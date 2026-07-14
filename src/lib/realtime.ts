@@ -91,6 +91,25 @@ function maybeReportPropagation(ev: RealtimeEvent): void {
   }
 }
 
+// T-30a2-ii — nudge-feed telemetry classifier. Mirrors
+// classifyPropagationMs/maybeReportPropagation above: a closed bounded enum
+// (mirrors the server's ALLOWED_NUDGE_SHOWN in server/routes/realtime.ts),
+// with an unrecognized kind classified to `null` so the caller never posts
+// an out-of-enum value.
+export function classifyNudgeShown(kind: string): "expiry" | "restock" | null {
+  return kind === "expiry" || kind === "restock" ? kind : null;
+}
+
+export function reportNudgeShown(kind: string): void {
+  try {
+    const bucket = classifyNudgeShown(kind);
+    if (!bucket) return;
+    void api.realtime.telemetry({ nudgeShown: bucket }).catch(() => {});
+  } catch {
+    // never throw from telemetry path
+  }
+}
+
 function getBroadcastChannel(): BroadcastChannel | null {
   if (typeof BroadcastChannel === "undefined") return null;
   if (!broadcastChannel) {

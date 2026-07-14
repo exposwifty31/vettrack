@@ -27,6 +27,8 @@ export const createItemSchema = z.object({
   unit: z.string().min(1).max(30).optional().nullable(),
   category: z.string().max(100).optional(),
   nfcTagId: z.string().max(200).optional().nullable(),
+  isBillable: z.boolean().optional(),
+  minimumDispenseToCapture: z.number().int().min(1).optional(),
   parLevel: z.number().int().min(0).optional().nullable(),
   reorderPoint: z.number().int().min(0).optional().nullable(),
 }).strict();
@@ -51,8 +53,10 @@ export const addPriceSchema = z.object({
   effectiveFrom: z.string().datetime({ offset: true }).optional(),
 }).strict();
 
-// GET /api/inventory-items — list active items for the clinic
-router.get("/", requireAuth, requireEffectiveRole("technician"), async (req, res) => {
+// GET /api/inventory-items — list active items for the clinic. NON-clinical
+// consumables catalog; any authenticated staff (student floor) may read it to
+// dispense/restock. Admin-only mutations stay requireAdmin below.
+router.get("/", requireAuth, requireEffectiveRole("student"), async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
   try {
     const clinicId = req.clinicId!;
@@ -96,7 +100,7 @@ router.get("/low-stock", requireAuth, requireAdmin, async (req, res) => {
 });
 
 // GET /api/inventory-items/:id/detail — aggregate facts, container distribution, 7-day usage
-router.get("/:id/detail", requireAuth, requireEffectiveRole("technician"), validateUuid("id"), async (req, res) => {
+router.get("/:id/detail", requireAuth, requireEffectiveRole("student"), validateUuid("id"), async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
   try {
     const clinicId = req.clinicId!;
@@ -187,6 +191,10 @@ router.post("/", requireAuth, requireAdmin, validateBody(createItemSchema), asyn
       unit: b.unit?.trim() || null,
       category: b.category?.trim() || null,
       nfcTagId: b.nfcTagId?.trim() || null,
+      ...(b.isBillable !== undefined ? { isBillable: b.isBillable } : {}),
+      ...(b.minimumDispenseToCapture !== undefined
+        ? { minimumDispenseToCapture: b.minimumDispenseToCapture }
+        : {}),
       parLevel: b.parLevel ?? null,
       reorderPoint: b.reorderPoint ?? null,
       isActive: true,
@@ -375,8 +383,9 @@ router.post("/:id/prices", requireAuth, requireAdmin, validateUuid("id"), valida
   }
 });
 
-// GET /api/inventory-items/:id/prices — list all prices for an item
-router.get("/:id/prices", requireAuth, requireEffectiveRole("technician"), validateUuid("id"), async (req, res) => {
+// GET /api/inventory-items/:id/prices — list all prices for an item (read-only;
+// student floor so a dispensing student sees pricing). Price mutations stay requireAdmin.
+router.get("/:id/prices", requireAuth, requireEffectiveRole("student"), validateUuid("id"), async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
   try {
     const clinicId = req.clinicId!;

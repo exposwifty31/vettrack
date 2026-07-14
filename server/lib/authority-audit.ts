@@ -53,6 +53,17 @@ const dispenseLegacyFallbackAuditLimiter = createLogLimiter({
   maxEntries: 500,
 });
 
+// Phase 10a T1 — Code Blue emergency break-glass grant audit. A break-glass
+// grant (clinical identity opening a Code Blue with no active shift) is a rare,
+// high-signal clinical event. A 60s per-(clinicId, userId, route) window
+// collapses repeated attempts within a single resuscitation while still
+// capturing distinct events; per-grant volume is covered by the metric counter.
+const codeBlueBreakGlassAuditLimiter = createLogLimiter({
+  dedupeWindowMs: 60_000,
+  sampleRate: 1,
+  maxEntries: 500,
+});
+
 function safeRoute(req: Request): string {
   // Strip query string: requests to the same endpoint with different query
   // values would otherwise hash to distinct rate-limit keys, bypassing the
@@ -202,5 +213,52 @@ export function emitDispenseLegacyFallbackAudit(args: {
     });
   } catch (err) {
     console.error("[authority-audit] legacy-fallback emission failed", err);
+  }
+}
+
+/**
+ * Phase 10a T1 — Code Blue emergency break-glass grant.
+ *
+ * Emitted when the POST /code-blue/sessions gate admits a clinical-non-student
+ * identity whose snapshot has effectiveClinicalRole=null and reason=EZSHIFT_NONE
+ * (no active shift) via the `allowPermanentClinicalRoleForEmergency` opt-in.
+ * Mirrors `emitDispenseLegacyFallbackAudit`: gated by `AUTHORITY_OBS_V1`,
+ * fire-and-forget, and rate-limited per (clinicId, userId, route).
+ */
+export function emitCodeBlueBreakGlassAudit(args: {
+  req: Request;
+  snapshot: AuthoritySnapshot;
+}): void {
+  if (!isAuthorityObsV1Enabled()) return;
+
+  const { req, snapshot } = args;
+  const clinicId = safeClinicId(req);
+  if (!clinicId) return;
+
+  const userId = safeUserId(req);
+  const route = safeRoute(req);
+  const key = `code_blue_break_glass:${clinicId}:${userId}:${route}`;
+  if (!codeBlueBreakGlassAuditLimiter.shouldLog(key)) return;
+
+  try {
+    logAudit({
+      clinicId,
+      actionType: "code_blue_break_glass_used",
+      performedBy: userId,
+      performedByEmail: safeUserEmail(req),
+      targetId: null,
+      targetType: "authority_decision",
+      metadata: {
+        route,
+        method: req.method,
+        requestId: safeRequestId(req),
+        snapshotReason: snapshot.reason,
+        snapshotSource: snapshot.source,
+        clinicalRole: snapshot.clinicalRole,
+      },
+      actorRole: snapshot.clinicalRole ?? null,
+    });
+  } catch (err) {
+    console.error("[authority-audit] code-blue break-glass emission failed", err);
   }
 }

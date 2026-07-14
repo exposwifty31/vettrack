@@ -6,6 +6,9 @@ import { Button } from "@/components/ui/button";
 import { type AccessDeniedReason, useAuth } from "@/hooks/use-auth";
 import { markNfcSignInToastShown, wasNfcSignInToastShownRecently } from "@/lib/nfc-equipment-toggle";
 import { t } from "@/lib/i18n";
+import { usePlatformTarget } from "@/app/platform";
+import { useExperience } from "@/hooks/use-experience";
+import { ManagementWebGate } from "@/app/platform/guards/ManagementWebGate";
 
 /**
  * Agent-friendly diagnostics shown only on prolonged load timeout in dev.
@@ -27,6 +30,11 @@ export function AuthGuard({ children }: { children: ReactNode }) {
   const [location, navigate] = useLocation();
   const search = useSearch();
   const { isLoaded, isSignedIn, status, accessDeniedReason, signOut, refreshAuth } = useAuth();
+  // T-31 (R-WEB-01): computed unconditionally (rules-of-hooks) even though the
+  // desktop/management.web check below only applies after every other guard
+  // clause has passed.
+  const platformTarget = usePlatformTarget();
+  const experience = useExperience();
 
   const accessDeniedReasonText: Record<Exclude<AccessDeniedReason, null>, string> = {
     MISSING_CLINIC_ID: t.auth.guard.reasons.missingClinicId,
@@ -157,6 +165,14 @@ export function AuthGuard({ children }: { children: ReactNode }) {
         </div>
       </div>
     );
+  }
+
+  // T-31 (R-WEB-01): the desktop web shell is a management console — gate it on
+  // management.web (admin + senior_technician + lead_technician + secondary-admin).
+  // Placed after every other AuthGuard clause so it never misfires against the
+  // loading / signed-out / pending / blocked / access-denied states above.
+  if (platformTarget === "desktop" && !experience.can("management.web")) {
+    return <ManagementWebGate />;
   }
 
   return <>{children}</>;

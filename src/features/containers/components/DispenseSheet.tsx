@@ -164,6 +164,12 @@ export function DispenseSheet({
     (result: ContainerDispenseSuccessPayload) => {
       idempotencyKeyRef.current = crypto.randomUUID();
       qc.invalidateQueries({ queryKey: ["/api/containers/detail", containerId] });
+      // Same container-item data is also cached under the restock-view key
+      // (inventory-page.tsx's container detail card — per-line qty/expected,
+      // "stocked" badge, and the overall fill %). Without this the parent
+      // page's stock indicator stays stale after a dispense decrements
+      // server-side stock (T17).
+      qc.invalidateQueries({ queryKey: ["/api/restock/container-items", containerId] });
       qc.invalidateQueries({ queryKey: ["/api/shift-handover"] });
       setSuccessData({
         takenBy: result.takenBy,
@@ -188,6 +194,7 @@ export function DispenseSheet({
       api.containers.completeEmergency(completedEventId!, data),
     onSuccess: (result) => {
       qc.invalidateQueries({ queryKey: ["/api/containers/detail", containerId] });
+      qc.invalidateQueries({ queryKey: ["/api/restock/container-items", containerId] });
       qc.invalidateQueries({ queryKey: ["/api/shift-handover"] });
       setSuccessData({
         takenBy: result.takenBy,
@@ -742,14 +749,16 @@ export function DispenseSheet({
           {/* Sticky bottom bar */}
           <div className="sticky bottom-0 bg-background pt-2 pb-2 space-y-2">
             <div className="flex items-center justify-between text-sm text-muted-foreground px-1">
-              <span>{totalSelected} {t.dispense.sheet.itemsSelected}</span>
+              <span>{t.dispense.sheet.itemsSelected(totalSelected)}</span>
               <ChevronRight className="w-4 h-4" />
             </div>
             <Button
               className="w-full min-h-[52px] text-lg font-bold rounded-xl"
               {...fieldProps({ disabled: totalSelected === 0 })}
               onClick={() => {
-                setSelectedAnimalId(undefined);
+                // Preserve a prop-provided patient (e.g. ER quick-scan pre-select)
+                // across the items→confirm step instead of clearing it.
+                setSelectedAnimalId(patientIdProp !== undefined ? patientIdProp : undefined);
                 setShowBypassOptions(false);
                 setBypassReason(null);
                 setIsEmergency(false);

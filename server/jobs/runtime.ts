@@ -2,7 +2,7 @@ import { Worker, type Job } from "bullmq";
 import type { Redis } from "ioredis";
 import { incrementMetric } from "../lib/metrics.js";
 import { createRedisConnection } from "../lib/redis.js";
-import { startWorkerHeartbeat } from "../lib/worker-heartbeat.js";
+import { startWorkerHeartbeat, stopWorkerHeartbeat } from "../lib/worker-heartbeat.js";
 import { processChargeAlertJob, bindChargeAlertProducerQueue } from "../workers/chargeAlertWorker.js";
 import {
   runExpiryCheckWorker,
@@ -302,6 +302,7 @@ export async function startJobRuntime(): Promise<void> {
 }
 
 export async function closeJobRuntime(): Promise<void> {
+  stopWorkerHeartbeat();
   for (const entry of runtimeWorkers) {
     try {
       await entry.worker.close();

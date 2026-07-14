@@ -1,10 +1,13 @@
 /**
- * Phase 2B.2 guard — dispense endpoints enforce clinical authority.
+ * T26 guard — dispense endpoints are NON-clinical consumables dispense.
  *
- * Static source assertions that the three dispense endpoints
- * (POST /draft, POST /:id/confirm, POST /emergency) each call
- * requireClinicalAuthority with the agreed Phase 2B.2 options,
- * and that the file does not regress to legacy or forbidden patterns.
+ * Inventory dispense was reclassified as non-clinical (drug formulary removed,
+ * migrations 142-143). The three dispense endpoints (POST /draft,
+ * POST /:id/confirm, POST /emergency) are no longer gated by clinical authority;
+ * the router admits any authenticated staff member down to the student floor via
+ * `requireEffectiveRole("student")`. Clinical authority (STUDENT_NEVER_ELEVATED /
+ * requireClinicalAuthority) is untouched and still gates Code Blue + genuinely-
+ * clinical routes — this file asserts dispense.ts has fully shed the clinical gate.
  */
 
 import { describe, expect, it } from "vitest";
@@ -20,60 +23,36 @@ const dispenseSource = fs.readFileSync(
   "utf8",
 );
 
-function blockAfter(marker: string): string {
-  const idx = dispenseSource.indexOf(marker);
-  expect(idx, `expected to find ${marker} in dispense.ts`).toBeGreaterThan(-1);
-  // Slice the next ~600 chars to cover the requireClinicalAuthority({...}) call.
-  return dispenseSource.slice(idx, idx + 600);
-}
-
-function expectAuthorityCallShape(block: string): void {
-  expect(block).toMatch(/requireClinicalAuthority\(\s*\{/);
-  expect(block).toMatch(
-    /allow:\s*\[\s*"vet"\s*,\s*"senior_technician"\s*,\s*"technician"\s*\]/,
-  );
-  expect(block).toMatch(
-    /allowPermanentClinicalRoleFallbackForLegacyDispense:\s*true/,
-  );
-  expect(block).not.toMatch(/allowSystemAdmin/);
-}
-
-describe("Phase 2B.2: dispense endpoints enforce requireClinicalAuthority", () => {
-  it("POST /draft is guarded by requireClinicalAuthority({...})", () => {
-    expectAuthorityCallShape(blockAfter('router.post(\n  "/draft"'));
-  });
-
-  it("POST /:id/confirm is guarded by requireClinicalAuthority({...})", () => {
-    expectAuthorityCallShape(blockAfter('router.post(\n  "/:id/confirm"'));
-  });
-
-  it("POST /emergency is guarded by requireClinicalAuthority({...})", () => {
-    expectAuthorityCallShape(blockAfter('router.post(\n  "/emergency"'));
-  });
-
-  it("requireClinicalAuthority( appears exactly 3 times in dispense.ts", () => {
+describe("T26: dispense endpoints are non-clinical (no clinical-authority gate)", () => {
+  it("dispense.ts contains no requireClinicalAuthority call (reclassified non-clinical)", () => {
     const matches = dispenseSource.match(/requireClinicalAuthority\(/g);
-    expect(matches).not.toBeNull();
-    expect(matches!.length).toBe(3);
+    expect(matches).toBeNull();
   });
 
-  it("allowPermanentClinicalRoleFallbackForLegacyDispense appears exactly 3 times", () => {
-    const matches = dispenseSource.match(
-      /allowPermanentClinicalRoleFallbackForLegacyDispense/g,
+  it("dispense.ts no longer references the legacy dispense fallback flag", () => {
+    expect(dispenseSource).not.toContain(
+      "allowPermanentClinicalRoleFallbackForLegacyDispense",
     );
-    expect(matches).not.toBeNull();
-    expect(matches!.length).toBe(3);
   });
 
-  it("no dispense endpoint passes allowSystemAdmin", () => {
-    expect(dispenseSource).not.toContain("allowSystemAdmin");
+  it("dispense.ts does not import the authority middleware module", () => {
+    expect(dispenseSource).not.toMatch(
+      /from\s+["'][^"']*middleware\/authority[^"']*["']/,
+    );
   });
 
-  it("requireClinicalUser remains at router level", () => {
+  it("router-level gate is requireEffectiveRole(\"student\") (admits all staff incl. students)", () => {
     expect(dispenseSource).toMatch(
-      /router\.use\s*\([^)]*requireAuth[^)]*requireClinicalUser[^)]*\)/,
+      /router\.use\s*\([^)]*requireAuth[^)]*requireEffectiveRole\(\s*["']student["']\s*\)[^)]*\)/,
     );
-    expect(dispenseSource).toContain("requireClinicalUser");
+  });
+
+  it("does not gate students out via requireClinicalUser", () => {
+    expect(dispenseSource).not.toContain("requireClinicalUser");
+  });
+
+  it("no endpoint passes allowSystemAdmin", () => {
+    expect(dispenseSource).not.toContain("allowSystemAdmin");
   });
 
   it("dispense.ts does not reference secondaryRole", () => {
@@ -88,10 +67,6 @@ describe("Phase 2B.2: dispense endpoints enforce requireClinicalAuthority", () =
 
   it("dispense.ts does not contain the literal resolveAuthority", () => {
     expect(dispenseSource).not.toContain("resolveAuthority");
-  });
-
-  it("dispense.ts does not contain requireEffectiveRole", () => {
-    expect(dispenseSource).not.toContain("requireEffectiveRole");
   });
 
   it("no TODO(Phase 2B) markers remain", () => {

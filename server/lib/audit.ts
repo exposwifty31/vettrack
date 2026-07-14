@@ -162,6 +162,12 @@ export type AuditActionType =
   | "authority_denied"
   | "authority_resolution_failed"
   | "dispense_legacy_role_fallback_used"
+  // Phase 10a T1 — Code Blue emergency break-glass grant. Emitted when the
+  // POST /code-blue/sessions gate admits a clinical-non-student identity with
+  // no active shift via the `allowPermanentClinicalRoleForEmergency` opt-in.
+  // Distinct from `dispense_legacy_role_fallback_used` so audit dashboards can
+  // separate emergency break-glass from legacy dispense compatibility grants.
+  | "code_blue_break_glass_used"
   | "authority_enforcement_denied_stale"
   | "authority_enforcement_denied_oprole"
   | "MANUAL_OWNERSHIP_CONFIRMATION"
@@ -235,11 +241,22 @@ export type AuditActionType =
   | "equipment_stale_checkout_nudged"
   // Sprint 1.7 — inference engine fires when no location signal exists for a device.
   | "equipment_location_unknown"
+  // T-24b — damage report flips conditionStatus to a non-"ok" value (R-EQ-F3).
+  | "equipment_damage_reported"
+  // T1.4 — docking-as-first-class: admin assigns/reassigns an item's Home
+  // Room + Category (ownership metadata). Distinct from custody events
+  // (checkout/return/dock-return) — ownership answers "where does this item
+  // belong", custody answers "where is it / who has it right now" — keeping
+  // them separate audit kinds lets reconciliation reporting attribute
+  // "who reassigned this item's home" without wading through custody noise.
+  | "equipment_home_assigned"
   // Phase 9 — Display device pairing
   | "display_pairing_code_issued"
   | "display_device_paired"
   | "display_device_renamed"
-  | "display_device_revoked";
+  | "display_device_revoked"
+  // Phase 10 (T21) — admin removes a dead (already-revoked) registry row.
+  | "display_device_deleted";
 
 export interface LogAuditParams {
   clinicId: string;

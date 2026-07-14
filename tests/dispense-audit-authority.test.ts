@@ -1,14 +1,15 @@
 /**
- * Phase 2.5 PR 4: dispense confirm passes authority observability fields
- * (source / reason / operationalRole) from req.authoritySnapshot into the
- * confirmDispense service, which lands them in the dispense_confirmed audit
- * row's metadata. This is the first explicit route-level consumer of the
- * check-in-derived snapshot fields beyond the existing effectiveClinicalRole
- * read used for actorRole.
+ * T26: dispense is reclassified as NON-clinical (inventory = consumables). The
+ * `/:id/confirm` route no longer runs `requireClinicalAuthority`, so
+ * `req.authoritySnapshot` is never populated in production. The confirm handler
+ * therefore records the actor's role directly (via resolveAuditActorRole) and
+ * carries NO clinical-authority source/reason/operationalRole — those three
+ * audit fields are always null.
  *
  * The route handler is unit-tested in isolation: the dispense service is
  * mocked so we observe the exact arguments the route passes through. No DB,
- * no Express boot, no real middleware.
+ * no Express boot, no real middleware. The first test injects a snapshot to
+ * prove the handler IGNORES it (the regression guard for the reclassification).
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
@@ -36,13 +37,15 @@ vi.mock("../server/services/dispense.service.js", () => ({
   },
 }));
 
+// T26: dispense is reclassified NON-clinical — the router uses
+// `requireEffectiveRole("student")` (role floor, admits all staff) instead of
+// `requireClinicalUser` + per-route `requireClinicalAuthority`. The mock stands
+// in for that middleware. The confirm handler no longer reads
+// `req.authoritySnapshot`, so the injected snapshot below is only used to prove
+// the handler ignores it.
 vi.mock("../server/middleware/auth.js", () => ({
   requireAuth: (_req: Request, _res: Response, next: () => void) => next(),
-  requireClinicalUser: (_req: Request, _res: Response, next: () => void) => next(),
-}));
-
-vi.mock("../server/middleware/authority.js", () => ({
-  requireClinicalAuthority:
+  requireEffectiveRole:
     () => (_req: Request, _res: Response, next: () => void) => next(),
 }));
 
@@ -137,17 +140,6 @@ const checkInSnapshot: AuthoritySnapshot = {
   resolvedAt: FIXED_RESOLVED_AT,
 };
 
-const shiftSnapshot: AuthoritySnapshot = {
-  systemRole: "User",
-  clinicalRole: "technician",
-  activeShiftRole: "technician",
-  operationalRole: null,
-  effectiveClinicalRole: "technician",
-  source: "shift",
-  reason: "EZSHIFT_ACTIVE",
-  resolvedAt: FIXED_RESOLVED_AT,
-};
-
 beforeEach(() => {
   confirmDispenseMock.mockReset();
   // Phase 5 PR 5.7 — `confirmDispense` returns `{ event, copDegraded }`.
@@ -161,34 +153,25 @@ beforeEach(() => {
   });
 });
 
-describe("POST /api/dispense/:id/confirm — authority observability fields", () => {
-  it("passes check-in snapshot source/reason/operationalRole to confirmDispense", async () => {
+describe("POST /api/dispense/:id/confirm — non-clinical dispense audit (T26)", () => {
+  it("ignores any injected authority snapshot — records NO clinical source/reason/operationalRole", async () => {
+    // Regression guard for the reclassification: even if a snapshot is present on
+    // req, the handler must NOT thread it into the audit (dispense is non-clinical).
+    // Before T26 this would have asserted "check_in"/"CHECKED_IN"/"doctor_icu"/"vet".
     const handler = await loadConfirmHandler();
     const { res } = makeRes();
     await handler(makeReq(checkInSnapshot), res);
 
     expect(confirmDispenseMock).toHaveBeenCalledTimes(1);
     const arg = confirmDispenseMock.mock.calls[0]![0] as Record<string, unknown>;
-    expect(arg.authoritySource).toBe("check_in");
-    expect(arg.authorityReason).toBe("CHECKED_IN");
-    expect(arg.authorityOperationalRole).toBe("doctor_icu");
-    expect(arg.actorRole).toBe("vet");
-  });
-
-  it("passes legacy shift snapshot source/reason and null operationalRole", async () => {
-    const handler = await loadConfirmHandler();
-    const { res } = makeRes();
-    await handler(makeReq(shiftSnapshot), res);
-
-    expect(confirmDispenseMock).toHaveBeenCalledTimes(1);
-    const arg = confirmDispenseMock.mock.calls[0]![0] as Record<string, unknown>;
-    expect(arg.authoritySource).toBe("shift");
-    expect(arg.authorityReason).toBe("EZSHIFT_ACTIVE");
+    expect(arg.authoritySource).toBeNull();
+    expect(arg.authorityReason).toBeNull();
     expect(arg.authorityOperationalRole).toBeNull();
+    // actorRole comes from resolveAuditActorRole (the user's role), not the snapshot.
     expect(arg.actorRole).toBe("technician");
   });
 
-  it("defaults all three authority fields to null when snapshot is missing", async () => {
+  it("passes null authority fields and the user's actorRole on the production path (no snapshot)", async () => {
     const handler = await loadConfirmHandler();
     const { res } = makeRes();
     await handler(makeReq(undefined), res);
@@ -198,5 +181,6 @@ describe("POST /api/dispense/:id/confirm — authority observability fields", ()
     expect(arg.authoritySource).toBeNull();
     expect(arg.authorityReason).toBeNull();
     expect(arg.authorityOperationalRole).toBeNull();
+    expect(arg.actorRole).toBe("technician");
   });
 });

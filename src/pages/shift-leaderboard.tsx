@@ -8,6 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorCard } from "@/components/ui/error-card";
 import { useAuth } from "@/hooks/use-auth";
+import { ManagementAccessDenied } from "@/desktop/management";
 import { t } from "@/lib/i18n";
 import { TrendingUp, AlertCircle, Users } from "lucide-react";
 import { Link } from "wouter";
@@ -41,10 +42,12 @@ export default function ShiftLeaderboardPage() {
     staleTime: 60_000,
   });
 
+  // T22: literal isAdmin — /api/analytics/shift-completion is requireAdmin-only
+  // server-side, narrower than the lead-inclusive management.web floor.
   if (!isAdmin) {
     return (
       <AppShell>
-        <div className="p-8 text-center text-muted-foreground">{t.shiftLeaderboard.adminRequired}</div>
+        <ManagementAccessDenied />
       </AppShell>
     );
   }

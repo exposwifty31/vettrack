@@ -1,16 +1,20 @@
 /**
- * Phase 2C PR 1 guard: requireClinicalAuthority consumers are tightly bounded.
+ * Guard: requireClinicalAuthority consumers are tightly bounded (server-side).
  *
- * After Phase 2B.2 wired the middleware into the three dispense endpoints,
- * Phase 2C PR 1 extended consumption to one additional endpoint:
- * POST /api/containers/:id/dispense in server/routes/containers.ts.
+ * History: the middleware was originally wired into the three dispense endpoints
+ * (dispense.ts) and POST /api/containers/:id/dispense (containers.ts). T26
+ * reclassified inventory dispense as NON-clinical consumables work, so BOTH of
+ * those inventory route files shed the clinical gate — they now use the
+ * student-floor role gate `requireEffectiveRole("student")`. The middleware is
+ * unchanged and STILL gates the Code Blue clinical surfaces in code-blue.ts.
  *
- * Phase 4 PR 4.2 extends consumption to POST /api/code-blue/sessions in
- * server/routes/code-blue.ts (initiator clinical gate per master plan §15).
- * Future Phase 4 PRs (4.3, 4.4a, 4.6) will add more endpoints in the same
- * route file. No other route file is permitted to import or call
- * requireClinicalAuthority. This test enforces that scope via grep-style
- * assertions on the working tree.
+ * The invariant this guard now protects:
+ *   - `requireClinicalAuthority` is imported/called by exactly ONE route file:
+ *     server/routes/code-blue.ts (plus its definition in middleware/authority.ts).
+ *   - dispense.ts and containers.ts contain NO clinical-authority call (T26 regression).
+ *   - No src/ file imports the middleware.
+ *   - The transitional legacy-dispense fallback flag is gone from server/routes/.
+ *   - The middleware never reads req.authUser.secondaryRole.
  */
 
 import { describe, expect, it } from "vitest";
@@ -25,69 +29,10 @@ const MIDDLEWARE_FILE = "server/middleware/authority.ts";
 const DISPENSE_ROUTE_FILE = "server/routes/dispense.ts";
 const CONTAINERS_ROUTE_FILE = "server/routes/containers.ts";
 const CODE_BLUE_ROUTE_FILE = "server/routes/code-blue.ts";
-const MIDDLEWARE_TEST_FILE = "tests/require-clinical-authority.test.ts";
-const GUARD_TEST_FILE = "tests/authority-middleware-zero-consumers.test.ts";
-const ENFORCEMENT_TEST_FILE = "tests/dispense-authority-enforcement.test.ts";
-const CONTAINERS_AUTHORITY_TEST_FILE =
-  "tests/containers-dispense-authority.test.ts";
-const OBSERVABILITY_TEST_FILE =
-  "tests/authority-middleware-observability.test.ts";
-const CODE_BLUE_PR_4_2_ROUTE_WIRING_TEST_FILE =
-  "tests/code-blue-pr-4-2-route-wiring.test.ts";
-const CODE_BLUE_PR_4_3_END_WIRING_TEST_FILE =
-  "tests/code-blue-pr-4-3-end-wiring.test.ts";
-const CODE_BLUE_PR_4_4A_LOGS_TEST_FILE =
-  "tests/code-blue-pr-4-4a-logs-clinical-gate.test.ts";
-const CODE_BLUE_PR_4_6_LEGACY_EVENTS_TEST_FILE =
-  "tests/code-blue-pr-4-6-legacy-events-gate.test.ts";
 
-// Files that may contain the literal `requireClinicalAuthority(` call-site
-// token. Test files appear here when they contain the literal substring
-// `requireClinicalAuthority(` (e.g., a `.not.toContain(...)` assertion);
-// test files that only mention the bare identifier `requireClinicalAuthority`
-// (no paren) are NOT included.
-const ALLOWED_FILES: ReadonlySet<string> = new Set([
-  MIDDLEWARE_FILE,
-  DISPENSE_ROUTE_FILE,
-  CONTAINERS_ROUTE_FILE,
-  CODE_BLUE_ROUTE_FILE,
-  MIDDLEWARE_TEST_FILE,
-  GUARD_TEST_FILE,
-  ENFORCEMENT_TEST_FILE,
-  CONTAINERS_AUTHORITY_TEST_FILE,
-  OBSERVABILITY_TEST_FILE,
-  CODE_BLUE_PR_4_3_END_WIRING_TEST_FILE,
-  // CODE_BLUE_PR_4_4A_LOGS_TEST_FILE: only mentions bare identifier (no
-  // paren), so the grep token `requireClinicalAuthority(` does not match it.
-  // Kept allowlisted for the legacy-fallback string check below.
-  CODE_BLUE_PR_4_6_LEGACY_EVENTS_TEST_FILE,
-]);
-
-// Files allowed to mention the transitional dispense-only flag. Code Blue
-// route source files intentionally do NOT use this flag (master plan forbids
-// it for Code Blue); they use `allowSystemAdmin: false` instead. The PR 4.2
-// route-wiring test mentions the string in a NEGATIVE assertion (asserting
-// the Code Blue route does NOT contain it) and is allowlisted for that.
-const ALLOWED_LEGACY_FALLBACK_FILES: ReadonlySet<string> = new Set([
-  MIDDLEWARE_FILE,
-  DISPENSE_ROUTE_FILE,
-  CONTAINERS_ROUTE_FILE,
-  MIDDLEWARE_TEST_FILE,
-  GUARD_TEST_FILE,
-  ENFORCEMENT_TEST_FILE,
-  CONTAINERS_AUTHORITY_TEST_FILE,
-  OBSERVABILITY_TEST_FILE,
-  CODE_BLUE_PR_4_2_ROUTE_WIRING_TEST_FILE,
-  CODE_BLUE_PR_4_3_END_WIRING_TEST_FILE,
-  CODE_BLUE_PR_4_4A_LOGS_TEST_FILE,
-  CODE_BLUE_PR_4_6_LEGACY_EVENTS_TEST_FILE,
-]);
-
-const ALLOWED_ROUTE_FILES: ReadonlySet<string> = new Set([
-  DISPENSE_ROUTE_FILE,
-  CONTAINERS_ROUTE_FILE,
-  CODE_BLUE_ROUTE_FILE,
-]);
+// After T26, the only route file that imports/uses requireClinicalAuthority is
+// code-blue.ts. dispense.ts and containers.ts are non-clinical consumables paths.
+const ALLOWED_ROUTE_FILES: ReadonlySet<string> = new Set([CODE_BLUE_ROUTE_FILE]);
 
 /**
  * Collect all regular files under `root` (recursively), filtering to those
@@ -183,8 +128,7 @@ function gitGrepLines(args: string): string[] {
 /**
  * Filter a list of "path:lineno:content" grep hits to drop matches that occur
  * inside a single-line `//` comment. This lets us assert "no real consumer in
- * server/routes/" without flagging legitimate forward-reference TODO comments
- * such as "TODO(Phase 2B): replace with requireClinicalAuthority(...)".
+ * server/routes/" without flagging legitimate forward-reference comments.
  */
 function withoutCommentMatches(lines: string[]): string[] {
   return lines.filter((line) => {
@@ -197,13 +141,13 @@ function withoutCommentMatches(lines: string[]): string[] {
   });
 }
 
-describe("Phase 2C PR 1: requireClinicalAuthority is consumed only by dispense.ts and containers.ts", () => {
+describe("requireClinicalAuthority is consumed only by code-blue.ts (T26)", () => {
   it("middleware file exists at the expected path", () => {
     const lines = gitGrepLines(`-l "Phase 2B" -- ${MIDDLEWARE_FILE}`);
     expect(lines.length).toBeGreaterThan(0);
   });
 
-  it("exactly the allowed route files import ../middleware/authority.js (dispense.ts, containers.ts, code-blue.ts)", () => {
+  it("exactly code-blue.ts imports ../middleware/authority.js under server/routes/", () => {
     const lines = gitGrepLines(
       `-lE "from .*middleware/authority" -- server/routes/`,
     );
@@ -218,83 +162,46 @@ describe("Phase 2C PR 1: requireClinicalAuthority is consumed only by dispense.t
     expect(lines, lines.join("\n")).toEqual([]);
   });
 
-  it("requireClinicalAuthority( call-site token appears as real code in exactly the allowed files", () => {
-    // Use -nE to get line-level hits so we can filter out comment-only
-    // references.
+  it("requireClinicalAuthority( call-site (non-comment) under server/ appears only in authority.ts and code-blue.ts", () => {
     const hits = withoutCommentMatches(
-      gitGrepLines(`-nE "requireClinicalAuthority\\(" -- server/ tests/`),
+      gitGrepLines(`-nE "requireClinicalAuthority\\(" -- server/`),
     );
     const files = new Set(hits.map((h) => h.split(":")[0]!));
-    expect(files).toEqual(ALLOWED_FILES);
+    expect(files).toEqual(new Set([MIDDLEWARE_FILE, CODE_BLUE_ROUTE_FILE]));
   });
 
-  it("requireClinicalAuthority( appears exactly 3 times in server/routes/dispense.ts", () => {
+  it("code-blue.ts still uses requireClinicalAuthority( (Code Blue clinical gate intact)", () => {
+    const hits = withoutCommentMatches(
+      gitGrepLines(`-nE "requireClinicalAuthority\\(" -- ${CODE_BLUE_ROUTE_FILE}`),
+    );
+    expect(hits.length).toBeGreaterThan(0);
+  });
+
+  it("dispense.ts contains NO requireClinicalAuthority( (reclassified non-clinical, T26)", () => {
     const hits = withoutCommentMatches(
       gitGrepLines(`-nE "requireClinicalAuthority\\(" -- ${DISPENSE_ROUTE_FILE}`),
     );
-    expect(hits.length).toBe(3);
+    expect(hits.length).toBe(0);
   });
 
-  it("requireClinicalAuthority( appears exactly 1 time in server/routes/containers.ts", () => {
+  it("containers.ts contains NO requireClinicalAuthority( (reclassified non-clinical, T26)", () => {
     const hits = withoutCommentMatches(
       gitGrepLines(
         `-nE "requireClinicalAuthority\\(" -- ${CONTAINERS_ROUTE_FILE}`,
       ),
     );
-    expect(hits.length).toBe(1);
+    expect(hits.length).toBe(0);
   });
 
-  it("no other route file under server/routes/ contains requireClinicalAuthority(", () => {
-    const hits = withoutCommentMatches(
-      gitGrepLines(`-nE "requireClinicalAuthority\\(" -- server/routes/`),
-    );
-    const files = new Set(hits.map((h) => h.split(":")[0]!));
-    expect(files).toEqual(ALLOWED_ROUTE_FILES);
-  });
-
-  it("no real (non-comment) requireClinicalAuthority( call-site under server/ except authority.ts, dispense.ts, containers.ts, and code-blue.ts", () => {
-    const hits = withoutCommentMatches(
-      gitGrepLines(`-nE "requireClinicalAuthority\\(" -- server/`),
-    );
-    const files = new Set(hits.map((h) => h.split(":")[0]!));
-    expect(files).toEqual(
-      new Set([
-        MIDDLEWARE_FILE,
-        DISPENSE_ROUTE_FILE,
-        CONTAINERS_ROUTE_FILE,
-        CODE_BLUE_ROUTE_FILE,
-      ]),
-    );
-  });
-
-  it("allowPermanentClinicalRoleFallbackForLegacyDispense appears only in dispense-scoped files (Code Blue routes excluded)", () => {
+  it("the legacy dispense fallback flag no longer appears under server/routes/", () => {
     const lines = gitGrepLines(
-      `-lE "allowPermanentClinicalRoleFallbackForLegacyDispense" -- server/ tests/`,
+      `-lE "allowPermanentClinicalRoleFallbackForLegacyDispense" -- server/routes/`,
     );
-    const files = new Set(lines);
-    expect(files).toEqual(ALLOWED_LEGACY_FALLBACK_FILES);
-  });
-
-  it("allowPermanentClinicalRoleFallbackForLegacyDispense appears exactly 3 times in server/routes/dispense.ts", () => {
-    const hits = gitGrepLines(
-      `-nE "allowPermanentClinicalRoleFallbackForLegacyDispense" -- ${DISPENSE_ROUTE_FILE}`,
-    );
-    expect(hits.length).toBe(3);
-  });
-
-  it("allowPermanentClinicalRoleFallbackForLegacyDispense appears exactly 1 time in server/routes/containers.ts", () => {
-    const hits = gitGrepLines(
-      `-nE "allowPermanentClinicalRoleFallbackForLegacyDispense" -- ${CONTAINERS_ROUTE_FILE}`,
-    );
-    expect(hits.length).toBe(1);
+    expect(lines, lines.join("\n")).toEqual([]);
   });
 
   it("server/middleware/authority.ts never reads req.authUser.secondaryRole", () => {
     // Phase 2B contract: middleware MUST NOT read req.authUser.secondaryRole.
-    // The literal token "secondaryRole" is permitted in the mandated header
-    // comment and in the `secondaryRole: null` payload passed to
-    // resolveAuthority (where it explicitly nulls the field for redundancy).
-    // What is forbidden is any access expression off req.authUser.
     const lines = gitGrepLines(
       `-nE "authUser\\.secondaryRole" -- ${MIDDLEWARE_FILE}`,
     );

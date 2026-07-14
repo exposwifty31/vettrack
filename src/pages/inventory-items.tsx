@@ -11,6 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogFooter,
@@ -128,6 +129,8 @@ export default function InventoryItemsPage() {
         label: form.label.trim(),
         category: form.category || undefined,
         nfcTagId: form.nfcTagId.trim() || undefined,
+        isBillable: form.isBillable,
+        minimumDispenseToCapture: form.minimumDispenseToCapture,
         parLevel: parseOptCount(form.parLevel),
         reorderPoint: parseOptCount(form.reorderPoint),
       }),
@@ -294,11 +297,13 @@ export default function InventoryItemsPage() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>{editTarget ? p.editItem : p.newItem}</DialogTitle>
+            <DialogDescription className="sr-only">{p.createDialogDescription}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-1">
-              <Label>{p.fieldCode}</Label>
+              <Label htmlFor="itemCode">{p.fieldCode}</Label>
               <Input
+                id="itemCode"
                 value={form.code}
                 onChange={(e) => setForm((f) => ({ ...f, code: e.target.value }))}
                 disabled={!!editTarget}
@@ -306,8 +311,9 @@ export default function InventoryItemsPage() {
               />
             </div>
             <div className="space-y-1">
-              <Label>{p.fieldLabel}</Label>
+              <Label htmlFor="itemLabel">{p.fieldLabel}</Label>
               <Input
+                id="itemLabel"
                 value={form.label}
                 onChange={(e) => setForm((f) => ({ ...f, label: e.target.value }))}
                 placeholder={p.fieldLabelPlaceholder}

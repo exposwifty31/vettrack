@@ -1,12 +1,19 @@
 /**
- * Phase 1 PR 1.4 — dispense endpoint authentication tests
+ * Dispense endpoint authentication tests.
+ *
+ * T26 reclassified inventory dispense as NON-clinical consumables work (drug
+ * formulary removed, migrations 142-143): the router now gates on
+ * `requireEffectiveRole("student")` (the role floor — admits ALL authenticated
+ * staff, including a supervised student) instead of the old
+ * `requireClinicalUser` + per-endpoint `requireClinicalAuthority`. Clinical
+ * authority (STUDENT_NEVER_ELEVATED / requireClinicalAuthority) is untouched and
+ * still gates Code Blue + genuinely-clinical routes.
  *
  * Covers:
  * - Unauthenticated requests to the three mutation endpoints return 401
  * - Authenticated requests pass through requireAuth to the handler
- * - No router-level requireEffectiveRole applied
+ * - The router-level gate is requireEffectiveRole("student"), not clinical authority
  * - Middleware order: requireAuth executes before handler
- * - Non-targeted routes are not affected by this change
  */
 
 import { describe, it, expect, beforeAll } from "vitest";
@@ -25,17 +32,19 @@ const dispenseSource = fs.readFileSync(
 
 // ── Static structure assertions ───────────────────────────────────────────────
 
-describe("dispense.ts static structure (Phase 1 PR 1.4)", () => {
+describe("dispense.ts static structure (T26: non-clinical consumables dispense)", () => {
   it("imports requireAuth", () => {
     expect(dispenseSource).toMatch(/import\s*\{[^}]*requireAuth[^}]*\}\s*from/);
   });
 
-  it("does NOT import requireEffectiveRole", () => {
-    expect(dispenseSource).not.toContain("requireEffectiveRole");
+  it("imports requireEffectiveRole (the student-floor role gate)", () => {
+    expect(dispenseSource).toMatch(/import\s*\{[^}]*requireEffectiveRole[^}]*\}\s*from/);
   });
 
-  it("does NOT apply router.use() with requireEffectiveRole", () => {
-    expect(dispenseSource).not.toMatch(/router\.use\s*\([^)]*requireEffectiveRole/);
+  it("applies requireEffectiveRole(\"student\") at router level via router.use()", () => {
+    expect(dispenseSource).toMatch(
+      /router\.use\s*\([^)]*requireAuth[^)]*requireEffectiveRole\(\s*["']student["']\s*\)[^)]*\)/,
+    );
   });
 
   it("requireAuth is applied at router level via router.use()", () => {
@@ -49,11 +58,14 @@ describe("dispense.ts static structure (Phase 1 PR 1.4)", () => {
     expect(matches).toBeNull();
   });
 
-  it("all three endpoints include the Phase 2B authority middleware", () => {
+  it("no dispense endpoint is gated by clinical authority (reclassified non-clinical)", () => {
     const needle = ["require", "Clinical", "Authority"].join("") + "\\(";
     const matches = dispenseSource.match(new RegExp(needle, "g"));
-    expect(matches).not.toBeNull();
-    expect(matches!.length).toBe(3);
+    expect(matches).toBeNull();
+  });
+
+  it("does not gate students out via requireClinicalUser (students may dispense consumables)", () => {
+    expect(dispenseSource).not.toContain("requireClinicalUser");
   });
 });
 
@@ -221,10 +233,14 @@ describe("requireAuth middleware behaviour (dispense context)", () => {
   });
 });
 
-// ── Regression: premature role middleware absent ──────────────────────────────
+// ── Regression: dispense is non-clinical (T26) ────────────────────────────────
 
-describe("regression: requireEffectiveRole absent from dispense.ts", () => {
-  it("requireEffectiveRole is not imported or used", () => {
-    expect(dispenseSource).not.toContain("requireEffectiveRole");
+describe("regression: dispense reclassified non-clinical (T26)", () => {
+  it("requireEffectiveRole(\"student\") is the router-level gate", () => {
+    expect(dispenseSource).toContain('requireEffectiveRole("student")');
+  });
+
+  it("requireClinicalAuthority is NOT imported or used in dispense.ts", () => {
+    expect(dispenseSource).not.toContain("requireClinicalAuthority");
   });
 });

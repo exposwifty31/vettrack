@@ -29,6 +29,7 @@ vi.mock("../server/db.js", () => ({
 import {
   emitAuthorityDeniedAudit,
   emitAuthorityResolutionFailedAudit,
+  emitCodeBlueBreakGlassAudit,
   emitDispenseLegacyFallbackAudit,
 } from "../server/lib/authority-audit.js";
 
@@ -109,6 +110,14 @@ describe("authority-audit — flag-off no-op", () => {
     expect(logAuditMock).not.toHaveBeenCalled();
   });
 
+  it("emitCodeBlueBreakGlassAudit does nothing when flag is unset", () => {
+    emitCodeBlueBreakGlassAudit({
+      req: makeReq(),
+      snapshot: makeSnapshot(),
+    });
+    expect(logAuditMock).not.toHaveBeenCalled();
+  });
+
   it("emitAuthorityDeniedAudit does nothing when flag is 'false'", () => {
     process.env.AUTHORITY_OBS_V1 = "false";
     emitAuthorityDeniedAudit({
@@ -182,6 +191,32 @@ describe("authority-audit — flag-on emission", () => {
       actorRole?: string | null;
     };
     expect(call.actionType).toBe("dispense_legacy_role_fallback_used");
+    expect(call.metadata.clinicalRole).toBe("vet");
+    expect(call.actorRole).toBe("vet");
+  });
+
+  it("emitCodeBlueBreakGlassAudit writes a code_blue_break_glass_used audit row", () => {
+    emitCodeBlueBreakGlassAudit({
+      req: makeReq({
+        clinicId: "c-bg-1",
+        originalUrl: "/api/code-blue/sessions",
+        path: "/api/code-blue/sessions",
+      } as Partial<Request>),
+      snapshot: makeSnapshot({ clinicalRole: "vet" }),
+    });
+    expect(logAuditMock).toHaveBeenCalledTimes(1);
+    const call = logAuditMock.mock.calls[0]![0] as {
+      actionType: string;
+      clinicId: string;
+      targetType: string | null;
+      metadata: Record<string, unknown>;
+      actorRole?: string | null;
+    };
+    expect(call.actionType).toBe("code_blue_break_glass_used");
+    expect(call.clinicId).toBe("c-bg-1");
+    expect(call.targetType).toBe("authority_decision");
+    expect(call.metadata.route).toBe("/api/code-blue/sessions");
+    expect(call.metadata.snapshotReason).toBe("EZSHIFT_NONE");
     expect(call.metadata.clinicalRole).toBe("vet");
     expect(call.actorRole).toBe("vet");
   });

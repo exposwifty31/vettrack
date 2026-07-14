@@ -24,9 +24,11 @@ const EXPECTED_MOUNT_PATHS = [
   "/api/health",
   "/api/health/ready",
   "/health",
+  "/api/equipment", // equipmentLocateRoutes (T-22a)
   "/api/equipment", // equipmentRoutes
   "/api/equipment", // equipmentCopilotRoutes
   "/api/equipment", // equipmentInferenceRoutes
+  "/api/equipment", // equipmentDamageRoutes (T-24b)
   "/api",
   "/api",
   "/api/rooms",
@@ -37,6 +39,7 @@ const EXPECTED_MOUNT_PATHS = [
   "/api/home",
   "/api/display",
   "/api/equipment-board",
+  "/api/docking", // dockingRoutes (T1.4)
   "/api/code-blue",
   "/api/crash-cart",
   "/api/admin",
@@ -57,6 +60,7 @@ const EXPECTED_MOUNT_PATHS = [
   "/api/containers",
   "/api/restock",
   "/api/inventory-items",
+  "/api/nudges", // nudgesRoutes (T-30a1-i)
   "/api/procurement",
   "/api/clinical",
   "/api/dispense",

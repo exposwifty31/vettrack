@@ -8,6 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogFooter,
@@ -72,6 +73,18 @@ export function FoldersSection() {
   });
 
   const manualFolders = folders?.filter((f) => f.type !== "smart") || [];
+
+  const isSaving = createMut.isPending || updateMut.isPending;
+
+  const submit = () => {
+    const trimmedName = folderName.trim();
+    if (!trimmedName || isSaving) return;
+    if (editFolder) {
+      updateMut.mutate({ id: editFolder.id, name: trimmedName });
+    } else {
+      createMut.mutate(trimmedName);
+    }
+  };
 
   return (
     <Card className="bg-card border-border/60 shadow-sm">
@@ -177,6 +190,7 @@ export function FoldersSection() {
             <DialogTitle>
               {editFolder ? t.adminPage.editFolder : t.adminPage.createFolder}
             </DialogTitle>
+            <DialogDescription className="sr-only">{t.adminPage.folderDialogDescription}</DialogDescription>
           </DialogHeader>
           <div className="flex flex-col gap-3 py-1">
             <Label htmlFor="folderName">{t.adminPage.folderName}</Label>
@@ -187,9 +201,7 @@ export function FoldersSection() {
               onChange={(e) => setFolderName(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === "Enter") {
-                  editFolder
-                    ? updateMut.mutate({ id: editFolder.id, name: folderName })
-                    : createMut.mutate(folderName);
+                  submit();
                 }
               }}
               data-testid="input-folder-name"
@@ -197,19 +209,11 @@ export function FoldersSection() {
           </div>
           <DialogFooter>
             <Button
-              onClick={() => {
-                editFolder
-                  ? updateMut.mutate({ id: editFolder.id, name: folderName })
-                  : createMut.mutate(folderName);
-              }}
-              disabled={
-                !folderName.trim() || createMut.isPending || updateMut.isPending
-              }
+              onClick={submit}
+              disabled={!folderName.trim() || isSaving}
               data-testid="btn-save-folder"
             >
-              {(createMut.isPending || updateMut.isPending) && (
-                <Loader2 className="w-4 h-4 me-2 animate-spin" />
-              )}
+              {isSaving && <Loader2 className="w-4 h-4 me-2 animate-spin" />}
               {editFolder ? t.adminPage.update : t.adminPage.create}
             </Button>
           </DialogFooter>

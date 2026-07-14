@@ -2,7 +2,7 @@ import { Helmet } from "react-helmet-async";
 import { useLocation } from "wouter";
 import { AppShell } from "@/components/layout/AppShell";
 import { t } from "@/lib/i18n";
-import { getBundledAppVersion } from "@/lib/app-version";
+import { getBundledAppVersion, getBuildTagSuffix } from "@/lib/app-version";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -65,9 +65,16 @@ export default function WhatsNewPage() {
     dismissWhatsNew(getBundledAppVersion());
     navigate("/home");
   };
+  // Sourced from the canonical build-time constants (never a hand-maintained
+  // literal) so this page can't drift stale relative to the deployed bundle —
+  // 2026-07-10 QA audit: "What's-new page is stale: v1.1.0 'Build 23' while
+  // the deployed app is 1.1.2".
+  const bundledVersion = getBundledAppVersion();
+  const buildTagSuffix = getBuildTagSuffix();
+
   const releases: ReleaseEntry[] = [
     {
-      version: wn.currentVersion,
+      version: bundledVersion,
       date: wn.currentDate,
       highlights: [
         {
@@ -125,7 +132,7 @@ export default function WhatsNewPage() {
                 v{release.version}
               </Badge>
               <span className="text-xs text-muted-foreground">
-                {release.date} · {wn.buildLabel}
+                {release.date} · {wn.buildLabel(buildTagSuffix)}
               </span>
             </div>
 

@@ -146,11 +146,39 @@ describe("route guards — display token reaches ONLY snapshot/heartbeat/stream"
     expect(displaySrc).toMatch(/router\.get\(\s*["']\/devices["']\s*,\s*requireAuth\s*,\s*requireAdmin/);
     expect(displaySrc).toMatch(/router\.patch\(\s*["']\/devices\/:id["']\s*,\s*requireAuth\s*,\s*requireAdmin/);
     expect(displaySrc).toMatch(/router\.post\(\s*["']\/devices\/:id\/revoke["']\s*,\s*requireAuth\s*,\s*requireAdmin/);
+    expect(displaySrc).toMatch(/router\.delete\(\s*["']\/devices\/:id["']\s*,\s*requireAuth\s*,\s*requireAdmin/);
   });
 
   it("never selects or returns the token hash from /devices", () => {
     // The devices list/rename projections must not include tokenHash.
     const devicesBlock = displaySrc.slice(displaySrc.indexOf("createDevicesListHandler"));
     expect(devicesBlock).not.toMatch(/tokenHash:\s*displayDevices\.tokenHash/);
+  });
+});
+
+describe("DELETE /devices/:id — dead-row removal (T21 item 3)", () => {
+  const displaySrc = readFileSync("./server/routes/display.ts", "utf-8");
+  const deleteBlock = displaySrc.slice(
+    displaySrc.indexOf("function createDeviceDeleteHandler"),
+    displaySrc.indexOf("/** Factory"),
+  );
+
+  it("scopes the delete by clinicId (multi-tenancy invariant)", () => {
+    expect(deleteBlock).toMatch(/eq\(displayDevices\.clinicId,\s*clinicId\)/);
+  });
+
+  it("only deletes an already-revoked (dead) row, never an active one", () => {
+    expect(deleteBlock).toMatch(/isNotNull\(displayDevices\.revokedAt\)/);
+  });
+
+  it("hard-deletes the device row but only logs an audit entry — never deletes from vt_audit_logs", () => {
+    expect(deleteBlock).toMatch(/db\s*\.delete\(displayDevices\)/);
+    expect(deleteBlock).toMatch(/actionType:\s*["']display_device_deleted["']/);
+    expect(deleteBlock).not.toMatch(/\.delete\(auditLogs\)/);
+  });
+
+  it("404s (not a silent success) when the device is missing, still active, or in another clinic", () => {
+    expect(deleteBlock).toMatch(/if \(!deleted\)/);
+    expect(deleteBlock).toMatch(/status\(404\)/);
   });
 });

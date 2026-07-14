@@ -15,7 +15,6 @@ import {
   users,
 } from "../db.js";
 import { requireAuth, requireEffectiveRole } from "../middleware/auth.js";
-import { requireClinicalAuthority } from "../middleware/authority.js";
 import { validateBody, validateUuid } from "../middleware/validate.js";
 import { seedDefaultContainersIfEmpty } from "../lib/ensure-clinic-phase2-defaults.js";
 import { restockContainerInTx } from "../services/inventory.service.js";
@@ -105,7 +104,9 @@ router.post("/bootstrap-defaults", requireAuth, requireEffectiveRole("technician
   }
 });
 
-router.get("/", requireAuth, requireEffectiveRole("technician"), async (req, res) => {
+// Inventory container list is NON-clinical consumables data — any authenticated
+// staff member (student floor) may read it to dispense/restock. Not a clinical gate.
+router.get("/", requireAuth, requireEffectiveRole("student"), async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
   try {
     const clinicId = req.clinicId!;
@@ -301,13 +302,15 @@ const completeEmergencySchema = z.object({
 });
 
 // POST /api/containers/:id/dispense
+// Consumables dispense is NON-clinical (drug formulary removed, migrations
+// 142-143): any authenticated staff member — including a supervised student —
+// may dispense. `requireEffectiveRole("student")` is the role floor. This is NOT
+// a clinical-authority gate; STUDENT_NEVER_ELEVATED and the clinical-authority
+// middleware stay in force for Code Blue + genuinely-clinical routes.
 router.post(
   "/:id/dispense",
   requireAuth,
-  requireClinicalAuthority({
-    allow: ["vet", "senior_technician", "technician"],
-    allowPermanentClinicalRoleFallbackForLegacyDispense: true,
-  }),
+  requireEffectiveRole("student"),
   validateUuid("id"),
   dispenseIdempotencyMiddleware,
   validateBody(dispenseSchema),
@@ -935,10 +938,13 @@ router.post(
 );
 
 // PATCH /api/containers/emergency/:eventId/complete
+// Completes a consumables emergency dispense initiated via POST /:id/dispense —
+// the second half of the same non-clinical dispense flow, so it shares the
+// student floor (a student who taps emergency must be able to complete it).
 router.patch(
   "/emergency/:eventId/complete",
   requireAuth,
-  requireEffectiveRole("technician"),
+  requireEffectiveRole("student"),
   validateBody(completeEmergencySchema),
   async (req, res) => {
     const requestId = resolveRequestId(res, req.headers["x-request-id"]);

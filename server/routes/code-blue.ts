@@ -282,6 +282,11 @@ router.post(
     // Phase 4 master plan §5 invariant 8: system-admin identity is not an
     // emergency clinical actor. Admins without a clinical check-in are denied.
     allowSystemAdmin: false,
+    // Phase 10a T1 — break-glass: a clinical identity (vet / senior_technician
+    // / technician, never a student) may OPEN a Code Blue with no active shift.
+    // A cardiac arrest must not wait on roster scheduling. Scoped to this gate
+    // only; all other Code Blue flows (logs/end/presence) stay roster-gated.
+    allowPermanentClinicalRoleForEmergency: true,
   }),
   codeBlueInitiatorGatePassedMarker,
   validateBody(startSessionSchema),

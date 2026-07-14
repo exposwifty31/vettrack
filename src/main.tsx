@@ -1,5 +1,5 @@
 import { createRoot, type Root } from "react-dom/client";
-import { ClerkProvider, type ClerkProp } from "@clerk/clerk-react";
+import { type ClerkProp } from "@clerk/clerk-react";
 import { useEffect, useState } from "react";
 import App from "./App";
 import "./index.css";
@@ -29,6 +29,7 @@ import {
 } from "@/lib/safe-browser";
 import { isCapacitorNative } from "@/lib/capacitor-runtime";
 import { clerkProviderPropsForRuntime } from "@/lib/clerk-capacitor-config";
+import { ClerkLocaleBridge } from "@/components/clerk-locale-bridge";
 import { NativeClerkGate } from "@/components/native-clerk-gate";
 import { primeNfcSupportCache } from "@/lib/nfc-platform";
 import { usePlatformTarget } from "@/app/platform";
@@ -259,9 +260,9 @@ if (!rootEl) {
     root.render(
       <HelmetProvider>
         {clerkRuntime ? (
-          <ClerkProvider {...clerkRuntime} Clerk={nativeClerk}>
+          <ClerkLocaleBridge runtimeProps={clerkRuntime} nativeClerk={nativeClerk}>
             <NativeClerkGate>{appShell}</NativeClerkGate>
-          </ClerkProvider>
+          </ClerkLocaleBridge>
         ) : (
           appShell
         )}

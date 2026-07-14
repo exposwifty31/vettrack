@@ -147,6 +147,7 @@ const translations = {
       moveError: d.equipmentList.toast.moveError,
       exportError: d.equipmentList.toast.exportError,
       checkoutError: d.equipmentList.toast.checkoutError,
+      checkoutFailed: (msg: string) => msg || d.equipmentList.toast.checkoutError,
       returnError: d.equipmentList.toast.returnError,
       returnSuccess: (name: string) => tr(d.equipmentList.toast.returnSuccess, { name }),
     },
@@ -252,8 +253,17 @@ const translations = {
     describeIssue: d.equipmentDetail.describeIssue,
     addObservations: d.equipmentDetail.addObservations,
     checkedOutBy: (email: string) => tr(d.equipmentDetail.checkedOutBy, { email }),
+    since: d.equipmentDetail.since,
     updateStatusTitle: d.equipmentDetail.updateStatusTitle,
     statusLabel: d.equipmentDetail.statusLabel,
+    actionInUse: d.equipmentDetail.actionInUse,
+    actionMove: d.equipmentDetail.actionMove,
+    actionIssue: d.equipmentDetail.actionIssue,
+    actionReturn: d.equipmentDetail.actionReturn,
+    scanSheetReportOrUpdateStatus: d.equipmentDetail.scanSheetReportOrUpdateStatus,
+    scanSheetScanAnother: d.equipmentDetail.scanSheetScanAnother,
+    scanSheetStayHere: d.equipmentDetail.scanSheetStayHere,
+    activityRoomVerified: (room: string) => tr(d.equipmentDetail.activityRoomVerified, { room }),
     reportIssueTitle: d.equipmentDetail.reportIssueTitle,
     localStatePendingSync: d.equipmentDetail.localStatePendingSync,
     localStateConflict: d.equipmentDetail.localStateConflict,
@@ -327,6 +337,10 @@ const translations = {
       issueReported: d.equipmentDetail.toast.issueReported,
       issueWhatsAppOffline: d.equipmentDetail.toast.issueWhatsAppOffline,
       reportFailed: (msg: string) => msg || d.equipmentDetail.toast.reportFailedDefault,
+      damageReported: d.equipmentDetail.toast.damageReported,
+      damageReportUndo: d.equipmentDetail.toast.damageReportUndo,
+      damageReportFailed: d.equipmentDetail.toast.damageReportFailed,
+      damageReportOffline: d.equipmentDetail.toast.damageReportOffline,
     },
     locationCard: {
       title: d.equipmentDetail.locationCard.title,
@@ -443,7 +457,10 @@ const translations = {
   dispense: {
     errors: d.dispense.errors,
     bypass: d.dispense.bypass,
-    sheet: d.dispense.sheet,
+    sheet: {
+      ...d.dispense.sheet,
+      itemsSelected: (count: number) => tr(d.dispense.sheet.itemsSelected, { count }),
+    },
     errorMessage: (code: string) => {
       const map = d.dispense.errors as Record<string, string>;
       return map[code] ?? map.fallback;
@@ -638,6 +655,9 @@ const translations = {
     minutesAgo: (minutes: number) => tr(d.alertsPage.minutesAgo, { minutes }),
     hoursAgo: (hours: number) => tr(d.alertsPage.hoursAgo, { hours }),
     daysAgo: (days: number) => tr(d.alertsPage.daysAgo, { days }),
+    minutesDuration: (minutes: number) => tr(d.alertsPage.minutesDuration, { minutes }),
+    hoursDuration: (hours: number) => tr(d.alertsPage.hoursDuration, { hours }),
+    daysDuration: (days: number) => tr(d.alertsPage.daysDuration, { days }),
     activeCount: (count: number) => tr(d.alertsPage.activeCount, { count }),
     openSummary: (total: number, urgent: number) =>
       tr(d.alertsPage.openSummary, { total, urgent }),
@@ -723,9 +743,14 @@ const translations = {
     ...d.roomsListPage,
     subtitle: (count: number) => tr(d.roomsListPage.subtitle, { count }),
     healthRingTitle: (pct: number) => tr(d.roomsListPage.healthRingTitle, { pct }),
+    cardItemCount: (count: number) => tr(d.roomsListPage.cardItemCount, { count }),
   },
 
-  managementDashboardPage: d.managementDashboardPage,
+  managementDashboardPage: {
+    ...d.managementDashboardPage,
+    usersUnit: (count: number) => tr(d.managementDashboardPage.usersUnit, { count }),
+    itemsUnit: (count: number) => tr(d.managementDashboardPage.itemsUnit, { count }),
+  },
 
   pwa: d.pwa,
 
@@ -751,6 +776,9 @@ const translations = {
       tr(d.adminPage.logClientPage, { current, total }),
     signedUp: (date: string) => tr(d.adminPage.signedUp, { date }),
     joined: (date: string) => tr(d.adminPage.joined, { date }),
+    requestedRoleHint: (role: string) => tr(d.adminPage.requestedRoleHint, { role }),
+    vetLicenseHint: (number: string) => tr(d.adminPage.vetLicenseHint, { number }),
+    approveAsRole: (role: string) => tr(d.adminPage.approveAsRole, { role }),
     rejectUserTitle: (name: string) => tr(d.adminPage.rejectUserTitle, { name }),
     deleteUserTitle: (name: string) => tr(d.adminPage.deleteUserTitle, { name }),
     deleteFolderTitle: (name: string) => tr(d.adminPage.deleteFolderTitle, { name }),
@@ -1057,6 +1085,8 @@ const translations = {
 
   webOnlyGuard: d.webOnlyGuard,
 
+  managementWebGate: d.managementWebGate,
+
   legalFooter: d.legalFooter,
 
   legalPage: d.legalPage,
@@ -1067,7 +1097,10 @@ const translations = {
 
   supportPage: d.supportPage,
 
-  whatsNew: d.whatsNew,
+  whatsNew: {
+    ...d.whatsNew,
+    buildLabel: (tag: string) => tr(d.whatsNew.buildLabel, { tag }),
+  },
 
   authPage: d.authPage,
 
@@ -1077,11 +1110,41 @@ const translations = {
 
   adminDocks: d.adminDocks,
 
+  adminHomeAssignment: d.adminHomeAssignment,
+
   adminAssetTypesPage: d.adminAssetTypesPage,
 
   conditionChecklist: d.conditionChecklist,
 
   crashCartAdmin: d.crashCartAdmin,
+
+  locateSearch: {
+    openButtonLabel: d.locateSearch.openButtonLabel,
+    label: d.locateSearch.label,
+    placeholder: d.locateSearch.placeholder,
+    title: d.locateSearch.title,
+    emptyPrompt: d.locateSearch.emptyPrompt,
+    noResults: d.locateSearch.noResults,
+    searching: d.locateSearch.searching,
+    resultsCount: (count: number) => tr(d.locateSearch.resultsCount, { count }),
+  },
+
+  homeNudges: d.homeNudges,
+
+  returnPlugDialog: {
+    ...d.returnPlugDialog,
+    description: (name?: string | null) =>
+      name
+        ? tr(d.returnPlugDialog.descriptionWithName, { name })
+        : d.returnPlugDialog.descriptionNoName,
+    plugAlertWarning: (minutes: number) =>
+      tr(
+        minutes === 1
+          ? d.returnPlugDialog.plugAlertWarningOne
+          : d.returnPlugDialog.plugAlertWarningOther,
+        { minutes },
+      ),
+  },
 
 } as const;
 

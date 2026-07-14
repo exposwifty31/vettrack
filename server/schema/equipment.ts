@@ -53,10 +53,15 @@ export const docks = vtTable(
     name: text("name").notNull(),
     description: text("description"),
     roomId: text("room_id").references(() => rooms.id, { onDelete: "set null" }),
+    assetTypeId: text("asset_type_id").references(() => assetTypes.id, { onDelete: "set null" }),
+    capacity: integer("capacity"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (t) => ({
     clinicNameUnique: uniqueIndex("vt_docks_clinic_name_unique").on(t.clinicId, t.name),
+    clinicRoomAssetTypeUnique: uniqueIndex("vt_docks_clinic_room_assettype_uq")
+      .on(t.clinicId, t.roomId, t.assetTypeId)
+      .where(sql`${t.assetTypeId} IS NOT NULL`),
   }),
 );
 export type Dock = typeof docks.$inferSelect;
@@ -114,6 +119,10 @@ export const equipment = vtTable("vt_equipment", {
   folderId: text("folder_id").references(() => folders.id, { onDelete: "set null" }),
   roomId: text("room_id").references(() => rooms.id, { onDelete: "set null" }),
   status: varchar("status", { length: 20 }).notNull().default("ok"),
+  /** Additive damage-tracking status (R-EQ-F3); "ok" preserves existing rows as not-damaged.
+   * TEXT + DB-level CHECK (migrations/162_vt_damage_events.sql) rather than VARCHAR(n): resizing a
+   * varchar bound later takes an ACCESS EXCLUSIVE lock on this production clinical table. */
+  conditionStatus: text("condition_status").notNull().default("ok"),
   lastSeen: timestamp("last_seen"),
   lastStatus: varchar("last_status", { length: 20 }),
   lastMaintenanceDate: timestamp("last_maintenance_date"),
@@ -138,6 +147,7 @@ export const equipment = vtTable("vt_equipment", {
   deletedAt: timestamp("deleted_at"),
   deletedBy: text("deleted_by"),
   usuallyFoundHere: text("usually_found_here"),
+  homeRoomId: text("home_room_id").references(() => rooms.id, { onDelete: "set null" }),
   searchAlias: text("search_alias"),
   staffNote: text("staff_note"),
   // Operational state — V1
@@ -410,3 +420,23 @@ export const equipmentReadinessConfig = vtTable(
     clinicKeyPk: primaryKey({ columns: [table.clinicId, table.key] }),
   }),
 );
+
+/** Damage report log for equipment (T-24a · R-EQ-F3). */
+export const damageEvents = vtTable(
+  "vt_damage_events",
+  {
+    id: text("id").primaryKey(),
+    clinicId: text("clinic_id").notNull().references(() => clinics.id, { onDelete: "restrict" }),
+    equipmentId: text("equipment_id").notNull().references(() => equipment.id, { onDelete: "cascade" }),
+    reportedBy: text("reported_by").notNull(),
+    at: timestamp("at").defaultNow().notNull(),
+    note: text("note"),
+    resolvedAt: timestamp("resolved_at"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => ({
+    clinicEquipmentIdx: index("idx_vt_damage_events_clinic_equipment").on(t.clinicId, t.equipmentId),
+  }),
+);
+export type DamageEvent = typeof damageEvents.$inferSelect;
+export type NewDamageEvent = typeof damageEvents.$inferInsert;

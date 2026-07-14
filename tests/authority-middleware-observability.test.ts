@@ -29,6 +29,7 @@ const resolveAuthorityMock = vi.fn<
 const emitDeniedMock = vi.fn();
 const emitResolutionFailedMock = vi.fn();
 const emitLegacyFallbackMock = vi.fn();
+const emitBreakGlassMock = vi.fn();
 const recordAccessDeniedMock = vi.fn();
 
 vi.mock("../server/lib/authority.js", () => ({
@@ -43,6 +44,8 @@ vi.mock("../server/lib/authority-audit.js", async (importOriginal) => {
       emitResolutionFailedMock(...args),
     emitDispenseLegacyFallbackAudit: (...args: unknown[]) =>
       emitLegacyFallbackMock(...args),
+    emitCodeBlueBreakGlassAudit: (...args: unknown[]) =>
+      emitBreakGlassMock(...args),
   };
 });
 vi.mock("../server/lib/access-denied.js", () => ({
@@ -128,6 +131,7 @@ beforeEach(() => {
   emitDeniedMock.mockReset();
   emitResolutionFailedMock.mockReset();
   emitLegacyFallbackMock.mockReset();
+  emitBreakGlassMock.mockReset();
   recordAccessDeniedMock.mockReset();
   resetMetrics();
 });
@@ -392,6 +396,64 @@ describe("requireClinicalAuthority observability — legacy fallback grant path"
     expect(next).toHaveBeenCalled();
     expect(getMetricsSnapshot().authority.legacyFallbackUsed).toBe(1);
     expect(emitLegacyFallbackMock).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("requireClinicalAuthority observability — emergency break-glass grant path (Phase 10a T1)", () => {
+  it("increments authority_emergency_break_glass_used and calls the break-glass audit when break-glass admits", async () => {
+    resolveAuthorityMock.mockResolvedValue(
+      makeSnapshot({
+        effectiveClinicalRole: null,
+        reason: "EZSHIFT_NONE",
+        source: "no_active_shift",
+        clinicalRole: "vet",
+      }),
+    );
+    const next = vi.fn();
+    await requireClinicalAuthority({
+      allow: ["vet", "senior_technician", "technician"],
+      allowPermanentClinicalRoleForEmergency: true,
+    })(makeReq() as never, makeRes() as never, next);
+    expect(next).toHaveBeenCalledTimes(1);
+    expect(getMetricsSnapshot().authority.emergencyBreakGlassUsed).toBe(1);
+    expect(emitBreakGlassMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("does NOT touch the legacy dispense fallback counter or audit — the two grant paths are independent", async () => {
+    resolveAuthorityMock.mockResolvedValue(
+      makeSnapshot({
+        effectiveClinicalRole: null,
+        reason: "EZSHIFT_NONE",
+        source: "no_active_shift",
+        clinicalRole: "technician",
+      }),
+    );
+    await requireClinicalAuthority({
+      allow: ["vet", "senior_technician", "technician"],
+      allowPermanentClinicalRoleForEmergency: true,
+    })(makeReq() as never, makeRes() as never, vi.fn());
+    expect(getMetricsSnapshot().authority.emergencyBreakGlassUsed).toBe(1);
+    expect(getMetricsSnapshot().authority.legacyFallbackUsed).toBe(0);
+    expect(emitLegacyFallbackMock).not.toHaveBeenCalled();
+  });
+
+  it("does not increment the break-glass counter when a student is denied on the emergency gate", async () => {
+    resolveAuthorityMock.mockResolvedValue(
+      makeSnapshot({
+        effectiveClinicalRole: null,
+        reason: "EZSHIFT_NONE",
+        source: "no_active_shift",
+        clinicalRole: "student",
+      }),
+    );
+    const res = makeRes();
+    await requireClinicalAuthority({
+      allow: ["vet", "senior_technician", "technician"],
+      allowPermanentClinicalRoleForEmergency: true,
+    })(makeReq() as never, res as never, vi.fn());
+    expect(res.statusCode).toBe(403);
+    expect(getMetricsSnapshot().authority.emergencyBreakGlassUsed).toBe(0);
+    expect(emitBreakGlassMock).not.toHaveBeenCalled();
   });
 });
 

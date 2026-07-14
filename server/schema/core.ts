@@ -18,6 +18,21 @@ export const users = vtTable("vt_users", {
   displayName: text("display_name").notNull().default(""),
   role: varchar("role", { length: 20 }).notNull().default("technician"),
   secondaryRole: varchar("secondary_role", { length: 20 }),
+  /**
+   * Self-requested role captured at sign-up (Clerk `unsafeMetadata.requestedRole`).
+   * ADVISORY / STAGING ONLY — distinct from the authoritative `role`. It never
+   * auto-becomes `role`; an admin reads it as a hint and grants the real role
+   * through the existing role-change mechanism. Like `secondaryRole`, it is
+   * never propagated to clinical authority (`resolveAuthority`).
+   */
+  requestedRole: varchar("requested_role", { length: 20 }),
+  /**
+   * Doctor/license number captured at sign-up when the self-requested role is
+   * `vet` (Clerk `unsafeMetadata.vetLicenseNumber`). Verification artifact only:
+   * the admin reviews it before approving the vet grant (see `resolveApprovalRole`).
+   * Not authoritative on its own; presence is required to auto-apply `vet` on approval.
+   */
+  vetLicenseNumber: varchar("vet_license_number", { length: 40 }),
   allowedOperationalRoles: jsonb("allowed_operational_roles").notNull().default(sql`'[]'::jsonb`),
   status: varchar("status", { length: 20 }).notNull().default("active"),
   preferredLocale: varchar("preferred_locale", { length: 10 }).notNull().default("he"),

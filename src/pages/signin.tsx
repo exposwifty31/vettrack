@@ -4,7 +4,8 @@ import { Helmet } from "react-helmet-async";
 import { Loader2 } from "lucide-react";
 import { t } from "@/lib/i18n";
 import { VetTrackMark } from "@/components/vettrack-mark";
-import { RoleChips } from "@/features/auth/components/RoleChips";
+import { RoleChips, type SignupRequestedRole } from "@/features/auth/components/RoleChips";
+import { readCarriedRole, writeCarriedRole } from "@/features/auth/requested-role-store";
 import { ClerkFailed, ClerkLoaded, ClerkLoading, SignIn, useUser } from "@clerk/clerk-react";
 import { useAuth } from "@/hooks/use-auth";
 import { PhoneSignIn } from "@/components/phone-sign-in";
@@ -14,6 +15,7 @@ import { isCapacitorNative } from "@/lib/capacitor-runtime";
 import { ClerkAuthFormShell } from "@/components/clerk-auth-form-shell";
 import { AuthBootstrapSpinner } from "@/components/native-clerk-gate";
 import { NativeSocialButtons } from "@/components/native-social-buttons";
+import { OfflineAuthGate } from "@/components/offline-auth-gate";
 import { LegalFooterLinks } from "@/components/legal-footer-links";
 
 const CLERK_PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY as string | undefined;
@@ -24,6 +26,8 @@ export default function SignInPage() {
   const { isLoaded: clerkLoaded, isSignedIn: clerkSignedIn } = useUser();
   const [, navigate] = useLocation();
   const [usePhoneFlow, setUsePhoneFlow] = useState(false);
+  // C5: pre-choosing a role here carries it to the sign-up screen.
+  const [preRole, setPreRole] = useState<SignupRequestedRole | null>(() => readCarriedRole());
   const isDark = useIsDarkActive();
 
   useEffect(() => {
@@ -70,13 +74,21 @@ export default function SignInPage() {
             <p className="text-sm text-muted-foreground">{t.authPage.signInSubtitle}</p>
           </div>
 
-          <RoleChips />
+          <RoleChips
+            selectedRole={preRole}
+            onSelectRole={(role) => {
+              setPreRole(role);
+              writeCarriedRole(role);
+            }}
+          />
 
           {CLERK_PUBLISHABLE_KEY ? (
             <div className="flex flex-col items-center gap-4">
               {usePhoneFlow ? (
                 <>
-                  <PhoneSignIn />
+                  <OfflineAuthGate>
+                    <PhoneSignIn />
+                  </OfflineAuthGate>
                   <button
                     type="button"
                     onClick={() => setUsePhoneFlow(false)}
@@ -99,15 +111,17 @@ export default function SignInPage() {
                   </ClerkFailed>
                   <ClerkLoaded>
                     <ClerkAuthFormShell>
-                      <div className="w-full min-h-[24rem] flex flex-col items-center justify-start gap-4">
-                        {isNative ? <NativeSocialButtons mode="signIn" /> : null}
-                        <SignIn
-                          routing="hash"
-                          signUpUrl="/signup"
-                          fallbackRedirectUrl="/home"
-                          appearance={isNative ? getClerkAppearanceNative(isDark) : getClerkAppearance(isDark)}
-                        />
-                      </div>
+                      <OfflineAuthGate>
+                        <div className="w-full min-h-[24rem] flex flex-col items-center justify-start gap-4">
+                          {isNative ? <NativeSocialButtons mode="signIn" /> : null}
+                          <SignIn
+                            routing="hash"
+                            signUpUrl="/signup"
+                            fallbackRedirectUrl="/home"
+                            appearance={isNative ? getClerkAppearanceNative(isDark) : getClerkAppearance(isDark)}
+                          />
+                        </div>
+                      </OfflineAuthGate>
                     </ClerkAuthFormShell>
                   </ClerkLoaded>
                   <p className="text-xs text-muted-foreground text-center max-w-xs">

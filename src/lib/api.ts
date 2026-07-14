@@ -31,6 +31,7 @@ import type {
   ShiftImport,
   ShiftImportPreview,
   ShiftImportResult,
+  ShiftNameHints,
   ShiftAdjustment,
   ShiftAdjustmentStatus,
   ShiftAdjustmentDecision,
@@ -59,10 +60,14 @@ import type {
   StagingClaim,
   DeployabilityResponse,
   Dock,
+  DockingReconciliation,
+  Equipment,
   OperationalMetricsSummary,
   DisplayDevice,
   DisplayPairingCode,
   DisplayPairClaim,
+  NudgeFeedResponse,
+  NudgeKind,
 } from "@/types";
 import type { AuthoritySnapshot } from "../../shared/authority.js";
 
@@ -129,6 +134,8 @@ function bootstrapHeaders(init: RequestInit): Record<string, string> {
 export {
   request,
   ApiError,
+  toApiErrorMessage,
+  extractApiErrorCode,
   EQUIPMENT_LIST_FETCH_TIMEOUT_MS,
   TASKS_FETCH_TIMEOUT_MS,
 };
@@ -400,6 +407,9 @@ export const api = {
   home: {
     dashboard: () => request<HomeDashboardPulse>("/api/home/dashboard"),
   },
+  nudges: {
+    list: () => request<NudgeFeedResponse>("/api/nudges"),
+  },
   analytics: {
     summary: () => request<AnalyticsSummary>("/api/analytics"),
     shiftCompletion: (from?: string, to?: string) => {
@@ -438,10 +448,14 @@ export const api = {
         method: "PATCH",
         body: JSON.stringify({ secondaryRole }),
       }),
-    updateStatus: (id: string, status: "pending" | "active" | "blocked") =>
+    updateStatus: (
+      id: string,
+      status: "pending" | "active" | "blocked",
+      role?: "admin" | "vet" | "technician" | "senior_technician" | "student",
+    ) =>
       request<User>(
         `/api/users/${id}/status`,
-        { method: "PATCH", body: JSON.stringify({ status }) }
+        { method: "PATCH", body: JSON.stringify(role ? { status, role } : { status }) }
       ),
     delete: (id: string) =>
       request<User>(`/api/users/${id}/delete`, { method: "PATCH" }),
@@ -547,6 +561,7 @@ export const api = {
     list: (date?: string) =>
       request<Shift[]>(date ? `/api/shifts?date=${encodeURIComponent(date)}` : "/api/shifts"),
     imports: () => request<ShiftImport[]>("/api/shifts/imports"),
+    importShiftNameHints: () => request<ShiftNameHints>("/api/shifts/import/shift-names"),
     previewImport: async (file: File) => {
       const form = new FormData();
       form.append("file", file);
@@ -983,7 +998,7 @@ export const api = {
     lowStock: () =>
       request<{ items: import("@/types").LowStockRow[] }>("/api/inventory-items/low-stock"),
     detail: (id: string) => request<InventoryItemDetail>(`/api/inventory-items/${id}/detail`),
-    create: (data: { code: string; label: string; category?: string; nfcTagId?: string | null; parLevel?: number | null; reorderPoint?: number | null }) =>
+    create: (data: { code: string; label: string; category?: string; nfcTagId?: string | null; isBillable?: boolean; minimumDispenseToCapture?: number; parLevel?: number | null; reorderPoint?: number | null }) =>
       request<InventoryItem>("/api/inventory-items", { method: "POST", body: JSON.stringify(data) }),
     update: (id: string, data: { label?: string; category?: string | null; nfcTagId?: string | null; isBillable?: boolean; minimumDispenseToCapture?: number; parLevel?: number | null; reorderPoint?: number | null }) =>
       request<InventoryItem>(`/api/inventory-items/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
@@ -1097,6 +1112,12 @@ export const api = {
         request<{ ok: boolean; id: string }>(`/api/display/devices/${id}/revoke`, {
           method: "POST",
         }),
+      // Hard-delete a DEAD (already-revoked) registry row — the server 404s if
+      // the device is still active, so an admin must revoke before deleting.
+      delete: (id: string): Promise<{ ok: boolean; id: string }> =>
+        request<{ ok: boolean; id: string }>(`/api/display/devices/${id}`, {
+          method: "DELETE",
+        }),
     },
   },
   realtime: {
@@ -1155,6 +1176,9 @@ export const api = {
       /** SYNC-TEL — event-driven sync engine signals (strict booleans). */
       syncPermanentFailure?: boolean;
       syncCircuitOpen?: boolean;
+      // T-30a2-ii — bounded enum: which nudge-feed kind was shown. Mirrors
+      // the server's closed ALLOWED_NUDGE_SHOWN enum (T-30a2-i).
+      nudgeShown?: NudgeKind;
     }) =>
       request<{ ok: boolean }>("/api/realtime/telemetry", {
         method: "POST",
@@ -1178,7 +1202,7 @@ export const api = {
       }),
     listDocks: () =>
       request<Dock[]>("/api/docks"),
-    createDock: (data: { name: string; description?: string; roomId?: string }) =>
+    createDock: (data: { name: string; description?: string; roomId?: string; assetTypeId?: string; capacity?: number }) =>
       request<Dock>("/api/docks", { method: "POST", body: JSON.stringify(data) }),
     deployability: (id: string) =>
       request<DeployabilityResponse>(`/api/equipment/${id}/deployability`),
@@ -1215,6 +1239,14 @@ export const api = {
       const query = qs.toString() ? `?${qs.toString()}` : "";
       return request<OperationalMetricsSummary>(`/api/operational-metrics/summary${query}`);
     },
+  },
+  docking: {
+    assignHome: (id: string, data: { homeRoomId: string | null; assetTypeId?: string | null }) =>
+      request<Equipment>(`/api/docking/equipment/${id}/home`, { method: "PATCH", body: JSON.stringify(data) }),
+    assignHomeBulk: (data: { ids: string[]; homeRoomId: string | null; assetTypeId?: string | null }) =>
+      request<{ updated: number }>("/api/docking/equipment/home/bulk", { method: "POST", body: JSON.stringify(data) }),
+    reconciliation: () =>
+      request<DockingReconciliation>("/api/docking/reconciliation"),
   },
   platform: {
     capabilities: () =>

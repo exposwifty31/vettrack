@@ -36,6 +36,13 @@ type MetricName =
   | "authority_denied_role_not_in_allow"
   | "authority_denied_legacy_fallback_not_matched"
   | "authority_legacy_fallback_used"
+  // Phase 10a T1 — Code Blue emergency break-glass grant. Incremented when the
+  // POST /code-blue/sessions gate admits a clinical-non-student identity with
+  // no active shift (effectiveClinicalRole=null, reason=EZSHIFT_NONE) via the
+  // `allowPermanentClinicalRoleForEmergency` opt-in. Distinct from the legacy
+  // dispense fallback counter so dashboards separate emergency break-glass from
+  // dispense compatibility grants.
+  | "authority_emergency_break_glass_used"
   | "authority_drift_role"
   | "authority_drift_shift_lookup_failed"
   | "authority_resolution_failed"
@@ -300,7 +307,14 @@ type MetricName =
   | "stale_checkout_nudged"
   | "stale_checkout_skipped"
   | "dock_return_nfc_confirmed"
-  | "auth_clerk_profile_fetch_failed";
+  | "auth_clerk_profile_fetch_failed"
+  // T-30a2-i — nudge telemetry closed enum (nudgeShown: "expiry" | "restock").
+  // Mirrors the ALLOWED_CB_PROPAGATION_BUCKETS pattern: an in-enum value
+  // increments its own counter; out-of-enum values are rejected via the
+  // existing telemetry_payload_rejected_enum_mismatch counter (no new
+  // metric series is created for unknown values).
+  | "nudge_shown_expiry"
+  | "nudge_shown_restock";
 
 type MetricBuckets = Record<MetricName, number>;
 
@@ -358,6 +372,8 @@ export interface MetricsSnapshot {
       legacyFallbackNotMatched: number;
     };
     legacyFallbackUsed: number;
+    /** Phase 10a T1 — Code Blue emergency break-glass grants (no active shift). */
+    emergencyBreakGlassUsed: number;
     drift: {
       role: number;
       shiftLookupFailed: number;
@@ -740,6 +756,7 @@ const DEFAULT_COUNTERS: MetricBuckets = {
   authority_denied_role_not_in_allow: 0,
   authority_denied_legacy_fallback_not_matched: 0,
   authority_legacy_fallback_used: 0,
+  authority_emergency_break_glass_used: 0,
   authority_drift_role: 0,
   authority_drift_shift_lookup_failed: 0,
   authority_resolution_failed: 0,
@@ -936,6 +953,9 @@ const DEFAULT_COUNTERS: MetricBuckets = {
   stale_checkout_skipped: 0,
   dock_return_nfc_confirmed: 0,
   auth_clerk_profile_fetch_failed: 0,
+  // T-30a2-i — nudge telemetry closed enum counters.
+  nudge_shown_expiry: 0,
+  nudge_shown_restock: 0,
 };
 
 const metrics: MetricBuckets = { ...DEFAULT_COUNTERS };
@@ -1101,6 +1121,7 @@ export function getMetricsSnapshot(): MetricsSnapshot {
           legacyFallbackNotMatched: metrics.authority_denied_legacy_fallback_not_matched,
         },
         legacyFallbackUsed: metrics.authority_legacy_fallback_used,
+        emergencyBreakGlassUsed: metrics.authority_emergency_break_glass_used,
         drift: {
           role: metrics.authority_drift_role,
           shiftLookupFailed: metrics.authority_drift_shift_lookup_failed,
@@ -1398,6 +1419,7 @@ export function getMetricsSnapshot(): MetricsSnapshot {
         resolutionSource: { checkIn: 0, shift: 0, noActiveShift: 0 },
         denied: { roleNotInAllow: 0, legacyFallbackNotMatched: 0 },
         legacyFallbackUsed: 0,
+        emergencyBreakGlassUsed: 0,
         drift: { role: 0, shiftLookupFailed: 0 },
         resolutionFailed: 0,
         oproleShadow: {

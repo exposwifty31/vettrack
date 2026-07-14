@@ -297,6 +297,18 @@ export interface TStructure {
     emergencyCountLabel: string;
     summaryCountsTitle: string;
   };
+  shiftImport: {
+    csvEmpty: string;
+    missingRequiredColumns: string;
+    missingRequiredValues: string;
+    invalidDate: string;
+    invalidStartTime: string;
+    invalidEndTime: string;
+    shiftNotRelevantVet: string;
+    shiftNotRelevantStudent: string;
+    shiftNotRelevant: string;
+    duplicateRow: string;
+  };
   inventoryPage: {
     title: string;
     targetHeading: string;
@@ -309,6 +321,8 @@ export interface TStructure {
     submitRestock: string;
     submitAudit: string;
     loadError: string;
+    restrictedAccessTitle: string;
+    restrictedAccessMessage: string;
     empty: string;
     quickAdd: string;
     quickAddSuccess: string;
@@ -470,8 +484,17 @@ export interface TStructure {
     describeIssue: string;
     addObservations: string;
     checkedOutBy: string;
+    since: string;
     updateStatusTitle: string;
     statusLabel: string;
+    actionInUse: string;
+    actionMove: string;
+    actionIssue: string;
+    actionReturn: string;
+    scanSheetReportOrUpdateStatus: string;
+    scanSheetScanAnother: string;
+    scanSheetStayHere: string;
+    activityRoomVerified: string;
     reportIssueTitle: string;
     localStatePendingSync: string;
     localStateConflict: string;
@@ -500,6 +523,10 @@ export interface TStructure {
       issueReported: string;
       issueWhatsAppOffline: string;
       reportFailedDefault: string;
+      damageReported: string;
+      damageReportUndo: string;
+      damageReportFailed: string;
+      damageReportOffline: string;
     };
     backToList: string;
     notFound: string;
@@ -757,6 +784,9 @@ export interface TStructure {
       signOut: string;
       loadingApp: string;
       nativeClerkFailed: string;
+      offlineTitle: string;
+      offlineBody: string;
+      offlineRetry: string;
       reasons: {
         missingClinicId: string;
         dbFallbackDisabled: string;
@@ -839,6 +869,26 @@ export interface TStructure {
     guidedTitle: string;
     guidedBody: string;
     inventoryActionHint: string;
+    myEquipmentRefreshFailed: string;
+    startOfShift: {
+      idleTitle: string;
+      opsExceptions: string;
+      opsExceptionsAction: string;
+      opsAllClear: string;
+      opsAllClearAction: string;
+      vetReview: string;
+      vetReviewAction: string;
+      vetReady: string;
+      vetReadyAction: string;
+      techOverdue: string;
+      techOverdueAction: string;
+      techCaughtUp: string;
+      techCaughtUpAction: string;
+      itemsCheckedOut: string;
+      itemsCheckedOutAction: string;
+      studentReady: string;
+      studentReadyAction: string;
+    };
   };
   home: {
     equipmentOverview: string;
@@ -973,6 +1023,7 @@ export interface TStructure {
   };
   reportIssueDialog: {
     title: string;
+    description: string;
     issueTitle: string;
     issueTitlePlaceholder: string;
     issueDetails: string;
@@ -1280,6 +1331,19 @@ export interface TStructure {
     employeeName: string;
     role: string;
     csvOnly: string;
+    doctorImportBadge: string;
+    rosterImportBadge: string;
+    userIdColumn: string;
+    operationalRoleColumn: string;
+    operationalRoleAdmission: string;
+    operationalRoleWard: string;
+    operationalRoleSeniorLead: string;
+    operationalRoleNightAdmissionOnly: string;
+    operationalRoleNightSeniorNoAdmission: string;
+    operationalRoleUnknown: string;
+    acceptedShiftNamesTitle: string;
+    acceptedShiftNamesHint: string;
+    acceptedShiftNamesLoadFailed: string;
   };
   alertsPage: {
     oneMinuteAgo: string;
@@ -1288,6 +1352,12 @@ export interface TStructure {
     hoursAgo: string;
     oneDayAgo: string;
     daysAgo: string;
+    oneMinuteDuration: string;
+    minutesDuration: string;
+    oneHourDuration: string;
+    hoursDuration: string;
+    oneDayDuration: string;
+    daysDuration: string;
     title: string;
     metaDescription: string;
     activeCount: string;
@@ -1718,6 +1788,8 @@ export interface TStructure {
     pilotRecent: string;
   };
   roomsListPage: {
+    selectRoomTitle: string;
+    selectRoomSubtitle: string;
     healthRingTitle: string;
     healthRingHelp: string;
     createRoomFailed: string;
@@ -1743,7 +1815,7 @@ export interface TStructure {
     summaryInUse: string;
     summaryIssues: string;
     summarySynced: string;
-    cardItemsUnit: string;
+    cardItemCount: string;
     cardAvailShort: string;
     cardInUseShort: string;
     roomNamePlaceholder: string;
@@ -1849,6 +1921,7 @@ export interface TStructure {
   };
   adminPage: {
     pageHeading: string;
+    metaDescription: string;
     tabShifts: string;
     tabFolders: string;
     tabPending: string;
@@ -1908,10 +1981,12 @@ export interface TStructure {
     userRestoreFailed: string;
     folderNew: string;
     folderNamePlaceholder: string;
+    folderDialogDescription: string;
     userDeleteFailed: string;
     secondaryRoleNone: string;
     ticketResolve: string;
     ticketDescription: string;
+    ticketDetailDescription: string;
     ticketSubmittedBy: string;
     ticketDate: string;
     ticketPageUrl: string;
@@ -1964,6 +2039,11 @@ export interface TStructure {
     tabDeleted: string;
     signedUp: string;
     joined: string;
+    requestedRoleHint: string;
+    vetLicenseHint: string;
+    approveAsRole: string;
+    grantRoleLabel: string;
+    vetLicenseRequiredError: string;
     reject: string;
     approve: string;
     rejectUserTitle: string;
@@ -2174,6 +2254,7 @@ export interface TStructure {
   };
   inventoryItemsPage: {
     title: string;
+    createDialogDescription: string;
     newItem: string;
     editItem: string;
     itemCreated: string;
@@ -2378,6 +2459,7 @@ export interface TStructure {
     staffMember: string;
     unassigned: string;
     linkedDevice: string;
+    equipmentLoadFailed: string;
     linkedOwner: string;
     unknownUser: string;
     scheduledAt: string;
@@ -2574,6 +2656,8 @@ export interface TStructure {
     managerLabelShort: string;
     managerInstruction: string;
     loadingManagers: string;
+    checkingActiveSession: string;
+    sessionCheckFailed: string;
     noManagersAvailable: string;
     you: string;
     managerFallbackName: string;
@@ -2841,6 +2925,12 @@ export interface TStructure {
       idRequired: string;
       notFound: string;
       unavailable: string;
+    };
+    docking: {
+      duplicateStation: string;
+      duplicateName: string;
+      invalidReference: string;
+      invalidEquipmentIds: string;
     };
   };
   push: {
@@ -3385,6 +3475,11 @@ export interface TStructure {
     accessPendingServer: string;
     pendingEndpoint: string;
     retry: string;
+    accessDenied: {
+      title: string;
+      description: string;
+      cta: string;
+    };
     state: {
       loading: string;
       empty: string;
@@ -3454,6 +3549,10 @@ export interface TStructure {
       issueDialogDescription: string;
       codeExpires: string;
       empty: string;
+      delete: string;
+      deleteConfirm: string;
+      deleted: string;
+      deleteError: string;
     };
     colConfigured: string;
     colCredentials: string;
@@ -3643,6 +3742,8 @@ export interface TStructure {
     pairing: string;
     pairButton: string;
     hint: string;
+    revokedNoticeTitle: string;
+    revokedNoticeMessage: string;
   };
   board: {
     deployableNow: string;
@@ -3671,6 +3772,8 @@ export interface TStructure {
     overdue: string;
     byType: string;
     critical: string;
+    noCriticalConfigured: string;
+    noCriticalConfiguredHint: string;
     allCriticalReady: string;
     loading: string;
     fallbackBoardUnavailable: string;
@@ -3694,12 +3797,15 @@ export interface TStructure {
     description: string;
     cta: string;
   };
+  managementWebGate: {
+    title: string;
+    description: string;
+  };
   whatsNew: {
     title: string;
     heading: string;
     description: string;
     configureAlerts: string;
-    currentVersion: string;
     currentDate: string;
     buildLabel: string;
     items: {
@@ -3750,6 +3856,12 @@ export interface TStructure {
     roleVetTech: string;
     roleVeterinarian: string;
     roleStudent: string;
+    roleSelectLabel: string;
+    roleSelectHint: string;
+    vetLicenseLabel: string;
+    vetLicensePlaceholder: string;
+    vetLicenseHint: string;
+    vetLicenseRequired: string;
     devModeNotice: string;
     enterDashboard: string;
     moreAboutVetTrack: string;
@@ -3996,6 +4108,39 @@ export interface TStructure {
     namePlaceholder: string;
     descriptionPlaceholder: string;
     roomPlaceholder: string;
+    categoryPlaceholder: string;
+    capacityPlaceholder: string;
+    noCategory: string;
+    capacityLabel: string;
+    invalidCapacity: string;
+    categoryLoadError: string;
+  };
+  adminHomeAssignment: {
+    title: string;
+    categoryLabel: string;
+    categoryPlaceholder: string;
+    allCategories: string;
+    homeRoomLabel: string;
+    homeRoomPlaceholder: string;
+    equipmentListLabel: string;
+    noEquipment: string;
+    assignBulkButton: string;
+    assignSuccess: string;
+    assignError: string;
+    pickRoomFirst: string;
+    unassignedTitle: string;
+    unassignedHint: string;
+    noUnassigned: string;
+    oneTapAssignButton: string;
+    needsCategoryHint: string;
+    noStationTitle: string;
+    noStationHint: string;
+    noNoStation: string;
+    manageDocksLink: string;
+    categoryUnavailable: string;
+    categoryLoadError: string;
+    roomsLoadError: string;
+    reconciliationLoadError: string;
   };
   adminAssetTypesPage: {
     typePlaceholder: string;
@@ -4020,9 +4165,41 @@ export interface TStructure {
     installAriaLabel: string;
     installTitle: string;
     installSubtitle: string;
+    installSubtitleDesktop: string;
     install: string;
     notNow: string;
     iosAriaLabel: string;
     iosTagline: string;
+  };
+  locateSearch: {
+    openButtonLabel: string;
+    label: string;
+    placeholder: string;
+    title: string;
+    emptyPrompt: string;
+    noResults: string;
+    searching: string;
+    resultsCount: string;
+  };
+  homeNudges: {
+    expiryMessage: string;
+    restockMessage: string;
+    dismissAria: string;
+  };
+  returnPlugDialog: {
+    title: string;
+    descriptionWithName: string;
+    descriptionNoName: string;
+    pluggedIn: string;
+    notPluggedIn: string;
+    plugAlertWarningOne: string;
+    plugAlertWarningOther: string;
+    deadlineLabel: string;
+    cancel: string;
+    confirmPluggedIn: string;
+    confirmSetAlert: string;
+    damagedButton: string;
+    damageWarning: string;
+    confirmReturnedDamaged: string;
   };
 }

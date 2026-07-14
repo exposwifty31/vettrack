@@ -1,14 +1,8 @@
-import { useState } from "react";
 import { X, Download, Share2, PlusSquare } from "lucide-react";
 import { useLocation } from "wouter";
 import { usePwaInstall } from "@/hooks/use-pwa-install";
+import { isKioskSuppressedPathname, usePlatformTarget } from "@/app/platform";
 import { t } from "@/lib/i18n";
-
-// Routes where the "add to home screen" promo must never appear: emergency flows
-// (never interrupt) and kiosk/display surfaces (a headless board is not a personal
-// device — the banner also overlapped the /board/pair code input, F9). "/board"
-// covers both /board and /board/pair.
-const PROMO_SUPPRESSED_PREFIXES = ["/code-blue", "/crash-cart", "/board"];
 
 // Shows for eligible users who haven't installed the app:
 //   • Android / Chrome  → native "Add to Home Screen" prompt
@@ -16,18 +10,24 @@ const PROMO_SUPPRESSED_PREFIXES = ["/code-blue", "/crash-cart", "/board"];
 // Hidden when already running as an installed PWA.
 export function PwaInstallPrompt() {
   const [location] = useLocation();
-  const { isStandalone, isIos, canInstall, promptInstall, iosGuidanceDismissed, dismissIosGuidance } =
-    usePwaInstall();
+  const platformTarget = usePlatformTarget();
+  const isDesktop = platformTarget === "desktop";
+  const {
+    isStandalone,
+    isIos,
+    canInstall,
+    promptInstall,
+    androidDismissed,
+    dismissAndroidBanner,
+    iosGuidanceDismissed,
+    dismissIosGuidance,
+  } = usePwaInstall();
 
-  // Session-level dismiss for the Android/Chrome banner (native prompt handles persistence).
-  const [androidDismissed, setAndroidDismissed] = useState(false);
-
-  // Never show the promo on emergency flows or kiosk/display surfaces. Match a
-  // whole path segment — exact prefix or prefix + "/" — so "/board" covers
-  // "/board" and "/board/pair" but NOT "/boardroom" (and "/code-blue" ≠
-  // "/code-blueprint").
+  // Never show the promo on emergency flows or kiosk/display surfaces (a
+  // headless board/wall is not a personal device — the banner also overlapped
+  // the /board/pair code input, F9, and rendered over /emergency-equipment-wall).
   const path = location.split("?")[0];
-  if (PROMO_SUPPRESSED_PREFIXES.some((r) => path === r || path.startsWith(`${r}/`))) return null;
+  if (isKioskSuppressedPathname(path)) return null;
 
   // Already installed — show nothing.
   if (isStandalone) return null;
@@ -52,14 +52,14 @@ export function PwaInstallPrompt() {
               {t.pwa.installTitle}
             </p>
             <p className="text-xs text-muted-foreground mt-0.5 leading-snug">
-              {t.pwa.installSubtitle}
+              {isDesktop ? t.pwa.installSubtitleDesktop : t.pwa.installSubtitle}
             </p>
             <div className="flex gap-2 mt-3">
               <button
                 type="button"
                 onClick={async () => {
                   await promptInstall();
-                  setAndroidDismissed(true);
+                  dismissAndroidBanner();
                 }}
                 className="inline-flex items-center justify-center gap-1.5 px-4 min-h-[44px] rounded-lg bg-primary text-primary-foreground text-sm font-semibold"
               >
@@ -68,7 +68,7 @@ export function PwaInstallPrompt() {
               </button>
               <button
                 type="button"
-                onClick={() => setAndroidDismissed(true)}
+                onClick={() => dismissAndroidBanner()}
                 className="inline-flex items-center justify-center gap-1.5 px-4 min-h-[44px] rounded-lg bg-secondary text-secondary-foreground text-sm font-medium"
               >
                 {t.pwa.notNow}
@@ -77,7 +77,7 @@ export function PwaInstallPrompt() {
           </div>
           <button
             type="button"
-            onClick={() => setAndroidDismissed(true)}
+            onClick={() => dismissAndroidBanner()}
             aria-label={t.common.close}
             className="flex items-center justify-center min-w-[44px] min-h-[44px] -mt-2 -me-2 text-muted-foreground hover:text-foreground shrink-0"
           >

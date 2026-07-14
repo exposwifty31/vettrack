@@ -10,6 +10,7 @@ import {
   unitConditionStates,
   stagingQueue,
   users,
+  rooms,
 } from "../db.js";
 import { eq, and, inArray, sql, asc } from "drizzle-orm";
 import { requireAuth, requireAdmin, requireEffectiveRole } from "../middleware/auth.js";
@@ -22,10 +23,11 @@ import {
   isEquipmentFullyDeployable,
 } from "../services/equipment-operational-state.service.js";
 import { apiError } from "../lib/apiError.js";
+import { referencedIdsBelongToClinic } from "../lib/clinic-scoped-refs.js";
 import { recordOperationalMetric } from "../services/operational-metrics.service.js";
 import { promoteStagingQueueNext } from "../lib/staging-promotion.js";
 import { promoteEquipmentWaitlistWithNotify } from "../lib/equipment-waitlist-promotion.js";
-import { isPostgresUniqueViolation, pgUpdateMatchedZeroRows } from "../lib/pg-result.js";
+import { isPostgresUniqueViolation, pgUpdateMatchedZeroRows, getPostgresConstraintName } from "../lib/pg-result.js";
 import { incrementMetric } from "../lib/metrics.js";
 
 const router = Router();
@@ -36,15 +38,34 @@ const createDockSchema = z.object({
   name: z.string().min(1).max(200),
   description: z.string().max(500).optional(),
   roomId: z.string().optional(),
+  assetTypeId: z.string().optional(),
+  capacity: z.number().int().min(1).max(999).optional(),
 });
 
 router.post("/docks", requireAuth, requireAdmin, validateBody(createDockSchema), async (req, res) => {
   const clinicId = req.clinicId!;
   const { id: userId, email } = req.authUser!;
-  const { name, description, roomId } = req.body as z.infer<typeof createDockSchema>;
+  const { name, description, roomId, assetTypeId, capacity } = req.body as z.infer<typeof createDockSchema>;
+
+  if (!(await referencedIdsBelongToClinic(clinicId, roomId, assetTypeId))) {
+    return apiError(req, res, "errors.docking.invalidReference", undefined, 400);
+  }
 
   const id = randomUUID();
-  await db.insert(docks).values({ id, clinicId, name, description: description ?? null, roomId: roomId ?? null });
+  try {
+    await db.insert(docks).values({
+      id, clinicId, name,
+      description: description ?? null, roomId: roomId ?? null,
+      assetTypeId: assetTypeId ?? null, capacity: capacity ?? null,
+    });
+  } catch (e) {
+    if (isPostgresUniqueViolation(e)) {
+      const constraint = getPostgresConstraintName(e);
+      if (constraint === "vt_docks_clinic_room_assettype_uq") return apiError(req, res, "errors.docking.duplicateStation", undefined, 409);
+      if (constraint === "vt_docks_clinic_name_unique") return apiError(req, res, "errors.docking.duplicateName", undefined, 409);
+    }
+    throw e;
+  }
   logAudit({ clinicId, actionType: "equipment_updated", performedBy: userId, performedByEmail: email, targetId: id, metadata: { action: "dock_created", name } });
 
   const [dock] = await db.select().from(docks).where(eq(docks.id, id));
@@ -54,7 +75,19 @@ router.post("/docks", requireAuth, requireAdmin, validateBody(createDockSchema),
 router.get("/docks", requireAuth, async (req, res) => {
   const clinicId = req.clinicId!;
 
-  const rows = await db.select().from(docks).where(eq(docks.clinicId, clinicId));
+  const rows = await db
+    .select({
+      id: docks.id, clinicId: docks.clinicId, name: docks.name,
+      description: docks.description, roomId: docks.roomId,
+      assetTypeId: docks.assetTypeId, capacity: docks.capacity,
+      createdAt: docks.createdAt,
+      assetTypeName: assetTypes.name,
+      roomName: rooms.name,
+    })
+    .from(docks)
+    .leftJoin(assetTypes, eq(docks.assetTypeId, assetTypes.id))
+    .leftJoin(rooms, eq(docks.roomId, rooms.id))
+    .where(eq(docks.clinicId, clinicId));
   res.json(rows);
 });
 

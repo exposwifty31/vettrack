@@ -649,12 +649,20 @@ function utcIsoDate(date: Date): string {
   return date.toISOString().slice(0, 10);
 }
 
-async function assertWithinVetShift(args: {
+/**
+ * Admin bypass (owner decision, 2026-07): an `admin` actor can create a task
+ * at any time, regardless of the assigned vet's roster shift. `actorRole` is
+ * only threaded in from `createAppointment` — `updateAppointment` does not
+ * pass it, so the shift-window check is unchanged for edits/reschedules.
+ */
+export async function assertWithinVetShift(args: {
   clinicId: string;
   vetId: string | null;
   startTime: Date;
   endTime: Date;
+  actorRole?: string;
 }): Promise<void> {
+  if (args.actorRole === "admin") return;
   if (!args.vetId) return;
   if (utcIsoDate(args.startTime) !== utcIsoDate(args.endTime)) {
     throw new AppointmentServiceError("OUTSIDE_SHIFT", 400, "Appointment must start and end on the same clinic day");
@@ -834,7 +842,7 @@ export async function createAppointment(clinicIdInput: string, payload: Appointm
 
 
   if (status !== "cancelled" && status !== "no_show") {
-    await assertWithinVetShift({ clinicId, vetId, startTime, endTime });
+    await assertWithinVetShift({ clinicId, vetId, startTime, endTime, actorRole: actor?.role });
     const conflict = vetId
       ? await findActiveVetConflict({ clinicId, vetId, startTime, endTime })
       : null;

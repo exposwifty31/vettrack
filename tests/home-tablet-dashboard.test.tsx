@@ -9,7 +9,7 @@
  * (fork contract asserted statically).
  */
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { render, screen, fireEvent, cleanup } from "@testing-library/react";
+import { render, screen, fireEvent, cleanup, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { HelmetProvider } from "react-helmet-async";
 import { readFileSync } from "fs";
@@ -107,6 +107,27 @@ describe("HomeTabletDashboard — M3 iPad bento", () => {
     // ICU (50%) must precede Surgery 1 (100%).
     expect(text.indexOf("ICU")).toBeGreaterThan(-1);
     expect(text.indexOf("ICU")).toBeLessThan(text.indexOf("Surgery 1"));
+  });
+
+  // T14 — the audit's self-contradictory pairing: 100% availability rendered as
+  // an all-clear next to "0 תקין · N לא אומתו". Cross-surface consistency with
+  // the native EquipmentLargeTitle: when nothing is verified, the availability
+  // figure must not paint the celebratory green even at 100%.
+  it("does not celebrate 100% availability when nothing has been verified", async () => {
+    // All operational (no attention) but never scanned → 100% available, 0 verified.
+    equipmentList.mockResolvedValueOnce([
+      { id: "eq-a", name: "Syringe pump 7", status: "ok" },
+      { id: "eq-b", name: "Infusion pump 3", status: "ok" },
+    ] as unknown as Equipment[]);
+    renderDashboard();
+    // Wait out the loading placeholder ("—") before reading the tone (the
+    // rooms tile also renders "100%", so scope the wait to this element).
+    const pct = screen.getByTestId("tablet-equipment-availability");
+    await waitFor(() => expect(pct.textContent).toBe("100%"));
+    expect(pct.getAttribute("data-availability-tone")).toBe("caution");
+    expect(pct.getAttribute("style")).not.toContain("var(--sys-green)");
+    // The verification split is shown alongside (0 verified · 2 unverified).
+    expect(screen.getByText(t.equipmentList.verifiedSplit(0, 2, 14))).toBeTruthy();
   });
 });
 

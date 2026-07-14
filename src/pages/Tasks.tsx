@@ -15,15 +15,17 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Textarea } from "@/components/ui/textarea";
 import { ErrorCard } from "@/components/ui/error-card";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Bdi } from "@/components/ui/bdi";
 import { api } from "@/lib/api";
 import { leaderPoll } from "@/lib/leader";
 import { useRealtime } from "@/hooks/useRealtime";
 import { useRealtimeReconciliation } from "@/hooks/useRealtimeReconciliation";
 import { useTaskRecommendations } from "@/hooks/useTaskRecommendations";
 import { useAuth } from "@/hooks/use-auth";
-import type { Appointment, AppointmentStatus, CreateAppointmentRequest } from "@/types";
+import type { Appointment, AppointmentStatus, CreateAppointmentRequest, Equipment } from "@/types";
 import { toast } from "sonner";
 import { toastSuccess } from "@/lib/ui-toast";
+import { EquipmentDeviceField } from "@/pages/tasks/EquipmentDeviceField";
 import {
   ACTION_BUTTON_BASE,
   ALLOWED_BOOKING_TASK_TYPES,
@@ -51,6 +53,7 @@ import {
   formatScheduledLabel,
   formatTimeHHMM,
   getTaskReasonBullets,
+  isAppointmentConflictError,
   minutesSinceDayStart,
   pixelsPerMinuteFor,
   priorityLabel,
@@ -106,6 +109,24 @@ export default function AppointmentsPage() {
   });
 
   const meUserId = meQuery.data?.id;
+
+  // T23: the task "device" field is a real vt_equipment picker, not free
+  // text. Same `["/api/equipment"]` query key + fetcher every other equipment
+  // consumer uses (NativeHeader, Topbar, equipment list) — react-query shares
+  // the one request/cache entry across all of them, so this adds no new fetch.
+  const equipmentQuery = useQuery({
+    queryKey: ["/api/equipment"],
+    queryFn: api.equipment.list,
+    enabled: !!userId,
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
+  });
+
+  const equipmentById = useMemo(() => {
+    const map = new Map<string, Equipment>();
+    for (const eq of equipmentQuery.data ?? []) map.set(eq.id, eq);
+    return map;
+  }, [equipmentQuery.data]);
 
   const metaQuery = useQuery({
     queryKey: ["/api/appointments/meta", day],
@@ -188,7 +209,7 @@ export default function AppointmentsPage() {
       setFormTaskType("maintenance");
     },
     onError: (error: Error, variables: CreateAppointmentRequest) => {
-      if (error.message === "APPOINTMENT_CONFLICT") {
+      if (isAppointmentConflictError(error)) {
         // Reuse the exact submitted payload (staleness-free + DRY) rather than
         // rebuilding it from live form state, which could drift between submit
         // and the conflict response.
@@ -435,7 +456,9 @@ export default function AppointmentsPage() {
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="space-y-1 min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
-                        <div className="text-sm font-semibold">{formatDevice(nbt.animalId)}</div>
+                        <div className="text-sm font-semibold">
+                          <Bdi dir="auto">{formatDevice(nbt.animalId, equipmentById)}</Bdi>
+                        </div>
                       </div>
                       <div className="text-xs text-muted-foreground">
                         {compactMeta(formatLocation(nbt.ownerId), resolveVet(nbt.vetId), timeRange)}
@@ -514,7 +537,9 @@ export default function AppointmentsPage() {
                     <li key={overdueItem.id} className={`rounded-lg border p-3 text-sm ${TASK_CARD_STYLES.overdue}`}>
                       <div className="flex flex-wrap items-start justify-between gap-2">
                         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-                          <span className="font-semibold min-w-0 flex-1 break-words">{formatDevice(overdueItem.animalId)}</span>
+                          <span className="font-semibold min-w-0 flex-1 break-words">
+                            <Bdi dir="auto">{formatDevice(overdueItem.animalId, equipmentById)}</Bdi>
+                          </span>
                         </div>
                         <Badge variant="outline" className={URGENT_BADGE_STYLES.overdue}>
                           overdue
@@ -538,7 +563,9 @@ export default function AppointmentsPage() {
                     <li key={`urgent-${urgentItem.id}`} className={`rounded-lg border p-3 text-sm ${TASK_CARD_STYLES.critical}`}>
                       <div className="flex flex-wrap items-start justify-between gap-2">
                         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-                          <span className="font-semibold min-w-0 flex-1 break-words">{formatDevice(urgentItem.animalId)}</span>
+                          <span className="font-semibold min-w-0 flex-1 break-words">
+                            <Bdi dir="auto">{formatDevice(urgentItem.animalId, equipmentById)}</Bdi>
+                          </span>
                         </div>
                         <Badge variant="outline" className={URGENT_BADGE_STYLES.critical}>
                           critical
@@ -630,7 +657,9 @@ export default function AppointmentsPage() {
                     <li key={todayTask.id} className={`flex flex-col gap-1.5 rounded-lg border p-3 text-sm ${TASK_CARD_STYLES.soon}`}>
                       <div className="flex flex-wrap items-start justify-between gap-2">
                         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-                          <span className="font-semibold min-w-0 flex-1 break-words">{formatDevice(todayTask.animalId)}</span>
+                          <span className="font-semibold min-w-0 flex-1 break-words">
+                            <Bdi dir="auto">{formatDevice(todayTask.animalId, equipmentById)}</Bdi>
+                          </span>
                         </div>
                         <div className="flex flex-wrap items-center justify-end gap-1 shrink-0">
                           <Badge
@@ -733,7 +762,9 @@ export default function AppointmentsPage() {
                     <li key={myTask.id} className={`flex flex-col gap-1.5 rounded-lg border p-3 text-sm ${TASK_CARD_STYLES.normal}`}>
                       <div className="flex flex-wrap items-start justify-between gap-2">
                         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-                          <span className="font-semibold min-w-0 flex-1 break-words">{formatDevice(myTask.animalId)}</span>
+                          <span className="font-semibold min-w-0 flex-1 break-words">
+                            <Bdi dir="auto">{formatDevice(myTask.animalId, equipmentById)}</Bdi>
+                          </span>
                         </div>
                         <div className="flex flex-wrap items-center justify-end gap-1 shrink-0">
                           <Badge
@@ -1053,7 +1084,9 @@ export default function AppointmentsPage() {
                       >
                         <div className="flex flex-wrap items-start justify-between gap-2">
                           <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5 text-xs font-semibold break-words">
-                            <span className="min-w-0">{formatDevice(appointment.animalId)}</span>
+                            <span className="min-w-0">
+                              <Bdi dir="auto">{formatDevice(appointment.animalId, equipmentById)}</Bdi>
+                            </span>
                           </div>
                           <div className="flex flex-wrap justify-end gap-1 shrink-0">
                             <Badge variant="secondary" className="text-[10px]">
@@ -1194,7 +1227,7 @@ export default function AppointmentsPage() {
           required select had zero options and submit stayed disabled with
           no explanation. */}
       {(metaQuery.isError ||
-        (metaQuery.isSuccess && (metaQuery.data?.vets ?? []).length === 0)) && (
+        (metaQuery.isSuccess && assignees.length === 0)) && (
         <p className="mt-1 text-xs text-destructive" role="alert">
           {t.appointmentsPage.noEligibleTechnicians}
         </p>
@@ -1205,16 +1238,31 @@ export default function AppointmentsPage() {
       <label htmlFor={`${bookingFormId}-asset`} className="text-xs text-muted-foreground block text-start">
         {t.appointmentsPage.labelDeviceAsset} <span className="text-destructive" aria-hidden>*</span>
       </label>
-      <Input
+      <EquipmentDeviceField
         id={`${bookingFormId}-asset`}
-        dir="ltr"
-        className="text-left"
+        equipment={equipmentQuery.data ?? []}
+        isLoading={equipmentQuery.isLoading}
+        hasError={equipmentQuery.isError}
         value={formDeviceRef}
-        onChange={(e) => setFormDeviceRef(e.target.value)}
-        placeholder={t.appointmentsPage.placeholderDevice}
+        onChange={setFormDeviceRef}
         required
-        aria-required="true"
       />
+      {/* A failed fetch must not read as "no equipment registered" — an
+          empty `equipment` array from an errored query looks identical to a
+          genuinely empty clinic otherwise. Retries are exhausted via the
+          shared queryClient default before `isError` settles. */}
+      {equipmentQuery.isError && (
+        <p className="mt-1 text-xs text-destructive" role="alert">
+          {t.appointmentsPage.equipmentLoadFailed}{" "}
+          <button
+            type="button"
+            onClick={() => equipmentQuery.refetch()}
+            className="underline"
+          >
+            {t.errorCard.retry}
+          </button>
+        </p>
+      )}
     </div>
 
     <div>

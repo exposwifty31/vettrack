@@ -3,11 +3,13 @@
  *
  * Phase 9 — Display-device pairing kiosk screen (GET /board/pair). Covers the
  * code-entry → claim → token-persisted → redirect happy path, the submit gating
- * (button disabled until an 8-char code is present), and the error branch when
- * the claim is rejected.
+ * (button disabled until an 8-char code is present), the error branch when the
+ * claim is rejected, and (Phase 10 / T21 item 2) the explicit revoked notice
+ * that replaces the previous silent fallback to a bare pairing form.
  */
+import { StrictMode, type ReactNode } from "react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, cleanup, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, cleanup, fireEvent, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Router, useLocation } from "wouter";
 import { memoryLocation } from "wouter/memory-location";
@@ -15,11 +17,15 @@ import { t } from "@/lib/i18n";
 
 const claimMock = vi.fn();
 const setTokenMock = vi.fn();
+const peekRevokedNoticeMock = vi.fn().mockReturnValue(false);
+const consumeRevokedNoticeMock = vi.fn().mockReturnValue(false);
 vi.mock("@/lib/api", () => ({
   claimDisplayPairing: (...a: unknown[]) => claimMock(...a),
 }));
 vi.mock("@/lib/display-token-store", () => ({
   setStoredDisplayToken: (...a: unknown[]) => setTokenMock(...a),
+  peekDisplayRevokedNotice: () => peekRevokedNoticeMock(),
+  consumeDisplayRevokedNotice: () => consumeRevokedNoticeMock(),
 }));
 
 import BoardPairPage from "@/pages/board-pair";
@@ -29,18 +35,21 @@ function LocationProbe() {
   return <div data-testid="loc">{loc}</div>;
 }
 
-function renderPage() {
+function renderPage(options?: { strict?: boolean }) {
   const qc = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
   const { hook } = memoryLocation({ path: "/board/pair" });
+  const Wrapper = options?.strict ? StrictMode : ({ children }: { children: ReactNode }) => <>{children}</>;
   return render(
-    <QueryClientProvider client={qc}>
-      <Router hook={hook}>
-        <BoardPairPage />
-        <LocationProbe />
-      </Router>
-    </QueryClientProvider>,
+    <Wrapper>
+      <QueryClientProvider client={qc}>
+        <Router hook={hook}>
+          <BoardPairPage />
+          <LocationProbe />
+        </Router>
+      </QueryClientProvider>
+    </Wrapper>,
   );
 }
 
@@ -51,6 +60,8 @@ function typeCode(value: string) {
 beforeEach(() => {
   claimMock.mockReset();
   setTokenMock.mockReset();
+  peekRevokedNoticeMock.mockReset().mockReturnValue(false);
+  consumeRevokedNoticeMock.mockReset().mockReturnValue(false);
 });
 afterEach(() => cleanup());
 
@@ -100,5 +111,45 @@ describe("BoardPairPage — error branch", () => {
     expect(await screen.findByText(t.boardPair.error)).toBeTruthy();
     expect(setTokenMock).not.toHaveBeenCalled();
     expect(screen.getByTestId("loc").textContent).toBe("/board/pair");
+  });
+});
+
+describe("BoardPairPage — revoked notice (T21 item 2)", () => {
+  it("shows an explicit revoked notice, not a bare form, when auth-fetch flagged a revocation", async () => {
+    peekRevokedNoticeMock.mockReturnValue(true);
+    renderPage();
+
+    const notice = await screen.findByTestId("board-pair-revoked-notice");
+    expect(notice).toBeTruthy();
+    expect(within(notice).getByText(t.boardPair.revokedNoticeTitle)).toBeTruthy();
+    expect(within(notice).getByText(t.boardPair.revokedNoticeMessage)).toBeTruthy();
+    // The underlying flag is cleared exactly once, from the post-mount effect
+    // (a plain, non-StrictMode render only runs that effect once).
+    await waitFor(() => expect(consumeRevokedNoticeMock).toHaveBeenCalledTimes(1));
+    // The pairing form is still present (re-pairing must remain possible) —
+    // the notice supplements the form, it does not replace it.
+    expect(screen.getByLabelText(t.boardPair.codeLabel)).toBeTruthy();
+  });
+
+  it("shows nothing when there is no revoked-notice flag (normal first-time pairing)", async () => {
+    peekRevokedNoticeMock.mockReturnValue(false);
+    renderPage();
+    await screen.findByLabelText(t.boardPair.codeLabel);
+    expect(screen.queryByTestId("board-pair-revoked-notice")).toBeNull();
+  });
+
+  it("StrictMode regression: the notice still shows once when the initializer is double-invoked", async () => {
+    // Before the fix, the lazy useState initializer both read AND cleared the
+    // flag; React StrictMode double-invokes initializers in development, so
+    // the second (already-cleared) call could win and silently drop the
+    // banner. peekDisplayRevokedNotice() is a pure read — the mock returning
+    // `true` on every call proves double-invocation can no longer eat the
+    // notice, regardless of how many times the initializer runs.
+    peekRevokedNoticeMock.mockReturnValue(true);
+    renderPage({ strict: true });
+
+    const notices = await screen.findAllByTestId("board-pair-revoked-notice");
+    expect(notices).toHaveLength(1);
+    expect(screen.getByText(t.boardPair.revokedNoticeTitle)).toBeTruthy();
   });
 });

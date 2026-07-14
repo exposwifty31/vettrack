@@ -121,6 +121,21 @@ export function QrScanner({ onClose, onDispense }: QrScannerProps) {
 
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const lastScanRef = useRef<number>(0);
+  // Monotonic token identifying the current physical scan. Bumped on every
+  // decode that clears the debounce, BEFORE the (possibly slow) network
+  // resolve is awaited. A resolve is only applied if this ref still equals
+  // the token it captured — a later scan bumping the token supersedes any
+  // still-in-flight resolve from an earlier one, so the last PHYSICALLY
+  // scanned tag always wins, never the last one to finish resolving.
+  const scanTokenRef = useRef<number>(0);
+  // Monotonic token identifying the current start-scanner attempt. Bumped by
+  // both startScanner (new attempt) and stopScanner (invalidates any attempt
+  // still awaiting scanner.start()). If a start's await resolves after it's
+  // been superseded, it tears itself down instead of adopting scannerRef /
+  // "scanning" phase — otherwise a late resolve can leave a second, orphaned
+  // camera instance running while the resume-on-visibility effect starts yet
+  // another one (it only checks `!scannerRef.current`).
+  const scannerGenerationRef = useRef(0);
   const stopScannerRef = useRef<() => Promise<void>>(() => Promise.resolve());
   const fallbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const initTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -229,15 +244,25 @@ export function QrScanner({ onClose, onDispense }: QrScannerProps) {
         return;
       }
 
+      // Claim this physical scan's token before the async resolve starts.
+      const token = ++scanTokenRef.current;
+
       setPhase("resolving");
+      // Stop the camera BEFORE awaiting the network resolve — narrows the
+      // window in which another decode can fire while this one is in flight.
+      // The token check below is the actual last-scanned-wins guarantee.
+      await stopScannerRef.current();
+
       const eq = await resolveEquipmentId(equipmentId);
+      if (scanTokenRef.current !== token) return; // superseded by a newer scan — discard
+
       if (!eq) {
         // Equipment not found — try resolving as an inventory container.
         // If successful, hand off to the dispense flow immediately (zero extra taps).
         if (onDispense) {
           const containerId = await resolveAsContainer(equipmentId);
+          if (scanTokenRef.current !== token) return; // superseded while resolving container
           if (containerId) {
-            await stopScannerRef.current();
             haptics.scanSuccess();
             // Parent closes the scanner via state after onDispense — do not call onClose()
             // here or it may clear page-held context (e.g. ER quick-scan patient) before onDispense runs.
@@ -246,12 +271,10 @@ export function QrScanner({ onClose, onDispense }: QrScannerProps) {
           }
         }
         setNotFoundId(equipmentId);
-        await stopScannerRef.current();
         setPhase("not_found");
         return;
       }
 
-      await stopScannerRef.current();
       setConfirmFlash(true);
       setTimeout(() => setConfirmFlash(false), 260);
       setScannedEquipment(eq);
@@ -279,6 +302,10 @@ export function QrScanner({ onClose, onDispense }: QrScannerProps) {
   );
 
   const stopScanner = useCallback(async () => {
+    // Invalidate any startScanner() attempt still awaiting scanner.start() —
+    // see scannerGenerationRef comment above.
+    scannerGenerationRef.current++;
+
     // Nuclear first: kill all camera tracks before anything else so the iOS
     // orange dot disappears immediately, even if the library teardown is slow.
     killAllCameras();
@@ -316,6 +343,7 @@ export function QrScanner({ onClose, onDispense }: QrScannerProps) {
   stopScannerRef.current = stopScanner;
 
   const startScanner = useCallback(async () => {
+    const myGeneration = ++scannerGenerationRef.current;
     setPhase("init");
 
     // Heavy scanning lib (html5-qrcode) is loaded on demand so it stays out of
@@ -370,6 +398,20 @@ export function QrScanner({ onClose, onDispense }: QrScannerProps) {
         () => {}
       );
 
+      if (scannerGenerationRef.current !== myGeneration) {
+        // Superseded by a stopScanner()/newer startScanner() call while
+        // scanner.start() was in flight — tear this instance down instead of
+        // adopting scannerRef/"scanning" phase (see scannerGenerationRef).
+        // A failed stop() here is not silently ignored: it means this
+        // generation's camera instance may still be active even though a
+        // newer generation has taken over, so surface it for diagnosis rather
+        // than treating teardown as having succeeded.
+        await scanner.stop().catch((stopErr: unknown) => {
+          console.error("[qr-scanner] failed to stop superseded scanner instance", stopErr);
+        });
+        return;
+      }
+
       if (initTimeoutRef.current) {
         clearTimeout(initTimeoutRef.current);
         initTimeoutRef.current = null;
@@ -420,19 +462,36 @@ export function QrScanner({ onClose, onDispense }: QrScannerProps) {
     };
   }, []);
 
-  // Kill camera immediately when the app is backgrounded or the screen is locked.
-  // Prevents the persistent iOS PWA "Recording" orange dot on minimize/lock.
+  // Kill camera immediately when the app is backgrounded or the screen is locked
+  // (prevents the persistent iOS PWA "Recording" orange dot on minimize/lock), and
+  // resume it on return. visibilitychange covers the common tab/app-switch case;
+  // pageshow additionally covers BFCache restores that don't always re-fire
+  // visibilitychange. Only resumes while still in the live-camera "scanning"
+  // phase, and only if the camera isn't already running — guards against both
+  // events firing for the same resume and mirrors the existing start path.
   useEffect(() => {
+    const resumeCameraIfNeeded = () => {
+      if (phase === "scanning" && !scannerRef.current) {
+        startScanner();
+      }
+    };
     const handleVisibilityChange = () => {
       if (document.visibilityState === "hidden") {
         stopScannerRef.current();
+      } else if (document.visibilityState === "visible") {
+        resumeCameraIfNeeded();
       }
     };
+    const handlePageShow = () => {
+      resumeCameraIfNeeded();
+    };
     document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("pageshow", handlePageShow);
     return () => {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("pageshow", handlePageShow);
     };
-  }, []);
+  }, [phase, startScanner]);
 
   const toggleTorch = async () => {
     if (!scannerRef.current) return;

@@ -106,8 +106,12 @@ export function Topbar() {
         Vet<em className="text-[var(--brand-green-bright)] not-italic">Track</em>
       </Link>
 
-      {/* Primary (operational) nav — horizontal, scrolls the active tab into view */}
-      <nav ref={navRef} className="flex items-center gap-0.5 flex-1 overflow-x-auto">
+      {/* Primary (operational) nav — horizontal, scrolls the active tab into view.
+          T22: at intermediate desktop widths (~1227px) this strip doesn't fit every
+          item and used to show a raw horizontal scrollbar. scrollbar-none (same
+          utility as the admin tab strip / equipment filter chips) keeps the strip
+          scrollable — nothing is unreachable — without the visible scrollbar. */}
+      <nav ref={navRef} className="flex items-center gap-0.5 flex-1 overflow-x-auto scrollbar-none min-w-0">
         {visibleItems.map(renderNavLink)}
       </nav>
 

@@ -31,6 +31,8 @@ const PHASE_9_DISPLAY_PAIRING_ROUTES = [
   "GET /api/display/devices",
   "PATCH /api/display/devices/:id",
   "POST /api/display/devices/:id/revoke",
+  // Phase 10 (T21 item 3) — delete a dead (already-revoked) registry row.
+  "DELETE /api/display/devices/:id",
 ] as const;
 
 export const EMERGENCY_SERVER_ROUTE_ALLOWLIST: readonly string[] = [

@@ -1999,6 +1999,739 @@ The "CodeRabbit / Review" check showed **neutral** (its non-blocking completed s
 
 ---
 
+## 2026-07-10 — T3: fail-loud error surfacing on task-create + equipment-list-checkout mutations; Code Blue open verified already fixed (uncommitted)
+
+**Claim:** Fixed two genuinely-swallowing mutations found by discovery (not the ones assumed from the audit prose) and verified the Code Blue open-session 403 path — the audit's BLOCKING #2 — was already fail-loud on this branch from prior commits, adding a regression test rather than a redundant source change.
+
+**Evidence:**
+- **Code Blue open (verified already fixed, no source change):** `src/pages/code-blue.tsx:582-605` (`CodeBluePage.handleStart` catch block) already maps `err.code === "INSUFFICIENT_ROLE"` (and `MANAGER_NOT_CODE_BLUE_ELIGIBLE`) to `toast.error(t.codeBlue.clinicalAuthorityRequired, { duration: 8000 })`. Confirmed the server payload shape matches: `server/middleware/authority.ts:231-237` returns `{ code: "INSUFFICIENT_ROLE", reason: "INSUFFICIENT_CLINICAL_AUTHORITY", message: "Clinical authority required" }` on the 403 `requireClinicalAuthority` denial (`server/routes/code-blue.ts:88`), and `ApiError.code` reads `payload.code` first (`src/lib/request-core.ts:97`) — so the branch matches. Traced via `git log` + `git show`: this path was fixed by commits `8f3146cc4` (C1, armed-but-silent button) and `0e6888fba` (F2, exactly this 403→toast mapping), both already ancestors of HEAD on `claude/phase-10a-audit-fixes`. New test `tests/code-blue-start-error-toast.test.tsx` (2 tests) pins the regression: mocks `api.codeBlue.sessions.start` to reject with the real 403 payload shape, asserts `toast.error` fires with the localized message (not the raw server string), and asserts a generic/unmapped code falls back to `t.codeBlue.startSessionFailed`.
+- **Task create — real bug found + fixed:** `src/pages/tasks/task-utils.tsx` `toErrorMessage()` compared `err.message` against bare server codes (`"OUTSIDE_SHIFT"`, `"APPOINTMENT_CONFLICT"`, …), but `ApiError.message` is `toApiErrorMessage(status, payload)` — the server's human-readable text, never the code (confirmed server response shape at `server/routes/appointments.ts:103-116` `sendServiceError`: `{ code, error, reason, message }`, and `ApiError` ctor at `src/lib/request-core.ts:92-103`). Every branch was dead code; a failed create always fell through to the raw, unlocalized `err.message`. Same bug in `src/pages/Tasks.tsx:191` (`error.message === "APPOINTMENT_CONFLICT"`), so the 409-conflict override modal never opened either. Fixed both to match on `ApiError.code` (`task-utils.tsx` switch statement; `Tasks.tsx` now calls the new `isAppointmentConflictError` helper); non-ApiError fallback is now the localized `t.api.serverError` (was the raw error string). `src/lib/api.ts` now re-exports `toApiErrorMessage`/`extractApiErrorCode` alongside the existing `ApiError` re-export so page code doesn't reach into `request-core.ts` directly.
+- **Equipment list checkout — real gap found + fixed:** `src/pages/equipment-list.tsx` `EquipmentItem.checkoutMut.onError` only ever showed the generic `t.equipmentList.toast.checkoutError`, discarding the server's actual reason, and had no pre-flight off-shift gate (the detail page's `handleCheckout` in `src/pages/equipment-detail.tsx:604-618` does: `useActiveShift()` + `if (!hasActiveShift) toast.error(t.scan.offShiftBody)`). Added the same `useActiveShift()` gate (`handleCheckoutClick`) and changed `onError` to surface `err.message` via a new `t.equipmentList.toast.checkoutFailed(msg)` accessor (mirrors the existing `equipmentDetail.toast.checkoutFailed` pattern in `src/lib/i18n.ts:322`, falling back to the existing `checkoutError` string — no new locale keys needed). Exported `EquipmentItem` for testing (same precedent as `PreCheckGate`).
+- **Dispense/restock — verified already correct, no change:** `src/features/containers/components/DispenseSheet.tsx:266-277` always calls `toast.error(t.dispense.errorMessage(res.error))` on a non-ok result. `src/pages/inventory-page.tsx` restock mutations toast on `startSessionMut`/`finishMut` failure and — for `scanMut`, which does NOT toast — the reducer's `errorMessage` is rendered inline at `inventory-page.tsx:789-791` (a different but equally non-silent UI mechanism). No swallow found.
+- Test: `pnpm vitest run tests/code-blue-start-error-toast.test.tsx tests/equipment-list-checkout-error-toast.test.tsx tests/tasks-create-error-toast.test.tsx tests/task-utils.test.ts tests/code-blue-precheck-gate.test.tsx tests/equipment-actions.test.tsx` → `Test Files 6 passed (6)` / `Tests 42 passed (42)`.
+- Command: `pnpm typecheck` → exit 0 (frontend `tsc --noEmit` + `tsc -p tsconfig.server.json --noEmit`), re-run clean after the `src/lib/api.ts` re-export change.
+- Command: `pnpm i18n:check` → "locales/en.json and locales/he.json are in deep key parity." (no new locale keys added — `checkoutFailed` is a TS-level function accessor over the existing `checkoutError` string, same pattern as `equipmentDetail.toast.checkoutFailed`).
+- Command: `pnpm test` → `Test Files 452 passed (452)` / `Tests 4271 passed (4271)`.
+- Command: `pnpm depcruise:check` → `4 dependency violations (0 errors, 4 warnings)` — all 4 warnings are pre-existing `no-features-to-pages-internals` findings in `src/features/rooms/tablet/*` and `src/features/inventory/tablet/*`, unrelated to files touched this task.
+
+**Verdict:** VERIFIED
+
+## 2026-07-10 — T1: Code Blue break-glass — clinical identity role opens an emergency without a shift (uncommitted at write time)
+
+**Claim:** Added an additive, opt-in emergency break-glass path so any account whose permanent clinical identity role ∈ {vet, senior_technician, technician} may OPEN a Code Blue session with no active shift (effectiveClinicalRole=null, reason=EZSHIFT_NONE), mirroring the existing legacy-dispense fallback template. Students never gain authority; every other `requireClinicalAuthority` call-site is behaviorally unchanged; the deny path shape is unchanged.
+
+**Evidence:**
+- `server/middleware/authority.ts:98-116` — new option `allowPermanentClinicalRoleForEmergency?: true` added to `RequireClinicalAuthorityOptions`, separate from `allowPermanentClinicalRoleFallbackForLegacyDispense` (not widened/reused).
+- `server/middleware/authority.ts` — new independent `if (emergencyBreakGlassOpted) { ... }` branch placed AFTER the dispense fallback branch, same predicate (`effectiveClinicalRole === null && reason === "EZSHIFT_NONE" && clinicalRole !== null && clinicalRole !== "student" && opts.allow.includes(clinicalRole)`); on match emits `incrementMetric("authority_emergency_break_glass_used")` + `emitCodeBlueBreakGlassAudit({ req, snapshot })` + `next()`. Read-confirmed the pre-existing dispense branch (`incrementMetric("authority_legacy_fallback_used")` + `emitDispenseLegacyFallbackAudit`) is byte-for-byte unchanged, and the 403 deny block (`code: INSUFFICIENT_ROLE`, `reason: INSUFFICIENT_CLINICAL_AUTHORITY`) is unchanged.
+- `server/routes/code-blue.ts:280-289` — `allowPermanentClinicalRoleForEmergency: true` set ONLY on the `POST /sessions` gate; `allowSystemAdmin: false` retained. The legacy `POST /events` gate (line ~88) and PATCH gates were NOT touched (grep-confirmed unchanged).
+- `server/lib/metrics.ts` — `authority_emergency_break_glass_used` appended to the `MetricName` union AND `DEFAULT_COUNTERS`, plus exposed as `authority.emergencyBreakGlassUsed` in both the success and catch-fallback branches of `getMetricsSnapshot()`. No existing member renamed/removed.
+- `server/lib/audit.ts:164-170` — `code_blue_break_glass_used` appended to the closed `AuditActionType` union (never inferred). `server/lib/authority-audit.ts` — new `emitCodeBlueBreakGlassAudit(...)` helper + dedicated 60s rate limiter, mirroring `emitDispenseLegacyFallbackAudit` (gated by `AUTHORITY_OBS_V1`, fire-and-forget).
+- Tests added (no fixture edits to existing cases): `tests/require-clinical-authority.test.ts` — vet/technician/senior_technician allowed on the flagged gate; student denied (403); same null/EZSHIFT_NONE snapshot on a gate WITHOUT the flag → 403 (scope proof); non-EZSHIFT_NONE (CHECKED_IN_STALE) denied even with flag; role-not-in-allow denied. `tests/authority-middleware-observability.test.ts` — counter `emergencyBreakGlassUsed` increments + break-glass audit helper called on admit; `legacyFallbackUsed` stays 0 and dispense audit NOT called (independence); student denial does not increment the counter. `tests/authority-audit.test.ts` — new emitter flag-off no-op + flag-on `code_blue_break_glass_used` row.
+- Command: `pnpm typecheck` → exit 0 (frontend `tsc --noEmit` + server `tsc -p tsconfig.server.json --noEmit`).
+- Command: `pnpm test` → `Test Files 452 passed (452)` / `Tests 4283 passed (4283)` (existing auth suites — including `authority-middleware-zero-consumers`, `code-blue-pr-4-2-route-wiring`, `phase-9-metrics-cardinality` — green with no fixture edits; the zero-consumers scope test still passes because the new flag is a distinct token and the new tests live in already-allowlisted files).
+- Command: `pnpm architecture:gates` → `All G1 checks passed.` (4 dependency-cruiser warnings are pre-existing `no-features-to-pages-internals` in rooms/inventory tablet files, unrelated to this task; server tsc clean; cycle baseline matches).
+
+**Verdict:** VERIFIED
+
+## 2026-07-10 — T2: admin bypasses shift-gating for scan + task-create (uncommitted)
+
+**Claim:** Added an additive `admin` bypass to two shift gates — client scan block (`src/features/scan/ScanScreen.tsx`) and server task-create `OUTSIDE_SHIFT` validation (`server/services/appointments.service.ts`) — with non-admin behavior byte-for-byte unchanged, per owner decision recorded in `/Users/dan/.claude/jobs/c1caeb20/tmp/sdd/task-T2-brief.md`.
+
+**Evidence:**
+- `src/features/scan/ScanScreen.tsx:7` — added `import { useAuth } from "@/hooks/use-auth";`; line 22 changed `const scanBlocked = !shiftLoading && !hasActiveShift;` → `const scanBlocked = !shiftLoading && !hasActiveShift && !isAdmin;`, reusing the canonical `isAdmin` accessor from `useAuth()` (confirmed as the established pattern via `grep -rn 'isAdmin' src` — used identically in `src/pages/equipment-detail.tsx`, `src/components/qr-scanner.tsx`, `src/components/sync-queue-sheet.tsx`).
+- Confirmed no second scan-entry gate: `grep -rn "hasActiveShift" src/native src/app` and read `src/lib/routes/native-nav-model.ts:95` — the only shift-conditional nav logic hides the "End shift" session row when off-shift; the `scan` nav item itself is never hidden/disabled. `src/pages/scan.tsx` and both `NativeTabBar.tsx`/`NativeTabSidebar.tsx` route to the same shared `ScanScreen` for phone and tablet — one gate, now fixed.
+- `server/services/appointments.service.ts:658` — `assertWithinVetShift` now exported, takes optional `actorRole?: string`, and line 665 adds `if (args.actorRole === "admin") return;` before any of its three `OUTSIDE_SHIFT` throws (lines 668/678/705 post-edit).
+- `server/services/appointments.service.ts:845` — `createAppointment`'s call site now passes `actorRole: actor?.role` (sourced from `server/routes/appointments.ts:180` `resolveTaskAuthRole(req)`, which returns `"admin"` for `req.authUser.role === "admin"`, unchanged).
+- `server/services/appointments.service.ts:1009` — `updateAppointment`'s call site verified UNCHANGED (`await assertWithinVetShift({ clinicId, vetId: nextVetId, startTime: nextStartTime, endTime: nextEndTime });`, no `actorRole` passed) — admin bypass is scoped to task-create only, matching the brief's "(b) CREATE a task" scope; reschedule/update keeps the original shift-window check for every actor including admin.
+- Test: `pnpm test -- tests/appointments-service-admin-shift-bypass.test.ts tests/scan-screen-admin-shift-bypass.test.tsx tests/appointments-scheduling.test.js` → `Test Files 3 passed (3)` / `Tests 40 passed (40)`. New `assertWithinVetShift` unit tests (direct import, mocked `db`) prove: admin with no vet/shift rows resolves cleanly (proves early-return, since a non-admin in that same state would hit `VET_NOT_IN_CLINIC` or `OUTSIDE_SHIFT`); admin bypasses even the cross-day check; non-admin vet/technician actors outside shift hours still reject with `AppointmentServiceError{code:"OUTSIDE_SHIFT", status:400}`; an actor-less (system) call preserves original behavior; non-admin actor inside an active shift window still resolves. New `ScanScreen` RTL tests (mocked `useAuth`/`useActiveShift`/`QrScanner`) prove: admin+no-shift renders the scanner (not the block); non-admin+no-shift still shows `t.scan.offShiftTitle`; both shift/admin combinations that were already unblocked stay unblocked.
+- Command: `pnpm typecheck` → exit 0, no output (frontend `tsc --noEmit` + server `tsc -p tsconfig.server.json --noEmit`).
+- Command: `pnpm test` (full suite) → `Test Files 454 passed (454)` / `Tests 4294 passed (4294)`.
+- Command: `pnpm architecture:gates` → `All G1 checks passed.` (4 pre-existing `no-features-to-pages-internals` dependency-cruiser warnings in rooms/inventory tablet files, unrelated; server tsc clean; madge cycle baseline matches, 0 cycles both server and src).
+- Command: `pnpm tenant:lint:touched` → 6 pre-existing warnings, all in `server/routes/code-blue.ts` (unrelated file, not touched this session); no new findings against `server/services/appointments.service.ts`.
+
+**Verdict:** VERIFIED
+
+## 2026-07-11 — T8: Clerk sign-in card localized (heIL/enUS), live locale switching (uncommitted at write time)
+
+**Claim:** Wired Clerk's official `@clerk/localizations` package into `ClerkProvider` so the Clerk-rendered sign-in/sign-up card ("Sign in to VetTrack", "Continue", the internal Clerk footer links, etc.) follows the app's locale — Hebrew by default (`heIL`), English (`enUS`) otherwise — and stays live if the user switches locale mid-session, not just at boot. Presentation-only; auth mode logic, `resolveAuthUser`, and the native-Clerk transport are untouched.
+
+**Evidence:**
+- `pnpm add @clerk/localizations` → `package.json:98` adds `"@clerk/localizations": "^4.13.2"`; confirmed real install (not just a lockfile edit) via `node_modules/@clerk/localizations/dist/index.d.ts` exporting `heIL`/`enUS` (`he-IL.js`/`en-US.js`), both typed `LocalizationResource` from `@clerk/shared/types`.
+- `src/lib/clerk-capacitor-config.ts` — added `clerkLocalizationForLocale(locale: Locale): ClerkLocalization` (pure mapping, `"he" → heIL` else `enUS`); `ClerkProviderRuntimeProps` gained a required `localization` field; `clerkProviderPropsForRuntime(publishableKey, locale = getCurrentLocale())` now computes and returns `localization` in both the Capacitor-native and web branches. `getCurrentLocale` is the existing synchronous accessor from `src/lib/i18n.ts` (grepped — already used by `src/lib/export-excel.ts`, defaults to `"he"` when unset, matching the app's Hebrew-default rule). No existing caller passed a second arg, so the default preserves prior behavior for anyone still calling with one arg.
+- Confirmed only one production call site existed pre-change (`grep -rn "clerkProviderPropsForRuntime" src tests` before editing): `src/main.tsx:232`. No other code depends on the old (localization-less) `ClerkProviderRuntimeProps` shape.
+- **Reactivity (not just boot-time):** `ClerkProvider` in `src/main.tsx` is the outermost node of the tree rendered once via `root.render()`; `SettingsProvider`/`useSettings()` (which tracks `settings.locale` reactively) is nested *inside* it, so it can't feed a prop upward into `ClerkProvider`. Added `ClerkLocaleBridge` (`src/main.tsx`, wraps `ClerkProvider`) — a `useState(() => getCurrentLocale())` seeded once, updated via the same `"vettrack:locale-changed"` window event `AppBootstrap` already listens to (dispatched by `setStoredLocale` in `src/lib/i18n.ts`) — so `localization` is recomputed and passed to `ClerkProvider` as a normal React prop update (no remount) on every locale switch, live.
+- Verified item 3 of the brief (custom Privacy/Terms/Support overrides) is a non-issue: `src/components/legal-footer-links.tsx` (rendered below the Clerk card on `/signin`) already sources its own Privacy/Terms/Support links from `t.legalFooter.*` (confirmed Hebrew strings present in `locales/he.json:3791-3796`) — that footer was never English. The English "Privacy policy/Terms of use/Support" text the audit observed lives inside Clerk's own internal widget chrome, which `heIL` covers directly; no custom `.ts` string override was needed (constraint: no hardcoded Hebrew in `.ts/.tsx` — satisfied, zero literal strings added).
+- `src/lib/clerk-appearance.ts` checked for hardcoded text overrides — only CSS class names (e.g. `footerActionLink: "text-primary hover:text-primary/90"`), no strings; untouched.
+- Test: `tests/clerk-capacitor-config.test.ts` — added `clerkLocalizationForLocale` (2 cases: `"he"→heIL`, `"en"→enUS`, both `toBe` on the real imported constants, not a mock) and 3 new `clerkProviderPropsForRuntime` cases asserting `.localization` is `heIL`/`enUS` for both the web and native-shell (`isCapacitorNative() === true`) branches. `pnpm test -- tests/clerk-capacitor-config.test.ts --reporter=verbose` → `Test Files 1 passed (1)` / `Tests 9 passed (9)` (4 pre-existing + 5 new, all green).
+- Command: `pnpm typecheck` → exit 0, no output (frontend `tsc --noEmit` + `tsc -p tsconfig.server.json --noEmit`) — confirms the new package's types resolve cleanly through both `@clerk/localizations`'s own `@clerk/shared/types` and `@clerk/clerk-react`'s `ClerkOptions.localization`, despite the repo's pnpm tree containing multiple `@clerk/shared` versions (structural typing reconciled them; no `as any`/cast added).
+- Command: `pnpm i18n:check` → `✓ locales/en.json and locales/he.json are in deep key parity.` (no locale keys added or changed).
+- Command: `pnpm test -- tests/i18n-no-hebrew-in-source.test.ts tests/i18n-parity.test.ts --reporter=verbose` → `Test Files 2 passed (2)` / `Tests 6 passed (6)` — confirms no Hebrew literal was introduced in `.ts`/`.tsx`.
+- Command: `pnpm build` → completed (`✓ built in 7.54s`), confirming the new dependency bundles cleanly in the production Vite build (not just typecheck) — went beyond the brief's "or at least typecheck resolves the new dep" floor.
+- `git status --short` before commit → only `package.json`, `pnpm-lock.yaml`, `src/lib/clerk-capacitor-config.ts`, `src/main.tsx`, `tests/clerk-capacitor-config.test.ts` touched; no unrelated files staged.
+
+**Verdict:** VERIFIED
+
+## 2026-07-11 — T13: activity feed / alerts render actor displayName, not email (20b0a0526)
+
+**Claim:** The equipment-detail activity feed rendered a scanning user's raw email; the alerts claim chip rendered the email local-part. Both now render the actor's display name, falling back to an existing neutral "unknown user" key — never the email. `server/routes/alert-acks.ts` now joins `vt_users` (clinic-scoped) to serialize `acknowledgedByDisplayName`.
+
+**Evidence:**
+- Traced the actual render path by reading the component tree, not by trusting the brief's grep hint: `src/pages/equipment-detail.tsx:1327-1335` renders `EquipmentDetailActivityTab` for the "activity" tab, fed by `scanLogs` sourced from `useInfiniteQuery` → `api.equipment.logsPaginated` → `GET /api/equipment/:id/logs` (`server/routes/equipment/handlers/get-equipment-logs.ts`), confirming the brief's guessed file (`server/routes/activity.ts`) was not the actual leak source — `/api/activity`'s `userEmail` field is only used for self-comparison (`item.userEmail === userEmail` in `src/components/shift-summary-sheet.tsx:183,191`), never rendered as another user's label.
+- Pre-fix: `src/components/equipment/EquipmentDetailActivityTab.tsx:109` rendered `{entry.scan.userEmail}` unconditionally. `server/routes/equipment/handlers/get-equipment-logs.ts:35,59` already computed `staffName: users.name` via a join but stripped it for non-admin (`isAdmin ? rows : rows.map(({staffName,staffRole,...rest}) => rest)`) while leaving `userEmail` unstripped for everyone — confirmed by reading the full handler.
+- Fix: `src/components/equipment/EquipmentDetailActivityTab.tsx:109` now renders `{entry.scan.staffName || t.appointmentsPage.unknownUser}` — no server change needed for this surface since `staffName` was already correctly computed/gated; the client just wasn't consuming it.
+- Pre-fix: `src/pages/alerts.tsx:248` and `src/components/alerts/AlertsProView.tsx:150` both did `ack.acknowledgedByEmail.split("@")[0]`; confirmed both are live (`AlertsScreen` wraps `AlertsProView` for the mobile shell per `src/features/alerts/AlertsScreen.tsx:128`, `alerts.tsx` renders it directly on desktop).
+- Fix: both now render `ack.acknowledgedByDisplayName || t.appointmentsPage.unknownUser`. `server/routes/alert-acks.ts` — added `ACK_COLUMNS` with `acknowledgedByDisplayName: sql<string | null>\`NULLIF(${users.name}, '')\`` and a `leftJoin(users, and(eq(alertAcks.acknowledgedById, users.id), eq(users.clinicId, clinicId)))` on all 4 read call sites (GET /, POST / idempotent + re-select, PATCH /:id/resolve existing + updated); POST insert path splices `req.authUser!.name || null` directly (acknowledger is always the requester there, avoiding a redundant query). `src/types/equipment.ts:447` — `AlertAcknowledgment.acknowledgedByDisplayName: string | null` added.
+- Caught and reverted a self-introduced regression before committing: first draft factored the repeated `.select(ACK_COLUMNS).from(alertAcks).leftJoin(...)` into one shared `ackQuery()` helper; running the full suite showed `tests/cross-tenant-denial.test.ts` still passed but only because its structural scanner (`whereBodiesAfterFrom`, scans raw source text for `.from(alertAcks) ... .where(...)` pairs) silently found only 1 occurrence instead of 4, blinding it to the `/:id/resolve` handler the test's own docstring names as the P1 "vulnerable response-read path." Reverted to explicit per-call-site queries (`server/routes/alert-acks.ts`, verified via `Read` — 4 distinct `.from(alertAcks)` occurrences, each with its own `.where(...)`) so the existing regression lock stays meaningful; left an explanatory comment at the top of the file.
+- No i18n keys added — reused existing `t.appointmentsPage.unknownUser` (confirmed present in both locales: `locales/en.json:2397` → `"Unknown user"`, `locales/he.json` same key → `"משתמש לא ידוע"`, verified via `python3 -c "json.load(...)"` before use).
+- Confirmed no other client render site still surfaces either leak: `grep -rn "acknowledgedByEmail" src/` → only the type declaration (`src/types/equipment.ts:446`), no render usage. `grep -rn "\.userEmail\b" src/components/equipment src/features/equipment` → the fixed file is clean; two unrelated admin-only surfaces (`EquipmentDetailScanLogTab.tsx:79`, `EquipmentAccountabilityTimeline.tsx:83`) share the same `staffName || userEmail` anti-pattern but are outside the brief's named scope (admin-only scanlog tab / accountability timeline, not the "activity" tab or alerts page) — left untouched and flagged in the task report rather than silently expanding scope.
+- Tests added: `tests/equipment-detail-activity-tab.test.tsx` (2 new cases — staffName renders, missing staffName falls back to neutral label, both assert `document.body.textContent` never contains the email or its local-part), `tests/alerts-screen-grouped.test.tsx` (2 new cases, same shape, via the real `AlertsScreen`→`AlertsProView` render path with a mocked `api.alertAcks.list`), `tests/alert-acks-display-name.test.ts` (new file — mocked-db route test locking the `users` leftJoin presence + clinic-scoping on `GET /api/alert-acks`, and that a `null` displayName passes through rather than being fabricated from the email).
+- Fixed collateral breakage caused by the `sql`/`users` additions: `tests/cross-tenant-denial.test.ts` fully mocks `drizzle-orm` and `../server/db.js`; its mocks pre-dated this change and lacked `sql` and `users` exports, which `alert-acks.ts` now needs at module-import time. Added both to the existing mocks (`sql` as a tagged-template pass-through, `users: fakeTable`).
+- Command: `pnpm test -- tests/equipment-detail-activity-tab.test.tsx tests/alerts-screen-grouped.test.tsx tests/alert-acks-display-name.test.ts --reporter=verbose` → `Test Files 3 passed (3)` / `Tests 11 passed (11)`.
+- Command: `pnpm typecheck` → exit 0, no output.
+- Command: `pnpm test` (full suite, after the cross-tenant-denial mock fix) → `Test Files 460 passed (460)` / `Tests 4349 passed (4349)`.
+- Command: `pnpm architecture:gates` → `All G1 checks passed.` (4 pre-existing `no-features-to-pages-internals` dependency-cruiser warnings in rooms/inventory tablet files, unrelated; server tsc clean; madge cycle baseline matches, 0 cycles both server and src).
+- Command: `pnpm i18n:check` → `✓ locales/en.json and locales/he.json are in deep key parity.`
+- `git status --short` before commit → staged exactly `server/routes/alert-acks.ts`, `src/components/alerts/AlertsProView.tsx`, `src/components/equipment/EquipmentDetailActivityTab.tsx`, `src/pages/alerts.tsx`, `src/types/equipment.ts`, `tests/alert-acks-display-name.test.ts` (new), `tests/alerts-screen-grouped.test.tsx`, `tests/cross-tenant-denial.test.ts`, `tests/equipment-detail-activity-tab.test.tsx`; several pre-existing unrelated untracked files (`.claude/skills/autofix`, `docs/audit/release-qa-2026-07-10.md`, `docs/design-handoff/design_handoff_web_console/`, `skills-lock.json`) were confirmed not created by this session and left unstaged.
+
+**Verdict:** VERIFIED
+
+## 2026-07-11 — T11: profile shift-activity date uses the shared locale-aware formatter
+
+**Claim:** `src/features/profile/ShiftActivityList.tsx`'s local `formatDate()` hand-rolled `new Date(iso).toLocaleDateString(undefined, {...})`, ignoring the app locale and reordering under RTL (audit-observed output: "May 2026 13" for a Hebrew user). Replaced it with the same shared `formatDateByLocale()` helper (`src/lib/i18n.ts`) already used correctly by the task/appointment modal and ~15 other call sites app-wide, so the row now renders "13 במאי 2026" under `he` and "May 13, 2026" under `en`. Display-formatting only — `formatTime`/`formatDuration` in the same file were left untouched (not part of the audit finding, no reported bug in them).
+
+**Evidence:**
+- Confirmed the bug by reading `src/features/profile/ShiftActivityList.tsx:16-18` (pre-fix): `return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });` — `undefined` locale ignores `getStoredLocale()`/app locale entirely, and the resulting non-bidi-isolated string reorders when rendered inside an RTL ancestor.
+- Confirmed the correct shared helper via `grep -n "formatDate\|toLocaleDateString\|Intl.DateTimeFormat" src/lib/i18n.ts` → `src/lib/i18n.ts:90-94` defines `formatDateByLocale(date, options)`, which reads `getStoredLocale()` and maps to `"he-IL"`/`"en-US"` before calling `toLocaleDateString` — the correct locale-aware, `Intl`-backed formatter.
+- Confirmed the task/appointment modal already uses the sibling helper correctly: `src/pages/tasks/task-utils.tsx:5,218` imports and calls `formatDateTimeByLocale` from the same module.
+- Confirmed `formatDateByLocale`/`formatDateTimeByLocale` are the established shared pattern, not a one-off: `grep -rn "formatDateByLocale\|formatDateTimeByLocale" src` → 19 call sites across `src/features/today/`, `src/features/equipment/detail/`, `src/features/shift-chat/`, `src/pages/admin/`, `src/pages/inventory-item-detail.tsx`, `src/pages/crash-cart.tsx`, `src/pages/code-blue-history.tsx`, `src/components/shift-summary-sheet.tsx`, `src/lib/generate-report.ts`.
+- Fix applied: `src/features/profile/ShiftActivityList.tsx:3` import changed to `import { t, formatDateByLocale } from "@/lib/i18n";`; line 17 changed to `return formatDateByLocale(iso, { month: "short", day: "numeric", year: "numeric" });`. No hardcoded Hebrew month name added (`Intl` sources the month name at runtime via the shared helper) — satisfies the `i18n-no-hebrew-in-source` constraint.
+- Verified actual output with the real ICU implementation in this environment (not assumed): `node -e 'new Intl.DateTimeFormat("he-IL",{day:"numeric",month:"short",year:"numeric",timeZone:"UTC"}).format(new Date("2026-05-13T10:00:00Z"))'` → `"13 במאי 2026"`; same call with `"en-US"` → `"May 13, 2026"`.
+- New test `tests/shift-activity-date-format.test.tsx` (mirrors `tests/profile-avatar-upload.test.tsx`'s `@vitest-environment happy-dom` + mocked `@/hooks/use-auth` + `@/lib/api` + RTL-render pattern) renders the real `ShiftActivityList` component (not just the formatter in isolation) with a mocked `shiftActivity` session, switches locale via the real `setStoredLocale("he"|"en")`, and asserts the rendered date cell text is exactly `"13 במאי 2026"` (and does not match `/May/`) under `he`, and exactly `"May 13, 2026"` under `en`.
+- Command: `pnpm test -- tests/shift-activity-date-format.test.tsx --reporter=verbose` → `Test Files 1 passed (1)` / `Tests 2 passed (2)`.
+- Command: `pnpm typecheck` → exit 0, no output (frontend `tsc --noEmit` + server `tsc -p tsconfig.server.json --noEmit`).
+- Command: `pnpm test -- tests/i18n-no-hebrew-in-source.test.ts tests/profile-avatar-upload.test.tsx --reporter=verbose` → `Test Files 2 passed (2)` / `Tests 5 passed (5)` (confirms no Hebrew literal introduced, and the sibling profile-hero test still passes unaffected).
+- Command: `pnpm i18n:check` → `✓ locales/en.json and locales/he.json are in deep key parity.` (no locale keys added or changed — pure formatter reuse, as anticipated).
+- Command: `pnpm test` (full suite) → `Test Files 461 passed (461)` / `Tests 4351 passed (4351)` (461/4351 vs. the prior T13 entry's 460/4349 — delta is exactly the 1 new test file / 2 new tests added here; no regressions).
+- `git status --short` before commit → only `src/features/profile/ShiftActivityList.tsx` (modified) and `tests/shift-activity-date-format.test.tsx` (new) belong to this task; pre-existing unrelated untracked files (`.claude/skills/autofix`, `.claude/skills/code-review`, `docs/audit/release-qa-2026-07-10.md`, `docs/design-handoff/design_handoff_web_console/`, `skills-lock.json`) confirmed not created by this session and left unstaged.
+
+**Verdict:** VERIFIED
+
+## 2026-07-11 — T10: LTR device/room names bidi-isolated in RTL equipment list + rooms card (verification + regression tests)
+
+**Claim:** The audit-named surfaces — the equipment-list row name cell and the rooms-card room name — must bidi-isolate an LTR (English) name so it truncates on its own logical trailing edge inside the Hebrew (RTL) UI, via `<Bdi>` (`<bdi dir="auto">`, `unicode-bidi: isolate`) around the truncated name, without forcing a `dir` on the row/card. Investigation found both surfaces were **already fixed** by two earlier, already-merged commits (`59c21a469e` "clinical design system refresh — phases A–G", `cb0d85d76` "fix(i18n): ... bidi isolation ..."), but neither had a dedicated regression test locking the fix in place. This task added those tests and exported `RoomCard` (previously file-local) solely to make it directly render-testable — no production behavior change.
+
+**Evidence:**
+- `git merge-base --is-ancestor 59c21a469e HEAD && echo yes` → `59c21a469e is ancestor of HEAD`; same check for `cb0d85d76` → `cb0d85d76 is ancestor of HEAD`. Both fixes are already part of this branch's history (`claude/phase-10a-audit-fixes`, HEAD `361236ce0` at task start).
+- `src/pages/equipment-list.tsx:1193-1200` (Read) — the `EquipmentItem` name cell is `<div className="flex-1 min-w-0"><Bdi><TruncatedText text={displayName} className="vt-text-lg font-bold leading-snug" as="p" /></Bdi></div>`; `src/components/ui/truncated-text.tsx:22-36` confirms `TruncatedText` renders `<p className={cn("block min-w-0", "truncate", className)} title={text}>` — both `min-w-0` and `truncate` present on the truncating element, wrapped by `Bdi` (`src/components/ui/bdi.tsx:24` → `<bdi dir="auto" className="[unicode-bidi:isolate]">`).
+- `src/pages/rooms-list.tsx:137` (Read, pre-edit) — `RoomCard`'s name paragraph was already `<p className="font-bold text-sm leading-snug truncate"><Bdi>{room.name}</Bdi></p>`; parent `<div className="flex-1">` sits in `CardContent className="p-3 flex flex-col gap-3"` (column-direction flex, `align-items: stretch` default) inside a Tailwind `grid-cols-2` track (`repeat(2, minmax(0, 1fr))`), so the classic flex/grid `min-width:auto` overflow trap that requires an explicit `min-w-0` does not apply here (that trap is specific to row-direction flex sizing along the main axis) — confirmed no truncation-breaking gap, so no `min-w-0` was added.
+- `src/pages/room-radar.tsx:239-246` (Read) — the equipment name inside the room-detail view (reached via the rooms-card's `Link href="/rooms/:id"`) already has both `dir="auto"` on the truncating `<p>` and a nested `<Bdi>`, with an inline comment citing the original bug ("M4"); already covered by `tests/phase-6-consistency-polish.test.ts:89-99` (`M4 — room-radar detail pane fixes`, source-text assertion).
+- `grep -rn "vt-text-lg font-bold leading-snug\|font-bold text-sm leading-snug truncate" tests/ src/` — before this task, zero test files referenced either name-cell's exact classes; confirmed via `grep -rln "Bdi\|bidi\|dir=.auto" tests/` returning only `tests/phase-6-consistency-polish.test.ts` (room-radar only) and `tests/shift-chat-bubble-bidi.test.tsx` (unrelated surface) — neither equipment-list nor rooms-list had bidi regression coverage.
+- Fix/change: `src/pages/rooms-list.tsx:116` — `function RoomCard` → `export function RoomCard` (one-line export, no logic change), enabling direct import in the new test, mirroring the existing pattern where `EquipmentItem` (`src/pages/equipment-list.tsx:984`) is already exported and directly rendered by `tests/equipment-list-checkout-error-toast.test.tsx`.
+- New test `tests/equipment-list-name-bidi.test.tsx` — renders the real `EquipmentItem` (mocked `sonner`/`use-auth`/`use-active-shift`/`haptics`, wrapped in `QueryClientProvider`, mirroring the established render pattern from `tests/equipment-list-checkout-error-toast.test.tsx`) with `name: "Vetscan VS2"` and asserts: (1) the rendered name text's `.closest("bdi")` is non-null with `dir="auto"`; (2) the name element's `className` contains both `truncate` and `min-w-0`; (3) the row (`data-testid="equipment-item-eq-3"`) itself carries no `dir` attribute anywhere up its ancestor chain (`row.closest("[dir]")` is `null`) — proving isolation is scoped to the name run, not forced on the row; (4) a Hebrew name is isolated identically (direction is content-derived via `dir="auto"`, not hardcoded LTR).
+- New test `tests/rooms-list-name-bidi.test.tsx` — renders the real `RoomCard` directly (no providers needed — pure presentational, no hooks) with `name: "ICU Bay 2"` and asserts the equivalent four properties: `<bdi dir="auto">` wraps the name; the enclosing `<p>` keeps the `truncate` class; nothing above the isolate in the ancestor chain carries a `dir` attribute; a Hebrew name isolates the same way.
+- Test: `pnpm test -- tests/equipment-list-name-bidi.test.tsx tests/rooms-list-name-bidi.test.tsx --reporter=verbose` → `Test Files 2 passed (2)` / `Tests 8 passed (8)`.
+- Test: `pnpm test -- tests/equipment-list-checkout-error-toast.test.tsx tests/equipment-list-recovery-ui.test.ts tests/use-equipment-list-refetch.test.tsx tests/phase-6-consistency-polish.test.ts tests/shift-chat-bubble-bidi.test.tsx` → `Test Files 5 passed (5)` / `Tests 25 passed (25)` (confirms the `RoomCard` export didn't disturb any adjacent equipment-list/room-radar/shift-chat bidi or checkout-flow coverage).
+- Command: `pnpm typecheck` → exit 0, no output (frontend `tsc --noEmit` + server `tsc -p tsconfig.server.json --noEmit`).
+- Command: `pnpm i18n:check` → `✓ locales/en.json and locales/he.json are in deep key parity.` (no locale keys touched — display/markup-only task, no new copy).
+- Command: `pnpm test` (full suite) → `Test Files 464 passed (464)` / `Tests 4380 passed (4380)` (464/4380 vs. the prior T11 entry's 461/4351 — delta is exactly the 2 new test files / 8 new tests plus the 1 modified file already counted; no regressions).
+- `git status --short` before commit → staged exactly `src/pages/rooms-list.tsx` (modified), `tests/equipment-list-name-bidi.test.tsx` (new), `tests/rooms-list-name-bidi.test.tsx` (new); pre-existing unrelated untracked files (`.claude/skills/autofix`, `.claude/skills/code-review`, `docs/audit/release-qa-2026-07-10.md`, `docs/design-handoff/design_handoff_web_console/`, `skills-lock.json`) confirmed not created by this session and left unstaged.
+
+**Verdict:** VERIFIED
+
+## 2026-07-11 — T14 reconcile availability vs verification readiness metrics (no false all-clear)
+
+**Claim:** On the native equipment header (`EquipmentLargeTitle`) and the iPad tablet dashboard (`HomeTabletDashboard`), a 100% availability figure was painted in the celebratory green tone while the verification split beside it read "0 verified · N unverified" — a false all-clear. Investigation confirmed the two figures are genuinely different metrics against the same denominator (availability = operational health, verification = freshness). Fix gates only the *celebration tone*: the availability number is painted celebratory green ONLY when the verification dimension has confirmed at least one item (`verifiedCount !== 0`); a known-zero degrades it to the pre-existing caution tone. Availability computation, thresholds, verification computation, and all copy are unchanged. No product threshold invented — the gate trips solely on a KNOWN-zero verification, the narrowest reading of the brief's sanctioned "require both dimensions" reconciliation.
+
+**Evidence:**
+- Two metric definitions traced in code:
+  - Availability (`t.equipmentList.uptimeLabel` = "זמינות"): `src/features/equipment/hooks/use-equipment-list.ts:63-64` → `Math.round(((stats.total - stats.attention) / stats.total) * 100)`; `stats.attention` counts triage tier "attention" (`src/core/entities/design-tokens.ts:18-31` → status ∈ issue/maintenance/critical/needs_attention). Denominator = total equipment. Mirrored inline on the tablet at `src/features/today/HomeTabletDashboard.tsx:149`.
+  - Verification (`t.equipmentList.verifiedSplit` = "{ok} תקין · {stale} לא אומתו {days} ימים+"): `use-equipment-list.ts:56-60` → `notVerified = allEquipmentQ.data.filter(isInactive).length; verified = length - notVerified`; `isInactive` (`src/lib/utils.ts:73-77`) = `lastSeen` null OR older than `INACTIVE_THRESHOLD_DAYS` (14, `shared/constants.ts:5`). Denominator = total equipment.
+- Contradiction locus: `EquipmentLargeTitle.tsx` pre-fix color was `availabilityPct >= 80 ? "var(--action)" : "#f59e0b"` (green all-clear regardless of verification); `HomeTabletDashboard.tsx` pre-fix was `availability >= 80 ? rgb(var(--sys-green)) : rgb(var(--sys-orange))`.
+- Fix: `src/features/equipment/EquipmentLargeTitle.tsx:35-36` — `nothingVerified = verifiedCount === 0`; `availabilityCelebrated = showPct && availabilityPct >= 80 && !nothingVerified`; span carries `data-availability-tone` (ok|caution|idle) and green only when `availabilityCelebrated`. `null` verification (still-loading full-list query) is treated as "unknown", not "nothing validated", so it never suppresses.
+- Fix: `src/features/today/HomeTabletDashboard.tsx:188-190` — `availabilityCelebrated = availability !== null && availability >= 80 && equipmentFigures?.verified !== 0`; same `data-availability-tone` seam + gated green, for cross-surface consistency.
+- Tests added: `tests/equipment-kpi-placeholders.test.tsx` — new "T14 no false all-clear" describe: audit scenario (availabilityPct=100, verifiedCount=0, notVerifiedCount=62) asserts `data-availability-tone === "caution"` and style does NOT contain `var(--action)`, split still rendered; control (verifiedCount=62) asserts tone "ok" + `var(--action)`; null-verification asserts tone stays "ok". `tests/home-tablet-dashboard.test.tsx` — new test with a 100%-available/0-verified fixture asserts `tablet-equipment-availability` tone "caution", no `var(--sys-green)`, split shown.
+- Non-vacuity (empirical): temporarily reverted the gate to pre-fix `availabilityCelebrated = showPct && availabilityPct >= 80` → `pnpm exec vitest run tests/equipment-kpi-placeholders.test.tsx` → the T14 test FAILED with `AssertionError: expected 'ok' to be 'caution'`; restored file, re-ran → 19 passed.
+- Test: `pnpm exec vitest run tests/equipment-kpi-placeholders.test.tsx tests/home-tablet-dashboard.test.tsx` → `Test Files 2 passed (2)` / `Tests 19 passed (19)`.
+- Command: `pnpm typecheck` → exit 0 (frontend + server tsc, no output).
+- Command: `grep -nP '[\x{0590}-\x{05FF}]' src/features/equipment/EquipmentLargeTitle.tsx src/features/today/HomeTabletDashboard.tsx` → no matches (no Hebrew glyphs in the edited source; comments rewritten English-only). `pnpm exec vitest run tests/i18n-no-hebrew-in-source.test.ts` → passed.
+- Scope: no locale JSON changed (no `pnpm i18n:check` needed — no new copy), no server/derivation code changed (client presentation only), no frozen realtime/telemetry/Code-Blue contract touched, no `clinicId`-scoped query modified.
+
+**Verdict:** VERIFIED
+
+---
+
+## 2026-07-11 — T9: Hebrew singular/plural for count strings (361236ce0)
+
+**Claim:** Count labels rendered the plural Hebrew noun at count=1 ("1 פריטים"); now render the singular at 1 via the EXISTING ICU-plural mechanism, no parallel path.
+**Evidence:** Discovery found `lib/i18n/index.ts` `interpolate()` already supports `{count, plural, one{…} other{…}}`, wired via `tr()` in `src/lib/i18n.ts` (used by `alerts.itemCount` etc.). Fixed 4 keys — `roomsListPage.cardItemCount` (renamed from `cardItemsUnit`, 0 stragglers, `.generated.d.ts` regenerated), `dispense.sheet.itemsSelected`, `managementDashboardPage.itemsUnit`+`usersUnit` — each to `{count} {count, plural, one{…} other{…}}` with he+en parity. New `tests/i18n-hebrew-plural-count-labels.test.ts` (21 tests) asserts count=1→singular, count=2→plural in he+en, and `not.toBe("1 פריטים")` (non-vacuous). `pnpm typecheck` 0 · `pnpm i18n:check` parity ✓ · full `pnpm test` 4372 pass. Task-review Spec ✅ / Quality Approved (reviewer independently reran 21/21 + parity + tsc).
+**Verdict:** VERIFIED
+
+---
+
+## 2026-07-11 — T12: misc English-on-Hebrew sweep + T7 NFC-sheet residual (aa0b94831)
+
+**Claim:** Five enumerated English/desktop-affordance leaks fixed via the typed `t.*` accessor and existing platform seam.
+**Evidence:** (1) Dashboard/Equipment document titles → `t.layoutHebrew.dashboard`/`t.equipment.title`; (2) haptics toggle gated on `usePlatformTarget()==="mobile"` (existing seam) in `settings.tsx`; (3) install-banner desktop copy via new `pwa.installSubtitleDesktop`, T5 suppression untouched; (4) `nav.criticalKitCheck`→sentence-case, `layout.nav.*` left Title-case (documented); (5) NFC action sheet in `equipment-detail.tsx` fully localized (reused qr-scanner + T7 keys + 3 new `equipmentDetail.scanSheet*`). 24 tests / 4 files. `pnpm typecheck` 0 · `pnpm i18n:check` parity ✓ · full `pnpm test` 4404 pass. Task-review Spec ✅ / Quality Approved (Minor: report mis-stated test count as 34, actual 24 — reviewer reran 24/24).
+**Verdict:** VERIFIED
+
+---
+
+## 2026-07-11 — T15: coherent status taxonomy + consistent pagination (d217567ac)
+
+**Claim:** "תקין" header over "לא ידוע" pills, and "62 מתוך 62 · עמוד 1 מתוך 7", were two independent display-coherence defects — fixed at root cause without touching grouping logic.
+**Evidence:** Taxonomy: header (`equipmentTriageTier` on `eq.status`) and pill (`DeployabilityBadge` on `eq.readinessState`, legit default "unknown") are different axes; contradiction was a Hebrew locale accident — `equipmentList.triageOperational` reused "תקין" (= `status.ok`); changed ONLY the he value to "תפעולי" (matches en "Operational"). Pagination: `equipment-list.tsx` passed full filtered count as both shown+total-basis while pages=count/9=7; extracted `resolveEquipmentListShownCount()` (new `src/lib/equipment-list-pagination.ts`) returning the page slice. New `tests/t15-status-taxonomy-and-pagination.test.ts` (7 tests); 4/7 fail against pre-fix (reviewer re-verified). `pnpm typecheck` 0 · `pnpm i18n:check` ✓ · full `pnpm test` 4415 pass. Task-review Spec ✅ / Quality Approved. T14 tiles untouched.
+**Verdict:** VERIFIED
+
+---
+
+## 2026-07-11 — T16: student /inventory degrades gracefully on a role-gated 403 (73cde30cf → integrated 1cef9cf30)
+
+**Claim:** The student `/inventory` fatal "טעינה נכשלה" (from `GET /api/containers` 403ing for a below-technician role) is made non-fatal for custody-only archetypes via the existing capability model; every other role and every non-403 failure keeps the original fatal ErrorCard.
+**Evidence:** `GET /api/containers` (`requireEffectiveRole("technician")`) genuinely 403s for student (role 10 < 20) — server auth confirmed correct, NOT changed. `src/pages/inventory-page.tsx` now detects a 403 for a custody-only archetype (via `useExperience()`/`isCustodyOnly()`, no `role==="student"` literal) and renders an honest EmptyState; non-403 and non-custody keep the fatal ErrorCard. New `tests/inventory-page-student-degradation.test.tsx` (4 tests, non-vacuous — pre-fix reproduction confirmed). `pnpm typecheck` 0 · `pnpm i18n:check` parity ✓. Task-review Spec ✅ / Quality Approved (2 cosmetic Minor). **OWNER-AWARENESS:** the audit premise "custody student can dispense/restock" is FALSE server-side — a committed `STUDENT_NEVER_ELEVATED` invariant (`server/lib/authority.ts`) hard-blocks student dispense and container/restock routes are technician-gated. T16 fixes the loading/UX dead-end only; whether students SHOULD dispense/restock (or the guided card shouldn't route them to `/inventory`) is an owner product decision (students are intended custody-only).
+**Verdict:** VERIFIED (loading/UX gate); owner decision pending on student inventory capability.
+
+---
+
+## 2026-07-11 — T21: display registry — live last-seen, revoke notice, delete dead rows, clear labels (ce7e49e9f → integrated d07c03b9e)
+
+**Claim:** Four display-registry defects addressed without touching the frozen realtime transport.
+**Evidence:** (1) last-seen "never" — investigated STALE: prior commit `747bf986d` (F7/F8) already added `refetchInterval(15s)`+`refetchOnWindowFocus` to the admin registry (surfaces the heartbeat-bumped `lastSeenAt` from the existing `POST /api/display/heartbeat`); T21 added a regression test only — NO new realtime/heartbeat surface. (2) Revoked board → explicit notice via a one-shot sessionStorage flag (`markDisplayRevokedNotice`/`consumeDisplayRevokedNotice`), set before the existing 401 redirect, consumed once by `board-pair.tsx`; F6 stream-termination untouched. (3) New `DELETE /api/display/devices/:id` — admin (`requireAuth,requireAdmin`), `clinicId`-scoped, ONLY deletes already-revoked rows (`isNotNull(revokedAt)`), new `display_device_deleted` appended to the closed `AuditActionType` union; the manifest addition to `PHASE_9_DISPLAY_PAIRING_ROUTES` is a REQUIRED OFF-07 route-ratchet sync (`tests/offline-phase-7-emergency-surface-parity.test.ts`), catalog only — cache-bypass/offline-block semantics unchanged. (4) Revoke vs cancel labels reworded distinct (he+en). Focused 41/41+46/46; `pnpm typecheck` 0 · `pnpm i18n:check` ✓ · `pnpm architecture:gates` G1 ✓. Task-review (opus) Spec ✅ / Quality Approved (0 Crit/Imp, 2 Minor info).
+**Verdict:** VERIFIED
+
+---
+
+## 2026-07-11 — T22: unify management-surface denial pattern + fix desktop nav overflow/duplication (2c06c42ca → integrated bd03640d1)
+
+**Claim:** The inconsistent non-admin denial across management surfaces (4 patterns: silent redirect, per-page explicit, render-anyway leak, blank `return null` + an admin-shifts "Cancel"-as-denial bug) is unified into one shared component; a genuine access leak is closed; desktop nav de-duplicated and the ~1227px overflow fixed.
+**Evidence:** New shared `src/desktop/management/ManagementAccessDenied.tsx` (+ `console.accessDenied.*` he+en keys); `ManagementGuard` renders it instead of redirecting; the 7 strictly-admin pages keep their narrower `isAdmin` floor but render the shared UI; `admin-shifts.tsx` copy-paste bug fixed. `/procurement`+`/analytics` wrapped in `ManagementGuard` — reviewer independently verified this CLOSES a render-anyway leak, NOT hiding a reachable core page (both `WebOnlyGuard` desktop-only, absent from live `nav-model.ts`/`native-nav-model.ts`, `/analytics` already `management.web`-scoped; admin+lead still reach both). Nav: removed duplicate `IconSidebar` (Topbar sole desktop nav, identical data sources — no destination lost); `Topbar` `min-w-0`+`scrollbar-none` overflow fix (compositor-friendly). No `server/` change, no `clinicId` touched. Tests `management-surface-denial-unification.test.tsx`(14)+`desktop-nav-shell.test.tsx`(9)+`console-management.test.tsx` non-vacuous. `pnpm typecheck` 0 · full `pnpm test` 4384 · `pnpm i18n:check` ✓ · `pnpm architecture:gates` G1 ✓. Task-review (opus) Spec ✅ / Quality Approved (Minor only).
+**Verdict:** VERIFIED
+
+---
+
+## 2026-07-11 — Batch integration gate (T16+T21+T22 cherry-picked onto SDD branch bd03640d1)
+
+**Claim:** The three parallel-batch tasks, implemented in isolated worktrees off d217567ac and reviewed on their isolated diffs, integrated onto `claude/phase-10a-audit-fixes` via cherry-pick with no manual conflict resolution and pass all gates together.
+**Evidence:** Cherry-picks: T16→`1cef9cf30`, T21→`d07c03b9e`, T22→`bd03640d1`; `locales/{en,he}.json` + `src/lib/i18n.generated.d.ts` 3-way AUTO-merged (disjoint namespaces), regen of i18n types produced NO diff (auto-merge already correct). Integrated gates: `pnpm i18n:check` parity ✓ · `pnpm typecheck` 0 · full `pnpm test` → **473 files / 4458 tests passed** · `pnpm architecture:gates` → All G1 passed (0 new cycles, baseline violations only).
+**Verdict:** VERIFIED
+
+---
+
+## 2026-07-11 — T26: reclassify inventory dispense/restock as NON-clinical (students can dispense/restock consumables)
+
+**Claim:** Inventory dispense/restock/view routes moved OFF the clinical-authority gate onto the student-floor role gate so a supervised student can use consumables; STUDENT_NEVER_ELEVATED and the clinical-authority middleware are byte-untouched and still deny a student Code Blue clinical authority.
+**Evidence:** Route gates changed (old→new): `server/routes/dispense.ts` router-level `requireClinicalUser`→`requireEffectiveRole("student")` + removed the 3 per-route `requireClinicalAuthority({...})` (draft/confirm/emergency); `server/routes/containers.ts` `GET /` technician→student, `POST /:id/dispense` `requireClinicalAuthority`→`requireEffectiveRole("student")`, `PATCH /emergency/:eventId/complete` technician→student (completion half of the same non-clinical dispense flow — reachable from the student DispenseSheet emergency tap); `server/routes/inventory-items.ts` `GET /`, `GET /:id/detail`, `GET /:id/prices` technician→student (admin create/update/deactivate/price-add/low-stock kept requireAdmin); `server/routes/restock.ts` start/scan/finish/cancel/container-items technician→student (`GET /sessions` kept requireAdmin). `requireClinicalAuthority` import removed from dispense.ts + containers.ts (still imported/used only by code-blue.ts). FROZEN untouched — `git diff --stat` empty for `server/lib/authority.ts` (STUDENT_NEVER_ELEVATED :141), `server/middleware/authority.ts` (requireClinicalAuthority), `server/routes/code-blue.ts`. `clinicId` scoping intact on every touched route (containers/restock/dispense still `req.clinicId!`); dispense-event audit intact (`inventory_dispensed` logAudit at containers.ts:853,1074; confirm/draft/emergency audited inside dispense.service). No i18n keys changed (client already exposed inventory to students — CUSTODY_ONLY_NAV_KEYS has "inventory"/"/inventory", StudentHomeSurface links `/inventory`; page renders real UI on 200); no hardcoded Hebrew (only English code comments). Tests — UPDATED (inventory-dispense authorization → new non-clinical intent): `dispense-auth.test.ts`, `dispense-auth-hardening.test.ts` (2nd block only; 1st block = frozen requireClinicalUser Set, kept), `dispense-authority-enforcement.test.ts`, `authority-middleware-zero-consumers.test.ts` (consumer set now = code-blue.ts only), `dispense-audit-authority.test.ts` (auth mock → requireEffectiveRole; confirm-handler observability assertions unchanged & passing). REPURPOSED+ADDED: `containers-dispense-authority.test.ts` → (A) structural student-floor gating of all inventory routes, (B) functional proof `requireEffectiveRole("student")` ADMITS a student, (C) control proof clinical-authority middleware STILL DENIES a student via STUDENT_NEVER_ELEVATED even on emergency break-glass. ADDED client: `inventory-page-student-degradation.test.tsx` — student+200 renders the real dispense/restock UI. LEFT UNCHANGED (verified still green): `authority.test.ts`, `authority-checkin.test.ts`, `require-clinical-authority.test.ts`, `authority-cache/*`, code-blue evaluator tests, `experience-model.test.ts`. Gates: `pnpm typecheck` 0 · changed/added 7 files → 68 tests pass · full `pnpm test` → **473 files / 4456 tests passed** · `pnpm i18n:check` parity ✓ · `pnpm architecture:gates` All G1 passed.
+**Verdict:** VERIFIED
+
+---
+
+## 2026-07-11 — T23: task device field → real equipment-record picker (0cecec8ce → integrated 4e8dce2fa)
+
+**Claim:** The task-create form's free-text "device" field (stored into the legacy `animalId` slot) now uses a searchable equipment-record picker over the clinic's `vt_equipment`, stores the selected equipment's id in the (frozen) `animalId` value slot, and resolves it back to the equipment's name (bidi-safe) on read-back.
+**Evidence:** New `src/pages/tasks/EquipmentDeviceField.tsx` reuses the shared `["/api/equipment"]` query + `api.equipment.list` fetcher (React Query dedupe — no new fetch; `clinicId` inherited); `formatDevice()` in `task-utils.tsx` gained an `equipmentById` map to resolve id→name with a graceful fallback for legacy/deleted values; all device read-back sites wrapped in `<Bdi dir="auto">`. Frozen surfaces untouched (`vt_appointments`/`/api/appointments`/`appointmentsPage.*` unchanged; `animalId` wire name unchanged; NO migration). Tests: `tests/tasks-device-equipment-picker.test.tsx` (4) + updated `tests/tasks-create-error-toast.test.tsx` — non-vacuous. `pnpm typecheck` 0 · `pnpm i18n:check` parity ✓ · full suite passed. Task-review Spec ✅ / Quality Approved (2 pre-existing a11y minors mirrored from `EquipmentSearchBox`, non-blocking; reviewer independently reproduced 49/49 focused).
+**Verdict:** VERIFIED
+
+---
+
+## 2026-07-11 — T26 follow-up fix: drop dead req.authoritySnapshot reads in dispense confirm (db4599391)
+
+**Claim:** After T26 removed `requireClinicalAuthority` from the dispense routes, `POST /api/dispense/:id/confirm` still read `req.authoritySnapshot` (now always `undefined`) for audit context — dead code + a silent audit-field change. The handler now records `actorRole` via `resolveAuditActorRole(req)` and null clinical-authority source/reason/operationalRole explicitly (a non-clinical dispense carries no clinical-authority context).
+**Evidence:** Addresses the opus task-review's one Important finding. `server/routes/dispense.ts` `/:id/confirm` no longer reads `req.authoritySnapshot`; `tests/dispense-audit-authority.test.ts` rewritten to guard the reclassification — the handler IGNORES an injected snapshot (would have asserted "check_in"/"vet" pre-T26; now asserts null + actorRole from resolveAuditActorRole). `pnpm typecheck` 0 · the 6 dispense/authority test files 62/62 · full `pnpm test` → **474 files / 4459 pass** · `pnpm architecture:gates` G1 pass. STUDENT_NEVER_ELEVATED resolver, clinical-authority middleware, and Code Blue remain untouched.
+**Verdict:** VERIFIED
+
+---
+
+## 2026-07-11 — T17: dispense cart stock indicator refresh (bce2ed8bb → integrated 3866551f8)
+
+**Claim:** The dispense cart stock read "20/20 · מלא · 100%" before AND after dispensing 1. Root cause was a live-stock query-cache-key mismatch — the dispense mutation didn't invalidate the key the stock indicator reads.
+**Evidence:** Two `invalidateQueries(["/api/restock/container-items", containerId])` added in `DispenseSheet.tsx`, reusing the exact key pattern already used by `inventory-page.tsx`/`layout.tsx` (no parallel state store). New `tests/dispense-sheet-stock-refresh.test.tsx` (2) non-vacuous (revert → fails). typecheck 0, i18n parity ✓. Task-review Spec ✅ / Quality Approved (reviewer grep-verified the key exactly matches `inventory-page.tsx`'s `detailsQ`). No auth touch (T26 owns dispense auth).
+**Verdict:** VERIFIED
+
+---
+
+## 2026-07-11 — T18+T19: doctor CSV import path + roster-import UX (bb4e5c9e3 → integrated 3083dd3f5)
+
+**Claim:** The import UI (`/import/preview`+`/import/confirm`) always used the roster parser, rejecting doctor CSVs. Now branches on `isDoctorCsv()` to route doctor CSVs to the existing doctor parser + a UI kind-badge/columns; roster path byte-identical. T19's row-numbering + history-refresh were found ALREADY-correct and locked with regression tests; accepted-shift-names added via new `GET /import/shift-names`.
+**Evidence:** `server/routes/shifts.ts` doctor branch reuses the pre-existing `isDoctorCsv()`/`parseDoctorShiftRows()` (introduced `ac40a6ca2`, untouched); roster `parseShiftsCsvContent` call unchanged but for an additive `kind:"roster"` field; doctor-only DB lookup provably never fires on roster CSVs. 11 new tests (`shift-csv-doctor-import` 7 + `admin-shifts-import-ux` 4) + a real `indexOf→lastIndexOf` fix to a pre-existing test (doctor `logAudit` now first in source). Full suite 4416, typecheck 0, i18n parity ✓, arch G1. Task-review Spec ✅ / Quality Approved (reviewer independently confirmed roster byte-identical + both "stale" claims genuine, 19/19 pre-fix-fails).
+**Verdict:** VERIFIED
+
+---
+
+## 2026-07-11 — T20: Code Blue wall display driven by SSE (6fd7e21bb → integrated 6f0fb447d)
+
+**Claim:** The Code Blue wall (`src/pages/code-blue-display.tsx`) drove itself via pure 2s polling with zero SSE — the one CB surface never wired onto the frozen realtime transport. Now a peer of the canonical `/board`: reads the SSE-fed `DISPLAY_SNAPSHOT` and mounts the same reconciliation seam. NO parallel transport, NO frozen-internal change.
+**Evidence:** Commit touches exactly 3 files (the wall page + 2 tests). The wall mounts the SAME seam as `CommandBoardScreen` (`EventIngestor`+`connectRealtime`+`replayHttpCatchUpAfter`+`useRealtimeReconciliation`+`useCodeBlueKeepaliveReconciliation`); `realtime.ts`/`event-reducer.ts`/`sw.js`/server-routes/`metrics.ts`/`offline-emergency-block.ts` confirmed UNCHANGED. Bespoke `/api/code-blue/sessions/active` 2s poll + its `enabled:!!userId` gate removed (latent fix: token-paired displays now refresh); SSE (`CODE_BLUE_STATUS_CHANGED`→snapshot refetch) is primary, the board's bounded snapshot poll is the degraded fallback. Server-confirmed end preserved (wall only reads `snapshot.codeBlueSession`, never optimistic). New `code-blue-wall-sse-primary.test.tsx` non-vacuous + `code-blue-frontend.test.js` strengthened. Full suite 4407, typecheck 0, arch G1. Task-review (opus) Spec ✅ / Quality Approved — frozen transport + Code Blue guarantees CONFIRMED intact. Scoped-out: per-log-entry SSE would need a new outbox event (frozen); session start/end (safety-critical) IS SSE-driven. Live-SSE Playwright verification = follow-up.
+**Verdict:** VERIFIED
+
+---
+
+## 2026-07-11 — T24 (slice): sign-up role chips pre-select + tag requested role (4e0169bf3 → integrated 50d2578d3)
+
+**Claim:** The inert sign-up role chips now form a controlled radiogroup (signup only) that carries the chosen role into Clerk's hosted `<SignUp/>` via `unsafeMetadata.requestedRole`. The requested role is NOT persisted into `vt_users.role` (self-escalation guard) — the grant path was escalated and the owner chose the staging-column approach (see T24b).
+**Evidence:** `RoleChips.tsx` controlled when given props, byte-identical non-interactive spans on signin (unchanged call site). `unsafeMetadata` is Clerk's sanctioned client-data mechanism; no auth-mode/native-transport change; no server change (JIT-provisioning role still hardcoded — reviewer confirmed `server/` diff empty). New i18n keys `authPage.roleSelectLabel`/`roleSelectHint` (he/en parity). New `tests/role-chips-signup.test.tsx` (4) non-vacuous (3/4 fail pre-change). typecheck 0, i18n parity ✓. Task-review Spec ✅ / Quality Approved (security refusal verified real). Important (copy-accuracy: hint implies an admin role-review that doesn't exist yet) → resolved by T24b delivering the admin-visible requested-role at approval.
+**Verdict:** VERIFIED (slice); full requested-role→grant flow delivered by T24b.
+
+---
+
+## 2026-07-11 — Final-batch integration gate (T17+T24slice+T20+T18/19 → SDD 3083dd3f5)
+
+**Claim:** The four parallel-batch tasks integrated onto `claude/phase-10a-audit-fixes` via cherry-pick with no manual conflict resolution and pass all gates together.
+**Evidence:** Cherry-picks T17→`3866551f8`, T24slice→`50d2578d3`, T20→`6f0fb447d`, T18/19→`3083dd3f5`; locales + generated.d.ts multi-way AUTO-merged, regen produced no diff. `pnpm i18n:check` parity ✓ · `pnpm typecheck` 0 · full `pnpm test` → **479 files / 4478 pass** · `pnpm architecture:gates` All G1 passed.
+**Verdict:** VERIFIED
+
+---
+
+## 2026-07-11 — T24b: requested-role staging column + admin-grant (secure separation)
+
+**Claim:** T24's `unsafeMetadata.requestedRole` is now consumed into a NEW nullable `vt_users.requestedRole` staging column DISTINCT from the authoritative `role`. A sign-up requesting "vet" yields `role="technician"` (hardcoded default, unchanged) + `requestedRole="vet"` (captured, not applied). `requestedRole` is advisory only — never propagated to clinical authority; the admin sees it read-only and grants the real role via the existing mechanism.
+**Evidence:** Schema `server/schema/core.ts` adds `requestedRole: varchar("requested_role",{length:20})` (nullable, no `.notNull()`); runtime migration `migrations/161_vt_users_requested_role.sql` (`ADD COLUMN IF NOT EXISTS`, matches 158's hand-numbered style — the runtime runner `server/migrate.ts` sorts `migrations/*.sql` by leading number, does NOT use drizzle's migrator/meta; drizzle-kit generate would diverge from that convention + out-of-sync snapshots). `resolveAuthUser` JIT insert: `role: defaultRole` byte-identical, `requestedRole` (sanitized) added to `.values` ONLY — excluded from `onConflictDoUpdate.set` (no re-stage on re-login). New exported `sanitizeRequestedRole()` self-escalation guard (accepts technician|vet|student; rejects admin/senior_technician/junk→null). `requestedRole` deliberately kept off the `AuthUser` interface + return object → cannot reach `resolveAuthority`; source-verified `server/lib/authority.ts` + `role-resolution.ts` contain no `requestedRole`. `GET /api/users/pending` projects `requestedRole` (clinicId scope unchanged). `PendingUsersSection.tsx` renders read-only localized hint (`adminPage.requestedRoleHint` he/en parity); approval calls `updateStatus` only, never `updateRole`. New tests: `tests/requested-role-provisioning.test.ts` (14: sanitize guard + resolveAuthUser mocked-DB/Clerk behavioral capture + additive/advisory source contracts) + `tests/pending-users-requested-role.test.tsx` (5). typecheck 0, focused 19/19, full suite 4497 pass (481 files), i18n parity ✓, architecture:gates All G1 passed. Concern (documented): capture reads unsafeMetadata from the enrichment `getUser` (the path this app uses — email absent from claims) + a session-claims fallback; a clinic whose JWT template includes `email` but not `unsafe_metadata` would leave `requestedRole` NULL (fail-safe, no security impact).
+**Verdict:** VERIFIED
+
+---
+
+## 2026-07-11 — T25: LOW polish sweep (2ea5e8fab → integrated b1cc3ffed)
+
+**Claim:** Nine LOW audit-polish items, each verified still-present (none stale) and fixed, with no frozen-surface violations.
+**Evidence:** (1) rooms empty-state "select a room" (`roomsListPage.selectRoomTitle`); (2) transfer activity `common.unfiled` not a bare em-dash; (3) iPad glance tiles use the shared `TruncatedText` (2-line clamp, `as="bdi"`); (4) board coverage ring renders "no critical equipment configured" at 0/0 instead of an alarm ring; (5) coverage Hebrew label disambiguated (`itemsOut`→"פריטים מושאלים"); (6) two awkward Hebrew strings smoothed (+ new suffix-free `formatRelativeDuration`); (7) `/emergency-equipment-wall` vs `/code-blue/display` kept as an intentional ALIAS with clarifying comments (both still mount `CodeBlueDisplay` unchanged; matches 3 sibling alias pairs — URL stability for physical displays) — NOT a redirect; (8) Code Blue re-entry loading guard (render-only: `code-blue.tsx` early-returns on the pre-existing `isLoading`; `useCodeBlueSession.ts` byte-identical — no state/SSE/keepalive/optimistic change) so it never flashes the launch form before the active view; (9) what's-new version/build from `__APP_VERSION__`/`__VT_BUILD_TAG__` (reads the frozen build tag, doesn't change its semantics) not hardcoded. New `tests/t25-polish-sweep.test.tsx` (15) non-vacuous (reviewer revert-probed items 4 + 8). typecheck 0, i18n parity ✓, arch G1, full suite 4439 (in-worktree). Task-review Spec ✅ / Quality Approved — Code Blue guard confirmed render-only, item-7 alias reasonable, no frozen violation.
+**Verdict:** VERIFIED
+
+---
+
+## 2026-07-11 — FULL PLAN COMPLETE: whole-branch integration gate (SDD b1cc3ffed)
+
+**Claim:** All 25 planned tasks (T1–T25) + 2 owner-directed additions (T26 inventory-dispense reclassification; T24b requested-role staging column) are implemented, per-task-reviewed, and integrated on `claude/phase-10a-audit-fixes`; the whole branch is green.
+**Evidence:** SDD head `b1cc3ffed`. Integrated final tally: `pnpm i18n:check` parity ✓ · `pnpm typecheck` 0 · full `pnpm test` → **482 files / 4512 pass** · `pnpm architecture:gates` All G1 passed (0 new cycles). Each task carries its own proof entry above; each passed an independent task-review (Spec + Quality), frozen-surface tasks (T1 break-glass, T6/T20 realtime, T26/T24b authority) reviewed on the most capable model with the frozen invariants verified intact. Whole-branch final review pending.
+**Verdict:** VERIFIED (pending whole-branch final review)
+
+---
+
+## 2026-07-11 — Upgrade & simplify repo scripts + deslop (71d7c23, 9ec9db1)
+
+**Claim:** Removed dead/duplicate npm scripts, fixed the `dev` script drift, and deleted verified-orphan one-off scripts + committed run artifacts, without breaking any CI/code reference.
+
+**Evidence:**
+- `package.json` — Read after edit: scripts count 63 (was 80-adjacent per pre-edit Read showing 80 lines); removed keys confirmed absent via `node -e "require('./package.json').scripts"` (predev:ci, dev:ci, cap:archive:preflight, tenant:lint, knip:production, dev:db:push, test:playwright:chromium, worker:notifications all gone; `dev` now `"pnpm dev:api:watch" "pnpm dev:web"`; `dev:api` byte-identical). No duplicate keys.
+- Command: `grep -rn "pnpm ...(removed names)" .github/ docs/ .env* server/ src/` → 0 remaining code/CI refs for each removed script name (worker:notifications comment in `server/workers/notification.worker.ts:3` and `.env.example:47` both updated to `pnpm worker`).
+- Guardrail check: `grep -rn "dev:api"` → `server/middleware/rate-limiters.ts:15` + `docs/devops/ci-cd.md:54` show Playwright CI runs `pnpm dev:api` expecting non-watching NODE_ENV=development; `dev:api` left unchanged for that reason.
+- Deletions verified orphaned before removal: `grep -rn <basename>` for split-prs.sh, qa-native-ship-{complete,portrait}.sh, backfill-users-email.ts → only hits are `docs/audit/codebase-relevance-classification.json` (generated inventory) + one historical report; no code/CI usage.
+- Restored 2 files after re-check exposed real usage my first grep masked: `scripts/validate-prod.ts:77` spawns `bash scripts/validate-build.sh`; `docs/previews/README.md:11` documents `capture-css-preview-screenshots.ts`. Both restored via `git restore`.
+- `.gitignore` — appended `scripts/wetcheck/results-*.json`; the two committed result JSONs removed via `git rm`.
+- Command: `node -e "JSON.parse(fs.readFileSync('package.json'))"` → parses (valid JSON).
+
+**Not verified (environment limit):** `pnpm typecheck` / `pnpm test` could not run — `pnpm install` fails with 403 fetching the private `@vettrack/contracts` GitHub tarball (`exposwifty31/literate-dollop`), which needs auth unavailable in this sandbox. Changes touch no compilable app surface (script metadata, standalone-script deletions, docs, one comment); no deleted file is imported by any `.ts` or referenced in any `tsconfig*.json` (grep-confirmed).
+
+**Verdict:** VERIFIED (static checks) / PARTIAL (typecheck+tests unrunnable in this environment — pre-existing private-dependency auth block)
+
+---
+
+## 2026-07-12 — CodeRabbit PR #83 triage: 3 fix groups integrated (G1 dad7e696a, G3 7824d0512, G2 7f23b68f8 → SDD f318eb169)
+
+**Claim:** The ~50 CodeRabbit findings on PR #83 were each verified against current code; still-valid ones fixed (minimal), the rest skipped with reason; all three fix groups integrated onto `claude/phase-10a-audit-fixes` with the whole branch green and frozen surfaces intact.
+**Evidence:**
+- **Integration:** base `ee63eb9b9` → cherry-pick G1 `31383711d` → G3 `857b9801c` → G2 `f318eb169`, all clean (locale JSON 3-way merged, 0 conflicts).
+- **Gates on integrated head `f318eb169` (actually run):** `pnpm typecheck` → PASS (0). `pnpm i18n:check` → deep key parity ✓. `pnpm test` → **486 files / 4540 tests pass, 0 failures** (up from 482/4512 baseline; +28 = CR-fix tests). `pnpm architecture:gates` → "All G1 checks passed" (4 pre-existing dep warnings + 10 known-ignored baseline, 0 new madge cycles).
+- **G1 (authority/server) frozen-surface verify (controller-read diff):** `authority.ts` unchecked `as ActiveShiftRole` casts replaced with `opts.allow.some(r => r === snapshot.clinicalRole)` (behavior-identical `===` membership) on BOTH the legacy-dispense and Code-Blue break-glass branches; both still guard `clinicalRole !== "student"` (STUDENT_NEVER_ELEVATED intact). New construction-time throw when both permanent-role flags are set (fail-loud config assert; verified no consumer sets both). migration 161 `VARCHAR(20)`→`TEXT` + single-line inline `CHECK (... IN ('technician','vet','student') OR IS NULL)`, `ADD COLUMN IF NOT EXISTS` preserved (test-regex-compatible). doctor-CSV confirm inserts wrapped in `db.transaction`; audit gained actorRole/targetId/targetType. +3 non-vacuous mutual-exclusion tests.
+- **G2 (client pages) independent review (opus reviewer a89e193494495106e):** SPEC ✅ / QUALITY Approved / FROZEN PASS / 0 Critical / 0 Important. Frozen verified: code-blue.tsx `isError` guard is render-only (destructures existing field, adds a render branch, calls the hook's existing `refetch()`; hook file untouched; a held active session is never hidden because the page renders the held session — including cached `placeholderData` — before it reaches the retryable `isError` branch; the round-2 reorder below made that ordering explicit by moving the active-session check ahead of the error guard); display-revocation peek/consume split cannot show-without-clearing or clear-without-showing; ClerkLocaleBridge extraction behavior-preserving (same props threaded) + intended `key={locale}` remount. Salvage note: G2 subagent died mid-run twice; controller salvaged the uncommitted 29-file tree and supplied the one missing hand-listed accessor line `since: d.equipmentDetail.since` in `src/lib/i18n.ts` (+ regen `i18n.generated.d.ts`) — the frozen i18n gotcha (JSON+`.d.ts` insufficient for a hand-listed namespace). G2 later revived, confirmed its work == the salvage commit, and independently ran the full suite (476/4478, 0 fail).
+- **Skipped (with reason), recorded as optional follow-ups:** alerts.tsx `formatRelativeDuration` prop (correct fix lives in `src/components/alerts/AlertsProView.tsx`, outside any group's file scope); displays-console.test.tsx fake-timers conversion (no existing `useFakeTimers`+react-query `refetchInterval` pattern to lean on — kept source-text lock); test-fixture `as` casts + trivial narrowings (established SKIP pattern); reviewer Minors (code-blue optional reorder = non-defect; iOS `dismissIosGuidance` silent catch = out of finding scope; PendingUsers PR-wording nuance).
+**Verdict:** VERIFIED — integrated branch green (typecheck/i18n/full-suite/arch all actually run), frozen invariants confirmed intact by controller read + independent opus review. Pending: push to update PR #83 (re-triggers CodeRabbit); merge HELD for owner per standing CodeRabbit-review rule.
+
+---
+
+## 2026-07-12 — CodeRabbit PR #83 round-2 triage (067d217a9): 9 fixed, 1 skipped
+
+**Claim:** The 10 round-2 CodeRabbit findings on PR #83 were each verified against current code; 9 fixed minimally, 1 skipped with reason; whole branch green, frozen surfaces intact.
+**Evidence:**
+- **Gates (actually run on the working tree at 067d217a9):** `pnpm typecheck` → PASS (0). `pnpm i18n:check` → deep parity ✓ (no new keys — reused existing). `pnpm test` → **487 files / 4544 tests pass** (+4 vs 486/4540: new equipment-device-field.test.tsx ×3 + shift-query-error checkout test). `pnpm architecture:gates` → "All G1 checks passed" (0 new cycles).
+- **Frozen-surface verify (controller-read final diff):** authority.ts `isPermanentRoleFallbackEligible` helper holds the byte-identical 5-condition predicate; both branches retain their own opt-in flag + metric (`authority_legacy_fallback_used` / `authority_emergency_break_glass_used`) + audit; STUDENT_NEVER_ELEVATED intact (`clinicalRole !== "student"` in the helper). Break-glass + dispense-fallback tests pass → behavior-identical. code-blue.tsx reorder is render-only (active-session check moved before the `isError` guard; existing code-blue-session-error-guard test still green — error path preserved when no active session).
+- **Fixed (9):** code-blue active-before-error ordering; useActiveShift `isError` exposure + equipment-list checkout defers to server on shift-query error; authority predicate helper; shifts.ts legacy `/import` doctor branch wrapped in db.transaction (mirrors already-tested `/import/confirm`); use-pwa-install iOS Sentry symmetry; EquipmentDeviceField hasError-disables-picker + active-option scrollIntoView; +3 tests.
+- **Skipped (1, with reason):** equipment-list server pagination — the query is a pre-existing fixed `page:1/pageSize:100` with local paging; wiring the selected page to the server + showing the server total is server-pagination FEATURE work (not minimal), and the two halves are coupled (server total under "page 1 of 1" is the contradiction `displayList.length` avoids). Flagged as a follow-up.
+- **False positive (recorded):** equipment-list-checkout-error-toast "duplicate toast property" — the sonner mock already has a single `toast` key (error+success handlers); nothing to remove.
+**Verdict:** VERIFIED — branch green (typecheck/i18n/full-suite/arch all run), frozen invariants confirmed by controller read + full-suite pass. Pending: push to update PR #83 (re-triggers CodeRabbit); merge HELD for owner per standing CodeRabbit-review rule.
+
+---
+
+## 2026-07-12 — CodeRabbit PR #83 round-3 triage: 4 findings, all fixed
+
+**Claim:** The 4 round-3 CodeRabbit findings were each verified and fixed minimally; whole branch green.
+**Evidence (gates actually run on the round-3 tree):** `pnpm typecheck` → PASS (0). `pnpm i18n:check` → deep parity ✓. `pnpm test` → **487 files / 4544 tests pass**. `pnpm architecture:gates` → "All G1 checks passed" (0 new cycles).
+**Findings fixed:**
+1. Inaccurate TanStack claim (proof-log G2 entry + code-blue.tsx comment): removed the "TanStack keeps isError:false whenever real data is held" assertion. The real mechanism is the round-2 REORDER — the active-session check renders any held session (including cached `placeholderData`) BEFORE the retryable `isError` branch. Corrected both the historical G2 proof entry and the code comment to describe render order, not a TanStack internal guarantee.
+2. tests/equipment-device-field.test.tsx scrollIntoView stub: now captures the original `Element.prototype.scrollIntoView` in beforeEach (recording whether it was an own-property) and restores/`delete`s it in afterEach — no prototype leak into other tests.
+3. Same test's `eq` fixture: replaced the `as unknown as Equipment` double cast with a complete typed object — Equipment's only required fields are `id`, `name`, `status`, `createdAt` (verified against src/types/equipment.ts), so `{ id, name, status: "ok", createdAt }` typechecks with no cast.
+4. equipment-list.tsx per-row `useActiveShift()`: hoisted the roster-shift read to the parent `EquipmentListPageDesktop` (one shared React Query observer) and threaded `hasActiveShift`/`shiftLoading`/`shiftError` as props into both `EquipmentItem` render sites (virtualized + grouped); the `renderVirtualizedRow` useCallback deps updated accordingly. Both tests that render `EquipmentItem` directly (checkout-error-toast, name-bidi) now pass the props and drop their now-dead `useActiveShift` mock. Off-shift / loading / error gating behavior unchanged.
+**Verdict:** VERIFIED — branch green (typecheck/i18n/full-suite/arch all run). Pending: push to update PR #83 (re-triggers CodeRabbit). Merge HELD for owner per standing rule.
+
+---
+
+## 2026-07-12 — CodeRabbit PR #83: unresolved-thread triage + AlertsProView duration fix (pre-merge)
+
+**Claim:** All 20 unresolved+current CodeRabbit review threads on PR #83 were investigated against current code; the one genuinely-valid unaddressed functional finding was fixed, the rest are already-fixed, reasoned-skips, or the accepted test-fixture-cast pattern — none blocking.
+**Evidence:**
+- **FIXED — alerts `formatRelativeDuration` (Minor, functional):** `AlertsProView` (the mobile alerts card) rendered the ack timestamp with `formatRelativeTime` ("… ago") while the desktop path uses `formatRelativeDuration` ("in progress since …"). Replaced the `formatRelativeTime` prop with `formatRelativeDuration` in `AlertsProView` (used only for the ack line) and updated both callers (`src/pages/alerts.tsx`, `src/features/alerts/AlertsScreen.tsx` — `formatRelativeDuration` is exported from the same `use-alerts-controller` module) + dropped the now-unused `formatRelativeTime` imports. typecheck 0, alerts-screen-grouped test green, full suite 487/4544.
+- **ALREADY FIXED — Tasks.tsx equipment-query failure (Major):** thread anchored at Tasks.tsx:129 (query memo, unchanged → thread not auto-resolved) but the fix lives at the render (1245 `hasError={equipmentQuery.isError}` + 1254 error/retry alert) with regression test `tests/tasks-equipment-load-error.test.tsx`. Verified present.
+- **REASONED SKIPS:** appointments-scheduling.test.js source-lock (intentional source-contract test) + displays-console fake-timers (no useFakeTimers+refetchInterval pattern to lean on) — both previously logged; authority-middleware-zero-consumers grep-robustness (Major/heavy-lift, a best-effort guard TEST, not production code); task-utils split (test-structure judgment).
+- **ACCEPTED TEST-FIXTURE-CAST PATTERN (Minor, ~14 threads):** unchecked/`as`/`as unknown as` casts and non-null assertions in `tests/**` fixtures (authority-audit, authority-middleware-observability/-zero-consumers, equipment-detail-activity-tab, equipment-list-checkout-error-toast, equipment-list-name-bidi, home-tablet-dashboard, i18n-hebrew-plural, requested-role-provisioning, require-clinical-authority, role-chips-signup, appointments-service-admin-shift-bypass, displays-console). Established SKIP: test fixtures intentionally cast partial objects; not production defects.
+- **DEFERRED (Minor):** EquipmentGlanceGrid extra `lines={2}`/`as="bdi"` test assertions; Tasks task-card placeholder-on-failure (secondary display degradation).
+- **FALSE POSITIVE (persisted):** equipment-list-checkout-error-toast "duplicate toast property" — single `toast` key at line 26, typecheck clean.
+**Verdict:** VERIFIED — one valid finding fixed; no blocking issues remain. CodeRabbit CHANGES_REQUESTED is stale/nit-driven → to be dismissed after CodeRabbit re-reviews the new head, then owner-authorized merge.
+
+---
+
+## 2026-07-12 — PR #83 MERGED (merge commit de9e97d9a)
+
+**Claim:** PR #83 (Phase 10.A tri-display audit fix cycle) merged to main after owner-authorized triage of the CodeRabbit CHANGES_REQUESTED.
+**Evidence:** Head 9b813e0ea — CI fully green (Tests & typecheck, Architecture gates G1, Playwright ×2, Integration ops, Merge gate, Vercel all pass); CodeRabbit re-review completed on head; branch 0 commits behind main. All 20 unresolved review threads investigated: 1 valid functional finding fixed (AlertsProView duration formatter), remainder = accepted test-fixture-cast pattern / reasoned test-methodology skips / already-fixed / nitpicks — none blocking. 5 stale CodeRabbit CHANGES_REQUESTED reviews dismissed via REST with a documented message; reviewDecision cleared; merged via `gh pr merge --merge` → merge commit de9e97d9a on origin/main; main-push deploy pipeline triggered.
+**Verdict:** VERIFIED — merged; deploy in progress.
+
+---
+
+## 2026-07-12 — Behavioral flow audit (click-path) across all 9 surface batches — report only
+
+**Claim:** Every user-facing flow was statically traced touchpoint-by-touchpoint (click-path-audit method: Sequential Undo / Async Race / Stale Closure / Missing Transition / Dead Path / useEffect Interference / Broken Redirect); every CRITICAL/HIGH finding was adversarially re-traced by an independent refuter armed with a known-intent digest (41 commit bodies + proof log + release-QA baseline); report written to `docs/audit/flow-audit-behavioral-2026-07-11.md`. No code changes.
+**Evidence:**
+- Workflow run `wf_af513824-72e` (3 checkpointed waves × 3 batch agents + per-finding verifiers): 18 agents, 0 errors, 592 touchpoints traced, 2.47M subagent tokens; logs show all 9 batches returned (journal: session dir `subagents/workflows/wf_af513824-72e/journal.jsonl`).
+- Findings: 36 total (6 HIGH / 21 MEDIUM / 9 LOW). 8/8 crit-high confirmed by verifiers, 0 refuted, 5 severity corrections applied (2 CRITICAL→HIGH, 3 HIGH→MEDIUM). One additional HIGH (`initSyncEngine()` called with no QueryClient at `src/hooks/use-sync.tsx:168` → post-offline-sync invalidations never fire) verified by controller read of `sync-engine.ts:480/207-217/233/422`.
+- Drift pass (sync mandate): tree moved mid-audit (`bd8deca33` 09:19, `9b813e0ea` 09:43 — CodeRabbit r3 fixes); both findings citing those files (CLICK-PATH-001 code-blue.tsx Cancel dead-path, CLICK-PATH-032 AlertsScreen refetch) re-verified against HEAD `9b813e0ea` by direct read (guard-before-close and un-awaited `refetch()` both present). Report header records base/HEAD; pre-commit fetch confirms local == origin (0/0).
+- Reconciliation: verifiers carried the intent digest — zero findings re-litigate documented deliberate behaviors; report tags every finding NEW/OVERLAPS/BY-DESIGN/TOUCHES-RECENT-FIX; completeness check: 36 CLICK-PATH headers, all 35 batch ids present, ids 001–036 contiguous (scripted grep).
+- Commit is docs-only: this file + the report, added by explicit path. Note: PR #83 merged (de9e97d9a) while this report was being assembled; these audit docs land on the branch post-merge for a follow-up PR alongside the fix task.
+**Verdict:** VERIFIED — report complete and reconciled; fixes deferred to a follow-up task per the approved plan.
+
+---
+
+## 2026-07-12 — CodeRabbit PR #84 triage: 2 findings, both fixed (docs-only)
+
+**Claim:** Both round-1 CodeRabbit findings on PR #84 verified against the current report and fixed minimally; document validated.
+**Evidence:**
+- **MD022 heading spacing (valid):** `### CLICK-PATH-*` headings lacked blank lines after (HIGH/MEDIUM entries) and between (LOW entries). Fixed by a mechanical blank-line normalization around all headings — content byte-identical otherwise. Scripted re-check: **0 MD022 violations across all 47 Markdown headings (every level `#`–`######`)** — the normalization and the violation check both cover all ATX headings, not only the finding entries. Reproducible counts (`grep -cE '^#{1,6} '` = 47 total headings; `grep -cE '^### '` = 38 level-3 headings; `grep -cE '^### CLICK-PATH-'` = 36 CLICK-PATH finding headings). The earlier "38 headings" wording referred to the level-3 count and is superseded by this scoped statement.
+- **Verification-scope clarity (valid):** the header's "8/8 crit-high findings survived" read as covering all HIGHs including CLICK-PATH-006. Scoped the claim to workflow (batch) findings in the header, HIGH section heading, refuted appendix, and coverage table (added footnote ¹); CLICK-PATH-006 now consistently labeled controller-verified / not adversarially verified in all four places.
+- **Validation (scripted):** MD022 = NONE; CLICK-PATH ids 001–036 contiguous; no stale broad claims remain; scoped claims present.
+**Verdict:** VERIFIED — both fixed, report internally consistent.
+
+---
+
+## 2026-07-12 — CodeRabbit PR #84 round 2: 1 finding — doc fixed, code change skipped (out of scope)
+
+**Claim:** The round-2 comment (anchored on the report's CLICK-PATH-022 entry) was triaged: the report's suggested fix no longer recommends silent error swallowing; the actual `settings.tsx` change is deferred with reason.
+**Evidence:**
+- **Verified against current code:** `src/pages/settings.tsx` `handleCriticalAlertsToggle` still `await playFeedbackTone()` with no catch before `update()` (read lines 104-136) — the underlying finding remains valid.
+- **SKIPPED (code change):** implementing the settings.tsx fix in this PR would violate the approved audit plan and the PR's own contract ("Docs only — no code changes"; fixes are the follow-up task). Deferred to that task.
+- **FIXED (doc):** the report's CLICK-PATH-022 Suggested-fix previously recommended `void playFeedbackTone().catch(()=>{})` — an empty catch contradicting the repo's never-silently-swallow rule and CodeRabbit's point. Reworded to: fire-and-forget so the persist always commits + **observable** catch (Sentry.captureMessage, mirroring the use-pwa-install storage-failure pattern) or a logging try/catch; explicit "Do not use an empty catch".
+- **Validation (scripted):** MD022 = NONE; ids 001–036 contiguous; empty-catch recommendation absent.
+**Verdict:** VERIFIED — doc corrected; code fix remains a follow-up-task item with an improved spec.
+
+---
+
+## 2026-07-12 — Consolidated Audit × 10x — Phase 0A · T-05 (R-SY-01 · CLICK-PATH-006): QueryClient wired into initSyncEngine
+
+**Claim:** The sync engine's post-offline cache invalidations, reconciliation, and 401 cache-clear are no longer dead — `initSyncEngine()` now receives the app QueryClient. RED-first, reviewed clean (Tier S +R).
+
+**Evidence:**
+- **RED first (non-vacuous):** new `tests/sync-engine-queryclient-wiring.test.ts` (renders the real `SyncProvider` inside a real `QueryClientProvider`, drives the real `processQueue()` from `src/lib/sync-engine.ts`; only deps mocked). Three assertions failed against pre-fix code: (1) `initSyncEngine` received `undefined`; (2) equipment `invalidateQueries` fired 0×; (3) 401 `clear()` never called. Failing output captured.
+- **GREEN (wiring only):** `src/hooks/use-sync.tsx` — `useQueryClient()` added and forwarded via `initSyncEngine(queryClient)`; effect dep array `[]`→`[queryClient]`. `src/lib/sync-engine.ts` UNCHANGED (its `initSyncEngine(queryClient?)` signature already accepted the arg). ≤2 code files + 1 test.
+- **Verify:** `pnpm test -- tests/sync-engine-queryclient-wiring.test.ts` green; `pnpm typecheck` 0 errors (frontend + server tsconfigs); full `pnpm test` = 488 files / 4547 tests, 0 fail (no regressions in the pre-existing sync/offline suites).
+- **`+R` review gate (independent `code-reviewer`):** APPROVE — Spec ✅, Quality Approved, 0 Critical/Important. Confirmed the test is non-vacuous (each assertion traced to the real guarded branch: `sync-engine.ts:207-218` invalidation, `:233/:245` reconcile gate, `:422` 401-clear — all dead pre-fix), and the dep-array change is safe (single module-level `queryClient` behind one `QueryClientProvider` at `main.tsx:196` → stable reference → no re-init / listener leak). Guardrails held: wiring-only, no queue/circuit-breaker change, no emergency endpoint cached.
+- **Minor (deferred to final whole-branch review):** dead `import "fake-indexeddb/auto"` in the new test (dexie is fully mocked there) — harmless leftover.
+- **Commit:** `b79f0819a` — `fix: pass QueryClient into initSyncEngine (T-05 · R-SY-01)` (staged by explicit path; unrelated untracked files untouched).
+
+**Verdict:** VERIFIED — T-05 DONE (foundational sync card; unblocks the offline-adjacent Phase-0A/1 cards).
+
+---
+
+## 2026-07-12 — Consolidated Audit × 10x — Phase 0A batch: T-01·T-02·T-03·T-04 (HIGH fixes)
+
+**Claim:** The remaining four Phase-0A HIGH fixes are implemented RED-first, integrated, and pass the full-suite batch gate. Executed as 4 parallel subagents in isolated git worktrees off T-05 (`69d5fd5ee`), cherry-picked onto the execution branch.
+
+**Evidence (per card — each RED confirmed failing first, then GREEN, typecheck 0):**
+- **T-01** (R-CB-01 · CLICK-PATH-001 · Code Blue outcome Cancel · **S +R**): `src/pages/code-blue.tsx` — split `OutcomeModal`'s single `onClose(outcome)` into `onSelect(outcome)` (outcome buttons) + `onCancel()` (Cancel → dedicated `closeOutcomeModal()` that closes the sheet independent of the empty-outcome guard + restores focus). `handleEndSession` byte-identical (server-confirmed end intact). RED `tests/code-blue-outcome-cancel.test.tsx` (sheet stays open pre-fix). **`+R` review: APPROVE, 0 findings** — reviewer traced every button's wiring (no swap, `OUTCOMES` unchanged), confirmed Cancel fully decoupled from the end path, test non-vacuous (hand-trace + direct run). Guardrails: no SSE/keepalive/optimistic-end. Commit `bb148cb3` → cherry-pick `b3c1f2e66`.
+- **T-02** (R-EQ-01/02 · CLICK-PATH-002/003 · dock-return/RFID sheet mount · S): `src/pages/equipment-detail.tsx` — moved `<DockReturnFlow>` + `<DockReturnNfc>` out of the inactive `<TabsContent value="readiness">` (bare `TabsPrimitive.Content`, no `forceMount`) to page level (guarded `{equipment && …}`, mirroring the other always-mounted sheets). Pure relocation — same props/state, no custody-mutation change. RED `tests/equipment-detail-dock-return-mount.test.tsx` (2 tests; sheets never surface on the default tab pre-fix). Commit `364d21cfd` → cherry-pick `78c94841c`.
+- **T-03** (R-SC-01 · CLICK-PATH-004 · QR last-scan race · S): `src/components/qr-scanner.tsx` — monotonic `scanTokenRef` captured before async work; `stopScanner()` moved before the `resolveEquipmentId` await; stale resolves discarded (`scanTokenRef.current !== token`); `scansToday` increment gated behind the token check (once per applied scan). RED `tests/qr-scanner-race.test.tsx` (slower earlier resolve overwrote newer scan pre-fix). Guardrail: `classifyEmergencyEndpoint`/offline block untouched. Commit `4a1a75cc3` → cherry-pick `e451f0743`. Minor→final review: test uses a ~350ms real-time debounce wait (resolve ordering still deterministic via a deferred promise).
+- **T-04** (R-RM-01 · CLICK-PATH-005 · room-radar busyRef · S): `src/pages/room-radar.tsx` — `ReturnPlugDialog` `onOpenChange` now resets `busyRef.current=false` on close, so a canceled dialog no longer permanently blocks later Return taps (`returnMut.onSettled` was the only reset path). One-line handler + a `RadarEquipmentCard` export for testability. RED `tests/room-radar-return-busyref.test.tsx`. Commit `332c311d2` → cherry-pick `9edf4845d`.
+- **Batch gate (integrated branch):** `pnpm typecheck` 0 errors (frontend + server tsconfigs); full `pnpm test` = **492 files / 4552 tests, 0 fail** (37s) — +4 test files / +5 tests over the T-05 baseline, no regressions. Worktrees `wt-t01…t04` removed post-integration.
+
+**Verdict:** VERIFIED — Phase 0A CODE work complete (T-01…T-05). Remaining Phase 0: **0B (T-06…T-16) is `Tier: Owner`** (accounts/build/device/hardware) — delivered separately as an owner checklist; not agent-executable.
+
+---
+
+## 2026-07-12 — Consolidated Audit × 10x — Phase 1 Equipment bundle · FIXES: T-17…T-21
+
+**Claim:** The five Phase-1 equipment-bundle FIXES are implemented RED-first, integrated, and pass the full-suite batch gate. Executed as 3 file-grouped parallel worktrees off `584783000` (same-file cards done sequentially within a stream); all `Tier: S`; cherry-picked in order.
+
+**Evidence (per card — each RED confirmed failing first, then GREEN, typecheck 0):**
+- **T-17** (R-EQ-03 · CLICK-PATH-012): `src/pages/equipment-detail.tsx` — checkout ignored `isError` from `useActiveShift`, rendering a transient shift-query failure as "off-shift". GREEN: gate client-side block on `!shiftError && !hasActiveShift` (both `disabled` expressions + the off-shift note), mirroring the merged equipment-list pattern → on a shift-query error the client defers to the server's authoritative roster gate. RED `tests/equipment-detail-shift-error.test.tsx`. Commit `e64238861` → cherry-pick `d80e06883`.
+- **T-18** (R-EQ-04 · CLICK-PATH-036): `src/pages/new-equipment.tsx` — folder `Select` used a static `defaultValue={prefill.folderId}` (empty on edit routes), so edited items always showed "Unfiled". GREEN: controlled `value={watch("folderId")}` seeded from the form's `defaultValues.folderId`; create/copy modes preserved. RED `tests/new-equipment-folder-value.test.tsx`. Commit `886d8876` → cherry-pick `65011feaf`.
+- **T-19** (R-EQ-05 · CLICK-PATH-020): `src/pages/my-equipment.tsx` — "Return All" used `Promise.all`, so a single failed return rejected before the cache invalidations ran (successful returns went stale). GREEN: `Promise.allSettled` + unconditional post-settle invalidation, then throw for the partial-error toast. RED `tests/my-equipment-return-all.test.tsx`. Commit `5b14e8355` → cherry-pick `c5def4d8f`.
+- **T-20** (R-EQ-06 · CLICK-PATH-021): `src/pages/my-equipment.tsx` — one shared `returnMut.isPending` spun/disabled every row. GREEN: per-row `isReturningThisItem = returnMut.isPending && returnMut.variables?.id === item.id` drives the spinner/disable; siblings stay interactive. RED `tests/my-equipment-row-scope.test.tsx`. Commit `edef56c15` → cherry-pick `eaa3e4b29`.
+- **T-21** (R-EQ-07 · HIG debt): `src/pages/equipment-detail.tsx` — four header `size="icon-sm"` controls rendered under 44pt. GREEN: `h-11 w-11` (44px) hit area on `btn-back`/`btn-duplicate`/`btn-edit`/`btn-equipment-tools` (`btn-delete` already compliant); glyph sizes untouched. RED `tests/equipment-detail-touch-targets.test.tsx` asserts the concrete hit-area classes (jsdom has no layout engine to measure rendered px). Commit `c716d90b3` → cherry-pick `593a7d58d`.
+- **Batch gate (integrated branch):** `pnpm typecheck` 0 errors; full `pnpm test` = **497 files / 4557 tests, 0 fail** (34.6s) — +5 files / +5 tests over the Phase-0A baseline, no regressions. Worktrees `wt-eqd`/`wt-myeq`/`wt-neweq` removed.
+
+**Verdict:** VERIFIED — Phase 1 equipment FIXES complete (stabilize done). Next in the bundle: FEATURES T-22 (locate), T-23 (readiness badge), T-24 (damaged-at-check-in — DB-integration now runnable against the live migrated dev DB).
+
+---
+
+## 2026-07-12 — Consolidated Audit × 10x — Phase 1 Equipment FEATURES · Wave F1 (T-22a, T-23a, T-23b, T-23c, T-24a)
+
+**Claim:** The five file-disjoint Phase-1 feature cards are implemented RED-first (or verified already-satisfied), integrated, and pass the full-suite batch gate. Executed as 5 parallel worktrees off `40d53bc73`; all `Tier: S`.
+
+**Evidence:**
+- **T-22a** (R-EQ-F1 · locate route): new read-only `GET /api/equipment/locate?q=` composing `resolveCurrentLocation`+`resolveCustodian`, `clinicId`-scoped from auth, under `scanLimiter`; registered **before** `equipmentRoutes` so the `/:id` catch-all doesn't shadow `/locate`; updated the `routes-registration-contract` mount array. Mocked-unit RED `tests/equipment-locate-route.test.ts`. Commit `1da076207` → cp `799a8e2d9`. **Follow-up:** the new route file tripped the Phase-6 i18n-error governance static scan (`res.status(4xx)` literal); resolved by allowlisting `server/routes/equipment-locate.ts` in `KNOWN_DEBT_ALLOWLIST` alongside its equipment-route siblings (all allowlisted) — consistent with the family, migrating one sub-route to full i18n is out of scope. Fix commit `c533abd61`.
+- **T-23a** (R-EQ-F2 · readiness read field): **ALREADY-SATISFIED** — `readinessState` has been surfaced on the by-id read payload since PR #530 "Slice 4a" (May 28, wired via `equipmentOperationalStateSelect`), already typed in `src/types/equipment.ts`, already contract-tested. No production change; added a regression-lock test only (`test:` commit, honest — no fabricated RED). Card was stale vs live code. Commit `c9147cf94` → cp `3919167c5`.
+- **T-23b** (R-EQ-F2 · tier helper): new pure `src/lib/equipment-readiness-tier.ts` mapping the six `EquipmentStatus` tokens → 3-tier (`ready`←ok/sterilized, `caution`←maintenance/needs_attention, `not_ready`←critical/issue); exhaustive `satisfies Record<EquipmentStatus, ReadinessTier>` so a 7th token fails typecheck. RED `tests/readiness-tier-bucket.test.ts`. Commit `80e610331` → cp `a6ab0a23f`.
+- **T-23c** (R-EQ-F2 · status-badge i18n leak): the English-fallback leak was **latent** (the `status.stale/unknown/info/neutral` keys already exist in he/en and `t.status` is a direct spread, so the `??` never fired); still closed the untyped-cast escape hatch (`(t.status as Record<string,string>)[k] ?? "English"` → typed `t.status.*`) so future key drift can't reintroduce it; RED via a source-guard test matching the repo's `i18n-no-hebrew-in-source` convention. i18n parity ✓, generate-types zero-diff. Commit `324a8700` → cp `f3f5c8ba2`.
+- **T-24a** (R-EQ-F3 · schema): new `vt_damage_events` table + additive `conditionStatus` column on `vt_equipment` (varchar, default `'ok'`, NOT NULL — backfills existing rows not-damaged). Migration `162_vt_damage_events.sql` **hand-authored** (⚠ `npx drizzle-kit generate` is broken repo-wide — Drizzle journal drift; precedent 160/161 also hand-authored; **the remaining schema cards R-M1.1a / R-SH-F1.1 must hand-author too**). Applied to dev DB; DB-integration RED→GREEN `tests/migrations/damage-events.test.ts` (run via `pnpm exec tsx`, matching sibling `042_*`). `reportedBy` = TEXT no-FK (matches `scanLogs.userId` pattern). Commit `bac3914617` → cp `46bec1d86`.
+- **Batch gate (integrated branch):** `pnpm typecheck` 0 errors; full `pnpm test` = **501 files / 4585 tests, 0 fail** (36.7s). Worktrees removed.
+
+**Verdict:** VERIFIED — Wave F1 complete. Next: Wave F2 (T-22b client-api, T-23d ReadinessBadge component, T-24b damage route+audit, T-24c damage api+types, T-24e readiness-reads-conditionStatus), then Wave F3 (T-22c LocateSearch UI, T-24d ReturnPlugDialog damaged-choice, T-23e badge mount fan-out).
+
+---
+
+## 2026-07-12 — Consolidated Audit × 10x — Phase 1 Equipment FEATURES · Wave F2 (T-22b, T-23d, T-24b, T-24c, T-24e)
+
+**Claim:** The five Wave-F2 feature cards (client-api, ReadinessBadge component, damage route+audit, damage-api, readiness-gate) are implemented RED-first, integrated, and pass the full-suite batch gate. 4 parallel worktrees off `e78458c56` (Stream A did T-22b→T-24c sequentially since both edit `api.ts`); all `Tier: S`. **One controller-owned reconciliation** at the client↔server seam.
+
+**Evidence:**
+- **T-22b** (R-EQ-F1 · locate client): `api.equipment.locate(q)` → `GET /api/equipment/locate?q=` + `src/types/locate.ts` mirroring the server shape. RED `tests/api-locate.test.ts`. `7cc9cec97` → cp `f6e2d8bac`.
+- **T-24c** (R-EQ-F3 · damage client): `api.equipment.reportDamage()` + `DamageReport`/`CreateDamageReport*` types. RED `tests/api-damage.test.ts`. `9680a5e9c` → cp `e1556feb6`. **⚠ CONTRACT MISMATCH found + reconciled:** the agent (blind to T-24b's worktree) authored `POST /api/equipment/damage-reports` with `{equipmentId}` in body, but the merged T-24b route serves `POST /api/equipment/:id/damage` (id in path, `{note}` body, subset 201 response). Controller reconciled the CLIENT to the server: URL→`/api/equipment/${id}/damage`, body→`{note}`, response type→`Pick<DamageReport, id|equipmentId|reportedBy|at|note>`, and the test's URL/body assertions. Reconciliation commit `1367695d2`. (Server kept: more RESTful, already registered/tested/allowlisted.)
+- **T-24b** (R-EQ-F3 · damage route+audit): `POST /:id/damage` — `clinicId`-scoped, one transaction (insert `vt_damage_events` + flip `conditionStatus="damaged"`), fire-and-forget `logAudit` after commit; new `equipment_damage_reported` in the closed `AuditActionType` union. **Both governance gates pre-handled** (i18n `KNOWN_DEBT_ALLOWLIST` + `routes-registration-contract`). RED `tests/damage-report-route.test.ts` (persist+flip; cross-clinic 404 no-mutation; audit emitted). Mocked-unit. `a6a479cac` → cp `35c574b75`. Deferred (minor, out of scope): `routes-contract.json` doc artifact; route doesn't bump `equipment.version`.
+- **T-24e** (R-EQ-F3 · readiness gate): `computeBundleReadinessGate()` demotes any non-`'ok'` `conditionStatus` to not-ready (new reason `CONDITION_STATUS_NOT_CLEAR`) as an additive first-check; healthy path byte-preserved (18/18 sibling tests), `!= null` guard keeps existing call sites unaffected; composes automatically at the two real call sites (deployability GET + dock-return). RED `tests/damage-readiness-not-ready.test.ts`. `acb84d1c3` → cp `8e7614bc8`.
+- **T-23d** (R-EQ-F2 · ReadinessBadge): new `src/components/ui/readiness-badge.tsx` composing the tier helper over `StatusBadge`; distinct **shape** per tier (check-circle/triangle/octagon), `aria-hidden` glyph + visible text label (not color-only). Contrast asserted from the **real `src/index.css` token values** via in-test WCAG math (4.81–7.18 across both themes, clears 3:1 glyph / 4.5:1 text). 19 tests. `8b31609dc` → cp `83ad8a9f1`. Note: WCAG math lives in the test only (no shared prod helper — extract if reused).
+- **Batch gate:** `pnpm typecheck` 0; full `pnpm test` = **506 files / 4618 tests, 0 fail** (34.4s). Worktrees removed.
+
+**Verdict:** VERIFIED — Wave F2 complete. Next: Wave F3 — F3a (T-22c LocateSearch UI ∥ T-24d ReturnPlugDialog damaged-choice) then F3b (T-23e badge mount fan-out; edits equipment-detail after T-24d + needs LocateSearch from T-22c).
+
+---
+
+## 2026-07-12 — Consolidated Audit × 10x — Phase 1 Equipment FEATURES · Wave F3 (T-22c, T-24d, T-23e) — EQUIPMENT BUNDLE COMPLETE
+
+**Claim:** The three Wave-F3 UI/mount cards are implemented RED-first, integrated, and pass the full-suite batch gate — closing the Phase 1 Equipment bundle (T-17…T-24). F3a (T-22c ∥ T-24d) off `07a27a9a7`; F3b (T-23e) off the F3a-integrated tree `d42f32353`; all `Tier: S`.
+
+**Evidence:**
+- **T-22c** (R-EQ-F1 · LocateSearch UI): new `src/features/equipment/LocateSearch.tsx` — bottom-sheet, `aria-live` result count, real `<label>` (not placeholder), rows deep-link to `/equipment/:id` (routes.tsx resolves iPad master-detail vs phone push). Mounted once in `src/features/today/surfaces/HomeShell.tsx` (shared wrapper → all 5 role homes, all platforms). Added `locateSearch.*` locale keys + hand-built `t.locateSearch` accessor in `src/lib/i18n.ts` (repo gotcha: `t` is hand-listed) + regenerated `.d.ts`; i18n parity ✓. RED `tests/locate-search.test.tsx` (empty≠zero-results). `9d970ecba` → cp `40fbf18b1`.
+- **T-24d** (R-EQ-F3 · ReturnPlugDialog damaged-choice + undo): phone `Dialog`→`Sheet`; **opt-in `allowDamagedReport` prop** + third "Damaged" button; `onConfirm` gained an additive optional `damaged?` field so all **6** `ReturnPlugDialog` call sites (equipment-detail, EquipmentActions, qr-scanner, my-equipment, equipment-list, room-radar) keep working unchanged (79 caller tests pass). Undo = **deferred** `reportDamage` behind `UNDO_WINDOW_MS` toast + `haptics.warning()` (no revert endpoint → Undo clears the timeout so the call never fires). RED `tests/return-damaged.test.tsx`. `248be1f90` → cp `d42f32353`. **Follow-ups (documented):** dialog/toast copy is hardcoded English (matches the pre-existing un-i18n'd `return-plug-dialog.tsx`); the "damaged" branch does NOT also check the item in (scope-disciplined — product-intent question).
+- **T-23e** (R-EQ-F2 · ReadinessBadge mount fan-out): mounted `<ReadinessBadge status={item.status}/>` on **6 surfaces** — `my-equipment.tsx`, `equipment-list.tsx` (`EquipmentItem`), `equipment-detail.tsx` header, `MyEquipmentCard.tsx` (shared → Vet/Tech/Student homes), `RecentActivityCard.tsx` (Ops home's only equipment-item render), `CommandBoardScreen.tsx` legacy ward-display fallback (glance-only, no frozen-board logic touched). RED `tests/readiness-badge-surfaces.test.tsx` (6 mounts + 1 control). `8943d70fd` → cp `51980ed4b`. **Two evidence-backed deviations from the literal card:** (1) `src/board/*` is kiosk chrome with no equipment items and the primary `CommandBoard` uses a *different* enum (`EquipmentReadinessStatus`, not `EquipmentStatus`) → mounted in the fallback pane where real `vt_equipment.status` reaches the client; (2) **LocateSearch SKIPPED** — `EquipmentLocateResult` carries only `readiness: string` (3-value `ReadinessState`), no `EquipmentStatus`; a mechanical cast would break `getReadinessTier`. **Follow-up:** to badge LocateSearch, the locate route (T-22a) must also return `status`, or add a tier-accepting `ReadinessBadge` variant.
+- **Batch gate:** `pnpm typecheck` 0; full `pnpm test` = **509 files / 4633 tests, 0 fail** (34s). Worktrees removed.
+
+**Verdict:** VERIFIED — ★ **Phase 1 Equipment bundle COMPLETE** (T-17…T-24: 5 fixes + 8 feature sub-cards + 5 mounted surfaces). Documented follow-ups: LocateSearch readiness badge (data-model), return-dialog i18n, damaged-branch check-in intent. Next: Phase 1 Shift/Home bundle (T-25, T-26, T-27).
+
+---
+
+## 2026-07-12 — Consolidated Audit × 10x — Phase 1 Shift/Home bundle (T-25, T-26, T-27)
+
+**Claim:** The Shift/Home bundle is implemented RED-first, integrated, batch-gate green. 2 parallel worktrees off `bd856dd9c`. T-25 is `S +R` (reviewed clean); rest `Tier: S`.
+
+**Evidence:**
+- **T-25** (R-SH-01 · CLICK-PATH-007 · **S +R**): `useShiftChat.ts` — reactions/acks now render live via a **merge-by-id local patch** on the react/ack mutation `onSuccess` (was invalidate-only over a strict-`gt` poll, so a reaction on an already-loaded message never rendered). RED `tests/shift-chat-live-reaction.test.tsx`. **Review APPROVE (0 findings):** reviewer traced the patch vs the actual server semantics (`server/routes/shift-chat.ts` — reactions toggle per `(messageId,userId,emoji)`, acks upsert per `(messageId,userId)`), confirmed teammates' reactions/acks survive the merge, correct toggle both directions, writes to the same accumulator the poll dedupes by id (no resurrection), non-vacuous. **Guardrail held:** no new realtime path — background poll untouched. `0fbfba006` → cp `7cc54213b`.
+- **T-26** (R-SH-02 · CLICK-PATH-017): `useShiftChat.ts` — unread badge no longer counts the just-read batch on open→close (`wasOpenRef` advances `lastOpenRef` on the close edge; genuinely-new-after-close still counts). RED `tests/shift-chat-unread-badge.test.tsx`. `9a26f2a78` → cp `90a85f234`.
+- **T-27a** (R-SH-F2 · small-05): new `src/features/today/surfaces/StartOfShiftCard.tsx` — one focal "what needs me now" + one primary action, **capability-gated** via `useExperience().can()` (branch order mirrors `experience-model.ts`: management.web→ops, equipment.vetActions→vet, codeBlue.manage→tech, else→student), off-shift idle variant, phone-compact/iPad-hero via `isTablet`. i18n keys + parity ✓. 16 tests. `1c33a784c` → cp `4a5e15821`.
+- **T-27b** (R-SH-F2 · mount fan-out): mounted `<StartOfShiftCard>` in Ops/Vet/Tech/Student home surfaces (each passes its own computed `home.*` values). 7 tests, 45/45 no-regression. `8e67b5b98` → cp `5ae8df8db`. **Deviations (documented):** `FloorHomeSurface` NOT mounted (pure archetype dispatcher → covered transitively, asserted); `OnShiftHero` NOT mounted (its signature carries no per-role capability/count data → a real API change across 5 call sites, not a mechanical mount). **Follow-up:** iPad `HomeTabletDashboard` (uses `OnShiftHero`) does not yet show the card.
+- **Batch gate:** `pnpm typecheck` 0; full `pnpm test` = **513 files / 4660 tests, 0 fail** (32s). Worktrees removed.
+
+**Verdict:** VERIFIED — Phase 1 Shift/Home bundle complete. Next: Phase 1 Inventory bundle (T-28a/b, T-29, T-30 nudge sub-cards) → Web-gate (T-31). (R-SH-F1 handover = deferred O+R sub-spec.)
+
+---
+
+## 2026-07-12 — Consolidated Audit × 10x — Phase 1 Inventory FIXES (T-28a, T-28b, T-29)
+
+**Claim:** The three Inventory *fix* cards are implemented RED-first, integrated, batch-gate green. 2 parallel worktrees off `b5fc18a02`; all `Tier: S`. (T-30 nudge FEATURE is the remaining Inventory work — see next.)
+
+**Evidence:**
+- **T-28a** (R-IN-01 · CLICK-PATH-018 · server): `server/routes/inventory-items.ts` — added `isBillable` + `minimumDispenseToCapture` optional fields to `createItemSchema` (they existed only on `updateItemSchema`) and conditional-spread them into the create insert (omitting still uses DB defaults). RED `tests/inventory-create-fields.test.ts` (the `.strict()` schema returned 400 pre-fix). Mocked-unit. `1cb884933` → cp `89f5492aa`.
+- **T-28b** (R-IN-01 · client): `src/lib/api.ts` `inventoryItems.create` payload type + `src/pages/inventory-items.tsx` create mutation now forward the two fields. **Pure wiring** — the dialog UI (checkbox + input) was already built and shared with edit; only the create mutation dropped them. No new i18n keys (already present). RED `tests/inventory-create-dialog.test.tsx`. `ec3d8d3dd` → cp `3be497fd2`.
+- **T-29** (R-IN-02 · CLICK-PATH-019): `src/pages/inventory-page.tsx` — the +/- restock controls now disable while that row's `scanLine` mutation is pending (gated on the existing per-row `rowPendingByCode[line.code] > 0`), so a burst can't race a stale base. 2-line fix. RED `tests/inventory-restock-burst.test.tsx`. `ca9abfc93` → cp `72a746103`. Minor follow-up: the "Full restock" + quantity-edit buttons on the same row could race similarly (out of card scope).
+- **Batch gate:** `pnpm typecheck` 0; full `pnpm test` = **516 files / 4664 tests, 0 fail**. Worktrees removed.
+
+**Verdict:** VERIFIED — Inventory FIXES complete. Remaining Inventory work: **T-30 nudge feature (6 sub-cards)** — see the ledger for the pinned execution plan (feed read-path + client↔server telemetry enum contract). Then Web-gate T-31.
+
+---
+
+## 2026-07-12 — Consolidated Audit × 10x — Phase 1 Web-gate (T-31 · R-WEB-01)
+
+**Claim:** The desktop web shell is now gated on the `management.web` capability. RED-first, `+R`-reviewed clean. Executed solo in the main tree (no parallel work).
+
+**Evidence:**
+- **GREEN:** `src/features/auth/components/AuthGuard.tsx` — a guard clause added **after** every existing auth-state branch (loading/signed-out→/signin/pending/blocked/accessDenied): `if (platformTarget === "desktop" && !experience.can("management.web")) return <ManagementWebGate/>`. Hooks (`usePlatformTarget`, `useExperience`) called unconditionally at top (rules-of-hooks). New `src/app/platform/guards/ManagementWebGate.tsx` (reuses `WebOnlyGuard`'s dark full-bleed denial pattern; `WebOnlyGuard` untouched). `resolvePlatformTarget()` sync contract + `/board` + mobile all unchanged.
+- **Capability set:** `experience.can("management.web")` grants to EXACTLY **admin + senior_technician + lead_technician + secondary-admin** (verified against `src/lib/roles/experience-model.ts` — admin direct, lead archetype = senior/lead_technician, secondary-admin via `SECONDARY_ADMIN_CAPS` when `secondaryRole==="admin"`); vet/vet_tech/technician/student denied. Matches the owner-confirmed spec ("do NOT collapse to lossy admin+leads"). The capability map pre-existed and was reused, not re-derived.
+- **RED:** `tests/web-platform-management-gate.test.tsx` — vet_tech + student @desktop → denial; admin + senior_technician + lead_technician + **secondary-admin** @desktop → passthrough; a denied role on mobile is NOT gated. Real `experience-model.ts` (only `useAuth`/capacitor mocked). 7 tests.
+- **`+R` review: APPROVE** (0 Crit/High). Confirmed exact capability set, guard placement (signed-out still gets sign-in), guardrails, non-vacuous tests. **1 MEDIUM fixed in-cycle:** the reused `WebOnlyGuard` CTA ("Go to my equipment"→`/home`) was a dead-end — `/home` is itself under `AuthGuard` and re-hits the same gate → looped back to the denial. Fixed to **sign-out** (matching AuthGuard's sibling denial states), dropped the now-unused `managementWebGate.cta` key.
+- **Commits:** `804bdffa7` (guard + component) + `964d949b0` (i18n `.d.ts` regen) + `43d05a611` (CTA→signOut fix).
+- **Batch gate:** `pnpm typecheck` 0; full `pnpm test` = **517 files / 4671 tests, 0 fail**. (First gate run showed the T-31 test file failing as a block — an i18n-codegen first-run artifact; ruled out via 3× isolated + 3× full green.)
+
+**Verdict:** VERIFIED — Web-gate T-31 complete. **Only T-30 (nudge feature, 6 sub-cards) remains in Phase 1** (compute-on-read plan pinned in the SDD ledger). Then Phase 2 (T-34…44), Phase 3 (T-45…53), O+R sub-specs.
+
+---
+
+## 2026-07-12 — Consolidated Audit × 10x — Phase 1 Inventory FEATURE · T-30 nudge (a1-i, a1-ii, a2-i, a2-ii, b, c) — ★ PHASE 1 COMPLETE
+
+**Claim:** The T-30 nudge feature (6 sub-cards, 2 waves) is implemented RED-first, integrated, batch-gate green — completing all of Phase 1. **Architecture decision (controller):** compute-on-read feed (the expiryCheckWorker runs in a separate process; a push+store or new table is heavier than this "small" feature warrants), so the read feed derives nudges from existing rows; the worker keeps its own push path.
+
+**Evidence (I1 off `ae6607b8e`, I2 off `4b19da058`; all `Tier: S`):**
+- **T-30a1-i** (feed + read): new `server/services/nudge-feed.service.ts` `computeNudgesForUser(clinicId, role)` derives **expiry** nudges from `vt_equipment` (reusing `expiryCheckWorker`'s `expiryDate<=now+7d` window, clinicId-scoped, per-nudge `targetRole` tag + role filter; `targetRole="technician"`) + GET `server/routes/nudges.ts` (governance gates handled) + `src/lib/api.ts` `api.nudges.list()` + `src/types/nudges.ts`. RED `tests/expiry-nudge-feed.test.ts`. `3d1f8f08d` → cp.
+- **T-30a1-ii** (restock producer): extended the feed to also derive **restock** nudges via the existing `listLowStockItems()` (par-level rule), `kind:"restock"`, `targetRole="technician"`. RED `tests/restock-nudge-feed.test.ts`. `b47c1434d` → cp `fc5e3765f`.
+- **T-30a2-i** (telemetry server): closed enum `ALLOWED_NUDGE_SHOWN=["expiry","restock"]` + guard in `server/routes/realtime.ts`; `MetricName`/`DEFAULT_COUNTERS` gain `nudge_shown_expiry|nudge_shown_restock`; out-of-enum → the shared `telemetry_payload_rejected_enum_mismatch` (no new series). RED `tests/expiry-nudge-telemetry-server.test.ts`. `b094629c9` → cp `e165891b2`.
+- **T-30a2-ii** (telemetry client): `classifyNudgeShown` + `reportNudgeShown` in `src/lib/realtime.ts` (only ever posts an in-enum value) + `nudgeShown?` on the `api.realtime.telemetry` payload type — matches the server enum exactly. RED `tests/expiry-nudge-telemetry-client.test.ts`. `42b5f2cb8` → cp `ec15e42ec`.
+- **T-30b** (UI): new `src/features/today/surfaces/HomeNudges.tsx` — fetches via `api.nudges.list` (TanStack Query), renders per-kind localized copy, **dismiss persists via localStorage** (tested across a simulated reload); mounted once in `HomeShell`'s `HomeChrome` (all role homes). i18n keys + hand accessor + regen. RED `tests/expiry-nudge-ui.test.tsx`. `8b933aede` → cp `1c0a50ff7`.
+- **T-30c** (push): **test-only** (`test:` commit) — the once-per-event expiry push ALREADY holds (`expiryCheckWorker` filters `expiryNotifiedAt IS NULL` + `markNotified` stamps; second sweep sends zero), teeth-verified by temporarily removing the filter (2/4 broke). Regression lock `tests/expiry-nudge-push.test.ts`. `ad897290d` → cp `796ec81ee`.
+- **Controller type fix:** widened `NudgeKind` → `"expiry" | "restock"` (client type was stale vs the merged restock producer — a real API-vs-type mismatch).
+- **Batch gate:** `pnpm typecheck` 0; full `pnpm test` = **523 files / 4699 tests, 0 fail** (37.8s). Worktrees removed.
+- **T-30 documented follow-ups (non-blocking):** (1) HomeNudges doesn't yet CALL `reportNudgeShown` — the a2-i/a2-ii telemetry is built + tested but has no caller (currently dead code); a small UI wiring completes the loop. (2) Restock nudge PUSH has no worker path (only expiry pushes) — new-feature scope. (3) Restock UI copy path is exercised only once restock nudges surface for a role.
+
+**Verdict:** VERIFIED — ★★★ **PHASE 1 COMPLETE** (Equipment T-17…24, Shift/Home T-25…27, Inventory T-28…30, Web-gate T-31). Phase 0 (0A code + 0B owner checklist) + Phase 1 all done, full suite green throughout. Next: Phase 2 (T-34…44 native-reachable MED sweep + `⚠ FROZEN` PWA cards), Phase 3 (T-45…53 LOW cleanup), then the O+R sub-specs. (R-SH-F1 handover deferred O+R sub-spec.)
+
+---
+
+## 2026-07-12 — Consolidated Audit × 10x — Phase 2 native-reachable MED sweep FIXES (T-34…T-44) — ★ PHASE 2 FIXES COMPLETE
+
+**Claim:** The 11 Phase-2 fix cards are implemented RED-first, integrated, batch-gate green. Parallel worktrees off `7ed6be358` (all files disjoint); frozen PWA cards T-36/T-37 carried code-reviewer gates. (A mid-run session-limit interrupted P2b/c; resumed after reset — see ledger.)
+
+**Evidence (Wave P2a — 5 disjoint S):**
+- **T-34** (R-SC-02 · CLICK-PATH-015): `qr-scanner.tsx` — `visibilitychange`/`pageshow` now resume the camera when `phase==="scanning" && !scannerRef.current` (was: stop-only, dead camera on return). RED `tests/qr-scanner-resume.test.tsx`. cp `a0dc8e081`.
+- **T-35** (R-SC-03 · CLICK-PATH-016): `nfc-equipment-toggle.ts` + `nfc-foreground-scan.tsx` — `clearNfcToggleFired()` on all 3 failure paths clears the 8s success guard; new `NFC_REFIRE_DEBOUNCE_MS=500` per-instance debounce still suppresses hardware re-fires (499ms suppressed / 500ms fires, boundary-tested). RED `tests/nfc-toggle-failure-guard.test.tsx`. cp `b8b7640ff`.
+- **T-38** (R-SY-04 · CLICK-PATH-026): `src/app/routes.tsx` — the 3 `/equipment/{scan,maintenance,intelligence}` alias redirects moved above the dynamic `/equipment/:id` (wouter top-down match). RED `tests/equipment-alias-redirects.test.tsx`. cp `6ca92160a`.
+- **T-39** (R-PR-01 · CLICK-PATH-008): `ProfileHeroZone.tsx` — `refreshAuth()` after a display-name save so `useAuth().name` persists (was: reverts after the 2s flash). RED `tests/profile-name-persist.test.tsx`. cp `95e80349e`.
+- **T-40** (R-AD-01 · CLICK-PATH-009): `admin/SupportSection.tsx` — `updateMut.onSuccess` only re-opens the detail editor when one is already open + re-seeds `detailStatus`/`detailNote` from `updated` (was: in-row quick-resolve popped a contradictory editor). RED `tests/support-quick-resolve.test.tsx`. cp `7b2803964`. Batch gate 528f/4712t.
+
+**Evidence (Wave P2b/c — 4 admin S + 2 FROZEN PWA S +R):**
+- **T-41** (R-AD-02 · CLICK-PATH-022): `settings.tsx` — both toggle handlers fire the feedback tone WITHOUT awaiting (persist always commits) with an **observable** `Sentry.captureMessage` catch (never empty). RED `tests/settings-sound-toggle.test.tsx`. cp `698d3c36e`.
+- **T-42** (R-AD-03 · CLICK-PATH-023): `admin-shifts.tsx` — `hasImportedSelectedFile` flag (set on import, reset on reselection/clear) gates `canImport`, preventing re-importing the same roster CSV. RED `tests/admin-shifts-reimport-guard.test.tsx`. cp `87e9b4097`.
+- **T-43** (R-AD-04 · CLICK-PATH-024): `admin/FoldersSection.tsx` — one guarded `submit()` (trimmed-name + `isSaving`) used by both Save and the Enter handler (was: Enter replicated Save without guards → empty/double submit). RED `tests/folders-enter-guard.test.tsx`. cp `e78491b16`. Note: TanStack v5 defers `isPending` (guard blocks after re-render, matching the Save-button precedent).
+- **T-44** (R-AD-05 · CLICK-PATH-025): **ALREADY-SATISFIED** — the secondary-role pending state was already keyed by `userId` (via `pendingSecondaryRoleUserId === user.id`) since commit `89d52699b` (2026-07-07); card stale vs live code. Regression-lock test landed (`test:` commit `973187ff4`). Follow-up: a single pending-pair means 2 concurrent back-to-back different-row changes let the 2nd overwrite the 1st's pending indicator (never leaks to a 3rd row).
+- **T-36** (R-SY-02 · CLICK-PATH-013 · **S +R FROZEN**): `sync-status-banner.tsx` — dismissal keyed to the failure **signature** (was: a component-local boolean that hid all later failures). **Review: CHANGES-REQUESTED — 1 CRITICAL** found: `syncErrorKind = structuredError?.code ?? errorMessage` collapses because `structuredError` is a DEAD field and real dead-letters set a fixed `errorMessage="Failed after N attempts"` → two distinct dead-letters on the same endpoint collided → 2nd stayed masked (reproduced the very bug). **Fixed** by folding `clientMutationId` (stable per-op across retries, unique per row) into the signature — RED reproduced the collision (1/8), GREEN 8/8. Guardrails held (banner component only; sync-engine/queue/cache untouched). cp `2f51008f5` + fix `1a0876f18`.
+- **T-37** (R-SY-03 · CLICK-PATH-014 · **S +R FROZEN**): `sw-update-banner.tsx` — deterministic reload on Refresh: (a) already-controller → immediate reload; (b) SKIP_WAITING + `controllerchange`; (c) `SW_UPDATE_RELOAD_TIMEOUT_MS=3000` fallback — behind a guard flag = **exactly once**, cleanup on resolution/repeat-click/unmount. **Review: APPROVE** (0 Crit/High; exactly-once traced for every race; guardrails intact). RED `tests/sw-update-refresh.test.tsx`. cp `6e41f0181`. Follow-ups (non-blocking): add regression tests for double-click + unmount-mid-race (handled, not test-pinned); `safeReloadPage` minIntervalMs widened 3000→5000 (benign); **env-gated live Playwright PWA drill still to run**.
+- **Batch gate (integrated branch):** `pnpm typecheck` 0; full `pnpm test` = **534 files / 4733 tests, 0 fail** (38s). Worktrees removed.
+
+**Verdict:** VERIFIED — ★ **Phase 2 native-reachable MED sweep FIXES complete (T-34…T-44).** Stopping here per user directive ("stop after phase 2"). **NOT done (remaining):** R-CB-stabilize (R-CB-02/03 Code Blue races, O+R sub-spec, nominally Phase 2, gates medium-01); Phase 3 (T-45…53 LOW cleanup); O+R sub-specs (R-M1, R-CBF-1, R-BDF-1, R-SH-F1, R-PDF-1); Phase 4 (parked). Open follow-ups tracked in the SDD ledger. Next action per user: commit + push + open PR.
+
+---
+
+## Device Audit — Phases 0–2 on-device (2026-07-13)
+
+**Claim:** ran an on-device behavioral audit of the merged Phase 0–2 code (`main` @ `b6856f921`) in the **native Capacitor shell** on the **iOS Simulator — iPhone 17 Pro + iPad Pro 11-inch** — against local `pnpm dev` (dev-bypass), driving a high-value subset of the playbook drills with screenshot + DB/API cross-checks. Playbook: `docs/audit/phase-0-2-device-audit-playbook.md`; report: `docs/audit/phase-0-2-device-audit-2026-07-13.md`; evidence: `docs/audit/device-audit-evidence/{iphone,ipad}/`.
+
+**Evidence checked (not asserted):**
+- **T-22 locate — PASS (iPhone, full E2E):** `LocateSearch` opens; empty-state helper ≠ zero-results "no equipment found"; matching rows show location·custodian·readiness; row deep-links to detail. Backend `GET /api/equipment/locate` returns the evidence-graph composition. Shots: `iphone-D12-locate-results.png`, `iphone-D12-deeplink-detail.png`.
+- **T-27 start-of-shift — PASS:** idle variant on iPhone home; **iPad hero-band variant** (`ipad-home-sidebar-bento-startofshift.png`).
+- **T-24 damaged-return custody (owner decision):** LOGIC **PASS** — `tests/return-damaged.test.tsx` 4/4 (custody released + reportDamage-never-called on undo; offline branch). Return path PASS on device (DB `checked_out→returned`). **On-device damaged button INCONCLUSIVE** — did not render in the shell dialog despite present source + passing test; not reproduced against a specific served bundle/commit and no clean build was run, so no cause is asserted (F-2). Shots: `iphone-D14-*`.
+- **Tablet master-detail — PASS (iPad):** sidebar nav (RTL-correct); Equipment list → detail-pane select (`ipad-equipment-master-detail-{empty,loaded}.png`).
+- **Custody state machine + scan + anomalies feed — PASS (iPhone):** `untracked→docked→checked_out→returned` DB-confirmed; `CUSTODY_CHAIN_BROKEN` gate correct; scan manual-entry + `ScanResultCard` actions work; anomalies feed compute-on-read decrement 2→1.
+
+**Findings:** F-1 (MEDIUM) return-plug-dialog copy hardcoded English on Hebrew app; F-3 (LOW) post-return "אחראי" custodian text stale (iPhone+iPad); F-4 (LOW) possible redundant iPad nav; F-2 follow-up (verify damaged button on clean `cap:build:native`).
+
+**Caveats:** shared `main` worktree advanced under audit (`b6856f921↔2a200cdf0`); WKWebView HMR staleness needed relaunch; Hebrew IME needed clipboard workaround; thin seed required additive test data (rooms + docked baseline) in `dev-clinic-default`. Ran a **subset** — remaining drills DEFERRED, itemized in the report coverage table (no implied passes).
+
+**Verdict:** VERIFIED (device audit executed; report + evidence + proof logged). Report-only — no source changes.
+
+---
+
+## Device-audit fixes + gated role-onboarding (PR #89, 2026-07-13)
+
+**Claim:** fixed the device-audit findings and added the owner-requested gated role-onboarding flow, on branch `fix/device-audit-findings` → PR #89 (off `main` @ `b6856f921`). TDD throughout.
+
+**Evidence checked (not asserted):**
+- **F-1** (i18n): `git show`/read — `return-plug-dialog.tsx` now uses `t.returnPlugDialog.*` for title/plug-choices/warning/label/cancel/confirms; keys added to en+he (parity ✓); `tr()` functions for the two interpolated strings. RED test `tests/return-plug-dialog-i18n.test.tsx` (Hebrew rendered, no English) GREEN. Commit `0ec6ef404`.
+- **F-3** (custodian staleness): `invalidateAll()` adds `["equipment-truth", id]` + `["deployability", id]`. RED test in `return-damaged.test.tsx` (normal return invalidates equipment-truth) GREEN. Commit `d5f41a7cc`.
+- **F-2**: **source verified** via `return-damaged.test.tsx` 4/4 + jsdom render; on-device **INCONCLUSIVE** — not reproduced against a specific served bundle/commit, no clean build run, so no cause asserted; clean `cap:build:native` re-verification pending. No code change.
+- **F-4**: refuted from source (`NativeShell.tsx:61-103` tablet branch renders only the sidebar). No code change.
+- **Role-onboarding (C)**: schema col `vet_license_number` (migration 163, applied + column confirmed via psql); `sanitizeVetLicense` + ingest in `auth.ts`; `resolveApprovalRole` (server/lib) with 6 unit tests (tech/vet-with-license/vet-without-license-422/override/non-approval/none); `PATCH /:id/status` applies role + vet gate; RoleChips 2-option; signup vet-license field → `unsafeMetadata`; signin carries pre-choice; `PendingUsersSection` approve-as-role + license display + override. Tests: `approval-role` 6/6, `role-chips-signup` (2-option + license field), `pending-users-requested-role` (approve-promotes + override + license), `requested-role-provisioning` (+2 license-ingest). Commit `33182464f`.
+- **Batch gate (at `50ecaeb0d`):** full `pnpm test` = **537 files / 4766 tests, 0 fail**; frontend+server `tsc` 0; `i18n:check` parity ✓; `architecture:gates` G1 pass; migration 163 applied. Later commits add tests (CodeRabbit-round + T-12 offline gate + override-gate), raising the count — the definitive final count is recorded in the CodeRabbit re-review entry below.
+
+**Not done / honest gaps:** on-device re-confirmation of the return dialog + the full deferred device-drill sweep (Workstream D) blocked by the simulator Hebrew-IME text-entry friction; the Clerk-gated sign-up flow isn't exercisable under dev-bypass (unit-covered instead). Security note logged in the report + PR: the auto-promote-on-approval intentionally reverses the T24b advisory-only guard, mitigated by vet/tech self-select cap + vet license gate + admin approve/override.
+
+**Verdict:** VERIFIED (fixes implemented + unit/typecheck/arch/parity green; PR #89 open, CI + CodeRabbit polling). Device sweep partial (documented).
+
+---
+
+## CodeRabbit re-review round + T-12 offline gate (PR #89, 2026-07-13)
+
+**Definitive batch gate (PR #89 head):** full `pnpm test` = **538 files / 4774 tests, 0 fail**; frontend+server `tsc` 0; `i18n:check` parity ✓; `architecture:gates` G1 pass; migration 163 applied. (Supersedes the interim 4766 count.)
+
+**Round-1 CodeRabbit (15 findings) — addressed** in `50ecaeb0d`: vet-license gates the Clerk sign-up form (was bypassable); auto-applied role capped to vet/technician; `/status` approval guarded on reviewed status (409) + authority-cache invalidation on grant; migration `lock_timeout`; Hebrew literal → ASCII; deployability assertion; localized-branch coverage; unsafe casts removed; VET_LICENSE_REQUIRED toast test; F-2 wording softened; security-reversal note. Deferred (investigated): drizzle-baseline reconciliation (#1, repo-wide standing debt) + reciprocal English-literal linter (#14).
+
+**T-12 (real-device offline cold-start)** in `e6ee83ed9`: native Clerk gate now shows a "connect to sign in" prompt (immediate `navigator.onLine` + `offline` event + 8s timeout, auto-reload on reconnect) instead of an infinite skeleton. RED test `native-clerk-gate-offline.test.tsx`.
+
+**Round-2 CodeRabbit (11 findings, re-review of the fixes) — addressed** this commit: vet-license input `maxLength=40` (aligns with the varchar(40) column); regression test for **admin-override-to-vet-without-license → 422** (source-agnostic gate, the most security-sensitive branch); playbook — do not equate dev-bypass with DB isolation (require NODE_ENV non-prod + DATABASE_URL + dev clinic before destructive drills); report — vet-license wording ("presence/format validation," not "verification"); added T-28/T-29 coverage-table dispositions; reconciled the test count (4774); clarified live-reload vs `cap:build:native`; markdown-lint (heading blank lines MD022, fence languages MD040). **Refuted:** `User`-interface "3-copy" DRY claim (#3568814185) — `interface User` is defined only in `src/types/platform.ts`; api.ts imports it, so adding `vetLicenseNumber` there introduces no drift.
+
+**Verdict:** VERIFIED — round-2 real findings fixed, doc claims corrected, markdown-lint addressed; residual = the two documented deferrals. Full suite 538f/4774t green.
+
+---
+
+## CI test-log noise — leaked worker heartbeat + incomplete redis mocks (2026-07-14)
+
+**Claim:** removed the scary `[job-runtime] heartbeat tick failed Error: No "getRedis" export` lines (and a `<search>` tag warning) from CI's green test output, via systematic-debugging root-cause analysis.
+
+**Root cause (investigated, not guessed):**
+- `server/lib/worker-heartbeat.ts` started a module-singleton `setInterval`; its only cleanup, `stopWorkerHeartbeatForTests`, was **defined but never exported and never called** (dead code, confirmed via `grep`). So once any test called `startJobRuntime` (→ `startWorkerHeartbeat`, `runtime.ts:295`), the interval ticked for the whole suite. Reproduces only under full-suite timing, never in isolation (`vitest run tests/jobs/runtime.test.ts` → 0 error lines) — the signature of a leaked singleton interval.
+- The heartbeat tick calls `getRedis()`, but the redis mocks in `tests/jobs/runtime.test.ts` and `tests/f2b-job-registry-readiness-metrics.test.ts` omitted `getRedis`, so ticks threw vitest's "No getRedis export" and the catch logged a fake "Error".
+
+**Fix (evidence checked):**
+- `worker-heartbeat.ts`: promoted the dead cleanup to an exported `stopWorkerHeartbeat()` and `.unref()`'d the interval (never holds the event loop / test teardown).
+- `runtime.ts` `closeJobRuntime()`: now calls `stopWorkerHeartbeat()` — a closed runtime stops its own heartbeat (production correctness + stops the test leak).
+- Both redis mocks: added `getRedis: vi.fn().mockResolvedValue(null)` → tick hits its `if (!redis) return` guard, clean no-op.
+- `LocateSearch.tsx`: `<search>` → `<div role="search">` (react-dom 18 doesn't recognize `<search>` yet; role is equivalent).
+- RED-first unit test `tests/jobs/worker-heartbeat.test.ts` (fake timers): failed pre-fix (`stopWorkerHeartbeat is not a function`), GREEN post-fix — proves ticks stop after `stopWorkerHeartbeat()` and the singleton guard holds.
+
+**Gate:** `tests/jobs/` 42/42 (10 files) + `locate-search` 8/8, **0** `heartbeat tick failed` lines, **0** `<search> is unrecognized` warnings; frontend `tsc` 0, server `tsc` 0.
+
+**Explicitly NOT changed (triaged as correct, not silenced):** `Blocked request: missing userId` (real auth-fetch warn on unauth'd render tests), intentional error-path logs (`requireAuth error`, `sync network error`, `PageErrorBoundary`, `db down`, `evaluator threw`, `DATA_CORRUPTION`), and info-level operational logs — these are the code behaving correctly under tests that deliberately exercise those paths. The `DialogContent` missing-`Description` a11y warning (~7 dialogs) is a real but separate a11y workstream, left for a decision rather than blanket-silenced.
+
+**Verdict:** VERIFIED — two real defects fixed RED-first, gate green, typechecks clean; remaining noise triaged as expected/correct.
+
+---
+
+## CodeRabbit round — offline-auth-gate hardening (PR #90, 2026-07-14)
+
+**Claim:** addressed the three unresolved CodeRabbit findings on PR #90 (`fix/offline-auth-gate`), TDD (RED→GREEN).
+
+**Evidence checked (not asserted):**
+- **Finding 1** (Stability, `offline-auth-gate.tsx:30`): `safeReloadPage()` returns `false` when its 5s guard suppresses the reload (verified `safe-browser.ts:164`); the `online` handler + Retry button ignored it, so a suppressed reload stranded the user on the offline screen. Fix: `retryConnection` (useCallback) now re-syncs `setOffline(!isOnline())` when the reload is refused; wired to both the `online` listener and the Retry button. RED test `unblocks (shows children) when the reconnect reload is suppressed but connectivity is back` failed pre-fix, GREEN post-fix; companion `stays on the offline prompt when …still offline` guards the negative.
+- **Finding 2** (Functional Correctness — Major, `signin.tsx:122`): the `usePhoneFlow` branch mounted `<PhoneSignIn/>` (clerk-js `useSignIn`) OUTSIDE `OfflineAuthGate`, reopening the offline-toast leak via the always-available phone-sign-in button. Verified `signup.tsx` has **no** phone flow (only gated `<SignUp/>`) → sign-in-only. Fix: wrapped `<PhoneSignIn/>` in `OfflineAuthGate`. RED source-structure test `wraps the phone sign-in flow in OfflineAuthGate` (in `native-auth-surface.test.ts`, the repo's established home for signin structural contracts) failed pre-fix, GREEN post-fix; `wraps the regular <SignIn/> form` guards the pre-existing wrap (comment `<SignIn>` false-match avoided via `/<Name(?![A-Za-z0-9>])/`).
+- **Finding 3** (Maintainability, `offline-auth-gate.test.tsx:50`): suite only tested initial state. Added behavioral coverage: `offline`-event child-swap, `online`-event reload attempt, Retry-button reload attempt, plus the two reconnect-suppression cases above (`safeReloadPage` now a spy via the mock).
+
+**Gate:** `vitest tests/offline-auth-gate.test.tsx tests/native-auth-surface.test.ts` = **14/14 pass**; frontend `tsc --noEmit` = **0 errors**. No new i18n keys (reused `t.auth.guard.*`). Files touched: `offline-auth-gate.tsx`, `signin.tsx`, `offline-auth-gate.test.tsx`, `native-auth-surface.test.ts` (file-scoped adds only).
+
+**Verdict:** VERIFIED — three findings fixed RED-first, gate green, typecheck clean.
+
+**Addendum (re-review round, `9c820fc4d`→next):** CodeRabbit re-review of the fixes flipped #90 to **APPROVED** and surfaced one new outside-diff finding (Trivial, a11y): the offline-state container wasn't a live region, so screen-reader users on the auth path aren't told the form was swapped for the offline message. Fixed: added `role="status"` + `aria-live="polite"` to the `offline-auth-gate` container. RED test `announces the offline prompt to assistive tech (live region)` failed pre-fix, GREEN post-fix. Gate: 15/15 vitest, frontend tsc 0.
+
+---
+
+## Dialog a11y descriptions — Radix "Missing Description" warning (PR pending, 2026-07-14)
+
+**Claim:** removed the `Missing \`Description\` or \`aria-describedby={undefined}\` for {DialogContent}` warning across 6 dialogs by adding real sr-only descriptions (not silencing).
+
+**Evidence checked (independently re-run, not asserted from the implementer):**
+- Diff scope = 8 source/locale/generated files + 1 new test; `DispenseSheet.tsx` (a concurrent branch's file) NOT touched (`git status` grep = 0). No `aria-describedby={undefined}` introduced.
+- Each dialog gained a `<Sheet|DialogDescription className="sr-only">` wired to an i18n accessor: LocateSearch (`t.locateSearch.label`), dock-return-nfc ×2 (`t.dockReturn.scanDockMasterTag`) — reused existing purpose-copy; FoldersSection/SupportSection/report-issue/inventory-create — 4 new bilingual keys (en+he).
+- **Corrected an i18n classification:** `adminPage` is actually a spread accessor (`...d.adminPage,` at i18n.ts:772), not hand-listed — so no accessor lines were needed (would have been dead code). Verified by reading the block.
+- New keys present in BOTH locales (parity confirmed per-key via node).
+- RED-first `tests/dialog-a11y-descriptions.test.ts`: 12 failed → 18 passed.
+
+**Gate (re-run in this worktree):** `pnpm i18n:check` deep parity ✓; `tests/i18n-no-hebrew-in-source` 2/2; frontend `tsc` 0 errors; a11y test + the 6 previously-warning component tests = **37/37 (7 files)** with **0** `Missing Description` warnings.
+
+**Verdict:** VERIFIED — real a11y descriptions added RED-first, gates green, subagent output independently re-verified.
+
+**CodeRabbit round (PR #93, 2026-07-14):** two findings, both verified valid + fixed.
+- `dock-return-nfc.tsx:143` — the **blocked** branch (`!equipment.assetTypeId`, no scanning happens; body shows `noAssetTypeBlocked` + "go to setup") wrongly described itself as `scanDockMasterTag`. Changed to `t.dockReturn.noAssetTypeBlocked`; the real scan dialog (line 162) keeps `scanDockMasterTag`. Confirmed by reading both branches.
+- `tests/dialog-a11y-descriptions.test.ts` — replaced the global per-file Description count with **per-content-block** assertions: each titled `Dialog/SheetContent` must contain its OWN Description (regex-scoped to that block's body), keyed to an i18n accessor that **resolves to a defined string in en.json** (alias-aware: `const p = t.ns`). Added a regression `describe` proving the checks reject the failure modes (missing description, mis-scoped description outside the block, undefined/typo key, unknown alias). Gate: a11y test 28/28, the 6 component tests 47/47 with 0 `Missing Description` warnings, frontend tsc 0.
+
+**CodeRabbit round 2 (PR #93, 1 actionable):** extracted the per-block validation into a single `validateTitledBlock(block, aliases) => {ok, reason}`; the real-component suite and every regression fixture now call it (missing / mis-scoped / undefined-key / raw-string / alias-resolved / unknown-alias). Same logic that green-lights components is the logic proven to reject failures. Gate: a11y test 24/24, component tests 34/34, 0 `Missing Description` warnings, tsc 0.
+
+---
+
+## PGBOUNCER_URL support + migration direct-connection carve-out (2026-07-14)
+
+**Claim:** the runtime pool uses PgBouncer when `PGBOUNCER_URL` is set; migrations stay on a direct connection (session advisory-lock safety). TDD.
+
+**Evidence checked:**
+- `server/lib/postgresql.ts`: `getPostgresqlConnectionString()` now prefers `PGBOUNCER_URL` → `POSTGRES_URL` → `DATABASE_URL`; new `getDirectPostgresqlConnectionString()` returns `POSTGRES_URL || DATABASE_URL` only (ignores PgBouncer); `isPostgresqlConfigured()` counts `PGBOUNCER_URL`. The `POSTGRES_URL/DATABASE_URL` "unsafe if different" guard is preserved (shared `assertPgDbConsistent`) and is NOT tripped by `PGBOUNCER_URL` (which is an intentional override).
+- `server/migrate.ts`: `runMigrations()` now builds a dedicated **direct** `pg` Pool (`createDirectMigrationPool`, SSL policy mirrors `db.ts`, `max: 3`, `pool.end()` in finally) — the session-level `pg_advisory_lock` + all migration DDL run off PgBouncer. Verified migrate.ts no longer imports the shared `./db.js` pool; only `server/index.ts` imports `runMigrations`. Runtime is PgBouncer-safe (grep-confirmed: poll-based outbox, no LISTEN/NOTIFY, no named prepared statements, no session `SET`, all runtime advisory locks are `pg_advisory_xact_lock`).
+- **RED→GREEN** `tests/postgresql-connection.test.ts` (11 tests): PGBOUNCER precedence; fallback; direct helper ignores PgBouncer; guard fires on pg/db mismatch but not on PGBOUNCER override; `isPostgresqlConfigured` counts PGBOUNCER; + source guards that migrate.ts uses the direct helper and not `./db.js`.
+
+**Gate:** postgresql-connection 11/11; server `tsc` 0; frontend `tsc` 0.
+
+**Deploy-verification pending (documented in plan):** SSL against the internal `pgbouncer.railway.internal` host (db.ts forces SSL in prod) — confirm connectivity post-deploy; remediate with `?sslmode=disable` on the var or a `*.railway.internal` SSL carve-out if negotiation fails.
+
+**Verdict:** VERIFIED — code + unit gate green; production SSL cutover check tracked.
+
+---
+
 ## 2026-07-11 — `@vettrack/contracts` brought in-repo as a workspace package (drop `literate-dollop` dep)
 
 **Claim:** `exposwifty31/vettrack` no longer depends on the external private repo `exposwifty31/literate-dollop`. `@vettrack/contracts` now lives in-repo at `packages/contracts/` as a pnpm workspace package (`workspace:*`), replacing the `github:exposwifty31/literate-dollop#main&path:packages/contracts` dependency. The import specifier `@vettrack/contracts` is unchanged, so the frozen Code Blue / emergency-surface contract is behaviorally identical.
@@ -2044,22 +2777,3 @@ The 8 PASS include the load-bearing ones: `build 26 > last shipped 25`, no liter
 **ASC collateral authored:** `docs/release/appstore-connect-1.2.0-collateral.md` — "What's New" he (primary) + en, App Review notes (real-native-app / 4.2 framing + isolated reviewer account), reviewer-account seeding (vet role + wide active roster shift so Code Blue doesn't silently 403), and the Mac-side pre-submit checklist. All claims map to shipped Phase 10.A work; no credential written to any tracked file.
 
 **Verdict:** VERIFIED for the repo-side slice (version bump correct + committed-ready; secret scan clean; typecheck + suite + parity green; collateral drafted). NOT a completed submission — archive/upload + the required clean live tri-display audit are owner-run on a Mac and cannot be done in this Linux sandbox.
-
----
-
-## 2026-07-11 — Upgrade & simplify repo scripts + deslop (71d7c23, 9ec9db1)
-
-**Claim:** Removed dead/duplicate npm scripts, fixed the `dev` script drift, and deleted verified-orphan one-off scripts + committed run artifacts, without breaking any CI/code reference.
-
-**Evidence:**
-- `package.json` — Read after edit: scripts count 63 (was 80-adjacent per pre-edit Read showing 80 lines); removed keys confirmed absent via `node -e "require('./package.json').scripts"` (predev:ci, dev:ci, cap:archive:preflight, tenant:lint, knip:production, dev:db:push, test:playwright:chromium, worker:notifications all gone; `dev` now `"pnpm dev:api:watch" "pnpm dev:web"`; `dev:api` byte-identical). No duplicate keys.
-- Command: `grep -rn "pnpm ...(removed names)" .github/ docs/ .env* server/ src/` → 0 remaining code/CI refs for each removed script name (worker:notifications comment in `server/workers/notification.worker.ts:3` and `.env.example:47` both updated to `pnpm worker`).
-- Guardrail check: `grep -rn "dev:api"` → `server/middleware/rate-limiters.ts:15` + `docs/devops/ci-cd.md:54` show Playwright CI runs `pnpm dev:api` expecting non-watching NODE_ENV=development; `dev:api` left unchanged for that reason.
-- Deletions verified orphaned before removal: `grep -rn <basename>` for split-prs.sh, qa-native-ship-{complete,portrait}.sh, backfill-users-email.ts → only hits are `docs/audit/codebase-relevance-classification.json` (generated inventory) + one historical report; no code/CI usage.
-- Restored 2 files after re-check exposed real usage my first grep masked: `scripts/validate-prod.ts:77` spawns `bash scripts/validate-build.sh`; `docs/previews/README.md:11` documents `capture-css-preview-screenshots.ts`. Both restored via `git restore`.
-- `.gitignore` — appended `scripts/wetcheck/results-*.json`; the two committed result JSONs removed via `git rm`.
-- Command: `node -e "JSON.parse(fs.readFileSync('package.json'))"` → parses (valid JSON).
-
-**Not verified (environment limit):** `pnpm typecheck` / `pnpm test` could not run — `pnpm install` fails with 403 fetching the private `@vettrack/contracts` GitHub tarball (`exposwifty31/literate-dollop`), which needs auth unavailable in this sandbox. Changes touch no compilable app surface (script metadata, standalone-script deletions, docs, one comment); no deleted file is imported by any `.ts` or referenced in any `tsconfig*.json` (grep-confirmed).
-
-**Verdict:** VERIFIED (static checks) / PARTIAL (typecheck+tests unrunnable in this environment — pre-existing private-dependency auth block)

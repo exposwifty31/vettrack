@@ -14,7 +14,8 @@ export interface WebShellProps {
 /**
  * Sole chrome owner for the desktop web platform.
  *
- * Desktop (lg+): Topbar + icon sidebar (via PageShell).
+ * Desktop (lg+): Topbar (via PageShell) — the one canonical desktop nav (T22:
+ * PageShell used to also render a duplicate icon-rail sidebar; removed).
  *
  * Mobile-web users are routed to NativeShell by PlatformRouter before they
  * reach this component, so the mobile-web Layout branch is no longer needed.

@@ -26,6 +26,8 @@ export interface EvidenceEquipmentRow {
   lastRfidSeenAt: Date | null;
   lastRfidRoomId: string | null;
   lastSeen: Date | null;
+  /** Damage-tracking status (R-EQ-F3). Optional so existing synthetic-graph test fixtures need no changes. */
+  conditionStatus?: string;
 }
 
 export interface EvidenceScanRow {

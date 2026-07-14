@@ -27,6 +27,13 @@ export interface User {
   displayName: string;
   role: UserRole;
   secondaryRole?: string | null;
+  /**
+   * Role the user requested at sign-up (staging column). Auto-applied on admin
+   * approval (C3); vet is gated on `vetLicenseNumber`.
+   */
+  requestedRole?: string | null;
+  /** Doctor/license number captured when the requested role is `vet` (C3). */
+  vetLicenseNumber?: string | null;
   effectiveRole?: UserRole | ShiftRole;
   roleSource?: "shift" | "permanent";
   activeShift?: Shift | null;
@@ -65,7 +72,19 @@ export interface ShiftCsvIssue {
   data: Record<string, string>;
 }
 
-export interface ShiftImportPreview {
+/** Doctor CSV shift-import row shape (userId column) — T18. */
+export interface DoctorShiftCsvRow {
+  rowNumber: number;
+  date: string;
+  startTime: string;
+  endTime: string;
+  userId: string;
+  shiftName: string;
+  operationalRole: string;
+}
+
+export interface RosterShiftImportPreview {
+  kind: "roster";
   filename: string;
   summary: {
     totalRows: number;
@@ -76,12 +95,48 @@ export interface ShiftImportPreview {
   issues: ShiftCsvIssue[];
 }
 
-export interface ShiftImportResult {
+export interface DoctorShiftImportPreview {
+  kind: "doctor";
+  filename: string;
+  summary: {
+    totalRows: number;
+    validRows: number;
+    skippedRows: number;
+  };
+  rows: DoctorShiftCsvRow[];
+  issues: ShiftCsvIssue[];
+}
+
+/** T18: the import UI's preview/confirm responses are tagged `kind` so an
+ * admin-uploaded doctor CSV (userId column) renders through the doctor
+ * branch instead of being force-fit into roster columns. */
+export type ShiftImportPreview = RosterShiftImportPreview | DoctorShiftImportPreview;
+
+export interface RosterShiftImportResult {
+  kind: "roster";
   importId: string;
   filename: string;
   insertedRows: number;
   skippedRows: number;
   issues: ShiftCsvIssue[];
+}
+
+export interface DoctorShiftImportResult {
+  kind: "doctor";
+  importId: string;
+  filename: string;
+  insertedRows: number;
+  skippedRows: number;
+  issues: ShiftCsvIssue[];
+}
+
+export type ShiftImportResult = RosterShiftImportResult | DoctorShiftImportResult;
+
+/** T19: accepted-shift-name keyword lists surfaced by GET /api/shifts/import/shift-names. */
+export interface ShiftNameHints {
+  technician: string[];
+  seniorTechnician: string[];
+  admin: string[];
 }
 
 export interface ShiftHandoverSession {

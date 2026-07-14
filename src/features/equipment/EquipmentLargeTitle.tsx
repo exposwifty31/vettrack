@@ -22,6 +22,19 @@ export function EquipmentLargeTitle({
   const showPct = !isLoading && availabilityPct !== null;
   const showVerifiedSplit =
     !isLoading && verifiedCount !== null && notVerifiedCount !== null && notVerifiedCount > 0;
+  // Availability (operational health) and verification (freshness) are two
+  // different metrics against the same denominator. A high availability figure
+  // must not read as an all-clear when the verification dimension confirms that
+  // nothing has been validated (verifiedCount === 0) — otherwise a 100%
+  // availability figure sits next to a "0 verified" readout as a false
+  // celebration (T14). Both dimensions are required before the number is
+  // painted celebratory green; a known-zero verification degrades it to the
+  // existing caution tone. `null` verification is "unknown" (still loading),
+  // not "nothing validated" — so it never suppresses. Availability computation
+  // itself is unchanged.
+  const nothingVerified = verifiedCount === 0;
+  const availabilityCelebrated = showPct && availabilityPct >= 80 && !nothingVerified;
+  const availabilityTone = showPct ? (availabilityCelebrated ? "ok" : "caution") : "idle";
 
   return (
     <div
@@ -82,12 +95,13 @@ export function EquipmentLargeTitle({
       >
         <span
           data-testid="equipment-availability"
+          data-availability-tone={availabilityTone}
           style={{
             fontFamily: "var(--font-num)",
             fontSize: "var(--text-2xl)",
             fontWeight: 700,
             color: showPct
-              ? availabilityPct >= 80
+              ? availabilityCelebrated
                 ? "var(--action)"
                 : "#f59e0b"
               : "rgba(255,255,255,0.45)",

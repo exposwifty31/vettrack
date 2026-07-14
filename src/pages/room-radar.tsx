@@ -105,7 +105,7 @@ interface RadarEquipmentCardProps {
   staleMs: number;
 }
 
-function RadarEquipmentCard({ equipment: eq, justVerified, staleMs }: RadarEquipmentCardProps) {
+export function RadarEquipmentCard({ equipment: eq, justVerified, staleMs }: RadarEquipmentCardProps) {
   const { id: roomId } = useParams<{ id: string }>();
   const [moveOpen, setMoveOpen] = useState(false);
   const [returnDialogOpen, setReturnDialogOpen] = useState(false);
@@ -367,7 +367,7 @@ function RadarEquipmentCard({ equipment: eq, justVerified, staleMs }: RadarEquip
       />
       <ReturnPlugDialog
         open={returnDialogOpen}
-        onOpenChange={setReturnDialogOpen}
+        onOpenChange={(o) => { setReturnDialogOpen(o); if (!o) busyRef.current = false; }}
         defaultDeadlineMinutes={30}
         onConfirm={(payload) => {
           returnMut.mutate(payload, {

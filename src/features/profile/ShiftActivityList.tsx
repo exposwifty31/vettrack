@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { api, type ShiftActivityItem } from "@/lib/api";
-import { t } from "@/lib/i18n";
+import { t, formatDateByLocale } from "@/lib/i18n";
 import { useAuth } from "@/hooks/use-auth";
 
 function formatDuration(startedAt: string, endedAt: string | null): string {
@@ -14,7 +14,7 @@ function formatDuration(startedAt: string, endedAt: string | null): string {
 }
 
 function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+  return formatDateByLocale(iso, { month: "short", day: "numeric", year: "numeric" });
 }
 
 function formatTime(iso: string): string {

@@ -89,6 +89,7 @@
     "@clerk/clerk-react": "^5.0.0",
     "@clerk/clerk-sdk-node": "^5.1.6",
     "@clerk/express": "^1.0.0",
+    "@clerk/localizations": "^4.13.2",
     "@hookform/resolvers": "^3.9.0",
     "@radix-ui/react-alert-dialog": "^1.1.15",
     "@radix-ui/react-dialog": "^1.1.15",

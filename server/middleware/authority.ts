@@ -42,6 +42,7 @@ import { resolveAuthority } from "../lib/authority.js";
 import {
   emitAuthorityDeniedAudit,
   emitAuthorityResolutionFailedAudit,
+  emitCodeBlueBreakGlassAudit,
   emitDispenseLegacyFallbackAudit,
   isAuthorityObsV1Enabled,
 } from "../lib/authority-audit.js";
@@ -71,6 +72,26 @@ export interface RequireClinicalAuthorityOptions {
    * MUST NOT be used outside dispense.
    */
   allowPermanentClinicalRoleFallbackForLegacyDispense?: true;
+
+  /**
+   * EMERGENCY BREAK-GLASS — Code Blue initiation only (Phase 10a T1).
+   *
+   * When true, a clinical-non-student identity whose snapshot has:
+   *   effectiveClinicalRole === null
+   *   reason === "EZSHIFT_NONE"
+   *
+   * may still pass if their permanent clinicalRole is in allow[].
+   *
+   * Rationale: a cardiac arrest must not wait on roster scheduling. This is an
+   * INDEPENDENT opt-in from the dispense fallback above — it emits its own
+   * distinct metric + audit and does NOT widen or reuse the dispense flag.
+   *
+   * Set ONLY on POST /api/code-blue/sessions. MUST NOT be used by any other
+   * consumer, and it never elevates a student (clinicalRole "student" is
+   * excluded) nor resurrects a stale/revoked check-in (reason must be
+   * EZSHIFT_NONE).
+   */
+  allowPermanentClinicalRoleForEmergency?: true;
 }
 
 declare global {
@@ -95,6 +116,30 @@ function resolveRequestId(req: Request, res: Response): string {
   return randomUUID();
 }
 
+/**
+ * Shared eligibility check for a permanent-clinical-role fallback — used by BOTH
+ * the legacy-dispense fallback and the Code Blue emergency break-glass branches
+ * (each keeps its own opt-in flag, metric, and audit; only this predicate is
+ * shared). Eligible when the resolver granted no shift-derived clinical
+ * authority (`effectiveClinicalRole === null`, `EZSHIFT_NONE`) yet the account
+ * holds a non-student clinical role the route allows.
+ *
+ * STUDENT_NEVER_ELEVATED: students are excluded here (`clinicalRole !== "student"`),
+ * so neither fallback path can ever elevate a student.
+ */
+function isPermanentRoleFallbackEligible(
+  snapshot: AuthoritySnapshot,
+  allow: readonly ActiveShiftRole[],
+): boolean {
+  return (
+    snapshot.effectiveClinicalRole === null &&
+    snapshot.reason === "EZSHIFT_NONE" &&
+    snapshot.clinicalRole !== null &&
+    snapshot.clinicalRole !== "student" &&
+    allow.some((role) => role === snapshot.clinicalRole)
+  );
+}
+
 export function requireClinicalAuthority(
   opts: RequireClinicalAuthorityOptions,
 ): (req: Request, res: Response, next: NextFunction) => Promise<void> {
@@ -109,6 +154,20 @@ export function requireClinicalAuthority(
         `requireClinicalAuthority: invalid allow role: ${String(role)}`,
       );
     }
+  }
+
+  // The legacy-dispense fallback and the Code Blue emergency break-glass are
+  // INDEPENDENT opt-ins with distinct metrics/audits. A single gate must never
+  // enable both: the dispense branch runs first, so a Code Blue request would be
+  // consumed (and mis-attributed) by the legacy-dispense path before break-glass
+  // is reached. Reject the conflicting config at construction time.
+  if (
+    opts.allowPermanentClinicalRoleFallbackForLegacyDispense === true &&
+    opts.allowPermanentClinicalRoleForEmergency === true
+  ) {
+    throw new Error(
+      "requireClinicalAuthority: allowPermanentClinicalRoleFallbackForLegacyDispense and allowPermanentClinicalRoleForEmergency are mutually exclusive",
+    );
   }
 
   return async function requireClinicalAuthorityMiddleware(
@@ -184,15 +243,26 @@ export function requireClinicalAuthority(
       opts.allowPermanentClinicalRoleFallbackForLegacyDispense === true;
 
     if (fallbackOpted) {
-      if (
-        snapshot.effectiveClinicalRole === null &&
-        snapshot.reason === "EZSHIFT_NONE" &&
-        snapshot.clinicalRole !== null &&
-        snapshot.clinicalRole !== "student" &&
-        opts.allow.includes(snapshot.clinicalRole as ActiveShiftRole)
-      ) {
+      if (isPermanentRoleFallbackEligible(snapshot, opts.allow)) {
         incrementMetric("authority_legacy_fallback_used");
         emitDispenseLegacyFallbackAudit({ req, snapshot });
+        next();
+        return;
+      }
+    }
+
+    // Phase 10a T1: emergency break-glass for Code Blue initiation. Independent
+    // of the dispense fallback above — a route sets at most one of the two
+    // flags, and both require effectiveClinicalRole === null so neither shadows
+    // the other. Same predicate as the dispense branch, but a distinct metric +
+    // audit so break-glass grants are separable from dispense compatibility.
+    const emergencyBreakGlassOpted =
+      opts.allowPermanentClinicalRoleForEmergency === true;
+
+    if (emergencyBreakGlassOpted) {
+      if (isPermanentRoleFallbackEligible(snapshot, opts.allow)) {
+        incrementMetric("authority_emergency_break_glass_used");
+        emitCodeBlueBreakGlassAudit({ req, snapshot });
         next();
         return;
       }

@@ -113,7 +113,7 @@ function computeEffectiveStatus(room: Room): string {
   return room.syncStatus;
 }
 
-function RoomCard({ room }: { room: Room }) {
+export function RoomCard({ room }: { room: Room }) {
   const available = room.availableCount ?? 0;
   const total = room.totalEquipment ?? 0;
   const inUse = room.inUseCount ?? 0;
@@ -141,7 +141,7 @@ function RoomCard({ room }: { room: Room }) {
                 <span className="truncate">{room.floor}</span>
               </p>
             ) : (
-              <p className="text-[11px] text-muted-foreground mt-0.5">{total} {t.roomsListPage.cardItemsUnit}</p>
+              <p className="text-[11px] text-muted-foreground mt-0.5">{t.roomsListPage.cardItemCount(total)}</p>
             )}
           </div>
 
@@ -209,6 +209,14 @@ export default function RoomsListPage({ singleColumn = false }: { singleColumn?:
   const [roomName, setRoomName] = useState("");
   const [roomFloor, setRoomFloor] = useState("");
   const [roomGatewayCode, setRoomGatewayCode] = useState("");
+  // Close + clear the Add Room form. Shared by Cancel and Radix's onOpenChange
+  // (Escape / overlay / X) so every dismissal path resets the fields.
+  const closeCreateDialog = () => {
+    setCreateOpen(false);
+    setRoomName("");
+    setRoomFloor("");
+    setRoomGatewayCode("");
+  };
   const [activeZone, setActiveZone] = useState<Zone>("all");
   const roomZoneLabels = zoneLabels();
 
@@ -238,10 +246,7 @@ export default function RoomsListPage({ singleColumn = false }: { singleColumn?:
     onSuccess: (room) => {
       queryClient.invalidateQueries({ queryKey: ["/api/rooms"] });
       toast.success(`"${room.name}" created`);
-      setCreateOpen(false);
-      setRoomName("");
-      setRoomFloor("");
-      setRoomGatewayCode("");
+      closeCreateDialog();
     },
     onError: (err: Error) => toast.error(err.message || t.roomsListPage.createRoomFailed),
   });
@@ -403,7 +408,7 @@ export default function RoomsListPage({ singleColumn = false }: { singleColumn?:
       </div>
 
       {/* create room dialog */}
-      <Dialog open={createOpen} onOpenChange={(o) => { setCreateOpen(o); if (!o) { setRoomName(""); setRoomFloor(""); setRoomGatewayCode(""); } }}>
+      <Dialog open={createOpen} onOpenChange={(o) => (o ? setCreateOpen(true) : closeCreateDialog())}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>{t.roomsListPage.createRoomDialogTitle}</DialogTitle>
@@ -444,7 +449,7 @@ export default function RoomsListPage({ singleColumn = false }: { singleColumn?:
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setCreateOpen(false)}>
+            <Button variant="outline" onClick={closeCreateDialog}>
               Cancel
             </Button>
             <Button

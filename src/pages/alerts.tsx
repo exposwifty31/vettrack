@@ -1,6 +1,6 @@
 import { t } from "@/lib/i18n";
 import { useMobileShellContext } from "@/shell/mobile/MobileShellContext";
-import { AlertsScreen, useAlertsController, formatRelativeTime } from "@/features/alerts";
+import { AlertsScreen, useAlertsController, formatRelativeDuration } from "@/features/alerts";
 import { Link, useLocation } from "wouter";
 import { Helmet } from "react-helmet-async";
 import { AppShell } from "@/components/layout/AppShell";
@@ -175,7 +175,7 @@ function AlertsPageDesktop() {
             onAck={acknowledgeAlert}
             onUnAck={unacknowledgeAlert}
             canOwn={canOwnAlerts}
-            formatRelativeTime={formatRelativeTime}
+            formatRelativeDuration={formatRelativeDuration}
           />
           </div>
         ) : (
@@ -245,11 +245,11 @@ function AlertsPageDesktop() {
                                   <UserCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
                                   <div className="min-w-0">
                                     <TruncatedText
-                                      text={ack.acknowledgedByEmail.split("@")[0]}
+                                      text={ack.acknowledgedByDisplayName || t.appointmentsPage.unknownUser}
                                       className="text-xs text-foreground font-medium"
                                     />
                                     <TruncatedText
-                                      text={`${t.alertsPage.inProgressSince} ${formatRelativeTime(new Date(ack.acknowledgedAt))}`}
+                                      text={`${t.alertsPage.inProgressSince} ${formatRelativeDuration(new Date(ack.acknowledgedAt))}`}
                                       className="text-xs text-muted-foreground"
                                     />
                                   </div>

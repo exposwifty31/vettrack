@@ -101,6 +101,7 @@ export async function loadEvidenceGraph(
       lastRfidSeenAt: equipment.lastRfidSeenAt,
       lastRfidRoomId: equipment.lastRfidRoomId,
       lastSeen: equipment.lastSeen,
+      conditionStatus: equipment.conditionStatus,
     })
     .from(equipment)
     .where(and(eq(equipment.id, equipmentId), eq(equipment.clinicId, clinicId), isNull(equipment.deletedAt)));

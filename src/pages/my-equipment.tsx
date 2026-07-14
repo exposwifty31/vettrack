@@ -15,6 +15,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { equipmentStatusLabel } from "@/lib/equipment-status-label";
 import { formatRelativeTime } from "@/lib/utils";
 import { statusToBadgeVariant } from "@/lib/design-tokens";
+import { ReadinessBadge } from "@/components/ui/readiness-badge";
 import {
   PackageOpen,
   MapPin,
@@ -110,10 +111,18 @@ export default function MyEquipmentPage() {
     try {
       await withToast(
         async () => {
-          await Promise.all(items.map((item) => api.equipment.return(item.id, { isPluggedIn: false })));
+          const results = await Promise.allSettled(
+            items.map((item) => api.equipment.return(item.id, { isPluggedIn: false })),
+          );
+          // Invalidate regardless of partial failure — the items that DID
+          // return successfully must not be left stale just because a
+          // sibling return call rejected.
           queryClient.invalidateQueries({ queryKey: ["/api/equipment/my"] });
           queryClient.invalidateQueries({ queryKey: ["/api/equipment"] });
           queryClient.invalidateQueries({ queryKey: ["/api/activity"] });
+          if (results.some((result) => result.status === "rejected")) {
+            throw new Error("partial_return_failure");
+          }
         },
         {
           success: t.myEquipment.toast.returnAllSuccess(count),
@@ -225,6 +234,8 @@ export default function MyEquipmentPage() {
                     deriveEquipmentRecoverySnapshotFromSource(item),
                   )
                 : null;
+              const isReturningThisItem =
+                returnMut.isPending && returnMut.variables?.id === item.id;
               return (
               <Card key={item.id} className="bg-card border-border/60 shadow-sm">
                 <CardContent className="p-4">
@@ -237,6 +248,7 @@ export default function MyEquipmentPage() {
                         <Badge variant={statusToBadgeVariant(item.status)} className="shrink-0 text-[10px] px-2 py-0.5">
                           {equipmentStatusLabel(item.status)}
                         </Badge>
+                        <ReadinessBadge status={item.status} />
                         {recoveryBadgeKey && (
                           <Badge
                             variant="outline"
@@ -262,10 +274,10 @@ export default function MyEquipmentPage() {
                         variant="outline"
                         className="border-border/60 text-muted-foreground hover:text-foreground min-h-[44px] px-3"
                         onClick={() => setPendingReturnEquipmentId(item.id)}
-                        disabled={returnMut.isPending}
+                        disabled={returningAll || isReturningThisItem}
                         data-testid={`btn-return-${item.id}`}
                       >
-                        {returnMut.isPending ? (
+                        {isReturningThisItem ? (
                           <Loader2 className="w-3.5 h-3.5 animate-spin" />
                         ) : (
                           <>

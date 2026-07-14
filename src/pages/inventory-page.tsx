@@ -30,6 +30,8 @@ import {
 import { useLocation } from "wouter";
 import { getCurrentUserId } from "@/lib/auth-store";
 import { useAuth } from "@/hooks/use-auth";
+import { useExperience } from "@/hooks/use-experience";
+import { isCustodyOnly } from "@/lib/roles/experience-model";
 import { useNfcSupported } from "@/hooks/use-nfc-supported";
 import { haptics } from "@/lib/haptics";
 import { safeStorageGetItem, safeStorageRemoveItem, safeStorageSetItem } from "@/lib/safe-browser";
@@ -54,6 +56,7 @@ export default function InventoryPage() {
   const p = t.inventoryPage;
   const [location] = useLocation();
   const { userId } = useAuth();
+  const experience = useExperience();
   const [sessionState, dispatch] = useReducer(restockSessionReducer, initialRestockSessionState);
 
   const [dispenseOpen, setDispenseOpen] = useState(false);
@@ -68,6 +71,19 @@ export default function InventoryPage() {
     retry: false,
     refetchOnWindowFocus: false,
   });
+
+  // Defense-in-depth graceful-degrade: if a custody-only archetype ever gets a
+  // 403 on the container list, render an expected, non-fatal "restricted" state
+  // (via the shared capability model, not a role literal) so the page doesn't
+  // blank into a scary "load failed" for a permissions boundary a retry can't
+  // fix. NOTE (T26): the container/dispense/restock routes were reclassified
+  // non-clinical (`requireEffectiveRole("student")`), so a student now gets 200
+  // here — this branch no longer triggers for students under the current auth
+  // config, but stays as a safety net for any residual custody-only 403. Any
+  // other role hitting a real 403/500 still gets the normal fatal ErrorCard.
+  const containersForbidden =
+    containersQ.error instanceof ApiError && containersQ.error.status === 403;
+  const containersRestrictedForRole = containersForbidden && isCustodyOnly(experience);
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
@@ -676,9 +692,21 @@ export default function InventoryPage() {
           </div>
         )}
 
-        {/* Fetch error */}
-        {containersQ.isError && (
+        {/* Fetch error — a genuine failure (network/server) still shows the fatal
+            retry card; a role-gated 403 for a custody-only user does not. */}
+        {containersQ.isError && !containersRestrictedForRole && (
           <ErrorCard message={p.loadError} onRetry={() => containersQ.refetch()} />
+        )}
+
+        {/* Restricted state — custody-only role, container list is above their
+            authorization. No retry action: retrying can't change a permission
+            boundary. */}
+        {containersRestrictedForRole && (
+          <EmptyState
+            icon={Package}
+            message={p.restrictedAccessTitle}
+            subMessage={p.restrictedAccessMessage}
+          />
         )}
 
         {/* Empty state */}
@@ -895,7 +923,7 @@ export default function InventoryPage() {
                               variant="outline"
                               size="icon"
                               className="h-11 w-11 rounded-xl shrink-0"
-                              disabled={otherUserHasSession}
+                              disabled={otherUserHasSession || pendingOps > 0}
                               onClick={() => scanLine(line.itemId, line.code, line.label, -1)}
                               aria-label={`Decrement ${line.label}`}
                             >
@@ -941,7 +969,7 @@ export default function InventoryPage() {
                               variant="outline"
                               size="icon"
                               className="h-11 w-11 rounded-xl shrink-0"
-                              disabled={otherUserHasSession}
+                              disabled={otherUserHasSession || pendingOps > 0}
                               onClick={() => scanLine(line.itemId, line.code, line.label, +1)}
                               aria-label={`Increment ${line.label}`}
                             >

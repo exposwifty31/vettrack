@@ -7,6 +7,7 @@ import { UrgentCountChips } from "../UrgentCountChips";
 import { HomeShell, HomeChrome } from "./HomeShell";
 import { HomeGreeting } from "./HomeGreeting";
 import { OnShiftHero } from "./OnShiftHero";
+import { StartOfShiftCard } from "./StartOfShiftCard";
 import { GetStartedCard } from "./GetStartedCard";
 import { useFloorHome } from "./floor/use-floor-home";
 import { TasksPreviewCard } from "./floor/TasksPreviewCard";
@@ -45,6 +46,13 @@ export function TechHomeSurface({ isTablet }: { isTablet: boolean }) {
               heroState={home.heroState}
               emphasis="primary"
               className={rise}
+            />
+            <StartOfShiftCard
+              heroState={home.heroState}
+              criticalCount={home.criticalCount}
+              overdueCount={home.overdueCount}
+              itemsOutCount={home.itemsOutCount}
+              isTablet={isTablet}
             />
             <QuickScanCard />
             <TasksPreviewCard dashboard={home.taskDashboard} isLoading={home.isLoading} />

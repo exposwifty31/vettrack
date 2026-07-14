@@ -2,6 +2,7 @@ import { Link } from "wouter";
 import { Activity, ArrowLeftRight, Plus, ScanLine } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
 import { LoadingSection } from "@/components/ui/loading-section";
+import { ReadinessBadge } from "@/components/ui/readiness-badge";
 import { isCapacitorNative } from "@/lib/capacitor-runtime";
 import { t, getStoredLocale } from "@/lib/i18n";
 import type { ActivityFeedItem } from "@/types";
@@ -99,6 +100,7 @@ export function RecentActivityCard({
                     : item.userEmail?.split("@")[0] ?? ""}
                 </p>
               </div>
+              {item.status && <ReadinessBadge status={item.status} />}
               <span className="shrink-0 font-num text-[12px] tabular-nums text-ivory-text3">
                 {formatClock(item.timestamp)}
               </span>

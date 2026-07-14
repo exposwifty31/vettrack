@@ -444,6 +444,7 @@ export interface AlertAcknowledgment {
   alertType: string;
   acknowledgedById: string;
   acknowledgedByEmail: string;
+  acknowledgedByDisplayName: string | null;
   acknowledgedAt: string;
 }
 
@@ -545,7 +546,25 @@ export interface Dock {
   description?: string | null;
   roomId?: string | null;
   roomName?: string | null;
+  assetTypeId?: string | null;
+  assetTypeName?: string | null;
+  capacity?: number | null;
   createdAt: string;
+}
+
+/** A single item in a docking reconciliation bucket (small projection). */
+export interface DockingReconciliationItem {
+  id: string;
+  name: string;
+  homeRoomId: string | null;
+  assetTypeId: string | null;
+}
+
+/** GET /api/docking/reconciliation response — P1 ownership-derivable buckets. */
+export interface DockingReconciliation {
+  unassigned: DockingReconciliationItem[];
+  noStation: DockingReconciliationItem[];
+  byDock: Array<{ dock: Dock; expectedFill: number; capacity: number | null }>;
 }
 
 export type QuickScanToggleAction = "checkout" | "return" | "blocked";
@@ -571,6 +590,29 @@ export interface DockReturnRequest {
 export interface DockReturnAmbiguousDocksError {
   error: "AMBIGUOUS_DOCKS";
   docks: Array<{ id: string; name: string }>;
+}
+
+/** vt_damage_events row (T-24a schema · R-EQ-F3) — POST /api/equipment/:id/damage (T-24b/c). */
+export interface DamageReport {
+  id: string;
+  clinicId: string;
+  equipmentId: string;
+  reportedBy: string;
+  at: string;
+  note: string | null;
+  resolvedAt: string | null;
+  createdAt: string;
+}
+
+export interface CreateDamageReportRequest {
+  equipmentId: string;
+  note?: string;
+}
+
+export interface CreateDamageReportResponse {
+  /** The route returns a subset of the row (no clinicId/resolvedAt/createdAt). */
+  damageEvent: Pick<DamageReport, "id" | "equipmentId" | "reportedBy" | "at" | "note">;
+  conditionStatus: string;
 }
 
 export interface OperationalMetricsSummary {

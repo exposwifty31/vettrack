@@ -27,6 +27,27 @@ export function formatRelativeTime(date: Date): string {
 }
 
 /**
+ * Bare duration since `date` — same bucketing as {@link formatRelativeTime} but
+ * without the localized "ago" suffix, for composing with a lead-in phrase that
+ * already supplies its own temporal framing (see `alertsPage.inProgressSince`
+ * + `t.whatsNew` etc.). Reusing `formatRelativeTime` there doubles up the
+ * temporal marker (a "since ... ago" collision — the Hebrew equivalents read
+ * as redundant back-to-back temporal particles).
+ */
+export function formatRelativeDuration(date: Date): string {
+  const diffMs = Date.now() - date.getTime();
+  const diffMin = Math.floor(diffMs / 60000);
+  if (diffMin < 1) return t.alerts.timeAgo.justNow;
+  if (diffMin === 1) return t.alertsPage.oneMinuteDuration;
+  if (diffMin < 60) return t.alertsPage.minutesDuration(diffMin);
+  const diffHr = Math.floor(diffMin / 60);
+  if (diffHr === 1) return t.alertsPage.oneHourDuration;
+  if (diffHr < 24) return t.alertsPage.hoursDuration(diffHr);
+  const diffDay = Math.floor(diffHr / 24);
+  return diffDay === 1 ? t.alertsPage.oneDayDuration : t.alertsPage.daysDuration(diffDay);
+}
+
+/**
  * One alerts data/ack controller for every surface. The desktop page and the
  * native AlertsScreen used to duplicate this wiring (and the native screen
  * skipped it entirely — flat list, no ack, no navigation: audit H2); both now
@@ -102,10 +123,7 @@ export function useAlertsController() {
     hasAckError,
     hasFatalError: equipmentQ.isError,
     isLoading: equipmentQ.isLoading || acksQ.isLoading,
-    refetch: () => {
-      void equipmentQ.refetch();
-      void acksQ.refetch();
-    },
+    refetch: () => Promise.all([equipmentQ.refetch(), acksQ.refetch()]),
     ack: (equipmentId: string, alertType: string) => ackMut.mutate({ equipmentId, alertType }),
     unAck: (equipmentId: string, alertType: string) => unAckMut.mutate({ equipmentId, alertType }),
   };
