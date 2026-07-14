@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "fs";
 import { resolve } from "path";
 
-const sql = readFileSync(resolve(__dirname, "../../migrations/164_docking_ownership.sql"), "utf8");
+const sql = readFileSync(resolve(__dirname, "../migrations/164_docking_ownership.sql"), "utf8");
 
 describe("164_docking_ownership migration", () => {
   it("adds docks.asset_type_id and capacity additively", () => {
