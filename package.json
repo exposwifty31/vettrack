@@ -62,6 +62,7 @@
     "db:migrate": "tsx scripts/run-migrations.ts",
     "migrate": "tsx scripts/run-migrations.ts",
     "db:analyze-indexes": "tsx server/scripts/analyze-missing-indexes.ts",
+    "db:backup-now": "tsx server/scripts/test-backup-restore.ts",
     "db:push": "drizzle-kit push",
     "seed:dev": "tsx server/seed.ts",
     "seed:dev:e2e": "tsx scripts/seed-dev.ts",

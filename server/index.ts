@@ -30,6 +30,7 @@ import { tenantContext } from "./middleware/tenant-context.js";
 import { sessionContextMiddleware } from "./middleware/auth.js";
 import { registerApiRoutes } from "./app/routes.js";
 import { initDatabaseMonitoring } from "./lib/db-startup.js";
+import { initBackupScheduler } from "./lib/backup-scheduler.js";
 import clerkWebhookRoutes from "./routes/webhooks.js";
 import inboundIntegrationWebhooks from "./integrations/webhooks/inbound.router.js";
 import rfidRoutes from "./routes/rfid.js";
@@ -429,6 +430,7 @@ app.listen(PORT, "0.0.0.0", () => {
   console.log(`Server listening on ${PORT}`);
 \n// Initialize database query monitoring
 initDatabaseMonitoring();
+initBackupScheduler();
 });
 
 runMigrations()
