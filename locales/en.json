@@ -4102,7 +4102,11 @@
   "adminDocks": {
     "namePlaceholder": "Dock name",
     "descriptionPlaceholder": "Description (optional)",
-    "roomPlaceholder": "Room (optional)"
+    "roomPlaceholder": "Room (optional)",
+    "categoryPlaceholder": "Category (optional)",
+    "capacityPlaceholder": "Capacity (optional)",
+    "noCategory": "No category",
+    "capacityLabel": "cap"
   },
   "adminAssetTypesPage": {
     "typePlaceholder": "Type name",

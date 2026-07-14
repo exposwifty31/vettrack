@@ -2926,6 +2926,10 @@ export interface TStructure {
       notFound: string;
       unavailable: string;
     };
+    docking: {
+      duplicateStation: string;
+      duplicateName: string;
+    };
   };
   push: {
     role: {
@@ -4102,6 +4106,10 @@ export interface TStructure {
     namePlaceholder: string;
     descriptionPlaceholder: string;
     roomPlaceholder: string;
+    categoryPlaceholder: string;
+    capacityPlaceholder: string;
+    noCategory: string;
+    capacityLabel: string;
   };
   adminAssetTypesPage: {
     typePlaceholder: string;

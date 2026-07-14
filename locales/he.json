@@ -4102,7 +4102,11 @@
   "adminDocks": {
     "namePlaceholder": "שם עגינה",
     "descriptionPlaceholder": "תיאור (אופציונלי)",
-    "roomPlaceholder": "חדר (אופציונלי)"
+    "roomPlaceholder": "חדר (אופציונלי)",
+    "categoryPlaceholder": "קטגוריה (אופציונלי)",
+    "capacityPlaceholder": "קיבולת (אופציונלי)",
+    "noCategory": "ללא קטגוריה",
+    "capacityLabel": "קיבולת"
   },
   "adminAssetTypesPage": {
     "typePlaceholder": "שם סוג",
