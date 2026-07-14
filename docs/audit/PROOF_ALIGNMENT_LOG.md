@@ -2865,3 +2865,31 @@ The 8 PASS include the load-bearing ones: `build 26 > last shipped 25`, no liter
 **Not run (deferred per task brief to the P2 review gate):** browser/Clerk-mode manual verification of the live dialog.
 
 **Verdict:** VERIFIED — TDD RED-first, all named existing tests + full repo suite green, both typechecks clean, i18n runtime-resolution independently confirmed (not just typechecked), architecture gates clean.
+
+## P2 review gate — mobile buildout (T2.3-mobile, T2.5-mobile) + phase review + fixes (docking P2, 2026-07-14)
+
+**Scope closed:** the P2 docking clinical UX on the NATIVE surfaces (owner directive: "web is irrelevant"). `UnifiedReturnDialog` mounted on `src/features/equipment/detail/EquipmentActions.tsx` (T2.3-mobile, `a7f7ce945`); citizen-anchor on the `qr-scanner` result sheet + Not-Found-Here on the native detail (T2.5-mobile, `9fd0b16b9`).
+
+**Evidence — controller-verified (not report-trusted), by reading the committed source:**
+- T2.3-mobile: `EquipmentActions.tsx:129` mounts `UnifiedReturnDialog`; the unchecked (plain-return) path routes through the pre-existing offline-capable `returnMut` via `onConfirmReturn` (`api.equipment.return` + `pendingSyncId`/`savedOffline` preserved); `ReturnPlugDialog` removed.
+- T2.5-mobile: scan button gated `!isCheckedOut && !!scannedEquipment.homeRoomId` → `api.docking.citizenAnchor`; detail `canReportNotFound = !isCheckedOut && !!equipment.homeRoomId`, early-return updated, → `api.docking.notFoundHere`. i18n gotcha handled: `equipmentDetail` hand-listed (explicit lines in `i18n.ts`), `qrScanner` spread; tsx runtime eval confirmed all 5 new keys resolve to real strings (not `undefined`).
+
+**Regression caught by the phase-gate FULL suite (per-task runs missed it):** `tests/stage-6-equipment-detail-token-consistency.test.js` is a source-TEXT guard (`fs.read(...).includes("ReturnPlugDialog")`) that broke on T2.3-mobile's sanctioned swap. **FIXED** `d67d102c9`: guard re-pointed at `UnifiedReturnDialog`; behavioral invariant (`api.equipment.return` still wired) unchanged and still asserted. 19/19 pass.
+
+**Phase review (opus, code-reviewer) over `bc62b51e7..d67d102c9` (10 commits, 40 files):** APPROVE-WITH-NITS · 0 Critical · 1 Important · 5 Minor. Reviewer traced every binding constraint to live source (multi-tenancy, D-13 contradiction-only, fire-and-forget non-blocking invalidation, migration additivity, closed audit union, evidence-graph precedence `checkout›rfid›dock_station›room›free-text`, frozen surfaces, i18n hand-wiring, no waitlist/bundle-gate/version-guard regression) and judged the T2.5 action-split sound. Findings + dispositions in `docs/audit/docking-review-findings.md ## P2`.
+
+**Fixes (`0483954b8`, TDD RED→GREEN):**
+- **I-1 (Important):** offline return of a HOMED item defaulted into the online-only `dockReturn`. Fixed — `effectiveDockOn = dockToggleOn && hasHomeRoom && isOnline`; offline falls back to the offline-capable plain return; toggle disabled offline with a correct offline hint; `stationUnresolvedHint` reworded (dropped the native-nonexistent "Readiness tab"). New tests lock BOTH branches: homed+online→`dockReturn`, homed+**offline**→`onConfirmReturn` (dockReturn never called) + toggle-disabled-offline — controller-verified at `tests/unified-return-dialog.test.tsx:247`.
+- **M-3 (Minor):** `not-found-here` now mirrors citizen-anchor's 404 existence check (integration test: nonexistent id → 404, no audit).
+- **M-4 (Minor):** dedicated `equipmentDetail.toast.notFoundFailed` error copy (was "Return failed").
+- **Deferred with written justification (findings doc):** M-1 (post-commit checkout-invalidation symmetry, by-design-acceptable), M-2 (single-open-anchor DB invariant — low value: create/invalidate operate on ALL open rows so a stray is self-healed; a unique index would add a concurrency-throw failure mode), M-5 (dock-room on return_toggle anchor, informational).
+
+**Gate (P2 review gate):**
+- `pnpm architecture:gates` — all G1 passed (tsc frontend+server clean; 4 depcruise warns = pre-existing rooms/inventory tablet→pages, NOT docking; madge = baseline).
+- `pnpm i18n:check` — deep key parity.
+- Full `pnpm test` — **4969/4969** after the fixes (was 4964/4964 before, +5 new tests; the single stage-6 failure fixed by `d67d102c9`).
+- Both `tsc --noEmit` configs — 0 errors. DB integration (`docking-citizen-anchor.integration.test.ts`) reaches real Postgres, 8/8.
+
+**Not run (deferred, same rationale as P1):** live RTL/device visual pass for the native scan/detail docking actions → dev-bypass/device-audit env (Clerk-mode shared env makes automated browser auth fragile; behavior covered by happy-dom component tests + real-DB integration).
+
+**Verdict:** VERIFIED — P2 feature-complete, phase-reviewed, Important + cheap-correctness findings fixed TDD-first and controller-verified against committed source, full suite + both typechecks + architecture gates + i18n all green. Ready to push + open the P2 PR for CodeRabbit (merge is the owner's call).
