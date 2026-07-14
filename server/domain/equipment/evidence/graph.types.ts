@@ -76,6 +76,22 @@ export interface SupersessionEvent {
   observedAt: Date;
 }
 
+/**
+ * The current OPEN anchor for the item (docking P2, design §3.3/§4) — the
+ * latest `vt_equipment_anchors` row with `invalidatedAt IS NULL`, joined to
+ * `vt_docks` for the station name. Invalidated/superseded anchors never appear
+ * here. `null` when the item has no open anchor.
+ */
+export interface EvidenceCurrentAnchor {
+  id: string;
+  dockId: string | null;
+  dockName: string | null;
+  roomId: string | null;
+  assertedAt: Date;
+  assertedById: string | null;
+  source: string;
+}
+
 export interface EvidenceGraph {
   clinicId: string;
   equipmentId: string;
@@ -91,6 +107,8 @@ export interface EvidenceGraph {
   supersessionEvents: SupersessionEvent[];
   waitlist: EquipmentWaitlistSnapshot | null;
   activeStaging: StagingQueueRow[];
+  /** Latest OPEN anchor (docking P2) or null — see EvidenceCurrentAnchor. */
+  currentAnchor?: EvidenceCurrentAnchor | null;
 }
 
 export interface ResolverContext {

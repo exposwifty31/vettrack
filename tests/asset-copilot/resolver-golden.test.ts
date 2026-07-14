@@ -681,14 +681,131 @@ const CASES: GoldenCase[] = [
       expect(r.citations.some((c) => c.type === "dock")).toBe(true);
     },
   },
+  {
+    // Resting item with an OPEN anchor and NO rfid: the current-anchor station
+    // outranks the assigned room. summary === dock_station:<dockName>.
+    id: "anchor-01",
+    category: "anchor",
+    graph: buildSyntheticEvidenceGraph({
+      clinicId: CLINIC,
+      equipmentId: EQ,
+      equipment: baseEquipment({
+        custodyState: "docked",
+        roomId: "room-store",
+        dockId: null,
+        location: null,
+      }),
+      rooms: [{ id: "room-store", clinicId: CLINIC, name: "Storage Room" }],
+      currentAnchor: {
+        id: "anc-1",
+        dockId: "dock-home",
+        dockName: "Home Bay 1",
+        roomId: "room-store",
+        assertedAt: new Date(NOW.getTime() - 10 * 60_000),
+        assertedById: "user-a",
+        source: "return_toggle",
+      },
+    }),
+    async assert() {
+      const r = await resolveCurrentLocation(ctx(), this.graph);
+      expect(r.summary).toBe("dock_station:Home Bay 1");
+      expect(
+        r.citations.some(
+          (c) => c.type === "dock" && c.id === "dock-home" && c.label === "Home Bay 1",
+        ),
+      ).toBe(true);
+    },
+  },
+  {
+    // A latest RFID room still beats the current anchor.
+    id: "anchor-02",
+    category: "anchor",
+    graph: buildSyntheticEvidenceGraph({
+      clinicId: CLINIC,
+      equipmentId: EQ,
+      equipment: baseEquipment({ roomId: "room-store", location: null }),
+      rooms: [
+        { id: "room-store", clinicId: CLINIC, name: "Storage Room" },
+        { id: "room-icu", clinicId: CLINIC, name: "ICU" },
+      ],
+      recentRfidReads: [
+        {
+          id: "rfid-a2",
+          clinicId: CLINIC,
+          equipmentId: EQ,
+          fromRoomId: null,
+          toRoomId: "room-icu",
+          gatewayCode: "gw1",
+          readAt: NOW,
+          batchId: "b1",
+        },
+      ],
+      currentAnchor: {
+        id: "anc-2",
+        dockId: "dock-home",
+        dockName: "Home Bay 1",
+        roomId: "room-store",
+        assertedAt: new Date(NOW.getTime() - 10 * 60_000),
+        assertedById: "user-a",
+        source: "return_toggle",
+      },
+    }),
+    async assert() {
+      const r = await resolveCurrentLocation(ctx(), this.graph);
+      expect(r.summary).toBe("rfid_room:ICU");
+    },
+  },
+  {
+    // Checkout still wins over the current anchor.
+    id: "anchor-03",
+    category: "anchor",
+    graph: buildSyntheticEvidenceGraph({
+      clinicId: CLINIC,
+      equipmentId: EQ,
+      equipment: baseEquipment({
+        custodyState: "checked_out",
+        checkedOutLocation: "OR-2",
+      }),
+      currentAnchor: {
+        id: "anc-3",
+        dockId: "dock-home",
+        dockName: "Home Bay 1",
+        roomId: null,
+        assertedAt: new Date(NOW.getTime() - 10 * 60_000),
+        assertedById: "user-a",
+        source: "return_toggle",
+      },
+    }),
+    async assert() {
+      const r = await resolveCurrentLocation(ctx(), this.graph);
+      expect(r.summary).toBe("checked_out:OR-2");
+    },
+  },
+  {
+    // Regression guard: a null/absent anchor falls through to the assigned
+    // room exactly as before the anchor branch existed.
+    id: "anchor-04",
+    category: "anchor",
+    graph: buildSyntheticEvidenceGraph({
+      clinicId: CLINIC,
+      equipmentId: EQ,
+      equipment: baseEquipment({ roomId: "room-store", location: null }),
+      rooms: [{ id: "room-store", clinicId: CLINIC, name: "Storage Room" }],
+      currentAnchor: null,
+    }),
+    async assert() {
+      const r = await resolveCurrentLocation(ctx(), this.graph);
+      expect(r.summary).toBe("room:Storage Room");
+    },
+  },
 ];
 
 function ctx(viewerUserId?: string) {
   return { clinicId: CLINIC, equipmentId: EQ, now: NOW, viewerUserId };
 }
 
-describe("asset copilot resolver golden (n=31)", () => {
-  expect(CASES.length).toBe(31);
+describe("asset copilot resolver golden (n=35)", () => {
+  expect(CASES.length).toBe(35);
 
   for (const testCase of CASES) {
     it(`${testCase.category} / ${testCase.id}`, async () => {
