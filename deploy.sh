@@ -137,27 +137,18 @@ if [ "$CHECK_MODE" = false ]; then
   # Readiness gate: /api/healthz above proves the process is alive, not that the
   # runtime DB pool actually works. A broken pool (e.g. PGBOUNCER_URL pointing at a
   # host that doesn't resolve) still passes liveness and would otherwise ship "green"
-  # — the 2026-07-14 prod outage. Require /api/health to report checks.db == "ok".
-  # Scoped to `db` on purpose: vapid/worker can flap transiently during a rolling
-  # deploy and must not fail an otherwise-healthy ship.
-  READINESS_URL="${READINESS_URL:-https://vettrack.uk/api/health}"
+  # — the 2026-07-14 prod outage. scripts/check-db-readiness.sh fails the deploy
+  # unless /api/health reports checks.db == "ok".
+  #
+  # The default target is DERIVED from HEALTHCHECK_URL (the same deployment target,
+  # not a hardcoded prod URL) by swapping the liveness path segment for the readiness
+  # one. The default applies only when READINESS_URL is UNSET; export READINESS_URL=""
+  # to disable the gate.
+  READINESS_URL="${READINESS_URL-${HEALTHCHECK_URL%healthz}health}"
   if [ -n "$READINESS_URL" ]; then
     echo "🩺 Verifying DB readiness at $READINESS_URL (checks.db == ok)..."
-    db_ready=false
-    for _ in $(seq 1 12); do
-      db_status=$(curl -sS --max-time 10 "$READINESS_URL" 2>/dev/null | jq -r '.checks.db // empty' 2>/dev/null || true)
-      if [ "$db_status" = "ok" ]; then
-        db_ready=true
-        break
-      fi
-      echo "⏳ DB readiness: ${db_status:-unreachable} — waiting..."
-      sleep 10
-    done
-    if [ "$db_ready" != true ]; then
-      echo "❌ Post-deploy DB readiness failed: $READINESS_URL reported checks.db != ok"
-      exit 1
-    fi
-    echo "✅ DB readiness OK"
+    # set -e aborts the deploy if the gate exits non-zero.
+    bash "$(dirname "$0")/scripts/check-db-readiness.sh" "$READINESS_URL"
   fi
 
   if [ -n "$RAILWAY_WORKER_SERVICE" ]; then
