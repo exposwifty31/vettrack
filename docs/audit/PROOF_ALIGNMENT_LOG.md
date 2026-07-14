@@ -2834,6 +2834,7 @@ The 8 PASS include the load-bearing ones: `build 26 > last shipped 25`, no liter
 - Justification posted to the PR thread: `https://github.com/exposwifty31/vettrack/pull/101#issuecomment-4971778916`.
 
 **Verdict:** VERIFIED (finding #2 fixed + tested; finding #1 justified with schema/list evidence and regression-guarded).
+
 ## T2.3 — unified return dialog (docking P2, 2026-07-14)
 
 **Claim:** collapsed equipment-detail.tsx's separate "Return" (`ReturnPlugDialog`) and "Dock return" (`DockReturnFlow`) quick actions into one home-station toggle: checked → dock-return endpoint (writes the docking anchor, T2.4); unchecked → plain custody return, preserving plugged-in/plug-deadline/"returned damaged" (T-24d) behavior verbatim. TDD (component test first).
@@ -2893,3 +2894,19 @@ The 8 PASS include the load-bearing ones: `build 26 > last shipped 25`, no liter
 **Not run (deferred, same rationale as P1):** live RTL/device visual pass for the native scan/detail docking actions → dev-bypass/device-audit env (Clerk-mode shared env makes automated browser auth fragile; behavior covered by happy-dom component tests + real-DB integration).
 
 **Verdict:** VERIFIED — P2 feature-complete, phase-reviewed, Important + cheap-correctness findings fixed TDD-first and controller-verified against committed source, full suite + both typechecks + architecture gates + i18n all green. Ready to push + open the P2 PR for CodeRabbit (merge is the owner's call).
+
+---
+
+### 2026-07-14 · PROD OUTAGE — runtime DB pool pointed at non-existent PgBouncer host (resolved)
+
+**Context:** The post-merge smoke-test of #12 (`@clerk/express` v1→v2) surfaced a **pre-existing prod outage unrelated to #12**. `/api/health` readiness returned `db:fail` (with a cascading `vapid:fail`) while `/api/healthz` (liveness) stayed green — so the deploy gate never caught it and the Railway dashboard showed "green/online".
+
+**Root cause (evidence, not guess):** Railway deploy logs showed `getaddrinfo ENOTFOUND pgbouncer.railway.internal` on every runtime query plus continuous `[event-outbox] publish batch failed: … ENOTFOUND` (SSE realtime down). `PGBOUNCER_URL` was SET on both **VetTrack + Worker** services pointing at `pgbouncer.railway.internal`, but **no PgBouncer service exists** in the `pacific-flow` project → the host does not resolve. #96's `getPostgresqlConnectionString()` prefers `PGBOUNCER_URL`, so the runtime pool aimed at a dead host. Migrations survived because they use the **direct** pool (`getDirectPostgresqlConnectionString()` → `DATABASE_URL` → `postgres.railway.internal`, which resolves) — hence app boots + liveness green while all runtime DB traffic fails. First hypothesis (SSL mismatch) was **wrong**; the logs corrected it — DNS fails before SSL is ever negotiated.
+
+**Fix (owner-approved):** `railway variable delete PGBOUNCER_URL` on VetTrack + Worker → runtime pool falls back to the working direct `DATABASE_URL`. A CI source deploy raced in carrying a **pre-deletion env snapshot** (Railway snapshots env at deploy-creation time), so a forced `railway redeploy -y` on both services was required to apply the PGBOUNCER-free env.
+
+**Evidence of recovery:** `/api/health` → `{"status":"ok","checks":{"db":"ok","clerk":"ok","vapid":"ok","worker":"ok"}}` (buildTag `1.2.0-mrkv9mos`; `db` flipped fail→ok 19:31 local); live log window shows zero `ENOTFOUND`/outbox errors; auth probes 401/401 (v2 Clerk clean). Verified independently of the Railway "green/online" status (which reflects liveness only).
+
+**Hardening (this PR #102):** `deploy.sh` healthchecked `/api/healthz` (liveness, no DB), so a DB-unreachable build shipped green. Added `scripts/check-db-readiness.sh` (polls `/api/health`, fails the deploy unless `checks.db == "ok"`; scoped to `db` since vapid/worker can flap during a rolling deploy) + `tests/deploy-db-readiness.test.ts` (stubbed-curl coverage). READINESS_URL derived from HEALTHCHECK_URL (same deploy target); `READINESS_URL=""` disables the gate.
+
+**Verdict:** VERIFIED — prod recovered (health probe, not dashboard); deploy-gate hardening added + tested so a DB-unreachable build fails the deploy instead of shipping green.
