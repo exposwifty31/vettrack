@@ -10,6 +10,7 @@ import { logAudit } from "../lib/audit.js";
 import { incrementMetric } from "../lib/metrics.js";
 import { sendPushToRole, type PushPayload, type PushSendResult } from "../lib/push.js";
 import { createRedisConnection } from "../lib/redis.js";
+import { MANAGER_NOTIFY_ROLES } from "../lib/notification-roles.js";
 
 // Returned-but-unverified items sit in the "returned_unverified" reconciliation bucket
 // (custodyState === "returned" with no open equipment anchor since return). A returned item
@@ -26,11 +27,6 @@ const STALE_RETURNED_ALERT_TYPE = "stale_returned_nudge" as const; // fits VARCH
 // D2 — vt_alert_acks.acknowledgedById AND .acknowledgedByEmail are both NOT NULL with no default.
 const SYSTEM_USER_ID = "system:stale-returned";
 const SYSTEM_USER_EMAIL = "stale-returned@vettrack.system";
-// "Manager" visibility mirrors task-notification.ts: DB roles are admin | vet | technician |
-// student (no `manager` role string in schema) — TASK_STARTED/COMPLETED already notify admin +
-// vet as the clinic's management tier. Returned items have no holder, so nudge those roles
-// instead of a specific user.
-const NUDGE_ROLES = ["admin", "vet"] as const;
 
 export const STALE_RETURNED_SWEEP_QUEUE_NAME = "stale-returned-sweep";
 export const STALE_RETURNED_SWEEP_JOB_NAME = "sweep-stale-returned";
@@ -57,7 +53,7 @@ function mergeDelivery(a: PushSendResult, b: PushSendResult): PushSendResult {
 /** Broadcasts to the clinic's manager-tier roles (no single holder exists for a returned item). */
 async function nudgeManagers(clinicId: string, payload: PushPayload): Promise<PushSendResult> {
   let result: PushSendResult = { deliveredAny: false, transientFailures: 0, invalidOrGoneCount: 0 };
-  for (const role of NUDGE_ROLES) {
+  for (const role of MANAGER_NOTIFY_ROLES) {
     const roleResult = await sendPushToRole(clinicId, role, payload);
     result = mergeDelivery(result, roleResult);
   }

@@ -326,6 +326,45 @@ describe.skipIf(!DATABASE_URL)("docking room sweep (T3.2a) integration", () => {
       if (!isRecord(res.json)) throw new Error("Expected response to be an object");
       expect(getString(res.json, "code")).toBe("errors.notFound");
     });
+
+    it("S2-9 (cross-clinic isolation): a second clinic's SAME-id-shaped room is invisible — 404s, and its homed equipment never appears under clinic A's room", async () => {
+      const otherClinicId = randomUUID();
+      const otherRoomId = randomUUID();
+      const otherAssetTypeId = randomUUID();
+      const otherEqId = randomUUID();
+      await seedClinic(otherClinicId);
+      await seedUser(randomUUID(), otherClinicId);
+      await seedRoom(otherRoomId, otherClinicId, "Other Clinic Room");
+      await seedAssetType(otherAssetTypeId, otherClinicId, "Other Clinic Type");
+      await seedEquipment(otherEqId, otherClinicId, {
+        homeRoomId: otherRoomId,
+        assetTypeId: otherAssetTypeId,
+        custodyState: "returned",
+      });
+
+      try {
+        // Clinic A's own room's sweep list never contains the other clinic's item.
+        const ownRoomRes = await api(`/api/docking/rooms/${ctx.roomId}/sweep`, "GET");
+        expect(ownRoomRes.status).toBe(200);
+        if (!isRecord(ownRoomRes.json)) throw new Error("Expected response to be an object");
+        const items = ownRoomRes.json.items as Array<Record<string, unknown>>;
+        expect(items.some((it) => it.id === otherEqId)).toBe(false);
+
+        // Fetching the other clinic's room by id as clinic A's actor 404s —
+        // the room lookup is clinic-scoped (WHERE clinic_id = req.clinicId).
+        const crossClinicRes = await api(`/api/docking/rooms/${otherRoomId}/sweep`, "GET");
+        expect(crossClinicRes.status).toBe(404);
+      } finally {
+        const P = probePool!;
+        await P.query(`DELETE FROM vt_equipment_anchors WHERE clinic_id = $1`, [otherClinicId]);
+        await P.query(`DELETE FROM vt_equipment WHERE clinic_id = $1`, [otherClinicId]);
+        await P.query(`DELETE FROM vt_docks WHERE clinic_id = $1`, [otherClinicId]);
+        await P.query(`DELETE FROM vt_asset_types WHERE clinic_id = $1`, [otherClinicId]);
+        await P.query(`DELETE FROM vt_rooms WHERE clinic_id = $1`, [otherClinicId]);
+        await P.query(`DELETE FROM vt_users WHERE clinic_id = $1`, [otherClinicId]);
+        await P.query(`DELETE FROM vt_clinics WHERE id = $1`, [otherClinicId]);
+      }
+    });
   });
 
   describe("POST /rooms/:roomId/sweep — commit", () => {

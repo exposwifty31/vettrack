@@ -53,13 +53,11 @@ import { logAudit } from "../lib/audit.js";
 import { incrementMetric } from "../lib/metrics.js";
 import { sendPushToRole, sendPushToUser } from "../lib/push.js";
 import { createRedisConnection } from "../lib/redis.js";
+import { MANAGER_NOTIFY_ROLES } from "../lib/notification-roles.js";
 
 const SWEEP_INTERVAL_MS = 10 * 60 * 1000; // 10 min TICK — mirrors the brief's "~ every 10 min" cadence
 const SYSTEM_USER_ID = "system:sweep-escalation";
 const SYSTEM_USER_EMAIL = "sweep-escalation@vettrack.system";
-// "Manager" visibility mirrors stale-returned-sweep.worker.ts: DB roles are
-// admin | vet | technician | student (no `manager` role string in schema).
-const MANAGER_ROLES = ["admin", "vet"] as const;
 
 export const SWEEP_ESCALATION_QUEUE_NAME = "room-sweep-escalation";
 export const SWEEP_ESCALATION_JOB_NAME = "sweep-room-escalation";
@@ -109,18 +107,22 @@ async function resolveStageCopy(
   return sweepEscalationCopyForLocale(locale, stage);
 }
 
+/**
+ * S2-8 (pre-PR review, DOC): this file's shift day/time frame uses
+ * server-local `Date` math (`getFullYear`/`getMonth`/`getDate` and the
+ * `new Date(y, m, d, h, mi, s)` constructor below) DELIBERATELY, mirroring
+ * `server/lib/role-resolution.ts`'s existing (merged, production)
+ * shift-window convention — not an oversight, and not something to "fix"
+ * here in isolation. Migrating both to clinic-timezone-aware helpers
+ * (`getClinicTimezone`/`clinicTodayIsoDate`, already used elsewhere in
+ * docking.ts) is a separate, cross-cutting change spanning both files and
+ * is explicitly out of P3 scope.
+ */
 function toLocalDateString(date: Date): string {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const day = String(date.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
-}
-
-function toLocalTimeString(date: Date): string {
-  const hours = String(date.getHours()).padStart(2, "0");
-  const minutes = String(date.getMinutes()).padStart(2, "0");
-  const seconds = String(date.getSeconds()).padStart(2, "0");
-  return `${hours}:${minutes}:${seconds}`;
 }
 
 /** Combines a roster `date` (YYYY-MM-DD) + clock-time (`HH:MM:SS`) into a local-time Date, same frame `shiftWindowContains` uses. */
@@ -208,6 +210,14 @@ interface OwnShiftRow {
  * NOT apply approved shift-adjustments (leave_early/extend) the way
  * `resolveCurrentRole` does — a direct roster-row lookup is the simpler,
  * more reliable source for a shift-end that must still resolve post-end.
+ *
+ * S2-8 (pre-PR review, DOC): reading the raw roster startTime/endTime
+ * without applying leave_early/extend shift-adjustments is a DELIBERATE,
+ * reviewed trade-off from the I-1 fix — not an oversight. The alternative
+ * (routing through `resolveCurrentRole`'s adjustment logic) was rejected
+ * because that path can't resolve post-shift-end (see above). Consequence:
+ * the escalation clock tracks ROSTERED hours, not adjusted hours — accepted
+ * as the P3 behavior.
  */
 async function findOwnShiftRow(clinicId: string, shiftDate: string, userName: string): Promise<OwnShiftRow | null> {
   const key = normalizeNameKey(normalizeName(userName));
@@ -280,7 +290,7 @@ async function fireEscalationStage(params: FireStageParams): Promise<void> {
     }
   } else {
     const copy = await resolveStageCopy(clinicId, 4, null);
-    for (const role of MANAGER_ROLES) {
+    for (const role of MANAGER_NOTIFY_ROLES) {
       await sendPushToRole(clinicId, role, {
         title: copy.title,
         body: copy.body,

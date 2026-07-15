@@ -78,6 +78,15 @@ describe("classifyReconciliationBucket", () => {
         ),
       ).toBe("returned_away");
     });
+
+    it("S2-13: returns returned_away via the roomId fallback when lastRfidRoomId is null (home is 'icu', presence known only via roomId)", () => {
+      expect(
+        classifyReconciliationBucket(
+          item({ homeRoomId: "icu", roomId: "ward", lastRfidRoomId: null }),
+          ctx({ currentAnchor: null }),
+        ),
+      ).toBe("returned_away");
+    });
   });
 
   describe("missing", () => {

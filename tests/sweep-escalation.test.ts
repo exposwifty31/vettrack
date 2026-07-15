@@ -431,6 +431,80 @@ describe.skipIf(!DATABASE_URL)("sweep-escalation (P3 T3.4-ii) integration", () =
     expect(row).toBeNull();
   });
 
+  // ─── S2-10 — stage-1 (coordinator-only reminder) ───────────────────────────
+  it("S2-10: minutes-to-end=50 (raw stage 1), normal single-eligible-coordinator shift -> pushes the COORDINATOR, not the senior", async () => {
+    const now50 = localDateTime(2026, 2, 2, 17, 10); // 18:00 end - 17:10 now = 50 min
+
+    const result = await runSweepEscalation(now50);
+    expect(result.escalated).toBeGreaterThanOrEqual(1);
+
+    const row = await getCoordinatorRow(ctx.clinicId, ctx.shiftDate);
+    expect(row?.escalation_stage).toBe(1);
+    expect(row?.coordinator_user_id).toBe(ctx.coordinatorId);
+    expect(row?.source).toBe("auto");
+
+    expect(sendPushToUser).toHaveBeenCalledWith(ctx.clinicId, ctx.coordinatorId, expect.any(Object));
+    expect(sendPushToUser).not.toHaveBeenCalledWith(ctx.clinicId, ctx.seniorId, expect.any(Object));
+    expect(incrementMetric).toHaveBeenCalledWith("sweep_escalation_stage_1_fired");
+    expect(logAudit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        clinicId: ctx.clinicId,
+        actionType: "room_sweep_escalated",
+        metadata: expect.objectContaining({ stage: 1 }),
+      }),
+    );
+  });
+
+  // ─── S2-11 — coordinator-only shift (no senior on shift), stage 2/3 no-op ──
+  describe("S2-11: coordinator-only shift (no senior tech on shift)", () => {
+    beforeEach(async () => {
+      // Remove the outer beforeEach's senior shift row — this shift has
+      // ONLY the coordinator on it (the senior user still exists, but is
+      // not matched as "on shift" without a roster row for this date).
+      await probePool!.query(`DELETE FROM vt_shifts WHERE clinic_id = $1 AND employee_name = $2`, [
+        ctx.clinicId,
+        "Shira Katz",
+      ]);
+    });
+
+    it("minutes-to-end=30 -> stage 2 still advances (row/metric/audit), but no senior push fires (if (seniorTechUserId) no-op)", async () => {
+      const now30 = localDateTime(2026, 2, 2, 17, 30);
+      const result = await runSweepEscalation(now30);
+      expect(result.escalated).toBeGreaterThanOrEqual(1);
+
+      const row = await getCoordinatorRow(ctx.clinicId, ctx.shiftDate);
+      expect(row?.escalation_stage).toBe(2);
+      expect(row?.coordinator_user_id).toBe(ctx.coordinatorId);
+
+      expect(sendPushToUser).not.toHaveBeenCalled();
+      expect(sendPushToRole).not.toHaveBeenCalled();
+      expect(incrementMetric).toHaveBeenCalledWith("sweep_escalation_stage_2_fired");
+      expect(logAudit).toHaveBeenCalledWith(
+        expect.objectContaining({ clinicId: ctx.clinicId, actionType: "room_sweep_escalated", metadata: expect.objectContaining({ stage: 2 }) }),
+      );
+    });
+
+    it("minutes-to-end=10 -> stage 3 still advances (row/metric/audit), current_responsible_user_id stays null, no senior push fires", async () => {
+      const now30 = localDateTime(2026, 2, 2, 17, 30);
+      await runSweepEscalation(now30); // reach stage 2 first
+
+      const now10 = localDateTime(2026, 2, 2, 17, 50);
+      const result = await runSweepEscalation(now10);
+      expect(result.escalated).toBeGreaterThanOrEqual(1);
+
+      const row = await getCoordinatorRow(ctx.clinicId, ctx.shiftDate);
+      expect(row?.escalation_stage).toBe(3);
+      expect(row?.current_responsible_user_id).toBeNull(); // no senior to transfer to
+
+      expect(sendPushToUser).not.toHaveBeenCalled();
+      expect(sendPushToRole).not.toHaveBeenCalled();
+      expect(incrementMetric).toHaveBeenCalledWith("sweep_escalation_stage_3_fired");
+      expect(logAudit).not.toHaveBeenCalledWith(
+        expect.objectContaining({ actionType: "room_sweep_responsibility_transferred" }),
+      );
+    });
+  });
+
   // ─── I-2 (phase review) — needs_confirmation still escalates to the senior ─
   //
   // Bug: `if (!resolution.coordinatorUserId) continue;` skipped BOTH

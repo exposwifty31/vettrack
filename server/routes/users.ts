@@ -34,6 +34,7 @@ import { presignObjectUrl } from "../lib/object-storage.js";
  * GET   /            admin-only  List all users
  * PATCH /:id/role    admin-only  Change a user's role
  * POST  /sync        student+    Sync Clerk identity to DB record
+ * PATCH /:id/equipment-coordinator   admin-only   Set/clear Equipment Coordinator eligibility
  * ─────────────────────────────────────────────────────
  * Role is always resolved from the DB record — never from request
  * headers, body, or JWT claims.

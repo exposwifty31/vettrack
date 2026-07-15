@@ -686,7 +686,14 @@ export interface ShiftCoordinatorResult {
   seniorTechUserId: string | null;
 }
 
-/** POST /api/docking/coordinator response — the stored confirmation row. */
+/**
+ * POST /api/docking/coordinator response — the full stored
+ * vt_shift_equipment_coordinator row, including the P3 T3.4-ii escalation
+ * ladder fields (migration 167): escalationStage (0 none, 1 coordinator
+ * reminded, 2 senior notified, 3 responsibility transferred, 4 open to
+ * all + manager notified), currentResponsibleUserId (set at stage 3, null
+ * otherwise), escalatedAt (last escalation timestamp, null before stage 1).
+ */
 export interface ShiftCoordinatorConfirmation {
   id: string;
   clinicId: string;
@@ -695,6 +702,9 @@ export interface ShiftCoordinatorConfirmation {
   source: "auto" | "confirmed" | "fallback_senior";
   assignedByUserId: string | null;
   createdAt: string;
+  escalationStage: number;
+  currentResponsibleUserId: string | null;
+  escalatedAt: string | null;
 }
 
 export type QuickScanToggleAction = "checkout" | "return" | "blocked";

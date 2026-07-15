@@ -515,4 +515,69 @@ describe.skipIf(!DATABASE_URL)("docking equipment coordinator (T3.4-i-a) integra
     expect(resolution.status).toBe("auto");
     expect(resolution.coordinatorUserId).toBe(eligible);
   });
+
+  it("S2-9 (cross-clinic isolation): a same-named eligible user + shift in a second clinic must not leak into clinic A's resolveShiftCoordinator name-matching", async () => {
+    const clinicAEligible = randomUUID();
+    const clinicBId = randomUUID();
+    const clinicBEligible = randomUUID();
+
+    await seedUser(clinicAEligible, ctx.clinicId, { name: "Dana Cohen", isEquipmentCoordinator: true });
+    await seedShift(randomUUID(), ctx.clinicId, ctx.shiftDate, "Dana Cohen", "technician");
+
+    await seedClinic(clinicBId);
+    await seedUser(clinicBEligible, clinicBId, { name: "Dana Cohen", isEquipmentCoordinator: true });
+    await seedShift(randomUUID(), clinicBId, ctx.shiftDate, "Dana Cohen", "technician");
+
+    try {
+      const resolution = await resolveShiftCoordinator(ctx.clinicId, ctx.shiftDate);
+      expect(resolution.status).toBe("auto");
+      expect(resolution.coordinatorUserId).toBe(clinicAEligible);
+      expect(resolution.candidates.map((c) => c.userId)).toEqual([clinicAEligible]);
+
+      const res = await api(`/api/docking/coordinator?date=${ctx.shiftDate}`, "GET");
+      expect(res.status).toBe(200);
+      if (!isRecord(res.json)) throw new Error("expected object");
+      expect(getString(res.json, "coordinatorUserId")).toBe(clinicAEligible);
+      const candidates = res.json.candidates as Array<Record<string, unknown>>;
+      expect(candidates.map((c) => c.userId)).toEqual([clinicAEligible]);
+    } finally {
+      await probePool!.query(`DELETE FROM vt_shifts WHERE clinic_id = $1`, [clinicBId]);
+      await probePool!.query(`DELETE FROM vt_users WHERE clinic_id = $1`, [clinicBId]);
+      await probePool!.query(`DELETE FROM vt_clinics WHERE id = $1`, [clinicBId]);
+    }
+  });
+
+  it("S2-12a: two senior techs on one shift -> seniorTechUserId is the alphabetically-first (deterministic tie-break)", async () => {
+    const seniorZohar = randomUUID();
+    const seniorAmit = randomUUID();
+    await seedUser(seniorZohar, ctx.clinicId, { name: "Zohar Ben", role: "senior_technician", isEquipmentCoordinator: false });
+    await seedUser(seniorAmit, ctx.clinicId, { name: "Amit Cohen", role: "senior_technician", isEquipmentCoordinator: false });
+    await seedShift(randomUUID(), ctx.clinicId, ctx.shiftDate, "Zohar Ben", "senior_technician");
+    await seedShift(randomUUID(), ctx.clinicId, ctx.shiftDate, "Amit Cohen", "senior_technician");
+
+    const resolution = await resolveShiftCoordinator(ctx.clinicId, ctx.shiftDate);
+    expect(resolution.seniorTechUserId).toBe(seniorAmit); // "Amit Cohen" < "Zohar Ben"
+  });
+
+  it("S2-12b: a user with permanent role lead_technician but a non-senior shift role still resolves as seniorTechUserId (mapLegacyRoleToClinicalRole alias)", async () => {
+    const userId = randomUUID();
+    await seedUser(userId, ctx.clinicId, { name: "Lead Tech", role: "lead_technician", isEquipmentCoordinator: false });
+    // Shift role is plain "technician" — only the PERMANENT vt_users.role
+    // (lead_technician, aliased to senior_technician) makes them the senior.
+    await seedShift(randomUUID(), ctx.clinicId, ctx.shiftDate, "Lead Tech", "technician");
+
+    const resolution = await resolveShiftCoordinator(ctx.clinicId, ctx.shiftDate);
+    expect(resolution.seniorTechUserId).toBe(userId);
+  });
+
+  it("S2-14: PATCH /api/users/:id/equipment-coordinator as a non-admin actor -> 403", async () => {
+    const target = randomUUID();
+    await seedUser(target, ctx.clinicId, { name: "Roni Adar", isEquipmentCoordinator: false });
+
+    setActor(randomUUID(), "technician");
+    const res = await api(`/api/users/${target}/equipment-coordinator`, "PATCH", { isEquipmentCoordinator: true });
+
+    expect(res.status).toBe(403);
+    expect(await isEquipmentCoordinatorFlag(target)).toBe(false);
+  });
 });

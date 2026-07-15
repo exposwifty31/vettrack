@@ -366,4 +366,66 @@ describe.skipIf(!DATABASE_URL)("GET /api/rooms — last-swept fields (T3.4-i-b P
     expect(icu).toBeDefined();
     expect(icu!.lastSweptByName).toBe("Dana Sweeper");
   });
+
+  it("S2-9 (cross-clinic isolation): a second clinic's sweep anchor never appears in clinic A's lastSwept, and its room is invisible in clinic A's list", async () => {
+    const otherClinicId = randomUUID();
+    const otherUserId = randomUUID();
+    const otherRoomId = randomUUID();
+    const otherAssetTypeId = randomUUID();
+    const otherDockId = randomUUID();
+    const otherEqId = randomUUID();
+
+    await seedClinic(otherClinicId);
+    await seedUser(otherUserId, otherClinicId, "Other Clinic Sweeper");
+    await seedRoom(otherRoomId, otherClinicId, "Other Clinic Room");
+    await seedAssetType(otherAssetTypeId, otherClinicId, "Other Clinic Type");
+    await seedDock(otherDockId, otherClinicId, otherRoomId, otherAssetTypeId, "Other Clinic Dock");
+    await seedEquipment(otherEqId, otherClinicId, {
+      name: "Other Clinic Pump",
+      homeRoomId: otherRoomId,
+      assetTypeId: otherAssetTypeId,
+      custodyState: "returned",
+    });
+    await createAnchor(db, {
+      clinicId: otherClinicId,
+      equipmentId: otherEqId,
+      dockId: otherDockId,
+      roomId: otherRoomId,
+      assertedById: otherUserId,
+      source: "sweep",
+    });
+
+    // Clinic A's own room has no sweep — this must stay unaffected by the
+    // unrelated clinic B sweep happening at the same time.
+    const itemId = randomUUID();
+    await seedEquipment(itemId, ctx.clinicId, {
+      name: "Clinic A Pump",
+      homeRoomId: ctx.roomId,
+      assetTypeId: ctx.assetTypeId,
+      custodyState: "returned",
+    });
+
+    try {
+      const res = await api("/api/rooms");
+      expect(res.status).toBe(200);
+      const rooms = res.json as Array<Record<string, unknown>>;
+
+      // Clinic B's room is entirely invisible in clinic A's list.
+      expect(rooms.some((r) => r.id === otherRoomId)).toBe(false);
+
+      const icu = rooms.find((r) => r.id === ctx.roomId);
+      expect(icu).toBeDefined();
+      expect(icu!.lastSweptAt).toBeNull();
+      expect(icu!.lastSweptByName).toBeNull();
+    } finally {
+      const P = probePool!;
+      await P.query(`DELETE FROM vt_equipment_anchors WHERE clinic_id = $1`, [otherClinicId]);
+      await P.query(`DELETE FROM vt_equipment WHERE clinic_id = $1`, [otherClinicId]);
+      await P.query(`DELETE FROM vt_docks WHERE clinic_id = $1`, [otherClinicId]);
+      await P.query(`DELETE FROM vt_asset_types WHERE clinic_id = $1`, [otherClinicId]);
+      await P.query(`DELETE FROM vt_rooms WHERE clinic_id = $1`, [otherClinicId]);
+      await P.query(`DELETE FROM vt_users WHERE clinic_id = $1`, [otherClinicId]);
+      await P.query(`DELETE FROM vt_clinics WHERE id = $1`, [otherClinicId]);
+    }
+  });
 });

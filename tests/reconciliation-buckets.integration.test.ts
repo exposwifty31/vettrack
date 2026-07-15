@@ -521,6 +521,36 @@ describe.skipIf(!DATABASE_URL)("docking reconciliation full 8-bucket breakdown (
     }
   });
 
+  it("S2-13: counts.returned_away === 1 for a homed item with room_id set to a non-home room and no anchor (roomId presence fallback)", async () => {
+    const otherRoomId = randomUUID();
+    await seedRoom(otherRoomId, ctx.clinicId, "Ward");
+    const eqId = randomUUID();
+    await seedEquipment(eqId, ctx.clinicId, {
+      home_room_id: ctx.roomId,
+      asset_type_id: ctx.assetTypeId,
+      custody_state: "returned",
+      room_id: otherRoomId, // presence elsewhere, lastRfidRoomId left NULL — exercises the `?? item.roomId` fallback
+    });
+
+    const res = await api(`/api/docking/reconciliation`, "GET");
+    expect(res.status).toBe(200);
+    expect(isRecord(res.json)).toBe(true);
+    if (!isRecord(res.json)) throw new Error("Expected response to be an object");
+
+    const counts = res.json.counts;
+    expect(isRecord(counts)).toBe(true);
+    if (!isRecord(counts)) throw new Error("Expected counts to be an object");
+    expect(getNumber(counts, "returned_away")).toBe(1);
+
+    const byBucket = res.json.byBucket;
+    expect(isRecord(byBucket)).toBe(true);
+    if (!isRecord(byBucket)) throw new Error("Expected byBucket to be an object");
+    const returnedAway = byBucket.returned_away;
+    expect(isArray(returnedAway)).toBe(true);
+    if (!isArray(returnedAway)) throw new Error("Expected byBucket.returned_away to be an array");
+    expect(returnedAway.some((e) => isRecord(e) && getString(e, "id") === eqId)).toBe(true);
+  });
+
   it("reconciliation full breakdown is clinic-scoped — another clinic's items never appear in counts/byBucket", async () => {
     const otherClinicId = randomUUID();
     const otherRoomId = randomUUID();

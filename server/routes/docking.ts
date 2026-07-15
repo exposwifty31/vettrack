@@ -10,8 +10,8 @@
  */
 import { Router } from "express";
 import { z } from "zod";
-import { db, equipment, docks, rooms, equipmentAnchors, users } from "../db.js";
-import { and, desc, eq, inArray, isNull, ne, sql } from "drizzle-orm";
+import { db, equipment, docks, rooms, users } from "../db.js";
+import { and, eq, inArray, isNull, ne, sql } from "drizzle-orm";
 import { requireAuth, requireAdmin } from "../middleware/auth.js";
 import { writeLimiter } from "../middleware/rate-limiters.js";
 import { validateBody } from "../middleware/validate.js";
@@ -220,7 +220,7 @@ router.get("/reconciliation", requireAuth, async (req, res) => {
     // ordered by assertedAt DESC. The latest row's invalidatedAt tells us
     // whether it's the currently open anchor or the most recent
     // contradiction (T3.1 ClassifierCtx derivation below).
-    db.execute(sql`
+    db.execute<LatestAnchorRow>(sql`
       SELECT DISTINCT ON (equipment_id) equipment_id, dock_id, invalidated_at, invalidated_reason
       FROM vt_equipment_anchors
       WHERE clinic_id = ${clinicId}
@@ -241,8 +241,7 @@ router.get("/reconciliation", requireAuth, async (req, res) => {
     capacity: dock.capacity,
   }));
 
-  const latestAnchorRows = (latestAnchorResult as unknown as { rows: LatestAnchorRow[] }).rows;
-  const latestAnchorByEquipmentId = new Map(latestAnchorRows.map((row) => [row.equipment_id, row]));
+  const latestAnchorByEquipmentId = new Map(latestAnchorResult.rows.map((row) => [row.equipment_id, row]));
 
   const counts = Object.fromEntries(RECONCILIATION_BUCKETS.map((b) => [b, 0])) as Record<
     ReconciliationBucket,
@@ -403,29 +402,34 @@ router.get("/rooms/:roomId/sweep", requireAuth, async (req, res) => {
       .where(and(eq(equipment.clinicId, clinicId), eq(equipment.homeRoomId, roomId), isNull(equipment.deletedAt))),
   ]);
 
+  // S2-2 (pre-PR review, MINOR): latest anchor per item in ONE DISTINCT ON
+  // query — same shape as the reconciliation route's latestAnchorResult
+  // above — instead of pulling each item's full anchor history and
+  // reducing in JS. The current-anchor UNIQUE index guarantees at most one
+  // open (invalidatedAt IS NULL) row per equipment, and createAnchor always
+  // invalidates the prior open row before inserting a new one, so the
+  // latest-by-assertedAt row IS the current anchor when one is open —
+  // behavior-equivalent to the old find(invalidatedAt === null) reduction.
   const itemIds = expectedItems.map((item) => item.id);
-  const anchorRows = itemIds.length
-    ? await db
-        .select()
-        .from(equipmentAnchors)
-        .where(and(eq(equipmentAnchors.clinicId, clinicId), inArray(equipmentAnchors.equipmentId, itemIds)))
-        .orderBy(desc(equipmentAnchors.assertedAt))
-    : [];
-
-  const anchorsByEquipmentId = new Map<string, typeof anchorRows>();
-  for (const anchor of anchorRows) {
-    const bucket = anchorsByEquipmentId.get(anchor.equipmentId);
-    if (bucket) bucket.push(anchor);
-    else anchorsByEquipmentId.set(anchor.equipmentId, [anchor]);
-  }
+  const latestAnchorResult = itemIds.length
+    ? await db.execute<LatestAnchorRow>(sql`
+        SELECT DISTINCT ON (equipment_id) equipment_id, dock_id, invalidated_at, invalidated_reason
+        FROM vt_equipment_anchors
+        WHERE clinic_id = ${clinicId} AND equipment_id IN (${sql.join(itemIds.map((id) => sql`${id}`), sql`, `)})
+        ORDER BY equipment_id, asserted_at DESC
+      `)
+    : null;
+  const latestAnchorByEquipmentId = new Map(
+    (latestAnchorResult?.rows ?? []).map((row) => [row.equipment_id, row]),
+  );
 
   const items = expectedItems.map((item) => {
     const homeDock = resolveHomeDock({ homeRoomId: item.homeRoomId, assetTypeId: item.assetTypeId }, clinicDocks);
-    const anchorsForItem = anchorsByEquipmentId.get(item.id) ?? []; // already ordered assertedAt DESC
-    const currentAnchor = anchorsForItem.find((a) => a.invalidatedAt === null) ?? null;
-    const lastContradictionReason: ClassifierCtx["lastContradictionReason"] = currentAnchor
-      ? null
-      : (anchorsForItem[0]?.invalidatedReason ?? null) as ClassifierCtx["lastContradictionReason"];
+    const latest = latestAnchorByEquipmentId.get(item.id);
+    const currentAnchor = latest && latest.invalidated_at == null ? { dockId: latest.dock_id } : null;
+    const lastContradictionReason = (
+      latest && latest.invalidated_at != null ? latest.invalidated_reason : null
+    ) as ClassifierCtx["lastContradictionReason"];
 
     const bucket = classifyReconciliationBucket(
       {

@@ -37,6 +37,51 @@ const patchRoomSchema = z.object({
   syncStatus: z.enum(["synced", "stale", "requires_audit"]).optional(),
 });
 
+type LastSweptRow = {
+  home_room_id: string;
+  asserted_at: Date | string;
+  sweeper_name: string | null;
+  sweeper_display_name: string | null;
+};
+
+/**
+ * S2-1 (pre-PR review, MAJOR): per-room "last swept" (docking P3 T3.4-i-b
+ * Part A) — the most recent source:"sweep" anchor among items currently
+ * homed to each room, plus the asserter's display name. ONE bounded
+ * DISTINCT ON (home_room_id) query, not an unbounded full-history select
+ * over every source:"sweep" anchor for the clinic deduped in JS. Shared by
+ * both GET /api/rooms (roomId omitted — every room) and GET /api/rooms/:id
+ * (roomId passed — scoped to that one room), so the derivation isn't
+ * copy-pasted a third time. All-time, not shift-scoped.
+ */
+async function lastSweptByRoom(
+  clinicId: string,
+  roomId?: string,
+): Promise<Map<string, { lastSweptAt: string; lastSweptByName: string | null }>> {
+  const result = await db.execute<LastSweptRow>(sql`
+    SELECT DISTINCT ON (e.home_room_id)
+      e.home_room_id, a.asserted_at, u.name AS sweeper_name, u.display_name AS sweeper_display_name
+    FROM vt_equipment_anchors a
+    INNER JOIN vt_equipment e ON e.id = a.equipment_id AND e.clinic_id = ${clinicId}
+    LEFT JOIN vt_users u ON u.id = a.asserted_by_id AND u.clinic_id = ${clinicId}
+    WHERE a.clinic_id = ${clinicId}
+      AND a.source = 'sweep'
+      AND e.home_room_id IS NOT NULL
+      AND e.deleted_at IS NULL
+      ${roomId ? sql`AND e.home_room_id = ${roomId}` : sql``}
+    ORDER BY e.home_room_id, a.asserted_at DESC
+  `);
+
+  const map = new Map<string, { lastSweptAt: string; lastSweptByName: string | null }>();
+  for (const row of result.rows) {
+    map.set(row.home_room_id, {
+      lastSweptAt: new Date(row.asserted_at).toISOString(),
+      lastSweptByName: row.sweeper_display_name || row.sweeper_name || null,
+    });
+  }
+  return map;
+}
+
 // GET /api/rooms — list all rooms with per-room equipment counts
 router.get("/", requireAuth, async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
@@ -54,7 +99,7 @@ router.get("/", requireAuth, async (req, res) => {
 
     const cutoff24h = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
-    const [counts, homedEquipment, clinicDocks, sweepAnchorRows] = await Promise.all([
+    const [counts, homedEquipment, clinicDocks, lastSweptByRoomId] = await Promise.all([
       db
         .select({
           roomId: equipment.roomId,
@@ -79,43 +124,8 @@ router.get("/", requireAuth, async (req, res) => {
         .from(equipment)
         .where(and(eq(equipment.clinicId, clinicId), isNotNull(equipment.homeRoomId), isNull(equipment.deletedAt))),
       db.select().from(docks).where(eq(docks.clinicId, clinicId)),
-      // Per-room "last swept" (docking P3 T3.4-i-b Part A) — the most recent
-      // source:"sweep" anchor among items currently homed to the room, plus
-      // the asserter's display name. One query (join, not N+1): ordered by
-      // assertedAt DESC so the first row seen per roomId in the reduction
-      // below is the most recent.
-      db
-        .select({
-          roomId: equipment.homeRoomId,
-          assertedAt: equipmentAnchors.assertedAt,
-          sweeperName: users.name,
-          sweeperDisplayName: users.displayName,
-        })
-        .from(equipmentAnchors)
-        .innerJoin(
-          equipment,
-          and(eq(equipmentAnchors.equipmentId, equipment.id), eq(equipment.clinicId, clinicId)),
-        )
-        .leftJoin(users, and(eq(equipmentAnchors.assertedById, users.id), eq(users.clinicId, clinicId)))
-        .where(
-          and(
-            eq(equipmentAnchors.clinicId, clinicId),
-            eq(equipmentAnchors.source, "sweep"),
-            isNotNull(equipment.homeRoomId),
-            isNull(equipment.deletedAt),
-          ),
-        )
-        .orderBy(desc(equipmentAnchors.assertedAt)),
+      lastSweptByRoom(clinicId),
     ]);
-
-    const lastSweptByRoomId = new Map<string, { lastSweptAt: string; lastSweptByName: string | null }>();
-    for (const row of sweepAnchorRows) {
-      if (!row.roomId || lastSweptByRoomId.has(row.roomId)) continue;
-      lastSweptByRoomId.set(row.roomId, {
-        lastSweptAt: new Date(row.assertedAt).toISOString(),
-        lastSweptByName: row.sweeperDisplayName || row.sweeperName || null,
-      });
-    }
 
     const countMap = new Map(counts.map((c) => [c.roomId, c]));
 
@@ -231,32 +241,13 @@ router.get("/:id", requireAuth, async (req, res) => {
     const recentlyVerified = counts?.recentlyVerified ?? 0;
 
     // "Last swept" (pre-PR review, MAJOR — mirrors the GET /api/rooms list
-    // handler's derivation above, scoped to this one room): the most recent
-    // source:"sweep" anchor among items currently HOMED to this room,
-    // joined to the asserting user's name. All-time, not shift-scoped (the
-    // client's copy for this surface is deliberately not "this shift").
-    const [lastSweep] = await db
-      .select({
-        assertedAt: equipmentAnchors.assertedAt,
-        sweeperName: users.name,
-        sweeperDisplayName: users.displayName,
-      })
-      .from(equipmentAnchors)
-      .innerJoin(
-        equipment,
-        and(eq(equipmentAnchors.equipmentId, equipment.id), eq(equipment.clinicId, clinicId)),
-      )
-      .leftJoin(users, and(eq(equipmentAnchors.assertedById, users.id), eq(users.clinicId, clinicId)))
-      .where(
-        and(
-          eq(equipmentAnchors.clinicId, clinicId),
-          eq(equipmentAnchors.source, "sweep"),
-          eq(equipment.homeRoomId, room.id),
-          isNull(equipment.deletedAt),
-        ),
-      )
-      .orderBy(desc(equipmentAnchors.assertedAt))
-      .limit(1);
+    // handler's derivation above, scoped to this one room via the shared
+    // lastSweptByRoom helper): the most recent source:"sweep" anchor among
+    // items currently HOMED to this room, joined to the asserting user's
+    // name. All-time, not shift-scoped (the client's copy for this surface
+    // is deliberately not "this shift").
+    const lastSweptMap = await lastSweptByRoom(clinicId, room.id);
+    const lastSweep = lastSweptMap.get(room.id);
 
     res.json({
       ...room,
@@ -266,8 +257,8 @@ router.get("/:id", requireAuth, async (req, res) => {
       issueCount: issue,
       recentlyVerifiedCount: recentlyVerified,
       linkedPatientName: null,
-      lastSweptAt: lastSweep ? new Date(lastSweep.assertedAt).toISOString() : null,
-      lastSweptByName: lastSweep ? lastSweep.sweeperDisplayName || lastSweep.sweeperName || null : null,
+      lastSweptAt: lastSweep?.lastSweptAt ?? null,
+      lastSweptByName: lastSweep?.lastSweptByName ?? null,
     });
   } catch (err) {
     console.error(err);

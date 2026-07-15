@@ -321,4 +321,56 @@ describe.skipIf(!DATABASE_URL)("GET /api/rooms — present-vs-expected readiness
     expect(icu!.expectedFill).toBe(1);
     expect(icu!.atHomeCount).toBe(0);
   });
+
+  it("S2-9 (cross-clinic isolation): a second clinic's homed+at_home equipment must not count in clinic A's expectedFill/atHomeCount", async () => {
+    const otherClinicId = randomUUID();
+    const otherUserId = randomUUID();
+    const otherRoomId = randomUUID();
+    const otherAssetTypeId = randomUUID();
+    const otherDockId = randomUUID();
+    const otherEqId = randomUUID();
+
+    await seedClinic(otherClinicId);
+    await seedUser(otherUserId, otherClinicId);
+    await seedRoom(otherRoomId, otherClinicId, "Other Clinic Room");
+    await seedAssetType(otherAssetTypeId, otherClinicId, "Other Clinic Type");
+    await seedDock(otherDockId, otherClinicId, otherRoomId, otherAssetTypeId, "Other Clinic Dock");
+    await seedEquipment(otherEqId, otherClinicId, {
+      name: "Other Clinic Pump",
+      homeRoomId: otherRoomId,
+      assetTypeId: otherAssetTypeId,
+      custodyState: "returned",
+    });
+    await createAnchor(db, {
+      clinicId: otherClinicId,
+      equipmentId: otherEqId,
+      dockId: otherDockId,
+      roomId: otherRoomId,
+      source: "citizen",
+    });
+
+    try {
+      const res = await api("/api/rooms");
+      expect(res.status).toBe(200);
+      const rooms = res.json as Array<Record<string, unknown>>;
+
+      // Clinic B's room is entirely invisible in clinic A's list.
+      expect(rooms.some((r) => r.id === otherRoomId)).toBe(false);
+
+      // Clinic A's empty room stays at zero — unaffected by clinic B's homed/at_home item.
+      const storage = rooms.find((r) => r.id === ctx.emptyRoomId);
+      expect(storage).toBeDefined();
+      expect(storage!.expectedFill).toBe(0);
+      expect(storage!.atHomeCount).toBe(0);
+    } finally {
+      const P = probePool!;
+      await P.query(`DELETE FROM vt_equipment_anchors WHERE clinic_id = $1`, [otherClinicId]);
+      await P.query(`DELETE FROM vt_equipment WHERE clinic_id = $1`, [otherClinicId]);
+      await P.query(`DELETE FROM vt_docks WHERE clinic_id = $1`, [otherClinicId]);
+      await P.query(`DELETE FROM vt_asset_types WHERE clinic_id = $1`, [otherClinicId]);
+      await P.query(`DELETE FROM vt_rooms WHERE clinic_id = $1`, [otherClinicId]);
+      await P.query(`DELETE FROM vt_users WHERE clinic_id = $1`, [otherClinicId]);
+      await P.query(`DELETE FROM vt_clinics WHERE id = $1`, [otherClinicId]);
+    }
+  });
 });
