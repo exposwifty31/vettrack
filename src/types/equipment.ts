@@ -588,6 +588,14 @@ export interface DockingReconciliationBucketItem {
  * buckets (unassigned/noStation/byDock, still consumed by
  * AdminHomeAssignmentPage) plus the P3 full 8-bucket classifier breakdown
  * (counts + byBucket) for the Manager reconciliation worklist.
+ *
+ * M-5 (phase review): `byBucket.at_home` / `byBucket.checked_out` are
+ * trimmed to counts-only (empty arrays) — those two buckets are potentially
+ * the whole fleet, and the client only ever renders their `counts`
+ * (BucketCountsSummary); ReconciliationWorklist's per-item sections only
+ * iterate the 4 drift buckets. The other 6 bucket keys (the 4 drift buckets
+ * + unassigned/no_station) still carry full item lists. `counts` is always
+ * complete for all 8 buckets.
  */
 export interface DockingReconciliation {
   unassigned: DockingReconciliationItem[];

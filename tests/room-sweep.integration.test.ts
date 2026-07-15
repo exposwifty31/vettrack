@@ -403,6 +403,35 @@ describe.skipIf(!DATABASE_URL)("docking room sweep (T3.2a) integration", () => {
       expect(isRecord(call.metadata) && (call.metadata as Record<string, unknown>).missing).toBe(1);
     });
 
+    it("D-9 defense-in-depth (M-1, phase review): excludes an item with a holder even if custodyState diverges from 'checked_out'", async () => {
+      const divergentId = randomUUID();
+      await seedEquipment(divergentId, ctx.clinicId, {
+        name: "Divergent-State Pump",
+        homeRoomId: ctx.roomId,
+        assetTypeId: ctx.assetTypeId,
+        // custodyState deliberately NOT "checked_out" — checkedOutById is
+        // the field the GET classifier keys "never sweep" on
+        // (classifyReconciliationBucket checks checkedOutById first), so a
+        // divergence here must still be excluded from the sweep's writable set.
+        custodyState: "returned",
+        checkedOutById: ctx.userId,
+        checkedOutByEmail: "holder@ops.local",
+      });
+
+      const res = await api(`/api/docking/rooms/${ctx.roomId}/sweep`, "POST", {
+        confirmedEquipmentIds: [divergentId], // even explicitly confirmed
+      });
+
+      expect(res.status).toBe(200);
+      expect(isRecord(res.json)).toBe(true);
+      if (!isRecord(res.json)) throw new Error("Expected response to be an object");
+      expect(res.json.confirmedCount).toBe(0);
+      expect(res.json.missingCount).toBe(0);
+
+      // Never anchored, never contradicted — silently excluded from the writable set.
+      expect(await anchorCount(divergentId)).toBe(0);
+    });
+
     it("silently ignores a confirmed id that is checked-out or foreign to the room (no error, no anchor)", async () => {
       const restingId = randomUUID();
       const checkedOutId = randomUUID();

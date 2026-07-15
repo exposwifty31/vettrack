@@ -6,12 +6,26 @@
  * nears its end. Mirrors staleCheckoutSweepWorker.ts / stale-returned-sweep.worker.ts's
  * BullMQ + `runX(now)` + `__test` + `QUEUE_DISABLED_NO_REDIS` shape.
  *
- * Shift-end = the Coordinator's OWN active shift (resolved via
- * `resolveCurrentRole`, reusing role-resolution.ts's roster window + shift-
- * adjustment handling), not the roster slot that first surfaced the clinic
- * as "has an active shift". If the Coordinator is `unresolved` (nobody
- * on shift) — or ambiguous (`needs_confirmation`, nobody confirmed yet) —
- * there is no single identity to escalate from, so the clinic is skipped.
+ * Shift-end = the responsible identity's OWN shift row for (clinicId,
+ * shiftDate), matched by normalized employee name directly against
+ * `vt_shifts` (`findOwnShiftRow`) — NOT `resolveCurrentRole`, whose
+ * active-shift query is `endTime > now` strict and would return
+ * `activeShift: null` the instant the shift ends (phase-review I-1: that
+ * gate made stage 4 unreachable in production, since `minutesToEnd` could
+ * never go <= 0). The candidate scan (`findActiveShiftClinicDates`) also
+ * includes shifts that ended within the last `SWEEP_INTERVAL_MS`, so the
+ * first tick after shift-end still processes the clinic (a post-end grace
+ * window for the terminal stage only — `isShiftSweepComplete` still
+ * short-circuits a finished sweep before any stage fires).
+ *
+ * Responsible identity: normally the Coordinator (`resolveShiftCoordinator`
+ * status `auto`/`confirmed`/`fallback_senior`), ladder starts at stage 1.
+ * When status is `needs_confirmation` (multiple eligible, nobody confirmed)
+ * AND a senior tech is on shift, the ladder still runs — with the senior as
+ * the responsible identity, starting at stage 2 (phase-review I-2: this was
+ * the highest-risk, most-diffuse-accountability case, and previously got
+ * ZERO escalation). Only `unresolved` (no coordinator AND no senior — truly
+ * nobody to escalate to) is skipped.
  *
  * Idempotency: `vt_shift_equipment_coordinator.escalation_stage` only ever
  * advances (`targetStage > current`) — a stage's notification never re-fires
@@ -19,11 +33,11 @@
  * (derived, never confirmed) may not have a stored row yet.
  */
 import { randomUUID } from "crypto";
-import { and, eq, sql } from "drizzle-orm";
+import { and, asc, eq, inArray } from "drizzle-orm";
 import { Queue, Worker } from "bullmq";
 import { db, shifts, users, shiftEquipmentCoordinator } from "../db.js";
 import { resolveShiftCoordinator } from "../services/equipment-coordinator.service.js";
-import { resolveCurrentRole, type PermanentVetTrackRole } from "../lib/role-resolution.js";
+import { normalizeName, normalizeNameKey } from "../lib/role-resolution.js";
 import { timeToMinutes } from "../lib/shift-adjustment-window.js";
 import {
   computeEscalationStage,
@@ -132,35 +146,85 @@ interface ActiveShiftClinicDate {
 }
 
 /**
- * Distinct (clinic, date) pairs with at least one roster shift active right
- * now — the same window predicate `resolveCurrentRole` uses for its own
- * roster match (server/lib/role-resolution.ts), duplicated locally (as
- * role-notification-scheduler.ts's own `getActiveShiftRows` already does)
- * since role-resolution.ts doesn't export its local time helpers.
+ * Distinct (clinic, date) pairs with at least one roster shift EITHER active
+ * right now OR that ended within the last `SWEEP_INTERVAL_MS` (I-1 fix —
+ * the post-end grace window). Without the grace window, a clinic drops out
+ * of this candidate scan at the exact instant its shift ends, and stage 4
+ * (which only fires once `minutesToEnd <= 0`) can never be reached in
+ * production. Restricted to shifts dated today/yesterday (mirrors the
+ * roster window `resolveCurrentRole` uses for its own shift match,
+ * server/lib/role-resolution.ts) to keep the scan bounded; overnight shifts
+ * are resolved via `shiftStartAsDate`/`shiftEndAsDate` (defined above),
+ * which already roll the end onto the next calendar day.
  */
 async function findActiveShiftClinicDates(now: Date): Promise<ActiveShiftClinicDate[]> {
   const currentDate = toLocalDateString(now);
-  const currentTime = toLocalTimeString(now);
   const previousDate = new Date(now);
   previousDate.setDate(now.getDate() - 1);
   const yesterday = toLocalDateString(previousDate);
+  const graceCutoff = new Date(now.getTime() - SWEEP_INTERVAL_MS);
 
   const rows = await db
-    .selectDistinct({ clinicId: shifts.clinicId, shiftDate: shifts.date })
+    .select({ clinicId: shifts.clinicId, shiftDate: shifts.date, startTime: shifts.startTime, endTime: shifts.endTime })
     .from(shifts)
-    .where(
-      sql`(
-        (${shifts.date} = ${currentDate}::date AND (
-          (${shifts.startTime} <= ${shifts.endTime} AND ${shifts.startTime} <= ${currentTime}::time AND ${shifts.endTime} > ${currentTime}::time)
-          OR
-          (${shifts.startTime} > ${shifts.endTime} AND ${currentTime}::time >= ${shifts.startTime})
-        ))
-        OR
-        (${shifts.date} = ${yesterday}::date AND ${shifts.startTime} > ${shifts.endTime} AND ${currentTime}::time < ${shifts.endTime})
-      )`,
-    );
+    .where(inArray(shifts.date, [currentDate, yesterday]));
 
-  return rows.map((r) => ({ clinicId: r.clinicId, shiftDate: r.shiftDate }));
+  const seen = new Set<string>();
+  const result: ActiveShiftClinicDate[] = [];
+  for (const row of rows) {
+    const start = shiftStartAsDate(row.shiftDate, row.startTime);
+    const end = shiftEndAsDate(row.shiftDate, row.startTime, row.endTime);
+    const activeNow = start <= now && now < end;
+    const recentlyEnded = end <= now && end >= graceCutoff;
+    if (!activeNow && !recentlyEnded) continue;
+
+    const key = `${row.clinicId}:${row.shiftDate}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    result.push({ clinicId: row.clinicId, shiftDate: row.shiftDate });
+  }
+  return result;
+}
+
+interface OwnShiftRow {
+  date: string;
+  startTime: string;
+  endTime: string;
+}
+
+/**
+ * The responsible identity's OWN shift row for (clinicId, shiftDate),
+ * matched by the same normalized-name key role-resolution.ts /
+ * equipment-coordinator.service.ts use to bridge `vt_shifts.employee_name`
+ * text rows to `vt_users` (first row wins, in start-time order, for
+ * determinism when someone is double-booked — mirrors
+ * equipment-coordinator.service.ts's `matchOnShiftUsers`).
+ *
+ * I-1 fix: unlike `resolveCurrentRole`, this does NOT gate on the shift
+ * still being active — the caller needs the shift's end time even after it
+ * has ended (the post-end escalation grace window), and
+ * `resolveCurrentRole`'s own active-shift query (`endTime > now` strict)
+ * would return `activeShift: null` at that point. This intentionally does
+ * NOT apply approved shift-adjustments (leave_early/extend) the way
+ * `resolveCurrentRole` does — a direct roster-row lookup is the simpler,
+ * more reliable source for a shift-end that must still resolve post-end.
+ */
+async function findOwnShiftRow(clinicId: string, shiftDate: string, userName: string): Promise<OwnShiftRow | null> {
+  const key = normalizeNameKey(normalizeName(userName));
+  if (!key) return null;
+
+  const rows = await db
+    .select({ date: shifts.date, startTime: shifts.startTime, endTime: shifts.endTime, employeeName: shifts.employeeName })
+    .from(shifts)
+    .where(and(eq(shifts.clinicId, clinicId), eq(shifts.date, shiftDate)))
+    .orderBy(asc(shifts.startTime));
+
+  for (const row of rows) {
+    if (normalizeNameKey(normalizeName(row.employeeName)) === key) {
+      return { date: row.date, startTime: row.startTime, endTime: row.endTime };
+    }
+  }
+  return null;
 }
 
 interface FireStageParams {
@@ -189,6 +253,11 @@ async function fireEscalationStage(params: FireStageParams): Promise<void> {
       url: "/docking",
     });
   } else if (targetStage === 2) {
+    // M-3: a coordinator-only shift (no senior tech on shift) has nobody to
+    // notify at stage 2 — the row/audit/metric still advance (idempotency
+    // must still hold), but the notification is a no-op. This is
+    // intentional: the coordinator already got stage 1, and stage 4's
+    // manager push (I-1 fix, now actually reachable) is the safety net.
     if (seniorTechUserId) {
       const copy = await resolveStageCopy(clinicId, 2, seniorTechUserId);
       await sendPushToUser(clinicId, seniorTechUserId, {
@@ -199,6 +268,7 @@ async function fireEscalationStage(params: FireStageParams): Promise<void> {
       });
     }
   } else if (targetStage === 3) {
+    // M-3: same no-senior-to-notify case as stage 2 above.
     if (seniorTechUserId) {
       const copy = await resolveStageCopy(clinicId, 3, seniorTechUserId);
       await sendPushToUser(clinicId, seniorTechUserId, {
@@ -268,36 +338,49 @@ export async function runSweepEscalation(now = new Date()): Promise<{ shiftsChec
 
   for (const { clinicId, shiftDate } of activeShiftDates) {
     const resolution = await resolveShiftCoordinator(clinicId, shiftDate);
-    // `unresolved` (nobody on shift) and `needs_confirmation` (ambiguous,
-    // nobody confirmed) both leave coordinatorUserId null — no single
-    // identity to escalate from, so skip.
-    if (!resolution.coordinatorUserId) continue;
 
-    const [coordinatorUser] = await db
-      .select({ id: users.id, name: users.name, displayName: users.displayName, role: users.role })
+    // `unresolved` (nobody on shift, no senior either) — no identity at all
+    // to escalate from, skip. Every other status resolves a responsible
+    // identity below, including `needs_confirmation` (I-2 fix, see the
+    // else-if branch).
+    if (resolution.status === "unresolved") continue;
+
+    let responsibleUserId: string;
+    let floorStage: 1 | 2;
+    if (resolution.coordinatorUserId) {
+      responsibleUserId = resolution.coordinatorUserId;
+      floorStage = 1;
+    } else if (resolution.status === "needs_confirmation" && resolution.seniorTechUserId) {
+      // I-2: multiple eligible, nobody confirmed — no single coordinator to
+      // remind (stage 1 is skipped below), but a senior tech IS on shift,
+      // so the ladder still runs for them starting at stage 2.
+      responsibleUserId = resolution.seniorTechUserId;
+      floorStage = 2;
+    } else {
+      continue; // needs_confirmation with no senior on shift either — nobody to escalate to
+    }
+
+    const [responsibleUser] = await db
+      .select({ id: users.id, name: users.name, displayName: users.displayName })
       .from(users)
-      .where(and(eq(users.id, resolution.coordinatorUserId), eq(users.clinicId, clinicId)))
+      .where(and(eq(users.id, responsibleUserId), eq(users.clinicId, clinicId)))
       .limit(1);
-    if (!coordinatorUser) continue;
+    if (!responsibleUser) continue;
 
-    const coordinatorRole = await resolveCurrentRole({
-      clinicId,
-      userId: coordinatorUser.id,
-      userName: coordinatorUser.displayName || coordinatorUser.name,
-      fallbackRole: (coordinatorUser.role as PermanentVetTrackRole) || "technician",
-      now,
-    });
-    const activeShift = coordinatorRole.activeShift;
-    if (!activeShift) continue; // the Coordinator's own shift can't be located — nothing to time against
+    const shiftRow = await findOwnShiftRow(clinicId, shiftDate, responsibleUser.displayName || responsibleUser.name);
+    if (!shiftRow) continue; // the responsible identity's own shift row can't be located — nothing to time against
 
-    const shiftEnd = shiftEndAsDate(activeShift.date, activeShift.startTime, activeShift.endTime);
-    const shiftStart = shiftStartAsDate(activeShift.date, activeShift.startTime);
+    const shiftEnd = shiftEndAsDate(shiftRow.date, shiftRow.startTime, shiftRow.endTime);
+    const shiftStart = shiftStartAsDate(shiftRow.date, shiftRow.startTime);
     const minutesToEnd = (shiftEnd.getTime() - now.getTime()) / 60_000;
 
     const complete = await isShiftSweepComplete(clinicId, { shiftStart, now });
     if (complete) continue; // sweep done — escalation stops (never rolls a reached stage back down)
 
-    const targetStage = computeEscalationStage(minutesToEnd);
+    let targetStage = computeEscalationStage(minutesToEnd);
+    // I-2: needs_confirmation has no single coordinator to remind — a raw
+    // stage-1 reading is not escalated (floored back to 0, i.e. "not yet").
+    if (floorStage === 2 && targetStage === 1) targetStage = 0;
     if (targetStage === 0) continue;
 
     const [existingRow] = await db
@@ -317,9 +400,14 @@ export async function runSweepEscalation(now = new Date()): Promise<{ shiftsChec
       clinicId,
       shiftDate,
       targetStage,
-      coordinatorUserId: resolution.coordinatorUserId,
+      // needs_confirmation has no confirmed coordinator to store — the
+      // senior fills that slot (I-2: "record the senior as the
+      // coordinator/responsible for this shift when it starts escalating").
+      coordinatorUserId: responsibleUserId,
       seniorTechUserId: resolution.seniorTechUserId,
-      source: resolution.status === "confirmed" || resolution.status === "fallback_senior" ? resolution.status : "auto",
+      source: resolution.coordinatorUserId
+        ? (resolution.status === "confirmed" || resolution.status === "fallback_senior" ? resolution.status : "auto")
+        : "fallback_senior",
       now,
     });
     escalated++;

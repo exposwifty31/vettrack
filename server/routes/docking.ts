@@ -192,7 +192,9 @@ type LatestAnchorRow = {
  *  - the full P3 8-bucket breakdown (T3.1 classifyReconciliationBucket) as
  *    `counts` (0-filled for every bucket) + `byBucket` (items grouped by
  *    bucket, enriched with homeDockId/Name + homeRoomId for the Manager
- *    worklist's "assign home" action).
+ *    worklist's "assign home" action). M-5 (phase review): `at_home` /
+ *    `checked_out` are trimmed to counts-only in `byBucket` — potentially
+ *    the whole fleet, and the client only renders their counts.
  */
 router.get("/reconciliation", requireAuth, async (req, res) => {
   const clinicId = req.clinicId!;
@@ -264,17 +266,24 @@ router.get("/reconciliation", requireAuth, async (req, res) => {
     });
 
     counts[bucket]++;
-    byBucket[bucket].push({
-      id: item.id,
-      name: item.name,
-      bucket,
-      custodyState: item.custodyState,
-      checkedOutById: item.checkedOutById,
-      checkedOutByEmail: item.checkedOutByEmail,
-      homeDockId: homeDock?.id ?? null,
-      homeDockName: homeDock?.name ?? null,
-      homeRoomId: item.homeRoomId,
-    });
+    // M-5: `at_home`/`checked_out` are potentially the whole fleet, and the
+    // client only ever renders their `counts` (BucketCountsSummary), never
+    // their item lists — DriftBucketSection only iterates the 4 drift
+    // buckets. Trim those two to counts-only; keep full item lists for the
+    // drift buckets + unassigned/no_station.
+    if (bucket !== "at_home" && bucket !== "checked_out") {
+      byBucket[bucket].push({
+        id: item.id,
+        name: item.name,
+        bucket,
+        custodyState: item.custodyState,
+        checkedOutById: item.checkedOutById,
+        checkedOutByEmail: item.checkedOutByEmail,
+        homeDockId: homeDock?.id ?? null,
+        homeDockName: homeDock?.name ?? null,
+        homeRoomId: item.homeRoomId,
+      });
+    }
   }
 
   res.json({ unassigned, noStation, byDock, counts, byBucket });
@@ -490,6 +499,13 @@ router.post(
               eq(equipment.homeRoomId, roomId),
               isNull(equipment.deletedAt),
               ne(equipment.custodyState, "checked_out"),
+              // M-1 (D-9 defense-in-depth): the GET /reconciliation classifier
+              // keys "never sweep" on `checkedOutById` (checked-out-first, see
+              // docking.service.ts's classifyReconciliationBucket), not
+              // `custodyState`. Exclude items with a holder here too, so the
+              // sweep POST's writable set can't diverge from the GET's if the
+              // two fields ever get out of sync.
+              isNull(equipment.checkedOutById),
             ),
           ),
       ]);

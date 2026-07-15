@@ -3,14 +3,17 @@
  * %" and becomes present-vs-expected: at_home / expected_fill (design §6.4).
  *
  * `roomPct` CHANGES MEANING here to present-vs-expected. The old scan metric
- * is preserved as `roomScanPct` (the previous body of `roomPct`).
+ * was preserved as `roomScanPct` (the previous body of `roomPct`) but had no
+ * consumer; dropped as dead code (M-4, phase review — `recentlyVerifiedCount`
+ * stays on the `Room` type / rooms GET, so the underlying data is still
+ * available if a future surface wants it).
  *
  * Pure unit test — no DB, no React render.
  * Run: pnpm test tests/room-readiness-present-expected.test.ts
  */
 
 import { describe, expect, it } from "vitest";
-import { roomPct, roomScanPct } from "../src/features/today/surfaces/ops/ops-tile-helpers";
+import { roomPct } from "../src/features/today/surfaces/ops/ops-tile-helpers";
 import type { Room } from "../src/types";
 
 function room(overrides: Partial<Room> = {}): Room {
@@ -39,15 +42,5 @@ describe("roomPct — present-vs-expected (T3.3)", () => {
 
   it("returns null (NOT 0) when expectedFill is undefined", () => {
     expect(roomPct(room({ expectedFill: undefined, atHomeCount: 2 }))).toBeNull();
-  });
-});
-
-describe("roomScanPct — preserved old scan-verification metric", () => {
-  it("returns Math.round(recentlyVerifiedCount / totalEquipment * 100)", () => {
-    expect(roomScanPct(room({ totalEquipment: 4, recentlyVerifiedCount: 2 }))).toBe(50);
-  });
-
-  it("returns null when totalEquipment is 0", () => {
-    expect(roomScanPct(room({ totalEquipment: 0, recentlyVerifiedCount: 0 }))).toBeNull();
   });
 });

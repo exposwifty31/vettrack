@@ -189,6 +189,12 @@ export async function confirmShiftCoordinator(
         coordinatorUserId: input.coordinatorUserId,
         source: "confirmed",
         assignedByUserId: input.assignedByUserId,
+        // M-2 (phase review): (re)confirming a coordinator restarts the
+        // sweep-escalation ladder for them rather than leaving it wherever
+        // the PRIOR coordinator's escalation had reached.
+        escalationStage: 0,
+        currentResponsibleUserId: null,
+        escalatedAt: null,
       },
     })
     .returning();

@@ -73,7 +73,31 @@ Execution: subagent-driven development with TDD, per-task review + per-phase rev
 
 ## P3 — Room Sweep + reconciliation
 
-_pending_
+**Scope:** the reconciliation bucket classifier (T3.1, 8 buckets §6.2, D-9 ladder); Room Sweep server endpoints + mobile-first UI (T3.2); present-vs-expected room readiness (T3.3); the Equipment Coordinator model — eligibility flag + per-shift auto-derivation + visibility (T3.4-i) and the escalation ladder (T3.4-ii); the `staleReturnedSweep` nudge worker (T3.5); the full 8-bucket reconciliation endpoint + manager worklist (T3.6). Migrations 166 (coordinator flag + table) + 167 (escalation columns). Range `3597bbf0a..<head>` (17 commits, 53 files, +6863/−67, after merging origin/main #104).
+
+### Design decisions captured this phase
+- **Equipment Coordinator model (owner-confirmed 2026-07-15):** eligibility = a new `vt_users.is_equipment_coordinator` flag (NOT `secondaryRole` — that's single-valued authority-elevation, wrong semantics). Per-shift Coordinator auto-derived from roster ∩ eligibility: exactly one eligible → auto; multiple → Senior Tech confirms among them; none → Senior Tech fallback. Roster↔user by role-resolution's normalized-name match (`vt_shifts` has `employeeName`, no `userId`). Senior-tech via the `lead_technician≡senior_technician` alias (authority-roles), not ROLE_LEVELS.
+- **Escalation ladder (owner-confirmed part of P3, NOT a fast-follow):** Coordinator→Senior→all+manager at **60/40/20/end** minutes (tunable). "Sweep complete" = every room with homed equipment has a `source:"sweep"` anchor within the shift window.
+- **Room-sweep surface (owner-confirmed):** mobile-first floor tool from room-radar (native-shell reachable); reconciliation worklist = web management on AdminHomeAssignmentPage.
+- **#104 merge:** merged origin/main (vite chunking + lazy-`en` locale + CI shard/check-name changes) into the P3 branch — ZERO conflicts (i18n.ts auto-merged); full suite 5089 green post-merge confirms the lazy-`en` reconciliation.
+
+### Phase review (opus, code-reviewer) — CHANGES-REQUIRED (narrow) → **APPROVE after I-1/I-2 fixes** · 0 Critical · 2 Important · 5 Minor
+
+**Adjudications (verified sound against live source):** multi-tenancy clean across every new query (reconciliation DISTINCT ON, sweep GET/POST, coordinator resolver, rooms readiness joins, escalation completion — all `clinicId`-scoped; migration unique index includes `clinic_id`; un-scoped `inArray` anchor lookups safe on globally-unique UUIDs); migrations 166/167 additive/idempotent; **`rooms-list.tsx` NOT touched** (boundary held); D-9 (checked-out first in classifier; sweep excludes checked-out; never bucketed missing); D-13 (sweep→`source:"sweep"`, unconfirmed→`sweep_missing`); coordinator correctness (flag not secondaryRole; normalized-name reuse; senior alias); no N+1 (single latest-anchor-per-item query; the partial unique index makes the two `currentAnchor` derivations provably equivalent); bounded telemetry + closed audit union; i18n hand-wired + runtime-resolving; frozen surfaces untouched.
+
+| ID | Sev | Finding | Resolution |
+|---|---|---|---|
+| **I-1** | Important | Escalation **stage 4 (manager notify + open-to-all) is unreachable in prod**: the worker only processes still-active shifts (`endTime > now` strict) and sources shift-end via `resolveCurrentRole` (same strict gate), so `minutesToEnd` is always > 0 → max reachable stage 3. Tests masked it (pure `computeEscalationStage(0)` in isolation; the only past-end integration test seeds a COMPLETE sweep → short-circuits). | **FIXED** (p3-review-fix, this commit): post-end grace window — candidate scan includes shifts ended within the last `SWEEP_INTERVAL_MS`; shift-end sourced directly from the coordinator's shift row (not the active-shift gate). New RED-first integration test: incomplete sweep one tick past shift-end → `escalation_stage===4` + manager `sendPushToRole`. |
+| **I-2** | Important | `needs_confirmation` coordinator (multiple eligible, none confirmed — the diffuse-accountability, highest-risk case) is skipped like `unresolved`, so the ladder is fully suppressed even when a senior is on shift. | **FIXED** (p3-review-fix, this commit): when `needs_confirmation` + senior present, run the ladder with the senior as responsible from **stage 2** (skip stage 1). Keep skipping `unresolved`. RED-first test. |
+| **M-1** | Minor | Sweep POST excludes checked-out by `custodyState`; GET/classifier key on `checkedOutById` (D-9 defense-in-depth). | **FIXED**: POST filter also excludes `isNotNull(checkedOutById)` to match GET's exact D-9 semantics. |
+| **M-2** | Minor | `confirmShiftCoordinator` reconfirm doesn't reset escalation fields → confirming a new coordinator mid-escalation leaves the ladder at the prior stage. | **FIXED**: `onConflictDoUpdate` resets `escalation_stage=0`/`current_responsible_user_id=null`/`escalated_at=null`. (The stored-coordinator eligibility re-validation the reviewer noted is a larger change — deferred.) |
+| **M-3** | Minor | No-senior shift: stages 2/3 advance silently (no push). | **FIXED**: documented intentional (no senior to notify; coordinator got stage 1; stage-4 manager push — now reachable via I-1 — is the safety net). |
+| **M-4** | Minor | `roomScanPct` exported but unused (`knip` would flag). | **FIXED**: dropped the dead helper (the `recentlyVerifiedCount` data remains on the Room type for future use). |
+| **M-5** | Minor | Reconciliation `byBucket` returns full `at_home`/`checked_out` item lists (whole fleet) but the page renders 4 drift buckets. | **FIXED**: return counts-only for the accounted buckets; full item lists for the drift + setup buckets; `counts` complete for all 8. |
+
+**Informational (verified intended):** `HomeTabletDashboard`'s own local `roomPct` (old verification formula) is out-of-P3-scope and left untouched — a cross-surface consistency note, not a P3 defect.
+
+**P3 verdict:** APPROVE after I-1/I-2 (+ the cheap minors) fixed in this commit. Live RTL/device visual pass for the sweep + worklist deferred to a dev-bypass/device-audit env (same rationale as P1/P2). The `needs_confirmation`+`unresolved`-with-no-senior case and stored-coordinator eligibility re-validation carry to the final whole-branch review.
 
 ## P4 — Charging integration
 

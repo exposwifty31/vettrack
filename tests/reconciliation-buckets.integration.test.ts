@@ -262,7 +262,7 @@ describe.skipIf(!DATABASE_URL)("docking reconciliation full 8-bucket breakdown (
     expect(rows[0]?.ok).toBe(1);
   });
 
-  it("byBucket.at_home / counts.at_home include a homed+categorized item anchored at its home dock", async () => {
+  it("counts.at_home reflects a homed+categorized item anchored at its home dock; byBucket.at_home is trimmed to counts-only (M-5, phase review)", async () => {
     const eqId = randomUUID();
     await seedEquipment(eqId, ctx.clinicId, {
       home_room_id: ctx.roomId,
@@ -287,22 +287,18 @@ describe.skipIf(!DATABASE_URL)("docking reconciliation full 8-bucket breakdown (
     if (!isRecord(counts)) throw new Error("Expected counts to be an object");
     expect(getNumber(counts, "at_home")).toBe(1);
 
+    // M-5: at_home is potentially the whole fleet and the client only
+    // renders its count — byBucket.at_home is trimmed to an empty array.
     const byBucket = res.json.byBucket;
     expect(isRecord(byBucket)).toBe(true);
     if (!isRecord(byBucket)) throw new Error("Expected byBucket to be an object");
     const atHome = byBucket.at_home;
     expect(isArray(atHome)).toBe(true);
     if (!isArray(atHome)) throw new Error("Expected byBucket.at_home to be an array");
-    const item = atHome.find((e) => isRecord(e) && getString(e, "id") === eqId);
-    expect(item).toBeDefined();
-    if (!isRecord(item)) throw new Error("Expected item to be an object");
-    expect(getString(item, "bucket")).toBe("at_home");
-    expect(getString(item, "homeDockId")).toBe(ctx.dockId);
-    expect(getString(item, "homeDockName")).toBe("ICU Pump Dock");
-    expect(getString(item, "homeRoomId")).toBe(ctx.roomId);
+    expect(atHome.length).toBe(0);
   });
 
-  it("byBucket.checked_out includes a checked-out item — never missing, regardless of anchor history", async () => {
+  it("counts.checked_out reflects a checked-out item — never counted as missing, regardless of anchor history; byBucket.checked_out is trimmed to counts-only (M-5, phase review)", async () => {
     const eqId = randomUUID();
     await seedEquipment(eqId, ctx.clinicId, {
       home_room_id: ctx.roomId,
@@ -323,17 +319,15 @@ describe.skipIf(!DATABASE_URL)("docking reconciliation full 8-bucket breakdown (
     expect(getNumber(counts, "checked_out")).toBe(1);
     expect(getNumber(counts, "missing")).toBe(0);
 
+    // M-5: checked_out is potentially the whole fleet — byBucket.checked_out
+    // is trimmed to an empty array; counts is still the source of truth.
     const byBucket = res.json.byBucket;
     expect(isRecord(byBucket)).toBe(true);
     if (!isRecord(byBucket)) throw new Error("Expected byBucket to be an object");
     const checkedOut = byBucket.checked_out;
     expect(isArray(checkedOut)).toBe(true);
     if (!isArray(checkedOut)) throw new Error("Expected byBucket.checked_out to be an array");
-    const item = checkedOut.find((e) => isRecord(e) && getString(e, "id") === eqId);
-    expect(item).toBeDefined();
-    if (!isRecord(item)) throw new Error("Expected item to be an object");
-    expect(getString(item, "checkedOutById")).toBe(ctx.userId);
-    expect(getString(item, "checkedOutByEmail")).toBe("holder@ops.local");
+    expect(checkedOut.length).toBe(0);
 
     const missing = byBucket.missing;
     expect(isArray(missing)).toBe(true);

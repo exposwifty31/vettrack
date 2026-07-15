@@ -383,4 +383,121 @@ describe.skipIf(!DATABASE_URL)("sweep-escalation (P3 T3.4-ii) integration", () =
 
     expect(sendPushToRole).not.toHaveBeenCalled();
   });
+
+  // ─── I-1 (phase review) — stage 4 post-end grace window ──────────────────
+  //
+  // Bug: the worker only scanned clinics with a STILL-ACTIVE shift
+  // (`endTime > now` strict), and sourced the coordinator's own shift-end via
+  // `resolveCurrentRole`, whose active-shift query is ALSO `endTime > now`
+  // strict. At the instant `minutesToEnd` hits 0, the clinic has already
+  // dropped out of BOTH gates — so `computeEscalationStage` never sees a
+  // value <= 0, and stage 4 (open to all + manager notified) is unreachable
+  // in production. Fix: (a) the candidate scan also includes shifts that
+  // ended within the last SWEEP_INTERVAL_MS, and (b) the responsible
+  // identity's shift-end is read directly from their own `vt_shifts` row
+  // (normalized-name match), not through `resolveCurrentRole`'s gate.
+  it("I-1: an incomplete sweep one tick past shift-end (within the grace window) reaches stage 4 and notifies the managers", async () => {
+    // 18:00 SHIFT_END + 5 minutes — one tick past end, still inside the
+    // 10-minute SWEEP_INTERVAL_MS grace window, sweep still incomplete
+    // (no anchors seeded for either homed room in this test's ctx).
+    const pastEnd = localDateTime(2026, 2, 2, 18, 5);
+    const result = await runSweepEscalation(pastEnd);
+    expect(result.escalated).toBeGreaterThanOrEqual(1);
+
+    const row = await getCoordinatorRow(ctx.clinicId, ctx.shiftDate);
+    expect(row?.escalation_stage).toBe(4);
+    expect(row?.current_responsible_user_id).toBeNull(); // stage 4 opens to all — no single responsible party
+
+    expect(sendPushToRole).toHaveBeenCalledWith(ctx.clinicId, "admin", expect.any(Object));
+    expect(sendPushToRole).toHaveBeenCalledWith(ctx.clinicId, "vet", expect.any(Object));
+    expect(incrementMetric).toHaveBeenCalledWith("sweep_escalation_stage_4_fired");
+    expect(logAudit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        clinicId: ctx.clinicId,
+        actionType: "room_sweep_escalated",
+        metadata: expect.objectContaining({ stage: 4 }),
+      }),
+    );
+  });
+
+  it("I-1: a shift more than SWEEP_INTERVAL_MS past its end is out of the grace window — no longer a candidate", async () => {
+    // 18:00 SHIFT_END + 15 minutes — outside the 10-minute grace window.
+    const wayPastEnd = localDateTime(2026, 2, 2, 18, 15);
+    const result = await runSweepEscalation(wayPastEnd);
+    expect(result.escalated).toBe(0);
+    expect(result.shiftsChecked).toBe(0);
+
+    const row = await getCoordinatorRow(ctx.clinicId, ctx.shiftDate);
+    expect(row).toBeNull();
+  });
+
+  // ─── I-2 (phase review) — needs_confirmation still escalates to the senior ─
+  //
+  // Bug: `if (!resolution.coordinatorUserId) continue;` skipped BOTH
+  // `unresolved` (correctly — nobody on shift at all) AND
+  // `needs_confirmation` (multiple eligible techs, nobody confirmed) even
+  // though `resolveShiftCoordinator` independently derives a
+  // `seniorTechUserId` for the needs_confirmation case. So the
+  // highest-risk, most-diffuse-accountability shift got ZERO escalation.
+  // Fix: when status is `needs_confirmation` AND a senior is on shift, run
+  // the ladder with the senior as the responsible identity, starting at
+  // stage 2 (stage 1 — "remind the coordinator" — is skipped: there's no
+  // single coordinator to remind).
+  describe("I-2: needs_confirmation with a senior on shift", () => {
+    let secondEligibleId: string;
+
+    beforeEach(async () => {
+      // A second eligible coordinator on the SAME shift flips
+      // resolveShiftCoordinator's status from "auto" (ctx's default
+      // single-eligible setup) to "needs_confirmation".
+      secondEligibleId = randomUUID();
+      await seedUser(secondEligibleId, ctx.clinicId, { name: "Noa Levi", role: "technician", isEquipmentCoordinator: true });
+      await seedShift(randomUUID(), ctx.clinicId, ctx.shiftDate, "Noa Levi", "technician", SHIFT_START, SHIFT_END);
+    });
+
+    it("never fires stage 1 (no single coordinator to remind)", async () => {
+      const now55 = localDateTime(2026, 2, 2, 17, 5); // 55 min to end -> raw stage 1 territory
+      const result = await runSweepEscalation(now55);
+      expect(result.escalated).toBe(0);
+      const row = await getCoordinatorRow(ctx.clinicId, ctx.shiftDate);
+      expect(row).toBeNull();
+    });
+
+    it("notifies the senior at stage >= 2 even though nobody confirmed a coordinator", async () => {
+      const now35 = localDateTime(2026, 2, 2, 17, 25); // 35 min to end -> stage 2
+      const result = await runSweepEscalation(now35);
+      expect(result.escalated).toBeGreaterThanOrEqual(1);
+
+      const row = await getCoordinatorRow(ctx.clinicId, ctx.shiftDate);
+      expect(row?.escalation_stage).toBeGreaterThanOrEqual(2);
+      expect(row?.coordinator_user_id).toBe(ctx.seniorId); // senior recorded as responsible
+      expect(row?.source).toBe("fallback_senior");
+
+      expect(sendPushToUser).toHaveBeenCalledWith(ctx.clinicId, ctx.seniorId, expect.any(Object));
+      expect(incrementMetric).toHaveBeenCalledWith("sweep_escalation_stage_2_fired");
+    });
+
+    it("transfers responsibility to the senior at stage 3", async () => {
+      const now35 = localDateTime(2026, 2, 2, 17, 25); // 35 min to end -> stage 2
+      await runSweepEscalation(now35);
+
+      const now15 = localDateTime(2026, 2, 2, 17, 45); // 15 min to end -> stage 3
+      const result = await runSweepEscalation(now15);
+      expect(result.escalated).toBeGreaterThanOrEqual(1);
+
+      const row = await getCoordinatorRow(ctx.clinicId, ctx.shiftDate);
+      expect(row?.escalation_stage).toBe(3);
+      expect(row?.current_responsible_user_id).toBe(ctx.seniorId);
+    });
+
+    it("is idempotent — a rerun at the same stage does not re-fire", async () => {
+      const now35 = localDateTime(2026, 2, 2, 17, 25);
+      await runSweepEscalation(now35);
+      const pushCallsBefore = vi.mocked(sendPushToUser).mock.calls.length;
+
+      const rerun = await runSweepEscalation(now35);
+      expect(rerun.escalated).toBe(0);
+      expect(vi.mocked(sendPushToUser).mock.calls.length).toBe(pushCallsBefore);
+    });
+  });
 });

@@ -378,6 +378,57 @@ describe.skipIf(!DATABASE_URL)("docking equipment coordinator (T3.4-i-a) integra
     expect(getString(res.json, "coordinatorUserId")).toBe(userId);
   });
 
+  it("case 7 (M-2, phase review): reconfirming mid-escalation resets escalation_stage/current_responsible_user_id/escalated_at", async () => {
+    const a = randomUUID();
+    const b = randomUUID();
+    const senior = randomUUID();
+    await seedUser(a, ctx.clinicId, { name: "Amit Ron", isEquipmentCoordinator: true });
+    await seedUser(b, ctx.clinicId, { name: "Tamar Gil", isEquipmentCoordinator: true });
+    await seedUser(senior, ctx.clinicId, { name: "Shira Katz", role: "senior_technician", isEquipmentCoordinator: false });
+    await seedShift(randomUUID(), ctx.clinicId, ctx.shiftDate, "Amit Ron", "technician");
+    await seedShift(randomUUID(), ctx.clinicId, ctx.shiftDate, "Tamar Gil", "technician");
+    await seedShift(randomUUID(), ctx.clinicId, ctx.shiftDate, "Shira Katz", "senior_technician");
+
+    setActor(senior, "senior_technician");
+    const first = await api("/api/docking/coordinator", "POST", { shiftDate: ctx.shiftDate, coordinatorUserId: a });
+    expect(first.status).toBe(200);
+
+    // Simulate the sweep-escalation worker having already advanced this
+    // shift's ladder for the first coordinator (a).
+    await probePool!.query(
+      `UPDATE vt_shift_equipment_coordinator
+       SET escalation_stage = 3, current_responsible_user_id = $1, escalated_at = now()
+       WHERE clinic_id = $2 AND shift_date = $3`,
+      [senior, ctx.clinicId, ctx.shiftDate],
+    );
+    const { rows: midRows } = await probePool!.query<{ escalation_stage: number }>(
+      `SELECT escalation_stage FROM vt_shift_equipment_coordinator WHERE clinic_id = $1 AND shift_date = $2`,
+      [ctx.clinicId, ctx.shiftDate],
+    );
+    expect(midRows[0]?.escalation_stage).toBe(3);
+
+    // Reconfirming (a different eligible pick, b) must reset the ladder.
+    const second = await api("/api/docking/coordinator", "POST", { shiftDate: ctx.shiftDate, coordinatorUserId: b });
+    expect(second.status).toBe(200);
+    if (!isRecord(second.json)) throw new Error("expected object");
+    expect(getString(second.json, "coordinatorUserId")).toBe(b);
+
+    const { rows } = await probePool!.query<{
+      escalation_stage: number;
+      current_responsible_user_id: string | null;
+      escalated_at: Date | null;
+      coordinator_user_id: string;
+    }>(
+      `SELECT escalation_stage, current_responsible_user_id, escalated_at, coordinator_user_id
+       FROM vt_shift_equipment_coordinator WHERE clinic_id = $1 AND shift_date = $2`,
+      [ctx.clinicId, ctx.shiftDate],
+    );
+    expect(rows[0]?.coordinator_user_id).toBe(b);
+    expect(rows[0]?.escalation_stage).toBe(0);
+    expect(rows[0]?.current_responsible_user_id).toBeNull();
+    expect(rows[0]?.escalated_at).toBeNull();
+  });
+
   it("uses resolveShiftCoordinator directly against the same DB (service-level sanity)", async () => {
     const eligible = randomUUID();
     await seedUser(eligible, ctx.clinicId, { name: "Direct Call", isEquipmentCoordinator: true });
