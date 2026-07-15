@@ -1,7 +1,7 @@
 import { CheckCircle2, Circle, User } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Bdi } from "@/components/ui/bdi";
-import { cn } from "@/lib/utils";
+import { cn, formatRelativeTime } from "@/lib/utils";
 import { t } from "@/lib/i18n";
 import type { RoomSweepItem } from "@/types";
 
@@ -68,7 +68,11 @@ export function SweepStationGroup({
                   </p>
                   <p className="flex items-center gap-1 text-[11px] text-muted-foreground mt-0.5">
                     <User className="w-3 h-3 shrink-0" aria-hidden />
-                    <Bdi>{t.roomSweep.withHolder(holder)}</Bdi>
+                    <Bdi>
+                      {item.checkedOutAt
+                        ? t.roomSweep.withHolderSince(holder, formatRelativeTime(item.checkedOutAt))
+                        : t.roomSweep.withHolder(holder)}
+                    </Bdi>
                   </p>
                 </div>
                 <Badge variant="secondary" className="shrink-0 text-[10px]">

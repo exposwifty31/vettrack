@@ -1,4 +1,5 @@
 import type { Dock } from "../db.js";
+import type { InvalidationReason } from "./equipment-anchor.service.js";
 
 type HomeDockInput = { homeRoomId: string | null; assetTypeId: string | null };
 type DockLike = Pick<Dock, "id" | "roomId" | "assetTypeId"> & Record<string, unknown>;
@@ -38,8 +39,9 @@ export type ReconciliationBucket =
   | "unassigned"
   | "no_station";
 
-// Mirrors InvalidationReason in equipment-anchor.service.ts (D-13 contradiction reasons).
-type ContradictionReason = "checkout" | "rfid_elsewhere" | "sweep_missing" | "not_found_here";
+// D-13 contradiction reasons — same union as InvalidationReason in
+// equipment-anchor.service.ts; aliased here for a readable local name.
+type ContradictionReason = InvalidationReason;
 
 export type ClassifierItem = {
   checkedOutById: string | null;

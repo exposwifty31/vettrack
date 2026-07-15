@@ -111,13 +111,7 @@ function isSeniorTech(u: MatchedOnShift): boolean {
 export async function resolveShiftCoordinator(
   clinicId: string,
   shiftDate: string,
-  // Reserved for a future point-in-time / TTL read; unused today — every
-  // signal this resolver reads (roster, eligibility, stored confirmation)
-  // is already scoped to `shiftDate`, not to "now".
-  now?: Date,
 ): Promise<CoordinatorResolution> {
-  void now;
-
   const onShift = await matchOnShiftUsers(clinicId, shiftDate);
 
   const eligible = onShift.filter((u) => u.isEquipmentCoordinator);

@@ -435,6 +435,7 @@ router.get("/rooms/:roomId/sweep", requireAuth, async (req, res) => {
       custodyState: item.custodyState,
       checkedOutById: item.checkedOutById,
       checkedOutByEmail: item.checkedOutByEmail,
+      checkedOutAt: item.checkedOutAt ? item.checkedOutAt.toISOString() : null,
       homeDockId: homeDock?.id ?? null,
       homeDockName: homeDock?.name ?? null,
       atStation: currentAnchor !== null && homeDock !== null && currentAnchor.dockId === homeDock.id,

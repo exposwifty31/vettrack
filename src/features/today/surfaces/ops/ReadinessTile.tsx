@@ -6,10 +6,11 @@ import { OpsTile, TileHeader, SkeletonRows, pctColor } from "./ops-tile-helpers"
 import type { Room } from "@/types";
 
 /**
- * Ops room-readiness tile — worst-5 verification % bars (reimplemented from
- * HomeTabletDashboard). The fill fills from the inline-start (RTL-correct) and is
- * tier-colored by the same {@link pctColor} scale the coverage card uses — one
- * color language across the surface.
+ * Ops room-readiness tile — worst-5 present-vs-expected % bars (design §6.4:
+ * at_home / expected_fill, via {@link ops-tile-helpers#roomPct}). The fill
+ * fills from the inline-start (RTL-correct) and is tier-colored by the same
+ * {@link pctColor} scale the coverage card uses — one color language across
+ * the surface.
  */
 export function ReadinessTile({
   worstRooms,
@@ -26,7 +27,7 @@ export function ReadinessTile({
       ) : worstRooms.length === 0 ? (
         <p className="flex items-center gap-2 text-sm text-ivory-text3">
           <DoorOpen className="h-4 w-4" aria-hidden />
-          {t.roomsListPage.healthRingHelp}
+          {t.homeSurface.readinessTileHelp}
         </p>
       ) : (
         <div className="flex flex-col gap-2.5">
@@ -35,7 +36,7 @@ export function ReadinessTile({
               key={room.id}
               href={`/rooms/${room.id}`}
               className="flex min-h-8 items-center gap-2.5"
-              title={t.roomsListPage.healthRingTitle(pct)}
+              title={t.homeSurface.readinessTileTitle(pct)}
             >
               <span className="w-[34%] min-w-0 truncate text-sm font-semibold text-ivory-text">
                 <Bdi>{room.name}</Bdi>

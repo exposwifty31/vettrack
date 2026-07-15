@@ -636,6 +636,7 @@ export interface RoomSweepItem {
   custodyState: string;
   checkedOutById: string | null;
   checkedOutByEmail: string | null;
+  checkedOutAt?: string | null;
   homeDockId: string | null;
   homeDockName: string | null;
   atStation: boolean;

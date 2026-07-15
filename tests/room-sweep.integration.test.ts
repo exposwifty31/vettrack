@@ -139,12 +139,13 @@ async function seedEquipment(
     custodyState?: string;
     checkedOutById?: string | null;
     checkedOutByEmail?: string | null;
+    checkedOutAt?: string | null;
   } = {},
 ) {
   await probePool!.query(
     `INSERT INTO vt_equipment
-       (id, clinic_id, name, status, version, home_room_id, asset_type_id, custody_state, checked_out_by_id, checked_out_by_email)
-     VALUES ($1, $2, $3, 'ok', 1, $4, $5, $6, $7, $8)`,
+       (id, clinic_id, name, status, version, home_room_id, asset_type_id, custody_state, checked_out_by_id, checked_out_by_email, checked_out_at)
+     VALUES ($1, $2, $3, 'ok', 1, $4, $5, $6, $7, $8, $9)`,
     [
       eqId,
       clinicId,
@@ -154,6 +155,7 @@ async function seedEquipment(
       overrides.custodyState ?? "returned",
       overrides.checkedOutById ?? null,
       overrides.checkedOutByEmail ?? null,
+      overrides.checkedOutAt ?? null,
     ],
   );
 }
@@ -277,6 +279,7 @@ describe.skipIf(!DATABASE_URL)("docking room sweep (T3.2a) integration", () => {
           custodyState: "returned",
         });
       }
+      const checkedOutAt = "2026-07-15T10:00:00.000Z";
       await seedEquipment(checkedOutId, ctx.clinicId, {
         name: "Checked Out Pump",
         homeRoomId: ctx.roomId,
@@ -284,6 +287,7 @@ describe.skipIf(!DATABASE_URL)("docking room sweep (T3.2a) integration", () => {
         custodyState: "checked_out",
         checkedOutById: ctx.userId,
         checkedOutByEmail: "holder@ops.local",
+        checkedOutAt,
       });
 
       const res = await api(`/api/docking/rooms/${ctx.roomId}/sweep`, "GET");
@@ -304,6 +308,7 @@ describe.skipIf(!DATABASE_URL)("docking room sweep (T3.2a) integration", () => {
         expect(item!.bucket).toBe("returned_unverified");
         expect(item!.atStation).toBe(false);
         expect(item!.checkedOutById).toBeNull();
+        expect(item!.checkedOutAt).toBeNull();
       }
 
       const checkedOutItem = items.find((it) => it.id === checkedOutId);
@@ -311,6 +316,7 @@ describe.skipIf(!DATABASE_URL)("docking room sweep (T3.2a) integration", () => {
       expect(checkedOutItem!.bucket).toBe("checked_out");
       expect(checkedOutItem!.checkedOutById).toBe(ctx.userId);
       expect(checkedOutItem!.checkedOutByEmail).toBe("holder@ops.local");
+      expect(new Date(checkedOutItem!.checkedOutAt as string).toISOString()).toBe(checkedOutAt);
     });
 
     it("404s errors.notFound for a room that doesn't exist in this clinic", async () => {
