@@ -175,6 +175,27 @@ graph LR
 
 ## IV.4 Phases (III.1–III.8 apply throughout; fences are the III.4 lists)
 
+> **Reconciliation status — 2026-07-15 (git-verified).** The program is essentially *built*; the per-phase markers below were stale (only P3 was flagged). **Every phase shipped July 6–12.** What remains is **Phase 10's verification bar + the actual resubmit** — the App Store build is still **25**.
+>
+> | Phase | Status | Evidence |
+> |---|---|---|
+> | R · research | ✅ done | 2 research docs |
+> | 0 · baseline/audits | ✅ built · ⚠️ live-walk pending | role switcher + `FLOW_INVENTORY.md` authored |
+> | 1 · web brief | ✅ done | brief + design handoff |
+> | 2 · experience model | ✅ done | #50, #51 |
+> | 3 · home split | ✅ done | #53, #91 |
+> | 4 · `/board` platform | ✅ done | #55 |
+> | 5 · snapshot modes | ✅ done | #56 |
+> | 6 · web console | ✅ done | #52 |
+> | 7 · module builds (7a–7f) | ✅ done | #58–#69 |
+> | 7S · god-file split | ✅ mostly | #70 (detail) |
+> | 7R · remediation | ✅ mostly · ⚠️ R1 flow-walk pending | #61/#71–#74 |
+> | 8 · full per-role | ⚠️ **partial** | #74 surfaces; student scope deferred |
+> | 9 · display pairing | ✅ done | #75 |
+> | 10 · program close | ✅ **prepared** · ⚠️ **NOT shipped** (build still 25) | #76/#78/#80/#83 |
+>
+> **Operative gate to resubmission:** (1) land **docking P3** (post-P10 work); (2) execute Phase 10's **4-platform `FLOW_INVENTORY` live-walk** — currently **~31 rows `⏳ pending`, 0 stamped `pass`** (never run — no sim/browser when authored; **0 rows broken**, because none walked), **re-scoped** to cover post-P10 additions (docking P1/P2/P3, Consolidated Audit × 10x #85/#86, the 36 behavioral-flow-audit findings #84); (3) fix whatever the walk fails; (4) **bump build past 25** and run `docs/release/cowork-appstore-resubmission-prompt.md`. **Post-P10 work outside the P0–10 numbering:** docking-first-class (`greedy-imagining-blossom.md`, separate plan) + the Consolidated Audit × 10x program.
+
 ### Phase R — Foundational research (FIRST, MANDATORY, before any code)
 *Establish factual ground for the whole plan. Everything here is a claim until R confirms it; what R refutes, the plan amends. Outputs are execution-easing playbooks, not academic reports.*
 
@@ -185,7 +206,7 @@ graph LR
 - **Deliverables:** `docs/design/platform-strategy-research.md` (R.2+R.3) and `docs/design/plan-validation-register.md` (R.1). Every claim cited. Findings contradicting frozen surfaces → noted N/A. Method: parallel WebSearch/WebFetch (one per topic) + `apple-platform-ux` skill + `deep-research` skill for contested R.1 rows.
 - **Fence:** the two research docs only. Zero code.
 
-### Phase 0 — Baseline: audits, flow inventory, role-testing enabler
+### Phase 0 — Baseline: audits, flow inventory, role-testing enabler — ✅ built · ⚠️ FLOW_INVENTORY live-walk pending (Phase-10 backstopped)
 - Run + record the full III.8 gate on the default branch — this IS the baseline.
 - `vettrack-codebase-relevance-audit` across the whole repo → `docs/audit/RELEVANCE_BASELINE.md` (report-only, no deletions).
 - `docs/audit/FLOW_INVENTORY.md` (III.6): every reachable flow per platform × role, walked and stamped.
@@ -201,7 +222,7 @@ graph LR
 - Per module: exists-vs-net-new table; inputs (Stage 1 tokens, Stage 7/8 `.dc.html`, 111 components, `docs/design-system.md`). Hard constraints stated: Hebrew-default RTL, i18n keys only, compose from existing components, desktop-only ≥1024px, no native implications, frozen surfaces (read-only views over bounded telemetry, no new transport), the III.2 bar with Phase R references as the calibration set. Requested: screens + empty/loading/error states + RTL spot-checks.
 - **Fence:** the brief doc only. Zero code.
 
-### Phase 2 (A1) — Role-experience model foundation (behavior-preserving)
+### Phase 2 (A1) — Role-experience model foundation (behavior-preserving) — ✅ DONE (#50, #51)
 *The IV.2-A keystone as a pure refactor — same UI for everyone, new single source underneath; also the I.2 native-spec artifact.*
 - New `src/lib/roles/experience-model.ts` (pure TS) + `src/hooks/use-experience.ts` (the only React touchpoint). Initially admin archetype = today's admin view; all others = today's non-admin view.
 - **Re-grep `isAdmin|adminOnly|role ===` across `src/` first** to lock the exact live consumer set (II flags the draft's list as partially unverified). Move `adminOnly` filtering behind the experience object in `nav-model.ts` + `native-nav-model.ts`; switch confirmed consumers (`IconSidebar`, `MoreSheet`) and the re-grepped remainder from `isAdmin` to the hook.
@@ -216,7 +237,7 @@ graph LR
 - Gate adds sim matrix: iPhone + iPad × {admin, senior_technician, technician} via the Phase 0 switcher.
 - **Allowed:** `home.tsx` (fork only), new `src/features/today/surfaces/`, `experience-model.ts` (nav deltas), `locales/{he,en}.json`, tests. Surfaces compose — if a card needs a prop, add the prop, don't fork the card. **DO NOT:** route registration, server, any page but `home.tsx`.
 
-### Phase 4 (C1) — `/board`: fourth-platform entry + kiosk hardening
+### Phase 4 (C1) — `/board`: fourth-platform entry + kiosk hardening — ✅ DONE (#55)
 *Give the Command Center its own platform posture without touching its proven data path.*
 - `platform/index.ts`: add `"board"` to `PlatformTarget`; add `isBoardPathname()` (prefix `/board`) checked in **both** resolvers after native, before touch-narrow.
 - `PlatformRouter.tsx`: `board` → new `src/board/BoardShell.tsx`: dark full-bleed, error boundary resetting to `/board` (not dying), fullscreen on first interaction, unconditional `useKioskWakeLock(true)` **that re-acquires the lock on `visibilitychange`/`pageshow`** (⟲ AMENDED R.1-K4: the wake-lock sentinel is released by the system when the document is hidden or on low power, so a one-shot acquire lets the screen sleep after the first backgrounding — [MDN Screen Wake Lock API](https://developer.mozilla.org/en-US/docs/Web/API/Screen_Wake_Lock_API)), heartbeat `kioskMode: true`.
@@ -226,7 +247,7 @@ graph LR
 - Gate adds phase-9 drills + new Playwright smoke (`/board` renders chrome-free, polls live, heartbeats).
 - **Allowed:** `platform/index.ts`, `PlatformRouter.tsx`, new `src/board/`, new `src/features/command-board/` (verbatim moves — moved blocks diff clean), `display.tsx` (shrinks to wrapper), `routes.tsx` (one line), tests. **DO NOT:** `public/sw.js`, SSE internals (`src/lib/realtime.ts`), snapshot semantics/cadence, `server/routes/display.ts`, emergency cache denylist.
 
-### Phase 5 (C2) — Snapshot enrichment + calm/pressure modes
+### Phase 5 (C2) — Snapshot enrichment + calm/pressure modes — ✅ DONE (#56)
 - `shared/equipment-board.ts`: **OPTIONAL additive** fields — `power?` (from `isPluggedIn` + charge-alert; plugged/charging/alert only, no battery %), `docks?`, `waitlist?` (depth), `staging?` (depth). Existing fields untouched (shared type). ✅ **Validated (R.1-K2):** additive optional fields are the textbook backward-compatible schema change — [Confluent schema evolution](https://docs.confluent.io/platform/current/schema-registry/fundamentals/schema-evolution.html). ⟲ **AMENDED (R.1-K2, reinforcement):** the companion **tolerant-reader** requirement is now explicit — the live client must render **gracefully when any new block is `undefined`** and never assume a field exists (the `?`-optional type enforces this at compile time; the panels below must enforce it at render time). This is a strengthening of the panels' contract, not a change to the field design.
 - Service: 4 cheap clinicId-filtered aggregates via `Promise.all`, each individually try/caught so one failure degrades only its block to `undefined` (the 2500ms `withTimeout` never trips on partial failure). Optional ~15s in-process per-clinic memo only if measured cost demands (server memo ≠ forbidden client/SW caching).
 - **Populate `byLocation` (currently `[]`) from the room join the unit query already does** (`roomName` is already selected — II) — the UI section already renders it.
@@ -234,19 +255,19 @@ graph LR
 - Tests: service fixtures per block + per-block degradation + clinicId scoping + latency guard + hysteresis. i18n (he+en same commit).
 - **Allowed:** `shared/equipment-board.ts` (additive `?`-optional only), `equipment-command-board.service.ts`, new panels in `command-board/`, `locales/*`, tests. Every new query filters `clinicId`. **DO NOT:** existing snapshot fields, poll cadence, SSE reconciliation, the `routes/display.ts` timeout envelope.
 
-### Phase 6 (B2) — Web chrome restage + headless pre-build (runs while designs are out)
+### Phase 6 (B2) — Web chrome restage + headless pre-build (runs while designs are out) — ✅ DONE (#52)
 - New `src/lib/routes/web-management-nav-model.ts` (the Phase 1 IA spine); `IconSidebar`/`Topbar` consume it for `can("management.web")` users; lead sees read-only scope.
 - Scaffold routes for net-new modules (`/admin/integrations`, `/admin/webhooks`, `/admin/notifications`, `/admin/rfid-readers`, `/ops/health`): `AuthGuard` + `WebOnlyGuard` + capability gate, structured skeletons (title, table shell, empty state). ~~Also fence `/admin/metrics` (currently unguarded).~~ **Dropped as-shipped (PROOF 2026-07-07 §1527/1531):** `/admin/metrics` was intentionally left `AuthGuard`-only because it has a real mobile screen — `WebOnlyGuard` would hide a reachable page (see the "don't over-fence reachable pages" rule). A console restage of metrics is Phase 7a's job, not a fence.
 - `src/lib/api.ts` + `src/types/`: typed clients for integrations, webhooks, whatsapp, outbox-dlq/health, rfid, restock, push — each written against the **actual route handler** (shapes read, never assumed).
 - New `src/desktop/management/` primitives: data-table (sorting/pagination/RTL), detail drawer, config-form scaffold — composed from `components/ui/`, domain-neutral. ✅ **Validated (R.1-K5):** headless-then-skin is the established way to parallelize design and dev against shared tokens — [Martin Fowler: Headless Component](https://martinfowler.com/articles/headless-component.html). ✅ **RTL guidance (R.1-A6):** build with **CSS logical properties** (`margin-inline-start`, `text-align: start`, `border-inline-start`) from the first component so one stylesheet serves both directions; flip directional icons but **not** functionally-directional controls — [SimpleLocalize RTL guide](https://simplelocalize.io/blog/posts/rtl-design-guide-developers/). Density/IA calibration (A5): [NN/g desktop tables](https://www.nngroup.com/videos/designing-tables-desktop-apps/).
 - **Allowed:** new nav model, new pages/skeletons, `routes.tsx` (additive lines), `api.ts` + `src/types/` (additive), new `src/desktop/management/`, `IconSidebar`/`Topbar` (rebase on Phase 2's merged result for these two — the one known Wave-2 overlap). **DO NOT:** `src/native/**`, `native-nav-model.ts`, operational page internals, server route logic (read, don't edit).
 
-### Phase 7 (B3) — Module builds as designs return (each independently shippable)
+### Phase 7 (B3) — Module builds as designs return (each independently shippable) — ✅ DONE 7a–7f (#58–#69)
 - 7a Management Home + Ops Health (restage `/dashboard`; DLQ/outbox/queue/heartbeat consoles; any new server endpoint appends audit kinds to the closed `AuditActionType` union) · 7b Integrations/Webhooks/Notifications (secrets never round-trip to client) · 7c RFID Readers + Equipment Governance · 7d Inventory & Procurement (restock completion) · 7e Analytics & Audit restage per Stage 7/8.
 - **Fence per module:** only its own pages + Phase 6 primitives + its typed client. Implement strictly what the returned design shows — a design gap is an owner question, never a guess. Any new server endpoint is proposed + reviewed against the existing route file before writing.
 - **Scope add (owner, 2026-07-07, from device QA):** *admins can scan even when not on an active shift* — the scan affordance / clinical-authority path currently gates on an active roster shift; admin (and secondary-admin) should bypass that gate for scanning. Verify against `resolveAuthority()` + the scan-affordance rules + the server scan handler before touching; ship the client shaping + any server relaxation as an evaluator change in shadow first (authority envelope), never a raw gate removal.
 
-### Phase 7S (Structural) — Equipment god-file decomposition (behavior-preserving)
+### Phase 7S (Structural) — Equipment god-file decomposition (behavior-preserving) — ✅ MOSTLY (#70 — detail page)
 *Added 2026-07-08 (owner-approved during the pre-Phase-7 cleanup). `server/routes/equipment.ts` (~1.05k LOC) and `src/pages/equipment-detail.tsx` (~2k LOC) mix concerns and make every equipment change high-risk. Scheduled as its own phase — deliberately NOT folded into Phase 7 or the cleanup — so it stays a clean, reviewable, behavior-preserving refactor.*
 - Execute per [`docs/architecture/equipment-god-files-split-plan.md`](architecture/equipment-god-files-split-plan.md) (route slices + page-component extraction) and its companion `equipment-inline-mutations-inventory.md`. **Do not start without product sign-off on the paused inline mutations** (per that inventory).
 - **Move, not rewrite:** each extraction diffs clean (only import paths + file boundaries change); assert byte-identical behavior via the existing equipment test suite + a PRE-refactor snapshot. No new endpoints, no semantic changes.
@@ -254,7 +275,7 @@ graph LR
 - **Sequencing:** after Phase 7's module builds by default (7c/7d also touch equipment surfaces — avoid a concurrent-edit collision); owner may resequence. Own branch + PR; gate = full III.8.
 - **Fence:** `server/routes/equipment.ts`, `src/pages/equipment-detail.tsx`, and the new extracted modules only. DO NOT change equipment behavior, any frozen surface, or any other page.
 
-### Phase 7R (Remediation) — Post-archaeology cleanup (before Phase 8)
+### Phase 7R (Remediation) — Post-archaeology cleanup (before Phase 8) — ✅ MOSTLY (#61/#71–#74) · ⚠️ R1 flow-walk pending
 *Added 2026-07-09 (owner-commissioned). Sequences the remediation roadmap from the **Product Archaeology & Flow Verification audit** (2026-07-09) as its own fenced phase — deliberately BEFORE Phase 8 so the product stops over-promising removed/half-built surfaces before the five-archetype differentiation is layered on top. Out-of-band, owner-sanctioned per III.4; each item is its own branch + PR in an **isolated worktree** (IV.5 — no two concurrent tracks write the same file), gate = full III.8. Frozen surfaces (SSE/outbox, Code Blue, SW emergency denylist, `appointmentsPage.*`/`vt_appointments`/`/api/appointments`, closed `AuditActionType`, bounded telemetry) stay byte-identical throughout.*
 
 - **Already closed by Phase 7 + 7S + the Critical fix (reconciliation — do NOT re-do):** the audit's Critical/High blockers are largely resolved. **Tasks → `/patients` dead links removed** (PR #61, `fix/tasks-dead-patient-links`). **All `PendingConsolePage` modules built out** — Integrations/Webhooks/Notifications (7b), RFID Readers + Equipment Governance (7c), Inventory restock-list + low-stock (7d, B3/B4 approved), Analytics/Audit (7e). **Owner blockers B1–B5 answered and shipped**; `/dashboard` restaged under `ManagementGuard` (7a, B2). **`equipment-detail.tsx` decomposition underway** (7S). This phase is the *residue*, not those.
@@ -267,18 +288,18 @@ graph LR
 - **Deploy verification (owner/ops, not code):** confirm Redis + the notification worker actually run in the production deploy (the audit could not prove worker deploy). Recorded here so it is owner-tracked; no repo change.
 - **Fence:** per-item as listed above; no item touches a frozen surface, another item's files, or a concurrent Phase-7/7S/8 fence. Sequencing: R4 + R5 (docs) any time; R1 owner-gated / Phase-10-backstopped; R2 → R6 after PR #61; R3 verify-first, routed to the nav-owning phase.
 
-### Phase 8 (A3) — Full per-role differentiation
+### Phase 8 (A3) — Full per-role differentiation — ⚠️ PARTIAL (#74 surfaces; full 5-archetype + student scope deferred)
 - Vet (clinical emphasis: code-blue readiness, vet actions, room radar) · tech (scan/custody throughput) · student (guided, read-mostly — exact scope is a deferred owner question). New surfaces in `src/features/today/surfaces/`, archetype deltas, per-archetype tab-bar order, migrate remaining ad-hoc checks to `can()`.
 - **Ad-hoc-check migration enumerated FIRST** (grep `isAdmin|role ===` across `src/`), listed in the commit; each behavior-identical, proven by the extended Phase 2 snapshot suite.
 - Any NEW server restriction ships as an evaluator in shadow first (touching only `server/lib/authority/enforcement/` + its wiring call site).
 - Gate: sim matrix iPhone + iPad × 5 archetypes (lead via `senior_technician`).
 - **Fence:** same shape as Phase 3 (surfaces compose, experience-model deltas only; no route/server edits except the shadow evaluators).
 
-### Phase 9 (C3) — Display-device pairing + Displays console
+### Phase 9 (C3) — Display-device pairing + Displays console — ✅ DONE (#75)
 - `vt_display_devices` (clinicId, name, tokenHash, lastSeenAt, revokedAt) in `server/schema/ops.ts` + migration via `npx drizzle-kit generate`; pairing-code issue/claim endpoints; display-token auth accepting ONLY read-only `GET /api/display/snapshot` + heartbeat + SSE stream for that clinic; `/board/pair` screen; Displays page in Ops Health (list/rename/revoke/heartbeat). Audit kinds appended to the closed union. Security review of token scope before merge.
 - **Fence:** the display-token path is a NEW additive resolver branch — `resolveAuthUser` and every existing auth mode stay byte-identical (full existing auth suite green, zero fixture edits). Token denies everything but the three read-only endpoints by default; **deny-list tests written before the allow path**. One new table — no ALTERs to existing tables.
 
-### Phase 10 — Program close: regression, roadmaps, App Store handoff
+### Phase 10 — Program close: regression, roadmaps, App Store handoff — ✅ PREPARED (#76/#78/#80/#83) · ⚠️ NOT shipped (build still 25; flow re-verification open)
 - Full regression on all gates; **FULL flow-inventory re-verification across all four platforms** — no row closes broken/degraded/unreachable without a recorded owner decision; PROOF_ALIGNMENT_LOG reconciled; design re-sync if component surfaces changed; decide `/equipment/board` → `/board` end-state (owner call).
 - **`docs/design/native-migration-roadmap.md`** (serves I.2): recommended path from Phase R topic 5 + what this program made portable (experience model, capability contracts, typed API surface, standalone board shell), staged with cost/risk — mapped to the **existing** downstream (`exposwifty31/literate-dollop` Expo/RN app + `@vettrack/contracts`, per `docs/MAINTENANCE_MODE.md`), so the roadmap targets a real consumer, not a greenfield.
 - **`docs/design/product-growth-roadmap.md`** (serves I.3): the six problems → concrete follow-on modules (provided / missing / proposed schema+platform placement / rough cost) so the owner can sequence the next program.
