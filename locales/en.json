@@ -3395,6 +3395,16 @@
     "pushTitle": "Returned equipment needs verification",
     "pushBody": "An item was returned but hasn't been re-verified at its station yet. Please check it in."
   },
+  "sweepEscalation": {
+    "stage1Title": "Room Sweep due soon",
+    "stage1Body": "Your shift ends in about an hour and the Room Sweep isn't done yet.",
+    "stage2Title": "Room Sweep needs a follow-up",
+    "stage2Body": "The Coordinator's Room Sweep still isn't done — please follow up.",
+    "stage3Title": "You're now responsible for the Room Sweep",
+    "stage3Body": "The shift is ending soon and the Room Sweep wasn't completed — it's been transferred to you.",
+    "stage4Title": "Room Sweep still open",
+    "stage4Body": "The shift has ended with the Room Sweep incomplete. It's now open to any tech to finish."
+  },
   "semiDock": {
     "pushTitle": "Device detected in home room",
     "pushBody": "We detected the device back in its home room. If you finished using it, return it to the charging station."

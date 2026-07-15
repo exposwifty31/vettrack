@@ -67,6 +67,19 @@ export const shiftEquipmentCoordinator = vtTable(
     source: text("source").notNull().$type<"auto" | "confirmed" | "fallback_senior">(),
     assignedByUserId: text("assigned_by_user_id").references(() => users.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    /**
+     * Docking P3 T3.4-ii — Room Sweep escalation ladder (migration 167). The
+     * same row now doubles as the per-shift sweep-responsibility +
+     * escalation record: `escalationStage` (0 none, 1 coordinator reminded,
+     * 2 senior notified, 3 responsibility auto-transferred, 4 open to all +
+     * manager notified) only ever advances within a shift (server/workers/
+     * sweep-escalation.worker.ts is the sole writer, idempotent by
+     * `targetStage > current`). `currentResponsibleUserId` is null until
+     * stage 3 sets it to the senior tech; stage 4 clears it back to null.
+     */
+    escalationStage: integer("escalation_stage").notNull().default(0),
+    currentResponsibleUserId: text("current_responsible_user_id").references(() => users.id, { onDelete: "set null" }),
+    escalatedAt: timestamp("escalated_at", { withTimezone: true }),
   },
   (t) => ({
     clinicDateUq: uniqueIndex("vt_shift_eq_coordinator_clinic_date_uq").on(t.clinicId, t.shiftDate),

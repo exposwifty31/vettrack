@@ -270,6 +270,14 @@ export type AuditActionType =
   // the confirmed coordinator's userId; metadata carries shiftDate).
   | "equipment_coordinator_eligibility_set"
   | "equipment_coordinator_assigned"
+  // P3 T3.4-ii — Room Sweep escalation ladder. `_escalated`: the worker
+  // advances a shift's escalation stage (targetId = the shift's coordinator
+  // row's clinicId-scoped shiftDate context; metadata carries {stage}).
+  // `_responsibility_transferred`: emitted additionally at stage 3, when
+  // responsibility auto-transfers from the Coordinator to the Senior Tech
+  // (targetId = the senior tech's userId).
+  | "room_sweep_escalated"
+  | "room_sweep_responsibility_transferred"
   // Phase 9 — Display device pairing
   | "display_pairing_code_issued"
   | "display_device_paired"

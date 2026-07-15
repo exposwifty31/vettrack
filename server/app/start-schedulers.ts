@@ -25,6 +25,7 @@ import { startStagingExpiryWorker } from "../workers/stagingExpiryWorker.js";
 import { startEquipmentWaitlistReservationWorker } from "../workers/equipment-waitlist-reservation.worker.js";
 import { startStaleCheckoutSweepWorker } from "../workers/staleCheckoutSweepWorker.js";
 import { startStaleReturnedSweepWorker } from "../workers/stale-returned-sweep.worker.js";
+import { startSweepEscalationWorker } from "../workers/sweep-escalation.worker.js";
 
 export async function startBackgroundSchedulers() {
   if (process.env.NODE_ENV === "test") {
@@ -72,4 +73,5 @@ export async function startBackgroundSchedulers() {
   startEquipmentWaitlistReservationWorker();
   startStaleCheckoutSweepWorker();
   startStaleReturnedSweepWorker();
+  startSweepEscalationWorker();
 }
