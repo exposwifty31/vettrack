@@ -94,11 +94,16 @@ describe("Stage 6 detail — actions (Check in)", () => {
   });
   it("only offers return to the holder or an admin", () => {
     expect(actions.includes("checkedOutByMe")).toBe(true);
-    expect(/if\s*\(!canReturn\)\s*return null/.test(actions)).toBe(true);
+    expect(/canReturn\s*=\s*isCheckedOut\s*&&\s*\(checkedOutByMe\s*\|\|\s*isAdmin\)/.test(actions)).toBe(true);
+    // Detail now also offers checkout, so the empty-state guard covers both actions.
+    expect(/if\s*\(!canReturn\s*&&\s*!canCheckout\)\s*return null/.test(actions)).toBe(true);
   });
   it("does NOT shift-gate return (you can always hand equipment back)", () => {
-    expect(actions.includes("hasActiveShift")).toBe(false);
-    expect(actions.includes("offShift")).toBe(false);
+    // canReturn is custody-only (no shift term). The roster/off-shift gate the
+    // mobile-checkout change added applies only to checkout (handleCheckout),
+    // never to the return path.
+    expect(/canReturn\s*=\s*isCheckedOut\s*&&\s*\(checkedOutByMe\s*\|\|\s*isAdmin\)/.test(actions)).toBe(true);
+    expect(/handleCheckout[\s\S]*?offShift/.test(actions)).toBe(true);
   });
 });
 
