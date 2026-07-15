@@ -307,6 +307,9 @@ type MetricName =
   | "semi_dock_skipped_deduped"
   | "stale_checkout_nudged"
   | "stale_checkout_skipped"
+  // T3.5 — staleReturnedSweep nudge worker (returned-unverified → nudge managers).
+  | "stale_returned_nudged"
+  | "stale_returned_skipped"
   | "dock_return_nfc_confirmed"
   | "auth_clerk_profile_fetch_failed"
   // T-30a2-i — nudge telemetry closed enum (nudgeShown: "expiry" | "restock").
@@ -315,7 +318,14 @@ type MetricName =
   // existing telemetry_payload_rejected_enum_mismatch counter (no new
   // metric series is created for unknown values).
   | "nudge_shown_expiry"
-  | "nudge_shown_restock";
+  | "nudge_shown_restock"
+  // P3 T3.4-ii — Room Sweep escalation ladder. One bounded counter per stage
+  // (closed 1-4 set) — never fired more than once per shift per stage
+  // (server/workers/sweep-escalation.worker.ts's targetStage > current gate).
+  | "sweep_escalation_stage_1_fired"
+  | "sweep_escalation_stage_2_fired"
+  | "sweep_escalation_stage_3_fired"
+  | "sweep_escalation_stage_4_fired";
 
 type MetricBuckets = Record<MetricName, number>;
 
@@ -954,11 +964,17 @@ const DEFAULT_COUNTERS: MetricBuckets = {
   semi_dock_skipped_deduped: 0,
   stale_checkout_nudged: 0,
   stale_checkout_skipped: 0,
+  stale_returned_nudged: 0,
+  stale_returned_skipped: 0,
   dock_return_nfc_confirmed: 0,
   auth_clerk_profile_fetch_failed: 0,
   // T-30a2-i — nudge telemetry closed enum counters.
   nudge_shown_expiry: 0,
   nudge_shown_restock: 0,
+  sweep_escalation_stage_1_fired: 0,
+  sweep_escalation_stage_2_fired: 0,
+  sweep_escalation_stage_3_fired: 0,
+  sweep_escalation_stage_4_fired: 0,
 };
 
 const metrics: MetricBuckets = { ...DEFAULT_COUNTERS };

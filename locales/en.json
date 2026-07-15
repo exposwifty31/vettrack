@@ -851,6 +851,8 @@
     "notReady": "Not ready",
     "inUse": "In use",
     "roomReadiness": "Room readiness",
+    "readinessTileTitle": "{pct}% of expected equipment is at its home station",
+    "readinessTileHelp": "Share of each room's expected equipment currently at its home station",
     "noExceptions": "No exceptions",
     "tasks": "Tasks",
     "tasksEmpty": "No tasks right now",
@@ -1790,6 +1792,36 @@
     "pilotStale": "Stale",
     "pilotRecent": "Recent"
   },
+  "roomSweep": {
+    "title": "Room Sweep",
+    "startSweep": "Start Room Sweep",
+    "markAllPresent": "Mark all present",
+    "present": "Present",
+    "notPresent": "Not present",
+    "withHolder": "with {holder}",
+    "withHolderSince": "with {holder} · since {relative}",
+    "checkedOutBadge": "In use",
+    "confirmSweep": "Confirm sweep",
+    "summary": "{present} present · {missing} missing",
+    "sweptToast": "Swept: {present} present, {missing} flagged",
+    "noHomedItems": "No equipment is homed to this room yet",
+    "noHomedItemsHint": "Assign equipment home stations to enable Room Sweep.",
+    "noStationGroup": "No station",
+    "commitError": "Sweep failed — try again",
+    "loadError": "Failed to load the expected equipment list"
+  },
+  "coordinator": {
+    "sweptPrefix": "Last swept",
+    "byName": "by {name}",
+    "notSweptThisShift": "Never swept",
+    "withName": "Coordinator: {name}",
+    "toBeConfirmed": "Coordinator: to be confirmed",
+    "unassigned": "Coordinator: unassigned",
+    "choosePlaceholder": "Choose coordinator",
+    "confirmSuccess": "Coordinator confirmed",
+    "confirmError": "Failed to confirm coordinator",
+    "loadError": "Failed to load coordinator"
+  },
   "roomsListPage": {
     "selectRoomTitle": "Select a room",
     "selectRoomSubtitle": "Choose from the list to see details here",
@@ -2105,7 +2137,10 @@
     "cursorBugFixerFailed": "Could not start Cursor bug fixer",
     "cursorBugFixerNotConfigured": "Cursor bug fixer is not fully configured on the server",
     "secondaryRoleUpdated": "Secondary role updated",
-    "secondaryRoleUpdateFailed": "Failed to update secondary role"
+    "secondaryRoleUpdateFailed": "Failed to update secondary role",
+    "equipmentCoordinatorLabel": "Equipment Coordinator",
+    "equipmentCoordinatorUpdated": "Equipment Coordinator eligibility updated",
+    "equipmentCoordinatorUpdateFailed": "Failed to update Equipment Coordinator eligibility"
   },
   "layoutHebrew": {
     "home": "Home",
@@ -2934,7 +2969,9 @@
       "duplicateName": "A dock with this name already exists.",
       "invalidReference": "The room or category does not belong to this clinic.",
       "invalidEquipmentIds": "Some equipment IDs do not exist, are deleted, or belong to another clinic.",
-      "noHomeStation": "This item is not resting, or has no resolvable home station."
+      "noHomeStation": "This item is not resting, or has no resolvable home station.",
+      "coordinatorForbidden": "Only the senior technician on this shift or an admin can confirm the Equipment Coordinator.",
+      "coordinatorNotEligible": "This person is not an eligible Equipment Coordinator on this shift."
     }
   },
   "push": {
@@ -3358,6 +3395,20 @@
   "staleCheckout": {
     "pushTitle": "Equipment still checked out",
     "pushBody": "This device has been checked out a while. If you're done, please return it."
+  },
+  "staleReturned": {
+    "pushTitle": "Returned equipment needs verification",
+    "pushBody": "An item was returned but hasn't been re-verified at its station yet. Please check it in."
+  },
+  "sweepEscalation": {
+    "stage1Title": "Room Sweep due soon",
+    "stage1Body": "Your shift ends in about an hour and the Room Sweep isn't done yet.",
+    "stage2Title": "Room Sweep needs a follow-up",
+    "stage2Body": "The Coordinator's Room Sweep still isn't done — please follow up.",
+    "stage3Title": "You're now responsible for the Room Sweep",
+    "stage3Body": "The shift is ending soon and the Room Sweep wasn't completed — it's been transferred to you.",
+    "stage4Title": "Room Sweep still open",
+    "stage4Body": "The shift has ended with the Room Sweep incomplete. It's now open to any tech to finish."
   },
   "semiDock": {
     "pushTitle": "Device detected in home room",
@@ -4144,7 +4195,37 @@
     "categoryUnavailable": "Categories are unavailable right now — you can still assign a Home Room",
     "categoryLoadError": "Failed to load categories",
     "roomsLoadError": "Failed to load rooms",
-    "reconciliationLoadError": "Failed to load reconciliation data"
+    "reconciliationLoadError": "Failed to load reconciliation data",
+    "bucketCountsTitle": "Reconciliation Overview",
+    "bucketLabels": {
+      "at_home": "At Home",
+      "checked_out": "Checked Out",
+      "returned_unverified": "Returned (Unverified)",
+      "returned_away": "Returned Away",
+      "misplaced_at_station": "Misplaced at Station",
+      "missing": "Missing",
+      "unassigned": "Unassigned",
+      "no_station": "No Station"
+    },
+    "driftBuckets": {
+      "returned_unverified": {
+        "hint": "Returned, but not yet re-anchored at a dock — recent, needs verification",
+        "empty": "Nothing returned-unverified"
+      },
+      "returned_away": {
+        "hint": "Last seen away from its home room",
+        "empty": "Nothing returned away"
+      },
+      "misplaced_at_station": {
+        "hint": "Docked, but not at its home station",
+        "empty": "Nothing misplaced"
+      },
+      "missing": {
+        "hint": "No anchor and no recent sighting — investigate",
+        "empty": "Nothing missing"
+      }
+    },
+    "holderLabel": "With {email}"
   },
   "adminAssetTypesPage": {
     "typePlaceholder": "Type name",

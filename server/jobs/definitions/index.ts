@@ -25,6 +25,14 @@ import {
   STALE_CHECKOUT_SWEEP_QUEUE_NAME,
 } from "../../workers/staleCheckoutSweepWorker.js";
 import {
+  STALE_RETURNED_SWEEP_JOB_NAME,
+  STALE_RETURNED_SWEEP_QUEUE_NAME,
+} from "../../workers/stale-returned-sweep.worker.js";
+import {
+  SWEEP_ESCALATION_JOB_NAME,
+  SWEEP_ESCALATION_QUEUE_NAME,
+} from "../../workers/sweep-escalation.worker.js";
+import {
   resolveBullmqJobName,
   type AnyJobDefinition,
   type JobDefinition,
@@ -45,6 +53,10 @@ export type StaleCheckInSweepJobPayload = Record<string, never>;
 
 export type StaleCheckoutSweepJobPayload = Record<string, never>;
 
+export type StaleReturnedSweepJobPayload = Record<string, never>;
+
+export type SweepEscalationJobPayload = Record<string, never>;
+
 export type PayloadForStaticKind = {
   "check-plug": ChargeAlertJobPayload;
   "task-ownership-backfill": TaskOwnershipBackfillJobData;
@@ -52,6 +64,8 @@ export type PayloadForStaticKind = {
   "check-expiry": ExpiryCheckJobPayload;
   "sweep-stale-checkins": StaleCheckInSweepJobPayload;
   "sweep-stale-checkouts": StaleCheckoutSweepJobPayload;
+  "sweep-stale-returned": StaleReturnedSweepJobPayload;
+  "sweep-room-escalation": SweepEscalationJobPayload;
 };
 
 /** Producer uses per-add opts only (no queue defaultJobOptions); attempts follow BullMQ default (1). */
@@ -122,6 +136,28 @@ const staleCheckoutSweepDefinition: JobDefinition<StaleCheckoutSweepJobPayload> 
   removeOnFail: 100,
 };
 
+const staleReturnedSweepDefinition: JobDefinition<StaleReturnedSweepJobPayload> = {
+  kind: STALE_RETURNED_SWEEP_JOB_NAME,
+  queue: STALE_RETURNED_SWEEP_QUEUE_NAME,
+  bullmqJobName: STALE_RETURNED_SWEEP_JOB_NAME,
+  workerConcurrency: 1,
+  attempts: 3,
+  backoff: { type: "exponential", delay: 2000 },
+  removeOnComplete: 50,
+  removeOnFail: 100,
+};
+
+const sweepEscalationDefinition: JobDefinition<SweepEscalationJobPayload> = {
+  kind: SWEEP_ESCALATION_JOB_NAME,
+  queue: SWEEP_ESCALATION_QUEUE_NAME,
+  bullmqJobName: SWEEP_ESCALATION_JOB_NAME,
+  workerConcurrency: 1,
+  attempts: 3,
+  backoff: { type: "exponential", delay: 2000 },
+  removeOnComplete: 50,
+  removeOnFail: 100,
+};
+
 export const staticJobDefinitions = [
   chargeAlertDefinition,
   taskOwnershipBackfillDefinition,
@@ -129,6 +165,8 @@ export const staticJobDefinitions = [
   expiryCheckDefinition,
   staleCheckInSweepDefinition,
   staleCheckoutSweepDefinition,
+  staleReturnedSweepDefinition,
+  sweepEscalationDefinition,
 ] as const;
 
 /** Integration enqueue metadata (dynamic job.name, shard queue per clinic). */

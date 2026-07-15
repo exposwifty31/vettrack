@@ -239,6 +239,8 @@ export type AuditActionType =
   | "equipment_rfid_observed_room_changed"
   | "equipment_semi_dock_notified"
   | "equipment_stale_checkout_nudged"
+  // T3.5 — staleReturnedSweep nudge worker (returned-unverified → nudge managers).
+  | "equipment_stale_returned_nudged"
   // Sprint 1.7 — inference engine fires when no location signal exists for a device.
   | "equipment_location_unknown"
   // T-24b — damage report flips conditionStatus to a non-"ok" value (R-EQ-F3).
@@ -257,6 +259,25 @@ export type AuditActionType =
   // (invalidateCurrentAnchor reason:"not_found_here").
   | "equipment_anchor_created"
   | "equipment_anchor_contradicted"
+  // P3 T3.2a — Room Sweep commit: a per-shift confirm pass over a room's
+  // homed items. Emitted once per sweep with `{confirmed, missing}` counts
+  // in metadata; targetId is the swept roomId.
+  | "room_swept"
+  // P3 T3.4-i-a — Equipment Coordinator model. `_eligibility_set`: admin
+  // flips a user's `is_equipment_coordinator` flag (targetId = the user).
+  // `_assigned`: a senior tech/admin confirms which eligible tech is THIS
+  // shift's coordinator when the auto-derivation was ambiguous (targetId =
+  // the confirmed coordinator's userId; metadata carries shiftDate).
+  | "equipment_coordinator_eligibility_set"
+  | "equipment_coordinator_assigned"
+  // P3 T3.4-ii — Room Sweep escalation ladder. `_escalated`: the worker
+  // advances a shift's escalation stage (targetId = the shift's coordinator
+  // row's clinicId-scoped shiftDate context; metadata carries {stage}).
+  // `_responsibility_transferred`: emitted additionally at stage 3, when
+  // responsibility auto-transfers from the Coordinator to the Senior Tech
+  // (targetId = the senior tech's userId).
+  | "room_sweep_escalated"
+  | "room_sweep_responsibility_transferred"
   // Phase 9 — Display device pairing
   | "display_pairing_code_issued"
   | "display_device_paired"

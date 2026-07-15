@@ -9,17 +9,27 @@
  * (room, category) → dock lookup or expected-fill counting here.
  */
 import { Router } from "express";
+import { randomUUID } from "crypto";
 import { z } from "zod";
-import { db, equipment, docks } from "../db.js";
-import { and, eq, inArray, isNull, sql } from "drizzle-orm";
+import { db, equipment, docks, rooms, users, equipmentAnchors } from "../db.js";
+import { and, eq, inArray, isNull, ne, sql } from "drizzle-orm";
 import { requireAuth, requireAdmin } from "../middleware/auth.js";
 import { writeLimiter } from "../middleware/rate-limiters.js";
 import { validateBody } from "../middleware/validate.js";
 import { logAudit } from "../lib/audit.js";
 import { apiError } from "../lib/apiError.js";
 import { referencedIdsBelongToClinic } from "../lib/clinic-scoped-refs.js";
-import { resolveHomeDock, dockExpectedFill } from "../services/docking.service.js";
+import { getClinicTimezone, clinicTodayIsoDate } from "../lib/clinic-timezone.js";
+import {
+  resolveHomeDock,
+  dockExpectedFill,
+  classifyReconciliationBucket,
+  type ClassifierCtx,
+  type ReconciliationBucket,
+} from "../services/docking.service.js";
 import { createAnchor, invalidateCurrentAnchor } from "../services/equipment-anchor.service.js";
+import { resolveShiftCoordinator, confirmShiftCoordinator } from "../services/equipment-coordinator.service.js";
+import { mapLegacyRoleToClinicalRole } from "../lib/authority-roles.js";
 
 const router = Router();
 
@@ -144,17 +154,81 @@ router.post(
   },
 );
 
+const RECONCILIATION_BUCKETS: ReconciliationBucket[] = [
+  "at_home",
+  "checked_out",
+  "returned_unverified",
+  "returned_away",
+  "misplaced_at_station",
+  "missing",
+  "unassigned",
+  "no_station",
+];
+
+interface ReconciliationBucketItem {
+  id: string;
+  name: string;
+  bucket: ReconciliationBucket;
+  custodyState: string;
+  checkedOutById: string | null;
+  checkedOutByEmail: string | null;
+  homeDockId: string | null;
+  homeDockName: string | null;
+  homeRoomId: string | null;
+}
+
+type LatestAnchorRow = {
+  equipment_id: string;
+  dock_id: string | null;
+  invalidated_at: Date | string | null;
+  invalidated_reason: string | null;
+};
+
+/**
+ * Latest anchor per item for a clinic, in ONE DISTINCT ON (equipment_id)
+ * query ordered by asserted_at DESC — shared by the reconciliation read and
+ * the room-sweep expected-list so the DISTINCT ON isn't copy-pasted. Pass
+ * `equipmentIds` to scope to a subset (the sweep path); an empty array
+ * short-circuits to an empty map (no query). The current-anchor UNIQUE index
+ * guarantees at most one open row per item, so the latest-by-assertedAt row
+ * IS the current anchor when one is open.
+ */
+async function latestAnchorByEquipment(
+  clinicId: string,
+  equipmentIds?: string[],
+): Promise<Map<string, LatestAnchorRow>> {
+  if (equipmentIds && equipmentIds.length === 0) return new Map();
+  const idFilter =
+    equipmentIds && equipmentIds.length
+      ? sql`AND equipment_id IN (${sql.join(equipmentIds.map((id) => sql`${id}`), sql`, `)})`
+      : sql``;
+  const result = await db.execute<LatestAnchorRow>(sql`
+    SELECT DISTINCT ON (equipment_id) equipment_id, dock_id, invalidated_at, invalidated_reason
+    FROM vt_equipment_anchors
+    WHERE clinic_id = ${clinicId} ${idFilter}
+    ORDER BY equipment_id, asserted_at DESC
+  `);
+  return new Map(result.rows.map((row) => [row.equipment_id, row]));
+}
+
 /**
  * GET /api/docking/reconciliation
  *
- * Loads this clinic's docks + a small equipment projection once, then
- * derives all three buckets in memory via the T1.2 pure functions —
- * no per-item queries.
+ * Loads this clinic's docks + a widened equipment projection + the latest
+ * anchor per item (one DISTINCT ON query, not per-item N+1), then derives:
+ *  - the legacy P1 ownership-only buckets (unassigned/noStation/byDock —
+ *    AdminHomeAssignmentPage still consumes these, kept byte-for-byte), and
+ *  - the full P3 8-bucket breakdown (T3.1 classifyReconciliationBucket) as
+ *    `counts` (0-filled for every bucket) + `byBucket` (items grouped by
+ *    bucket, enriched with homeDockId/Name + homeRoomId for the Manager
+ *    worklist's "assign home" action). M-5 (phase review): `at_home` /
+ *    `checked_out` are trimmed to counts-only in `byBucket` — potentially
+ *    the whole fleet, and the client only renders their counts.
  */
 router.get("/reconciliation", requireAuth, async (req, res) => {
   const clinicId = req.clinicId!;
 
-  const [clinicDocks, clinicEquipment] = await Promise.all([
+  const [clinicDocks, clinicEquipment, latestAnchorByEquipmentId] = await Promise.all([
     db.select().from(docks).where(eq(docks.clinicId, clinicId)),
     db
       .select({
@@ -162,9 +236,18 @@ router.get("/reconciliation", requireAuth, async (req, res) => {
         name: equipment.name,
         homeRoomId: equipment.homeRoomId,
         assetTypeId: equipment.assetTypeId,
+        roomId: equipment.roomId,
+        lastRfidRoomId: equipment.lastRfidRoomId,
+        checkedOutById: equipment.checkedOutById,
+        checkedOutByEmail: equipment.checkedOutByEmail,
+        custodyState: equipment.custodyState,
       })
       .from(equipment)
       .where(and(eq(equipment.clinicId, clinicId), isNull(equipment.deletedAt))),
+    // Latest anchor per item, in ONE query (shared DISTINCT ON helper). The
+    // latest row's invalidatedAt tells us whether it's the currently open
+    // anchor or the most recent contradiction (T3.1 ClassifierCtx below).
+    latestAnchorByEquipment(clinicId),
   ]);
 
   const unassigned = clinicEquipment.filter((item) => item.homeRoomId === null || item.assetTypeId === null);
@@ -180,7 +263,50 @@ router.get("/reconciliation", requireAuth, async (req, res) => {
     capacity: dock.capacity,
   }));
 
-  res.json({ unassigned, noStation, byDock });
+  const counts = Object.fromEntries(RECONCILIATION_BUCKETS.map((b) => [b, 0])) as Record<
+    ReconciliationBucket,
+    number
+  >;
+  const byBucket = Object.fromEntries(
+    RECONCILIATION_BUCKETS.map((b) => [b, [] as ReconciliationBucketItem[]]),
+  ) as Record<ReconciliationBucket, ReconciliationBucketItem[]>;
+
+  for (const item of clinicEquipment) {
+    const homeDock = resolveHomeDock(item, clinicDocks);
+    const latest = latestAnchorByEquipmentId.get(item.id);
+    const currentAnchor = latest && latest.invalidated_at == null ? { dockId: latest.dock_id } : null;
+    const lastContradictionReason = (
+      latest && latest.invalidated_at != null ? latest.invalidated_reason : null
+    ) as ClassifierCtx["lastContradictionReason"];
+
+    const bucket = classifyReconciliationBucket(item, {
+      homeDock: homeDock ? { id: homeDock.id } : null,
+      currentAnchor,
+      lastContradictionReason,
+    });
+
+    counts[bucket]++;
+    // M-5: `at_home`/`checked_out` are potentially the whole fleet, and the
+    // client only ever renders their `counts` (BucketCountsSummary), never
+    // their item lists — DriftBucketSection only iterates the 4 drift
+    // buckets. Trim those two to counts-only; keep full item lists for the
+    // drift buckets + unassigned/no_station.
+    if (bucket !== "at_home" && bucket !== "checked_out") {
+      byBucket[bucket].push({
+        id: item.id,
+        name: item.name,
+        bucket,
+        custodyState: item.custodyState,
+        checkedOutById: item.checkedOutById,
+        checkedOutByEmail: item.checkedOutByEmail,
+        homeDockId: homeDock?.id ?? null,
+        homeDockName: homeDock?.name ?? null,
+        homeRoomId: item.homeRoomId,
+      });
+    }
+  }
+
+  res.json({ unassigned, noStation, byDock, counts, byBucket });
 });
 
 /**
@@ -270,6 +396,349 @@ router.post("/equipment/:id/not-found-here", requireAuth, writeLimiter, async (r
   });
 
   res.json({ ok: true });
+});
+
+/**
+ * GET /api/docking/rooms/:roomId/sweep
+ *
+ * P3 T3.2a — the expected list for a per-shift Room Sweep (design §5,
+ * §6.2/§6.3): every item HOMED to this room (resting + checked-out —
+ * checked-out items are shown but D-9 accounted, never swept/missing),
+ * each classified via the T3.1 reconciliation ladder. One anchors query
+ * for the room's item ids (not per-item) to avoid N+1.
+ */
+router.get("/rooms/:roomId/sweep", requireAuth, async (req, res) => {
+  const clinicId = req.clinicId!;
+  const { roomId } = req.params;
+
+  const [room] = await db.select().from(rooms).where(and(eq(rooms.clinicId, clinicId), eq(rooms.id, roomId)));
+  if (!room) return apiError(req, res, "errors.notFound", undefined, 404);
+
+  const [clinicDocks, expectedItems] = await Promise.all([
+    db.select().from(docks).where(eq(docks.clinicId, clinicId)),
+    db
+      .select()
+      .from(equipment)
+      .where(and(eq(equipment.clinicId, clinicId), eq(equipment.homeRoomId, roomId), isNull(equipment.deletedAt))),
+  ]);
+
+  // S2-2 (pre-PR review, MINOR): latest anchor per item in ONE DISTINCT ON
+  // query (shared latestAnchorByEquipment helper, scoped to this room's item
+  // ids) instead of pulling each item's full anchor history and reducing in
+  // JS. The current-anchor UNIQUE index guarantees at most one open
+  // (invalidatedAt IS NULL) row per equipment, and createAnchor always
+  // invalidates the prior open row before inserting a new one, so the
+  // latest-by-assertedAt row IS the current anchor when one is open.
+  const itemIds = expectedItems.map((item) => item.id);
+  const latestAnchorByEquipmentId = await latestAnchorByEquipment(clinicId, itemIds);
+
+  const items = expectedItems.map((item) => {
+    const homeDock = resolveHomeDock({ homeRoomId: item.homeRoomId, assetTypeId: item.assetTypeId }, clinicDocks);
+    const latest = latestAnchorByEquipmentId.get(item.id);
+    const currentAnchor = latest && latest.invalidated_at == null ? { dockId: latest.dock_id } : null;
+    const lastContradictionReason = (
+      latest && latest.invalidated_at != null ? latest.invalidated_reason : null
+    ) as ClassifierCtx["lastContradictionReason"];
+
+    const bucket = classifyReconciliationBucket(
+      {
+        checkedOutById: item.checkedOutById,
+        homeRoomId: item.homeRoomId,
+        assetTypeId: item.assetTypeId,
+        roomId: item.roomId,
+        lastRfidRoomId: item.lastRfidRoomId,
+      },
+      { homeDock: homeDock ? { id: homeDock.id } : null, currentAnchor, lastContradictionReason },
+    );
+
+    return {
+      id: item.id,
+      name: item.name,
+      assetTypeId: item.assetTypeId,
+      custodyState: item.custodyState,
+      checkedOutById: item.checkedOutById,
+      checkedOutByEmail: item.checkedOutByEmail,
+      checkedOutAt: item.checkedOutAt ? item.checkedOutAt.toISOString() : null,
+      homeDockId: homeDock?.id ?? null,
+      homeDockName: homeDock?.name ?? null,
+      atStation: currentAnchor !== null && homeDock !== null && currentAnchor.dockId === homeDock.id,
+      bucket,
+    };
+  });
+
+  res.json({ roomId, items });
+});
+
+const roomSweepCommitSchema = z.object({
+  confirmedEquipmentIds: z.array(z.string()).max(1000),
+});
+
+/**
+ * POST /api/docking/rooms/:roomId/sweep
+ *
+ * P3 T3.2a — commits a Room Sweep. Confirmed expected-resting items get a
+ * fresh source:"sweep" anchor at their home dock; unconfirmed
+ * expected-resting items are contradicted (reason:"sweep_missing").
+ * Checked-out items are D-9 accounted — never swept or marked missing.
+ * A confirmed id that is checked-out or foreign to this room's expected-
+ * resting set is silently ignored, not errored. One transaction.
+ */
+router.post(
+  "/rooms/:roomId/sweep",
+  requireAuth,
+  writeLimiter,
+  validateBody(roomSweepCommitSchema),
+  async (req, res) => {
+    const clinicId = req.clinicId!;
+    const { id: userId, email } = req.authUser!;
+    const { roomId } = req.params;
+    const { confirmedEquipmentIds } = req.body as z.infer<typeof roomSweepCommitSchema>;
+
+    const [room] = await db.select().from(rooms).where(and(eq(rooms.clinicId, clinicId), eq(rooms.id, roomId)));
+    if (!room) return apiError(req, res, "errors.notFound", undefined, 404);
+
+    const confirmedSet = new Set(confirmedEquipmentIds);
+    let confirmedCount = 0;
+    let missingCount = 0;
+    let skippedNoStationCount = 0;
+
+    await db.transaction(async (tx) => {
+      const [clinicDocks, expectedResting] = await Promise.all([
+        tx.select().from(docks).where(eq(docks.clinicId, clinicId)),
+        tx
+          .select()
+          .from(equipment)
+          .where(
+            and(
+              eq(equipment.clinicId, clinicId),
+              eq(equipment.homeRoomId, roomId),
+              isNull(equipment.deletedAt),
+              ne(equipment.custodyState, "checked_out"),
+              // M-1 (D-9 defense-in-depth): the GET /reconciliation classifier
+              // keys "never sweep" on `checkedOutById` (checked-out-first, see
+              // docking.service.ts's classifyReconciliationBucket), not
+              // `custodyState`. Exclude items with a holder here too, so the
+              // sweep POST's writable set can't diverge from the GET's if the
+              // two fields ever get out of sync.
+              isNull(equipment.checkedOutById),
+            ),
+          ),
+      ]);
+
+      // Which expected-resting items currently have an OPEN anchor. An
+      // unconfirmed item WITH an open anchor is contradicted in place
+      // (invalidateCurrentAnchor). An unconfirmed item with NO open anchor
+      // (never anchored, or already contradicted) would leave
+      // invalidateCurrentAnchor a no-op — so we instead write an
+      // already-invalidated `sweep_missing` marker row (A1-1), making the
+      // contradiction durable so reconciliation buckets it `missing` rather
+      // than mis-bucketing a never-anchored item `returned_unverified`.
+      const restingIds = expectedResting.map((item) => item.id);
+      const openAnchorRows = restingIds.length
+        ? await tx
+            .select({ equipmentId: equipmentAnchors.equipmentId })
+            .from(equipmentAnchors)
+            .where(
+              and(
+                eq(equipmentAnchors.clinicId, clinicId),
+                inArray(equipmentAnchors.equipmentId, restingIds),
+                isNull(equipmentAnchors.invalidatedAt),
+              ),
+            )
+        : [];
+      const hasOpenAnchor = new Set(openAnchorRows.map((r) => r.equipmentId));
+
+      for (const item of expectedResting) {
+        if (confirmedSet.has(item.id)) {
+          const homeDock = resolveHomeDock({ homeRoomId: item.homeRoomId, assetTypeId: item.assetTypeId }, clinicDocks);
+          if (!homeDock) {
+            // No resolvable home dock — nothing to anchor to; neither swept
+            // nor missing. Counted separately (pre-PR review, MINOR) so the
+            // client-visible totals stay internally consistent with what
+            // the tech actually toggled (the GET expected-list still shows
+            // this item grouped under "No station").
+            skippedNoStationCount++;
+            continue;
+          }
+          await createAnchor(tx, {
+            clinicId,
+            equipmentId: item.id,
+            dockId: homeDock.id,
+            roomId: homeDock.roomId,
+            assertedById: userId,
+            source: "sweep",
+          });
+          confirmedCount++;
+        } else if (hasOpenAnchor.has(item.id)) {
+          await invalidateCurrentAnchor(tx, { clinicId, equipmentId: item.id, reason: "sweep_missing" });
+          missingCount++;
+        } else {
+          // Never-anchored (or already-contradicted) unconfirmed item — write a
+          // durable, already-invalidated sweep_missing marker so the sweep
+          // leaves a trace and reconciliation buckets it `missing`.
+          await tx.insert(equipmentAnchors).values({
+            id: randomUUID(),
+            clinicId,
+            equipmentId: item.id,
+            dockId: null,
+            roomId: null,
+            assertedById: userId,
+            source: "sweep",
+            invalidatedAt: new Date(),
+            invalidatedReason: "sweep_missing",
+          });
+          missingCount++;
+        }
+      }
+    });
+
+    const sweptAt = new Date().toISOString();
+
+    logAudit({
+      clinicId,
+      actionType: "room_swept",
+      performedBy: userId,
+      performedByEmail: email,
+      targetId: roomId,
+      metadata: { confirmed: confirmedCount, missing: missingCount },
+    });
+
+    res.json({ roomId, confirmedCount, missingCount, skippedNoStationCount, sweptById: userId, sweptAt });
+  },
+);
+
+const SHIFT_DATE_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+/**
+ * A `shiftDate` must be well-formed YYYY-MM-DD AND a real calendar date —
+ * `2026-13-40` matches the regex but is not a date and would blow up the DB
+ * DATE cast. Shared by BOTH the GET (`?date=`) and POST (`shiftDate`) handlers
+ * so an impossible date is rejected with a 400 BEFORE any DB query.
+ */
+function isValidShiftDate(value: string): boolean {
+  const m = SHIFT_DATE_RE.exec(value);
+  if (!m) return false;
+  const [, y, mo, d] = m;
+  const year = Number(y);
+  const month = Number(mo);
+  const day = Number(d);
+  const dt = new Date(Date.UTC(year, month - 1, day));
+  return dt.getUTCFullYear() === year && dt.getUTCMonth() === month - 1 && dt.getUTCDate() === day;
+}
+
+const shiftDateSchema = z
+  .string()
+  .refine(isValidShiftDate, { message: "shiftDate must be a valid YYYY-MM-DD calendar date" });
+
+/**
+ * GET /api/docking/coordinator?date=YYYY-MM-DD
+ *
+ * P3 T3.4-i-a — the derived Equipment Coordinator for a shift date (default:
+ * today in clinic-local time). Thin read over `resolveShiftCoordinator`;
+ * enriches `coordinatorUserId` with a display name (candidates already
+ * carry names from the resolver).
+ */
+router.get("/coordinator", requireAuth, async (req, res) => {
+  const clinicId = req.clinicId!;
+  const rawDate = typeof req.query.date === "string" ? req.query.date : undefined;
+
+  // Reject an impossible date up front — before the clinic-timezone / resolver
+  // DB queries. The default (clinic-local today) is always valid.
+  if (rawDate !== undefined && !shiftDateSchema.safeParse(rawDate).success) {
+    return apiError(req, res, "errors.validation", undefined, 400);
+  }
+
+  let shiftDate = rawDate;
+  if (!shiftDate) {
+    const timeZone = await getClinicTimezone(clinicId);
+    shiftDate = clinicTodayIsoDate(timeZone);
+  }
+
+  const resolution = await resolveShiftCoordinator(clinicId, shiftDate);
+
+  let coordinatorName: string | null = null;
+  if (resolution.coordinatorUserId) {
+    const fromCandidates = resolution.candidates.find((c) => c.userId === resolution.coordinatorUserId);
+    if (fromCandidates) {
+      coordinatorName = fromCandidates.name;
+    } else {
+      const [row] = await db
+        .select({ name: users.name, displayName: users.displayName })
+        .from(users)
+        .where(and(eq(users.clinicId, clinicId), eq(users.id, resolution.coordinatorUserId)))
+        .limit(1);
+      coordinatorName = row?.displayName || row?.name || null;
+    }
+  }
+
+  res.json({
+    shiftDate,
+    status: resolution.status,
+    coordinatorUserId: resolution.coordinatorUserId,
+    coordinatorName,
+    candidates: resolution.candidates,
+    seniorTechUserId: resolution.seniorTechUserId,
+  });
+});
+
+const confirmCoordinatorSchema = z.object({
+  shiftDate: shiftDateSchema,
+  coordinatorUserId: z.string().min(1),
+});
+
+/**
+ * POST /api/docking/coordinator
+ *
+ * P3 T3.4-i-a — confirms which eligible tech is this shift's Equipment
+ * Coordinator when auto-derivation was ambiguous (status "needs_confirmation").
+ * Authorization: the caller must be the derived senior tech for that shift,
+ * or an admin — not gated by `requireAdmin` since a senior tech (not an
+ * admin) is the primary confirmer. `coordinatorUserId` must be in the
+ * currently-eligible-on-shift set (422 otherwise).
+ */
+router.post("/coordinator", requireAuth, writeLimiter, validateBody(confirmCoordinatorSchema), async (req, res) => {
+  const clinicId = req.clinicId!;
+  const { id: userId, email, role } = req.authUser!;
+  const { shiftDate, coordinatorUserId } = req.body as z.infer<typeof confirmCoordinatorSchema>;
+
+  const resolution = await resolveShiftCoordinator(clinicId, shiftDate);
+
+  const isAdmin = role === "admin";
+  // Security (pre-PR review, MAJOR): `seniorTechUserId` is derived by
+  // matching the free-text roster `employeeName` to `vt_users.displayName ||
+  // name` — and `displayName` is self-editable via PATCH
+  // /api/users/:id/display_name. Matching the roster identity alone is not
+  // sufficient authorization; the caller's OWN immutable permanent role
+  // (always `vt_users.role`, never a spoofable source) must also be
+  // senior_technician (or its `lead_technician` alias).
+  const callerIsSeniorByPermanentRole = mapLegacyRoleToClinicalRole(role) === "senior_technician";
+  const isSeniorTechOnShift =
+    resolution.seniorTechUserId !== null &&
+    resolution.seniorTechUserId === userId &&
+    callerIsSeniorByPermanentRole;
+  if (!isAdmin && !isSeniorTechOnShift) {
+    return apiError(req, res, "errors.docking.coordinatorForbidden", undefined, 403);
+  }
+
+  const result = await confirmShiftCoordinator(
+    { clinicId, shiftDate, coordinatorUserId, assignedByUserId: userId },
+    resolution,
+  );
+  if (!result.ok) {
+    return apiError(req, res, "errors.docking.coordinatorNotEligible", undefined, 422);
+  }
+
+  logAudit({
+    clinicId,
+    actionType: "equipment_coordinator_assigned",
+    performedBy: userId,
+    performedByEmail: email,
+    targetId: coordinatorUserId,
+    targetType: "user",
+    metadata: { shiftDate, source: "confirmed" },
+  });
+
+  res.json(result.row);
 });
 
 export default router;

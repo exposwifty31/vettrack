@@ -527,6 +527,8 @@ export interface TStructure {
       damageReportUndo: string;
       damageReportFailed: string;
       damageReportOffline: string;
+      reportedNotFound: string;
+      notFoundFailed: string;
     };
     backToList: string;
     notFound: string;
@@ -540,6 +542,7 @@ export interface TStructure {
     floorNoteSaveFailed: string;
     confirmHere: string;
     confirmedHere: string;
+    notFoundHere: string;
     scanCount: string;
     scanCountOnce: string;
     scanLogTab: string;
@@ -851,6 +854,8 @@ export interface TStructure {
     notReady: string;
     inUse: string;
     roomReadiness: string;
+    readinessTileTitle: string;
+    readinessTileHelp: string;
     noExceptions: string;
     tasks: string;
     tasksEmpty: string;
@@ -1101,6 +1106,9 @@ export interface TStructure {
     markedOk: string;
     statusUpdateFailed: string;
     subtitleEquipmentQr: string;
+    confirmHere: string;
+    confirmedHere: string;
+    confirmHereFailed: string;
   };
   onboarding: {
     step1: {
@@ -1787,6 +1795,36 @@ export interface TStructure {
     pilotStale: string;
     pilotRecent: string;
   };
+  roomSweep: {
+    title: string;
+    startSweep: string;
+    markAllPresent: string;
+    present: string;
+    notPresent: string;
+    withHolder: string;
+    withHolderSince: string;
+    checkedOutBadge: string;
+    confirmSweep: string;
+    summary: string;
+    sweptToast: string;
+    noHomedItems: string;
+    noHomedItemsHint: string;
+    noStationGroup: string;
+    commitError: string;
+    loadError: string;
+  };
+  coordinator: {
+    sweptPrefix: string;
+    byName: string;
+    notSweptThisShift: string;
+    withName: string;
+    toBeConfirmed: string;
+    unassigned: string;
+    choosePlaceholder: string;
+    confirmSuccess: string;
+    confirmError: string;
+    loadError: string;
+  };
   roomsListPage: {
     selectRoomTitle: string;
     selectRoomSubtitle: string;
@@ -2103,6 +2141,9 @@ export interface TStructure {
     cursorBugFixerNotConfigured: string;
     secondaryRoleUpdated: string;
     secondaryRoleUpdateFailed: string;
+    equipmentCoordinatorLabel: string;
+    equipmentCoordinatorUpdated: string;
+    equipmentCoordinatorUpdateFailed: string;
   };
   layoutHebrew: {
     home: string;
@@ -2931,6 +2972,9 @@ export interface TStructure {
       duplicateName: string;
       invalidReference: string;
       invalidEquipmentIds: string;
+      noHomeStation: string;
+      coordinatorForbidden: string;
+      coordinatorNotEligible: string;
     };
   };
   push: {
@@ -3354,6 +3398,20 @@ export interface TStructure {
   staleCheckout: {
     pushTitle: string;
     pushBody: string;
+  };
+  staleReturned: {
+    pushTitle: string;
+    pushBody: string;
+  };
+  sweepEscalation: {
+    stage1Title: string;
+    stage1Body: string;
+    stage2Title: string;
+    stage2Body: string;
+    stage3Title: string;
+    stage3Body: string;
+    stage4Title: string;
+    stage4Body: string;
   };
   semiDock: {
     pushTitle: string;
@@ -4141,6 +4199,36 @@ export interface TStructure {
     categoryLoadError: string;
     roomsLoadError: string;
     reconciliationLoadError: string;
+    bucketCountsTitle: string;
+    bucketLabels: {
+      at_home: string;
+      checked_out: string;
+      returned_unverified: string;
+      returned_away: string;
+      misplaced_at_station: string;
+      missing: string;
+      unassigned: string;
+      no_station: string;
+    };
+    driftBuckets: {
+      returned_unverified: {
+        hint: string;
+        empty: string;
+      };
+      returned_away: {
+        hint: string;
+        empty: string;
+      };
+      misplaced_at_station: {
+        hint: string;
+        empty: string;
+      };
+      missing: {
+        hint: string;
+        empty: string;
+      };
+    };
+    holderLabel: string;
   };
   adminAssetTypesPage: {
     typePlaceholder: string;
@@ -4201,5 +4289,10 @@ export interface TStructure {
     damagedButton: string;
     damageWarning: string;
     confirmReturnedDamaged: string;
+    toggleLabelStation: string;
+    toggleLabelGeneric: string;
+    noHomeHint: string;
+    stationUnresolvedHint: string;
+    offlineDockHint: string;
   };
 }

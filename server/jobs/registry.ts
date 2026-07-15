@@ -17,7 +17,9 @@ export type StaticJobKind =
   | "stale-task-ownership-sweep"
   | "check-expiry"
   | "sweep-stale-checkins"
-  | "sweep-stale-checkouts";
+  | "sweep-stale-checkouts"
+  | "sweep-stale-returned"
+  | "sweep-room-escalation";
 
 /** Enqueue-only kind for integration sync (dynamic BullMQ `job.name`). */
 export type IntegrationEnqueueKind = "integration-sync-enqueue";

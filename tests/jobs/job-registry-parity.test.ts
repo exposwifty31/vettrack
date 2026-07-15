@@ -247,8 +247,10 @@ describe("E3 — job registry / enqueue parity", () => {
         "check-expiry",
         "check-plug",
         "stale-task-ownership-sweep",
+        "sweep-room-escalation",
         "sweep-stale-checkins",
         "sweep-stale-checkouts",
+        "sweep-stale-returned",
         "task-ownership-backfill",
       ]
     `);
@@ -284,8 +286,10 @@ describe("E3 — job registry / enqueue parity", () => {
         "check-expiry",
         "check-plug",
         "stale-task-ownership-sweep",
+        "sweep-room-escalation",
         "sweep-stale-checkins",
         "sweep-stale-checkouts",
+        "sweep-stale-returned",
         "task-ownership-backfill",
       ]
     `);

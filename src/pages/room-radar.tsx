@@ -37,6 +37,7 @@ import {
   LogIn,
   LogOut,
   PawPrint,
+  ListChecks,
 } from "lucide-react";
 import { formatRelativeTime } from "@/lib/utils";
 import { statusToBadgeVariant } from "@/lib/design-tokens";
@@ -47,6 +48,8 @@ import { useAuth } from "@/hooks/use-auth";
 import type { Equipment, Room, RoomActivityEntry, EquipmentStatus } from "@/types";
 import { ReturnPlugDialog } from "@/components/return-plug-dialog";
 import { haptics } from "@/lib/haptics";
+import { RoomSweep } from "@/features/equipment/sweep/RoomSweep";
+import { CoordinatorSweepState } from "@/features/equipment/sweep/CoordinatorSweepState";
 
 function toInitials(name: string | null | undefined): string {
   if (!name?.trim()) return "?";
@@ -390,6 +393,7 @@ export default function RoomRadarPage() {
   const [availableOnly, setAvailableOnly] = useState(false);
   const [activityOpen, setActivityOpen] = useState(false);
   const [nfcOverlayOpen, setNfcOverlayOpen] = useState(false);
+  const [sweepOpen, setSweepOpen] = useState(false);
   const [verifyState, setVerifyState] = useState<"idle" | "verifying" | "done">("idle");
   const [verifiedCount, setVerifiedCount] = useState(0);
   const verifyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -583,30 +587,51 @@ export default function RoomRadarPage() {
               </Link>
             </div>
           ) : room ? (
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <h1 className="text-2xl font-bold leading-tight">{room.name}</h1>
-                  <SyncBadge status={room.syncStatus} />
+            <>
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h1 className="text-2xl font-bold leading-tight">{room.name}</h1>
+                    <SyncBadge status={room.syncStatus} />
+                  </div>
+                  {room.floor && (
+                    <p className="text-sm text-muted-foreground flex items-center gap-1 mt-0.5">
+                      <MapPin className="w-3 h-3" />
+                      {room.floor}
+                    </p>
+                  )}
+                  {room.linkedPatientName ? (
+                    <p className="flex items-center gap-2 text-sm font-semibold text-violet-800 dark:text-violet-200 mt-2">
+                      <PawPrint className="w-4 h-4 shrink-0" aria-hidden />
+                      <span>
+                        {t.roomRadarPage.patientActive}: {room.linkedPatientName}
+                      </span>
+                    </p>
+                  ) : (
+                    <p className="text-sm text-muted-foreground mt-2">{t.roomRadarPage.roomVacant}</p>
+                  )}
                 </div>
-                {room.floor && (
-                  <p className="text-sm text-muted-foreground flex items-center gap-1 mt-0.5">
-                    <MapPin className="w-3 h-3" />
-                    {room.floor}
-                  </p>
-                )}
-                {room.linkedPatientName ? (
-                  <p className="flex items-center gap-2 text-sm font-semibold text-violet-800 dark:text-violet-200 mt-2">
-                    <PawPrint className="w-4 h-4 shrink-0" aria-hidden />
-                    <span>
-                      {t.roomRadarPage.patientActive}: {room.linkedPatientName}
-                    </span>
-                  </p>
-                ) : (
-                  <p className="text-sm text-muted-foreground mt-2">{t.roomRadarPage.roomVacant}</p>
-                )}
               </div>
-            </div>
+
+              {/* Room Sweep entry (docking P3 T3.2b) — mobile floor tool to
+                  confirm which owned items are physically present. Any
+                  authenticated user may start a sweep (low-stakes heal
+                  action; per-shift designation is a later task). */}
+              <button
+                type="button"
+                onClick={() => setSweepOpen(true)}
+                data-testid="start-room-sweep"
+                className="flex items-center justify-center gap-2 w-full sm:w-auto px-4 py-2.5 mt-3 rounded-xl border border-primary/30 bg-primary/5 text-primary text-sm font-bold min-h-[44px] active:scale-[0.98] transition-transform hover:bg-primary/10"
+              >
+                <ListChecks className="w-4 h-4" aria-hidden />
+                {t.roomSweep.startSweep}
+              </button>
+
+              {/* Equipment Coordinator + sweep-state line (docking P3
+                  T3.4-i-b) — this shift's derived coordinator and this
+                  room's last-swept status, right under the sweep entry. */}
+              <CoordinatorSweepState lastSweptAt={room.lastSweptAt} lastSweptByName={room.lastSweptByName} />
+            </>
           ) : null}
         </div>
 
@@ -817,6 +842,15 @@ export default function RoomRadarPage() {
           </div>
         )}
       </div>
+
+      {id && (
+        <RoomSweep
+          roomId={id}
+          roomName={room?.name}
+          open={sweepOpen}
+          onOpenChange={setSweepOpen}
+        />
+      )}
     </>
   );
   return <AppShell>{pageContent}</AppShell>;

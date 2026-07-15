@@ -69,6 +69,14 @@ export interface Room {
   inUseCount?: number;
   issueCount?: number;
   recentlyVerifiedCount?: number;
+  /** Items homed to this room WITH a category (docking P3 T3.3, design §6.4). */
+  expectedFill?: number;
+  /** Homed items currently classified "at_home" by the reconciliation ladder. */
+  atHomeCount?: number;
+  /** Most recent source:"sweep" anchor among items homed to this room (docking P3 T3.4-i-b). */
+  lastSweptAt?: string | null;
+  /** Display name of whoever asserted that most recent sweep anchor. */
+  lastSweptByName?: string | null;
   /** Manual patient linked to this room (GET /api/rooms/:id). */
   linkedPatientName?: string | null;
 }
@@ -562,11 +570,39 @@ export interface DockingReconciliationItem {
   assetTypeId: string | null;
 }
 
-/** GET /api/docking/reconciliation response — P1 ownership-derivable buckets. */
+/** A single item within the P3 full 8-bucket reconciliation breakdown (T3.6a). */
+export interface DockingReconciliationBucketItem {
+  id: string;
+  name: string;
+  bucket: ReconciliationBucket;
+  custodyState: string;
+  checkedOutById: string | null;
+  checkedOutByEmail: string | null;
+  homeDockId: string | null;
+  homeDockName: string | null;
+  homeRoomId: string | null;
+}
+
+/**
+ * GET /api/docking/reconciliation response — the P1 ownership-derivable
+ * buckets (unassigned/noStation/byDock, still consumed by
+ * AdminHomeAssignmentPage) plus the P3 full 8-bucket classifier breakdown
+ * (counts + byBucket) for the Manager reconciliation worklist.
+ *
+ * M-5 (phase review): `byBucket.at_home` / `byBucket.checked_out` are
+ * trimmed to counts-only (empty arrays) — those two buckets are potentially
+ * the whole fleet, and the client only ever renders their `counts`
+ * (BucketCountsSummary); ReconciliationWorklist's per-item sections only
+ * iterate the 4 drift buckets. The other 6 bucket keys (the 4 drift buckets
+ * + unassigned/no_station) still carry full item lists. `counts` is always
+ * complete for all 8 buckets.
+ */
 export interface DockingReconciliation {
   unassigned: DockingReconciliationItem[];
   noStation: DockingReconciliationItem[];
   byDock: Array<{ dock: Dock; expectedFill: number; capacity: number | null }>;
+  counts: Record<ReconciliationBucket, number>;
+  byBucket: Record<ReconciliationBucket, DockingReconciliationBucketItem[]>;
 }
 
 /**
@@ -587,6 +623,88 @@ export interface EquipmentAnchor {
   invalidatedAt: string | null;
   invalidatedReason: "checkout" | "rfid_elsewhere" | "sweep_missing" | "not_found_here" | null;
   createdAt: string;
+}
+
+/** Mirrors ReconciliationBucket in server/services/docking.service.ts (design §6.2). */
+export type ReconciliationBucket =
+  | "at_home"
+  | "checked_out"
+  | "returned_unverified"
+  | "returned_away"
+  | "misplaced_at_station"
+  | "missing"
+  | "unassigned"
+  | "no_station";
+
+/** A single item in the P3 Room Sweep expected list (design §5, §6.2/§6.3). */
+export interface RoomSweepItem {
+  id: string;
+  name: string;
+  assetTypeId: string | null;
+  custodyState: string;
+  checkedOutById: string | null;
+  checkedOutByEmail: string | null;
+  checkedOutAt?: string | null;
+  homeDockId: string | null;
+  homeDockName: string | null;
+  atStation: boolean;
+  bucket: ReconciliationBucket;
+}
+
+/** GET /api/docking/rooms/:roomId/sweep response — the expected list for the UI. */
+export interface RoomSweepList {
+  roomId: string;
+  items: RoomSweepItem[];
+}
+
+/** POST /api/docking/rooms/:roomId/sweep response — the commit result. */
+export interface RoomSweepResult {
+  roomId: string;
+  confirmedCount: number;
+  missingCount: number;
+  /** Confirmed items with no resolvable home dock (grouped "No station" in the expected list) — counted separately so totals stay internally consistent. */
+  skippedNoStationCount: number;
+  sweptById: string;
+  sweptAt: string;
+}
+
+/** Mirrors CoordinatorStatus in server/services/equipment-coordinator.service.ts. */
+export type EquipmentCoordinatorStatus = "auto" | "confirmed" | "fallback_senior" | "needs_confirmation" | "unresolved";
+
+export interface EquipmentCoordinatorCandidate {
+  userId: string;
+  name: string;
+}
+
+/** GET /api/docking/coordinator response — this shift date's derived Equipment Coordinator. */
+export interface ShiftCoordinatorResult {
+  shiftDate: string;
+  status: EquipmentCoordinatorStatus;
+  coordinatorUserId: string | null;
+  coordinatorName: string | null;
+  candidates: EquipmentCoordinatorCandidate[];
+  seniorTechUserId: string | null;
+}
+
+/**
+ * POST /api/docking/coordinator response — the full stored
+ * vt_shift_equipment_coordinator row, including the P3 T3.4-ii escalation
+ * ladder fields (migration 167): escalationStage (0 none, 1 coordinator
+ * reminded, 2 senior notified, 3 responsibility transferred, 4 open to
+ * all + manager notified), currentResponsibleUserId (set at stage 3, null
+ * otherwise), escalatedAt (last escalation timestamp, null before stage 1).
+ */
+export interface ShiftCoordinatorConfirmation {
+  id: string;
+  clinicId: string;
+  shiftDate: string;
+  coordinatorUserId: string;
+  source: "auto" | "confirmed" | "fallback_senior";
+  assignedByUserId: string | null;
+  createdAt: string;
+  escalationStage: number;
+  currentResponsibleUserId: string | null;
+  escalatedAt: string | null;
 }
 
 export type QuickScanToggleAction = "checkout" | "return" | "blocked";

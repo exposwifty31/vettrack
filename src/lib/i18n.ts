@@ -465,10 +465,14 @@ const translations = {
 
   home: d.home,
 
-  // Phase 3 (A2) home ops/floor surfaces. No interpolated keys → plain namespace
-  // spread (the buildTranslations gotcha: without this line t.homeSurface is
-  // undefined at runtime even with the JSON keys + generated .d.ts present).
-  homeSurface: d.homeSurface,
+  // Phase 3 (A2) home ops/floor surfaces (the buildTranslations gotcha: without
+  // this line t.homeSurface is undefined at runtime even with the JSON keys +
+  // generated .d.ts present). `readinessTileTitle` (P3 cleanup) is the only
+  // interpolated key in this namespace — everything else is a plain spread.
+  homeSurface: {
+    ...d.homeSurface,
+    readinessTileTitle: (pct: number) => tr(d.homeSurface.readinessTileTitle, { pct }),
+  },
 
   equipment: {
     ...d.equipment,
@@ -770,6 +774,21 @@ const translations = {
     verifyAllInRoom: (roomName: string) => tr(d.roomRadarPage.verifyAllInRoom, { roomName }),
     itemsVerified: (count: number) => tr(d.roomRadarPage.itemsVerified, { count }),
     filterHint: (shown: number, total: number) => tr(d.roomRadarPage.filterHint, { shown, total }),
+  },
+
+  roomSweep: {
+    ...d.roomSweep,
+    withHolder: (holder: string) => tr(d.roomSweep.withHolder, { holder }),
+    withHolderSince: (holder: string, relative: string) =>
+      tr(d.roomSweep.withHolderSince, { holder, relative }),
+    summary: (present: number, missing: number) => tr(d.roomSweep.summary, { present, missing }),
+    sweptToast: (present: number, missing: number) => tr(d.roomSweep.sweptToast, { present, missing }),
+  },
+
+  coordinator: {
+    ...d.coordinator,
+    byName: (name: string) => tr(d.coordinator.byName, { name }),
+    withName: (name: string) => tr(d.coordinator.withName, { name }),
   },
 
   roomsListPage: {
@@ -1143,7 +1162,10 @@ const translations = {
 
   adminDocks: d.adminDocks,
 
-  adminHomeAssignment: d.adminHomeAssignment,
+  adminHomeAssignment: {
+    ...d.adminHomeAssignment,
+    holderLabel: (email: string) => tr(d.adminHomeAssignment.holderLabel, { email }),
+  },
 
   adminAssetTypesPage: d.adminAssetTypesPage,
 

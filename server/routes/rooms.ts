@@ -1,12 +1,13 @@
 import { Router } from "express";
 import { randomUUID } from "crypto";
 import { z } from "zod";
-import { db, equipment, rooms, scanLogs, users } from "../db.js";
-import { eq, and, isNull, isNotNull, sql, desc, gt } from "drizzle-orm";
+import { db, equipment, rooms, scanLogs, users, docks, equipmentAnchors } from "../db.js";
+import { eq, and, isNull, isNotNull, inArray, sql, desc, gt } from "drizzle-orm";
 import { requireAuth, requireAdmin, requireEffectiveRole } from "../middleware/auth.js";
 import { validateBody } from "../middleware/validate.js";
 import { logAudit, resolveAuditActorRole } from "../lib/audit.js";
 import { resolveRequestId, apiError } from "../lib/route-utils.js";
+import { roomExpected, resolveHomeDock, classifyReconciliationBucket } from "../services/docking.service.js";
 
 /*
  * PERMISSIONS MATRIX — /api/rooms
@@ -36,6 +37,62 @@ const patchRoomSchema = z.object({
   syncStatus: z.enum(["synced", "stale", "requires_audit"]).optional(),
 });
 
+type LastSweptRow = {
+  home_room_id: string;
+  asserted_at: Date | string;
+  sweeper_name: string | null;
+  sweeper_display_name: string | null;
+};
+
+/**
+ * S2-1 (pre-PR review, MAJOR): per-room "last swept" (docking P3 T3.4-i-b
+ * Part A) — the most recent sweep-derived anchor among items currently
+ * homed to each room, plus the asserter's display name. ONE bounded
+ * DISTINCT ON (home_room_id) query, not an unbounded full-history select
+ * over every source:"sweep" anchor for the clinic deduped in JS. Shared by
+ * both GET /api/rooms (roomId omitted — every room) and GET /api/rooms/:id
+ * (roomId passed — scoped to that one room), so the derivation isn't
+ * copy-pasted a third time. All-time, not shift-scoped.
+ *
+ * A2-7 (CodeRabbit PR #106): "swept" counts EITHER a `source:"sweep"`
+ * anchor (a confirmed-present item — displayed at `asserted_at`) OR an
+ * `invalidated_reason:"sweep_missing"` anchor (an unconfirmed item, A1-1 —
+ * displayed at `invalidated_at`, the sweep's own timestamp, since that
+ * anchor's `asserted_at` may predate this sweep entirely for an item that
+ * had a prior open anchor from some other source). Without the second
+ * branch, a sweep that confirms zero items present leaves no
+ * `source:"sweep"` anchor at all, so the room falsely shows "never swept".
+ */
+async function lastSweptByRoom(
+  clinicId: string,
+  roomId?: string,
+): Promise<Map<string, { lastSweptAt: string; lastSweptByName: string | null }>> {
+  const result = await db.execute<LastSweptRow>(sql`
+    SELECT DISTINCT ON (e.home_room_id)
+      e.home_room_id,
+      CASE WHEN a.invalidated_reason = 'sweep_missing' THEN a.invalidated_at ELSE a.asserted_at END AS asserted_at,
+      u.name AS sweeper_name, u.display_name AS sweeper_display_name
+    FROM vt_equipment_anchors a
+    INNER JOIN vt_equipment e ON e.id = a.equipment_id AND e.clinic_id = ${clinicId}
+    LEFT JOIN vt_users u ON u.id = a.asserted_by_id AND u.clinic_id = ${clinicId}
+    WHERE a.clinic_id = ${clinicId}
+      AND (a.source = 'sweep' OR a.invalidated_reason = 'sweep_missing')
+      AND e.home_room_id IS NOT NULL
+      AND e.deleted_at IS NULL
+      ${roomId ? sql`AND e.home_room_id = ${roomId}` : sql``}
+    ORDER BY e.home_room_id, asserted_at DESC
+  `);
+
+  const map = new Map<string, { lastSweptAt: string; lastSweptByName: string | null }>();
+  for (const row of result.rows) {
+    map.set(row.home_room_id, {
+      lastSweptAt: new Date(row.asserted_at).toISOString(),
+      lastSweptByName: row.sweeper_display_name || row.sweeper_name || null,
+    });
+  }
+  return map;
+}
+
 // GET /api/rooms — list all rooms with per-room equipment counts
 router.get("/", requireAuth, async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
@@ -53,19 +110,73 @@ router.get("/", requireAuth, async (req, res) => {
 
     const cutoff24h = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
-    const counts = await db
-      .select({
-        roomId: equipment.roomId,
-        total: sql<number>`count(*)::int`,
-        inUse: sql<number>`count(*) filter (where ${equipment.checkedOutById} is not null)::int`,
-        issue: sql<number>`count(*) filter (where ${equipment.status} in ('issue', 'maintenance'))::int`,
-        recentlyVerified: sql<number>`count(*) filter (where ${equipment.lastVerifiedAt} > ${cutoff24h})::int`,
-      })
-      .from(equipment)
-      .where(and(eq(equipment.clinicId, clinicId), isNotNull(equipment.roomId), isNull(equipment.deletedAt)))
-      .groupBy(equipment.roomId);
+    const [counts, homedEquipment, clinicDocks, lastSweptByRoomId] = await Promise.all([
+      db
+        .select({
+          roomId: equipment.roomId,
+          total: sql<number>`count(*)::int`,
+          inUse: sql<number>`count(*) filter (where ${equipment.checkedOutById} is not null)::int`,
+          issue: sql<number>`count(*) filter (where ${equipment.status} in ('issue', 'maintenance'))::int`,
+          recentlyVerified: sql<number>`count(*) filter (where ${equipment.lastVerifiedAt} > ${cutoff24h})::int`,
+        })
+        .from(equipment)
+        .where(and(eq(equipment.clinicId, clinicId), isNotNull(equipment.roomId), isNull(equipment.deletedAt)))
+        .groupBy(equipment.roomId),
+      // Present-vs-expected readiness (design §6.4) is homed-based, not
+      // current-room-based — a room's expected fill is what's HOMED there,
+      // regardless of where an item currently sits.
+      db
+        .select({
+          id: equipment.id,
+          homeRoomId: equipment.homeRoomId,
+          assetTypeId: equipment.assetTypeId,
+          checkedOutById: equipment.checkedOutById,
+        })
+        .from(equipment)
+        .where(and(eq(equipment.clinicId, clinicId), isNotNull(equipment.homeRoomId), isNull(equipment.deletedAt))),
+      db.select().from(docks).where(eq(docks.clinicId, clinicId)),
+      lastSweptByRoom(clinicId),
+    ]);
 
     const countMap = new Map(counts.map((c) => [c.roomId, c]));
+
+    const homedIds = homedEquipment.map((item) => item.id);
+    const anchorRows = homedIds.length
+      ? await db
+          .select({ equipmentId: equipmentAnchors.equipmentId, dockId: equipmentAnchors.dockId })
+          .from(equipmentAnchors)
+          .where(
+            and(
+              eq(equipmentAnchors.clinicId, clinicId),
+              inArray(equipmentAnchors.equipmentId, homedIds),
+              isNull(equipmentAnchors.invalidatedAt),
+            ),
+          )
+      : [];
+    const anchorDockByEquipmentId = new Map(anchorRows.map((a) => [a.equipmentId, a.dockId]));
+
+    // T3.1 reconciliation ladder decides "at_home" before it ever needs
+    // presence (roomId/lastRfidRoomId) or contradiction history, so those
+    // are safe placeholders here — see docking.service.ts classifier order.
+    const atHomeCountByRoomId = new Map<string, number>();
+    for (const item of homedEquipment) {
+      const homeDock = resolveHomeDock({ homeRoomId: item.homeRoomId, assetTypeId: item.assetTypeId }, clinicDocks);
+      const hasAnchor = anchorDockByEquipmentId.has(item.id);
+      const currentAnchor = hasAnchor ? { dockId: anchorDockByEquipmentId.get(item.id) ?? null } : null;
+      const bucket = classifyReconciliationBucket(
+        {
+          checkedOutById: item.checkedOutById,
+          homeRoomId: item.homeRoomId,
+          assetTypeId: item.assetTypeId,
+          roomId: null,
+          lastRfidRoomId: null,
+        },
+        { homeDock: homeDock ? { id: homeDock.id } : null, currentAnchor, lastContradictionReason: null },
+      );
+      if (bucket === "at_home" && item.homeRoomId) {
+        atHomeCountByRoomId.set(item.homeRoomId, (atHomeCountByRoomId.get(item.homeRoomId) ?? 0) + 1);
+      }
+    }
 
     const result = allRooms.map((room) => {
       const c = countMap.get(room.id);
@@ -80,6 +191,10 @@ router.get("/", requireAuth, async (req, res) => {
         inUseCount: inUse,
         issueCount: issue,
         recentlyVerifiedCount: recentlyVerified,
+        expectedFill: roomExpected(room.id, homedEquipment),
+        atHomeCount: atHomeCountByRoomId.get(room.id) ?? 0,
+        lastSweptAt: lastSweptByRoomId.get(room.id)?.lastSweptAt ?? null,
+        lastSweptByName: lastSweptByRoomId.get(room.id)?.lastSweptByName ?? null,
       };
     });
 
@@ -136,6 +251,15 @@ router.get("/:id", requireAuth, async (req, res) => {
     const issue = counts?.issue ?? 0;
     const recentlyVerified = counts?.recentlyVerified ?? 0;
 
+    // "Last swept" (pre-PR review, MAJOR — mirrors the GET /api/rooms list
+    // handler's derivation above, scoped to this one room via the shared
+    // lastSweptByRoom helper): the most recent source:"sweep" anchor among
+    // items currently HOMED to this room, joined to the asserting user's
+    // name. All-time, not shift-scoped (the client's copy for this surface
+    // is deliberately not "this shift").
+    const lastSweptMap = await lastSweptByRoom(clinicId, room.id);
+    const lastSweep = lastSweptMap.get(room.id);
+
     res.json({
       ...room,
       totalEquipment: total,
@@ -144,6 +268,8 @@ router.get("/:id", requireAuth, async (req, res) => {
       issueCount: issue,
       recentlyVerifiedCount: recentlyVerified,
       linkedPatientName: null,
+      lastSweptAt: lastSweep?.lastSweptAt ?? null,
+      lastSweptByName: lastSweep?.lastSweptByName ?? null,
     });
   } catch (err) {
     console.error(err);

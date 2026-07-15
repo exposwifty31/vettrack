@@ -9,6 +9,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { subscribeKeepalive } from "@/lib/realtime";
 import { useAlertsController } from "@/features/alerts";
 import { OnShiftHero, deriveHeroState } from "./surfaces/OnShiftHero";
+import { roomPct } from "./surfaces/ops/ops-tile-helpers";
 import { Bdi } from "@/components/ui/bdi";
 import { ForwardChevron } from "@/components/ui/directional-chevron";
 import { equipmentTriageTier } from "@/lib/design-tokens";
@@ -25,12 +26,6 @@ function greetingFor(hour: number, name: string): string {
 }
 
 const ALERT_ORDER: Alert["type"][] = ["issue", "overdue", "sterilization_due", "inactive"];
-
-function roomPct(room: Room): number | null {
-  const total = room.totalEquipment ?? 0;
-  if (total === 0) return null;
-  return Math.round(((room.recentlyVerifiedCount ?? 0) / total) * 100);
-}
 
 function pctColor(pct: number): string {
   if (pct >= 80) return "rgb(var(--sys-green))";
@@ -452,7 +447,7 @@ export function HomeTabletDashboard() {
         ) : worstRooms.length === 0 ? (
           <p style={{ margin: 0, display: "flex", alignItems: "center", gap: 8, fontSize: "var(--text-sm)", color: "hsl(var(--muted-foreground))" }}>
             <DoorOpen size={16} aria-hidden />
-            {t.roomsListPage.healthRingHelp}
+            {t.homeSurface.readinessTileHelp}
           </p>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -461,7 +456,7 @@ export function HomeTabletDashboard() {
                 key={room.id}
                 href={`/rooms/${room.id}`}
                 style={{ display: "flex", alignItems: "center", gap: 10, textDecoration: "none", minHeight: 32 }}
-                title={t.roomsListPage.healthRingTitle(pct)}
+                title={t.homeSurface.readinessTileTitle(pct)}
               >
                 <span
                   dir="auto"

@@ -62,6 +62,10 @@ import type {
   Dock,
   DockingReconciliation,
   EquipmentAnchor,
+  RoomSweepList,
+  RoomSweepResult,
+  ShiftCoordinatorResult,
+  ShiftCoordinatorConfirmation,
   Equipment,
   OperationalMetricsSummary,
   DisplayDevice,
@@ -448,6 +452,11 @@ export const api = {
       request<{ user: User }>(`/api/users/${id}/secondary-role`, {
         method: "PATCH",
         body: JSON.stringify({ secondaryRole }),
+      }),
+    setEquipmentCoordinator: (id: string, isEquipmentCoordinator: boolean) =>
+      request<User>(`/api/users/${id}/equipment-coordinator`, {
+        method: "PATCH",
+        body: JSON.stringify({ isEquipmentCoordinator }),
       }),
     updateStatus: (
       id: string,
@@ -1252,6 +1261,14 @@ export const api = {
       request<EquipmentAnchor>(`/api/docking/equipment/${id}/citizen-anchor`, { method: "POST" }),
     notFoundHere: (id: string) =>
       request<{ ok: true }>(`/api/docking/equipment/${id}/not-found-here`, { method: "POST" }),
+    roomSweepList: (roomId: string) =>
+      request<RoomSweepList>(`/api/docking/rooms/${roomId}/sweep`),
+    commitRoomSweep: (roomId: string, data: { confirmedEquipmentIds: string[] }) =>
+      request<RoomSweepResult>(`/api/docking/rooms/${roomId}/sweep`, { method: "POST", body: JSON.stringify(data) }),
+    shiftCoordinator: (date?: string) =>
+      request<ShiftCoordinatorResult>(`/api/docking/coordinator${date ? `?date=${date}` : ""}`),
+    confirmCoordinator: (data: { shiftDate: string; coordinatorUserId: string }) =>
+      request<ShiftCoordinatorConfirmation>("/api/docking/coordinator", { method: "POST", body: JSON.stringify(data) }),
   },
   platform: {
     capabilities: () =>

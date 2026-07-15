@@ -26,9 +26,12 @@ const { equipmentList, acksList, homeDashboard, roomsList } = vi.hoisted(() => {
     { id: "eq-a", name: "Syringe pump 7", status: "ok" },
     { id: "eq-b", name: "Infusion pump 3", status: "ok" },
   ];
+  // present-vs-expected fixtures (P3 formula: atHomeCount / expectedFill) —
+  // same 100%/50% split as the pre-P3 recentlyVerifiedCount/totalEquipment
+  // fixture this replaces, so the worst-first ordering assertions hold.
   const rooms = [
-    { id: "room-full", name: "Surgery 1", totalEquipment: 4, recentlyVerifiedCount: 4 },
-    { id: "room-half", name: "ICU", totalEquipment: 2, recentlyVerifiedCount: 1 },
+    { id: "room-full", name: "Surgery 1", expectedFill: 4, atHomeCount: 4 },
+    { id: "room-half", name: "ICU", expectedFill: 2, atHomeCount: 1 },
   ];
   return {
     equipmentList: vi.fn(async () => equipment as unknown as Equipment[]),

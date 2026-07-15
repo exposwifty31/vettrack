@@ -851,6 +851,8 @@
     "notReady": "לא מוכן",
     "inUse": "בשימוש",
     "roomReadiness": "מוכנות חדרים",
+    "readinessTileTitle": "{pct}% מהציוד הצפוי לחדר נמצא בתחנת הבית שלו",
+    "readinessTileHelp": "החלק מהציוד הצפוי של כל חדר שנמצא כרגע בתחנת הבית שלו",
     "noExceptions": "אין חריגות",
     "tasks": "משימות",
     "tasksEmpty": "אין משימות כרגע",
@@ -1790,6 +1792,36 @@
     "pilotStale": "ישן",
     "pilotRecent": "עדכני"
   },
+  "roomSweep": {
+    "title": "סריקת חדר",
+    "startSweep": "התחל סריקת חדר",
+    "markAllPresent": "סמן הכל כנוכח",
+    "present": "נוכח",
+    "notPresent": "לא נוכח",
+    "withHolder": "אצל {holder}",
+    "withHolderSince": "אצל {holder} · מאז {relative}",
+    "checkedOutBadge": "בשימוש",
+    "confirmSweep": "אשר סריקה",
+    "summary": "{present} נוכחים · {missing} חסרים",
+    "sweptToast": "נסרק: {present} נוכחים, {missing} סומנו כחסרים",
+    "noHomedItems": "אין ציוד ששויך לחדר זה עדיין",
+    "noHomedItemsHint": "שייכו ציוד לתחנת בית כדי לאפשר סריקת חדר.",
+    "noStationGroup": "ללא תחנה",
+    "commitError": "הסריקה נכשלה — נסו שוב",
+    "loadError": "טעינת רשימת הציוד הצפוי נכשלה"
+  },
+  "coordinator": {
+    "sweptPrefix": "נסרק לאחרונה",
+    "byName": "על ידי {name}",
+    "notSweptThisShift": "מעולם לא נסרק",
+    "withName": "רכז הציוד: {name}",
+    "toBeConfirmed": "רכז הציוד: טרם אושר",
+    "unassigned": "רכז הציוד: לא שובץ",
+    "choosePlaceholder": "בחר רכז ציוד",
+    "confirmSuccess": "רכז הציוד אושר",
+    "confirmError": "אישור רכז הציוד נכשל",
+    "loadError": "טעינת רכז הציוד נכשלה"
+  },
   "roomsListPage": {
     "selectRoomTitle": "בחר חדר",
     "selectRoomSubtitle": "בחר מהרשימה כדי לראות כאן פרטים",
@@ -2105,7 +2137,10 @@
     "cursorBugFixerFailed": "לא ניתן להפעיל את מתקן הבאגים של Cursor",
     "cursorBugFixerNotConfigured": "מתקן הבאגים של Cursor לא מוגדר במלואו בשרת",
     "secondaryRoleUpdated": "תפקיד משני עודכן",
-    "secondaryRoleUpdateFailed": "עדכון תפקיד משני נכשל"
+    "secondaryRoleUpdateFailed": "עדכון תפקיד משני נכשל",
+    "equipmentCoordinatorLabel": "רכז ציוד",
+    "equipmentCoordinatorUpdated": "זכאות רכז הציוד עודכנה",
+    "equipmentCoordinatorUpdateFailed": "עדכון זכאות רכז הציוד נכשל"
   },
   "layoutHebrew": {
     "home": "ראשי",
@@ -2934,7 +2969,9 @@
       "duplicateName": "כבר קיימת עמדת עגינה בשם זה.",
       "invalidReference": "החדר או הקטגוריה אינם שייכים למרפאה זו.",
       "invalidEquipmentIds": "חלק ממזהי הציוד אינם קיימים, נמחקו, או שייכים למרפאה אחרת.",
-      "noHomeStation": "פריט זה אינו במנוחה, או שאין לו עמדת בית ניתנת לזיהוי."
+      "noHomeStation": "פריט זה אינו במנוחה, או שאין לו עמדת בית ניתנת לזיהוי.",
+      "coordinatorForbidden": "רק הטכנאי הבכיר במשמרת זו או מנהל מערכת יכולים לאשר את רכז הציוד.",
+      "coordinatorNotEligible": "אדם זה אינו רכז ציוד זכאי במשמרת זו."
     }
   },
   "push": {
@@ -3358,6 +3395,20 @@
   "staleCheckout": {
     "pushTitle": "ציוד עדיין בשימוש",
     "pushBody": "המכשיר הזה בשימוש כבר זמן מה. אם סיימת, אנא החזר אותו."
+  },
+  "staleReturned": {
+    "pushTitle": "ציוד הוחזר — טרם אומת מיקום",
+    "pushBody": "פריט הוחזר אך מיקומו בעמדה טרם אומת. יש לבדוק ולעגן את הפריט."
+  },
+  "sweepEscalation": {
+    "stage1Title": "סריקת חדר מתקרבת למועד הסיום",
+    "stage1Body": "המשמרת שלך מסתיימת בעוד כשעה וסריקת החדר עדיין לא בוצעה.",
+    "stage2Title": "סריקת חדר דורשת מעקב",
+    "stage2Body": "סריקת החדר של הרכז עדיין לא בוצעה — נא לעקוב אחריה.",
+    "stage3Title": "האחריות על סריקת החדר הועברה אליך",
+    "stage3Body": "המשמרת מתקרבת לסיום וסריקת החדר לא הושלמה — האחריות הועברה אליך.",
+    "stage4Title": "סריקת חדר עדיין פתוחה",
+    "stage4Body": "המשמרת הסתיימה וסריקת החדר לא הושלמה. כעת כל טכנאי יכול להשלים אותה."
   },
   "semiDock": {
     "pushTitle": "זוהה מכשיר בחדר הבית",
@@ -4144,7 +4195,37 @@
     "categoryUnavailable": "הקטגוריות אינן זמינות כעת — עדיין ניתן לשייך חדר בית",
     "categoryLoadError": "טעינת הקטגוריות נכשלה",
     "roomsLoadError": "טעינת החדרים נכשלה",
-    "reconciliationLoadError": "טעינת נתוני ההתאמה נכשלה"
+    "reconciliationLoadError": "טעינת נתוני ההתאמה נכשלה",
+    "bucketCountsTitle": "סקירת התאמה",
+    "bucketLabels": {
+      "at_home": "בבית",
+      "checked_out": "בשימוש",
+      "returned_unverified": "הוחזר (לא מאומת)",
+      "returned_away": "הוחזר במקום אחר",
+      "misplaced_at_station": "במיקום שגוי בתחנה",
+      "missing": "חסר",
+      "unassigned": "לא משויך",
+      "no_station": "אין תחנה"
+    },
+    "driftBuckets": {
+      "returned_unverified": {
+        "hint": "הוחזר, אך טרם עוגן מחדש בתחנה — לאחרונה, דורש אימות",
+        "empty": "אין פריטים שהוחזרו וטרם אומתו"
+      },
+      "returned_away": {
+        "hint": "נצפה לאחרונה הרחק מחדר הבית שלו",
+        "empty": "אין פריטים שהוחזרו במקום אחר"
+      },
+      "misplaced_at_station": {
+        "hint": "מעוגן, אך לא בתחנת הבית שלו",
+        "empty": "אין פריטים במיקום שגוי"
+      },
+      "missing": {
+        "hint": "אין עיגון ואין צפייה אחרונה — יש לבדוק",
+        "empty": "אין פריטים חסרים"
+      }
+    },
+    "holderLabel": "אצל {email}"
   },
   "adminAssetTypesPage": {
     "typePlaceholder": "שם סוג",
