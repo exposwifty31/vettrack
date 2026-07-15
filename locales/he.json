@@ -1790,6 +1790,22 @@
     "pilotStale": "ישן",
     "pilotRecent": "עדכני"
   },
+  "roomSweep": {
+    "title": "סריקת חדר",
+    "startSweep": "התחל סריקת חדר",
+    "markAllPresent": "סמן הכל כנוכח",
+    "present": "נוכח",
+    "notPresent": "לא נוכח",
+    "withHolder": "אצל {holder}",
+    "checkedOutBadge": "בשימוש",
+    "confirmSweep": "אשר סריקה",
+    "summary": "{present} נוכחים · {missing} חסרים",
+    "sweptToast": "נסרק: {present} נוכחים, {missing} סומנו כחסרים",
+    "noHomedItems": "אין ציוד ששויך לחדר זה עדיין",
+    "noHomedItemsHint": "שייכו ציוד לתחנת בית כדי לאפשר סריקת חדר.",
+    "noStationGroup": "ללא תחנה",
+    "commitError": "הסריקה נכשלה — נסו שוב"
+  },
   "roomsListPage": {
     "selectRoomTitle": "בחר חדר",
     "selectRoomSubtitle": "בחר מהרשימה כדי לראות כאן פרטים",

@@ -1790,6 +1790,22 @@
     "pilotStale": "Stale",
     "pilotRecent": "Recent"
   },
+  "roomSweep": {
+    "title": "Room Sweep",
+    "startSweep": "Start Room Sweep",
+    "markAllPresent": "Mark all present",
+    "present": "Present",
+    "notPresent": "Not present",
+    "withHolder": "with {holder}",
+    "checkedOutBadge": "In use",
+    "confirmSweep": "Confirm sweep",
+    "summary": "{present} present · {missing} missing",
+    "sweptToast": "Swept: {present} present, {missing} flagged",
+    "noHomedItems": "No equipment is homed to this room yet",
+    "noHomedItemsHint": "Assign equipment home stations to enable Room Sweep.",
+    "noStationGroup": "No station",
+    "commitError": "Sweep failed — try again"
+  },
   "roomsListPage": {
     "selectRoomTitle": "Select a room",
     "selectRoomSubtitle": "Choose from the list to see details here",

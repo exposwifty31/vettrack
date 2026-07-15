@@ -742,6 +742,13 @@ const translations = {
     filterHint: (shown: number, total: number) => tr(d.roomRadarPage.filterHint, { shown, total }),
   },
 
+  roomSweep: {
+    ...d.roomSweep,
+    withHolder: (holder: string) => tr(d.roomSweep.withHolder, { holder }),
+    summary: (present: number, missing: number) => tr(d.roomSweep.summary, { present, missing }),
+    sweptToast: (present: number, missing: number) => tr(d.roomSweep.sweptToast, { present, missing }),
+  },
+
   roomsListPage: {
     ...d.roomsListPage,
     subtitle: (count: number) => tr(d.roomsListPage.subtitle, { count }),
