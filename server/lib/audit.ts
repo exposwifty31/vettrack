@@ -239,6 +239,8 @@ export type AuditActionType =
   | "equipment_rfid_observed_room_changed"
   | "equipment_semi_dock_notified"
   | "equipment_stale_checkout_nudged"
+  // T3.5 — staleReturnedSweep nudge worker (returned-unverified → nudge managers).
+  | "equipment_stale_returned_nudged"
   // Sprint 1.7 — inference engine fires when no location signal exists for a device.
   | "equipment_location_unknown"
   // T-24b — damage report flips conditionStatus to a non-"ok" value (R-EQ-F3).

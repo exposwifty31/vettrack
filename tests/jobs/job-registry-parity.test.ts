@@ -249,6 +249,7 @@ describe("E3 — job registry / enqueue parity", () => {
         "stale-task-ownership-sweep",
         "sweep-stale-checkins",
         "sweep-stale-checkouts",
+        "sweep-stale-returned",
         "task-ownership-backfill",
       ]
     `);
@@ -286,6 +287,7 @@ describe("E3 — job registry / enqueue parity", () => {
         "stale-task-ownership-sweep",
         "sweep-stale-checkins",
         "sweep-stale-checkouts",
+        "sweep-stale-returned",
         "task-ownership-backfill",
       ]
     `);

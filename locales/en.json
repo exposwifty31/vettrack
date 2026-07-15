@@ -3375,6 +3375,10 @@
     "pushTitle": "Equipment still checked out",
     "pushBody": "This device has been checked out a while. If you're done, please return it."
   },
+  "staleReturned": {
+    "pushTitle": "Returned equipment needs verification",
+    "pushBody": "An item was returned but hasn't been re-verified at its station yet. Please check it in."
+  },
   "semiDock": {
     "pushTitle": "Device detected in home room",
     "pushBody": "We detected the device back in its home room. If you finished using it, return it to the charging station."

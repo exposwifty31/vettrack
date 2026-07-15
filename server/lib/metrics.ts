@@ -307,6 +307,9 @@ type MetricName =
   | "semi_dock_skipped_deduped"
   | "stale_checkout_nudged"
   | "stale_checkout_skipped"
+  // T3.5 — staleReturnedSweep nudge worker (returned-unverified → nudge managers).
+  | "stale_returned_nudged"
+  | "stale_returned_skipped"
   | "dock_return_nfc_confirmed"
   | "auth_clerk_profile_fetch_failed"
   // T-30a2-i — nudge telemetry closed enum (nudgeShown: "expiry" | "restock").
@@ -954,6 +957,8 @@ const DEFAULT_COUNTERS: MetricBuckets = {
   semi_dock_skipped_deduped: 0,
   stale_checkout_nudged: 0,
   stale_checkout_skipped: 0,
+  stale_returned_nudged: 0,
+  stale_returned_skipped: 0,
   dock_return_nfc_confirmed: 0,
   auth_clerk_profile_fetch_failed: 0,
   // T-30a2-i — nudge telemetry closed enum counters.
