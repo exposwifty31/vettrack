@@ -854,6 +854,8 @@ export interface TStructure {
     notReady: string;
     inUse: string;
     roomReadiness: string;
+    readinessTileTitle: string;
+    readinessTileHelp: string;
     noExceptions: string;
     tasks: string;
     tasksEmpty: string;
@@ -1800,6 +1802,7 @@ export interface TStructure {
     present: string;
     notPresent: string;
     withHolder: string;
+    withHolderSince: string;
     checkedOutBadge: string;
     confirmSweep: string;
     summary: string;
@@ -3398,6 +3401,16 @@ export interface TStructure {
     pushTitle: string;
     pushBody: string;
   };
+  sweepEscalation: {
+    stage1Title: string;
+    stage1Body: string;
+    stage2Title: string;
+    stage2Body: string;
+    stage3Title: string;
+    stage3Body: string;
+    stage4Title: string;
+    stage4Body: string;
+  };
   semiDock: {
     pushTitle: string;
     pushBody: string;
@@ -4184,6 +4197,36 @@ export interface TStructure {
     categoryLoadError: string;
     roomsLoadError: string;
     reconciliationLoadError: string;
+    bucketCountsTitle: string;
+    bucketLabels: {
+      at_home: string;
+      checked_out: string;
+      returned_unverified: string;
+      returned_away: string;
+      misplaced_at_station: string;
+      missing: string;
+      unassigned: string;
+      no_station: string;
+    };
+    driftBuckets: {
+      returned_unverified: {
+        hint: string;
+        empty: string;
+      };
+      returned_away: {
+        hint: string;
+        empty: string;
+      };
+      misplaced_at_station: {
+        hint: string;
+        empty: string;
+      };
+      missing: {
+        hint: string;
+        empty: string;
+      };
+    };
+    holderLabel: string;
   };
   adminAssetTypesPage: {
     typePlaceholder: string;
