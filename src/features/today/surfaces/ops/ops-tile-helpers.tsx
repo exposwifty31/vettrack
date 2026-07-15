@@ -26,11 +26,13 @@ export function pctColor(pct: number): string {
  * Room readiness % — present-vs-expected (design §6.4): at_home / expected_fill.
  * `expectedFill` is items homed to the room WITH a category; a room with
  * nothing homed has no readiness signal, so this returns null (not 0).
+ * Capped at 100 — `atHomeCount` can transiently exceed `expectedFill` (e.g.
+ * an item homed elsewhere mid-move) and readiness should never read >100%.
  */
 export function roomPct(room: Room): number | null {
   const expectedFill = room.expectedFill ?? 0;
   if (expectedFill === 0) return null;
-  return Math.round(((room.atHomeCount ?? 0) / expectedFill) * 100);
+  return Math.min(100, Math.round(((room.atHomeCount ?? 0) / expectedFill) * 100));
 }
 
 /** Shared tile shell — border + surface + card shadow, RTL-safe. */

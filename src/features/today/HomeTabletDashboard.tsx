@@ -9,6 +9,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { subscribeKeepalive } from "@/lib/realtime";
 import { useAlertsController } from "@/features/alerts";
 import { OnShiftHero, deriveHeroState } from "./surfaces/OnShiftHero";
+import { roomPct } from "./surfaces/ops/ops-tile-helpers";
 import { Bdi } from "@/components/ui/bdi";
 import { ForwardChevron } from "@/components/ui/directional-chevron";
 import { equipmentTriageTier } from "@/lib/design-tokens";
@@ -25,17 +26,6 @@ function greetingFor(hour: number, name: string): string {
 }
 
 const ALERT_ORDER: Alert["type"][] = ["issue", "overdue", "sterilization_due", "inactive"];
-
-// Present-vs-expected (design §6.4: at_home / expected_fill) — matches the
-// phone ops surface's ops-tile-helpers#roomPct (mobile is source of truth).
-// This tablet copy predates P3's formula change; deliberately duplicated
-// (see ops-tile-helpers.tsx doc comment) rather than importing, so v1 keeps
-// this file's own render internals — DRY convergence is a tracked follow-up.
-function roomPct(room: Room): number | null {
-  const expectedFill = room.expectedFill ?? 0;
-  if (expectedFill === 0) return null;
-  return Math.round(((room.atHomeCount ?? 0) / expectedFill) * 100);
-}
 
 function pctColor(pct: number): string {
   if (pct >= 80) return "rgb(var(--sys-green))";

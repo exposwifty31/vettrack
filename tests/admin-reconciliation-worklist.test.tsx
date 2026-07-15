@@ -132,7 +132,15 @@ const assetTypes: AssetType[] = [
   { id: "at-1", clinicId: "clinic-1", name: "Pump", createdAt: "2026-01-01T00:00:00.000Z" },
 ];
 
-const rooms: Room[] = [{ id: "room-1", name: "ICU" } as Room];
+const rooms: Room[] = [
+  {
+    id: "room-1",
+    name: "ICU",
+    syncStatus: "synced",
+    createdAt: "2026-01-01T00:00:00.000Z",
+    updatedAt: "2026-01-01T00:00:00.000Z",
+  },
+];
 
 const pumps: Equipment[] = [
   { id: "eq-1", name: "Pump A", assetTypeId: "at-1", status: "available", createdAt: "2026-01-01T00:00:00.000Z" } as Equipment,

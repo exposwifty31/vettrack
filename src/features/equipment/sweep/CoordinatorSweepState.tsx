@@ -59,6 +59,10 @@ export function CoordinatorSweepState({ lastSweptAt, lastSweptByName }: Coordina
 
   const confirmMut = useMutation({
     mutationFn: (coordinatorUserId: string) =>
+      // Non-null assertion is safe: this mutationFn is only invoked from the
+      // `canConfirm`-gated Select below (line ~99), which itself requires
+      // `!!coordinator` — `coordinator` is guaranteed defined by the time a
+      // confirm selection can fire.
       api.docking.confirmCoordinator({ shiftDate: coordinator!.shiftDate, coordinatorUserId }),
     onSuccess: () => {
       toast.success(t.coordinator.confirmSuccess);

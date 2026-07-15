@@ -618,6 +618,7 @@ export default function RoomRadarPage() {
                   authenticated user may start a sweep (low-stakes heal
                   action; per-shift designation is a later task). */}
               <button
+                type="button"
                 onClick={() => setSweepOpen(true)}
                 data-testid="start-room-sweep"
                 className="flex items-center justify-center gap-2 w-full sm:w-auto px-4 py-2.5 mt-3 rounded-xl border border-primary/30 bg-primary/5 text-primary text-sm font-bold min-h-[44px] active:scale-[0.98] transition-transform hover:bg-primary/10"

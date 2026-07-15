@@ -18,6 +18,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { t } from "@/lib/i18n";
+import { formatRelativeTime } from "@/lib/utils";
 import type { RoomSweepItem, RoomSweepList, RoomSweepResult } from "@/types";
 
 afterEach(() => cleanup());
@@ -87,6 +88,17 @@ const ITEM_D_CHECKED_OUT = sweepItem({
   checkedOutByEmail: "nurse@clinic.test",
   bucket: "checked_out",
 });
+const ITEM_F_CHECKED_OUT_WITH_SINCE = sweepItem({
+  id: "eq-f",
+  name: "Monitor F",
+  homeDockId: "dock-2",
+  homeDockName: "Station 2",
+  custodyState: "checked_out",
+  checkedOutById: "u-10",
+  checkedOutByEmail: "tech@clinic.test",
+  checkedOutAt: "2026-07-15T08:00:00.000Z",
+  bucket: "checked_out",
+});
 
 function sweepList(items: RoomSweepItem[]): RoomSweepList {
   return { roomId: ROOM_ID, items };
@@ -143,6 +155,25 @@ describe("RoomSweep — mobile floor sweep UI (T3.2b)", () => {
 
     // Commit bar summary starts at 0 present / 3 missing (3 resting items).
     expect(screen.getByTestId("sweep-commit-bar").textContent).toContain(t.roomSweep.summary(0, 3));
+  });
+
+  it("shows 'with holder · since relative' (not the plain fallback) for a checked-out item that carries checkedOutAt", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(new Date("2026-07-15T12:00:00.000Z"));
+    try {
+      roomSweepListMock.mockResolvedValue(sweepList([ITEM_F_CHECKED_OUT_WITH_SINCE]));
+      renderSweep();
+
+      await screen.findByTestId("sweep-item-checked-out-eq-f");
+      const expected = t.roomSweep.withHolderSince(
+        "tech",
+        formatRelativeTime(ITEM_F_CHECKED_OUT_WITH_SINCE.checkedOutAt),
+      );
+      expect(screen.getByText(expected)).toBeTruthy();
+      expect(screen.queryByText(t.roomSweep.withHolder("tech"))).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('"Mark all present" confirms all resting items and updates the commit summary', async () => {
@@ -239,5 +270,23 @@ describe("RoomSweep — mobile floor sweep UI (T3.2b)", () => {
 
     await waitFor(() => expect(toastError).toHaveBeenCalledWith(t.roomSweep.commitError));
     expect(onOpenChange).not.toHaveBeenCalledWith(false);
+  });
+
+  it("logs the underlying error to the console when commitRoomSweep rejects (diagnostic visibility)", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const commitError = new Error("server exploded");
+      roomSweepListMock.mockResolvedValue(sweepList([ITEM_A]));
+      commitRoomSweepMock.mockRejectedValueOnce(commitError);
+      renderSweep();
+
+      await screen.findByTestId("sweep-item-toggle-eq-a");
+      fireEvent.click(screen.getByTestId("sweep-confirm-button"));
+
+      await waitFor(() => expect(toastError).toHaveBeenCalledWith(t.roomSweep.commitError));
+      expect(errorSpy).toHaveBeenCalledWith("[room-sweep] commit failed", commitError);
+    } finally {
+      errorSpy.mockRestore();
+    }
   });
 });

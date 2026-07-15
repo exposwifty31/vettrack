@@ -43,4 +43,8 @@ describe("roomPct — present-vs-expected (T3.3)", () => {
   it("returns null (NOT 0) when expectedFill is undefined", () => {
     expect(roomPct(room({ expectedFill: undefined, atHomeCount: 2 }))).toBeNull();
   });
+
+  it("caps at 100 when atHomeCount exceeds expectedFill (transient data)", () => {
+    expect(roomPct(room({ expectedFill: 4, atHomeCount: 5 }))).toBe(100);
+  });
 });

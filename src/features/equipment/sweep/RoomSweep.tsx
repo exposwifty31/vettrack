@@ -116,7 +116,10 @@ export function RoomSweep({ roomId, roomName, open, onOpenChange }: RoomSweepPro
       queryClient.invalidateQueries({ queryKey: ["/api/docking/reconciliation"] });
       resetAndClose();
     },
-    onError: () => toast.error(t.roomSweep.commitError),
+    onError: (error) => {
+      console.error("[room-sweep] commit failed", error);
+      toast.error(t.roomSweep.commitError);
+    },
   });
 
   return (
