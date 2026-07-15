@@ -5,6 +5,7 @@ import { CheckCircle2, ListChecks, PackageX } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
+import { ErrorCard } from "@/components/ui/error-card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Bdi } from "@/components/ui/bdi";
 import { api } from "@/lib/api";
@@ -64,7 +65,7 @@ export function RoomSweep({ roomId, roomName, open, onOpenChange }: RoomSweepPro
   const queryClient = useQueryClient();
   const [confirmedIds, setConfirmedIds] = useState<Set<string>>(new Set());
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ["/api/docking/rooms", roomId, "sweep"],
     queryFn: () => api.docking.roomSweepList(roomId),
     enabled: open && !!roomId,
@@ -145,6 +146,8 @@ export function RoomSweep({ roomId, roomName, open, onOpenChange }: RoomSweepPro
                 <Skeleton key={i} className="h-16 rounded-xl" />
               ))}
             </div>
+          ) : isError ? (
+            <ErrorCard message={t.roomSweep.loadError} onRetry={() => refetch()} />
           ) : items.length === 0 ? (
             <EmptyState icon={PackageX} message={t.roomSweep.noHomedItems} subMessage={t.roomSweep.noHomedItemsHint} />
           ) : (

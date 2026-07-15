@@ -129,6 +129,8 @@ function AdminHomeAssignmentContent() {
         <BucketCountsSummary
           counts={reconciliationQ.data?.counts}
           isLoading={reconciliationQ.isLoading}
+          isError={reconciliationQ.isError}
+          onRetry={() => reconciliationQ.refetch()}
         />
 
         <Card>

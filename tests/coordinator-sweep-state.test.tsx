@@ -216,4 +216,20 @@ describe("CoordinatorSweepState — coordinator + sweep-state line (T3.4-i-b Par
     expect(line.textContent).toBe(t.coordinator.toBeConfirmed);
     expect(screen.queryByTestId("coordinator-confirm-select")).toBeNull();
   });
+
+  it("shows a non-silent inline error (not a vanished picker) when the coordinator fetch fails, and retry refetches", async () => {
+    shiftCoordinatorMock.mockRejectedValueOnce(new Error("network down"));
+    renderState();
+
+    const errorRow = await screen.findByTestId("coordinator-load-error");
+    expect(errorRow.textContent).toContain(t.coordinator.loadError);
+    expect(screen.queryByTestId("coordinator-line")).toBeNull();
+    expect(screen.queryByTestId("coordinator-confirm-picker")).toBeNull();
+
+    shiftCoordinatorMock.mockResolvedValueOnce(coordinatorResult({ status: "auto" }));
+    fireEvent.click(errorRow);
+
+    await waitFor(() => expect(shiftCoordinatorMock).toHaveBeenCalledTimes(2));
+    expect(await screen.findByTestId("coordinator-line")).toBeTruthy();
+  });
 });

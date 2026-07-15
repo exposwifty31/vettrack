@@ -1811,6 +1811,7 @@ export interface TStructure {
     noHomedItemsHint: string;
     noStationGroup: string;
     commitError: string;
+    loadError: string;
   };
   coordinator: {
     sweptPrefix: string;
@@ -1822,6 +1823,7 @@ export interface TStructure {
     choosePlaceholder: string;
     confirmSuccess: string;
     confirmError: string;
+    loadError: string;
   };
   roomsListPage: {
     selectRoomTitle: string;

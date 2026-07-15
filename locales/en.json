@@ -1807,18 +1807,20 @@
     "noHomedItems": "No equipment is homed to this room yet",
     "noHomedItemsHint": "Assign equipment home stations to enable Room Sweep.",
     "noStationGroup": "No station",
-    "commitError": "Sweep failed — try again"
+    "commitError": "Sweep failed — try again",
+    "loadError": "Failed to load the expected equipment list"
   },
   "coordinator": {
     "sweptPrefix": "Last swept",
     "byName": "by {name}",
-    "notSweptThisShift": "Not swept this shift",
+    "notSweptThisShift": "Never swept",
     "withName": "Coordinator: {name}",
     "toBeConfirmed": "Coordinator: to be confirmed",
     "unassigned": "Coordinator: unassigned",
     "choosePlaceholder": "Choose coordinator",
     "confirmSuccess": "Coordinator confirmed",
-    "confirmError": "Failed to confirm coordinator"
+    "confirmError": "Failed to confirm coordinator",
+    "loadError": "Failed to load coordinator"
   },
   "roomsListPage": {
     "selectRoomTitle": "Select a room",

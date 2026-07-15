@@ -186,4 +186,57 @@ describe("RoomSweep — mobile floor sweep UI (T3.2b)", () => {
     expect(screen.queryByTestId("sweep-commit-bar")).toBeNull();
     expect(screen.queryByTestId("sweep-confirm-button")).toBeNull();
   });
+
+  it("renders an error state with retry (not the empty state) when the expected-list fetch fails", async () => {
+    roomSweepListMock.mockRejectedValueOnce(new Error("network down"));
+    renderSweep();
+
+    expect(await screen.findByText(t.roomSweep.loadError)).toBeTruthy();
+    expect(screen.queryByText(t.roomSweep.noHomedItems)).toBeNull();
+    expect(screen.queryByTestId("sweep-commit-bar")).toBeNull();
+
+    roomSweepListMock.mockResolvedValueOnce(sweepList([ITEM_A]));
+    fireEvent.click(screen.getByRole("button", { name: t.errorCard.retry }));
+
+    await waitFor(() => expect(roomSweepListMock).toHaveBeenCalledTimes(2));
+    expect(await screen.findByTestId("sweep-item-toggle-eq-a")).toBeTruthy();
+  });
+
+  it('per-station "Mark all present" confirms only that station\'s resting items and commits the correct partial id set', async () => {
+    const ITEM_STATION_2 = sweepItem({
+      id: "eq-e",
+      name: "Otoscope E",
+      homeDockId: "dock-2",
+      homeDockName: "Station 2",
+    });
+    roomSweepListMock.mockResolvedValue(sweepList([ITEM_A, ITEM_B, ITEM_STATION_2]));
+    commitRoomSweepMock.mockResolvedValue(sweepResult({ confirmedCount: 2, missingCount: 1 }));
+    renderSweep();
+
+    await screen.findByTestId("sweep-item-toggle-eq-a");
+    fireEvent.click(screen.getByTestId("sweep-group-mark-present-Station 1"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("sweep-item-toggle-eq-a").getAttribute("aria-pressed")).toBe("true");
+    });
+    expect(screen.getByTestId("sweep-item-toggle-eq-b").getAttribute("aria-pressed")).toBe("true");
+    // Station 2's own item must be untouched by Station 1's bulk action.
+    expect(screen.getByTestId("sweep-item-toggle-eq-e").getAttribute("aria-pressed")).toBe("false");
+
+    fireEvent.click(screen.getByTestId("sweep-confirm-button"));
+    await waitFor(() => expect(commitRoomSweepMock).toHaveBeenCalledTimes(1));
+    expect(commitRoomSweepMock).toHaveBeenCalledWith(ROOM_ID, { confirmedEquipmentIds: ["eq-a", "eq-b"] });
+  });
+
+  it("shows the commit-error toast and keeps the sheet open when commitRoomSweep rejects", async () => {
+    roomSweepListMock.mockResolvedValue(sweepList([ITEM_A]));
+    commitRoomSweepMock.mockRejectedValueOnce(new Error("server exploded"));
+    const { onOpenChange } = renderSweep();
+
+    await screen.findByTestId("sweep-item-toggle-eq-a");
+    fireEvent.click(screen.getByTestId("sweep-confirm-button"));
+
+    await waitFor(() => expect(toastError).toHaveBeenCalledWith(t.roomSweep.commitError));
+    expect(onOpenChange).not.toHaveBeenCalledWith(false);
+  });
 });

@@ -13,7 +13,7 @@
  * Same Radix Select stand-in rationale as tests/admin-home-assignment.test.tsx.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { HelmetProvider } from "react-helmet-async";
 import * as React from "react";
@@ -269,5 +269,22 @@ describe("AdminHomeAssignmentPage — full 8-bucket reconciliation worklist (T3.
 
     expect(await screen.findByText("Unassigned Monitor")).toBeTruthy();
     expect(await screen.findByText("No-Station Otoscope")).toBeTruthy();
+  });
+
+  it("shows an error state (not eight 0 chips) when reconciliation fetch fails, and retry refetches", async () => {
+    reconciliationMock.mockRejectedValueOnce(new Error("network down"));
+    renderPage();
+
+    const errors = await screen.findAllByText(t.adminHomeAssignment.reconciliationLoadError);
+    expect(errors.length).toBeGreaterThan(0);
+    // The all-zero bucket-count chip row must NOT render on error.
+    expect(screen.queryByTestId("reconciliation-bucket-counts")).toBeNull();
+
+    reconciliationMock.mockResolvedValueOnce(reconciliation);
+    const retryButtons = screen.getAllByRole("button", { name: t.errorCard.retry });
+    fireEvent.click(retryButtons[0]);
+
+    await waitFor(() => expect(reconciliationMock).toHaveBeenCalledTimes(2));
+    expect(await screen.findByTestId("reconciliation-bucket-counts")).toBeTruthy();
   });
 });

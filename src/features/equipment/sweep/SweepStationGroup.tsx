@@ -43,7 +43,7 @@ export function SweepStationGroup({
             type="button"
             data-testid={`sweep-group-mark-present-${groupKey}`}
             onClick={() => onMarkGroupPresent(restingIds)}
-            className="text-[11px] font-semibold text-primary hover:underline min-h-[32px] px-1"
+            className="text-[11px] font-semibold text-primary hover:underline min-h-[44px] px-1"
           >
             {t.roomSweep.markAllPresent}
           </button>

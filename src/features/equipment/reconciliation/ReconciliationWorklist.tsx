@@ -56,30 +56,36 @@ export function bucketLabel(bucket: ReconciliationBucket): string {
 interface BucketCountsSummaryProps {
   counts: Partial<Record<ReconciliationBucket, number>> | undefined;
   isLoading: boolean;
+  isError: boolean;
+  onRetry: () => void;
 }
 
 /** All 8 buckets as compact stat chips — the top-of-page reconciliation overview (§6.1). */
-export function BucketCountsSummary({ counts, isLoading }: BucketCountsSummaryProps) {
+export function BucketCountsSummary({ counts, isLoading, isError, onRetry }: BucketCountsSummaryProps) {
   return (
     <Card>
       <CardHeader>
         <CardTitle>{t.adminHomeAssignment.bucketCountsTitle}</CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="flex flex-wrap gap-2" data-testid="reconciliation-bucket-counts">
-          {RECONCILIATION_BUCKET_ORDER.map((bucket) => (
-            <div
-              key={bucket}
-              data-testid={`bucket-count-${bucket}`}
-              className="flex items-center gap-1.5 rounded-full border px-2.5 py-1"
-            >
-              <Badge variant={bucketBadgeVariant(bucket)} className="px-1.5 py-0 text-[10px] tabular-nums">
-                {isLoading ? "…" : (counts?.[bucket] ?? 0)}
-              </Badge>
-              <span className="text-xs text-muted-foreground">{bucketLabel(bucket)}</span>
-            </div>
-          ))}
-        </div>
+        {isError ? (
+          <ErrorCard message={t.adminHomeAssignment.reconciliationLoadError} onRetry={onRetry} />
+        ) : (
+          <div className="flex flex-wrap gap-2" data-testid="reconciliation-bucket-counts">
+            {RECONCILIATION_BUCKET_ORDER.map((bucket) => (
+              <div
+                key={bucket}
+                data-testid={`bucket-count-${bucket}`}
+                className="flex items-center gap-1.5 rounded-full border px-2.5 py-1"
+              >
+                <Badge variant={bucketBadgeVariant(bucket)} className="px-1.5 py-0 text-[10px] tabular-nums">
+                  {isLoading ? "…" : (counts?.[bucket] ?? 0)}
+                </Badge>
+                <span className="text-xs text-muted-foreground">{bucketLabel(bucket)}</span>
+              </div>
+            ))}
+          </div>
+        )}
       </CardContent>
     </Card>
   );

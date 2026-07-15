@@ -1,7 +1,6 @@
-import { useMemo } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { CheckCircle2, UserCog } from "lucide-react";
+import { CheckCircle2, RefreshCw, UserCog } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -36,13 +35,20 @@ interface CoordinatorSweepStateProps {
 export function CoordinatorSweepState({ lastSweptAt, lastSweptByName }: CoordinatorSweepStateProps) {
   const { userId, isAdmin } = useAuth();
   const queryClient = useQueryClient();
-  // Included in the query key (not passed to shiftCoordinator(), which
-  // defaults to "today" clinic-side) purely so a tab left open across
-  // midnight naturally re-fetches on next render instead of serving a stale
-  // cached value for yesterday's shift.
-  const todayLocal = useMemo(() => new Date().toISOString().slice(0, 10), []);
+  // Recomputed every render (NOT memoized) — included in the query key (not
+  // passed to shiftCoordinator(), which defaults to "today" clinic-side)
+  // purely so a tab/kiosk left open across midnight naturally re-fetches
+  // instead of freezing on the mount-time day forever. `useMemo(fn, [])`
+  // would compute once and never bust; the date-string format is cheap
+  // enough to just recompute. UTC-midnight flip vs. clinic-local tz is an
+  // accepted minor — matches how other client date keys work.
+  const todayLocal = new Date().toISOString().slice(0, 10);
 
-  const { data: coordinator } = useQuery({
+  const {
+    data: coordinator,
+    isError: coordinatorError,
+    refetch: refetchCoordinator,
+  } = useQuery({
     queryKey: ["/api/docking/coordinator", todayLocal],
     queryFn: () => api.docking.shiftCoordinator(),
     staleTime: 60_000,
@@ -73,7 +79,20 @@ export function CoordinatorSweepState({ lastSweptAt, lastSweptByName }: Coordina
 
   return (
     <div className="flex flex-col gap-1.5 mt-3 text-xs text-muted-foreground" data-testid="coordinator-sweep-state">
-      {coordinator &&
+      {coordinatorError ? (
+        <button
+          type="button"
+          data-testid="coordinator-load-error"
+          onClick={() => refetchCoordinator()}
+          className="flex items-center gap-1.5 text-destructive"
+        >
+          <UserCog className="w-3.5 h-3.5 shrink-0" aria-hidden />
+          {t.coordinator.loadError}
+          <RefreshCw className="w-3 h-3 shrink-0" aria-hidden />
+          {t.errorCard.retry}
+        </button>
+      ) : (
+        coordinator &&
         (coordinator.status === "needs_confirmation" ? (
           canConfirm ? (
             <div className="flex items-center gap-2" data-testid="coordinator-confirm-picker">
@@ -102,14 +121,15 @@ export function CoordinatorSweepState({ lastSweptAt, lastSweptByName }: Coordina
             <UserCog className="w-3.5 h-3.5 shrink-0" aria-hidden />
             {coordinator.coordinatorName ? t.coordinator.withName(coordinator.coordinatorName) : t.coordinator.unassigned}
           </span>
-        ))}
+        ))
+      )}
 
       <span
         className={`flex items-center gap-1.5 ${lastSweptAt ? "text-[var(--status-ok-fg)] font-medium" : ""}`}
         data-testid="sweep-state-line"
       >
         {lastSweptAt && <CheckCircle2 className="w-3.5 h-3.5 shrink-0" aria-hidden />}
-        {sweptText}
+        <Bdi>{sweptText}</Bdi>
       </span>
     </div>
   );

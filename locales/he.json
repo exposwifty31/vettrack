@@ -1807,18 +1807,20 @@
     "noHomedItems": "אין ציוד ששויך לחדר זה עדיין",
     "noHomedItemsHint": "שייכו ציוד לתחנת בית כדי לאפשר סריקת חדר.",
     "noStationGroup": "ללא תחנה",
-    "commitError": "הסריקה נכשלה — נסו שוב"
+    "commitError": "הסריקה נכשלה — נסו שוב",
+    "loadError": "טעינת רשימת הציוד הצפוי נכשלה"
   },
   "coordinator": {
     "sweptPrefix": "נסרק לאחרונה",
     "byName": "על ידי {name}",
-    "notSweptThisShift": "טרם נסרק במשמרת זו",
+    "notSweptThisShift": "מעולם לא נסרק",
     "withName": "רכז הציוד: {name}",
     "toBeConfirmed": "רכז הציוד: טרם אושר",
     "unassigned": "רכז הציוד: לא שובץ",
     "choosePlaceholder": "בחר רכז ציוד",
     "confirmSuccess": "רכז הציוד אושר",
-    "confirmError": "אישור רכז הציוד נכשל"
+    "confirmError": "אישור רכז הציוד נכשל",
+    "loadError": "טעינת רכז הציוד נכשלה"
   },
   "roomsListPage": {
     "selectRoomTitle": "בחר חדר",

@@ -26,10 +26,15 @@ function greetingFor(hour: number, name: string): string {
 
 const ALERT_ORDER: Alert["type"][] = ["issue", "overdue", "sterilization_due", "inactive"];
 
+// Present-vs-expected (design §6.4: at_home / expected_fill) — matches the
+// phone ops surface's ops-tile-helpers#roomPct (mobile is source of truth).
+// This tablet copy predates P3's formula change; deliberately duplicated
+// (see ops-tile-helpers.tsx doc comment) rather than importing, so v1 keeps
+// this file's own render internals — DRY convergence is a tracked follow-up.
 function roomPct(room: Room): number | null {
-  const total = room.totalEquipment ?? 0;
-  if (total === 0) return null;
-  return Math.round(((room.recentlyVerifiedCount ?? 0) / total) * 100);
+  const expectedFill = room.expectedFill ?? 0;
+  if (expectedFill === 0) return null;
+  return Math.round(((room.atHomeCount ?? 0) / expectedFill) * 100);
 }
 
 function pctColor(pct: number): string {
@@ -452,7 +457,7 @@ export function HomeTabletDashboard() {
         ) : worstRooms.length === 0 ? (
           <p style={{ margin: 0, display: "flex", alignItems: "center", gap: 8, fontSize: "var(--text-sm)", color: "hsl(var(--muted-foreground))" }}>
             <DoorOpen size={16} aria-hidden />
-            {t.roomsListPage.healthRingHelp}
+            {t.homeSurface.readinessTileHelp}
           </p>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -461,7 +466,7 @@ export function HomeTabletDashboard() {
                 key={room.id}
                 href={`/rooms/${room.id}`}
                 style={{ display: "flex", alignItems: "center", gap: 10, textDecoration: "none", minHeight: 32 }}
-                title={t.roomsListPage.healthRingTitle(pct)}
+                title={t.homeSurface.readinessTileTitle(pct)}
               >
                 <span
                   dir="auto"
