@@ -97,7 +97,33 @@ Execution: subagent-driven development with TDD, per-task review + per-phase rev
 
 **Informational (verified intended):** `HomeTabletDashboard`'s own local `roomPct` (old verification formula) is out-of-P3-scope and left untouched — a cross-surface consistency note, not a P3 defect.
 
-**P3 verdict:** APPROVE after I-1/I-2 (+ the cheap minors) fixed in this commit. Live RTL/device visual pass for the sweep + worklist deferred to a dev-bypass/device-audit env (same rationale as P1/P2). The `needs_confirmation`+`unresolved`-with-no-senior case and stored-coordinator eligibility re-validation carry to the final whole-branch review.
+**P3 verdict:** APPROVE after I-1/I-2 (+ the cheap minors) fixed in `e7acf17e5`. Live RTL/device visual pass for the sweep + worklist deferred to a dev-bypass/device-audit env (same rationale as P1/P2). The `needs_confirmation`+`unresolved`-with-no-senior case and stored-coordinator eligibility re-validation carry to the final whole-branch review.
+
+### Pre-PR CodeRabbit-emulation review (before opening the P3 PR) — 0 Critical / 0 Major open
+
+Ran a 6-lens adversarial panel (TypeScript/correctness, database/migrations, security, React/a11y-RTL, quality/DRY, test-coverage) over the exact PR diff (`origin/main 3597bbf0a … HEAD`, before opening the PR) to pre-empt CodeRabbit, then a 2-lens re-review over the fix delta. Raw panel: **1 Critical · 16 Major · 17 Minor · 7 Nitpick** (heavy cross-lens overlap). Disposition: **17 fixed, ~11 deferred-with-rationale, 1 dropped as a verified false positive.** Fix commits: `40deb2c04` (server behavioral+security), `8b2d05336` (client), `9b3155549` (server perf/hygiene/coverage), `0b936bd33` (re-review residuals).
+
+| ID | Sev | Finding | Resolution |
+|---|---|---|---|
+| PR-C1 | **Critical** | `resolveShiftCoordinator` treated ANY stored `vt_shift_equipment_coordinator` row as `status:"confirmed"`, but the escalation worker now writes `source:"auto"\|"fallback_senior"` bookkeeping rows there — so the first escalation on a `needs_confirmation` shift permanently hid the manager's confirm picker. | **FIXED** `40deb2c04`: guard is `stored.source === "confirmed"`; non-confirmed rows re-derive from eligibility. RED→GREEN integration test. |
+| PR-S1 | Major (sec) | `POST /api/docking/coordinator` senior-tech gate was bypassable via self-editable `displayName` spoofing the roster name-match. | **FIXED** `40deb2c04`: gate additionally requires the caller's own `mapLegacyRoleToClinicalRole(vt_users.role) === "senior_technician"` (admin still bypasses). RED test: spoofing technician → 403. |
+| PR-R1 | Major | `GET /api/rooms/:id` never returned `lastSweptAt/lastSweptByName` → room-radar's status line always "not swept"; and the copy claimed "this shift" though the query isn't shift-scoped. | **FIXED** `40deb2c04`+`8b2d05336`: shared `lastSweptByRoom` helper populates both list + single-room (all-time); copy → honest "Never swept". |
+| PR-U1..3 | Major | Missing error states: RoomSweep failed-fetch rendered "no equipment homed"; BucketCountsSummary showed all-zeros on error; CoordinatorSweepState silently vanished. | **FIXED** `8b2d05336`: `isError`+retry on all three. |
+| PR-X1 | Major | `sweptText` composite not `Bdi`-wrapped (RTL garble); `useMemo(…,[])` "today" never recomputed; tablet `roomPct` diverged from mobile (present-vs-expected). | **FIXED** `8b2d05336`: `<Bdi>` wrap; per-render `today`; `HomeTabletDashboard` aligned to the mobile formula (supersedes the phase-review "informational" note above — mobile is source of truth). |
+| PR-P1 | Major→MEDIUM | Unbounded full-history sweep-anchor scan on `GET /api/rooms`; rewritten to `DISTINCT ON`, but re-review's `EXPLAIN` showed a residual Seq-Scan (no `source='sweep'` index) on the never-purged anchor table. | **FIXED** `9b3155549` (DISTINCT ON) + `0b936bd33` (migration 168 partial index `WHERE source='sweep'`). |
+| PR-m* | Minor/Nit | `skippedNoStationCount`; `db.execute<T>` (drop `as unknown as`); shared `MANAGER_NOTIFY_ROLES`; dead `toLocalTimeString`; type-DTO fields; permissions-matrix comment; 44px target; fixture backfill; retry in-flight guard. | **FIXED** across `40deb2c04`/`9b3155549`/`0b936bd33`. |
+| PR-cov | Major/Minor | Coverage gaps: no cross-clinic isolation on 4 integration suites; stage-1 ladder untested; per-station interaction; error-state tests; tie-break/fallback; `returned_away` fallback; 403 eligibility. | **FIXED** `9b3155549`+`8b2d05336`: all added, RED-first where behavioral. |
+| PR-DB-idx | Minor | "Missing `home_room_id` index". | **DROPPED — false positive**: `idx_vt_equipment_clinic_home_room` already exists via migration 164 (reviewer read only the Drizzle schema, which doesn't mirror it). |
+
+**Deferred with rationale (documented so a CodeRabbit comment has a ready, reasoned reply — none is a correctness/security gap):**
+- **Escalation worker server-local `Date` math** (not clinic-tz helpers): intentionally mirrors `server/lib/role-resolution.ts`'s existing merged/production shift-window convention; migrating both to `getClinicTimezone`/`clinicTodayIsoDate` is a cross-cutting change out of P3 scope. Documented in-code (`sweep-escalation.worker.ts`, `9b3155549`).
+- **`findOwnShiftRow` ignores `leave_early`/`extend` adjustments**: the I-1 fix's chosen trade-off (sources shift-end directly rather than via `resolveCurrentRole`'s adjustment logic); the escalation clock tracks rostered hours. Documented in-code.
+- **DRY**: overnight-window date math is a 3rd copy of `shift-adjustment-window.ts`; `ClassifierCtx` build + roster↔user name-match each duplicated across ~3 sites. Verified behavior-consistent; convergence is a tracked post-P3 cleanup (heavier refactor of just-landed code carries more risk than value now).
+- **Indexes**: `vt_shifts.date` (10-min cron on a tiny roster table) and `vt_shift_equipment_coordinator` FK columns (~1 row/clinic/day, soft-delete convention) — marginal; re-review agreed low-urgency.
+
+**Re-review (2-lens, over `3cb894002..HEAD`):** all 7 fix groups confirmed genuinely and correctly implemented (Critical + security backed by real, non-tautological regression tests); DB lens verified the `DISTINCT ON` rewrites behavior-equivalent to the old JS reductions against live Postgres (25/25, incl. invalidated-latest-anchor + multi-anchor tie-break) and the empty-`IN()` guard. Residuals it surfaced (partial index, fixture backfill, retry in-flight guard) closed in `0b936bd33`.
+
+**Gates (first-party on final HEAD `0b936bd33`):** `pnpm architecture:gates` (tsc frontend+server, depcruise, madge cycles) — all G1 passed; `pnpm i18n:check` — deep parity; broad `pnpm test` on the combined pre-residual state (S2) — 5117/5117, 0 regressions; residual targeted suites 15/15; migration 168 applied clean.
 
 ## P4 — Charging integration
 
