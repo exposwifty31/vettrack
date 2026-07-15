@@ -1204,12 +1204,13 @@ export function refreshTranslations(locale: string | null | undefined = getStore
   });
 }
 
-// If the active locale at startup isn't the eager default (he), kick off its lazy load
-// so the app re-renders correctly once it arrives (a brief he flash for the rare
-// en-at-startup case; he — the default — is instant, no flash).
-if (typeof window !== "undefined") {
+/**
+ * Ensure the ACTIVE locale's dict is loaded and `t` reflects it. Await this before the
+ * first render so a non-default startup locale (en) never flashes the default (he).
+ * Resolves immediately for `he` (always eager) — zero delay on the common path.
+ */
+export async function ensureActiveLocaleLoaded(): Promise<void> {
   const active = getStoredLocale();
-  if (active !== "he" && !loadedDicts[active]) {
-    refreshTranslations(active);
-  }
+  const dict = loadedDicts[active] ?? (await loadDict(active));
+  t = buildTranslations(dict);
 }

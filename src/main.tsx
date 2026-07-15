@@ -30,6 +30,7 @@ import {
 import { isCapacitorNative } from "@/lib/capacitor-runtime";
 import { clerkProviderPropsForRuntime } from "@/lib/clerk-capacitor-config";
 import { ClerkLocaleBridge } from "@/components/clerk-locale-bridge";
+import { ensureActiveLocaleLoaded } from "@/lib/i18n";
 import { NativeClerkGate } from "@/components/native-clerk-gate";
 import { primeNfcSupportCache } from "@/lib/nfc-platform";
 import { usePlatformTarget } from "@/app/platform";
@@ -270,13 +271,15 @@ if (!rootEl) {
     );
   };
 
-  void nativeClerkPromise.then((nativeClerk) => {
+  // Gate the first render on the active locale being loaded so a non-default startup
+  // locale (en) never flashes the default (he). he is eager → resolves instantly.
+  void Promise.all([nativeClerkPromise, ensureActiveLocaleLoaded()]).then(([nativeClerk]) => {
     renderApp(nativeClerk);
   });
 
   if (import.meta.hot) {
     import.meta.hot.accept(() => {
-      void nativeClerkPromise.then((nativeClerk) => {
+      void Promise.all([nativeClerkPromise, ensureActiveLocaleLoaded()]).then(([nativeClerk]) => {
         renderApp(nativeClerk);
       });
     });
