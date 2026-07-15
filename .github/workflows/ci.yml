@@ -17,10 +17,99 @@ permissions:
   contents: read
 
 jobs:
-  test:
-    name: 🧪 Tests & typecheck
+  # tsc lives in ONE dedicated job (was duplicated across the old test job and
+  # architecture-gates). Incremental + a restored .cache means unchanged files skip
+  # re-checking: cold 30-60s each → warm 1-3s.
+  typecheck:
+    name: 🔷 Typecheck
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 15
+
+    steps:
+      - name: ⬇️ Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
+
+      - name: 📦 pnpm
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.4.0
+        with:
+          run_install: false
+
+      - name: 🟢 Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version-file: ".nvmrc"
+          cache: "pnpm"
+
+      - name: 📥 Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # --tsBuildInfoFile is required: --noEmit otherwise suppresses the buildinfo write,
+      # which incremental needs. .cache is keyed on lockfile+tsconfig, with restore-keys
+      # falling back to the most recent partial cache.
+      - name: ♻️ Restore tsc build info
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: .cache
+          key: tsc-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml', 'tsconfig*.json') }}-${{ github.sha }}
+          restore-keys: |
+            tsc-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml', 'tsconfig*.json') }}-
+            tsc-${{ runner.os }}-
+
+      - name: 🔷 TypeScript (frontend)
+        run: pnpm exec tsc --noEmit --incremental --tsBuildInfoFile .cache/tsc-fe.tsbuildinfo
+
+      - name: 🔷 TypeScript (server)
+        run: pnpm exec tsc --noEmit --project tsconfig.server-check.json --incremental --tsBuildInfoFile .cache/tsc-srv.tsbuildinfo
+
+  # Frontend production build — pulled out of the old test job so it isn't repeated
+  # once per test shard.
+  build:
+    name: 🏗️ Frontend build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: ⬇️ Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
+
+      - name: 📦 pnpm
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.4.0
+        with:
+          run_install: false
+
+      - name: 🟢 Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version-file: ".nvmrc"
+          cache: "pnpm"
+
+      - name: 📥 Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: 🏗️ Frontend build
+        run: |
+          export VITE_CLERK_PUBLISHABLE_KEY="${VITE_CLERK_PUBLISHABLE_KEY:-pk_test_ci_dummy_publishable_key}"
+          pnpm build
+        env:
+          VITE_CLERK_PUBLISHABLE_KEY: ${{ secrets.VITE_CLERK_PUBLISHABLE_KEY }}
+
+  # Vitest sharded 4 ways (was one ~9½-min job). fail-fast:false so one shard failing
+  # still reports the others. Each shard is a fresh runner with its own Postgres +
+  # migrations — the default suite is file-isolated, so this is embarrassingly parallel.
+  # Coverage is unchanged: vitest reads the same vite.config.ts excludes as `pnpm test`.
+  test:
+    name: 🧪 Tests (shard ${{ matrix.shard }}/4)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
 
     services:
       postgres:
@@ -44,15 +133,17 @@ jobs:
 
     steps:
       - name: ⬇️ Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
 
       - name: 📦 pnpm
-        uses: pnpm/action-setup@v6
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.4.0
         with:
           run_install: false
 
       - name: 🟢 Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version-file: ".nvmrc"
           cache: "pnpm"
@@ -60,26 +151,12 @@ jobs:
       - name: 📥 Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: 🔷 TypeScript (frontend)
-        run: pnpm exec tsc --noEmit
-
-      - name: 🔷 TypeScript (server)
-        run: pnpm exec tsc --noEmit --project tsconfig.server-check.json
-
-      - name: 🏗️ Frontend build
-        run: |
-          export VITE_CLERK_PUBLISHABLE_KEY="${VITE_CLERK_PUBLISHABLE_KEY:-pk_test_ci_dummy_publishable_key}"
-          pnpm build
-        env:
-          VITE_CLERK_PUBLISHABLE_KEY: ${{ secrets.VITE_CLERK_PUBLISHABLE_KEY }}
-
       # Apply all `migrations/*.sql` via `server/migrate.ts` (tracks `vt_migrations`).
-      # `pnpm db:migrate` (drizzle-kit) only runs entries in `migrations/meta/_journal.json`.
       - name: 🗄️ Database migrations
         run: pnpm migrate
 
-      - name: 🧪 Test suite
-        run: pnpm test
+      - name: 🧪 Test suite (shard ${{ matrix.shard }}/4)
+        run: pnpm exec vitest run --shard=${{ matrix.shard }}/4 --reporter=dot
 
   integration-ops:
     name: 🔌 Integration ops
@@ -108,15 +185,17 @@ jobs:
 
     steps:
       - name: ⬇️ Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
 
       - name: 📦 pnpm
-        uses: pnpm/action-setup@v6
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.4.0
         with:
           run_install: false
 
       - name: 🟢 Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version-file: ".nvmrc"
           cache: "pnpm"
@@ -137,17 +216,18 @@ jobs:
 
     steps:
       - name: ⬇️ Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - name: 📦 pnpm
-        uses: pnpm/action-setup@v6
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.4.0
         with:
           run_install: false
 
       - name: 🟢 Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version-file: ".nvmrc"
           cache: "pnpm"
@@ -158,12 +238,7 @@ jobs:
       - name: 📦 @vettrack/contracts gate
         run: bash scripts/ci/contracts-gate.sh
 
-      - name: 🔷 TypeScript (frontend)
-        run: pnpm exec tsc --noEmit
-
-      - name: 🔷 TypeScript (server)
-        run: pnpm exec tsc --noEmit --project tsconfig.server-check.json
-
+      # tsc moved to the dedicated `typecheck` job (it was duplicated here).
       - name: 🛡️ dependency-cruiser
         run: pnpm exec depcruise --config .dependency-cruiser.cjs --output-type err --ignore-known .dependency-cruiser-known-violations.json server src
 
@@ -194,7 +269,7 @@ jobs:
     name: 🚢 Deploy to Railway
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    needs: [test, integration-ops, architecture-gates]
+    needs: [typecheck, build, test, integration-ops, architecture-gates]
     # vars.RAILWAY_USE_CLI_DEPLOY (repo *variable*, not secret) is the deploy kill-switch.
     # workflow_dispatch on main = "redeploy main" recovery button.
     if: >-
@@ -226,7 +301,7 @@ jobs:
       # Pinned SHA + no persisted credentials: this job holds RAILWAY_TOKEN and
       # uploads the checkout to Railway — keep the git credential out of it.
       - name: ⬇️ Checkout
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
           persist-credentials: false
 
@@ -237,14 +312,22 @@ jobs:
     name: ✅ Merge gate
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    needs: [test, integration-ops, architecture-gates, deploy]
+    needs: [typecheck, build, test, integration-ops, architecture-gates, deploy]
     if: always()
 
     steps:
       - name: Require green checks
         run: |
+          if [[ "${{ needs.typecheck.result }}" != "success" ]]; then
+            echo "❌ Typecheck failed — blocking merge"
+            exit 1
+          fi
+          if [[ "${{ needs.build.result }}" != "success" ]]; then
+            echo "❌ Frontend build failed — blocking merge"
+            exit 1
+          fi
           if [[ "${{ needs.test.result }}" != "success" ]]; then
-            echo "❌ Tests failed — blocking merge"
+            echo "❌ Tests failed (one or more shards) — blocking merge"
             exit 1
           fi
           if [[ "${{ needs.integration-ops.result }}" != "success" ]]; then
