@@ -589,6 +589,46 @@ export interface EquipmentAnchor {
   createdAt: string;
 }
 
+/** Mirrors ReconciliationBucket in server/services/docking.service.ts (design §6.2). */
+export type ReconciliationBucket =
+  | "at_home"
+  | "checked_out"
+  | "returned_unverified"
+  | "returned_away"
+  | "misplaced_at_station"
+  | "missing"
+  | "unassigned"
+  | "no_station";
+
+/** A single item in the P3 Room Sweep expected list (design §5, §6.2/§6.3). */
+export interface RoomSweepItem {
+  id: string;
+  name: string;
+  assetTypeId: string | null;
+  custodyState: string;
+  checkedOutById: string | null;
+  checkedOutByEmail: string | null;
+  homeDockId: string | null;
+  homeDockName: string | null;
+  atStation: boolean;
+  bucket: ReconciliationBucket;
+}
+
+/** GET /api/docking/rooms/:roomId/sweep response — the expected list for the UI. */
+export interface RoomSweepList {
+  roomId: string;
+  items: RoomSweepItem[];
+}
+
+/** POST /api/docking/rooms/:roomId/sweep response — the commit result. */
+export interface RoomSweepResult {
+  roomId: string;
+  confirmedCount: number;
+  missingCount: number;
+  sweptById: string;
+  sweptAt: string;
+}
+
 export type QuickScanToggleAction = "checkout" | "return" | "blocked";
 
 export interface QuickScanToggleResult {

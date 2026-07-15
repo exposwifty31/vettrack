@@ -62,6 +62,8 @@ import type {
   Dock,
   DockingReconciliation,
   EquipmentAnchor,
+  RoomSweepList,
+  RoomSweepResult,
   Equipment,
   OperationalMetricsSummary,
   DisplayDevice,
@@ -1252,6 +1254,10 @@ export const api = {
       request<EquipmentAnchor>(`/api/docking/equipment/${id}/citizen-anchor`, { method: "POST" }),
     notFoundHere: (id: string) =>
       request<{ ok: true }>(`/api/docking/equipment/${id}/not-found-here`, { method: "POST" }),
+    roomSweepList: (roomId: string) =>
+      request<RoomSweepList>(`/api/docking/rooms/${roomId}/sweep`),
+    commitRoomSweep: (roomId: string, data: { confirmedEquipmentIds: string[] }) =>
+      request<RoomSweepResult>(`/api/docking/rooms/${roomId}/sweep`, { method: "POST", body: JSON.stringify(data) }),
   },
   platform: {
     capabilities: () =>

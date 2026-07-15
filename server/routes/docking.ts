@@ -10,15 +10,20 @@
  */
 import { Router } from "express";
 import { z } from "zod";
-import { db, equipment, docks } from "../db.js";
-import { and, eq, inArray, isNull, sql } from "drizzle-orm";
+import { db, equipment, docks, rooms, equipmentAnchors } from "../db.js";
+import { and, desc, eq, inArray, isNull, ne, sql } from "drizzle-orm";
 import { requireAuth, requireAdmin } from "../middleware/auth.js";
 import { writeLimiter } from "../middleware/rate-limiters.js";
 import { validateBody } from "../middleware/validate.js";
 import { logAudit } from "../lib/audit.js";
 import { apiError } from "../lib/apiError.js";
 import { referencedIdsBelongToClinic } from "../lib/clinic-scoped-refs.js";
-import { resolveHomeDock, dockExpectedFill } from "../services/docking.service.js";
+import {
+  resolveHomeDock,
+  dockExpectedFill,
+  classifyReconciliationBucket,
+  type ClassifierCtx,
+} from "../services/docking.service.js";
 import { createAnchor, invalidateCurrentAnchor } from "../services/equipment-anchor.service.js";
 
 const router = Router();
@@ -271,5 +276,164 @@ router.post("/equipment/:id/not-found-here", requireAuth, writeLimiter, async (r
 
   res.json({ ok: true });
 });
+
+/**
+ * GET /api/docking/rooms/:roomId/sweep
+ *
+ * P3 T3.2a — the expected list for a per-shift Room Sweep (design §5,
+ * §6.2/§6.3): every item HOMED to this room (resting + checked-out —
+ * checked-out items are shown but D-9 accounted, never swept/missing),
+ * each classified via the T3.1 reconciliation ladder. One anchors query
+ * for the room's item ids (not per-item) to avoid N+1.
+ */
+router.get("/rooms/:roomId/sweep", requireAuth, async (req, res) => {
+  const clinicId = req.clinicId!;
+  const { roomId } = req.params;
+
+  const [room] = await db.select().from(rooms).where(and(eq(rooms.clinicId, clinicId), eq(rooms.id, roomId)));
+  if (!room) return apiError(req, res, "errors.notFound", undefined, 404);
+
+  const [clinicDocks, expectedItems] = await Promise.all([
+    db.select().from(docks).where(eq(docks.clinicId, clinicId)),
+    db
+      .select()
+      .from(equipment)
+      .where(and(eq(equipment.clinicId, clinicId), eq(equipment.homeRoomId, roomId), isNull(equipment.deletedAt))),
+  ]);
+
+  const itemIds = expectedItems.map((item) => item.id);
+  const anchorRows = itemIds.length
+    ? await db
+        .select()
+        .from(equipmentAnchors)
+        .where(and(eq(equipmentAnchors.clinicId, clinicId), inArray(equipmentAnchors.equipmentId, itemIds)))
+        .orderBy(desc(equipmentAnchors.assertedAt))
+    : [];
+
+  const anchorsByEquipmentId = new Map<string, typeof anchorRows>();
+  for (const anchor of anchorRows) {
+    const bucket = anchorsByEquipmentId.get(anchor.equipmentId);
+    if (bucket) bucket.push(anchor);
+    else anchorsByEquipmentId.set(anchor.equipmentId, [anchor]);
+  }
+
+  const items = expectedItems.map((item) => {
+    const homeDock = resolveHomeDock({ homeRoomId: item.homeRoomId, assetTypeId: item.assetTypeId }, clinicDocks);
+    const anchorsForItem = anchorsByEquipmentId.get(item.id) ?? []; // already ordered assertedAt DESC
+    const currentAnchor = anchorsForItem.find((a) => a.invalidatedAt === null) ?? null;
+    const lastContradictionReason: ClassifierCtx["lastContradictionReason"] = currentAnchor
+      ? null
+      : (anchorsForItem[0]?.invalidatedReason ?? null) as ClassifierCtx["lastContradictionReason"];
+
+    const bucket = classifyReconciliationBucket(
+      {
+        checkedOutById: item.checkedOutById,
+        homeRoomId: item.homeRoomId,
+        assetTypeId: item.assetTypeId,
+        roomId: item.roomId,
+        lastRfidRoomId: item.lastRfidRoomId,
+      },
+      { homeDock: homeDock ? { id: homeDock.id } : null, currentAnchor, lastContradictionReason },
+    );
+
+    return {
+      id: item.id,
+      name: item.name,
+      assetTypeId: item.assetTypeId,
+      custodyState: item.custodyState,
+      checkedOutById: item.checkedOutById,
+      checkedOutByEmail: item.checkedOutByEmail,
+      homeDockId: homeDock?.id ?? null,
+      homeDockName: homeDock?.name ?? null,
+      atStation: currentAnchor !== null && homeDock !== null && currentAnchor.dockId === homeDock.id,
+      bucket,
+    };
+  });
+
+  res.json({ roomId, items });
+});
+
+const roomSweepCommitSchema = z.object({
+  confirmedEquipmentIds: z.array(z.string()).max(1000),
+});
+
+/**
+ * POST /api/docking/rooms/:roomId/sweep
+ *
+ * P3 T3.2a — commits a Room Sweep. Confirmed expected-resting items get a
+ * fresh source:"sweep" anchor at their home dock; unconfirmed
+ * expected-resting items are contradicted (reason:"sweep_missing").
+ * Checked-out items are D-9 accounted — never swept or marked missing.
+ * A confirmed id that is checked-out or foreign to this room's expected-
+ * resting set is silently ignored, not errored. One transaction.
+ */
+router.post(
+  "/rooms/:roomId/sweep",
+  requireAuth,
+  writeLimiter,
+  validateBody(roomSweepCommitSchema),
+  async (req, res) => {
+    const clinicId = req.clinicId!;
+    const { id: userId, email } = req.authUser!;
+    const { roomId } = req.params;
+    const { confirmedEquipmentIds } = req.body as z.infer<typeof roomSweepCommitSchema>;
+
+    const [room] = await db.select().from(rooms).where(and(eq(rooms.clinicId, clinicId), eq(rooms.id, roomId)));
+    if (!room) return apiError(req, res, "errors.notFound", undefined, 404);
+
+    const confirmedSet = new Set(confirmedEquipmentIds);
+    let confirmedCount = 0;
+    let missingCount = 0;
+
+    await db.transaction(async (tx) => {
+      const [clinicDocks, expectedResting] = await Promise.all([
+        tx.select().from(docks).where(eq(docks.clinicId, clinicId)),
+        tx
+          .select()
+          .from(equipment)
+          .where(
+            and(
+              eq(equipment.clinicId, clinicId),
+              eq(equipment.homeRoomId, roomId),
+              isNull(equipment.deletedAt),
+              ne(equipment.custodyState, "checked_out"),
+            ),
+          ),
+      ]);
+
+      for (const item of expectedResting) {
+        if (confirmedSet.has(item.id)) {
+          const homeDock = resolveHomeDock({ homeRoomId: item.homeRoomId, assetTypeId: item.assetTypeId }, clinicDocks);
+          if (!homeDock) continue; // no resolvable home dock — nothing to anchor to; neither swept nor missing
+          await createAnchor(tx, {
+            clinicId,
+            equipmentId: item.id,
+            dockId: homeDock.id,
+            roomId: homeDock.roomId,
+            assertedById: userId,
+            source: "sweep",
+          });
+          confirmedCount++;
+        } else {
+          await invalidateCurrentAnchor(tx, { clinicId, equipmentId: item.id, reason: "sweep_missing" });
+          missingCount++;
+        }
+      }
+    });
+
+    const sweptAt = new Date().toISOString();
+
+    logAudit({
+      clinicId,
+      actionType: "room_swept",
+      performedBy: userId,
+      performedByEmail: email,
+      targetId: roomId,
+      metadata: { confirmed: confirmedCount, missing: missingCount },
+    });
+
+    res.json({ roomId, confirmedCount, missingCount, sweptById: userId, sweptAt });
+  },
+);
 
 export default router;

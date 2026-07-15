@@ -257,6 +257,10 @@ export type AuditActionType =
   // (invalidateCurrentAnchor reason:"not_found_here").
   | "equipment_anchor_created"
   | "equipment_anchor_contradicted"
+  // P3 T3.2a — Room Sweep commit: a per-shift confirm pass over a room's
+  // homed items. Emitted once per sweep with `{confirmed, missing}` counts
+  // in metadata; targetId is the swept roomId.
+  | "room_swept"
   // Phase 9 — Display device pairing
   | "display_pairing_code_issued"
   | "display_device_paired"
