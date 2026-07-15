@@ -27,6 +27,8 @@ export interface User {
   displayName: string;
   role: UserRole;
   secondaryRole?: string | null;
+  /** Equipment Coordinator eligibility (docking P3 T3.4-i-a) — static, manager-set. */
+  isEquipmentCoordinator?: boolean;
   /**
    * Role the user requested at sign-up (staging column). Auto-applied on admin
    * approval (C3); vet is gated on `vetLicenseNumber`.

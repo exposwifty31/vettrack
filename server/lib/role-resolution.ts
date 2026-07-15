@@ -110,11 +110,24 @@ function toLocalTimeString(date: Date): string {
   return `${hours}:${minutes}:${seconds}`;
 }
 
-function normalizeName(name: string): string {
+/**
+ * Whitespace/casing normalization only — collapses runs of whitespace and
+ * trims. Exported so other roster↔user name-matching (e.g.
+ * `resolveShiftCoordinator`) reuses the exact same normalization this
+ * module's shift-match uses, instead of drifting with a second
+ * implementation.
+ */
+export function normalizeName(name: string): string {
   return name.trim().replace(/\s+/g, " ");
 }
 
-function normalizeNameKey(name: string): string {
+/**
+ * The full match key: lowercased, punctuation/whitespace stripped. This is
+ * the same key `resolveCurrentRole`'s SQL-side shift-match computes
+ * (`replace(replace(...lower(trim(employee_name))...))`) — keep both in
+ * sync if either changes.
+ */
+export function normalizeNameKey(name: string): string {
   return normalizeName(name)
     .toLowerCase()
     .replace(/[.\-_/\\,]+/g, "")

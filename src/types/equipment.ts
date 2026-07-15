@@ -633,6 +633,35 @@ export interface RoomSweepResult {
   sweptAt: string;
 }
 
+/** Mirrors CoordinatorStatus in server/services/equipment-coordinator.service.ts. */
+export type EquipmentCoordinatorStatus = "auto" | "confirmed" | "fallback_senior" | "needs_confirmation" | "unresolved";
+
+export interface EquipmentCoordinatorCandidate {
+  userId: string;
+  name: string;
+}
+
+/** GET /api/docking/coordinator response — this shift date's derived Equipment Coordinator. */
+export interface ShiftCoordinatorResult {
+  shiftDate: string;
+  status: EquipmentCoordinatorStatus;
+  coordinatorUserId: string | null;
+  coordinatorName: string | null;
+  candidates: EquipmentCoordinatorCandidate[];
+  seniorTechUserId: string | null;
+}
+
+/** POST /api/docking/coordinator response — the stored confirmation row. */
+export interface ShiftCoordinatorConfirmation {
+  id: string;
+  clinicId: string;
+  shiftDate: string;
+  coordinatorUserId: string;
+  source: "auto" | "confirmed" | "fallback_senior";
+  assignedByUserId: string | null;
+  createdAt: string;
+}
+
 export type QuickScanToggleAction = "checkout" | "return" | "blocked";
 
 export interface QuickScanToggleResult {

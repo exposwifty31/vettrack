@@ -2950,7 +2950,9 @@
       "duplicateName": "A dock with this name already exists.",
       "invalidReference": "The room or category does not belong to this clinic.",
       "invalidEquipmentIds": "Some equipment IDs do not exist, are deleted, or belong to another clinic.",
-      "noHomeStation": "This item is not resting, or has no resolvable home station."
+      "noHomeStation": "This item is not resting, or has no resolvable home station.",
+      "coordinatorForbidden": "Only the senior technician on this shift or an admin can confirm the Equipment Coordinator.",
+      "coordinatorNotEligible": "This person is not an eligible Equipment Coordinator on this shift."
     }
   },
   "push": {

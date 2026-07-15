@@ -263,6 +263,13 @@ export type AuditActionType =
   // homed items. Emitted once per sweep with `{confirmed, missing}` counts
   // in metadata; targetId is the swept roomId.
   | "room_swept"
+  // P3 T3.4-i-a — Equipment Coordinator model. `_eligibility_set`: admin
+  // flips a user's `is_equipment_coordinator` flag (targetId = the user).
+  // `_assigned`: a senior tech/admin confirms which eligible tech is THIS
+  // shift's coordinator when the auto-derivation was ambiguous (targetId =
+  // the confirmed coordinator's userId; metadata carries shiftDate).
+  | "equipment_coordinator_eligibility_set"
+  | "equipment_coordinator_assigned"
   // Phase 9 — Display device pairing
   | "display_pairing_code_issued"
   | "display_device_paired"

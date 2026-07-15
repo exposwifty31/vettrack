@@ -46,6 +46,35 @@ export const shiftImports = vtTable("vt_shift_imports", {
   rowCount: integer("row_count").notNull(),
 });
 
+/**
+ * Docking P3 T3.4-i-a — Equipment Coordinator per-shift assignment.
+ * `resolveShiftCoordinator` (server/services/equipment-coordinator.service.ts)
+ * derives the coordinator from the roster ∩ `vt_users.is_equipment_coordinator`
+ * eligibility for a given (clinic, shift_date); a row here is written only when
+ * that derivation is ambiguous (multiple eligible on shift) and a senior
+ * tech/admin confirms one. `source` mirrors the resolver's status enum for
+ * the confirmed case ('auto' | 'confirmed' | 'fallback_senior') — kept as
+ * plain text (TS-narrowed via `$type`, not a DB enum) to match the additive
+ * migration exactly. At most one row per (clinic, shift_date).
+ */
+export const shiftEquipmentCoordinator = vtTable(
+  "vt_shift_equipment_coordinator",
+  {
+    id: text("id").primaryKey(),
+    clinicId: text("clinic_id").notNull().references(() => clinics.id, { onDelete: "restrict" }),
+    shiftDate: date("shift_date", { mode: "string" }).notNull(),
+    coordinatorUserId: text("coordinator_user_id").notNull().references(() => users.id, { onDelete: "restrict" }),
+    source: text("source").notNull().$type<"auto" | "confirmed" | "fallback_senior">(),
+    assignedByUserId: text("assigned_by_user_id").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    clinicDateUq: uniqueIndex("vt_shift_eq_coordinator_clinic_date_uq").on(t.clinicId, t.shiftDate),
+  }),
+);
+export type ShiftEquipmentCoordinatorRow = typeof shiftEquipmentCoordinator.$inferSelect;
+export type NewShiftEquipmentCoordinatorRow = typeof shiftEquipmentCoordinator.$inferInsert;
+
 export const doctorShifts = vtTable(
   "vt_doctor_shifts",
   {

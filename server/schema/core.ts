@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { text, timestamp, varchar, jsonb, index } from "drizzle-orm/pg-core";
+import { text, timestamp, varchar, jsonb, boolean, index } from "drizzle-orm/pg-core";
 import { vtTable } from "./helpers.js";
 
 export const clinics = vtTable("vt_clinics", {
@@ -33,6 +33,15 @@ export const users = vtTable("vt_users", {
    * Not authoritative on its own; presence is required to auto-apply `vet` on approval.
    */
   vetLicenseNumber: varchar("vet_license_number", { length: 40 }),
+  /**
+   * Equipment Coordinator eligibility (docking P3 T3.4-i-a) — static,
+   * manager-set: "this person is qualified to be picked as a shift's
+   * Equipment Coordinator". Distinct from `secondaryRole` (a single-valued
+   * authority-elevation field) — a clinic can have many eligible
+   * coordinators; which one is on point for a given shift is derived
+   * separately (`resolveShiftCoordinator`), never stored on the user row.
+   */
+  isEquipmentCoordinator: boolean("is_equipment_coordinator").notNull().default(false),
   allowedOperationalRoles: jsonb("allowed_operational_roles").notNull().default(sql`'[]'::jsonb`),
   status: varchar("status", { length: 20 }).notNull().default("active"),
   preferredLocale: varchar("preferred_locale", { length: 10 }).notNull().default("he"),

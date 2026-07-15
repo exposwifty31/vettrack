@@ -10,7 +10,7 @@
  */
 import { Router } from "express";
 import { z } from "zod";
-import { db, equipment, docks, rooms, equipmentAnchors } from "../db.js";
+import { db, equipment, docks, rooms, equipmentAnchors, users } from "../db.js";
 import { and, desc, eq, inArray, isNull, ne, sql } from "drizzle-orm";
 import { requireAuth, requireAdmin } from "../middleware/auth.js";
 import { writeLimiter } from "../middleware/rate-limiters.js";
@@ -18,6 +18,7 @@ import { validateBody } from "../middleware/validate.js";
 import { logAudit } from "../lib/audit.js";
 import { apiError } from "../lib/apiError.js";
 import { referencedIdsBelongToClinic } from "../lib/clinic-scoped-refs.js";
+import { getClinicTimezone, clinicTodayIsoDate } from "../lib/clinic-timezone.js";
 import {
   resolveHomeDock,
   dockExpectedFill,
@@ -25,6 +26,7 @@ import {
   type ClassifierCtx,
 } from "../services/docking.service.js";
 import { createAnchor, invalidateCurrentAnchor } from "../services/equipment-anchor.service.js";
+import { resolveShiftCoordinator, confirmShiftCoordinator } from "../services/equipment-coordinator.service.js";
 
 const router = Router();
 
@@ -435,5 +437,104 @@ router.post(
     res.json({ roomId, confirmedCount, missingCount, sweptById: userId, sweptAt });
   },
 );
+
+const SHIFT_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * GET /api/docking/coordinator?date=YYYY-MM-DD
+ *
+ * P3 T3.4-i-a — the derived Equipment Coordinator for a shift date (default:
+ * today in clinic-local time). Thin read over `resolveShiftCoordinator`;
+ * enriches `coordinatorUserId` with a display name (candidates already
+ * carry names from the resolver).
+ */
+router.get("/coordinator", requireAuth, async (req, res) => {
+  const clinicId = req.clinicId!;
+  const rawDate = typeof req.query.date === "string" ? req.query.date : undefined;
+
+  let shiftDate = rawDate;
+  if (!shiftDate) {
+    const timeZone = await getClinicTimezone(clinicId);
+    shiftDate = clinicTodayIsoDate(timeZone);
+  }
+  if (!SHIFT_DATE_RE.test(shiftDate)) {
+    return apiError(req, res, "errors.validation", undefined, 400);
+  }
+
+  const resolution = await resolveShiftCoordinator(clinicId, shiftDate);
+
+  let coordinatorName: string | null = null;
+  if (resolution.coordinatorUserId) {
+    const fromCandidates = resolution.candidates.find((c) => c.userId === resolution.coordinatorUserId);
+    if (fromCandidates) {
+      coordinatorName = fromCandidates.name;
+    } else {
+      const [row] = await db
+        .select({ name: users.name, displayName: users.displayName })
+        .from(users)
+        .where(and(eq(users.clinicId, clinicId), eq(users.id, resolution.coordinatorUserId)))
+        .limit(1);
+      coordinatorName = row?.displayName || row?.name || null;
+    }
+  }
+
+  res.json({
+    shiftDate,
+    status: resolution.status,
+    coordinatorUserId: resolution.coordinatorUserId,
+    coordinatorName,
+    candidates: resolution.candidates,
+    seniorTechUserId: resolution.seniorTechUserId,
+  });
+});
+
+const confirmCoordinatorSchema = z.object({
+  shiftDate: z.string().regex(SHIFT_DATE_RE, "shiftDate must be YYYY-MM-DD"),
+  coordinatorUserId: z.string().min(1),
+});
+
+/**
+ * POST /api/docking/coordinator
+ *
+ * P3 T3.4-i-a — confirms which eligible tech is this shift's Equipment
+ * Coordinator when auto-derivation was ambiguous (status "needs_confirmation").
+ * Authorization: the caller must be the derived senior tech for that shift,
+ * or an admin — not gated by `requireAdmin` since a senior tech (not an
+ * admin) is the primary confirmer. `coordinatorUserId` must be in the
+ * currently-eligible-on-shift set (422 otherwise).
+ */
+router.post("/coordinator", requireAuth, writeLimiter, validateBody(confirmCoordinatorSchema), async (req, res) => {
+  const clinicId = req.clinicId!;
+  const { id: userId, email, role } = req.authUser!;
+  const { shiftDate, coordinatorUserId } = req.body as z.infer<typeof confirmCoordinatorSchema>;
+
+  const resolution = await resolveShiftCoordinator(clinicId, shiftDate);
+
+  const isAdmin = role === "admin";
+  const isSeniorTechOnShift = resolution.seniorTechUserId !== null && resolution.seniorTechUserId === userId;
+  if (!isAdmin && !isSeniorTechOnShift) {
+    return apiError(req, res, "errors.docking.coordinatorForbidden", undefined, 403);
+  }
+
+  const result = await confirmShiftCoordinator(
+    { clinicId, shiftDate, coordinatorUserId, assignedByUserId: userId },
+    resolution,
+  );
+  if (!result.ok) {
+    return apiError(req, res, "errors.docking.coordinatorNotEligible", undefined, 422);
+  }
+
+  logAudit({
+    clinicId,
+    actionType: "equipment_coordinator_assigned",
+    performedBy: userId,
+    performedByEmail: email,
+    targetId: coordinatorUserId,
+    targetType: "user",
+    metadata: { shiftDate, source: "confirmed" },
+  });
+
+  res.json(result.row);
+});
 
 export default router;
