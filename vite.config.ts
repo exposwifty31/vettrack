@@ -110,13 +110,24 @@ export default defineConfig(({ mode }) => {
     },
     build: {
       outDir: "dist/public",
-      sourcemap: "hidden",
+      // Hidden sourcemaps are only useful where they're uploaded to Sentry (the deploy
+      // build sets SENTRY_AUTH_TOKEN). Generating the (large) .map files in CI compile-
+      // checks / local builds just to throw them away is wasted time.
+      sourcemap: process.env.SENTRY_AUTH_TOKEN ? "hidden" : false,
       rollupOptions: {
         output: {
-          manualChunks: {
-            "vendor-charts": ["recharts"],
-            "vendor-export": ["jspdf", "xlsx"],
-            "vendor-react": ["react", "react-dom"],
+          // Split ONLY the eager app-shell vendors into long-lived, cacheable chunks.
+          // Do NOT name lazy-only libs (recharts, jspdf, xlsx, html2canvas, @clerk/clerk-js)
+          // here — an explicit manualChunks entry hoists them into the initial graph and
+          // defeats their lazy route / dynamic-import splitting (they belong in the lazy
+          // chunk of the page that dynamically imports them).
+          manualChunks(id) {
+            if (!id.includes("node_modules")) return undefined;
+            if (/[\\/]node_modules[\\/](react|react-dom|scheduler)[\\/]/.test(id)) return "vendor-react";
+            if (id.includes("@clerk/clerk-react")) return "vendor-clerk";
+            if (id.includes("@radix-ui")) return "vendor-radix";
+            if (id.includes("@tanstack")) return "vendor-query";
+            return undefined;
           },
         },
       },
