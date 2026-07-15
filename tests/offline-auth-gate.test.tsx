@@ -90,6 +90,22 @@ describe("OfflineAuthGate", () => {
     expect(safeReloadPageMock).toHaveBeenCalledTimes(1);
   });
 
+  it("does NOT reload on a spurious online event while already online", () => {
+    // Capacitor app-resume / interface flapping fires `online` without a real
+    // offline period — reloading then would discard the user's in-progress form.
+    isOnlineMock.mockReturnValue(true);
+    safeReloadPageMock.mockReturnValue(true);
+    renderGate();
+    expect(screen.getByTestId("clerk-form")).toBeTruthy();
+
+    act(() => {
+      window.dispatchEvent(new Event("online"));
+    });
+
+    expect(safeReloadPageMock).not.toHaveBeenCalled();
+    expect(screen.getByTestId("clerk-form")).toBeTruthy();
+  });
+
   it("attempts a reload when the Retry button is pressed", () => {
     isOnlineMock.mockReturnValue(false);
     safeReloadPageMock.mockReturnValue(true);
