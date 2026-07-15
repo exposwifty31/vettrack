@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { t } from "@/lib/i18n";
 import { isOnline, safeReloadPage } from "@/lib/safe-browser";
 import { Button } from "@/components/ui/button";
@@ -17,12 +17,28 @@ import { Button } from "@/components/ui/button";
  */
 export function OfflineAuthGate({ children }: { children: ReactNode }) {
   const [offline, setOffline] = useState(() => !isOnline());
+  // The `online` listener is bound once; read the latest `offline` via a ref so
+  // it can tell a real recovery from a spurious event without a stale closure.
+  const offlineRef = useRef(offline);
+  offlineRef.current = offline;
+
+  // Recover from a genuine offline period: reload to remount clerk-js fresh. The
+  // shared reload is throttled session-wide, so if it no-ops just drop the gate —
+  // never strand the user on "tap to retry".
+  const recover = () => {
+    if (!safeReloadPage()) setOffline(false);
+  };
 
   useEffect(() => {
     // Re-sync in case connectivity changed between the initializer and mount.
     setOffline(!isOnline());
     const handleOffline = () => setOffline(true);
-    const handleOnline = () => safeReloadPage();
+    // Ignore spurious `online` events fired while we were never showing the gate
+    // (Capacitor app-resume / interface flapping) — reloading then would discard
+    // the user's in-progress sign-in form. Only recover from a real offline state.
+    const handleOnline = () => {
+      if (offlineRef.current) recover();
+    };
     window.addEventListener("offline", handleOffline);
     window.addEventListener("online", handleOnline);
     return () => {
@@ -42,7 +58,7 @@ export function OfflineAuthGate({ children }: { children: ReactNode }) {
     >
       <p className="text-base font-semibold text-foreground">{t.auth.guard.offlineTitle}</p>
       <p className="text-sm text-muted-foreground max-w-md">{t.auth.guard.offlineBody}</p>
-      <Button type="button" variant="outline" onClick={() => safeReloadPage()}>
+      <Button type="button" variant="outline" onClick={recover}>
         {t.auth.guard.offlineRetry}
       </Button>
     </div>

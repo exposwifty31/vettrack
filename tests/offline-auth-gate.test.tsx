@@ -8,13 +8,14 @@
  * the Clerk component while offline, so clerk-js never mounts and never toasts.
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { act, cleanup, render, screen } from "@testing-library/react";
 import { t } from "@/lib/i18n";
 
 const isOnlineMock = vi.fn();
+const safeReloadPageMock = vi.fn(() => true);
 vi.mock("@/lib/safe-browser", () => ({
   isOnline: () => isOnlineMock(),
-  safeReloadPage: vi.fn(),
+  safeReloadPage: () => safeReloadPageMock(),
 }));
 
 import { OfflineAuthGate } from "@/components/offline-auth-gate";
@@ -45,6 +46,50 @@ describe("OfflineAuthGate", () => {
         <div data-testid="clerk-form">clerk</div>
       </OfflineAuthGate>,
     );
+    expect(screen.getByTestId("clerk-form")).toBeTruthy();
+    expect(screen.queryByTestId("offline-auth-gate")).toBeNull();
+  });
+
+  it("does NOT reload on a spurious online event while already online", () => {
+    // Capacitor app-resume / interface flapping fires `online` without a real
+    // offline period — reloading then would discard the user's in-progress form.
+    isOnlineMock.mockReturnValue(true);
+    safeReloadPageMock.mockReturnValue(true);
+    render(
+      <OfflineAuthGate>
+        <div data-testid="clerk-form">clerk</div>
+      </OfflineAuthGate>,
+    );
+    act(() => window.dispatchEvent(new Event("online")));
+    expect(safeReloadPageMock).not.toHaveBeenCalled();
+    expect(screen.getByTestId("clerk-form")).toBeTruthy();
+  });
+
+  it("reloads to recover when connectivity returns after an offline period", () => {
+    isOnlineMock.mockReturnValue(false);
+    safeReloadPageMock.mockReturnValue(true);
+    render(
+      <OfflineAuthGate>
+        <div data-testid="clerk-form">clerk</div>
+      </OfflineAuthGate>,
+    );
+    expect(screen.getByTestId("offline-auth-gate")).toBeTruthy();
+    act(() => window.dispatchEvent(new Event("online")));
+    expect(safeReloadPageMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("drops the gate instead of stranding the user when the reload is throttled", () => {
+    isOnlineMock.mockReturnValue(false);
+    safeReloadPageMock.mockReturnValue(false); // shared reload throttle no-ops
+    render(
+      <OfflineAuthGate>
+        <div data-testid="clerk-form">clerk</div>
+      </OfflineAuthGate>,
+    );
+    expect(screen.getByTestId("offline-auth-gate")).toBeTruthy();
+    act(() => window.dispatchEvent(new Event("online")));
+    expect(safeReloadPageMock).toHaveBeenCalled();
+    // Not left on the "you're offline, tap to retry" screen: children render.
     expect(screen.getByTestId("clerk-form")).toBeTruthy();
     expect(screen.queryByTestId("offline-auth-gate")).toBeNull();
   });
