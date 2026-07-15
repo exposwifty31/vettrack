@@ -32,7 +32,7 @@ async function loadDict(locale: Locale): Promise<LocaleDict> {
   if (cached) return cached;
   if (locale === "en") {
     const mod = await import("../../locales/en.json");
-    loadedDicts.en = (mod.default ?? mod) as unknown as LocaleDict;
+    loadedDicts.en = mod.default;
     return loadedDicts.en;
   }
   return heDict;
@@ -1188,8 +1188,13 @@ return stripInternalKeys(translations) as typeof translations;
 
 export let t = buildTranslations(loadedDicts[getStoredLocale()] ?? heDict);
 
+// Monotonic counter so an in-flight async locale load only applies if no newer selection
+// superseded it — a slow `en` load must not clobber a later switch back to `he`.
+let localeGeneration = 0;
+
 export function refreshTranslations(locale: string | null | undefined = getStoredLocale()): void {
   const resolved = resolveClientLocale(locale);
+  const gen = ++localeGeneration;
   const cached = loadedDicts[resolved];
   if (cached) {
     t = buildTranslations(cached);
@@ -1197,8 +1202,9 @@ export function refreshTranslations(locale: string | null | undefined = getStore
     return;
   }
   // Non-eager locale (en) not loaded yet — fetch it, then rebuild + notify so the app
-  // re-renders in the correct language once the dict arrives.
+  // re-renders in the correct language once the dict arrives (unless a newer selection won).
   void loadDict(resolved).then((dict) => {
+    if (gen !== localeGeneration) return; // superseded — drop this stale load
     t = buildTranslations(dict);
     notifyLocaleChanged(resolved);
   });
@@ -1207,10 +1213,19 @@ export function refreshTranslations(locale: string | null | undefined = getStore
 /**
  * Ensure the ACTIVE locale's dict is loaded and `t` reflects it. Await this before the
  * first render so a non-default startup locale (en) never flashes the default (he).
- * Resolves immediately for `he` (always eager) — zero delay on the common path.
+ * Resolves immediately for `he` (always eager) — zero delay on the common path. Never
+ * rejects: if the lazy chunk fails to load, it falls back to `he` so startup can't blank.
  */
 export async function ensureActiveLocaleLoaded(): Promise<void> {
   const active = getStoredLocale();
-  const dict = loadedDicts[active] ?? (await loadDict(active));
-  t = buildTranslations(dict);
+  const cached = loadedDicts[active];
+  if (cached) {
+    t = buildTranslations(cached);
+    return;
+  }
+  try {
+    t = buildTranslations(await loadDict(active));
+  } catch {
+    t = buildTranslations(heDict);
+  }
 }
