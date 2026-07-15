@@ -29,6 +29,7 @@ import { promoteStagingQueueNext } from "../lib/staging-promotion.js";
 import { promoteEquipmentWaitlistWithNotify } from "../lib/equipment-waitlist-promotion.js";
 import { isPostgresUniqueViolation, pgUpdateMatchedZeroRows, getPostgresConstraintName } from "../lib/pg-result.js";
 import { incrementMetric } from "../lib/metrics.js";
+import { createAnchor } from "../services/equipment-anchor.service.js";
 
 const router = Router();
 
@@ -371,6 +372,31 @@ router.post("/equipment/:equipmentId/dock-return", requireAuth, validateBody(doc
       if (pgUpdateMatchedZeroRows(updated)) {
         throw new Error("VERSION_CONFLICT");
       }
+
+      // Reaching the docked transition is an accountable at-station assertion —
+      // create an anchor in the same transaction so a rolled-back return leaves
+      // no anchor (toggle ⇒ anchor ⇒ docked).
+      //
+      // The anchor's roomId must be the DOCK's room, not the equipment's
+      // assigned room (eq_row.roomId) — those can diverge, and the anchor is
+      // asserting where the item physically is (at the dock), not where it's
+      // administratively homed. Read fresh inside the tx rather than reusing
+      // the pre-transaction `dock` lookup above. If the dock can't be resolved
+      // (anomaly — dockId is the just-validated return target), record `null`
+      // rather than falling back to the stale assigned room: `dockId` remains
+      // the authoritative location and `roomId` is informational + nullable.
+      const [dockRow] = await tx
+        .select({ roomId: docks.roomId })
+        .from(docks)
+        .where(and(eq(docks.id, dockId), eq(docks.clinicId, clinicId)));
+      await createAnchor(tx, {
+        clinicId,
+        equipmentId,
+        dockId,
+        roomId: dockRow?.roomId ?? null,
+        assertedById: userId,
+        source: "return_toggle",
+      });
 
       await insertRealtimeDomainEvent(tx, {
         clinicId,

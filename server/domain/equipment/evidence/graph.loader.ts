@@ -2,7 +2,9 @@ import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 import {
   assetTypeConditions,
   db,
+  docks,
   equipment,
+  equipmentAnchors,
   equipmentReturns,
   equipmentRfidReads,
   rooms,
@@ -12,7 +14,9 @@ import {
   unitConditionStates,
 } from "../../../db.js";
 import { buildWaitlistSnapshot } from "../../../services/equipment-waitlist.service.js";
+import type { AnchorSource } from "../../../services/equipment-anchor.service.js";
 import type {
+  EvidenceCurrentAnchor,
   EvidenceGraph,
   EvidenceReturnRow,
   EvidenceScanRow,
@@ -211,6 +215,39 @@ export async function loadEvidenceGraph(
       ),
     );
 
+  // Latest OPEN anchor (docking P2) — sticky-until-contradicted (D-13). The
+  // `invalidated_at IS NULL` filter excludes superseded/contradicted anchors,
+  // so they contribute nothing. Left-joined to docks so the graph carries the
+  // station NAME (consistent with how rooms are pre-loaded above).
+  const [anchorRow] = await db
+    .select({
+      id: equipmentAnchors.id,
+      dockId: equipmentAnchors.dockId,
+      dockName: docks.name,
+      roomId: equipmentAnchors.roomId,
+      assertedAt: equipmentAnchors.assertedAt,
+      assertedById: equipmentAnchors.assertedById,
+      source: equipmentAnchors.source,
+    })
+    .from(equipmentAnchors)
+    .leftJoin(docks, eq(equipmentAnchors.dockId, docks.id))
+    .where(
+      and(
+        eq(equipmentAnchors.clinicId, clinicId),
+        eq(equipmentAnchors.equipmentId, equipmentId),
+        isNull(equipmentAnchors.invalidatedAt),
+      ),
+    )
+    .orderBy(desc(equipmentAnchors.assertedAt))
+    .limit(1);
+
+  // `equipmentAnchors.source` is a plain `text` column (DB-enforced via CHECK,
+  // not a Drizzle pgEnum) — narrow the select result to the AnchorSource
+  // literal union here rather than widening EvidenceCurrentAnchor's type.
+  const currentAnchor: EvidenceCurrentAnchor | null = anchorRow
+    ? { ...anchorRow, source: anchorRow.source as AnchorSource }
+    : null;
+
   const waitlist =
     viewerUserId != null
       ? await buildWaitlistSnapshot(clinicId, equipmentId, viewerUserId)
@@ -241,6 +278,7 @@ export async function loadEvidenceGraph(
     supersessionEvents,
     waitlist,
     activeStaging,
+    currentAnchor,
   };
 }
 
@@ -270,5 +308,6 @@ export function buildSyntheticEvidenceGraph(
       ),
     waitlist: partial.waitlist ?? null,
     activeStaging: partial.activeStaging ?? [],
+    currentAnchor: partial.currentAnchor ?? null,
   };
 }

@@ -523,7 +523,9 @@
       "damageReported": "הוחזר פגום",
       "damageReportUndo": "בטל",
       "damageReportFailed": "לא ניתן היה לדווח על נזק",
-      "damageReportOffline": "הוחזר פגום — במצב לא מקוון, כך שדיווח הנזק לא נשלח. התחבר ודווח שוב."
+      "damageReportOffline": "הוחזר פגום — במצב לא מקוון, כך שדיווח הנזק לא נשלח. התחבר ודווח שוב.",
+      "reportedNotFound": "דווח — מעדכן מיקום",
+      "notFoundFailed": "לא ניתן היה לדווח — נסה שוב"
     },
     "backToList": "חזרה לרשימה",
     "notFound": "הציוד לא נמצא",
@@ -537,6 +539,7 @@
     "floorNoteSaveFailed": "שמירת הערת המיקום נכשלה",
     "confirmHere": "אשר כאן",
     "confirmedHere": "אושר!",
+    "notFoundHere": "לא נמצא כאן",
     "scanCount": "אושר {count} פעמים",
     "scanCountOnce": "אושר פעם אחת",
     "scanLogTab": "יומן סריקה",
@@ -1097,7 +1100,10 @@
     "viewFullDetails": "פרטים מלאים",
     "markedOk": "{name} סומן כתקין",
     "statusUpdateFailed": "עדכון סטטוס נכשל",
-    "subtitleEquipmentQr": "ציוד QR"
+    "subtitleEquipmentQr": "ציוד QR",
+    "confirmHere": "לא לוקח — מאשר שנמצא כאן",
+    "confirmedHere": "אושר בעמדה",
+    "confirmHereFailed": "לא ניתן היה לאשר"
   },
   "onboarding": {
     "step1": {
@@ -2927,7 +2933,8 @@
       "duplicateStation": "כבר קיימת עמדה לקטגוריה זו בחדר זה.",
       "duplicateName": "כבר קיימת עמדת עגינה בשם זה.",
       "invalidReference": "החדר או הקטגוריה אינם שייכים למרפאה זו.",
-      "invalidEquipmentIds": "חלק ממזהי הציוד אינם קיימים, נמחקו, או שייכים למרפאה אחרת."
+      "invalidEquipmentIds": "חלק ממזהי הציוד אינם קיימים, נמחקו, או שייכים למרפאה אחרת.",
+      "noHomeStation": "פריט זה אינו במנוחה, או שאין לו עמדת בית ניתנת לזיהוי."
     }
   },
   "push": {
@@ -4197,6 +4204,11 @@
     "confirmSetAlert": "הגדרת התראה והחזרה",
     "damagedButton": "פגום",
     "damageWarning": "דוח נזק יוגש עבור ציוד זה. ניתן לבטל מיד לאחר האישור.",
-    "confirmReturnedDamaged": "אישור — הוחזר פגום"
+    "confirmReturnedDamaged": "אישור — הוחזר פגום",
+    "toggleLabelStation": "הוחזר ל{station}, מחובר לחשמל",
+    "toggleLabelGeneric": "הוחזר לעמדתו, מחובר לחשמל",
+    "noHomeHint": "לא הוגדרה עמדת בית לציוד זה — בקש ממנהל להגדיר אחת",
+    "stationUnresolvedHint": "עמדת הבית של הציוד עדיין לא הוגדרה — בטל את הסימון כדי להחזיר ללא עגינה",
+    "offlineDockHint": "החזרה לעגינה דורשת חיבור לרשת — מוחזר כעת ללא עגינה"
   }
 }

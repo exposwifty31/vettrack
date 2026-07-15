@@ -239,6 +239,30 @@ export const equipmentReturns = vtTable("vt_equipment_returns", {
   clinicEquipmentIdx: index("idx_vt_equipment_returns_clinic_equipment").on(t.clinicId, t.equipmentId),
 }));
 
+/** Append-only "this item is at its station" assertion stream (docking P2, design §3.3/§4). Never expires by time — only by contradiction (D-13). Current anchor = latest row per equipment with invalidatedAt IS NULL. */
+export const equipmentAnchors = vtTable(
+  "vt_equipment_anchors",
+  {
+    id: text("id").primaryKey(),
+    clinicId: text("clinic_id").notNull().references(() => clinics.id, { onDelete: "restrict" }),
+    equipmentId: text("equipment_id").notNull().references(() => equipment.id, { onDelete: "cascade" }),
+    dockId: text("dock_id").references(() => docks.id, { onDelete: "set null" }),
+    roomId: text("room_id").references(() => rooms.id, { onDelete: "set null" }),
+    assertedById: text("asserted_by_id"),
+    assertedAt: timestamp("asserted_at", { withTimezone: true }).notNull().defaultNow(),
+    source: text("source").notNull(),
+    invalidatedAt: timestamp("invalidated_at", { withTimezone: true }),
+    invalidatedReason: text("invalidated_reason"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    clinicEquipmentAssertedIdx: index("idx_vt_equipment_anchors_clinic_equipment_asserted").on(t.clinicId, t.equipmentId, t.assertedAt),
+    currentIdx: uniqueIndex("idx_vt_equipment_anchors_current").on(t.clinicId, t.equipmentId).where(sql`${t.invalidatedAt} IS NULL`),
+  }),
+);
+export type EquipmentAnchor = typeof equipmentAnchors.$inferSelect;
+export type NewEquipmentAnchor = typeof equipmentAnchors.$inferInsert;
+
 export const stagingQueue = vtTable(
   "vt_staging_queue",
   {

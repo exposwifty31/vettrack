@@ -43,6 +43,120 @@ interface ReturnPlugDialogProps {
 
 const DEFAULT_DEADLINE_MINUTES = 30;
 
+export interface PlugStatusFieldsProps {
+  isPluggedIn: boolean;
+  onPluggedInChange: (value: boolean) => void;
+  returnedDamaged: boolean;
+  onReturnedDamagedChange: (value: boolean) => void;
+  deadlineMinutes: number;
+  onDeadlineMinutesChange: (value: number) => void;
+  defaultDeadlineMinutes: number;
+  allowDamagedReport?: boolean;
+  isBusy?: boolean;
+}
+
+/**
+ * The plugged-in / not-plugged / "returned damaged" (T-24d) choice grid +
+ * its sub-fields — extracted so `UnifiedReturnDialog` (T2.3 docking P2) can
+ * reuse this exact, already-tested UI for its unchecked (plain-return)
+ * path without duplicating it. `ReturnPlugDialog` below still owns all the
+ * state and the confirm/cancel actions; this component is presentational
+ * only.
+ */
+export function PlugStatusFields({
+  isPluggedIn,
+  onPluggedInChange,
+  returnedDamaged,
+  onReturnedDamagedChange,
+  deadlineMinutes,
+  onDeadlineMinutesChange,
+  defaultDeadlineMinutes,
+  allowDamagedReport = false,
+  isBusy = false,
+}: PlugStatusFieldsProps) {
+  return (
+    <>
+      <div className={allowDamagedReport ? "grid grid-cols-3 gap-2" : "grid grid-cols-2 gap-2"}>
+        <Button
+          type="button"
+          variant={!returnedDamaged && isPluggedIn ? "default" : "outline"}
+          className="h-11 gap-2"
+          onClick={() => {
+            onReturnedDamagedChange(false);
+            onPluggedInChange(true);
+          }}
+          disabled={isBusy}
+          data-testid="btn-plugged-yes"
+        >
+          <Plug className="h-4 w-4" aria-hidden />
+          {t.returnPlugDialog.pluggedIn}
+        </Button>
+        <Button
+          type="button"
+          variant={!returnedDamaged && !isPluggedIn ? "default" : "outline"}
+          className="h-11 gap-2"
+          onClick={() => {
+            onReturnedDamagedChange(false);
+            onPluggedInChange(false);
+          }}
+          disabled={isBusy}
+          data-testid="btn-plugged-no"
+        >
+          <BatteryWarning className="h-4 w-4" aria-hidden />
+          {t.returnPlugDialog.notPluggedIn}
+        </Button>
+        {allowDamagedReport && (
+          <Button
+            type="button"
+            variant={returnedDamaged ? "destructive" : "outline"}
+            className="h-11 gap-2"
+            onClick={() => onReturnedDamagedChange(true)}
+            disabled={isBusy}
+            data-testid="btn-returned-damaged"
+          >
+            <AlertTriangle className="h-4 w-4" aria-hidden />
+            {t.returnPlugDialog.damagedButton}
+          </Button>
+        )}
+      </div>
+
+      {!returnedDamaged && !isPluggedIn && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800" data-testid="return-plug-warning">
+          {t.returnPlugDialog.plugAlertWarning(deadlineMinutes)}
+        </div>
+      )}
+
+      {!returnedDamaged && !isPluggedIn && (
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="plugInDeadlineMinutes">{t.returnPlugDialog.deadlineLabel}</Label>
+          <Input
+            id="plugInDeadlineMinutes"
+            type="number"
+            inputMode="numeric"
+            min={1}
+            max={1440}
+            value={deadlineMinutes}
+            onChange={(event) =>
+              onDeadlineMinutesChange(parseInt(event.target.value || `${defaultDeadlineMinutes}`, 10))
+            }
+            disabled={isBusy}
+            data-testid="input-plug-deadline"
+          />
+        </div>
+      )}
+
+      {returnedDamaged && (
+        <div
+          className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive"
+          data-testid="return-damaged-warning"
+        >
+          {t.returnPlugDialog.damageWarning}
+        </div>
+      )}
+    </>
+  );
+}
+
 export function ReturnPlugDialog({
   open,
   equipmentName,
@@ -91,83 +205,17 @@ export function ReturnPlugDialog({
         </SheetHeader>
 
         <div className="flex flex-col gap-3 py-2">
-          <div className={allowDamagedReport ? "grid grid-cols-3 gap-2" : "grid grid-cols-2 gap-2"}>
-            <Button
-              type="button"
-              variant={!returnedDamaged && isPluggedIn ? "default" : "outline"}
-              className="h-11 gap-2"
-              onClick={() => {
-                setReturnedDamaged(false);
-                setIsPluggedIn(true);
-              }}
-              disabled={isBusy}
-              data-testid="btn-plugged-yes"
-            >
-              <Plug className="h-4 w-4" aria-hidden />
-              {t.returnPlugDialog.pluggedIn}
-            </Button>
-            <Button
-              type="button"
-              variant={!returnedDamaged && !isPluggedIn ? "default" : "outline"}
-              className="h-11 gap-2"
-              onClick={() => {
-                setReturnedDamaged(false);
-                setIsPluggedIn(false);
-              }}
-              disabled={isBusy}
-              data-testid="btn-plugged-no"
-            >
-              <BatteryWarning className="h-4 w-4" aria-hidden />
-              {t.returnPlugDialog.notPluggedIn}
-            </Button>
-            {allowDamagedReport && (
-              <Button
-                type="button"
-                variant={returnedDamaged ? "destructive" : "outline"}
-                className="h-11 gap-2"
-                onClick={() => setReturnedDamaged(true)}
-                disabled={isBusy}
-                data-testid="btn-returned-damaged"
-              >
-                <AlertTriangle className="h-4 w-4" aria-hidden />
-                {t.returnPlugDialog.damagedButton}
-              </Button>
-            )}
-          </div>
-
-          {!returnedDamaged && !isPluggedIn && (
-            <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800" data-testid="return-plug-warning">
-              {t.returnPlugDialog.plugAlertWarning(deadlineMinutes)}
-            </div>
-          )}
-
-          {!returnedDamaged && !isPluggedIn && (
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="plugInDeadlineMinutes">{t.returnPlugDialog.deadlineLabel}</Label>
-              <Input
-                id="plugInDeadlineMinutes"
-                type="number"
-                inputMode="numeric"
-                min={1}
-                max={1440}
-                value={deadlineMinutes}
-                onChange={(event) =>
-                  setDeadlineMinutes(parseInt(event.target.value || `${defaultDeadlineMinutes}`, 10))
-                }
-                disabled={isBusy}
-                data-testid="input-plug-deadline"
-              />
-            </div>
-          )}
-
-          {returnedDamaged && (
-            <div
-              className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive"
-              data-testid="return-damaged-warning"
-            >
-              {t.returnPlugDialog.damageWarning}
-            </div>
-          )}
+          <PlugStatusFields
+            isPluggedIn={isPluggedIn}
+            onPluggedInChange={setIsPluggedIn}
+            returnedDamaged={returnedDamaged}
+            onReturnedDamagedChange={setReturnedDamaged}
+            deadlineMinutes={deadlineMinutes}
+            onDeadlineMinutesChange={setDeadlineMinutes}
+            defaultDeadlineMinutes={defaultDeadlineMinutes}
+            allowDamagedReport={allowDamagedReport}
+            isBusy={isBusy}
+          />
         </div>
 
         <SheetFooter>

@@ -67,6 +67,18 @@ function resolveLocationFromGraph(ctx: ResolverContext, graph: EvidenceGraph): L
     });
   }
 
+  // Current-anchor station (docking P2): attribute the summary to the anchor's
+  // dock. Only the OPEN anchor reaches here (the loader's `invalidated_at IS
+  // NULL` filter), so invalidated/superseded anchors contribute nothing.
+  if (graph.currentAnchor && graph.currentAnchor.dockId && graph.currentAnchor.dockName) {
+    citations.push({
+      type: "dock",
+      id: graph.currentAnchor.dockId,
+      label: graph.currentAnchor.dockName,
+      evidence: { observedAt: iso(graph.currentAnchor.assertedAt) },
+    });
+  }
+
   citations.push({
     type: "equipment",
     id: eq.id,
@@ -79,6 +91,8 @@ function resolveLocationFromGraph(ctx: ResolverContext, graph: EvidenceGraph): L
     summary = `checked_out:${eq.checkedOutLocation}`;
   } else if (latestRfid && roomLabel(graph, latestRfid.toRoomId)) {
     summary = `rfid_room:${roomLabel(graph, latestRfid.toRoomId)}`;
+  } else if (graph.currentAnchor && graph.currentAnchor.dockName) {
+    summary = `dock_station:${graph.currentAnchor.dockName}`;
   } else if (eq.roomId && roomLabel(graph, eq.roomId)) {
     summary = `room:${roomLabel(graph, eq.roomId)}`;
   } else if (eq.location) {

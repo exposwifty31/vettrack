@@ -570,6 +570,25 @@ export function QrScanner({ onClose, onDispense }: QrScannerProps) {
     setReturnDialogOpen(true);
   }
 
+  async function handleConfirmHere() {
+    if (!scannedEquipment) return;
+    setIsActing(true);
+    try {
+      await api.docking.citizenAnchor(scannedEquipment.id);
+      haptics.tap();
+      toast.success(t.qrScanner.confirmedHere);
+      // The anchor changes this item's derived location — refresh both the
+      // detail cache and any equipment list views.
+      queryClient.invalidateQueries({ queryKey: [`/api/equipment/${scannedEquipment.id}`] });
+      queryClient.invalidateQueries({ queryKey: ["/api/equipment"] });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : t.qrScanner.confirmHereFailed;
+      toast.error(msg);
+    } finally {
+      setIsActing(false);
+    }
+  }
+
   async function handleConfirmReturn(payload: {
     isPluggedIn: boolean;
     plugInDeadlineMinutes?: number;
@@ -1017,6 +1036,23 @@ export function QrScanner({ onClose, onDispense }: QrScannerProps) {
                 >
                   {isActing ? <Loader2 className="w-5 h-5 animate-spin" /> : <LogIn className="w-5 h-5" />}
                   {t.qrScanner.checkOut}
+                </Button>
+              )}
+
+              {/* Citizen anchor — resting item at its home station; positive
+                  physical-presence confirmation without taking it. Hidden for
+                  non-docking clinics (no homeRoomId → guaranteed 409). */}
+              {!isCheckedOut && !!scannedEquipment.homeRoomId && (
+                <Button
+                  variant="outline"
+                  size="lg"
+                  className="w-full gap-2.5"
+                  onClick={handleConfirmHere}
+                  disabled={isActing}
+                  data-testid="btn-scan-inline-confirm-here"
+                >
+                  {isActing ? <Loader2 className="w-5 h-5 animate-spin" /> : null}
+                  {t.qrScanner.confirmHere}
                 </Button>
               )}
 

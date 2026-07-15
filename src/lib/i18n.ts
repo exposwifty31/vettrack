@@ -283,6 +283,7 @@ const translations = {
     floorNoteSaveFailed: d.equipmentDetail.floorNoteSaveFailed,
     confirmHere: d.equipmentDetail.confirmHere,
     confirmedHere: d.equipmentDetail.confirmedHere,
+    notFoundHere: d.equipmentDetail.notFoundHere,
     scanCount: (count: number) => count === 1
       ? d.equipmentDetail.scanCountOnce
       : tr(d.equipmentDetail.scanCount, { count }),
@@ -341,6 +342,8 @@ const translations = {
       damageReportUndo: d.equipmentDetail.toast.damageReportUndo,
       damageReportFailed: d.equipmentDetail.toast.damageReportFailed,
       damageReportOffline: d.equipmentDetail.toast.damageReportOffline,
+      reportedNotFound: d.equipmentDetail.toast.reportedNotFound,
+      notFoundFailed: d.equipmentDetail.toast.notFoundFailed,
     },
     locationCard: {
       title: d.equipmentDetail.locationCard.title,
@@ -1144,6 +1147,8 @@ const translations = {
           : d.returnPlugDialog.plugAlertWarningOther,
         { minutes },
       ),
+    // T2.3 (docking P2) — unified return dialog's home-station toggle label.
+    toggleLabelStation: (station: string) => tr(d.returnPlugDialog.toggleLabelStation, { station }),
   },
 
 } as const;

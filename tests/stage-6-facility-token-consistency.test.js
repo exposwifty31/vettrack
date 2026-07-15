@@ -33,9 +33,21 @@ describe("Stage 6 — desktop equipment-detail.tsx", () => {
   it("has no hardcoded palette", () => {
     expect(BANNED.test(src)).toBe(false);
   });
-  it("uses status/sys tokens for banners, buttons and status text", () => {
+  it("uses status tokens for banners and status text", () => {
     expect(src.includes("var(--status-issue-")).toBe(true);
     expect(src.includes("var(--status-stale-")).toBe(true);
+  });
+});
+
+// T2.3 (docking P2) retired equipment-detail.tsx's standalone blue-accent
+// "Dock return" quick-action button — its home-station toggle (same
+// --sys-blue accent) now lives in UnifiedReturnDialog.tsx instead.
+describe("Stage 6 — UnifiedReturnDialog.tsx (home-station toggle, T2.3)", () => {
+  const src = read("src", "components", "equipment", "UnifiedReturnDialog.tsx");
+  it("has no hardcoded palette", () => {
+    expect(BANNED.test(src)).toBe(false);
+  });
+  it("uses the sys-blue token for the docking accent", () => {
     expect(src.includes("rgb(var(--sys-blue))")).toBe(true);
   });
 });

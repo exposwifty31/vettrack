@@ -168,6 +168,8 @@ export interface Equipment {
   dockConfirmedReadyAt?: string | null;
   emergencyOverrideAt?: string | null;
   procedureBoundHospitalizationId?: string | null;
+  /** Home room assignment (docking P1) — paired with assetTypeId to derive the item's home dock client-side. */
+  homeRoomId?: string | null;
 }
 
 export interface CreateEquipmentRequest {
@@ -565,6 +567,26 @@ export interface DockingReconciliation {
   unassigned: DockingReconciliationItem[];
   noStation: DockingReconciliationItem[];
   byDock: Array<{ dock: Dock; expectedFill: number; capacity: number | null }>;
+}
+
+/**
+ * The item's current (or superseded) home-station assertion (P2 docking §3.3).
+ * Never expires by time — only by contradiction; `invalidatedAt` null means
+ * the anchor is currently open. Returned by
+ * POST /api/docking/equipment/:id/citizen-anchor.
+ */
+export interface EquipmentAnchor {
+  id: string;
+  clinicId: string;
+  equipmentId: string;
+  dockId: string | null;
+  roomId: string | null;
+  assertedById: string | null;
+  assertedAt: string;
+  source: "return_toggle" | "sweep" | "citizen" | "smart_charger";
+  invalidatedAt: string | null;
+  invalidatedReason: "checkout" | "rfid_elsewhere" | "sweep_missing" | "not_found_here" | null;
+  createdAt: string;
 }
 
 export type QuickScanToggleAction = "checkout" | "return" | "blocked";

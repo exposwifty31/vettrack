@@ -523,7 +523,9 @@
       "damageReported": "Returned damaged",
       "damageReportUndo": "Undo",
       "damageReportFailed": "Could not report damage",
-      "damageReportOffline": "Returned damaged — offline, so the damage report wasn't sent. Reconnect and report it again."
+      "damageReportOffline": "Returned damaged — offline, so the damage report wasn't sent. Reconnect and report it again.",
+      "reportedNotFound": "Reported — updating location",
+      "notFoundFailed": "Couldn't report — try again"
     },
     "backToList": "Back to list",
     "notFound": "Equipment not found",
@@ -537,6 +539,7 @@
     "floorNoteSaveFailed": "Failed to save floor note",
     "confirmHere": "Confirm here",
     "confirmedHere": "Confirmed!",
+    "notFoundHere": "Not Found Here",
     "scanCount": "Confirmed {count} times",
     "scanCountOnce": "Confirmed once",
     "scanLogTab": "Scan Log",
@@ -1097,7 +1100,10 @@
     "viewFullDetails": "View Full Details",
     "markedOk": "{name} marked as OK",
     "statusUpdateFailed": "Status update failed",
-    "subtitleEquipmentQr": "Equipment QR"
+    "subtitleEquipmentQr": "Equipment QR",
+    "confirmHere": "Not taking — confirming it's here",
+    "confirmedHere": "Confirmed at station",
+    "confirmHereFailed": "Couldn't confirm"
   },
   "onboarding": {
     "step1": {
@@ -2927,7 +2933,8 @@
       "duplicateStation": "A station for this category already exists in this room.",
       "duplicateName": "A dock with this name already exists.",
       "invalidReference": "The room or category does not belong to this clinic.",
-      "invalidEquipmentIds": "Some equipment IDs do not exist, are deleted, or belong to another clinic."
+      "invalidEquipmentIds": "Some equipment IDs do not exist, are deleted, or belong to another clinic.",
+      "noHomeStation": "This item is not resting, or has no resolvable home station."
     }
   },
   "push": {
@@ -4197,6 +4204,11 @@
     "confirmSetAlert": "Set Alert & Return",
     "damagedButton": "Damaged",
     "damageWarning": "A damage report will be filed for this equipment. You can undo this right after confirming.",
-    "confirmReturnedDamaged": "Confirm — Returned Damaged"
+    "confirmReturnedDamaged": "Confirm — Returned Damaged",
+    "toggleLabelStation": "Returned to {station}, plugged in",
+    "toggleLabelGeneric": "Returned to its station, plugged in",
+    "noHomeHint": "No home station assigned yet — ask an admin to set one",
+    "stationUnresolvedHint": "This item's home station isn't set up yet — uncheck to return without docking",
+    "offlineDockHint": "Dock return needs a connection — returning without docking for now"
   }
 }

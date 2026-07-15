@@ -10,6 +10,7 @@ import {
   isEquipmentHomeRoom,
   type SemiDockNotifyCandidate,
 } from "./semi-dock-notify.js";
+import { getCurrentAnchor, invalidateCurrentAnchor } from "../services/equipment-anchor.service.js";
 
 export interface RfidBatchEvent {
   tagEpc: string;
@@ -69,6 +70,51 @@ function coalesceLatestPerTag(events: RfidBatchEvent[]): RfidBatchEvent[] {
   return [...byTag.values()];
 }
 
+type RfidElsewhereCandidate = {
+  equipmentId: string;
+  dockId: string | null;
+  newRoomId: string;
+};
+
+/**
+ * D-13 anchor contradiction: an RFID read placed the item in a room
+ * different from its current anchor's station room. No current anchor, or
+ * the new room matches the anchor's station room, is a no-op. Off the
+ * ingest hot path — always called fire-and-forget (see ingestRfidBatch).
+ */
+async function invalidateAnchorIfRfidElsewhere(
+  clinicId: string,
+  candidate: RfidElsewhereCandidate,
+): Promise<void> {
+  try {
+    const anchor = await getCurrentAnchor(clinicId, candidate.equipmentId);
+    if (!anchor) return;
+
+    let stationRoomId: string | null = null;
+    if (anchor.dockId) {
+      const [dockRow] = await db
+        .select({ roomId: docks.roomId })
+        .from(docks)
+        .where(and(eq(docks.clinicId, clinicId), eq(docks.id, anchor.dockId)))
+        .limit(1);
+      stationRoomId = dockRow?.roomId ?? null;
+    }
+    if (!stationRoomId) {
+      stationRoomId = anchor.roomId ?? null;
+    }
+
+    if (!stationRoomId || stationRoomId === candidate.newRoomId) return;
+
+    await invalidateCurrentAnchor(db, {
+      clinicId,
+      equipmentId: candidate.equipmentId,
+      reason: "rfid_elsewhere",
+    });
+  } catch (err) {
+    console.error("[docking] anchor invalidation failed (rfid_elsewhere, non-fatal):", err);
+  }
+}
+
 export async function ingestRfidBatch(
   clinicId: string,
   batch: RfidBatchInput,
@@ -88,6 +134,7 @@ export async function ingestRfidBatch(
   const tagEpcs = [...new Set(coalesced.map((e) => e.tagEpc))];
   const gatewayCodes = [...new Set(coalesced.map((e) => e.gatewayCode))];
   const semiDockCandidates: SemiDockNotifyCandidate[] = [];
+  const rfidElsewhereCandidates: RfidElsewhereCandidate[] = [];
 
   await db.transaction(async (tx) => {
     const equipmentRows = await tx
@@ -252,6 +299,8 @@ export async function ingestRfidBatch(
       result.updated += 1;
       incrementMetric("rfid_event_room_changed");
 
+      rfidElsewhereCandidates.push({ equipmentId: eqRow.id, dockId: eqRow.dockId, newRoomId: roomId });
+
       const homeRoomIds = buildEquipmentHomeRoomIds(
         eqRow.roomId,
         eqRow.dockId ? dockRoomByDockId.get(eqRow.dockId) ?? null : null,
@@ -277,6 +326,12 @@ export async function ingestRfidBatch(
 
   for (const candidate of semiDockCandidates) {
     void deliverSemiDockPush(candidate);
+  }
+
+  // D-13 anchor contradiction: off the ingest hot path — fire-and-forget,
+  // dispatched only after the transaction above has committed.
+  for (const candidate of rfidElsewhereCandidates) {
+    void invalidateAnchorIfRfidElsewhere(clinicId, candidate);
   }
 
   return result;

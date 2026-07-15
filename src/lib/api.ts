@@ -61,6 +61,7 @@ import type {
   DeployabilityResponse,
   Dock,
   DockingReconciliation,
+  EquipmentAnchor,
   Equipment,
   OperationalMetricsSummary,
   DisplayDevice,
@@ -1247,6 +1248,10 @@ export const api = {
       request<{ updated: number }>("/api/docking/equipment/home/bulk", { method: "POST", body: JSON.stringify(data) }),
     reconciliation: () =>
       request<DockingReconciliation>("/api/docking/reconciliation"),
+    citizenAnchor: (id: string) =>
+      request<EquipmentAnchor>(`/api/docking/equipment/${id}/citizen-anchor`, { method: "POST" }),
+    notFoundHere: (id: string) =>
+      request<{ ok: true }>(`/api/docking/equipment/${id}/not-found-here`, { method: "POST" }),
   },
   platform: {
     capabilities: () =>

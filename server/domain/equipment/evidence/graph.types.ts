@@ -5,6 +5,7 @@ import type {
   UnitConditionState,
 } from "../../../db.js";
 import type { EquipmentWaitlistSnapshot } from "../../../../shared/equipment-waitlist.js";
+import type { AnchorSource } from "../../../services/equipment-anchor.service.js";
 
 /** Clinic-scoped raw evidence — no interpretation. */
 export interface EvidenceEquipmentRow {
@@ -76,6 +77,22 @@ export interface SupersessionEvent {
   observedAt: Date;
 }
 
+/**
+ * The current OPEN anchor for the item (docking P2, design §3.3/§4) — the
+ * latest `vt_equipment_anchors` row with `invalidatedAt IS NULL`, joined to
+ * `vt_docks` for the station name. Invalidated/superseded anchors never appear
+ * here. `null` when the item has no open anchor.
+ */
+export interface EvidenceCurrentAnchor {
+  id: string;
+  dockId: string | null;
+  dockName: string | null;
+  roomId: string | null;
+  assertedAt: Date;
+  assertedById: string | null;
+  source: AnchorSource;
+}
+
 export interface EvidenceGraph {
   clinicId: string;
   equipmentId: string;
@@ -91,6 +108,8 @@ export interface EvidenceGraph {
   supersessionEvents: SupersessionEvent[];
   waitlist: EquipmentWaitlistSnapshot | null;
   activeStaging: StagingQueueRow[];
+  /** Latest OPEN anchor (docking P2) or null — see EvidenceCurrentAnchor. Always set by both loadEvidenceGraph and buildSyntheticEvidenceGraph (never left undefined). */
+  currentAnchor: EvidenceCurrentAnchor | null;
 }
 
 export interface ResolverContext {

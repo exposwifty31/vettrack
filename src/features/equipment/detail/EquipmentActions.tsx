@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { LogIn, LogOut } from "lucide-react";
+import { LogIn, LogOut, SearchX } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { ReturnPlugDialog } from "@/components/return-plug-dialog";
+import { UnifiedReturnDialog } from "@/components/equipment/UnifiedReturnDialog";
 import { useAuth } from "@/hooks/use-auth";
 import { useActiveShift } from "@/hooks/use-active-shift";
 import { api, ApiError } from "@/lib/api";
@@ -18,7 +18,14 @@ type Props = {
 /**
  * Mobile detail actions. Two equipment-scoped mutations, gated by custody state:
  *  - "Check in" (return) for an item the viewer holds (or any item, for admins);
- *    NOT shift-gated — you can always hand equipment back.
+ *    NOT shift-gated — you can always hand equipment back. Opens
+ *    `UnifiedReturnDialog` (T2.3-mobile, docking P2): a home-station toggle
+ *    collapses the plain return and dock-return flows into one sheet —
+ *    checked routes to the online-only dock-return endpoint (handled
+ *    entirely inside the dialog); unchecked routes back through this file's
+ *    own `returnMut` (`onConfirmReturn`) so the offline-capable
+ *    `api.equipment.return` path (pendingSyncId / savedOffline toast) is
+ *    preserved exactly as before.
  *  - "Check out" (take) for an available item at its dock — mirrors the
  *    equipment-list quick-action gate: not held, status ok, not `returned`
  *    (that path prompts Dock Return first), and on an active roster shift.
@@ -35,6 +42,9 @@ export function EquipmentActions({ equipment }: Props) {
   const canReturn = isCheckedOut && (checkedOutByMe || isAdmin);
   const canCheckout =
     !isCheckedOut && equipment.status === "ok" && equipment.custodyState !== "returned";
+  // Resting + homed only — a held item is accounted for, and hidden for
+  // non-docking clinics (no homeRoomId means no home station to report against).
+  const canReportNotFound = !isCheckedOut && !!equipment.homeRoomId;
 
   const returnMut = useMutation({
     mutationFn: (values: { isPluggedIn: boolean; plugInDeadlineMinutes?: number }) =>
@@ -74,6 +84,18 @@ export function EquipmentActions({ equipment }: Props) {
     },
   });
 
+  const notFoundMut = useMutation({
+    mutationFn: () => api.docking.notFoundHere(equipment.id),
+    onSuccess: () => {
+      haptics.tap();
+      queryClient.invalidateQueries({ queryKey: [`/api/equipment/${equipment.id}`] });
+      queryClient.invalidateQueries({ queryKey: ["/api/equipment"] });
+      toast.success(t.equipmentDetail.toast.reportedNotFound);
+    },
+    onError: (err: unknown) =>
+      toast.error(err instanceof ApiError ? err.message : t.equipmentDetail.toast.notFoundFailed),
+  });
+
   // Off-shift ownership is not permitted (roster gate). Stay quiet while the
   // shift query resolves; only a *successful* no-shift read blocks client-side —
   // a shift-query error defers to the server's authoritative gate (fail loud).
@@ -86,7 +108,7 @@ export function EquipmentActions({ equipment }: Props) {
     checkoutMut.mutate();
   };
 
-  if (!canReturn && !canCheckout) return null;
+  if (!canReturn && !canCheckout && !canReportNotFound) return null;
 
   return (
     <section style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -118,13 +140,39 @@ export function EquipmentActions({ equipment }: Props) {
         </Button>
       )}
 
+      {canReportNotFound && (
+        <Button
+          variant="outline"
+          size="lg"
+          className="w-full gap-2"
+          onClick={() => notFoundMut.mutate()}
+          disabled={notFoundMut.isPending}
+          data-testid="btn-detail-not-found-here"
+        >
+          <SearchX className="h-5 w-5" />
+          {t.equipmentDetail.notFoundHere}
+        </Button>
+      )}
+
       {canReturn && (
-        <ReturnPlugDialog
+        <UnifiedReturnDialog
           open={returnOpen}
+          equipment={equipment}
           equipmentName={equipment.name}
           isSubmitting={returnMut.isPending}
           onOpenChange={setReturnOpen}
-          onConfirm={(values) => returnMut.mutate(values)}
+          // Unchecked (no home-station) path — routed through the same
+          // offline-capable returnMut as before (api.equipment.return,
+          // pendingSyncId/savedOffline toast). Do NOT let the dialog own this
+          // path itself; the checked (dock-return) path below is online-only
+          // and stays fully inside UnifiedReturnDialog.
+          onConfirmReturn={(values) => returnMut.mutate(values)}
+          onDockReturnSuccess={() => {
+            queryClient.invalidateQueries({ queryKey: [`/api/equipment/${equipment.id}`] });
+            queryClient.invalidateQueries({ queryKey: ["/api/equipment"] });
+            queryClient.invalidateQueries({ queryKey: ["/api/equipment/my"] });
+            queryClient.invalidateQueries({ queryKey: ["/api/activity"] });
+          }}
         />
       )}
     </section>
