@@ -2649,3 +2649,21 @@ The "CodeRabbit / Review" check showed **neutral** (its non-blocking completed s
 **Round-2 CodeRabbit (11 findings, re-review of the fixes) — addressed** this commit: vet-license input `maxLength=40` (aligns with the varchar(40) column); regression test for **admin-override-to-vet-without-license → 422** (source-agnostic gate, the most security-sensitive branch); playbook — do not equate dev-bypass with DB isolation (require NODE_ENV non-prod + DATABASE_URL + dev clinic before destructive drills); report — vet-license wording ("presence/format validation," not "verification"); added T-28/T-29 coverage-table dispositions; reconciled the test count (4774); clarified live-reload vs `cap:build:native`; markdown-lint (heading blank lines MD022, fence languages MD040). **Refuted:** `User`-interface "3-copy" DRY claim (#3568814185) — `interface User` is defined only in `src/types/platform.ts`; api.ts imports it, so adding `vetLicenseNumber` there introduces no drift.
 
 **Verdict:** VERIFIED — round-2 real findings fixed, doc claims corrected, markdown-lint addressed; residual = the two documented deferrals. Full suite 538f/4774t green.
+
+---
+
+## Phase-10 III.6 flow-walk harness stood up (commit 7f8eb93a3, 2026-07-15)
+
+**Claim:** built an executable, manifest-driven harness for the four-platform flow walk (`tests/flow-walk/`), ready to run once docking P3 lands + an app is up. Reconciled `docs/audit/FLOW_INVENTORY.md` (2026-07-06) against current `src/app/routes.tsx`.
+
+**Evidence checked (not asserted):**
+- **Route drift** read directly from `routes.tsx` (grep of every `<Route path= / WebOnlyGuard / Redirect`): `/equipment/scan`, `/equipment/maintenance`, `/equipment/intelligence`, `/shift-handover`, `/pending`, `/pending-emergencies`, `/stability`, `/app-tour`, `/admin/medication-integrity` are now `<Redirect>`; `/equipment/board` · `/display` · `/equipment-board` → `/board`; a 10-route `WebOnlyGuard > ManagementGuard` console (`/admin/integrations`…`/ops/health`) exists that the doc never listed. All encoded `drift: true`.
+- **Web = management-only (T-31/R-WEB-01)** verified from source: `AuthGuard.tsx:174` (`platformTarget === "desktop" && !experience.can("management.web")` → `<ManagementWebGate />`, `data-testid="management-web-gate-screen"`), mounted OUTSIDE WebOnlyGuard/ManagementGuard so it preempts them; `ManagementWebGate.tsx` renders (not redirect). Corrected `expectedWebOutcome` accordingly; native (`expectedNativeOutcome`) unchanged (mobile target, gate inert). WebOnlyGuard native → `/home` and CustodyGuard student → `/equipment` read from `WebOnlyGuard.tsx:22-28` / `CustodyGuard.tsx:19-25`.
+- **Self-check GREEN:** `pnpm exec vitest run tests/flow-walk/flow-inventory.manifest.test.ts` = **76/76** (structural invariants, 49 canonical-path coverage rows, 14 routes.tsx drift anchors, outcome-derivation incl. the T-31 correction, walk-list selection).
+- **Web spec collects:** `PW_SUITE=flow-walk playwright test --list` → 5 role tests (admin+senior_technician labeled `(management.web)`, vet/technician/student `(gated on web)`); `PW_SUITE=ci …--list` → **0** flow-walk matches (default CI unaffected). Not run end-to-end (no local app up).
+- **Typecheck:** `pnpm exec tsc --noEmit` (frontend) exit 0 — covers the two `data-testid` edits on `app-error-boundary.tsx` / `page-error-boundary.tsx`. `tests/flow-walk/**` is outside the root tsconfig include, so not type-gated there (native harness is its own isolated tsconfig/package).
+- **No regressions:** `tests/page-error-boundary-loop-guard.test.ts` = 5/5 (testid addition inert).
+
+**Not done / honest gaps:** the walk itself was NOT executed — no `matrix.json` produced (gated on docking P3 + a running app/sim per the resubmission gate). The native Appium harness is a correct scaffold with two `TODO(sim)` seams (in-webview navigation mechanism + per-page render markers) that only a booted simulator can pin; its deps are uninstalled by design. `vet`'s exact `management.web` capability is taken from the AuthGuard comment's role list (admin+lead), not independently confirmed against `experience-model`.
+
+**Verdict:** VERIFIED (harness built + self-check/typecheck/collection green; drift + T-31 corrections evidenced from source). Execution of the walk is the pending Phase-10 step, not this task.
