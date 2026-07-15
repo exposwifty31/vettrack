@@ -1,12 +1,13 @@
 import { Router } from "express";
 import { randomUUID } from "crypto";
 import { z } from "zod";
-import { db, equipment, rooms, scanLogs, users } from "../db.js";
-import { eq, and, isNull, isNotNull, sql, desc, gt } from "drizzle-orm";
+import { db, equipment, rooms, scanLogs, users, docks, equipmentAnchors } from "../db.js";
+import { eq, and, isNull, isNotNull, inArray, sql, desc, gt } from "drizzle-orm";
 import { requireAuth, requireAdmin, requireEffectiveRole } from "../middleware/auth.js";
 import { validateBody } from "../middleware/validate.js";
 import { logAudit, resolveAuditActorRole } from "../lib/audit.js";
 import { resolveRequestId, apiError } from "../lib/route-utils.js";
+import { roomExpected, resolveHomeDock, classifyReconciliationBucket } from "../services/docking.service.js";
 
 /*
  * PERMISSIONS MATRIX — /api/rooms
@@ -53,19 +54,72 @@ router.get("/", requireAuth, async (req, res) => {
 
     const cutoff24h = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
-    const counts = await db
-      .select({
-        roomId: equipment.roomId,
-        total: sql<number>`count(*)::int`,
-        inUse: sql<number>`count(*) filter (where ${equipment.checkedOutById} is not null)::int`,
-        issue: sql<number>`count(*) filter (where ${equipment.status} in ('issue', 'maintenance'))::int`,
-        recentlyVerified: sql<number>`count(*) filter (where ${equipment.lastVerifiedAt} > ${cutoff24h})::int`,
-      })
-      .from(equipment)
-      .where(and(eq(equipment.clinicId, clinicId), isNotNull(equipment.roomId), isNull(equipment.deletedAt)))
-      .groupBy(equipment.roomId);
+    const [counts, homedEquipment, clinicDocks] = await Promise.all([
+      db
+        .select({
+          roomId: equipment.roomId,
+          total: sql<number>`count(*)::int`,
+          inUse: sql<number>`count(*) filter (where ${equipment.checkedOutById} is not null)::int`,
+          issue: sql<number>`count(*) filter (where ${equipment.status} in ('issue', 'maintenance'))::int`,
+          recentlyVerified: sql<number>`count(*) filter (where ${equipment.lastVerifiedAt} > ${cutoff24h})::int`,
+        })
+        .from(equipment)
+        .where(and(eq(equipment.clinicId, clinicId), isNotNull(equipment.roomId), isNull(equipment.deletedAt)))
+        .groupBy(equipment.roomId),
+      // Present-vs-expected readiness (design §6.4) is homed-based, not
+      // current-room-based — a room's expected fill is what's HOMED there,
+      // regardless of where an item currently sits.
+      db
+        .select({
+          id: equipment.id,
+          homeRoomId: equipment.homeRoomId,
+          assetTypeId: equipment.assetTypeId,
+          checkedOutById: equipment.checkedOutById,
+        })
+        .from(equipment)
+        .where(and(eq(equipment.clinicId, clinicId), isNotNull(equipment.homeRoomId), isNull(equipment.deletedAt))),
+      db.select().from(docks).where(eq(docks.clinicId, clinicId)),
+    ]);
 
     const countMap = new Map(counts.map((c) => [c.roomId, c]));
+
+    const homedIds = homedEquipment.map((item) => item.id);
+    const anchorRows = homedIds.length
+      ? await db
+          .select({ equipmentId: equipmentAnchors.equipmentId, dockId: equipmentAnchors.dockId })
+          .from(equipmentAnchors)
+          .where(
+            and(
+              eq(equipmentAnchors.clinicId, clinicId),
+              inArray(equipmentAnchors.equipmentId, homedIds),
+              isNull(equipmentAnchors.invalidatedAt),
+            ),
+          )
+      : [];
+    const anchorDockByEquipmentId = new Map(anchorRows.map((a) => [a.equipmentId, a.dockId]));
+
+    // T3.1 reconciliation ladder decides "at_home" before it ever needs
+    // presence (roomId/lastRfidRoomId) or contradiction history, so those
+    // are safe placeholders here — see docking.service.ts classifier order.
+    const atHomeCountByRoomId = new Map<string, number>();
+    for (const item of homedEquipment) {
+      const homeDock = resolveHomeDock({ homeRoomId: item.homeRoomId, assetTypeId: item.assetTypeId }, clinicDocks);
+      const hasAnchor = anchorDockByEquipmentId.has(item.id);
+      const currentAnchor = hasAnchor ? { dockId: anchorDockByEquipmentId.get(item.id) ?? null } : null;
+      const bucket = classifyReconciliationBucket(
+        {
+          checkedOutById: item.checkedOutById,
+          homeRoomId: item.homeRoomId,
+          assetTypeId: item.assetTypeId,
+          roomId: null,
+          lastRfidRoomId: null,
+        },
+        { homeDock: homeDock ? { id: homeDock.id } : null, currentAnchor, lastContradictionReason: null },
+      );
+      if (bucket === "at_home" && item.homeRoomId) {
+        atHomeCountByRoomId.set(item.homeRoomId, (atHomeCountByRoomId.get(item.homeRoomId) ?? 0) + 1);
+      }
+    }
 
     const result = allRooms.map((room) => {
       const c = countMap.get(room.id);
@@ -80,6 +134,8 @@ router.get("/", requireAuth, async (req, res) => {
         inUseCount: inUse,
         issueCount: issue,
         recentlyVerifiedCount: recentlyVerified,
+        expectedFill: roomExpected(room.id, homedEquipment),
+        atHomeCount: atHomeCountByRoomId.get(room.id) ?? 0,
       };
     });
 

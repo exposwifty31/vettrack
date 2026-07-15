@@ -22,8 +22,23 @@ export function pctColor(pct: number): string {
   return "rgb(var(--sys-red))";
 }
 
-/** Room verification % (verified / total), or null when the room has no equipment. */
+/**
+ * Room readiness % — present-vs-expected (design §6.4): at_home / expected_fill.
+ * `expectedFill` is items homed to the room WITH a category; a room with
+ * nothing homed has no readiness signal, so this returns null (not 0).
+ */
 export function roomPct(room: Room): number | null {
+  const expectedFill = room.expectedFill ?? 0;
+  if (expectedFill === 0) return null;
+  return Math.round(((room.atHomeCount ?? 0) / expectedFill) * 100);
+}
+
+/**
+ * Room scan-verification % (recently-verified / total), or null when the room
+ * has no equipment. Preserved pre-T3.3 metric — `roomPct` above is the new
+ * present-vs-expected headline.
+ */
+export function roomScanPct(room: Room): number | null {
   const total = room.totalEquipment ?? 0;
   if (total === 0) return null;
   return Math.round(((room.recentlyVerifiedCount ?? 0) / total) * 100);

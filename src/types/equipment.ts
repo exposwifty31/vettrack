@@ -69,6 +69,10 @@ export interface Room {
   inUseCount?: number;
   issueCount?: number;
   recentlyVerifiedCount?: number;
+  /** Items homed to this room WITH a category (docking P3 T3.3, design §6.4). */
+  expectedFill?: number;
+  /** Homed items currently classified "at_home" by the reconciliation ladder. */
+  atHomeCount?: number;
   /** Manual patient linked to this room (GET /api/rooms/:id). */
   linkedPatientName?: string | null;
 }
