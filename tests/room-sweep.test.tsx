@@ -97,6 +97,7 @@ function sweepResult(overrides: Partial<RoomSweepResult> = {}): RoomSweepResult 
     roomId: ROOM_ID,
     confirmedCount: 0,
     missingCount: 0,
+    skippedNoStationCount: 0,
     sweptById: "u-1",
     sweptAt: "2026-07-15T10:00:00.000Z",
     ...overrides,

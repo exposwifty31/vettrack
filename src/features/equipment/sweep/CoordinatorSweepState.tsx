@@ -47,6 +47,7 @@ export function CoordinatorSweepState({ lastSweptAt, lastSweptByName }: Coordina
   const {
     data: coordinator,
     isError: coordinatorError,
+    isFetching: coordinatorFetching,
     refetch: refetchCoordinator,
   } = useQuery({
     queryKey: ["/api/docking/coordinator", todayLocal],
@@ -84,7 +85,8 @@ export function CoordinatorSweepState({ lastSweptAt, lastSweptByName }: Coordina
           type="button"
           data-testid="coordinator-load-error"
           onClick={() => refetchCoordinator()}
-          className="flex items-center gap-1.5 text-destructive"
+          disabled={coordinatorFetching}
+          className="flex items-center gap-1.5 text-destructive disabled:opacity-50"
         >
           <UserCog className="w-3.5 h-3.5 shrink-0" aria-hidden />
           {t.coordinator.loadError}
