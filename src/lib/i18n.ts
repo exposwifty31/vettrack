@@ -1126,7 +1126,10 @@ const translations = {
 
   adminDocks: d.adminDocks,
 
-  adminHomeAssignment: d.adminHomeAssignment,
+  adminHomeAssignment: {
+    ...d.adminHomeAssignment,
+    holderLabel: (email: string) => tr(d.adminHomeAssignment.holderLabel, { email }),
+  },
 
   adminAssetTypesPage: d.adminAssetTypesPage,
 

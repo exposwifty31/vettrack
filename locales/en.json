@@ -4180,7 +4180,37 @@
     "categoryUnavailable": "Categories are unavailable right now — you can still assign a Home Room",
     "categoryLoadError": "Failed to load categories",
     "roomsLoadError": "Failed to load rooms",
-    "reconciliationLoadError": "Failed to load reconciliation data"
+    "reconciliationLoadError": "Failed to load reconciliation data",
+    "bucketCountsTitle": "Reconciliation Overview",
+    "bucketLabels": {
+      "at_home": "At Home",
+      "checked_out": "Checked Out",
+      "returned_unverified": "Returned (Unverified)",
+      "returned_away": "Returned Away",
+      "misplaced_at_station": "Misplaced at Station",
+      "missing": "Missing",
+      "unassigned": "Unassigned",
+      "no_station": "No Station"
+    },
+    "driftBuckets": {
+      "returned_unverified": {
+        "hint": "Returned, but not yet re-anchored at a dock — recent, needs verification",
+        "empty": "Nothing returned-unverified"
+      },
+      "returned_away": {
+        "hint": "Last seen away from its home room",
+        "empty": "Nothing returned away"
+      },
+      "misplaced_at_station": {
+        "hint": "Docked, but not at its home station",
+        "empty": "Nothing misplaced"
+      },
+      "missing": {
+        "hint": "No anchor and no recent sighting — investigate",
+        "empty": "Nothing missing"
+      }
+    },
+    "holderLabel": "With {email}"
   },
   "adminAssetTypesPage": {
     "typePlaceholder": "Type name",

@@ -4180,7 +4180,37 @@
     "categoryUnavailable": "הקטגוריות אינן זמינות כעת — עדיין ניתן לשייך חדר בית",
     "categoryLoadError": "טעינת הקטגוריות נכשלה",
     "roomsLoadError": "טעינת החדרים נכשלה",
-    "reconciliationLoadError": "טעינת נתוני ההתאמה נכשלה"
+    "reconciliationLoadError": "טעינת נתוני ההתאמה נכשלה",
+    "bucketCountsTitle": "סקירת התאמה",
+    "bucketLabels": {
+      "at_home": "בבית",
+      "checked_out": "בשימוש",
+      "returned_unverified": "הוחזר (לא מאומת)",
+      "returned_away": "הוחזר במקום אחר",
+      "misplaced_at_station": "במיקום שגוי בתחנה",
+      "missing": "חסר",
+      "unassigned": "לא משויך",
+      "no_station": "אין תחנה"
+    },
+    "driftBuckets": {
+      "returned_unverified": {
+        "hint": "הוחזר, אך טרם עוגן מחדש בתחנה — לאחרונה, דורש אימות",
+        "empty": "אין פריטים שהוחזרו וטרם אומתו"
+      },
+      "returned_away": {
+        "hint": "נצפה לאחרונה הרחק מחדר הבית שלו",
+        "empty": "אין פריטים שהוחזרו במקום אחר"
+      },
+      "misplaced_at_station": {
+        "hint": "מעוגן, אך לא בתחנת הבית שלו",
+        "empty": "אין פריטים במיקום שגוי"
+      },
+      "missing": {
+        "hint": "אין עיגון ואין צפייה אחרונה — יש לבדוק",
+        "empty": "אין פריטים חסרים"
+      }
+    },
+    "holderLabel": "אצל {email}"
   },
   "adminAssetTypesPage": {
     "typePlaceholder": "שם סוג",

@@ -13,6 +13,11 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ErrorCard } from "@/components/ui/error-card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ManagementAccessDenied } from "@/desktop/management";
+import {
+  BucketCountsSummary,
+  DRIFT_BUCKET_ORDER,
+  DriftBucketSection,
+} from "@/features/equipment/reconciliation/ReconciliationWorklist";
 import { t } from "@/lib/i18n";
 import type { AssetType, DockingReconciliationItem, Equipment, Room } from "@/types";
 
@@ -121,6 +126,11 @@ function AdminHomeAssignmentContent() {
         <title>{t.adminHomeAssignment.title}</title>
       </Helmet>
       <div className="mx-auto max-w-3xl space-y-6 p-4">
+        <BucketCountsSummary
+          counts={reconciliationQ.data?.counts}
+          isLoading={reconciliationQ.isLoading}
+        />
+
         <Card>
           <CardHeader>
             <CardTitle>{t.adminHomeAssignment.title}</CardTitle>
@@ -275,6 +285,17 @@ function AdminHomeAssignmentContent() {
             </Link>
           )}
         />
+
+        {DRIFT_BUCKET_ORDER.map((bucket) => (
+          <DriftBucketSection
+            key={bucket}
+            bucket={bucket}
+            items={reconciliationQ.data?.byBucket?.[bucket] ?? []}
+            isLoading={reconciliationQ.isLoading}
+            isError={reconciliationQ.isError}
+            onRetry={() => reconciliationQ.refetch()}
+          />
+        ))}
       </div>
     </AppShell>
   );
