@@ -53,7 +53,7 @@ vi.mock("../server/middleware/auth.js", () => ({
 }));
 
 const roomsRoutes = (await import("../server/routes/rooms.js")).default;
-const { createAnchor } = await import("../server/services/equipment-anchor.service.js");
+const { createAnchor, invalidateCurrentAnchor } = await import("../server/services/equipment-anchor.service.js");
 const { db } = await import("../server/db.js");
 
 function buildApp() {
@@ -149,6 +149,26 @@ async function seedEquipment(
       overrides.assetTypeId ?? null,
       overrides.custodyState ?? "returned",
     ],
+  );
+}
+
+/**
+ * A2-7: mirrors docking.ts's sweep-commit "never-anchored, unconfirmed"
+ * branch (A1-1) — an already-invalidated `sweep_missing` marker row, no
+ * room/dock, `invalidated_at` set explicitly (not DB `defaultNow()`), since
+ * the "recent" test below needs to control ordering against other rows.
+ */
+async function seedSweepMissingAnchor(
+  anchorId: string,
+  clinicId: string,
+  equipmentId: string,
+  assertedById: string,
+  invalidatedAt: Date,
+) {
+  await requireProbePool().query(
+    `INSERT INTO vt_equipment_anchors (id, clinic_id, equipment_id, room_id, dock_id, asserted_by_id, source, invalidated_at, invalidated_reason)
+     VALUES ($1, $2, $3, NULL, NULL, $4, 'sweep', $5, 'sweep_missing')`,
+    [anchorId, clinicId, equipmentId, assertedById, invalidatedAt.toISOString()],
   );
 }
 
@@ -441,5 +461,73 @@ describe.skipIf(!DATABASE_URL)("GET /api/rooms — last-swept fields (T3.4-i-b P
       await P.query(`DELETE FROM vt_users WHERE clinic_id = $1`, [otherClinicId]);
       await P.query(`DELETE FROM vt_clinics WHERE id = $1`, [otherClinicId]);
     }
+  });
+
+  // ─── A2-7 (CodeRabbit PR #106) — sweep_missing counts as swept ────────────
+  describe("A2-7: sweep_missing anchors count as 'swept' for lastSweptAt/lastSweptByName", () => {
+    it("a room swept with ALL items missing (never-anchored, sweep_missing marker only) still registers lastSweptAt/lastSweptByName — not 'never swept'", async () => {
+      const itemId = randomUUID();
+      await seedEquipment(itemId, ctx.clinicId, {
+        name: "Never-anchored Pump",
+        homeRoomId: ctx.roomId,
+        assetTypeId: ctx.assetTypeId,
+        custodyState: "returned",
+      });
+
+      // No createAnchor call at all — this item has never had an anchor.
+      // Only the A1-1 "never-anchored, unconfirmed" sweep_missing marker.
+      await seedSweepMissingAnchor(
+        randomUUID(),
+        ctx.clinicId,
+        itemId,
+        ctx.sweeperUserId,
+        new Date(),
+      );
+
+      const res = await api("/api/rooms");
+      expect(res.status).toBe(200);
+      const rooms = asRecordArray(res.json);
+      const icu = rooms.find((r) => r.id === ctx.roomId);
+      expect(icu).toBeDefined();
+      expect(icu!.lastSweptAt).toEqual(expect.any(String));
+      expect(icu!.lastSweptByName).toBe("Dana Sweeper");
+
+      // Same behavior on the single-room GET.
+      const single = await api(`/api/rooms/${ctx.roomId}`);
+      expect(single.status).toBe(200);
+      if (!isRecord(single.json)) throw new Error("expected object");
+      expect(single.json.lastSweptAt).toEqual(expect.any(String));
+      expect(single.json.lastSweptByName).toBe("Dana Sweeper");
+    });
+
+    it("a sweep_missing marker on an item that HAD a prior open anchor (invalidated in place) uses the invalidation time, not the anchor's original assertedAt", async () => {
+      const itemId = randomUUID();
+      await seedEquipment(itemId, ctx.clinicId, {
+        name: "Previously-anchored Pump",
+        homeRoomId: ctx.roomId,
+        assetTypeId: ctx.assetTypeId,
+        custodyState: "returned",
+      });
+
+      // An older anchor from an unrelated source (e.g. citizen), then
+      // contradicted by a LATER sweep via invalidateCurrentAnchor — mirrors
+      // docking.ts's "has open anchor" sweep_missing branch.
+      await createAnchor(db, {
+        clinicId: ctx.clinicId,
+        equipmentId: itemId,
+        dockId: ctx.dockId,
+        roomId: ctx.roomId,
+        assertedById: ctx.userId,
+        source: "citizen",
+      });
+      await invalidateCurrentAnchor(db, { clinicId: ctx.clinicId, equipmentId: itemId, reason: "sweep_missing" });
+
+      const res = await api("/api/rooms");
+      expect(res.status).toBe(200);
+      const rooms = asRecordArray(res.json);
+      const icu = rooms.find((r) => r.id === ctx.roomId);
+      expect(icu).toBeDefined();
+      expect(icu!.lastSweptAt).toEqual(expect.any(String));
+    });
   });
 });

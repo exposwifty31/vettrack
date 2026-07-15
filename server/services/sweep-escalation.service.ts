@@ -8,7 +8,7 @@
  * (`home_room_id`) has a `source:"sweep"` anchor asserted within the
  * current shift window. Rooms with no homed equipment need no sweep.
  */
-import { and, eq, gte, isNotNull, isNull, lte } from "drizzle-orm";
+import { and, eq, gte, isNotNull, isNull, lte, or } from "drizzle-orm";
 import { db, equipment, equipmentAnchors } from "../db.js";
 
 export {
@@ -33,11 +33,23 @@ async function homedRoomIds(clinicId: string): Promise<Set<string>> {
 }
 
 /**
- * Distinct home-rooms with a `source:"sweep"` anchor asserted within
- * `[shiftStart, now]`. Joins the anchor to the item's `home_room_id` (not
- * the anchor's own `room_id`) — same join shape rooms.ts's per-room
- * "last swept" readout uses, so "swept" always means "the item's home room
- * was confirmed", regardless of which dock the anchor itself points at.
+ * Distinct home-rooms swept within `[shiftStart, now]`. Joins the anchor to
+ * the item's `home_room_id` (not the anchor's own `room_id`) — same join
+ * shape rooms.ts's per-room "last swept" readout uses, so "swept" always
+ * means "the item's home room was confirmed", regardless of which dock the
+ * anchor itself points at.
+ *
+ * A2-7 (CodeRabbit PR #106): a room counts as swept via EITHER of two
+ * anchor shapes, both written only by the sweep-commit transaction
+ * (docking.ts POST /rooms/:roomId/sweep):
+ *  - `source:"sweep"` — a confirmed-present item, windowed on `assertedAt`.
+ *  - `invalidated_reason:"sweep_missing"` — an unconfirmed item (A1-1),
+ *    windowed on `invalidatedAt` (NOT `assertedAt` — for an item that had
+ *    an open anchor from a PRIOR source before being contradicted in place,
+ *    `assertedAt` predates this sweep; `invalidatedAt` is when the sweep
+ *    itself ran). Without this branch, a sweep that confirms zero items
+ *    present (all missing) leaves no `source:"sweep"` anchor at all, so the
+ *    room never registers as swept even though the sweep was done.
  */
 async function sweptRoomIds(clinicId: string, shiftStart: Date, now: Date): Promise<Set<string>> {
   const rows = await db
@@ -47,11 +59,21 @@ async function sweptRoomIds(clinicId: string, shiftStart: Date, now: Date): Prom
     .where(
       and(
         eq(equipmentAnchors.clinicId, clinicId),
-        eq(equipmentAnchors.source, "sweep"),
         isNotNull(equipment.homeRoomId),
         isNull(equipment.deletedAt),
-        gte(equipmentAnchors.assertedAt, shiftStart),
-        lte(equipmentAnchors.assertedAt, now),
+        or(
+          and(
+            eq(equipmentAnchors.source, "sweep"),
+            gte(equipmentAnchors.assertedAt, shiftStart),
+            lte(equipmentAnchors.assertedAt, now),
+          ),
+          and(
+            eq(equipmentAnchors.invalidatedReason, "sweep_missing"),
+            isNotNull(equipmentAnchors.invalidatedAt),
+            gte(equipmentAnchors.invalidatedAt, shiftStart),
+            lte(equipmentAnchors.invalidatedAt, now),
+          ),
+        ),
       ),
     );
   return new Set(rows.map((r) => r.roomId).filter((id): id is string => Boolean(id)));

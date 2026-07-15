@@ -33,10 +33,15 @@ export const DEFAULT_ESCALATION_THRESHOLDS: EscalationThresholds = { s1: 60, s2:
  * shift-end" reading. No DB, no side effects — deterministic and
  * unit-testable in isolation.
  *
- *   minutesToShiftEnd >= s1        -> 0 (no escalation yet)
- *   s2 <= minutesToShiftEnd < s1   -> 1 (coordinator reminded)
- *   s3 <= minutesToShiftEnd < s2   -> 2 (senior notified)
- *   s4 <  minutesToShiftEnd < s3   -> 3 (responsibility transferred)
+ * Thresholds are INCLUSIVE at the boundary (A2-1, CodeRabbit PR #106) —
+ * `minutesToShiftEnd == s1` reaches stage 1 exactly AT the threshold,
+ * matching the docstrings above ("Stage 1 @ 60 min before shift-end", not
+ * "just after 60 min").
+ *
+ *   minutesToShiftEnd >  s1        -> 0 (no escalation yet)
+ *   s2 <  minutesToShiftEnd <= s1  -> 1 (coordinator reminded)
+ *   s3 <  minutesToShiftEnd <= s2  -> 2 (senior notified)
+ *   s4 <  minutesToShiftEnd <= s3  -> 3 (responsibility transferred)
  *   minutesToShiftEnd <= s4        -> 4 (open to all + manager notified)
  */
 export function computeEscalationStage(
@@ -44,8 +49,8 @@ export function computeEscalationStage(
   thresholds: EscalationThresholds = DEFAULT_ESCALATION_THRESHOLDS,
 ): EscalationStage {
   if (minutesToShiftEnd <= thresholds.s4) return 4;
-  if (minutesToShiftEnd < thresholds.s3) return 3;
-  if (minutesToShiftEnd < thresholds.s2) return 2;
-  if (minutesToShiftEnd < thresholds.s1) return 1;
+  if (minutesToShiftEnd <= thresholds.s3) return 3;
+  if (minutesToShiftEnd <= thresholds.s2) return 2;
+  if (minutesToShiftEnd <= thresholds.s1) return 1;
   return 0;
 }

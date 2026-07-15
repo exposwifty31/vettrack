@@ -13,10 +13,15 @@
  * `activeShift: null` the instant the shift ends (phase-review I-1: that
  * gate made stage 4 unreachable in production, since `minutesToEnd` could
  * never go <= 0). The candidate scan (`findActiveShiftClinicDates`) also
- * includes shifts that ended within the last `SWEEP_INTERVAL_MS`, so the
- * first tick after shift-end still processes the clinic (a post-end grace
- * window for the terminal stage only — `isShiftSweepComplete` still
- * short-circuits a finished sweep before any stage fires).
+ * includes shifts that ended within the last `ESCALATION_CATCHUP_WINDOW_MS`
+ * (A2-3, CodeRabbit PR #106 — widened from the original single-tick
+ * `SWEEP_INTERVAL_MS` grace, which dropped a shift out of the scan for good
+ * if the scheduler/deploy was down for longer than one tick), so a
+ * scheduler outage still lets the clinic catch up once it resumes (a
+ * post-end grace window for the terminal stage only — `isShiftSweepComplete`
+ * still short-circuits a finished sweep before any stage fires). Bounded,
+ * not unbounded — a shift that ended longer ago than the window is not
+ * resurrected.
  *
  * Responsible identity: normally the Coordinator (`resolveShiftCoordinator`
  * status `auto`/`confirmed`/`fallback_senior`), ladder starts at stage 1.
@@ -33,8 +38,8 @@
  * (derived, never confirmed) may not have a stored row yet.
  */
 import { randomUUID } from "crypto";
-import { and, asc, eq, inArray } from "drizzle-orm";
-import { Queue, Worker } from "bullmq";
+import { and, asc, eq, inArray, isNull } from "drizzle-orm";
+import { Queue, Worker, type JobsOptions } from "bullmq";
 import { db, shifts, users, shiftEquipmentCoordinator } from "../db.js";
 import { resolveShiftCoordinator } from "../services/equipment-coordinator.service.js";
 import { normalizeName, normalizeNameKey } from "../lib/role-resolution.js";
@@ -46,16 +51,26 @@ import {
 } from "../services/sweep-escalation.service.js";
 import { loadLocale } from "../../lib/i18n/loader.js";
 import { resolve as resolveI18nKey } from "../../lib/i18n/index.js";
-import { INITIAL_LOCALE } from "../../lib/i18n/types.js";
+import { DEFAULT_LOCALE } from "../../lib/i18n/types.js";
 import type { Locale } from "../../lib/i18n/types.js";
 import { resolveUserLocale } from "../lib/resolve-user-locale.js";
 import { logAudit } from "../lib/audit.js";
 import { incrementMetric } from "../lib/metrics.js";
-import { sendPushToRole, sendPushToUser } from "../lib/push.js";
+import { sendPushToUser } from "../lib/push.js";
 import { createRedisConnection } from "../lib/redis.js";
 import { MANAGER_NOTIFY_ROLES } from "../lib/notification-roles.js";
 
 const SWEEP_INTERVAL_MS = 10 * 60 * 1000; // 10 min TICK — mirrors the brief's "~ every 10 min" cadence
+/**
+ * A2-3 (CodeRabbit PR #106) — bounded catch-up window for the post-end
+ * candidate scan (`findActiveShiftClinicDates`). Separate from
+ * `SWEEP_INTERVAL_MS` (the scan cadence): a window equal to the tick length
+ * only covers a single missed tick — a scheduler/deploy outage longer than
+ * that permanently drops the shift out of the scan and stage 4 (I-1's fix)
+ * never fires. 4 hours covers a realistic outage/redeploy window within the
+ * same clinical day without resurrecting a shift that ended long ago.
+ */
+const ESCALATION_CATCHUP_WINDOW_MS = 4 * 60 * 60 * 1000; // 4 hours
 const SYSTEM_USER_ID = "system:sweep-escalation";
 const SYSTEM_USER_EMAIL = "sweep-escalation@vettrack.system";
 
@@ -71,39 +86,35 @@ const STAGE_METRIC = {
   4: "sweep_escalation_stage_4_fired",
 } as const;
 
-const FALLBACK_COPY: Record<1 | 2 | 3 | 4, { title: string; body: string }> = {
-  1: {
-    title: "Room Sweep due soon",
-    body: "Your shift ends in about an hour and the Room Sweep isn't done yet.",
-  },
-  2: {
-    title: "Room Sweep needs a follow-up",
-    body: "The Coordinator's Room Sweep still isn't done — please follow up.",
-  },
-  3: {
-    title: "You're now responsible for the Room Sweep",
-    body: "The shift is ending soon and the Room Sweep wasn't completed — it's been transferred to you.",
-  },
-  4: {
-    title: "Room Sweep still open",
-    body: "The shift has ended with the Room Sweep incomplete. It's now open to any tech to finish.",
-  },
-};
-
+/**
+ * A2-2 (CodeRabbit PR #106): no more hardcoded English `FALLBACK_COPY` —
+ * `sweepEscalation.stage{1..4}{Title,Body}` exist in BOTH en+he (parity
+ * enforced, tests/i18n-parity.test.ts), so a missing key here means real
+ * key/locale drift, not an expected runtime path. Resolving against the
+ * default-locale dictionary (rather than a hand-maintained duplicate)
+ * keeps this file from silently going stale if the locale JSON changes.
+ */
 function sweepEscalationCopyForLocale(locale: Locale, stage: 1 | 2 | 3 | 4): { title: string; body: string } {
   const dict = loadLocale(locale);
-  const fallback = FALLBACK_COPY[stage];
-  const title = resolveI18nKey(dict, `sweepEscalation.stage${stage}Title`) ?? fallback.title;
-  const body = resolveI18nKey(dict, `sweepEscalation.stage${stage}Body`) ?? fallback.body;
+  const fallbackDict = loadLocale(DEFAULT_LOCALE);
+  const title =
+    resolveI18nKey(dict, `sweepEscalation.stage${stage}Title`) ??
+    resolveI18nKey(fallbackDict, `sweepEscalation.stage${stage}Title`) ??
+    `sweepEscalation.stage${stage}Title`;
+  const body =
+    resolveI18nKey(dict, `sweepEscalation.stage${stage}Body`) ??
+    resolveI18nKey(fallbackDict, `sweepEscalation.stage${stage}Body`) ??
+    `sweepEscalation.stage${stage}Body`;
   return { title, body };
 }
 
+/** Every stage resolves the RECIPIENT's own locale (A2-2) — never a fixed default. */
 async function resolveStageCopy(
   clinicId: string,
   stage: 1 | 2 | 3 | 4,
-  recipientUserId: string | null,
+  recipientUserId: string,
 ): Promise<{ title: string; body: string }> {
-  const locale = recipientUserId ? await resolveUserLocale(clinicId, recipientUserId) : INITIAL_LOCALE;
+  const locale = await resolveUserLocale(clinicId, recipientUserId);
   return sweepEscalationCopyForLocale(locale, stage);
 }
 
@@ -149,12 +160,15 @@ interface ActiveShiftClinicDate {
 
 /**
  * Distinct (clinic, date) pairs with at least one roster shift EITHER active
- * right now OR that ended within the last `SWEEP_INTERVAL_MS` (I-1 fix —
- * the post-end grace window). Without the grace window, a clinic drops out
- * of this candidate scan at the exact instant its shift ends, and stage 4
- * (which only fires once `minutesToEnd <= 0`) can never be reached in
- * production. Restricted to shifts dated today/yesterday (mirrors the
- * roster window `resolveCurrentRole` uses for its own shift match,
+ * right now OR that ended within the last `ESCALATION_CATCHUP_WINDOW_MS`
+ * (I-1 fix, widened by A2-3 — the post-end grace window). Without the grace
+ * window, a clinic drops out of this candidate scan at the exact instant
+ * its shift ends, and stage 4 (which only fires once `minutesToEnd <= 0`)
+ * can never be reached in production. The window is BOUNDED (not
+ * unbounded) — a shift that ended longer ago than
+ * `ESCALATION_CATCHUP_WINDOW_MS` is not a candidate, so a long-stale shift
+ * is never resurrected. Restricted to shifts dated today/yesterday (mirrors
+ * the roster window `resolveCurrentRole` uses for its own shift match,
  * server/lib/role-resolution.ts) to keep the scan bounded; overnight shifts
  * are resolved via `shiftStartAsDate`/`shiftEndAsDate` (defined above),
  * which already roll the end onto the next calendar day.
@@ -164,7 +178,7 @@ async function findActiveShiftClinicDates(now: Date): Promise<ActiveShiftClinicD
   const previousDate = new Date(now);
   previousDate.setDate(now.getDate() - 1);
   const yesterday = toLocalDateString(previousDate);
-  const graceCutoff = new Date(now.getTime() - SWEEP_INTERVAL_MS);
+  const graceCutoff = new Date(now.getTime() - ESCALATION_CATCHUP_WINDOW_MS);
 
   const rows = await db
     .select({ clinicId: shifts.clinicId, shiftDate: shifts.date, startTime: shifts.startTime, endTime: shifts.endTime })
@@ -289,9 +303,19 @@ async function fireEscalationStage(params: FireStageParams): Promise<void> {
       });
     }
   } else {
-    const copy = await resolveStageCopy(clinicId, 4, null);
-    for (const role of MANAGER_NOTIFY_ROLES) {
-      await sendPushToRole(clinicId, role, {
+    // A2-2: per-recipient locale requires an actual recipient — enumerate
+    // the clinic's manager-role users (mirrors sendPushToRole's own
+    // role-match query) and push each one individually via sendPushToUser,
+    // same mechanism stages 1-3 already use. No managers on record -> no
+    // pushes, same no-op-but-still-advance shape as the M-3 stage 2/3 case.
+    const managerUsers = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(and(eq(users.clinicId, clinicId), isNull(users.deletedAt), inArray(users.role, MANAGER_NOTIFY_ROLES)));
+
+    for (const manager of managerUsers) {
+      const copy = await resolveStageCopy(clinicId, 4, manager.id);
+      await sendPushToUser(clinicId, manager.id, {
         title: copy.title,
         body: copy.body,
         tag: `sweep-escalation:${clinicId}:${shiftDate}:4`,
@@ -432,6 +456,25 @@ export const __test = {
   shiftStartAsDate,
   shiftEndAsDate,
   SWEEP_INTERVAL_MS,
+  ESCALATION_CATCHUP_WINDOW_MS,
+};
+
+/**
+ * A2-4 (CodeRabbit PR #106): mirrors `sweepEscalationDefinition` in
+ * server/jobs/definitions/index.ts (attempts: 3, exponential backoff
+ * 2000ms, same removeOnComplete/removeOnFail). Duplicated here — not
+ * imported — because that registry module imports THIS file's
+ * QUEUE_NAME/JOB_NAME constants, and importing back would create a
+ * definitions/index.ts <-> sweep-escalation.worker.ts cycle. Same
+ * standalone-Queue/Worker-per-file shape staleCheckoutSweepWorker.ts /
+ * stale-returned-sweep.worker.ts already use. Keep these two literal value
+ * sets in sync by hand if either changes.
+ */
+const SWEEP_ESCALATION_JOB_OPTIONS: Pick<JobsOptions, "attempts" | "backoff" | "removeOnComplete" | "removeOnFail"> = {
+  attempts: 3,
+  backoff: { type: "exponential", delay: 2000 },
+  removeOnComplete: 50,
+  removeOnFail: 100,
 };
 
 let sweepQueueInitialized = false;
@@ -441,54 +484,67 @@ export function startSweepEscalationWorker(): void {
   sweepQueueInitialized = true;
 
   void (async () => {
-    const queueConnection = await createRedisConnection();
-    const workerConnection = await createRedisConnection();
+    // A2-5: catch at the detached IIFE boundary — an uncaught rejection in
+    // here would otherwise surface only as an unhandled-rejection warning
+    // (or crash, depending on Node config), never reach a caller, and leave
+    // `sweepQueueInitialized` permanently `true` with no worker actually
+    // running, so a later retry attempt would silently no-op forever.
+    let sweepQueue: Queue | null = null;
+    let sweepWorker: Worker | null = null;
+    try {
+      const queueConnection = await createRedisConnection();
+      const workerConnection = await createRedisConnection();
 
-    if (!queueConnection || !workerConnection) {
-      console.log("[sweep-room-escalation] queue disabled (Redis unavailable) — falling back to setInterval");
-      // Fallback for environments without Redis (dev/test without REDIS_URL)
-      setInterval(() => {
-        runSweepEscalation().catch((e) => console.error("[sweep-room-escalation] failed:", e));
-      }, SWEEP_INTERVAL_MS);
-      runSweepEscalation().catch((e) => console.error("[sweep-room-escalation] startup failed:", e));
-      return;
-    }
+      if (!queueConnection || !workerConnection) {
+        console.log("[sweep-room-escalation] queue disabled (Redis unavailable) — falling back to setInterval");
+        // Fallback for environments without Redis (dev/test without REDIS_URL)
+        setInterval(() => {
+          runSweepEscalation().catch((e) => console.error("[sweep-room-escalation] failed:", e));
+        }, SWEEP_INTERVAL_MS);
+        runSweepEscalation().catch((e) => console.error("[sweep-room-escalation] startup failed:", e));
+        return;
+      }
 
-    const sweepQueue = new Queue(SWEEP_ESCALATION_QUEUE_NAME, { connection: queueConnection });
-    const sweepWorker = new Worker(
-      SWEEP_ESCALATION_QUEUE_NAME,
-      async (job) => {
-        if (job.name !== SWEEP_ESCALATION_JOB_NAME) return;
-        await runSweepEscalation();
-      },
-      { connection: workerConnection, concurrency: 1 },
-    );
+      sweepQueue = new Queue(SWEEP_ESCALATION_QUEUE_NAME, { connection: queueConnection });
+      sweepWorker = new Worker(
+        SWEEP_ESCALATION_QUEUE_NAME,
+        async (job) => {
+          if (job.name !== SWEEP_ESCALATION_JOB_NAME) return;
+          await runSweepEscalation();
+        },
+        { connection: workerConnection, concurrency: 1 },
+      );
 
-    sweepWorker.on("failed", (job, error) => {
-      console.error("[sweep-room-escalation] job failed", {
-        jobId: job?.id,
-        name: job?.name,
-        message: error.message,
+      sweepWorker.on("failed", (job, error) => {
+        console.error("[sweep-room-escalation] job failed", {
+          jobId: job?.id,
+          name: job?.name,
+          message: error.message,
+        });
       });
-    });
 
-    await sweepQueue.add(
-      SWEEP_ESCALATION_JOB_NAME,
-      {},
-      {
-        jobId: SWEEP_ESCALATION_REPEAT_JOB_ID,
-        repeat: { pattern: SWEEP_ESCALATION_CRON },
-        removeOnComplete: 50,
-        removeOnFail: 100,
-      },
-    );
+      await sweepQueue.add(
+        SWEEP_ESCALATION_JOB_NAME,
+        {},
+        {
+          jobId: SWEEP_ESCALATION_REPEAT_JOB_ID,
+          repeat: { pattern: SWEEP_ESCALATION_CRON },
+          ...SWEEP_ESCALATION_JOB_OPTIONS,
+        },
+      );
 
-    console.log("[sweep-room-escalation] scheduled via BullMQ", {
-      queueName: SWEEP_ESCALATION_QUEUE_NAME,
-      cron: SWEEP_ESCALATION_CRON,
-    });
+      console.log("[sweep-room-escalation] scheduled via BullMQ", {
+        queueName: SWEEP_ESCALATION_QUEUE_NAME,
+        cron: SWEEP_ESCALATION_CRON,
+      });
 
-    // Run once at startup so the first sweep doesn't wait up to 10 minutes.
-    runSweepEscalation().catch((e) => console.error("[sweep-room-escalation] startup sweep failed:", e));
+      // Run once at startup so the first sweep doesn't wait up to 10 minutes.
+      runSweepEscalation().catch((e) => console.error("[sweep-room-escalation] startup sweep failed:", e));
+    } catch (err) {
+      console.error("[sweep-room-escalation] startup failed — closing partial connections:", err);
+      await sweepWorker?.close().catch(() => {});
+      await sweepQueue?.close().catch(() => {});
+      sweepQueueInitialized = false; // allow a later call to retry
+    }
   })();
 }

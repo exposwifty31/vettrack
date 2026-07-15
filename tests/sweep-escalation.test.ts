@@ -24,24 +24,24 @@ describe("computeEscalationStage (pure, no DB)", () => {
     expect(computeEscalationStage(70)).toBe(0);
   });
 
-  it("60 minutes to end (boundary) -> stage 0", () => {
-    expect(computeEscalationStage(60)).toBe(0);
+  it("60 minutes to end (boundary, A2-1 inclusive) -> stage 1", () => {
+    expect(computeEscalationStage(60)).toBe(1);
   });
 
   it("50 minutes to end -> stage 1 (coordinator reminded)", () => {
     expect(computeEscalationStage(50)).toBe(1);
   });
 
-  it("40 minutes to end (boundary) -> stage 1", () => {
-    expect(computeEscalationStage(40)).toBe(1);
+  it("40 minutes to end (boundary, A2-1 inclusive) -> stage 2", () => {
+    expect(computeEscalationStage(40)).toBe(2);
   });
 
   it("30 minutes to end -> stage 2 (senior notified)", () => {
     expect(computeEscalationStage(30)).toBe(2);
   });
 
-  it("20 minutes to end (boundary) -> stage 2", () => {
-    expect(computeEscalationStage(20)).toBe(2);
+  it("20 minutes to end (boundary, A2-1 inclusive) -> stage 3", () => {
+    expect(computeEscalationStage(20)).toBe(3);
   });
 
   it("10 minutes to end -> stage 3 (responsibility transferred)", () => {
@@ -88,6 +88,19 @@ vi.mock("../server/lib/metrics.js", () => ({
   incrementMetric: vi.fn(),
 }));
 
+// A2-4/A2-5 (startSweepEscalationWorker startup path) — mocked so the
+// BullMQ-queue branch is reachable without a real Redis/BullMQ instance.
+// Unused by every other test in this file (which only calls
+// runSweepEscalation, never startSweepEscalationWorker).
+vi.mock("../server/lib/redis.js", () => ({
+  createRedisConnection: vi.fn().mockResolvedValue(null),
+}));
+
+vi.mock("bullmq", () => ({
+  Queue: vi.fn(),
+  Worker: vi.fn(),
+}));
+
 // Deferred until beforeAll (after the DATABASE_URL guard) so an unset
 // DATABASE_URL never forces server/db.js to construct a connection pool at
 // module-import time — mirrors tests/equipment-anchor.service.integration.test.ts.
@@ -103,6 +116,8 @@ let sendPushToUser: PushModule["sendPushToUser"];
 let sendPushToRole: PushModule["sendPushToRole"];
 let logAudit: AuditModule["logAudit"];
 let incrementMetric: MetricsModule["incrementMetric"];
+let workerTestExports: WorkerModule["__test"];
+let startSweepEscalationWorker: WorkerModule["startSweepEscalationWorker"];
 
 async function seedClinic(clinicId: string) {
   await probePool!.query(`INSERT INTO vt_clinics (id) VALUES ($1) ON CONFLICT DO NOTHING`, [clinicId]);
@@ -111,13 +126,22 @@ async function seedClinic(clinicId: string) {
 async function seedUser(
   userId: string,
   clinicId: string,
-  opts: { name: string; role?: string; isEquipmentCoordinator?: boolean },
+  opts: { name: string; role?: string; isEquipmentCoordinator?: boolean; preferredLocale?: "en" | "he" },
 ) {
   await probePool!.query(
     `INSERT INTO vt_users (id, clinic_id, clerk_id, email, name, display_name, role, status, preferred_locale, is_equipment_coordinator)
-     VALUES ($1, $2, $3, $4, $5, $5, $6, 'active', 'en', $7)
+     VALUES ($1, $2, $3, $4, $5, $5, $6, 'active', $7, $8)
      ON CONFLICT DO NOTHING`,
-    [userId, clinicId, `clerk_${randomUUID()}`, `${userId}@ops.local`, opts.name, opts.role ?? "technician", opts.isEquipmentCoordinator ?? false],
+    [
+      userId,
+      clinicId,
+      `clerk_${randomUUID()}`,
+      `${userId}@ops.local`,
+      opts.name,
+      opts.role ?? "technician",
+      opts.preferredLocale ?? "en",
+      opts.isEquipmentCoordinator ?? false,
+    ],
   );
 }
 
@@ -164,6 +188,25 @@ async function seedSweepAnchor(
     `INSERT INTO vt_equipment_anchors (id, clinic_id, equipment_id, room_id, source, asserted_at)
      VALUES ($1, $2, $3, $4, 'sweep', $5)`,
     [anchorId, clinicId, equipmentId, roomId, assertedAt.toISOString()],
+  );
+}
+
+/**
+ * A2-7: mirrors the "never-anchored, unconfirmed" branch docking.ts's
+ * sweep-commit writes (A1-1) — an already-invalidated `sweep_missing`
+ * marker row with no room/dock (the item was never anchored at all).
+ */
+async function seedSweepMissingAnchor(
+  anchorId: string,
+  clinicId: string,
+  equipmentId: string,
+  assertedById: string,
+  invalidatedAt: Date,
+) {
+  await probePool!.query(
+    `INSERT INTO vt_equipment_anchors (id, clinic_id, equipment_id, room_id, dock_id, asserted_by_id, source, invalidated_at, invalidated_reason)
+     VALUES ($1, $2, $3, NULL, NULL, $4, 'sweep', $5, 'sweep_missing')`,
+    [anchorId, clinicId, equipmentId, assertedById, invalidatedAt.toISOString()],
   );
 }
 
@@ -241,7 +284,9 @@ describe.skipIf(!DATABASE_URL)("sweep-escalation (P3 T3.4-ii) integration", () =
       throw new Error(`Database connection or schema validation failed: ${err instanceof Error ? err.message : String(err)}`);
     }
 
-    ({ runSweepEscalation } = await import("../server/workers/sweep-escalation.worker.js"));
+    ({ runSweepEscalation, __test: workerTestExports, startSweepEscalationWorker } = await import(
+      "../server/workers/sweep-escalation.worker.js"
+    ));
     ({ isShiftSweepComplete } = await import("../server/services/sweep-escalation.service.js"));
     ({ sendPushToUser, sendPushToRole } = await import("../server/lib/push.js"));
     ({ logAudit } = await import("../server/lib/audit.js"));
@@ -397,8 +442,11 @@ describe.skipIf(!DATABASE_URL)("sweep-escalation (P3 T3.4-ii) integration", () =
   // identity's shift-end is read directly from their own `vt_shifts` row
   // (normalized-name match), not through `resolveCurrentRole`'s gate.
   it("I-1: an incomplete sweep one tick past shift-end (within the grace window) reaches stage 4 and notifies the managers", async () => {
-    // 18:00 SHIFT_END + 5 minutes — one tick past end, still inside the
-    // 10-minute SWEEP_INTERVAL_MS grace window, sweep still incomplete
+    const adminId = randomUUID();
+    await seedUser(adminId, ctx.clinicId, { name: "Admin Manager", role: "admin" });
+
+    // 18:00 SHIFT_END + 5 minutes — one tick past end, still comfortably
+    // inside the (A2-3) bounded catch-up window, sweep still incomplete
     // (no anchors seeded for either homed room in this test's ctx).
     const pastEnd = localDateTime(2026, 2, 2, 18, 5);
     const result = await runSweepEscalation(pastEnd);
@@ -408,8 +456,10 @@ describe.skipIf(!DATABASE_URL)("sweep-escalation (P3 T3.4-ii) integration", () =
     expect(row?.escalation_stage).toBe(4);
     expect(row?.current_responsible_user_id).toBeNull(); // stage 4 opens to all — no single responsible party
 
-    expect(sendPushToRole).toHaveBeenCalledWith(ctx.clinicId, "admin", expect.any(Object));
-    expect(sendPushToRole).toHaveBeenCalledWith(ctx.clinicId, "vet", expect.any(Object));
+    // A2-2: stage 4 pushes each manager recipient individually (sendPushToUser),
+    // not a role broadcast (sendPushToRole) — see the dedicated A2-2 test below
+    // for the per-recipient-locale assertion.
+    expect(sendPushToUser).toHaveBeenCalledWith(ctx.clinicId, adminId, expect.any(Object));
     expect(incrementMetric).toHaveBeenCalledWith("sweep_escalation_stage_4_fired");
     expect(logAudit).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -420,9 +470,23 @@ describe.skipIf(!DATABASE_URL)("sweep-escalation (P3 T3.4-ii) integration", () =
     );
   });
 
-  it("I-1: a shift more than SWEEP_INTERVAL_MS past its end is out of the grace window — no longer a candidate", async () => {
-    // 18:00 SHIFT_END + 15 minutes — outside the 10-minute grace window.
-    const wayPastEnd = localDateTime(2026, 2, 2, 18, 15);
+  it("A2-3: a shift ended ~2x the old (10-min) SWEEP_INTERVAL_MS ago is still a candidate under the new bounded catch-up window", async () => {
+    // 18:00 SHIFT_END + 20 minutes — would have been OUTSIDE the pre-A2-3
+    // 10-minute grace window, but is comfortably inside the new bounded
+    // catch-up window (ESCALATION_CATCHUP_WINDOW_MS). Demonstrates the bug
+    // A2-3 fixes: a scheduler/deploy gap longer than one tick must not
+    // permanently drop the shift out of escalation.
+    const wellPastEnd = localDateTime(2026, 2, 2, 18, 20);
+    const result = await runSweepEscalation(wellPastEnd);
+    expect(result.escalated).toBeGreaterThanOrEqual(1);
+
+    const row = await getCoordinatorRow(ctx.clinicId, ctx.shiftDate);
+    expect(row?.escalation_stage).toBe(4);
+  });
+
+  it("I-1/A2-3: a shift past the end of the bounded catch-up window is no longer a candidate", async () => {
+    // 18:00 SHIFT_END + 5 hours — well beyond ESCALATION_CATCHUP_WINDOW_MS (4h).
+    const wayPastEnd = localDateTime(2026, 2, 2, 23, 0);
     const result = await runSweepEscalation(wayPastEnd);
     expect(result.escalated).toBe(0);
     expect(result.shiftsChecked).toBe(0);
@@ -572,6 +636,160 @@ describe.skipIf(!DATABASE_URL)("sweep-escalation (P3 T3.4-ii) integration", () =
       const rerun = await runSweepEscalation(now35);
       expect(rerun.escalated).toBe(0);
       expect(vi.mocked(sendPushToUser).mock.calls.length).toBe(pushCallsBefore);
+    });
+  });
+
+  // ─── A2-2 (CodeRabbit PR #106) — stage 4 per-recipient locale ─────────────
+  describe("A2-2: stage 4 resolves each manager recipient's OWN locale", () => {
+    it("pushes an 'he' manager the Hebrew copy and an 'en' manager the English copy (not a shared default)", async () => {
+      const heManagerId = randomUUID();
+      const enManagerId = randomUUID();
+      await seedUser(heManagerId, ctx.clinicId, { name: "Hebrew Admin", role: "admin", preferredLocale: "he" });
+      await seedUser(enManagerId, ctx.clinicId, { name: "English Vet", role: "vet", preferredLocale: "en" });
+
+      const pastEnd = localDateTime(2026, 2, 2, 18, 5); // one tick past shift-end -> stage 4
+      const result = await runSweepEscalation(pastEnd);
+      expect(result.escalated).toBeGreaterThanOrEqual(1);
+
+      const heCopy = workerTestExports.sweepEscalationCopyForLocale("he", 4);
+      const enCopy = workerTestExports.sweepEscalationCopyForLocale("en", 4);
+      expect(heCopy.title).not.toBe(enCopy.title); // sanity: the two locales actually differ
+
+      expect(sendPushToUser).toHaveBeenCalledWith(
+        ctx.clinicId,
+        heManagerId,
+        expect.objectContaining({ title: heCopy.title, body: heCopy.body }),
+      );
+      expect(sendPushToUser).toHaveBeenCalledWith(
+        ctx.clinicId,
+        enManagerId,
+        expect.objectContaining({ title: enCopy.title, body: enCopy.body }),
+      );
+    });
+
+    it("no managers on record -> stage still advances to 4 (row/metric/audit), but no push fires", async () => {
+      const pastEnd = localDateTime(2026, 2, 2, 18, 5);
+      const result = await runSweepEscalation(pastEnd);
+      expect(result.escalated).toBeGreaterThanOrEqual(1);
+
+      const row = await getCoordinatorRow(ctx.clinicId, ctx.shiftDate);
+      expect(row?.escalation_stage).toBe(4);
+      expect(incrementMetric).toHaveBeenCalledWith("sweep_escalation_stage_4_fired");
+      // No admin/vet seeded in this test's ctx -> zero manager recipients.
+      expect(sendPushToUser).not.toHaveBeenCalledWith(ctx.clinicId, expect.anything(), expect.objectContaining({
+        tag: `sweep-escalation:${ctx.clinicId}:${ctx.shiftDate}:4`,
+      }));
+    });
+  });
+
+  // ─── A2-7 (CodeRabbit PR #106) — sweep_missing counts as swept ────────────
+  describe("A2-7: isShiftSweepComplete treats a sweep_missing anchor as a completed sweep for that room", () => {
+    it("a room swept with ALL items missing (never-anchored, sweep_missing markers only) registers complete", async () => {
+      const inWindow = localDateTime(2026, 2, 2, 9, 0);
+      const now = localDateTime(2026, 2, 2, 17, 30);
+
+      // Neither room has a source:"sweep" anchor — only sweep_missing markers
+      // (A1-1's "never-anchored, unconfirmed" branch) for every homed item.
+      await seedSweepMissingAnchor(randomUUID(), ctx.clinicId, ctx.itemAId, ctx.coordinatorId, inWindow);
+      await seedSweepMissingAnchor(randomUUID(), ctx.clinicId, ctx.itemBId, ctx.coordinatorId, inWindow);
+
+      await expect(isShiftSweepComplete(ctx.clinicId, { shiftStart: SHIFT_START_DT, now })).resolves.toBe(true);
+    });
+
+    it("without A2-7, a sweep_missing-only sweep would NOT register complete via a plain source:sweep check", async () => {
+      // Documents the bug this fixes: zero source:"sweep" anchors exist for
+      // either room in this scenario, so a query that only looked at
+      // source:"sweep" would report the sweep incomplete forever.
+      const now = localDateTime(2026, 2, 2, 17, 30);
+      await expect(isShiftSweepComplete(ctx.clinicId, { shiftStart: SHIFT_START_DT, now })).resolves.toBe(false);
+    });
+  });
+
+  // ─── A2-4/A2-5 (CodeRabbit PR #106) — worker startup wiring, mocked BullMQ ─
+  //
+  // `sweepQueueInitialized` is module-private state with no test reset hook,
+  // so these two `it`s are deliberately ORDER-DEPENDENT (Vitest runs `it`s
+  // within a describe sequentially, in declaration order, by default): the
+  // A2-5 test's own retry assertion requires it to fail startup twice in a
+  // row (each failure resets the guard), which leaves the guard `false`
+  // afterward — exactly the precondition the A2-4 test needs to run at all.
+  describe("A2-4/A2-5: startSweepEscalationWorker startup (mocked Redis/BullMQ)", () => {
+    let createRedisConnection: (typeof import("../server/lib/redis.js"))["createRedisConnection"];
+    let QueueMock: ReturnType<typeof vi.fn>;
+    let WorkerMock: ReturnType<typeof vi.fn>;
+
+    beforeAll(async () => {
+      ({ createRedisConnection } = await import("../server/lib/redis.js"));
+      const bullmq = (await import("bullmq")) as unknown as { Queue: ReturnType<typeof vi.fn>; Worker: ReturnType<typeof vi.fn> };
+      QueueMock = bullmq.Queue;
+      WorkerMock = bullmq.Worker;
+    });
+
+    afterEach(() => {
+      vi.mocked(createRedisConnection).mockReset().mockResolvedValue(null);
+      QueueMock.mockReset();
+      WorkerMock.mockReset();
+    });
+
+    it("A2-5: a startup failure (queue.add rejects) is caught, closes partial connections, and resets init state so a later call retries", async () => {
+      vi.mocked(createRedisConnection).mockResolvedValue({} as never);
+
+      const queueClose = vi.fn().mockResolvedValue(undefined);
+      const queueAdd = vi.fn().mockRejectedValue(new Error("redis add boom"));
+      // `function`, not an arrow — the source calls `new Queue(...)`, and an
+      // arrow-function mockImplementation cannot back a `new` invocation.
+      QueueMock.mockImplementation(function () {
+        return { add: queueAdd, close: queueClose };
+      });
+
+      const workerClose = vi.fn().mockResolvedValue(undefined);
+      WorkerMock.mockImplementation(function () {
+        return { on: vi.fn(), close: workerClose };
+      });
+
+      const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+      startSweepEscalationWorker();
+
+      await vi.waitFor(() => {
+        expect(queueClose).toHaveBeenCalled();
+        expect(workerClose).toHaveBeenCalled();
+      });
+      expect(errSpy).toHaveBeenCalled();
+
+      // Retry proof: a later call re-attempts createRedisConnection, which
+      // only happens if the startup failure reset sweepQueueInitialized.
+      const callsBefore = vi.mocked(createRedisConnection).mock.calls.length;
+      startSweepEscalationWorker();
+      await vi.waitFor(() => {
+        expect(vi.mocked(createRedisConnection).mock.calls.length).toBeGreaterThan(callsBefore);
+      });
+
+      errSpy.mockRestore();
+    });
+
+    it("A2-4: the repeat job is added with the registry's attempts/backoff, not BullMQ's bare defaults", async () => {
+      vi.mocked(createRedisConnection).mockResolvedValue({} as never);
+
+      const queueAdd = vi.fn().mockResolvedValue(undefined);
+      QueueMock.mockImplementation(function () {
+        return { add: queueAdd, close: vi.fn().mockResolvedValue(undefined) };
+      });
+      WorkerMock.mockImplementation(function () {
+        return { on: vi.fn(), close: vi.fn().mockResolvedValue(undefined) };
+      });
+
+      startSweepEscalationWorker();
+
+      await vi.waitFor(() => expect(queueAdd).toHaveBeenCalled());
+
+      const [, , opts] = queueAdd.mock.calls[0] as [unknown, unknown, Record<string, unknown>];
+      expect(opts.attempts).toBe(3);
+      expect(opts.backoff).toEqual({ type: "exponential", delay: 2000 });
+      expect(opts.removeOnComplete).toBe(50);
+      expect(opts.removeOnFail).toBe(100);
+      expect(opts.jobId).toBeDefined();
+      expect(opts.repeat).toBeDefined();
     });
   });
 });

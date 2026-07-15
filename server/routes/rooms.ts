@@ -46,13 +46,22 @@ type LastSweptRow = {
 
 /**
  * S2-1 (pre-PR review, MAJOR): per-room "last swept" (docking P3 T3.4-i-b
- * Part A) — the most recent source:"sweep" anchor among items currently
+ * Part A) — the most recent sweep-derived anchor among items currently
  * homed to each room, plus the asserter's display name. ONE bounded
  * DISTINCT ON (home_room_id) query, not an unbounded full-history select
  * over every source:"sweep" anchor for the clinic deduped in JS. Shared by
  * both GET /api/rooms (roomId omitted — every room) and GET /api/rooms/:id
  * (roomId passed — scoped to that one room), so the derivation isn't
  * copy-pasted a third time. All-time, not shift-scoped.
+ *
+ * A2-7 (CodeRabbit PR #106): "swept" counts EITHER a `source:"sweep"`
+ * anchor (a confirmed-present item — displayed at `asserted_at`) OR an
+ * `invalidated_reason:"sweep_missing"` anchor (an unconfirmed item, A1-1 —
+ * displayed at `invalidated_at`, the sweep's own timestamp, since that
+ * anchor's `asserted_at` may predate this sweep entirely for an item that
+ * had a prior open anchor from some other source). Without the second
+ * branch, a sweep that confirms zero items present leaves no
+ * `source:"sweep"` anchor at all, so the room falsely shows "never swept".
  */
 async function lastSweptByRoom(
   clinicId: string,
@@ -60,16 +69,18 @@ async function lastSweptByRoom(
 ): Promise<Map<string, { lastSweptAt: string; lastSweptByName: string | null }>> {
   const result = await db.execute<LastSweptRow>(sql`
     SELECT DISTINCT ON (e.home_room_id)
-      e.home_room_id, a.asserted_at, u.name AS sweeper_name, u.display_name AS sweeper_display_name
+      e.home_room_id,
+      CASE WHEN a.invalidated_reason = 'sweep_missing' THEN a.invalidated_at ELSE a.asserted_at END AS asserted_at,
+      u.name AS sweeper_name, u.display_name AS sweeper_display_name
     FROM vt_equipment_anchors a
     INNER JOIN vt_equipment e ON e.id = a.equipment_id AND e.clinic_id = ${clinicId}
     LEFT JOIN vt_users u ON u.id = a.asserted_by_id AND u.clinic_id = ${clinicId}
     WHERE a.clinic_id = ${clinicId}
-      AND a.source = 'sweep'
+      AND (a.source = 'sweep' OR a.invalidated_reason = 'sweep_missing')
       AND e.home_room_id IS NOT NULL
       AND e.deleted_at IS NULL
       ${roomId ? sql`AND e.home_room_id = ${roomId}` : sql``}
-    ORDER BY e.home_room_id, a.asserted_at DESC
+    ORDER BY e.home_room_id, asserted_at DESC
   `);
 
   const map = new Map<string, { lastSweptAt: string; lastSweptByName: string | null }>();
