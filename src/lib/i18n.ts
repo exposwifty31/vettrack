@@ -1,8 +1,9 @@
 import { interpolate } from "../../lib/i18n/index";
 import { isInternalKey } from "../../lib/i18n/internal-keys";
 import type { Locale as SharedLocale } from "../../lib/i18n/types";
-import enDict from "../../locales/en.json";
 import heDict from "../../locales/he.json";
+// `en` is NOT statically imported — it is lazy-loaded (see loadDict) so its ~40 kB gzip
+// stays off first paint. `he` (the default) stays eager for an instant correct render.
 import { safeStorageGetItem, safeStorageSetItem } from "./safe-browser";
 import { isCapacitorNative } from "./capacitor-runtime";
 
@@ -10,10 +11,38 @@ export type Locale = SharedLocale;
 export const LOCALE_STORAGE_KEY = "vettrack-locale";
 
 const RTL_LOCALES = new Set<Locale>(["he"]);
-const dictionaries: Record<Locale, typeof heDict> = {
-  en: enDict,
-  he: heDict,
-};
+
+/** The shape of a locale dictionary. Both locales share this structure — enforced by
+ *  the i18n parity check. */
+export type LocaleDict = typeof heDict;
+
+// `he` is eager (imported above); `en` is populated on first use via loadDict — or
+// synchronously via registerLocaleDict (the test setup preloads it).
+const loadedDicts: Partial<Record<Locale, LocaleDict>> = { he: heDict };
+
+/** Synchronously register a loaded dict. Used by the test setup to preload `en` so the
+ *  synchronous refreshTranslations("en") path holds in the node test environment. */
+export function registerLocaleDict(locale: Locale, dict: LocaleDict): void {
+  loadedDicts[locale] = dict;
+}
+
+/** Lazily load a locale dict. `he` is always eager; only `en` is fetched on demand. */
+async function loadDict(locale: Locale): Promise<LocaleDict> {
+  const cached = loadedDicts[locale];
+  if (cached) return cached;
+  if (locale === "en") {
+    const mod = await import("../../locales/en.json");
+    loadedDicts.en = (mod.default ?? mod) as unknown as LocaleDict;
+    return loadedDicts.en;
+  }
+  return heDict;
+}
+
+function notifyLocaleChanged(locale: Locale): void {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent("vettrack:locale-changed", { detail: locale }));
+  }
+}
 
 /**
  * Strip top-level internal keys (e.g. `_meta`) from the accessor tree.
@@ -64,8 +93,9 @@ export function setStoredLocale(locale: string): Locale {
   try {
     if (typeof window !== "undefined") {
       safeStorageSetItem(LOCALE_STORAGE_KEY, resolved);
+      // refreshTranslations fires "vettrack:locale-changed" itself, AFTER t is rebuilt —
+      // essential for the lazy `en` path where the dict must load before we notify.
       refreshTranslations(resolved);
-      window.dispatchEvent(new CustomEvent("vettrack:locale-changed", { detail: resolved }));
     }
   } catch {
   }
@@ -1156,8 +1186,30 @@ const translations = {
 return stripInternalKeys(translations) as typeof translations;
 }
 
-export let t = buildTranslations(dictionaries[getStoredLocale()]);
+export let t = buildTranslations(loadedDicts[getStoredLocale()] ?? heDict);
 
 export function refreshTranslations(locale: string | null | undefined = getStoredLocale()): void {
-  t = buildTranslations(dictionaries[resolveClientLocale(locale)]);
+  const resolved = resolveClientLocale(locale);
+  const cached = loadedDicts[resolved];
+  if (cached) {
+    t = buildTranslations(cached);
+    notifyLocaleChanged(resolved);
+    return;
+  }
+  // Non-eager locale (en) not loaded yet — fetch it, then rebuild + notify so the app
+  // re-renders in the correct language once the dict arrives.
+  void loadDict(resolved).then((dict) => {
+    t = buildTranslations(dict);
+    notifyLocaleChanged(resolved);
+  });
+}
+
+// If the active locale at startup isn't the eager default (he), kick off its lazy load
+// so the app re-renders correctly once it arrives (a brief he flash for the rare
+// en-at-startup case; he — the default — is instant, no flash).
+if (typeof window !== "undefined") {
+  const active = getStoredLocale();
+  if (active !== "he" && !loadedDicts[active]) {
+    refreshTranslations(active);
+  }
 }
