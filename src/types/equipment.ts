@@ -570,11 +570,31 @@ export interface DockingReconciliationItem {
   assetTypeId: string | null;
 }
 
-/** GET /api/docking/reconciliation response — P1 ownership-derivable buckets. */
+/** A single item within the P3 full 8-bucket reconciliation breakdown (T3.6a). */
+export interface DockingReconciliationBucketItem {
+  id: string;
+  name: string;
+  bucket: ReconciliationBucket;
+  custodyState: string;
+  checkedOutById: string | null;
+  checkedOutByEmail: string | null;
+  homeDockId: string | null;
+  homeDockName: string | null;
+  homeRoomId: string | null;
+}
+
+/**
+ * GET /api/docking/reconciliation response — the P1 ownership-derivable
+ * buckets (unassigned/noStation/byDock, still consumed by
+ * AdminHomeAssignmentPage) plus the P3 full 8-bucket classifier breakdown
+ * (counts + byBucket) for the Manager reconciliation worklist.
+ */
 export interface DockingReconciliation {
   unassigned: DockingReconciliationItem[];
   noStation: DockingReconciliationItem[];
   byDock: Array<{ dock: Dock; expectedFill: number; capacity: number | null }>;
+  counts: Record<ReconciliationBucket, number>;
+  byBucket: Record<ReconciliationBucket, DockingReconciliationBucketItem[]>;
 }
 
 /**

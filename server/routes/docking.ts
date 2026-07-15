@@ -24,6 +24,7 @@ import {
   dockExpectedFill,
   classifyReconciliationBucket,
   type ClassifierCtx,
+  type ReconciliationBucket,
 } from "../services/docking.service.js";
 import { createAnchor, invalidateCurrentAnchor } from "../services/equipment-anchor.service.js";
 import { resolveShiftCoordinator, confirmShiftCoordinator } from "../services/equipment-coordinator.service.js";
@@ -151,17 +152,52 @@ router.post(
   },
 );
 
+const RECONCILIATION_BUCKETS: ReconciliationBucket[] = [
+  "at_home",
+  "checked_out",
+  "returned_unverified",
+  "returned_away",
+  "misplaced_at_station",
+  "missing",
+  "unassigned",
+  "no_station",
+];
+
+interface ReconciliationBucketItem {
+  id: string;
+  name: string;
+  bucket: ReconciliationBucket;
+  custodyState: string;
+  checkedOutById: string | null;
+  checkedOutByEmail: string | null;
+  homeDockId: string | null;
+  homeDockName: string | null;
+  homeRoomId: string | null;
+}
+
+type LatestAnchorRow = {
+  equipment_id: string;
+  dock_id: string | null;
+  invalidated_at: Date | string | null;
+  invalidated_reason: string | null;
+};
+
 /**
  * GET /api/docking/reconciliation
  *
- * Loads this clinic's docks + a small equipment projection once, then
- * derives all three buckets in memory via the T1.2 pure functions —
- * no per-item queries.
+ * Loads this clinic's docks + a widened equipment projection + the latest
+ * anchor per item (one DISTINCT ON query, not per-item N+1), then derives:
+ *  - the legacy P1 ownership-only buckets (unassigned/noStation/byDock —
+ *    AdminHomeAssignmentPage still consumes these, kept byte-for-byte), and
+ *  - the full P3 8-bucket breakdown (T3.1 classifyReconciliationBucket) as
+ *    `counts` (0-filled for every bucket) + `byBucket` (items grouped by
+ *    bucket, enriched with homeDockId/Name + homeRoomId for the Manager
+ *    worklist's "assign home" action).
  */
 router.get("/reconciliation", requireAuth, async (req, res) => {
   const clinicId = req.clinicId!;
 
-  const [clinicDocks, clinicEquipment] = await Promise.all([
+  const [clinicDocks, clinicEquipment, latestAnchorResult] = await Promise.all([
     db.select().from(docks).where(eq(docks.clinicId, clinicId)),
     db
       .select({
@@ -169,9 +205,24 @@ router.get("/reconciliation", requireAuth, async (req, res) => {
         name: equipment.name,
         homeRoomId: equipment.homeRoomId,
         assetTypeId: equipment.assetTypeId,
+        roomId: equipment.roomId,
+        lastRfidRoomId: equipment.lastRfidRoomId,
+        checkedOutById: equipment.checkedOutById,
+        checkedOutByEmail: equipment.checkedOutByEmail,
+        custodyState: equipment.custodyState,
       })
       .from(equipment)
       .where(and(eq(equipment.clinicId, clinicId), isNull(equipment.deletedAt))),
+    // Latest anchor per item, in ONE query — DISTINCT ON (equipment_id)
+    // ordered by assertedAt DESC. The latest row's invalidatedAt tells us
+    // whether it's the currently open anchor or the most recent
+    // contradiction (T3.1 ClassifierCtx derivation below).
+    db.execute(sql`
+      SELECT DISTINCT ON (equipment_id) equipment_id, dock_id, invalidated_at, invalidated_reason
+      FROM vt_equipment_anchors
+      WHERE clinic_id = ${clinicId}
+      ORDER BY equipment_id, asserted_at DESC
+    `),
   ]);
 
   const unassigned = clinicEquipment.filter((item) => item.homeRoomId === null || item.assetTypeId === null);
@@ -187,7 +238,46 @@ router.get("/reconciliation", requireAuth, async (req, res) => {
     capacity: dock.capacity,
   }));
 
-  res.json({ unassigned, noStation, byDock });
+  const latestAnchorRows = (latestAnchorResult as unknown as { rows: LatestAnchorRow[] }).rows;
+  const latestAnchorByEquipmentId = new Map(latestAnchorRows.map((row) => [row.equipment_id, row]));
+
+  const counts = Object.fromEntries(RECONCILIATION_BUCKETS.map((b) => [b, 0])) as Record<
+    ReconciliationBucket,
+    number
+  >;
+  const byBucket = Object.fromEntries(
+    RECONCILIATION_BUCKETS.map((b) => [b, [] as ReconciliationBucketItem[]]),
+  ) as Record<ReconciliationBucket, ReconciliationBucketItem[]>;
+
+  for (const item of clinicEquipment) {
+    const homeDock = resolveHomeDock(item, clinicDocks);
+    const latest = latestAnchorByEquipmentId.get(item.id);
+    const currentAnchor = latest && latest.invalidated_at == null ? { dockId: latest.dock_id } : null;
+    const lastContradictionReason = (
+      latest && latest.invalidated_at != null ? latest.invalidated_reason : null
+    ) as ClassifierCtx["lastContradictionReason"];
+
+    const bucket = classifyReconciliationBucket(item, {
+      homeDock: homeDock ? { id: homeDock.id } : null,
+      currentAnchor,
+      lastContradictionReason,
+    });
+
+    counts[bucket]++;
+    byBucket[bucket].push({
+      id: item.id,
+      name: item.name,
+      bucket,
+      custodyState: item.custodyState,
+      checkedOutById: item.checkedOutById,
+      checkedOutByEmail: item.checkedOutByEmail,
+      homeDockId: homeDock?.id ?? null,
+      homeDockName: homeDock?.name ?? null,
+      homeRoomId: item.homeRoomId,
+    });
+  }
+
+  res.json({ unassigned, noStation, byDock, counts, byBucket });
 });
 
 /**
