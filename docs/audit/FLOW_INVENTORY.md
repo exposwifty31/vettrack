@@ -11,6 +11,25 @@ Per rule III.6, every flow in the app must be provable 100% functioning across p
 
 **Status legend (for the live walk):** `pass` · `broken` · `degraded` · `unreachable` · `⏳ pending` (not yet walked).
 
+> **Executable harness (2026-07-15).** This inventory is now machine-readable +
+> walkable: `tests/flow-walk/` (see its `README.md`). `flow-inventory.manifest.ts`
+> is the reconciled row set (web via Playwright, iPhone/iPad via Appium), and
+> `flow-inventory.manifest.test.ts` is a **drift guard** that fails if a route's
+> guard classification diverges from `src/app/routes.tsx`. Two corrections the manifest
+> bakes in that this table (generated 2026-07-06) predates:
+> - **Route drift:** several rows below are now redirects, not pages — `/equipment/scan`,
+>   `/equipment/maintenance`, `/equipment/intelligence`, `/shift-handover`, `/pending`,
+>   `/pending-emergencies`, `/stability`, `/app-tour`, `/admin/medication-integrity`; and
+>   `/equipment/board` · `/display` now redirect to the canonical `/board`. A new
+>   `WebOnlyGuard > ManagementGuard` web console (`/admin/integrations`, `/webhooks`,
+>   `/notifications`, `/rfid-readers`, `/governance`, `/audit-log`, `/inventory`,
+>   `/people`, `/displays`, `/ops/health`) exists that this table never listed.
+> - **Web = management-only (T-31 / R-WEB-01):** on the desktop web target, `AuthGuard`
+>   shows `ManagementWebGate` to any non-`management.web` role (admin + lead only) on
+>   *every* route — it preempts the per-route guards below. So on web, non-management
+>   roles gate everywhere; the per-role `access_denied`/redirect distinctions in this
+>   table describe the **native** target, where that gate is inert.
+
 ## Platform availability rules (verified from guards)
 
 | Guard (in `routes.tsx`) | iPhone | iPad | Web (≥1024) | Board | Marketing |
@@ -83,7 +102,7 @@ Per `docs/scope-change-2026.md` (migrations 142–143), patient/ER/med domains w
 
 ## How to complete the live walk (the pending III.6 step)
 
-1. **Web + board:** `pnpm dev` (dev-bypass auth, `clinicId=dev-clinic-default`), then walk each web/board/marketing row in a desktop browser (≥1024px). Use the **Phase 0 dev-role switcher** (Settings → *Developer · role override*) to cycle `admin → vet → senior_technician → technician → student` and re-walk role-gated rows. Stamp each `pass/broken/degraded/unreachable`.
+1. **Web + board:** `pnpm dev` (dev-bypass auth, `clinicId=dev-clinic-default`), then `pnpm test:playwright:flow-walk` (or walk manually in a desktop browser ≥1024px). The harness cycles `admin → vet → senior_technician → technician → student` via the same `vt:devRole` override the **Phase 0 dev-role switcher** writes. **Expect the desktop web app to be management-only:** only `admin` + `senior_technician` (lead) clear `ManagementWebGate`; `vet` / `technician` / `student` get the gate on every route (that is the correct outcome, not a break). It writes `artifacts/flow-walk/web-matrix.json`; stamp each row `pass/broken/degraded/unreachable` from it.
 2. **iPhone + iPad:** `pnpm cap:build:native && pnpm cap:install:ios-sim`; walk the AuthGuard rows on both device classes; confirm every WebOnlyGuard row **redirects** (never renders a broken desktop layout) on native.
 3. **Role note (II.1):** the server collapses `lead_technician`/`vet_tech` → `student`; exercise the **lead** archetype via `senior_technician` and **tech** via `technician`. `admin` is the dev-bypass default when the override is cleared.
 4. Re-stamp touched rows in every phase; Phase 10 re-verifies the full inventory across all four platforms.

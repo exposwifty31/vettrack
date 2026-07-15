@@ -56,6 +56,10 @@ export const PLAYWRIGHT_SUITE_MATCH: Record<string, string[]> = {
     'equipment-waitlist-paginated-list.spec.ts',
     'equipment-waitlist-two-browser.spec.ts',
   ],
+  // Phase-10 III.6 dev-bypass flow walk. NOT in `ci` (self-skips without a running
+  // app anyway). Must NOT be added to PLAYWRIGHT_BASE_IGNORE — testIgnore applies to
+  // every suite, which would blank this one too.
+  'flow-walk': ['flow-walk/web-board-walk.spec.ts'],
 };
 
 export function resolvePlaywrightSuite(): string {
