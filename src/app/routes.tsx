@@ -29,7 +29,7 @@ const AlertsPage = lazy(() => import("@/pages/alerts"));
 const MyEquipmentPage = lazy(() => import("@/pages/my-equipment"));
 const RoomsListPage = lazy(() => import("@/pages/rooms-list"));
 const RoomRadarPage = lazy(() => import("@/pages/room-radar"));
-const RoomsMasterDetail = lazy(() => import("@/features/rooms/tablet/RoomsMasterDetail"));
+const RoomsMasterDetail = lazy(() => import("@/native/tablet/RoomsMasterDetail"));
 const QrPrintPage = lazy(() => import("@/pages/qr-print"));
 const EquipmentQrPrintPage = lazy(() => import("@/pages/equipment-qr-print"));
 const AdminPage = lazy(() => import("@/pages/admin"));
@@ -60,7 +60,7 @@ const WhatsNewPage = lazy(() => import("@/pages/whats-new"));
 const ShiftLeaderboardPage = lazy(() => import("@/pages/shift-leaderboard"));
 const InventoryItemsPage = lazy(() => import("@/pages/inventory-items"));
 const InventoryItemDetailPage = lazy(() => import("@/pages/inventory-item-detail"));
-const InventoryItemsMasterDetail = lazy(() => import("@/features/inventory/tablet/InventoryItemsMasterDetail"));
+const InventoryItemsMasterDetail = lazy(() => import("@/native/tablet/InventoryItemsMasterDetail"));
 const ProcurementPage = lazy(() => import("@/pages/procurement"));
 const ShiftChatArchive = lazy(() =>
   import("@/features/shift-chat/components/ShiftChatArchive").then((m) => ({ default: m.ShiftChatArchive }))
