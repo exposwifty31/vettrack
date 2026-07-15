@@ -106,8 +106,9 @@ export interface ExpectedOutcome {
 }
 
 /**
- * The reconciled inventory. Row count maps 1:1 onto FLOW_INVENTORY.md's 31 rows,
- * plus a clearly-tagged block of routes.tsx surfaces the 2026-07-06 doc predates.
+ * The reconciled inventory. Covers all of FLOW_INVENTORY.md's 31 rows (several
+ * split into multiple manifest rows for per-path guard precision), plus a
+ * drift-tagged block of routes.tsx surfaces the 2026-07-06 doc predates.
  */
 export const FLOW_ROWS: FlowRow[] = [
   // ── Marketing (unauthenticated, chrome-free) — FLOW_INVENTORY §Marketing ──
@@ -191,6 +192,16 @@ export const FLOW_ROWS: FlowRow[] = [
 /** Rows whose walk targets include the given platform. */
 export function rowsForPlatform(platform: Platform): FlowRow[] {
   return FLOW_ROWS.filter((r) => r.platforms.includes(platform));
+}
+
+/**
+ * Does an already-relative path match a redirect target, ignoring query strings?
+ * Shared by both walks (web `walk-helpers.ts` and native `native-walk.e2e.ts`) so
+ * the redirect-matching rule lives in exactly one place.
+ */
+export function pathMatchesTarget(actualPath: string, target?: string): boolean {
+  if (!target) return true;
+  return actualPath === target || actualPath.split("?")[0] === target.split("?")[0];
 }
 
 /** Deduped union of web + board + marketing rows (what the browser walk can reach). */

@@ -18,6 +18,7 @@ import {
   webWalkRows,
   expectedWebOutcome,
   expectedNativeOutcome,
+  pathMatchesTarget,
   type FlowRow,
 } from "./flow-inventory.manifest";
 
@@ -205,6 +206,13 @@ describe("flow-walk manifest — outcome derivation", () => {
     expect(expectedNativeOutcome(row("alerts"), "student")).toMatchObject({ kind: "redirect", to: "/equipment" });
     expect(expectedNativeOutcome(row("alerts"), "technician")).toMatchObject({ kind: "render" });
     expect(expectedNativeOutcome(row("emergency-wall"), "admin")).toMatchObject({ kind: "guard-redirect", to: "/home" });
+  });
+
+  it("pathMatchesTarget ignores query strings and treats an absent target as a match", () => {
+    expect(pathMatchesTarget("/equipment?scan=1", "/equipment")).toBe(true);
+    expect(pathMatchesTarget("/equipment", "/equipment")).toBe(true);
+    expect(pathMatchesTarget("/home", "/equipment")).toBe(false);
+    expect(pathMatchesTarget("/anything", undefined)).toBe(true);
   });
 
   it("redirect rows redirect to their declared target on every platform", () => {

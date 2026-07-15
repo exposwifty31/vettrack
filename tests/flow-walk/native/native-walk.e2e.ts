@@ -19,6 +19,7 @@ import { browser } from "@wdio/globals";
 import {
   DEV_ROLE_KEY,
   expectedNativeOutcome,
+  pathMatchesTarget,
   rowsForPlatform,
   type FlowRow,
   type Platform,
@@ -77,19 +78,9 @@ async function isVisible(testid: string): Promise<boolean> {
   }, testid) as Promise<boolean>;
 }
 
-/** iPad-native serves some list rows via a master-detail route; pick the right path. */
+/** iPad-native serves some rows via a master-detail route, but the base path still matches. */
 function pathForRow(row: FlowRow): string {
-  if (PLATFORM === "ipad" && row.tabletMasterDetail) {
-    // e.g. /equipment → /equipment (master-detail :id? still matches the base path)
-    return row.paths[0];
-  }
   return row.paths[0];
-}
-
-function pathMatches(actual: string, target?: string): boolean {
-  if (!target) return true;
-  const a = actual.split("?")[0];
-  return a === target || a === target.split("?")[0];
 }
 
 describe(`VetTrack native flow walk (${PLATFORM})`, () => {
@@ -111,7 +102,7 @@ describe(`VetTrack native flow walk (${PLATFORM})`, () => {
 
           if (expected.kind === "redirect" || expected.kind === "guard-redirect") {
             // The router should have bounced us to the guard/redirect target.
-            expect(pathMatches(final, expected.to)).toBe(true);
+            expect(pathMatchesTarget(final, expected.to)).toBe(true);
             return;
           }
 

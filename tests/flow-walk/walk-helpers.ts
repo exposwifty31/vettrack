@@ -11,6 +11,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import {
   DEV_ROLE_KEY,
+  pathMatchesTarget,
   type ExpectedOutcome,
   type FlowRow,
   type OutcomeKind,
@@ -28,7 +29,7 @@ export interface WalkResult {
   platform: string;
   role: RoleArchetype;
   expected: OutcomeKind;
-  actual: OutcomeKind;
+  actual: OutcomeKind | "unreachable";
   status: WalkStatus;
   finalUrl: string;
   screenshot?: string;
@@ -147,11 +148,8 @@ export function classifyActual(
 }
 
 function redirectMatches(finalUrl: string, target?: string): boolean {
-  if (!target) return true;
-  const final = relativePath(finalUrl);
-  const targetPath = target.split("?")[0];
-  // Redirect target may add/keep query params; match on the pathname prefix.
-  return final === target || final.split("?")[0] === targetPath;
+  // Redirect target may add/keep query params; match on the pathname.
+  return pathMatchesTarget(relativePath(finalUrl), target);
 }
 
 /** Grade one walked row: pass / broken / degraded / observe. */

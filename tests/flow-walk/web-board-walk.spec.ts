@@ -21,7 +21,6 @@ import {
   expectedWebOutcome,
   roleHasManagementWeb,
   webWalkRows,
-  type RoleArchetype,
 } from "./flow-inventory.manifest";
 import {
   applyDevRole,
@@ -87,7 +86,20 @@ test.describe.serial("Flow walk (dev-bypass) — web + board + marketing", () =>
           });
 
         if (!navigated) {
-          results.push(baseResult(row, role, requestedPath, "unreachable", "unreachable", page.url(), consoleErrors, failedRequests, "navigation threw"));
+          results.push({
+            rowId: row.id,
+            group: row.group,
+            path: requestedPath,
+            platform: "web",
+            role,
+            expected: expectedWebOutcome(row, role).kind,
+            actual: "unreachable",
+            status: "unreachable",
+            finalUrl: relativePath(page.url()),
+            consoleErrors: [...consoleErrors],
+            failedRequests: [...failedRequests],
+            notes: "navigation threw",
+          });
           continue;
         }
 
@@ -144,30 +156,3 @@ test.describe.serial("Flow walk (dev-bypass) — web + board + marketing", () =>
     );
   });
 });
-
-function baseResult(
-  row: { id: string; group: string },
-  role: RoleArchetype,
-  path: string,
-  expected: WalkResult["expected"],
-  actual: WalkResult["actual"],
-  finalUrl: string,
-  consoleErrors: string[],
-  failedRequests: string[],
-  notes: string,
-): WalkResult {
-  return {
-    rowId: row.id,
-    group: row.group,
-    path,
-    platform: "web",
-    role,
-    expected,
-    actual,
-    status: "unreachable",
-    finalUrl: relativePath(finalUrl),
-    consoleErrors: [...consoleErrors],
-    failedRequests: [...failedRequests],
-    notes,
-  };
-}
