@@ -201,7 +201,12 @@ describe("flow-walk manifest — outcome derivation", () => {
   it("kiosk + marketing escape the desktop console gate for every role", () => {
     for (const r of ROLE_ARCHETYPES) {
       expect(expectedWebOutcome(row("board-kiosk"), r), `board ${r}`).toMatchObject({ kind: "kiosk" });
-      expect(expectedWebOutcome(row("signin"), r), `signin ${r}`).toMatchObject({ kind: "render" });
+      // The walk runs permanently authenticated (dev-bypass has no signed-out
+      // state): a signed-in visit to /signin or /signup bounces to /home
+      // (signin.tsx / signup.tsx redirect effects). Legal pages never bounce.
+      expect(expectedWebOutcome(row("signin"), r), `signin ${r}`).toMatchObject({ kind: "redirect", to: "/home" });
+      expect(expectedWebOutcome(row("signup"), r), `signup ${r}`).toMatchObject({ kind: "redirect", to: "/home" });
+      expect(expectedWebOutcome(row("legal-support"), r), `legal ${r}`).toMatchObject({ kind: "render" });
     }
   });
 

@@ -271,7 +271,16 @@ function roleIsCustodyOnly(role: RoleArchetype): boolean {
  */
 export function expectedWebOutcome(row: FlowRow, role: RoleArchetype): ExpectedOutcome {
   if (row.guard === "redirect") return { kind: "redirect", to: row.redirectTo, confidence: "firm" };
-  if (row.guard === "marketing") return { kind: "render", confidence: "firm" };
+  if (row.guard === "marketing") {
+    // The walk is permanently authenticated (dev-bypass has no signed-out state),
+    // and a signed-in visit to /signin or /signup bounces to /home (the pages'
+    // redirect effects; signup goes via "/", which resolves to /home under auth).
+    // Legal pages (/privacy, /terms, /support) have no bounce and render for all.
+    if (row.id === "signin" || row.id === "signup") {
+      return { kind: "redirect", to: "/home", confidence: "firm" };
+    }
+    return { kind: "render", confidence: "firm" };
+  }
   if (row.guard === "kiosk") return { kind: "kiosk", confidence: "firm" };
 
   // Every remaining guard (auth/custody/web-only/management) is a `desktop`-target

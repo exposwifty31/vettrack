@@ -49,18 +49,19 @@ The `flow-inventory.manifest.test.ts` drift guard keeps these in sync going forw
 
 ## When to run
 
-Gated behind two prerequisites (per the resubmission gate):
-1. **Docking P3 lands** — several equipment/rooms rows change with the docking-first-class
-   work; walking before it merges would stamp soon-to-be-stale results.
-2. **A running app** — web needs `pnpm dev` (dev-bypass); native needs a booted sim with
-   the dev-bypass shell installed.
+Both original gates are met: docking P3 merged to main (#106, 2026-07-15), so results
+stamp against current routes. The remaining prerequisite is **a running walk server** —
+web needs `pnpm dev:walk`; native needs a booted sim with the dev-bypass shell installed.
 
 ## Run — web + board + marketing
 
 ```bash
-pnpm dev                      # terminal 1: local dev-bypass server (:3001 API, :5000 web)
-pnpm test:playwright:flow-walk  # terminal 2
+pnpm dev:walk                   # terminal 1: walk server (:3001 API, :5000 web)
+pnpm test:playwright:flow-walk  # terminal 2 (walks the Vite port, :5000)
 ```
+- `dev:walk` = `dev:bypass` + `PLAYWRIGHT_E2E=true`, which skips the global per-IP API
+  rate limiter (the same switch CI's Playwright API server uses). Without it a 5-role
+  walk trips the 100 req/min limit and every row after the cliff bounces to `/signin`.
 - Self-skips with a clear message if the app isn't reachable — safe to invoke anytime.
 - Writes `artifacts/flow-walk/web-matrix.json` + per-row screenshots under
   `artifacts/flow-walk/screenshots/`.

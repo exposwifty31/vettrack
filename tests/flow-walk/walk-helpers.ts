@@ -50,8 +50,17 @@ export function attachObservers(page: Page): {
   });
   page.on("response", (res) => {
     const url = res.url();
-    if (url.includes("/api/") && res.status() >= 500) {
+    // >=400, not >=500: a 401/403/429 on /api/users/me flips the client to
+    // signed-out and poisons every subsequent row — the admin walk's rate-limit
+    // cliff (429s) was invisible under the old >=500 filter.
+    if (url.includes("/api/") && res.status() >= 400) {
       failedRequests.push(`${res.status()} ${url}`);
+    }
+  });
+  page.on("requestfailed", (req) => {
+    const url = req.url();
+    if (url.includes("/api/")) {
+      failedRequests.push(`FAILED ${req.failure()?.errorText ?? "?"} ${url}`);
     }
   });
   return { consoleErrors, failedRequests };
