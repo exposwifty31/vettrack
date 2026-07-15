@@ -49,6 +49,7 @@ import type { Equipment, Room, RoomActivityEntry, EquipmentStatus } from "@/type
 import { ReturnPlugDialog } from "@/components/return-plug-dialog";
 import { haptics } from "@/lib/haptics";
 import { RoomSweep } from "@/features/equipment/sweep/RoomSweep";
+import { CoordinatorSweepState } from "@/features/equipment/sweep/CoordinatorSweepState";
 
 function toInitials(name: string | null | undefined): string {
   if (!name?.trim()) return "?";
@@ -624,6 +625,11 @@ export default function RoomRadarPage() {
                 <ListChecks className="w-4 h-4" aria-hidden />
                 {t.roomSweep.startSweep}
               </button>
+
+              {/* Equipment Coordinator + sweep-state line (docking P3
+                  T3.4-i-b) — this shift's derived coordinator and this
+                  room's last-swept status, right under the sweep entry. */}
+              <CoordinatorSweepState lastSweptAt={room.lastSweptAt} lastSweptByName={room.lastSweptByName} />
             </>
           ) : null}
         </div>

@@ -1806,6 +1806,17 @@
     "noStationGroup": "No station",
     "commitError": "Sweep failed — try again"
   },
+  "coordinator": {
+    "sweptPrefix": "Last swept",
+    "byName": "by {name}",
+    "notSweptThisShift": "Not swept this shift",
+    "withName": "Coordinator: {name}",
+    "toBeConfirmed": "Coordinator: to be confirmed",
+    "unassigned": "Coordinator: unassigned",
+    "choosePlaceholder": "Choose coordinator",
+    "confirmSuccess": "Coordinator confirmed",
+    "confirmError": "Failed to confirm coordinator"
+  },
   "roomsListPage": {
     "selectRoomTitle": "Select a room",
     "selectRoomSubtitle": "Choose from the list to see details here",
@@ -2121,7 +2132,10 @@
     "cursorBugFixerFailed": "Could not start Cursor bug fixer",
     "cursorBugFixerNotConfigured": "Cursor bug fixer is not fully configured on the server",
     "secondaryRoleUpdated": "Secondary role updated",
-    "secondaryRoleUpdateFailed": "Failed to update secondary role"
+    "secondaryRoleUpdateFailed": "Failed to update secondary role",
+    "equipmentCoordinatorLabel": "Equipment Coordinator",
+    "equipmentCoordinatorUpdated": "Equipment Coordinator eligibility updated",
+    "equipmentCoordinatorUpdateFailed": "Failed to update Equipment Coordinator eligibility"
   },
   "layoutHebrew": {
     "home": "Home",

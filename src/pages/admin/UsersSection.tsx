@@ -3,6 +3,7 @@ import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-q
 import { api } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Select,
@@ -181,6 +182,17 @@ export function UsersSection() {
     onError: () => toast.error(t.adminPage.statusUpdateFailed),
   });
 
+  const setEquipmentCoordinatorMut = useMutation({
+    mutationFn: ({ id, isEquipmentCoordinator }: { id: string; isEquipmentCoordinator: boolean }) =>
+      api.users.setEquipmentCoordinator(id, isEquipmentCoordinator),
+    onSuccess: () => {
+      haptics.tap();
+      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      toast.success(t.adminPage.equipmentCoordinatorUpdated);
+    },
+    onError: () => toast.error(t.adminPage.equipmentCoordinatorUpdateFailed),
+  });
+
   const deleteUserMut = useMutation({
     mutationFn: (id: string) => api.users.delete(id),
     onSuccess: () => {
@@ -294,6 +306,22 @@ export function UsersSection() {
                   <p className="text-xs text-muted-foreground mt-0.5">
                     {t.adminPage.joined(formatDateByLocale(user.createdAt))}
                   </p>
+                  {(user.role === "technician" || user.role === "senior_technician") && (
+                    <label
+                      className="flex items-center gap-2 text-xs text-muted-foreground mt-2"
+                      data-testid={`equipment-coordinator-row-${user.id}`}
+                    >
+                      <Checkbox
+                        checked={!!user.isEquipmentCoordinator}
+                        onCheckedChange={(checked) =>
+                          setEquipmentCoordinatorMut.mutate({ id: user.id, isEquipmentCoordinator: checked })
+                        }
+                        disabled={setEquipmentCoordinatorMut.isPending}
+                        data-testid={`checkbox-equipment-coordinator-${user.id}`}
+                      />
+                      {t.adminPage.equipmentCoordinatorLabel}
+                    </label>
+                  )}
                   {user.status === "pending" && (
                     <div className="flex gap-2 mt-2">
                       <Button

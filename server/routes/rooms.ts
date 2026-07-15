@@ -54,7 +54,7 @@ router.get("/", requireAuth, async (req, res) => {
 
     const cutoff24h = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
-    const [counts, homedEquipment, clinicDocks] = await Promise.all([
+    const [counts, homedEquipment, clinicDocks, sweepAnchorRows] = await Promise.all([
       db
         .select({
           roomId: equipment.roomId,
@@ -79,7 +79,43 @@ router.get("/", requireAuth, async (req, res) => {
         .from(equipment)
         .where(and(eq(equipment.clinicId, clinicId), isNotNull(equipment.homeRoomId), isNull(equipment.deletedAt))),
       db.select().from(docks).where(eq(docks.clinicId, clinicId)),
+      // Per-room "last swept" (docking P3 T3.4-i-b Part A) — the most recent
+      // source:"sweep" anchor among items currently homed to the room, plus
+      // the asserter's display name. One query (join, not N+1): ordered by
+      // assertedAt DESC so the first row seen per roomId in the reduction
+      // below is the most recent.
+      db
+        .select({
+          roomId: equipment.homeRoomId,
+          assertedAt: equipmentAnchors.assertedAt,
+          sweeperName: users.name,
+          sweeperDisplayName: users.displayName,
+        })
+        .from(equipmentAnchors)
+        .innerJoin(
+          equipment,
+          and(eq(equipmentAnchors.equipmentId, equipment.id), eq(equipment.clinicId, clinicId)),
+        )
+        .leftJoin(users, and(eq(equipmentAnchors.assertedById, users.id), eq(users.clinicId, clinicId)))
+        .where(
+          and(
+            eq(equipmentAnchors.clinicId, clinicId),
+            eq(equipmentAnchors.source, "sweep"),
+            isNotNull(equipment.homeRoomId),
+            isNull(equipment.deletedAt),
+          ),
+        )
+        .orderBy(desc(equipmentAnchors.assertedAt)),
     ]);
+
+    const lastSweptByRoomId = new Map<string, { lastSweptAt: string; lastSweptByName: string | null }>();
+    for (const row of sweepAnchorRows) {
+      if (!row.roomId || lastSweptByRoomId.has(row.roomId)) continue;
+      lastSweptByRoomId.set(row.roomId, {
+        lastSweptAt: new Date(row.assertedAt).toISOString(),
+        lastSweptByName: row.sweeperDisplayName || row.sweeperName || null,
+      });
+    }
 
     const countMap = new Map(counts.map((c) => [c.roomId, c]));
 
@@ -136,6 +172,8 @@ router.get("/", requireAuth, async (req, res) => {
         recentlyVerifiedCount: recentlyVerified,
         expectedFill: roomExpected(room.id, homedEquipment),
         atHomeCount: atHomeCountByRoomId.get(room.id) ?? 0,
+        lastSweptAt: lastSweptByRoomId.get(room.id)?.lastSweptAt ?? null,
+        lastSweptByName: lastSweptByRoomId.get(room.id)?.lastSweptByName ?? null,
       };
     });
 

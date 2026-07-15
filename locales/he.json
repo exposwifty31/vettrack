@@ -1806,6 +1806,17 @@
     "noStationGroup": "ללא תחנה",
     "commitError": "הסריקה נכשלה — נסו שוב"
   },
+  "coordinator": {
+    "sweptPrefix": "נסרק לאחרונה",
+    "byName": "על ידי {name}",
+    "notSweptThisShift": "טרם נסרק במשמרת זו",
+    "withName": "רכז הציוד: {name}",
+    "toBeConfirmed": "רכז הציוד: טרם אושר",
+    "unassigned": "רכז הציוד: לא שובץ",
+    "choosePlaceholder": "בחר רכז ציוד",
+    "confirmSuccess": "רכז הציוד אושר",
+    "confirmError": "אישור רכז הציוד נכשל"
+  },
   "roomsListPage": {
     "selectRoomTitle": "בחר חדר",
     "selectRoomSubtitle": "בחר מהרשימה כדי לראות כאן פרטים",
@@ -2121,7 +2132,10 @@
     "cursorBugFixerFailed": "לא ניתן להפעיל את מתקן הבאגים של Cursor",
     "cursorBugFixerNotConfigured": "מתקן הבאגים של Cursor לא מוגדר במלואו בשרת",
     "secondaryRoleUpdated": "תפקיד משני עודכן",
-    "secondaryRoleUpdateFailed": "עדכון תפקיד משני נכשל"
+    "secondaryRoleUpdateFailed": "עדכון תפקיד משני נכשל",
+    "equipmentCoordinatorLabel": "רכז ציוד",
+    "equipmentCoordinatorUpdated": "זכאות רכז הציוד עודכנה",
+    "equipmentCoordinatorUpdateFailed": "עדכון זכאות רכז הציוד נכשל"
   },
   "layoutHebrew": {
     "home": "ראשי",

@@ -527,6 +527,8 @@ export interface TStructure {
       damageReportUndo: string;
       damageReportFailed: string;
       damageReportOffline: string;
+      reportedNotFound: string;
+      notFoundFailed: string;
     };
     backToList: string;
     notFound: string;
@@ -540,6 +542,7 @@ export interface TStructure {
     floorNoteSaveFailed: string;
     confirmHere: string;
     confirmedHere: string;
+    notFoundHere: string;
     scanCount: string;
     scanCountOnce: string;
     scanLogTab: string;
@@ -1101,6 +1104,9 @@ export interface TStructure {
     markedOk: string;
     statusUpdateFailed: string;
     subtitleEquipmentQr: string;
+    confirmHere: string;
+    confirmedHere: string;
+    confirmHereFailed: string;
   };
   onboarding: {
     step1: {
@@ -1787,6 +1793,33 @@ export interface TStructure {
     pilotStale: string;
     pilotRecent: string;
   };
+  roomSweep: {
+    title: string;
+    startSweep: string;
+    markAllPresent: string;
+    present: string;
+    notPresent: string;
+    withHolder: string;
+    checkedOutBadge: string;
+    confirmSweep: string;
+    summary: string;
+    sweptToast: string;
+    noHomedItems: string;
+    noHomedItemsHint: string;
+    noStationGroup: string;
+    commitError: string;
+  };
+  coordinator: {
+    sweptPrefix: string;
+    byName: string;
+    notSweptThisShift: string;
+    withName: string;
+    toBeConfirmed: string;
+    unassigned: string;
+    choosePlaceholder: string;
+    confirmSuccess: string;
+    confirmError: string;
+  };
   roomsListPage: {
     selectRoomTitle: string;
     selectRoomSubtitle: string;
@@ -2103,6 +2136,9 @@ export interface TStructure {
     cursorBugFixerNotConfigured: string;
     secondaryRoleUpdated: string;
     secondaryRoleUpdateFailed: string;
+    equipmentCoordinatorLabel: string;
+    equipmentCoordinatorUpdated: string;
+    equipmentCoordinatorUpdateFailed: string;
   };
   layoutHebrew: {
     home: string;
@@ -2931,6 +2967,9 @@ export interface TStructure {
       duplicateName: string;
       invalidReference: string;
       invalidEquipmentIds: string;
+      noHomeStation: string;
+      coordinatorForbidden: string;
+      coordinatorNotEligible: string;
     };
   };
   push: {
@@ -3352,6 +3391,10 @@ export interface TStructure {
     signInFirst: string;
   };
   staleCheckout: {
+    pushTitle: string;
+    pushBody: string;
+  };
+  staleReturned: {
     pushTitle: string;
     pushBody: string;
   };
@@ -4201,5 +4244,10 @@ export interface TStructure {
     damagedButton: string;
     damageWarning: string;
     confirmReturnedDamaged: string;
+    toggleLabelStation: string;
+    toggleLabelGeneric: string;
+    noHomeHint: string;
+    stationUnresolvedHint: string;
+    offlineDockHint: string;
   };
 }

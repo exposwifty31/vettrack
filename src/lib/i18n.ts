@@ -749,6 +749,12 @@ const translations = {
     sweptToast: (present: number, missing: number) => tr(d.roomSweep.sweptToast, { present, missing }),
   },
 
+  coordinator: {
+    ...d.coordinator,
+    byName: (name: string) => tr(d.coordinator.byName, { name }),
+    withName: (name: string) => tr(d.coordinator.withName, { name }),
+  },
+
   roomsListPage: {
     ...d.roomsListPage,
     subtitle: (count: number) => tr(d.roomsListPage.subtitle, { count }),

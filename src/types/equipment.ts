@@ -73,6 +73,10 @@ export interface Room {
   expectedFill?: number;
   /** Homed items currently classified "at_home" by the reconciliation ladder. */
   atHomeCount?: number;
+  /** Most recent source:"sweep" anchor among items homed to this room (docking P3 T3.4-i-b). */
+  lastSweptAt?: string | null;
+  /** Display name of whoever asserted that most recent sweep anchor. */
+  lastSweptByName?: string | null;
   /** Manual patient linked to this room (GET /api/rooms/:id). */
   linkedPatientName?: string | null;
 }
