@@ -1,0 +1,16 @@
+{
+  "//": "Isolated tsconfig for the native (Appium/WDIO) flow walk. The root tsconfig only includes src/lib/shared-contracts, so these files are never seen by `pnpm typecheck`; this config is what ts-node/WDIO uses when the native walk runs.",
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "types": ["node", "@wdio/globals/types", "@wdio/mocha-framework"],
+    "esModuleInterop": true,
+    "allowImportingTsExtensions": true,
+    "resolveJsonModule": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "noEmit": true
+  },
+  "include": ["*.ts", "*.e2e.ts", "../flow-inventory.manifest.ts"]
+}

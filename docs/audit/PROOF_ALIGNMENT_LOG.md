@@ -2958,3 +2958,20 @@ The 8 PASS include the load-bearing ones: `build 26 > last shipped 25`, no liter
 **Skipped/not applicable:** none of the 19 in-scope findings were skipped. All 13 fix-numbered findings (#1, #2, #3, #5, #6, #7, #9, #10, #11, #12, #13, #14, #15, #18, #20, #21, #22, #23 — 18 total, #10 appears in two clusters for the same file) were addressed with either a behavioral fix + RED→GREEN test, or (for #10/#14/#5, convention/trivial items with no meaningful failure mode to RED-test) a direct, verified code change.
 
 **Verdict:** VERIFIED — every finding fixed and grounded in real `file:line` evidence (not brief-summary trust); the 3 highest-risk claims (unique index actually applied to the DB, the concurrency race actually demonstrated RED before GREEN, the #7 roomId bug actually reproduced before the fix) were independently re-verified via revert-and-rerun rather than taken on faith. One flaky test found and fixed during verification (not swept under the rug). Full suite + both typechecks + i18n + architecture gates green. Single commit `993e42502`.
+
+---
+
+## Phase-10 flow-walk harness + offline-gate fix, re-based onto current main (2026-07-15)
+
+**Claim:** landed the flow-walk harness (`tests/flow-walk/`), a `.dockerignore`, and an offline-auth-gate reload-guard fix as a focused PR off current `main` — after discovering the original working branch (`fix/ios-phase0b-permission-prompts`) was a 96-commit-behind stale fork whose other work main had already merged independently (equipment checkout `e56d26bc0`, offline-toast `a666ee1c0`, secondaryRole series, audit #85).
+
+**Evidence checked (not asserted):**
+- **Manifest valid against main:** `pnpm exec vitest run tests/flow-walk/flow-inventory.manifest.test.ts` = **77/77** on `origin/main`'s `routes.tsx` — the 14 drift anchors + the T-31/WebOnlyGuard/CustodyGuard/management-console classifications all still match main's guard source (not the stale branch's).
+- **Offline-gate reconciled, not clobbered:** main already had a *different* partial fix (`retryConnection` throttle-noop fallback + `role="status"`/`aria-live`) but still reloaded on every `online` event — the spurious-online-discards-your-form bug was live on main. Layered my guard (`offlineRef` → recover only when the gate was showing) on top; all 8 of main's existing tests stay green (they start offline) + 1 new RED→GREEN test for the online-while-online case. `pnpm exec vitest` offline-gate = **9/9**.
+- **Supporting wiring re-applied to main's files** (not cherry-picked): `data-testid` on both error boundaries, `flow-walk` `PW_SUITE` entry, `test:playwright:flow-walk` script. `PW_SUITE=flow-walk playwright --list` → 5 role tests; `PW_SUITE=ci` unaffected.
+- **`.dockerignore`** mirrors main's (unchanged) `.railwayignore`; main has no prior `.dockerignore`.
+- **Gates:** `pnpm typecheck` PASS; full suite + architecture/i18n verified before the PR (below).
+
+**Not done / honest gaps:** the flow-walk itself is NOT executed (no `matrix.json`) — gated on a running app/sim, the Phase-10 step. Program-plan reconciliation from the stale branch was intentionally NOT ported (main's `program-plan.md` is 96 commits divergent — a separate task). The stale branch's iOS/equipment/permissions commits were dropped as duplicates of what main already has.
+
+**Verdict:** VERIFIED — net-new work re-based cleanly onto main, manifest re-validated against main's routes, offline fix reconciled with main's version + tested. Focused PR (supersedes closed #107).

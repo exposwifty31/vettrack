@@ -1,0 +1,23 @@
+{
+  "name": "vettrack-flow-walk-native",
+  "private": true,
+  "type": "module",
+  "description": "Isolated Appium/WebdriverIO harness for the Phase-10 III.6 native (iOS) flow walk. Deliberately NOT part of the root install so appium + the xcuitest driver are only fetched when the native walk is actually run (keeps CI + `pnpm install` lean).",
+  "scripts": {
+    "walk:iphone": "cross-env DEVICE=iphone wdio run ./wdio.conf.ts",
+    "walk:ipad": "cross-env DEVICE=ipad wdio run ./wdio.conf.ts",
+    "appium:doctor": "appium driver doctor xcuitest"
+  },
+  "devDependencies": {
+    "@wdio/cli": "^9.4.0",
+    "@wdio/globals": "^9.4.0",
+    "@wdio/local-runner": "^9.4.0",
+    "@wdio/mocha-framework": "^9.4.0",
+    "@wdio/spec-reporter": "^9.4.0",
+    "appium": "^3.0.0",
+    "appium-xcuitest-driver": "^11.0.0",
+    "cross-env": "^7.0.3",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.5.0"
+  }
+}

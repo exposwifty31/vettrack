@@ -61,7 +61,7 @@ export class PageErrorBoundary extends Component<Props, State> {
   render() {
     if (this.state.hasError) {
       return (
-        <div className="rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-5 flex flex-col items-center gap-3 text-center my-2">
+        <div className="rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-5 flex flex-col items-center gap-3 text-center my-2" data-testid="page-error-boundary">
           <AlertTriangle className="w-6 h-6 text-destructive opacity-70" />
           <div>
             <p className="text-sm font-medium text-foreground">

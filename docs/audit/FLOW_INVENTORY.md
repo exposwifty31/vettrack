@@ -11,6 +11,19 @@ Per rule III.6, every flow in the app must be provable 100% functioning across p
 
 **Status legend (for the live walk):** `pass` · `broken` · `degraded` · `unreachable` · `⏳ pending` (not yet walked).
 
+> **Executable harness (2026-07-15).** This inventory is now machine-readable +
+> walkable: `tests/flow-walk/` (see its `README.md`). `flow-inventory.manifest.ts`
+> is the reconciled row set (web via Playwright, iPhone/iPad via Appium);
+> `flow-inventory.manifest.test.ts` is a **drift guard** that fails if a route's
+> guard classification diverges from `src/app/routes.tsx`. Run the web/board walk
+> with `pnpm dev` + `pnpm test:playwright:flow-walk`. Two corrections it encodes that
+> this table (generated 2026-07-06) predates: several rows are now redirects
+> (`/equipment/scan|maintenance|intelligence`, `/shift-handover`, `/pending*`,
+> `/equipment/board`·`/display`→`/board`), and **the desktop web app is
+> management-only** (T-31/R-WEB-01: `AuthGuard` shows `ManagementWebGate` to
+> non-`management.web` roles on every desktop route — the per-role notes below
+> describe the *native* target, where that gate is inert).
+
 ## Platform availability rules (verified from guards)
 
 | Guard (in `routes.tsx`) | iPhone | iPad | Web (≥1024) | Board | Marketing |
