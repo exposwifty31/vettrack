@@ -1,0 +1,56 @@
+# Mirrors .railwayignore so a local `docker build .` matches the Railway upload
+# context. Railway's DOCKERFILE builder already filters by .railwayignore before
+# the build, so this file is belt-and-suspenders: it also protects plain
+# `docker build .` (which ignores .railwayignore) from the ~4 GB tree + a host
+# node_modules clobbering the clean `pnpm install --frozen-lockfile` layer.
+#
+# The Dockerfile installs deps and runs `vite build` INSIDE the image, so
+# node_modules/ and dist/ are intentionally excluded (regenerated in-image).
+# Runtime dirs the Express server needs at `pnpm start` (server/, lib/, shared/,
+# shared-contracts/, locales/, migrations/, public/, scripts/, src/) are NOT listed.
+
+# VCS
+.git/
+.gitignore
+
+# Dependencies and build output — reinstalled + rebuilt in-image (Dockerfile)
+node_modules/
+dist/
+build/
+.pnpm-store/
+
+# Agent / IDE tooling — not part of runtime
+.claude/
+.agents/
+.cursor/
+
+# Mobile native projects — not needed for the server build/runtime
+ios/
+android/
+
+# Docs + dev assets — not served by the Express app (@assets alias unused in source)
+docs/
+attached_assets/
+
+# Tests, coverage, and test/report artifacts — not part of the deployable server
+tests/
+coverage/
+artifacts/
+playwright-report/
+playwright-ui-screenshots/
+blob-report/
+test-results/
+load/
+
+# Secrets — never bake local env into an image (keep the checked-in example)
+.env
+.env.*
+!.env.example
+
+# Local dev cruft
+*.log
+*.bak
+*.tmp
+.tmp-*
+_tmp_*
+pilot-vars-backup.txt

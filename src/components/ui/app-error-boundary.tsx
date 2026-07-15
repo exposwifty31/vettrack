@@ -84,7 +84,7 @@ export class AppErrorBoundary extends Component<Props, State> {
     if (!this.state.hasError) return this.props.children;
 
     return (
-      <div className="min-h-screen flex items-center justify-center p-6 bg-background">
+      <div className="min-h-screen flex items-center justify-center p-6 bg-background" data-testid="app-error-boundary">
         <div className="w-full max-w-md rounded-2xl border border-destructive/30 bg-destructive/5 p-6 flex flex-col items-center gap-4 text-center">
           <AlertTriangle className="w-8 h-8 text-destructive opacity-80" />
           <div className="space-y-1">

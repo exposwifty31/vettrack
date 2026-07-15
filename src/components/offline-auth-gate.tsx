@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { t } from "@/lib/i18n";
 import { isOnline, safeReloadPage } from "@/lib/safe-browser";
 import { Button } from "@/components/ui/button";
@@ -17,6 +17,10 @@ import { Button } from "@/components/ui/button";
  */
 export function OfflineAuthGate({ children }: { children: ReactNode }) {
   const [offline, setOffline] = useState(() => !isOnline());
+  // Read the latest `offline` inside the once-bound `online` listener without a
+  // stale closure, so it can tell a real recovery from a spurious event.
+  const offlineRef = useRef(offline);
+  offlineRef.current = offline;
 
   // Reload to pick up the freshly-online clerk-js. `safeReloadPage()` can refuse
   // (its 5s guard returns false) — in that case, don't leave the user stranded
@@ -30,12 +34,23 @@ export function OfflineAuthGate({ children }: { children: ReactNode }) {
   useEffect(() => {
     // Re-sync in case connectivity changed between the initializer and mount.
     setOffline(!isOnline());
-    const handleOffline = () => setOffline(true);
+    const handleOffline = () => {
+      // Update the ref eagerly (not just on the next render) so a rapid
+      // offline→online sequence still sees `true` in handleOnline and recovers.
+      offlineRef.current = true;
+      setOffline(true);
+    };
+    // Only recover on `online` if the gate was actually showing. Browsers/WebViews
+    // (Capacitor app-resume, interface flapping) fire spurious `online` events while
+    // already online — reloading then would discard the user's in-progress form.
+    const handleOnline = () => {
+      if (offlineRef.current) retryConnection();
+    };
     window.addEventListener("offline", handleOffline);
-    window.addEventListener("online", retryConnection);
+    window.addEventListener("online", handleOnline);
     return () => {
       window.removeEventListener("offline", handleOffline);
-      window.removeEventListener("online", retryConnection);
+      window.removeEventListener("online", handleOnline);
     };
   }, [retryConnection]);
 
