@@ -28,6 +28,7 @@ import {
   registerServiceWorkerSafe,
 } from "@/lib/safe-browser";
 import { isCapacitorNative } from "@/lib/capacitor-runtime";
+import { isClerkEnabled } from "@/lib/auth-fetch";
 import { clerkProviderPropsForRuntime } from "@/lib/clerk-capacitor-config";
 import { ClerkLocaleBridge } from "@/components/clerk-locale-bridge";
 import { ensureActiveLocaleLoaded } from "@/lib/i18n";
@@ -49,7 +50,7 @@ function GlobalShiftChat() {
 }
 
 const PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
-const CLERK_ENABLED = Boolean(PUBLISHABLE_KEY);
+const CLERK_ENABLED = isClerkEnabled();
 
 // Local auth mode contract (deterministic):
 //   VITE_CLERK_PUBLISHABLE_KEY present => Clerk mode

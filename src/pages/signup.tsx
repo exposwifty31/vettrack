@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { readCarriedRole } from "@/features/auth/requested-role-store";
 import { ClerkFailed, ClerkLoaded, ClerkLoading, SignUp } from "@clerk/clerk-react";
 import { useAuth } from "@/hooks/use-auth";
+import { isClerkEnabled } from "@/lib/auth-fetch";
 import { getClerkAppearance, getClerkAppearanceNative } from "@/lib/clerk-appearance";
 import { useIsDarkActive } from "@/hooks/use-settings";
 import { isCapacitorNative } from "@/lib/capacitor-runtime";
@@ -18,7 +19,7 @@ import { NativeSocialButtons } from "@/components/native-social-buttons";
 import { OfflineAuthGate } from "@/components/offline-auth-gate";
 import { LegalFooterLinks } from "@/components/legal-footer-links";
 
-const CLERK_PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY as string | undefined;
+const CLERK_ENABLED = isClerkEnabled();
 
 export default function SignUpPage() {
   const isNative = isCapacitorNative();
@@ -86,7 +87,7 @@ export default function SignUpPage() {
             </div>
           )}
 
-          {CLERK_PUBLISHABLE_KEY ? (
+          {CLERK_ENABLED ? (
             <div className="flex flex-col items-center gap-4 w-full">
               <ClerkLoading>
                 <div className="flex w-full min-h-[12rem] justify-center items-center" aria-busy>

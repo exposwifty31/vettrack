@@ -2,7 +2,7 @@ import { createContext, useContext, useState, useEffect, useCallback, useMemo, u
 import type { Shift, ShiftRole, UserRole } from "@/types";
 import type { AuthoritySnapshot } from "../../shared/authority.js";
 import { setAuthState, setCurrentClinicId } from "@/lib/auth-store";
-import { isValidJwt, setClerkTokenGetter } from "@/lib/auth-fetch";
+import { isClerkEnabled, isValidJwt, setClerkTokenGetter } from "@/lib/auth-fetch";
 import { useUser, useAuth as useClerkAuth } from "@clerk/clerk-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { restoreOfflineSession, saveOfflineSession, clearOfflineSession } from "@/lib/offline-session";
@@ -547,7 +547,7 @@ function ClerkModeAuthProvider({ children }: { children: ReactNode }) {
 }
 
 export function ClerkAuthProviderInner({ children }: { children: ReactNode }) {
-  if (Boolean(import.meta.env.VITE_CLERK_PUBLISHABLE_KEY)) {
+  if (isClerkEnabled()) {
     return <ClerkModeAuthProvider>{children}</ClerkModeAuthProvider>;
   }
   return <DevAuthProviderInner>{children}</DevAuthProviderInner>;

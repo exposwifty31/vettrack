@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Link, useLocation } from "wouter";
 import { Helmet } from "react-helmet-async";
 import { Loader2 } from "lucide-react";
@@ -8,6 +8,7 @@ import { RoleChips, type SignupRequestedRole } from "@/features/auth/components/
 import { readCarriedRole, writeCarriedRole } from "@/features/auth/requested-role-store";
 import { ClerkFailed, ClerkLoaded, ClerkLoading, SignIn, useUser } from "@clerk/clerk-react";
 import { useAuth } from "@/hooks/use-auth";
+import { isClerkEnabled } from "@/lib/auth-fetch";
 import { PhoneSignIn } from "@/components/phone-sign-in";
 import { getClerkAppearance, getClerkAppearanceNative } from "@/lib/clerk-appearance";
 import { useIsDarkActive } from "@/hooks/use-settings";
@@ -18,12 +19,42 @@ import { NativeSocialButtons } from "@/components/native-social-buttons";
 import { OfflineAuthGate } from "@/components/offline-auth-gate";
 import { LegalFooterLinks } from "@/components/legal-footer-links";
 
-const CLERK_PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY as string | undefined;
+const CLERK_ENABLED = isClerkEnabled();
+
+/**
+ * Clerk-mode-only bootstrap gate. `useUser` is valid ONLY under a mounted
+ * ClerkProvider (Clerk's rule — "useUser can only be used within <ClerkProvider>"),
+ * so this — the sign-in page's only `useUser` caller — renders exclusively when
+ * `CLERK_ENABLED`; in dev-bypass the provider isn't mounted and calling `useUser`
+ * would crash. While a Clerk session exists but VetTrack hasn't confirmed sign-in,
+ * show the bootstrap spinner (do NOT mount <SignIn> — it auto-redirects to /home and
+ * races AuthGuard into a /home ↔ /signin loop). Otherwise render the page.
+ */
+function ClerkSignInBootstrapGate({
+  vtSignedIn,
+  children,
+}: {
+  vtSignedIn: boolean;
+  children: ReactNode;
+}) {
+  const { isLoaded: clerkLoaded, isSignedIn: clerkSignedIn } = useUser();
+  if (clerkLoaded && clerkSignedIn && !vtSignedIn) {
+    return (
+      <>
+        <Helmet>
+          <title>{t.authPage.signInMetaTitle}</title>
+          <meta name="robots" content="noindex" />
+        </Helmet>
+        <AuthBootstrapSpinner />
+      </>
+    );
+  }
+  return <>{children}</>;
+}
 
 export default function SignInPage() {
   const isNative = isCapacitorNative();
   const { isLoaded, isSignedIn } = useAuth();
-  const { isLoaded: clerkLoaded, isSignedIn: clerkSignedIn } = useUser();
   const [, navigate] = useLocation();
   const [usePhoneFlow, setUsePhoneFlow] = useState(false);
   // C5: pre-choosing a role here carries it to the sign-up screen.
@@ -36,22 +67,7 @@ export default function SignInPage() {
     }
   }, [isLoaded, isSignedIn, navigate]);
 
-  // Clerk session exists but VetTrack context has not confirmed sign-in yet.
-  // Do NOT mount <SignIn> — it auto-redirects to fallbackRedirectUrl (/home) while
-  // AuthGuard still sees isSignedIn=false → /home ↔ /signin redirect loop.
-  if (clerkLoaded && clerkSignedIn && !isSignedIn) {
-    return (
-      <>
-        <Helmet>
-          <title>{t.authPage.signInMetaTitle}</title>
-          <meta name="robots" content="noindex" />
-        </Helmet>
-        <AuthBootstrapSpinner />
-      </>
-    );
-  }
-
-  return (
+  const page = (
     <>
       <Helmet>
         <title>{t.authPage.signInMetaTitle}</title>
@@ -82,7 +98,7 @@ export default function SignInPage() {
             }}
           />
 
-          {CLERK_PUBLISHABLE_KEY ? (
+          {CLERK_ENABLED ? (
             <div className="flex flex-col items-center gap-4">
               {usePhoneFlow ? (
                 <>
@@ -164,5 +180,11 @@ export default function SignInPage() {
         </div>
       </div>
     </>
+  );
+
+  return CLERK_ENABLED ? (
+    <ClerkSignInBootstrapGate vtSignedIn={isSignedIn}>{page}</ClerkSignInBootstrapGate>
+  ) : (
+    page
   );
 }

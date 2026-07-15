@@ -18,11 +18,34 @@ export function isValidJwt(token?: string | null): boolean {
   return !!token && token.split(".").length === 3;
 }
 
-function isClerkEnabledForFetch(): boolean {
-  const env = (import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env;
+/**
+ * Whether the CLIENT runs in Clerk auth mode. SINGLE SOURCE OF TRUTH — every
+ * client-side auth-mode branch (main.tsx, App.tsx, routes.tsx, use-auth.tsx,
+ * signin/signup) routes through this so the mode is always coherent (a partial
+ * split produces a half-Clerk hybrid that crashes `useUser`).
+ *
+ * A Clerk publishable key => Clerk mode, EXCEPT the dev-only force-bypass escape
+ * hatch: `VITE_FORCE_DEV_BYPASS=true` runs dev-bypass even with a key present, so
+ * role-cycling tooling (the flow-walk, the DevRoleSwitcher) works without editing
+ * `.env`. It is gated on `import.meta.env.DEV`, so a production/native build
+ * (DEV=false) ALWAYS runs Clerk when a key is present — the flag can NEVER weaken
+ * production auth. In node/test (`DEV` undefined) it is inert, so `isClerkEnabled`
+ * stays byte-identical to the old `Boolean(key)` there.
+ */
+export function isClerkEnabled(): boolean {
+  const env = (import.meta as ImportMeta & { env?: Record<string, string | boolean | undefined> }).env;
   const processEnv =
     typeof process !== "undefined" ? (process as { env?: Record<string, string | undefined> }).env : undefined;
-  return Boolean(env?.VITE_CLERK_PUBLISHABLE_KEY || processEnv?.VITE_CLERK_PUBLISHABLE_KEY);
+  const hasKey = Boolean(env?.VITE_CLERK_PUBLISHABLE_KEY || processEnv?.VITE_CLERK_PUBLISHABLE_KEY);
+  if (!hasKey) return false;
+  const isDev = env?.DEV === true;
+  const forcedBypass =
+    (env?.VITE_FORCE_DEV_BYPASS ?? processEnv?.VITE_FORCE_DEV_BYPASS) === "true";
+  return !(isDev && forcedBypass);
+}
+
+function isClerkEnabledForFetch(): boolean {
+  return isClerkEnabled();
 }
 
 /** localStorage key for the dev-only role override (dev-bypass builds only). */
