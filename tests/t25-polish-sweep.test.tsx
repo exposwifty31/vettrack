@@ -34,7 +34,7 @@ describe("T25.1 — rooms empty-state noun", () => {
   it("RoomsMasterDetail.tsx actually wires the room-specific copy into the placeholder", async () => {
     vi.doMock("@/pages/rooms-list", () => ({ default: () => <div data-testid="stub-rooms-list" /> }));
     vi.doMock("@/pages/room-radar", () => ({ default: () => <div data-testid="stub-room-radar" /> }));
-    const { default: RoomsMasterDetail } = await import("@/features/rooms/tablet/RoomsMasterDetail");
+    const { default: RoomsMasterDetail } = await import("@/native/tablet/RoomsMasterDetail");
     const { hook } = memoryLocation({ path: "/rooms" });
     render(
       <Router hook={hook}>
