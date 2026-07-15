@@ -156,7 +156,11 @@ describe("flow-walk manifest — drift guard vs routes.tsx", () => {
         expect(tok.redirect, `${path} should be a Redirect`).toBe(true);
         break;
       case "kiosk":
-        expect(tok.auth && !tok.webOnly && !tok.redirect, `${path} should be AuthGuard-only kiosk`).toBe(true);
+        // Distinct from plain "auth": the kiosk must render BoardShell, not merely be
+        // AuthGuard-only — otherwise a silent /board → plain-AuthGuard-page regression
+        // would slip past this drift guard.
+        expect(tok.auth && !tok.webOnly && !tok.redirect, `${path} should be AuthGuard-only`).toBe(true);
+        expect(seg!.includes("BoardShell"), `${path} should render BoardShell (kiosk)`).toBe(true);
         break;
       case "web-only":
         expect(tok.webOnly && !tok.management, `${path} should be WebOnlyGuard w/o ManagementGuard`).toBe(true);

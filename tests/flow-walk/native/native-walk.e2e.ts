@@ -68,14 +68,14 @@ async function navigate(path: string): Promise<void> {
 }
 
 async function currentPath(): Promise<string> {
-  return browser.execute(() => window.location.pathname + window.location.search) as Promise<string>;
+  return browser.execute<string, []>(() => window.location.pathname + window.location.search);
 }
 
 async function isVisible(testid: string): Promise<boolean> {
-  return browser.execute((id: string) => {
+  return browser.execute<boolean, [string]>((id: string) => {
     const el = document.querySelector(`[data-testid="${id}"]`);
     return !!el && (el as HTMLElement).offsetParent !== null;
-  }, testid) as Promise<boolean>;
+  }, testid);
 }
 
 /** iPad-native serves some rows via a master-detail route, but the base path still matches. */

@@ -106,6 +106,22 @@ describe("OfflineAuthGate", () => {
     expect(screen.getByTestId("clerk-form")).toBeTruthy();
   });
 
+  it("recovers on a rapid offline→online sequence (offline ref updated eagerly)", () => {
+    // If the ref only updated on render, the `online` handler would read a stale
+    // `false` and skip recovery, leaving the gate stuck. handleOffline sets it eagerly.
+    isOnlineMock.mockReturnValue(true);
+    safeReloadPageMock.mockReturnValue(true);
+    renderGate();
+    expect(screen.getByTestId("clerk-form")).toBeTruthy();
+
+    act(() => {
+      window.dispatchEvent(new Event("offline"));
+      window.dispatchEvent(new Event("online"));
+    });
+
+    expect(safeReloadPageMock).toHaveBeenCalledTimes(1);
+  });
+
   it("attempts a reload when the Retry button is pressed", () => {
     isOnlineMock.mockReturnValue(false);
     safeReloadPageMock.mockReturnValue(true);

@@ -172,6 +172,14 @@ export function evaluateRow(args: {
     if (!redirectMatches(finalUrl, expected.to)) {
       return { status: mismatchStatus, notes: `redirected to ${relativePath(finalUrl)}, expected ${expected.to}` };
     }
+    // The redirect matched — but the destination must also be healthy, or a flow
+    // that redirects onto a crashed/erroring page would be graded a false "pass".
+    if (surfaces.hasCrash) {
+      return { status: "broken", notes: `redirect landed on a crashed page (${relativePath(finalUrl)})` };
+    }
+    if (consoleErrors.length > 0) {
+      return { status: "degraded", notes: `redirect landed with ${consoleErrors.length} console error(s)` };
+    }
     return { status: "pass" };
   }
 

@@ -33,14 +33,24 @@ export type Guard =
   | "kiosk" // /board — AuthGuard only, BoardShell kiosk (board/web)
   | "redirect"; // pure <Redirect> — no page renders
 
-/** Terminal state a walk row is expected to reach on a given platform. */
+/**
+ * Terminal state a walk row is expected to reach on a given platform.
+ *
+ * Note: `guard-screen` and `access-denied` are **observed-only** — `classifyActual`
+ * (walk-helpers) returns them to name a wrong-surface if one appears, but the
+ * expected-outcome derivations never produce them by design: the web walk runs at a
+ * desktop viewport (so WebOnlyGuard renders rather than showing its <1024 screen) and
+ * the T-31 console gate preempts ManagementGuard's inline denial. They exist so a
+ * WebOnlyGuard/ManagementGuard route that *wrongly* renders one of those surfaces is
+ * caught as a mismatch instead of silently graded "render".
+ */
 export type OutcomeKind =
   | "render" // page renders without a crash surface
   | "redirect" // navigates away to `to`
   | "guard-redirect" // WebOnlyGuard native redirect to /home
-  | "guard-screen" // WebOnlyGuard mobile-browser (<1024) dark guard screen
+  | "guard-screen" // WebOnlyGuard mobile-browser (<1024) dark guard screen — observed-only
   | "management-web-gate" // AuthGuard desktop gate (T-31/R-WEB-01) — non-management.web role on the web console
-  | "access-denied" // ManagementGuard inline "not authorized" surface
+  | "access-denied" // ManagementGuard inline "not authorized" surface — observed-only
   | "kiosk"; // BoardShell kiosk chrome
 
 /** Coarse role gating, from the guard wrapping the route. */
@@ -118,7 +128,7 @@ export const FLOW_ROWS: FlowRow[] = [
 
   // ── Core operational (AuthGuard) — FLOW_INVENTORY §Core operational ──
   { id: "home", group: "core", paths: ["/home", "/"], guard: "auth", platforms: ["iphone", "ipad", "web", "board"], roleGating: "open", notes: "RootRoute: '/' resolves to home under auth, marketing landing when signed out." },
-  { id: "equipment-list", group: "core", paths: ["/equipment"], guard: "auth", platforms: ["iphone", "web"], roleGating: "open", tabletMasterDetail: true, notes: "iPad-native swaps /equipment list for /equipment/:id? master-detail (routes.tsx isNativeTablet)." },
+  { id: "equipment-list", group: "core", paths: ["/equipment"], guard: "auth", platforms: ["iphone", "ipad", "web"], roleGating: "open", tabletMasterDetail: true, notes: "iPad-native serves /equipment via the /equipment/:id? master-detail (routes.tsx isNativeTablet); the base path still resolves there." },
   { id: "equipment-new", group: "core", paths: ["/equipment/new"], guard: "auth", platforms: ["iphone", "ipad", "web"], roleGating: "open" },
   { id: "equipment-detail", group: "core", paths: ["/equipment/eq1"], guard: "auth", platforms: ["iphone", "ipad", "web"], roleGating: "open", notes: "Device audit gotcha: non-UUID ids like 'eq1' may 404 against a real DB; walk against a seeded id." },
   { id: "equipment-edit", group: "core", paths: ["/equipment/eq1/edit"], guard: "auth", platforms: ["iphone", "ipad", "web"], roleGating: "open" },
@@ -136,7 +146,7 @@ export const FLOW_ROWS: FlowRow[] = [
   { id: "handoff", group: "core", paths: ["/handoff"], guard: "auth", platforms: ["iphone", "ipad", "web"], roleGating: "open" },
   { id: "emergency-kit", group: "core", paths: ["/critical-kit-check", "/emergency-equipment-log", "/emergency-equipment-history"], guard: "auth", platforms: ["iphone", "ipad", "web"], roleGating: "open" },
   { id: "inventory", group: "core", paths: ["/inventory"], guard: "auth", platforms: ["iphone", "ipad", "web"], roleGating: "open" },
-  { id: "inventory-items", group: "core", paths: ["/inventory-items"], guard: "auth", platforms: ["iphone", "web"], roleGating: "open", tabletMasterDetail: true, notes: "iPad-native uses /inventory-items/:id? master-detail." },
+  { id: "inventory-items", group: "core", paths: ["/inventory-items"], guard: "auth", platforms: ["iphone", "ipad", "web"], roleGating: "open", tabletMasterDetail: true, notes: "iPad-native serves /inventory-items via the /inventory-items/:id? master-detail; the base path still resolves there." },
   { id: "app-surfaces", group: "core", paths: ["/settings", "/help", "/whats-new"], guard: "auth", platforms: ["iphone", "ipad", "web"], roleGating: "open", notes: "/stability and /app-tour now redirect to /home (see app-surfaces-redirect)." },
   { id: "app-surfaces-redirect", group: "core", paths: ["/stability", "/app-tour"], guard: "redirect", platforms: ["iphone", "ipad", "web"], roleGating: "open", redirectTo: "/home", drift: true, notes: "DRIFT: doc §Core listed /stability + /app-tour as surfaces; now redirect to /home." },
   { id: "shift-chat", group: "core", paths: ["/shift-chat/s1"], guard: "auth", platforms: ["iphone", "ipad", "web"], roleGating: "open" },

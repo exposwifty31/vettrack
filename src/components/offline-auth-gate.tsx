@@ -34,7 +34,12 @@ export function OfflineAuthGate({ children }: { children: ReactNode }) {
   useEffect(() => {
     // Re-sync in case connectivity changed between the initializer and mount.
     setOffline(!isOnline());
-    const handleOffline = () => setOffline(true);
+    const handleOffline = () => {
+      // Update the ref eagerly (not just on the next render) so a rapid
+      // offline→online sequence still sees `true` in handleOnline and recovers.
+      offlineRef.current = true;
+      setOffline(true);
+    };
     // Only recover on `online` if the gate was actually showing. Browsers/WebViews
     // (Capacitor app-resume, interface flapping) fire spurious `online` events while
     // already online — reloading then would discard the user's in-progress form.
