@@ -25,6 +25,14 @@ import { randomUUID } from "crypto";
 const DATABASE_URL = process.env.DATABASE_URL ?? "";
 let probePool: Pool | null = null;
 
+/** The initialized probe pool, or a contextual throw if setup didn't run. */
+function requireProbePool(): Pool {
+  if (!probePool) {
+    throw new Error("probePool is not initialized — DB integration setup (beforeAll) did not run");
+  }
+  return probePool;
+}
+
 let currentClinicId = "";
 let currentUserId = "";
 const currentUserRole = "admin";
@@ -62,6 +70,12 @@ function isRecord(val: unknown): val is Record<string, unknown> {
   return val !== null && typeof val === "object" && !Array.isArray(val);
 }
 
+/** Assert an unknown value is an array of records before field access (no `as` cast). */
+function asRecordArray(val: unknown): Array<Record<string, unknown>> {
+  if (!Array.isArray(val)) throw new Error("Expected value to be an array");
+  return val.filter(isRecord);
+}
+
 async function api(path: string): Promise<{ status: number; json: unknown }> {
   const res = await fetch(`${baseUrl}${path}`, { headers: { "Content-Type": "application/json" } });
   let json: unknown = {};
@@ -77,11 +91,11 @@ async function api(path: string): Promise<{ status: number; json: unknown }> {
 }
 
 async function seedClinic(clinicId: string) {
-  await probePool!.query(`INSERT INTO vt_clinics (id) VALUES ($1) ON CONFLICT DO NOTHING`, [clinicId]);
+  await requireProbePool().query(`INSERT INTO vt_clinics (id) VALUES ($1) ON CONFLICT DO NOTHING`, [clinicId]);
 }
 
 async function seedUser(userId: string, clinicId: string) {
-  await probePool!.query(
+  await requireProbePool().query(
     `INSERT INTO vt_users (id, clinic_id, clerk_id, email, name, role, status, preferred_locale)
      VALUES ($1, $2, $3, $4, $5, 'admin', 'active', 'en')
      ON CONFLICT DO NOTHING`,
@@ -90,21 +104,21 @@ async function seedUser(userId: string, clinicId: string) {
 }
 
 async function seedRoom(roomId: string, clinicId: string, name: string) {
-  await probePool!.query(
+  await requireProbePool().query(
     `INSERT INTO vt_rooms (id, clinic_id, name) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`,
     [roomId, clinicId, name],
   );
 }
 
 async function seedAssetType(assetTypeId: string, clinicId: string, name: string) {
-  await probePool!.query(
+  await requireProbePool().query(
     `INSERT INTO vt_asset_types (id, clinic_id, name) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`,
     [assetTypeId, clinicId, name],
   );
 }
 
 async function seedDock(dockId: string, clinicId: string, roomId: string, assetTypeId: string, name: string) {
-  await probePool!.query(
+  await requireProbePool().query(
     `INSERT INTO vt_docks (id, clinic_id, name, room_id, asset_type_id, capacity)
      VALUES ($1, $2, $3, $4, $5, 4) ON CONFLICT DO NOTHING`,
     [dockId, clinicId, name, roomId, assetTypeId],
@@ -127,7 +141,7 @@ async function seedEquipment(
   // so tests asserting both metrics need an item that is actually present
   // where it's homed unless a test deliberately wants them to diverge.
   const homeRoomId = overrides.homeRoomId ?? null;
-  await probePool!.query(
+  await requireProbePool().query(
     `INSERT INTO vt_equipment
        (id, clinic_id, name, status, version, room_id, home_room_id, asset_type_id, custody_state, checked_out_by_id)
      VALUES ($1, $2, $3, 'ok', 1, $4, $5, $6, $7, $8)`,
@@ -145,7 +159,7 @@ async function seedEquipment(
 }
 
 async function purgeClinic(clinicId: string) {
-  const P = probePool!;
+  const P = requireProbePool();
   await P.query(`DELETE FROM vt_equipment_anchors WHERE clinic_id = $1`, [clinicId]);
   await P.query(`DELETE FROM vt_equipment WHERE clinic_id = $1`, [clinicId]);
   await P.query(`DELETE FROM vt_docks WHERE clinic_id = $1`, [clinicId]);
@@ -232,7 +246,7 @@ describe.skipIf(!DATABASE_URL)("GET /api/rooms — present-vs-expected readiness
   });
 
   it("confirms the DB was actually reached (sanity)", async () => {
-    const { rows } = await probePool!.query("SELECT 1 AS ok");
+    const { rows } = await requireProbePool().query("SELECT 1 AS ok");
     expect(rows[0]?.ok).toBe(1);
   });
 
@@ -263,7 +277,7 @@ describe.skipIf(!DATABASE_URL)("GET /api/rooms — present-vs-expected readiness
 
     expect(res.status).toBe(200);
     expect(Array.isArray(res.json)).toBe(true);
-    const rooms = res.json as Array<Record<string, unknown>>;
+    const rooms = asRecordArray(res.json);
     const icu = rooms.find((r) => r.id === ctx.roomId);
     expect(icu).toBeDefined();
     expect(icu!.expectedFill).toBe(3);
@@ -276,7 +290,7 @@ describe.skipIf(!DATABASE_URL)("GET /api/rooms — present-vs-expected readiness
     const res = await api("/api/rooms");
 
     expect(res.status).toBe(200);
-    const rooms = res.json as Array<Record<string, unknown>>;
+    const rooms = asRecordArray(res.json);
     const storage = rooms.find((r) => r.id === ctx.emptyRoomId);
     expect(storage).toBeDefined();
     expect(storage!.expectedFill).toBe(0);
@@ -294,7 +308,7 @@ describe.skipIf(!DATABASE_URL)("GET /api/rooms — present-vs-expected readiness
 
     const res = await api("/api/rooms");
     expect(res.status).toBe(200);
-    const rooms = res.json as Array<Record<string, unknown>>;
+    const rooms = asRecordArray(res.json);
     const icu = rooms.find((r) => r.id === ctx.roomId);
     expect(icu).toBeDefined();
     expect(icu!.expectedFill).toBe(0);
@@ -315,7 +329,7 @@ describe.skipIf(!DATABASE_URL)("GET /api/rooms — present-vs-expected readiness
 
     const res = await api("/api/rooms");
     expect(res.status).toBe(200);
-    const rooms = res.json as Array<Record<string, unknown>>;
+    const rooms = asRecordArray(res.json);
     const icu = rooms.find((r) => r.id === ctx.roomId);
     expect(icu).toBeDefined();
     expect(icu!.expectedFill).toBe(1);
@@ -352,7 +366,7 @@ describe.skipIf(!DATABASE_URL)("GET /api/rooms — present-vs-expected readiness
     try {
       const res = await api("/api/rooms");
       expect(res.status).toBe(200);
-      const rooms = res.json as Array<Record<string, unknown>>;
+      const rooms = asRecordArray(res.json);
 
       // Clinic B's room is entirely invisible in clinic A's list.
       expect(rooms.some((r) => r.id === otherRoomId)).toBe(false);
@@ -363,7 +377,7 @@ describe.skipIf(!DATABASE_URL)("GET /api/rooms — present-vs-expected readiness
       expect(storage!.expectedFill).toBe(0);
       expect(storage!.atHomeCount).toBe(0);
     } finally {
-      const P = probePool!;
+      const P = requireProbePool();
       await P.query(`DELETE FROM vt_equipment_anchors WHERE clinic_id = $1`, [otherClinicId]);
       await P.query(`DELETE FROM vt_equipment WHERE clinic_id = $1`, [otherClinicId]);
       await P.query(`DELETE FROM vt_docks WHERE clinic_id = $1`, [otherClinicId]);

@@ -30,6 +30,14 @@ import { i18nMiddleware } from "../lib/i18n/middleware.js";
 const DATABASE_URL = process.env.DATABASE_URL ?? "";
 let probePool: Pool | null = null;
 
+/** The initialized probe pool, or a contextual throw if setup didn't run. */
+function requireProbePool(): Pool {
+  if (!probePool) {
+    throw new Error("probePool is not initialized — DB integration setup (beforeAll) did not run");
+  }
+  return probePool;
+}
+
 let currentClinicId = "";
 let currentUserId = "";
 let currentUserRole = "admin";
@@ -85,6 +93,12 @@ function isRecord(val: unknown): val is Record<string, unknown> {
   return val !== null && typeof val === "object" && !Array.isArray(val);
 }
 
+/** Assert an unknown value is an array of records before field access (no `as` cast). */
+function asRecordArray(val: unknown): Array<Record<string, unknown>> {
+  if (!Array.isArray(val)) throw new Error("Expected value to be an array");
+  return val.filter(isRecord);
+}
+
 function getString(obj: Record<string, unknown>, key: string): string | undefined {
   const val = obj[key];
   return typeof val === "string" ? val : undefined;
@@ -113,7 +127,7 @@ async function api(
 }
 
 async function seedClinic(clinicId: string) {
-  await probePool!.query(`INSERT INTO vt_clinics (id) VALUES ($1) ON CONFLICT DO NOTHING`, [clinicId]);
+  await requireProbePool().query(`INSERT INTO vt_clinics (id) VALUES ($1) ON CONFLICT DO NOTHING`, [clinicId]);
 }
 
 async function seedUser(
@@ -121,7 +135,7 @@ async function seedUser(
   clinicId: string,
   opts: { name: string; role?: string; isEquipmentCoordinator?: boolean },
 ) {
-  await probePool!.query(
+  await requireProbePool().query(
     `INSERT INTO vt_users (id, clinic_id, clerk_id, email, name, display_name, role, status, preferred_locale, is_equipment_coordinator)
      VALUES ($1, $2, $3, $4, $5, $5, $6, 'active', 'en', $7)
      ON CONFLICT DO NOTHING`,
@@ -138,7 +152,7 @@ async function seedShift(
   startTime = "08:00:00",
   endTime = "16:00:00",
 ) {
-  await probePool!.query(
+  await requireProbePool().query(
     `INSERT INTO vt_shifts (id, clinic_id, date, start_time, end_time, employee_name, role)
      VALUES ($1, $2, $3, $4, $5, $6, $7)
      ON CONFLICT DO NOTHING`,
@@ -147,7 +161,7 @@ async function seedShift(
 }
 
 async function isEquipmentCoordinatorFlag(userId: string): Promise<boolean> {
-  const { rows } = await probePool!.query<{ is_equipment_coordinator: boolean }>(
+  const { rows } = await requireProbePool().query<{ is_equipment_coordinator: boolean }>(
     `SELECT is_equipment_coordinator FROM vt_users WHERE id = $1`,
     [userId],
   );
@@ -155,7 +169,7 @@ async function isEquipmentCoordinatorFlag(userId: string): Promise<boolean> {
 }
 
 async function purgeClinic(clinicId: string) {
-  const P = probePool!;
+  const P = requireProbePool();
   await P.query(`DELETE FROM vt_shift_equipment_coordinator WHERE clinic_id = $1`, [clinicId]);
   await P.query(`DELETE FROM vt_shifts WHERE clinic_id = $1`, [clinicId]);
   await P.query(`DELETE FROM vt_users WHERE clinic_id = $1`, [clinicId]);
@@ -230,7 +244,7 @@ describe.skipIf(!DATABASE_URL)("docking equipment coordinator (T3.4-i-a) integra
   });
 
   it("confirms the DB was actually reached (sanity)", async () => {
-    const { rows } = await probePool!.query("SELECT 1 AS ok");
+    const { rows } = await requireProbePool().query("SELECT 1 AS ok");
     expect(rows[0]?.ok).toBe(1);
   });
 
@@ -250,7 +264,7 @@ describe.skipIf(!DATABASE_URL)("docking equipment coordinator (T3.4-i-a) integra
     expect(getString(res.json, "status")).toBe("auto");
     expect(getString(res.json, "coordinatorUserId")).toBe(eligible);
     expect(getString(res.json, "coordinatorName")).toBe("Dana Cohen");
-    const candidates = res.json.candidates as Array<Record<string, unknown>>;
+    const candidates = asRecordArray(res.json.candidates);
     expect(candidates.map((c) => c.userId)).toEqual([eligible]);
   });
 
@@ -300,7 +314,7 @@ describe.skipIf(!DATABASE_URL)("docking equipment coordinator (T3.4-i-a) integra
     if (!isRecord(res.json)) throw new Error("expected object");
     expect(getString(res.json, "status")).toBe("needs_confirmation");
     expect(res.json.coordinatorUserId).toBeNull();
-    const candidateIds = (res.json.candidates as Array<Record<string, unknown>>).map((c) => c.userId).sort();
+    const candidateIds = (asRecordArray(res.json.candidates)).map((c) => c.userId).sort();
     expect(candidateIds).toEqual([a, b].sort());
   });
 
@@ -318,7 +332,7 @@ describe.skipIf(!DATABASE_URL)("docking equipment coordinator (T3.4-i-a) integra
     // Simulate the sweep-escalation worker having already written a
     // bookkeeping row for this needs_confirmation shift (I-2 ladder,
     // source "fallback_senior") — NOT a genuine human confirmation.
-    await probePool!.query(
+    await requireProbePool().query(
       `INSERT INTO vt_shift_equipment_coordinator
          (id, clinic_id, shift_date, coordinator_user_id, source, escalation_stage, current_responsible_user_id, escalated_at)
        VALUES ($1, $2, $3, $4, 'fallback_senior', 2, $4, now())`,
@@ -346,7 +360,7 @@ describe.skipIf(!DATABASE_URL)("docking equipment coordinator (T3.4-i-a) integra
     await seedShift(randomUUID(), ctx.clinicId, ctx.shiftDate, "Amit Ron", "technician");
     await seedShift(randomUUID(), ctx.clinicId, ctx.shiftDate, "Tamar Gil", "technician");
 
-    await probePool!.query(
+    await requireProbePool().query(
       `INSERT INTO vt_shift_equipment_coordinator (id, clinic_id, shift_date, coordinator_user_id, source)
        VALUES ($1, $2, $3, $4, 'confirmed')`,
       [randomUUID(), ctx.clinicId, ctx.shiftDate, a],
@@ -472,13 +486,13 @@ describe.skipIf(!DATABASE_URL)("docking equipment coordinator (T3.4-i-a) integra
 
     // Simulate the sweep-escalation worker having already advanced this
     // shift's ladder for the first coordinator (a).
-    await probePool!.query(
+    await requireProbePool().query(
       `UPDATE vt_shift_equipment_coordinator
        SET escalation_stage = 3, current_responsible_user_id = $1, escalated_at = now()
        WHERE clinic_id = $2 AND shift_date = $3`,
       [senior, ctx.clinicId, ctx.shiftDate],
     );
-    const { rows: midRows } = await probePool!.query<{ escalation_stage: number }>(
+    const { rows: midRows } = await requireProbePool().query<{ escalation_stage: number }>(
       `SELECT escalation_stage FROM vt_shift_equipment_coordinator WHERE clinic_id = $1 AND shift_date = $2`,
       [ctx.clinicId, ctx.shiftDate],
     );
@@ -490,7 +504,7 @@ describe.skipIf(!DATABASE_URL)("docking equipment coordinator (T3.4-i-a) integra
     if (!isRecord(second.json)) throw new Error("expected object");
     expect(getString(second.json, "coordinatorUserId")).toBe(b);
 
-    const { rows } = await probePool!.query<{
+    const { rows } = await requireProbePool().query<{
       escalation_stage: number;
       current_responsible_user_id: string | null;
       escalated_at: Date | null;
@@ -538,12 +552,10 @@ describe.skipIf(!DATABASE_URL)("docking equipment coordinator (T3.4-i-a) integra
       expect(res.status).toBe(200);
       if (!isRecord(res.json)) throw new Error("expected object");
       expect(getString(res.json, "coordinatorUserId")).toBe(clinicAEligible);
-      const candidates = res.json.candidates as Array<Record<string, unknown>>;
+      const candidates = asRecordArray(res.json.candidates);
       expect(candidates.map((c) => c.userId)).toEqual([clinicAEligible]);
     } finally {
-      await probePool!.query(`DELETE FROM vt_shifts WHERE clinic_id = $1`, [clinicBId]);
-      await probePool!.query(`DELETE FROM vt_users WHERE clinic_id = $1`, [clinicBId]);
-      await probePool!.query(`DELETE FROM vt_clinics WHERE id = $1`, [clinicBId]);
+      await purgeClinic(clinicBId);
     }
   });
 
@@ -568,6 +580,42 @@ describe.skipIf(!DATABASE_URL)("docking equipment coordinator (T3.4-i-a) integra
 
     const resolution = await resolveShiftCoordinator(ctx.clinicId, ctx.shiftDate);
     expect(resolution.seniorTechUserId).toBe(userId);
+  });
+
+  it("A1-3 (CodeRabbit): GET /coordinator?date=2026-13-40 (well-formed but impossible calendar date) -> 400 before any DB query", async () => {
+    const res = await api(`/api/docking/coordinator?date=2026-13-40`, "GET");
+    expect(res.status).toBe(400);
+  });
+
+  it("A1-3 (CodeRabbit): GET /coordinator?date=2026-02-30 (Feb 30) -> 400", async () => {
+    const res = await api(`/api/docking/coordinator?date=2026-02-30`, "GET");
+    expect(res.status).toBe(400);
+  });
+
+  it("A1-3 (CodeRabbit): POST /coordinator with an impossible calendar date -> 400", async () => {
+    setActor(randomUUID(), "admin");
+    const res = await api("/api/docking/coordinator", "POST", {
+      shiftDate: "2026-13-40",
+      coordinatorUserId: randomUUID(),
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it("A1-5 (CodeRabbit): GET /api/users admin list carries isEquipmentCoordinator reflecting persisted state", async () => {
+    const eligible = randomUUID();
+    const nonEligible = randomUUID();
+    await seedUser(eligible, ctx.clinicId, { name: "Coord Eligible", role: "technician", isEquipmentCoordinator: true });
+    await seedUser(nonEligible, ctx.clinicId, { name: "Coord None", role: "technician", isEquipmentCoordinator: false });
+
+    setActor(randomUUID(), "admin");
+    const res = await api(`/api/users`, "GET");
+    expect(res.status).toBe(200);
+    if (!isRecord(res.json)) throw new Error("expected object");
+    const items = asRecordArray(res.json.items);
+    const eligibleItem = items.find((u) => u.id === eligible);
+    const nonEligibleItem = items.find((u) => u.id === nonEligible);
+    expect(eligibleItem?.isEquipmentCoordinator).toBe(true);
+    expect(nonEligibleItem?.isEquipmentCoordinator).toBe(false);
   });
 
   it("S2-14: PATCH /api/users/:id/equipment-coordinator as a non-admin actor -> 403", async () => {

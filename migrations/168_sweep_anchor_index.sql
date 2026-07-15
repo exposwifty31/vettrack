@@ -18,6 +18,15 @@
 -- order, so the anchor side becomes an index scan over just the sweep
 -- anchors. Additive + idempotent (new index only, IF NOT EXISTS); no table
 -- rewrite, no lock-staging needed.
+--
+-- CONCURRENTLY trade-off (accepted, PR #106 CodeRabbit): the migration runner
+-- wraps each file in a single BEGIN/COMMIT (server/migrate.ts), and
+-- CREATE INDEX CONCURRENTLY cannot run inside a transaction — so this is a
+-- standard (briefly blocking) index build. That is acceptable here: although
+-- vt_equipment_anchors is append-only, it is small at current per-clinic scale
+-- and the build completes fast. A concurrent, out-of-band build would require
+-- reworking the runner to special-case CONCURRENTLY files, which is out of P3
+-- scope.
 
 CREATE INDEX IF NOT EXISTS idx_vt_equipment_anchors_clinic_sweep_asserted
   ON vt_equipment_anchors (clinic_id, asserted_at DESC)

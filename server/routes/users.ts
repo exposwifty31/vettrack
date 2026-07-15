@@ -57,6 +57,7 @@ const adminListUserFields = {
   ...userFields,
   clerkId: users.clerkId,
   secondaryRole: users.secondaryRole,
+  isEquipmentCoordinator: users.isEquipmentCoordinator,
 };
 
 const VALID_ROLES = ["admin", "vet", "technician", "senior_technician", "student"] as const;
@@ -281,6 +282,7 @@ router.get("/", requireAuth, requireAdmin, async (req, res) => {
       displayName: item.displayName,
       role: item.role,
       secondaryRole: item.secondaryRole ?? null,
+      isEquipmentCoordinator: item.isEquipmentCoordinator ?? false,
       status: item.status,
       createdAt: item.createdAt,
     }));

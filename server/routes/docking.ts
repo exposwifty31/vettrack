@@ -9,8 +9,9 @@
  * (room, category) → dock lookup or expected-fill counting here.
  */
 import { Router } from "express";
+import { randomUUID } from "crypto";
 import { z } from "zod";
-import { db, equipment, docks, rooms, users } from "../db.js";
+import { db, equipment, docks, rooms, users, equipmentAnchors } from "../db.js";
 import { and, eq, inArray, isNull, ne, sql } from "drizzle-orm";
 import { requireAuth, requireAdmin } from "../middleware/auth.js";
 import { writeLimiter } from "../middleware/rate-limiters.js";
@@ -184,6 +185,33 @@ type LatestAnchorRow = {
 };
 
 /**
+ * Latest anchor per item for a clinic, in ONE DISTINCT ON (equipment_id)
+ * query ordered by asserted_at DESC — shared by the reconciliation read and
+ * the room-sweep expected-list so the DISTINCT ON isn't copy-pasted. Pass
+ * `equipmentIds` to scope to a subset (the sweep path); an empty array
+ * short-circuits to an empty map (no query). The current-anchor UNIQUE index
+ * guarantees at most one open row per item, so the latest-by-assertedAt row
+ * IS the current anchor when one is open.
+ */
+async function latestAnchorByEquipment(
+  clinicId: string,
+  equipmentIds?: string[],
+): Promise<Map<string, LatestAnchorRow>> {
+  if (equipmentIds && equipmentIds.length === 0) return new Map();
+  const idFilter =
+    equipmentIds && equipmentIds.length
+      ? sql`AND equipment_id IN (${sql.join(equipmentIds.map((id) => sql`${id}`), sql`, `)})`
+      : sql``;
+  const result = await db.execute<LatestAnchorRow>(sql`
+    SELECT DISTINCT ON (equipment_id) equipment_id, dock_id, invalidated_at, invalidated_reason
+    FROM vt_equipment_anchors
+    WHERE clinic_id = ${clinicId} ${idFilter}
+    ORDER BY equipment_id, asserted_at DESC
+  `);
+  return new Map(result.rows.map((row) => [row.equipment_id, row]));
+}
+
+/**
  * GET /api/docking/reconciliation
  *
  * Loads this clinic's docks + a widened equipment projection + the latest
@@ -200,7 +228,7 @@ type LatestAnchorRow = {
 router.get("/reconciliation", requireAuth, async (req, res) => {
   const clinicId = req.clinicId!;
 
-  const [clinicDocks, clinicEquipment, latestAnchorResult] = await Promise.all([
+  const [clinicDocks, clinicEquipment, latestAnchorByEquipmentId] = await Promise.all([
     db.select().from(docks).where(eq(docks.clinicId, clinicId)),
     db
       .select({
@@ -216,16 +244,10 @@ router.get("/reconciliation", requireAuth, async (req, res) => {
       })
       .from(equipment)
       .where(and(eq(equipment.clinicId, clinicId), isNull(equipment.deletedAt))),
-    // Latest anchor per item, in ONE query — DISTINCT ON (equipment_id)
-    // ordered by assertedAt DESC. The latest row's invalidatedAt tells us
-    // whether it's the currently open anchor or the most recent
-    // contradiction (T3.1 ClassifierCtx derivation below).
-    db.execute<LatestAnchorRow>(sql`
-      SELECT DISTINCT ON (equipment_id) equipment_id, dock_id, invalidated_at, invalidated_reason
-      FROM vt_equipment_anchors
-      WHERE clinic_id = ${clinicId}
-      ORDER BY equipment_id, asserted_at DESC
-    `),
+    // Latest anchor per item, in ONE query (shared DISTINCT ON helper). The
+    // latest row's invalidatedAt tells us whether it's the currently open
+    // anchor or the most recent contradiction (T3.1 ClassifierCtx below).
+    latestAnchorByEquipment(clinicId),
   ]);
 
   const unassigned = clinicEquipment.filter((item) => item.homeRoomId === null || item.assetTypeId === null);
@@ -240,8 +262,6 @@ router.get("/reconciliation", requireAuth, async (req, res) => {
     expectedFill: dockExpectedFill(dock, clinicEquipment),
     capacity: dock.capacity,
   }));
-
-  const latestAnchorByEquipmentId = new Map(latestAnchorResult.rows.map((row) => [row.equipment_id, row]));
 
   const counts = Object.fromEntries(RECONCILIATION_BUCKETS.map((b) => [b, 0])) as Record<
     ReconciliationBucket,
@@ -403,25 +423,14 @@ router.get("/rooms/:roomId/sweep", requireAuth, async (req, res) => {
   ]);
 
   // S2-2 (pre-PR review, MINOR): latest anchor per item in ONE DISTINCT ON
-  // query — same shape as the reconciliation route's latestAnchorResult
-  // above — instead of pulling each item's full anchor history and
-  // reducing in JS. The current-anchor UNIQUE index guarantees at most one
-  // open (invalidatedAt IS NULL) row per equipment, and createAnchor always
+  // query (shared latestAnchorByEquipment helper, scoped to this room's item
+  // ids) instead of pulling each item's full anchor history and reducing in
+  // JS. The current-anchor UNIQUE index guarantees at most one open
+  // (invalidatedAt IS NULL) row per equipment, and createAnchor always
   // invalidates the prior open row before inserting a new one, so the
-  // latest-by-assertedAt row IS the current anchor when one is open —
-  // behavior-equivalent to the old find(invalidatedAt === null) reduction.
+  // latest-by-assertedAt row IS the current anchor when one is open.
   const itemIds = expectedItems.map((item) => item.id);
-  const latestAnchorResult = itemIds.length
-    ? await db.execute<LatestAnchorRow>(sql`
-        SELECT DISTINCT ON (equipment_id) equipment_id, dock_id, invalidated_at, invalidated_reason
-        FROM vt_equipment_anchors
-        WHERE clinic_id = ${clinicId} AND equipment_id IN (${sql.join(itemIds.map((id) => sql`${id}`), sql`, `)})
-        ORDER BY equipment_id, asserted_at DESC
-      `)
-    : null;
-  const latestAnchorByEquipmentId = new Map(
-    (latestAnchorResult?.rows ?? []).map((row) => [row.equipment_id, row]),
-  );
+  const latestAnchorByEquipmentId = await latestAnchorByEquipment(clinicId, itemIds);
 
   const items = expectedItems.map((item) => {
     const homeDock = resolveHomeDock({ homeRoomId: item.homeRoomId, assetTypeId: item.assetTypeId }, clinicDocks);
@@ -516,6 +525,29 @@ router.post(
           ),
       ]);
 
+      // Which expected-resting items currently have an OPEN anchor. An
+      // unconfirmed item WITH an open anchor is contradicted in place
+      // (invalidateCurrentAnchor). An unconfirmed item with NO open anchor
+      // (never anchored, or already contradicted) would leave
+      // invalidateCurrentAnchor a no-op — so we instead write an
+      // already-invalidated `sweep_missing` marker row (A1-1), making the
+      // contradiction durable so reconciliation buckets it `missing` rather
+      // than mis-bucketing a never-anchored item `returned_unverified`.
+      const restingIds = expectedResting.map((item) => item.id);
+      const openAnchorRows = restingIds.length
+        ? await tx
+            .select({ equipmentId: equipmentAnchors.equipmentId })
+            .from(equipmentAnchors)
+            .where(
+              and(
+                eq(equipmentAnchors.clinicId, clinicId),
+                inArray(equipmentAnchors.equipmentId, restingIds),
+                isNull(equipmentAnchors.invalidatedAt),
+              ),
+            )
+        : [];
+      const hasOpenAnchor = new Set(openAnchorRows.map((r) => r.equipmentId));
+
       for (const item of expectedResting) {
         if (confirmedSet.has(item.id)) {
           const homeDock = resolveHomeDock({ homeRoomId: item.homeRoomId, assetTypeId: item.assetTypeId }, clinicDocks);
@@ -537,8 +569,24 @@ router.post(
             source: "sweep",
           });
           confirmedCount++;
-        } else {
+        } else if (hasOpenAnchor.has(item.id)) {
           await invalidateCurrentAnchor(tx, { clinicId, equipmentId: item.id, reason: "sweep_missing" });
+          missingCount++;
+        } else {
+          // Never-anchored (or already-contradicted) unconfirmed item — write a
+          // durable, already-invalidated sweep_missing marker so the sweep
+          // leaves a trace and reconciliation buckets it `missing`.
+          await tx.insert(equipmentAnchors).values({
+            id: randomUUID(),
+            clinicId,
+            equipmentId: item.id,
+            dockId: null,
+            roomId: null,
+            assertedById: userId,
+            source: "sweep",
+            invalidatedAt: new Date(),
+            invalidatedReason: "sweep_missing",
+          });
           missingCount++;
         }
       }
@@ -559,7 +607,28 @@ router.post(
   },
 );
 
-const SHIFT_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const SHIFT_DATE_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+/**
+ * A `shiftDate` must be well-formed YYYY-MM-DD AND a real calendar date —
+ * `2026-13-40` matches the regex but is not a date and would blow up the DB
+ * DATE cast. Shared by BOTH the GET (`?date=`) and POST (`shiftDate`) handlers
+ * so an impossible date is rejected with a 400 BEFORE any DB query.
+ */
+function isValidShiftDate(value: string): boolean {
+  const m = SHIFT_DATE_RE.exec(value);
+  if (!m) return false;
+  const [, y, mo, d] = m;
+  const year = Number(y);
+  const month = Number(mo);
+  const day = Number(d);
+  const dt = new Date(Date.UTC(year, month - 1, day));
+  return dt.getUTCFullYear() === year && dt.getUTCMonth() === month - 1 && dt.getUTCDate() === day;
+}
+
+const shiftDateSchema = z
+  .string()
+  .refine(isValidShiftDate, { message: "shiftDate must be a valid YYYY-MM-DD calendar date" });
 
 /**
  * GET /api/docking/coordinator?date=YYYY-MM-DD
@@ -573,13 +642,16 @@ router.get("/coordinator", requireAuth, async (req, res) => {
   const clinicId = req.clinicId!;
   const rawDate = typeof req.query.date === "string" ? req.query.date : undefined;
 
+  // Reject an impossible date up front — before the clinic-timezone / resolver
+  // DB queries. The default (clinic-local today) is always valid.
+  if (rawDate !== undefined && !shiftDateSchema.safeParse(rawDate).success) {
+    return apiError(req, res, "errors.validation", undefined, 400);
+  }
+
   let shiftDate = rawDate;
   if (!shiftDate) {
     const timeZone = await getClinicTimezone(clinicId);
     shiftDate = clinicTodayIsoDate(timeZone);
-  }
-  if (!SHIFT_DATE_RE.test(shiftDate)) {
-    return apiError(req, res, "errors.validation", undefined, 400);
   }
 
   const resolution = await resolveShiftCoordinator(clinicId, shiftDate);
@@ -610,7 +682,7 @@ router.get("/coordinator", requireAuth, async (req, res) => {
 });
 
 const confirmCoordinatorSchema = z.object({
-  shiftDate: z.string().regex(SHIFT_DATE_RE, "shiftDate must be YYYY-MM-DD"),
+  shiftDate: shiftDateSchema,
   coordinatorUserId: z.string().min(1),
 });
 

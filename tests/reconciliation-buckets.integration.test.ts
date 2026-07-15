@@ -26,6 +26,14 @@ import { i18nMiddleware } from "../lib/i18n/middleware.js";
 const DATABASE_URL = process.env.DATABASE_URL ?? "";
 let probePool: Pool | null = null;
 
+/** The initialized probe pool, or a contextual throw if setup didn't run. */
+function requireProbePool(): Pool {
+  if (!probePool) {
+    throw new Error("probePool is not initialized — DB integration setup (beforeAll) did not run");
+  }
+  return probePool;
+}
+
 let currentClinicId = "";
 let currentUserId = "";
 const currentUserRole = "admin";
@@ -93,11 +101,11 @@ async function api(path: string, method: "GET" | "POST" = "GET"): Promise<{ stat
 }
 
 async function seedClinic(clinicId: string) {
-  await probePool!.query(`INSERT INTO vt_clinics (id) VALUES ($1) ON CONFLICT DO NOTHING`, [clinicId]);
+  await requireProbePool().query(`INSERT INTO vt_clinics (id) VALUES ($1) ON CONFLICT DO NOTHING`, [clinicId]);
 }
 
 async function seedUser(userId: string, clinicId: string) {
-  await probePool!.query(
+  await requireProbePool().query(
     `INSERT INTO vt_users (id, clinic_id, clerk_id, email, name, role, status, preferred_locale)
      VALUES ($1, $2, $3, $4, $5, 'admin', 'active', 'en')
      ON CONFLICT DO NOTHING`,
@@ -106,21 +114,21 @@ async function seedUser(userId: string, clinicId: string) {
 }
 
 async function seedRoom(roomId: string, clinicId: string, name: string) {
-  await probePool!.query(
+  await requireProbePool().query(
     `INSERT INTO vt_rooms (id, clinic_id, name) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`,
     [roomId, clinicId, name],
   );
 }
 
 async function seedAssetType(assetTypeId: string, clinicId: string, name: string) {
-  await probePool!.query(
+  await requireProbePool().query(
     `INSERT INTO vt_asset_types (id, clinic_id, name) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`,
     [assetTypeId, clinicId, name],
   );
 }
 
 async function seedDock(dockId: string, clinicId: string, roomId: string, assetTypeId: string, name: string) {
-  await probePool!.query(
+  await requireProbePool().query(
     `INSERT INTO vt_docks (id, clinic_id, name, room_id, asset_type_id, capacity)
      VALUES ($1, $2, $3, $4, $5, 4) ON CONFLICT DO NOTHING`,
     [dockId, clinicId, name, roomId, assetTypeId],
@@ -143,6 +151,7 @@ const SEED_EQUIPMENT_ALLOWED_COLUMNS = new Set([
   "checked_out_by_email",
   "room_id",
   "last_rfid_room_id",
+  "deleted_at",
 ]);
 
 async function seedEquipment(eqId: string, clinicId: string, overrides: Record<string, unknown> = {}) {
@@ -159,11 +168,11 @@ async function seedEquipment(eqId: string, clinicId: string, overrides: Record<s
   }
   const keys = Object.keys(row).join(", ");
   const vals = Object.keys(row).map((_, i) => `$${i + 1}`).join(", ");
-  await probePool!.query(`INSERT INTO vt_equipment (${keys}) VALUES (${vals})`, Object.values(row));
+  await requireProbePool().query(`INSERT INTO vt_equipment (${keys}) VALUES (${vals})`, Object.values(row));
 }
 
 async function purgeClinic(clinicId: string) {
-  const P = probePool!;
+  const P = requireProbePool();
   await P.query(`DELETE FROM vt_equipment_anchors WHERE clinic_id = $1`, [clinicId]);
   await P.query(`DELETE FROM vt_equipment WHERE clinic_id = $1`, [clinicId]);
   await P.query(`DELETE FROM vt_docks WHERE clinic_id = $1`, [clinicId]);
@@ -258,7 +267,7 @@ describe.skipIf(!DATABASE_URL)("docking reconciliation full 8-bucket breakdown (
   });
 
   it("confirms the DB was actually reached (sanity)", async () => {
-    const { rows } = await probePool!.query("SELECT 1 AS ok");
+    const { rows } = await requireProbePool().query("SELECT 1 AS ok");
     expect(rows[0]?.ok).toBe(1);
   });
 
@@ -588,6 +597,37 @@ describe.skipIf(!DATABASE_URL)("docking reconciliation full 8-bucket breakdown (
       }
     } finally {
       await purgeClinic(otherClinicId);
+    }
+  });
+
+  it("A1 test-hygiene (CodeRabbit): a soft-deleted (deleted_at set) homed item is excluded from reconciliation counts/byBucket", async () => {
+    const deletedId = randomUUID();
+    await seedEquipment(deletedId, ctx.clinicId, {
+      home_room_id: ctx.roomId,
+      asset_type_id: ctx.assetTypeId,
+      custody_state: "returned",
+      deleted_at: new Date().toISOString(),
+    });
+
+    const res = await api(`/api/docking/reconciliation`, "GET");
+    expect(res.status).toBe(200);
+    expect(isRecord(res.json)).toBe(true);
+    if (!isRecord(res.json)) throw new Error("Expected response to be an object");
+
+    const counts = res.json.counts;
+    expect(isRecord(counts)).toBe(true);
+    if (!isRecord(counts)) throw new Error("Expected counts to be an object");
+    const total = Object.values(counts).reduce((sum, n) => sum + (typeof n === "number" ? n : 0), 0);
+    expect(total).toBe(0);
+
+    const byBucket = res.json.byBucket;
+    expect(isRecord(byBucket)).toBe(true);
+    if (!isRecord(byBucket)) throw new Error("Expected byBucket to be an object");
+    for (const bucket of ALL_BUCKETS) {
+      const arr = byBucket[bucket];
+      expect(isArray(arr)).toBe(true);
+      if (!isArray(arr)) throw new Error(`Expected byBucket.${bucket} to be an array`);
+      expect(arr.some((e) => isRecord(e) && getString(e, "id") === deletedId)).toBe(false);
     }
   });
 });

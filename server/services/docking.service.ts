@@ -43,19 +43,19 @@ export type ReconciliationBucket =
 // equipment-anchor.service.ts; aliased here for a readable local name.
 type ContradictionReason = InvalidationReason;
 
-export type ClassifierItem = {
+export interface ClassifierItem {
   checkedOutById: string | null;
   homeRoomId: string | null;
   assetTypeId: string | null;
   roomId: string | null; // current room assignment (presence)
   lastRfidRoomId: string | null; // last RFID-observed room (presence), may be null
-};
+}
 
-export type ClassifierCtx = {
+export interface ClassifierCtx {
   homeDock: { id: string } | null; // resolveHomeDock(...) result for this item
   currentAnchor: { dockId: string | null } | null; // the current OPEN anchor (getCurrentAnchor), or null
   lastContradictionReason: ContradictionReason | null; // reason of the most-recent invalidated anchor when no open anchor
-};
+}
 
 /**
  * Reconciliation bucket ladder (design doc §6.2 buckets; §3.3 ownership-vs-presence;

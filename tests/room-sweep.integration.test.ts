@@ -28,6 +28,14 @@ import { i18nMiddleware } from "../lib/i18n/middleware.js";
 const DATABASE_URL = process.env.DATABASE_URL ?? "";
 let probePool: Pool | null = null;
 
+/** The initialized probe pool, or a contextual throw if setup didn't run. */
+function requireProbePool(): Pool {
+  if (!probePool) {
+    throw new Error("probePool is not initialized — DB integration setup (beforeAll) did not run");
+  }
+  return probePool;
+}
+
 let currentClinicId = "";
 let currentUserId = "";
 const currentUserRole = "admin";
@@ -67,6 +75,12 @@ function isRecord(val: unknown): val is Record<string, unknown> {
   return val !== null && typeof val === "object" && !Array.isArray(val);
 }
 
+/** Assert an unknown value is an array of records before field access (no `as` cast). */
+function asRecordArray(val: unknown): Array<Record<string, unknown>> {
+  if (!Array.isArray(val)) throw new Error("Expected value to be an array");
+  return val.filter(isRecord);
+}
+
 function getString(obj: Record<string, unknown>, key: string): string | undefined {
   const val = obj[key];
   return typeof val === "string" ? val : undefined;
@@ -95,11 +109,11 @@ async function api(
 }
 
 async function seedClinic(clinicId: string) {
-  await probePool!.query(`INSERT INTO vt_clinics (id) VALUES ($1) ON CONFLICT DO NOTHING`, [clinicId]);
+  await requireProbePool().query(`INSERT INTO vt_clinics (id) VALUES ($1) ON CONFLICT DO NOTHING`, [clinicId]);
 }
 
 async function seedUser(userId: string, clinicId: string) {
-  await probePool!.query(
+  await requireProbePool().query(
     `INSERT INTO vt_users (id, clinic_id, clerk_id, email, name, role, status, preferred_locale)
      VALUES ($1, $2, $3, $4, $5, 'admin', 'active', 'en')
      ON CONFLICT DO NOTHING`,
@@ -108,21 +122,21 @@ async function seedUser(userId: string, clinicId: string) {
 }
 
 async function seedRoom(roomId: string, clinicId: string, name: string) {
-  await probePool!.query(
+  await requireProbePool().query(
     `INSERT INTO vt_rooms (id, clinic_id, name) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`,
     [roomId, clinicId, name],
   );
 }
 
 async function seedAssetType(assetTypeId: string, clinicId: string, name: string) {
-  await probePool!.query(
+  await requireProbePool().query(
     `INSERT INTO vt_asset_types (id, clinic_id, name) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`,
     [assetTypeId, clinicId, name],
   );
 }
 
 async function seedDock(dockId: string, clinicId: string, roomId: string, assetTypeId: string, name: string) {
-  await probePool!.query(
+  await requireProbePool().query(
     `INSERT INTO vt_docks (id, clinic_id, name, room_id, asset_type_id, capacity)
      VALUES ($1, $2, $3, $4, $5, 4) ON CONFLICT DO NOTHING`,
     [dockId, clinicId, name, roomId, assetTypeId],
@@ -142,7 +156,7 @@ async function seedEquipment(
     checkedOutAt?: string | null;
   } = {},
 ) {
-  await probePool!.query(
+  await requireProbePool().query(
     `INSERT INTO vt_equipment
        (id, clinic_id, name, status, version, home_room_id, asset_type_id, custody_state, checked_out_by_id, checked_out_by_email, checked_out_at)
      VALUES ($1, $2, $3, 'ok', 1, $4, $5, $6, $7, $8, $9)`,
@@ -161,7 +175,7 @@ async function seedEquipment(
 }
 
 async function anchorCount(equipmentId: string): Promise<number> {
-  const { rows } = await probePool!.query<{ count: string }>(
+  const { rows } = await requireProbePool().query<{ count: string }>(
     `SELECT COUNT(*)::int AS count FROM vt_equipment_anchors WHERE equipment_id = $1`,
     [equipmentId],
   );
@@ -169,7 +183,7 @@ async function anchorCount(equipmentId: string): Promise<number> {
 }
 
 async function lastInvalidatedReason(equipmentId: string): Promise<string | null> {
-  const { rows } = await probePool!.query<{ invalidated_reason: string | null }>(
+  const { rows } = await requireProbePool().query<{ invalidated_reason: string | null }>(
     `SELECT invalidated_reason FROM vt_equipment_anchors WHERE equipment_id = $1 ORDER BY asserted_at DESC LIMIT 1`,
     [equipmentId],
   );
@@ -177,7 +191,7 @@ async function lastInvalidatedReason(equipmentId: string): Promise<string | null
 }
 
 async function purgeClinic(clinicId: string) {
-  const P = probePool!;
+  const P = requireProbePool();
   await P.query(`DELETE FROM vt_equipment_anchors WHERE clinic_id = $1`, [clinicId]);
   await P.query(`DELETE FROM vt_equipment WHERE clinic_id = $1`, [clinicId]);
   await P.query(`DELETE FROM vt_docks WHERE clinic_id = $1`, [clinicId]);
@@ -262,7 +276,7 @@ describe.skipIf(!DATABASE_URL)("docking room sweep (T3.2a) integration", () => {
   });
 
   it("confirms the DB was actually reached (sanity)", async () => {
-    const { rows } = await probePool!.query("SELECT 1 AS ok");
+    const { rows } = await requireProbePool().query("SELECT 1 AS ok");
     expect(rows[0]?.ok).toBe(1);
   });
 
@@ -296,8 +310,7 @@ describe.skipIf(!DATABASE_URL)("docking room sweep (T3.2a) integration", () => {
       expect(isRecord(res.json)).toBe(true);
       if (!isRecord(res.json)) throw new Error("Expected response to be an object");
       expect(getString(res.json, "roomId")).toBe(ctx.roomId);
-      const items = res.json.items as Array<Record<string, unknown>>;
-      expect(Array.isArray(items)).toBe(true);
+      const items = asRecordArray(res.json.items);
       expect(items.length).toBe(4);
 
       for (const id of restingIds) {
@@ -347,7 +360,7 @@ describe.skipIf(!DATABASE_URL)("docking room sweep (T3.2a) integration", () => {
         const ownRoomRes = await api(`/api/docking/rooms/${ctx.roomId}/sweep`, "GET");
         expect(ownRoomRes.status).toBe(200);
         if (!isRecord(ownRoomRes.json)) throw new Error("Expected response to be an object");
-        const items = ownRoomRes.json.items as Array<Record<string, unknown>>;
+        const items = asRecordArray(ownRoomRes.json.items);
         expect(items.some((it) => it.id === otherEqId)).toBe(false);
 
         // Fetching the other clinic's room by id as clinic A's actor 404s —
@@ -355,14 +368,7 @@ describe.skipIf(!DATABASE_URL)("docking room sweep (T3.2a) integration", () => {
         const crossClinicRes = await api(`/api/docking/rooms/${otherRoomId}/sweep`, "GET");
         expect(crossClinicRes.status).toBe(404);
       } finally {
-        const P = probePool!;
-        await P.query(`DELETE FROM vt_equipment_anchors WHERE clinic_id = $1`, [otherClinicId]);
-        await P.query(`DELETE FROM vt_equipment WHERE clinic_id = $1`, [otherClinicId]);
-        await P.query(`DELETE FROM vt_docks WHERE clinic_id = $1`, [otherClinicId]);
-        await P.query(`DELETE FROM vt_asset_types WHERE clinic_id = $1`, [otherClinicId]);
-        await P.query(`DELETE FROM vt_rooms WHERE clinic_id = $1`, [otherClinicId]);
-        await P.query(`DELETE FROM vt_users WHERE clinic_id = $1`, [otherClinicId]);
-        await P.query(`DELETE FROM vt_clinics WHERE id = $1`, [otherClinicId]);
+        await purgeClinic(otherClinicId);
       }
     });
   });
@@ -440,6 +446,42 @@ describe.skipIf(!DATABASE_URL)("docking room sweep (T3.2a) integration", () => {
       expect(call.targetId).toBe(ctx.roomId);
       expect(isRecord(call.metadata) && (call.metadata as Record<string, unknown>).confirmed).toBe(2);
       expect(isRecord(call.metadata) && (call.metadata as Record<string, unknown>).missing).toBe(1);
+    });
+
+    it("A1-1 (CodeRabbit): an unconfirmed NEVER-anchored homed item gets a durable sweep_missing marker row → reconciliation buckets it `missing`, not `returned_unverified`", async () => {
+      // A homed, categorized, resting item that has NEVER been anchored (no
+      // prior anchor row at all). invalidateCurrentAnchor no-ops with nothing
+      // open, so before the fix the sweep left NO trace and reconciliation
+      // mis-bucketed it `returned_unverified`. The fix writes an
+      // already-invalidated `sweep_missing` marker so the contradiction is durable.
+      const neverAnchoredId = randomUUID();
+      await seedEquipment(neverAnchoredId, ctx.clinicId, {
+        name: "Never-Anchored Pump",
+        homeRoomId: ctx.roomId,
+        assetTypeId: ctx.assetTypeId,
+        custodyState: "returned",
+      });
+
+      const res = await api(`/api/docking/rooms/${ctx.roomId}/sweep`, "POST", {
+        confirmedEquipmentIds: [], // item is unconfirmed
+      });
+      expect(res.status).toBe(200);
+      if (!isRecord(res.json)) throw new Error("Expected response to be an object");
+      expect(res.json.missingCount).toBe(1);
+
+      // A durable anchor row now exists, invalidated with reason sweep_missing.
+      expect(await anchorCount(neverAnchoredId)).toBe(1);
+      expect(await lastInvalidatedReason(neverAnchoredId)).toBe("sweep_missing");
+      const currentAfter = await getCurrentAnchor(ctx.clinicId, neverAnchoredId);
+      expect(currentAfter).toBeNull(); // the marker is already invalidated (not open)
+
+      // Reconciliation now buckets it `missing`, not `returned_unverified`.
+      const recon = await api(`/api/docking/reconciliation`, "GET");
+      expect(recon.status).toBe(200);
+      if (!isRecord(recon.json)) throw new Error("Expected reconciliation response to be an object");
+      const byBucket = recon.json.byBucket as Record<string, Array<Record<string, unknown>>>;
+      expect(byBucket.missing.some((it) => it.id === neverAnchoredId)).toBe(true);
+      expect(byBucket.returned_unverified.some((it) => it.id === neverAnchoredId)).toBe(false);
     });
 
     it("D-9 defense-in-depth (M-1, phase review): excludes an item with a holder even if custodyState diverges from 'checked_out'", async () => {
