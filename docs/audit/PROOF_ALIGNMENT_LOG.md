@@ -2982,3 +2982,42 @@ $ npx tsx -e "import {t} from './src/lib/i18n'; console.log(JSON.stringify([t.ro
 **Deferred (per brief, same rationale as P1/P2):** live browser/RTL screenshot — Clerk-mode shared env makes automated browser auth fragile; did not start a second dev server. Behavior covered by the happy-dom component test; a real-device RTL/touch-target pass is still owed before user-facing ship.
 
 **Verdict:** VERIFIED — RED confirmed before GREEN, exact-payload assertion (not a loose "was called" check) on the highest-risk contract point (confirmed ids exclude checked-out + un-toggled items), i18n resolution checked at runtime not just parity, hard boundary grepped clean, tsc/i18n/targeted-regression all green. Single commit `20ee7899c`.
+
+## 2026-07-15 — P3 T3.4-i-b — Equipment Coordinator visibility (`65d8ed030`)
+
+**Scope:** Part A (server) — `server/routes/rooms.ts` GET `/` += `lastSweptAt`/`lastSweptByName` per room, `src/types/equipment.ts` `Room` type. Part B — `src/pages/admin/UsersSection.tsx` per-user Equipment Coordinator checkbox (admin-only surface, technician/senior_technician rows only). Parts C/D — new `src/features/equipment/sweep/CoordinatorSweepState.tsx` (coordinator line + sweep-state line + senior/admin confirm picker), mounted in `src/pages/room-radar.tsx` right after the Room Sweep entry button. New `coordinator` i18n namespace + 3 `adminPage.equipmentCoordinator*` keys in both locales. Consumed the already-committed T3.4-i-a surfaces without redefining them: read `src/lib/api.ts:456` (`setEquipmentCoordinator`), `:1268-1271` (`shiftCoordinator`/`confirmCoordinator`) and `src/types/equipment.ts:637-663` (`EquipmentCoordinatorStatus`, `ShiftCoordinatorResult`, `ShiftCoordinatorConfirmation`) before writing any component code, and read `server/services/equipment-coordinator.service.ts` to confirm `resolution.seniorTechUserId`/`candidates`/`status` semantics used for the Part D gate.
+
+**Hard boundary respected:** `src/pages/rooms-list.tsx` was never opened, edited, or imported — `git diff --stat -- src/pages/rooms-list.tsx` against the pre-task HEAD produced no output (confirmed after the commit).
+
+**TDD, RED confirmed first for all three test files:**
+- `tests/room-last-swept.integration.test.ts` (new, Postgres integration, mirrors `tests/room-readiness.integration.test.ts`'s harness): run before touching `rooms.ts` → 4/5 failed (`expected undefined to be ...`), 1/5 passed (the DB-reached sanity check) — confirms the DB was actually reached, not skipped. After implementing the single grouped join query (`equipmentAnchors` ⋈ `equipment` ⋈ `users`, `source='sweep'`, reduced to first-per-room in a `Map` since rows are ordered `assertedAt DESC`) → 5/5 pass, including a dedicated "most recent wins when a room has 2 sweep anchors" case that exercises `createAnchor`'s own supersede behavior, and a "non-sweep source (citizen) is ignored" case.
+- `tests/users-section-coordinator.test.tsx` (new): run before the checkbox existed → 2/3 failed (`findByTestId` timeout on `checkbox-equipment-coordinator-*`), 1/3 passed vacuously (vet/admin-hides-toggle, true before the toggle existed at all). After adding the `Checkbox` + `setEquipmentCoordinatorMut` in `UsersSection.tsx` → 3/3 pass: toggle-on calls `setEquipmentCoordinator("u-tech", true)`, toggle-off calls `setEquipmentCoordinator("u-senior", false)`, vet/admin rows render no checkbox.
+- `tests/coordinator-sweep-state.test.tsx` (new): run before the component file existed → Vite import-resolution failure (`Failed to resolve import ".../CoordinatorSweepState"`), 0 tests ran. After implementing the component → 6/6 pass, covering: coordinator name shown for `status:"auto"`; `"not swept this shift"` vs `"last swept … by NAME"` from `lastSweptAt`/`lastSweptByName`; `needs_confirmation` + current user IS `seniorTechUserId` → picker renders and `fireEvent.change` → `confirmCoordinator` called with `{ shiftDate, coordinatorUserId }` **exactly**; `needs_confirmation` + admin (not the senior) → picker also renders; `needs_confirmation` + neither senior nor admin → read-only `t.coordinator.toBeConfirmed` line, `coordinator-confirm-select` testid absent. Radix `Select` was mocked with a native `<select>` (same pattern as `tests/users-secondary-role-pending.test.tsx`) since happy-dom can't drive Radix's popup/portal machinery.
+
+**i18n gotcha handled:** new `coordinator` namespace added to both locale JSONs (parity-safe insertion right after `roomSweep`) and hand-wired into `src/lib/i18n.ts`'s `buildTranslations` (interpolated `byName`/`withName` get explicit `tr(...)`, the rest spread via `...d.coordinator`); 3 new `adminPage.equipmentCoordinator*` keys added the same way (spread, no interpolation needed). Ran the brief's runtime-resolution check for every new key (not just the 2 named in the brief) — all resolved to real Hebrew strings, none `undefined`:
+```
+$ npx tsx -e "import {t} from './src/lib/i18n'; ..."
+withName: רכז הציוד: Dana
+byName: על ידי Dana
+sweptPrefix: נסרק לאחרונה
+notSweptThisShift: טרם נסרק במשמרת זו
+toBeConfirmed: רכז הציוד: טרם אושר
+unassigned: רכז הציוד: לא שובץ
+choosePlaceholder: בחר רכז ציוד
+confirmSuccess: רכז הציוד אושר
+confirmError: אישור רכז הציוד נכשל
+adminPage.equipmentCoordinatorLabel: רכז ציוד
+adminPage.equipmentCoordinatorUpdated: זכאות רכז הציוד עודכנה
+adminPage.equipmentCoordinatorUpdateFailed: עדכון זכאות רכז הציוד נכשל
+```
+`pnpm i18n:generate-types` also re-run afterward (not strictly required by the brief's verify list, but keeps `src/lib/i18n.generated.d.ts` in sync — confirmed nothing else imports it, so this was hygiene, not a gate).
+
+**Full verify:**
+- `pnpm i18n:check` → `✓ locales/en.json and locales/he.json are in deep key parity.`
+- `npx tsc --noEmit` (frontend) → 0 errors. `npx tsc -p tsconfig.server.json --noEmit` → 0 errors.
+- Targeted regression set (11 files spanning the 3 new tests + adjacent room-radar/UsersSection/docking-coordinator/room-sweep/rooms-list-bidi tests): 50/50 pass.
+- Full `pnpm test` (entire default suite, not just targeted files, given the shared `rooms.ts`/`i18n.ts` surfaces touched): **578/578 files, 5054/5054 tests**, one run, green.
+
+**Deferred (per brief, explicitly, do not start a dev server):** live browser/RTL screenshot verification of the room-radar sweep-state line and the confirm picker's actual touch targets/RTL layout on a real viewport. Behavior is covered by the happy-dom component test (`coordinator-sweep-state.test.tsx`); a real-device or dev-server-driven RTL/touch-target pass is still owed before user-facing ship, consistent with how T3.2b logged the same deferral.
+
+**Verdict:** VERIFIED — RED confirmed before GREEN on all three new test files (DB actually reached for the integration test, not skipped; import-resolution failure, not a stub, for the new component before it existed), the highest-risk contract point (senior/admin gating on the confirm picker, and the exact `confirmCoordinator` payload) asserted precisely rather than loosely, i18n resolution checked at runtime for every new key, hard boundary (`rooms-list.tsx`) grepped/diffed clean, both tsc configs and the full 5054-test suite green. Single commit `65d8ed030`.
