@@ -304,6 +304,83 @@ describe.skipIf(!DATABASE_URL)("docking equipment coordinator (T3.4-i-a) integra
     expect(candidateIds).toEqual([a, b].sort());
   });
 
+  it("case 3b (CRITICAL, pre-PR review): a stored row from the escalation worker (source fallback_senior, NOT confirmed) must not be treated as a human confirmation", async () => {
+    const a = randomUUID();
+    const b = randomUUID();
+    const senior = randomUUID();
+    await seedUser(a, ctx.clinicId, { name: "Amit Ron", isEquipmentCoordinator: true });
+    await seedUser(b, ctx.clinicId, { name: "Tamar Gil", isEquipmentCoordinator: true });
+    await seedUser(senior, ctx.clinicId, { name: "Shira Katz", role: "senior_technician", isEquipmentCoordinator: false });
+    await seedShift(randomUUID(), ctx.clinicId, ctx.shiftDate, "Amit Ron", "technician");
+    await seedShift(randomUUID(), ctx.clinicId, ctx.shiftDate, "Tamar Gil", "technician");
+    await seedShift(randomUUID(), ctx.clinicId, ctx.shiftDate, "Shira Katz", "senior_technician");
+
+    // Simulate the sweep-escalation worker having already written a
+    // bookkeeping row for this needs_confirmation shift (I-2 ladder,
+    // source "fallback_senior") — NOT a genuine human confirmation.
+    await probePool!.query(
+      `INSERT INTO vt_shift_equipment_coordinator
+         (id, clinic_id, shift_date, coordinator_user_id, source, escalation_stage, current_responsible_user_id, escalated_at)
+       VALUES ($1, $2, $3, $4, 'fallback_senior', 2, $4, now())`,
+      [randomUUID(), ctx.clinicId, ctx.shiftDate, senior],
+    );
+
+    const resolution = await resolveShiftCoordinator(ctx.clinicId, ctx.shiftDate);
+    expect(resolution.status).toBe("needs_confirmation");
+    expect(resolution.coordinatorUserId).toBeNull();
+
+    // The HTTP GET must reflect the same re-derived status, so the
+    // manager's confirm picker (CoordinatorSweepState.tsx) stays visible.
+    const res = await api(`/api/docking/coordinator?date=${ctx.shiftDate}`, "GET");
+    expect(res.status).toBe(200);
+    if (!isRecord(res.json)) throw new Error("expected object");
+    expect(getString(res.json, "status")).toBe("needs_confirmation");
+    expect(res.json.coordinatorUserId).toBeNull();
+  });
+
+  it("case 3c (CRITICAL, pre-PR review): a stored row with source confirmed IS a genuine human confirmation -> status confirmed", async () => {
+    const a = randomUUID();
+    const b = randomUUID();
+    await seedUser(a, ctx.clinicId, { name: "Amit Ron", isEquipmentCoordinator: true });
+    await seedUser(b, ctx.clinicId, { name: "Tamar Gil", isEquipmentCoordinator: true });
+    await seedShift(randomUUID(), ctx.clinicId, ctx.shiftDate, "Amit Ron", "technician");
+    await seedShift(randomUUID(), ctx.clinicId, ctx.shiftDate, "Tamar Gil", "technician");
+
+    await probePool!.query(
+      `INSERT INTO vt_shift_equipment_coordinator (id, clinic_id, shift_date, coordinator_user_id, source)
+       VALUES ($1, $2, $3, $4, 'confirmed')`,
+      [randomUUID(), ctx.clinicId, ctx.shiftDate, a],
+    );
+
+    const resolution = await resolveShiftCoordinator(ctx.clinicId, ctx.shiftDate);
+    expect(resolution.status).toBe("confirmed");
+    expect(resolution.coordinatorUserId).toBe(a);
+  });
+
+  it("case 4b (MAJOR, pre-PR review, security): a plain technician whose self-editable displayName matches the roster's senior employeeName must NOT pass the senior-tech gate", async () => {
+    const a = randomUUID();
+    const impersonator = randomUUID();
+    await seedUser(a, ctx.clinicId, { name: "Amit Ron", isEquipmentCoordinator: true });
+    // Permanent role is "technician" — this user is NOT actually a senior
+    // tech. Their displayName has been self-edited (PATCH /api/users/:id/display_name
+    // is user-editable) to match the roster's senior_technician employeeName
+    // for this shift-date, so `matchOnShiftUsers`/`isSeniorTech` derive them
+    // as `seniorTechUserId` from the roster row alone.
+    await seedUser(impersonator, ctx.clinicId, { name: "Shira Katz", role: "technician", isEquipmentCoordinator: false });
+    await seedShift(randomUUID(), ctx.clinicId, ctx.shiftDate, "Amit Ron", "technician");
+    await seedShift(randomUUID(), ctx.clinicId, ctx.shiftDate, "Shira Katz", "senior_technician");
+
+    // Sanity: the resolver really does derive this user as seniorTechUserId.
+    const resolution = await resolveShiftCoordinator(ctx.clinicId, ctx.shiftDate);
+    expect(resolution.seniorTechUserId).toBe(impersonator);
+
+    // The caller's OWN permanent DB role is "technician" — the gate must
+    // reject them even though they are the derived seniorTechUserId.
+    setActor(impersonator, "technician");
+    const res = await api("/api/docking/coordinator", "POST", { shiftDate: ctx.shiftDate, coordinatorUserId: a });
+    expect(res.status).toBe(403);
+  });
+
   it("case 4: POST confirm as the senior tech picks an eligible candidate -> confirmed; a non-eligible pick -> 422", async () => {
     const a = randomUUID();
     const b = randomUUID();

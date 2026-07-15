@@ -230,6 +230,34 @@ router.get("/:id", requireAuth, async (req, res) => {
     const issue = counts?.issue ?? 0;
     const recentlyVerified = counts?.recentlyVerified ?? 0;
 
+    // "Last swept" (pre-PR review, MAJOR — mirrors the GET /api/rooms list
+    // handler's derivation above, scoped to this one room): the most recent
+    // source:"sweep" anchor among items currently HOMED to this room,
+    // joined to the asserting user's name. All-time, not shift-scoped (the
+    // client's copy for this surface is deliberately not "this shift").
+    const [lastSweep] = await db
+      .select({
+        assertedAt: equipmentAnchors.assertedAt,
+        sweeperName: users.name,
+        sweeperDisplayName: users.displayName,
+      })
+      .from(equipmentAnchors)
+      .innerJoin(
+        equipment,
+        and(eq(equipmentAnchors.equipmentId, equipment.id), eq(equipment.clinicId, clinicId)),
+      )
+      .leftJoin(users, and(eq(equipmentAnchors.assertedById, users.id), eq(users.clinicId, clinicId)))
+      .where(
+        and(
+          eq(equipmentAnchors.clinicId, clinicId),
+          eq(equipmentAnchors.source, "sweep"),
+          eq(equipment.homeRoomId, room.id),
+          isNull(equipment.deletedAt),
+        ),
+      )
+      .orderBy(desc(equipmentAnchors.assertedAt))
+      .limit(1);
+
     res.json({
       ...room,
       totalEquipment: total,
@@ -238,6 +266,8 @@ router.get("/:id", requireAuth, async (req, res) => {
       issueCount: issue,
       recentlyVerifiedCount: recentlyVerified,
       linkedPatientName: null,
+      lastSweptAt: lastSweep ? new Date(lastSweep.assertedAt).toISOString() : null,
+      lastSweptByName: lastSweep ? lastSweep.sweeperDisplayName || lastSweep.sweeperName || null : null,
     });
   } catch (err) {
     console.error(err);

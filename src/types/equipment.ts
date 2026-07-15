@@ -662,6 +662,8 @@ export interface RoomSweepResult {
   roomId: string;
   confirmedCount: number;
   missingCount: number;
+  /** Confirmed items with no resolvable home dock (grouped "No station" in the expected list) — counted separately so totals stay internally consistent. */
+  skippedNoStationCount: number;
   sweptById: string;
   sweptAt: string;
 }

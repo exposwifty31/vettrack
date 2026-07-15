@@ -478,6 +478,34 @@ describe.skipIf(!DATABASE_URL)("docking room sweep (T3.2a) integration", () => {
       expect(await lastInvalidatedReason(restingId)).toBe("sweep_missing");
     });
 
+    it("MINOR (pre-PR review): a confirmed item with no resolvable home dock is counted as skippedNoStationCount, not in confirmedCount/missingCount", async () => {
+      const noStationAssetTypeId = randomUUID();
+      await seedAssetType(noStationAssetTypeId, ctx.clinicId, "No-Station Category");
+      // No dock exists for (ctx.roomId, noStationAssetTypeId) — resolveHomeDock
+      // returns null for this item, so it hits the `!homeDock` continue.
+      const noStationId = randomUUID();
+      await seedEquipment(noStationId, ctx.clinicId, {
+        name: "No-Station Pump",
+        homeRoomId: ctx.roomId,
+        assetTypeId: noStationAssetTypeId,
+        custodyState: "returned",
+      });
+
+      const res = await api(`/api/docking/rooms/${ctx.roomId}/sweep`, "POST", {
+        confirmedEquipmentIds: [noStationId],
+      });
+
+      expect(res.status).toBe(200);
+      expect(isRecord(res.json)).toBe(true);
+      if (!isRecord(res.json)) throw new Error("Expected response to be an object");
+      expect(res.json.confirmedCount).toBe(0);
+      expect(res.json.missingCount).toBe(0);
+      expect(res.json.skippedNoStationCount).toBe(1);
+
+      // Never anchored, never contradicted.
+      expect(await anchorCount(noStationId)).toBe(0);
+    });
+
     it("404s errors.notFound for a room that doesn't exist in this clinic, with no writes", async () => {
       const res = await api(`/api/docking/rooms/${randomUUID()}/sweep`, "POST", {
         confirmedEquipmentIds: [],

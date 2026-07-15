@@ -28,6 +28,7 @@ import {
 } from "../services/docking.service.js";
 import { createAnchor, invalidateCurrentAnchor } from "../services/equipment-anchor.service.js";
 import { resolveShiftCoordinator, confirmShiftCoordinator } from "../services/equipment-coordinator.service.js";
+import { mapLegacyRoleToClinicalRole } from "../lib/authority-roles.js";
 
 const router = Router();
 
@@ -486,6 +487,7 @@ router.post(
     const confirmedSet = new Set(confirmedEquipmentIds);
     let confirmedCount = 0;
     let missingCount = 0;
+    let skippedNoStationCount = 0;
 
     await db.transaction(async (tx) => {
       const [clinicDocks, expectedResting] = await Promise.all([
@@ -513,7 +515,15 @@ router.post(
       for (const item of expectedResting) {
         if (confirmedSet.has(item.id)) {
           const homeDock = resolveHomeDock({ homeRoomId: item.homeRoomId, assetTypeId: item.assetTypeId }, clinicDocks);
-          if (!homeDock) continue; // no resolvable home dock — nothing to anchor to; neither swept nor missing
+          if (!homeDock) {
+            // No resolvable home dock — nothing to anchor to; neither swept
+            // nor missing. Counted separately (pre-PR review, MINOR) so the
+            // client-visible totals stay internally consistent with what
+            // the tech actually toggled (the GET expected-list still shows
+            // this item grouped under "No station").
+            skippedNoStationCount++;
+            continue;
+          }
           await createAnchor(tx, {
             clinicId,
             equipmentId: item.id,
@@ -541,7 +551,7 @@ router.post(
       metadata: { confirmed: confirmedCount, missing: missingCount },
     });
 
-    res.json({ roomId, confirmedCount, missingCount, sweptById: userId, sweptAt });
+    res.json({ roomId, confirmedCount, missingCount, skippedNoStationCount, sweptById: userId, sweptAt });
   },
 );
 
@@ -618,7 +628,18 @@ router.post("/coordinator", requireAuth, writeLimiter, validateBody(confirmCoord
   const resolution = await resolveShiftCoordinator(clinicId, shiftDate);
 
   const isAdmin = role === "admin";
-  const isSeniorTechOnShift = resolution.seniorTechUserId !== null && resolution.seniorTechUserId === userId;
+  // Security (pre-PR review, MAJOR): `seniorTechUserId` is derived by
+  // matching the free-text roster `employeeName` to `vt_users.displayName ||
+  // name` — and `displayName` is self-editable via PATCH
+  // /api/users/:id/display_name. Matching the roster identity alone is not
+  // sufficient authorization; the caller's OWN immutable permanent role
+  // (always `vt_users.role`, never a spoofable source) must also be
+  // senior_technician (or its `lead_technician` alias).
+  const callerIsSeniorByPermanentRole = mapLegacyRoleToClinicalRole(role) === "senior_technician";
+  const isSeniorTechOnShift =
+    resolution.seniorTechUserId !== null &&
+    resolution.seniorTechUserId === userId &&
+    callerIsSeniorByPermanentRole;
   if (!isAdmin && !isSeniorTechOnShift) {
     return apiError(req, res, "errors.docking.coordinatorForbidden", undefined, 403);
   }

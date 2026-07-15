@@ -126,7 +126,14 @@ export async function resolveShiftCoordinator(
     .where(and(eq(shiftEquipmentCoordinator.clinicId, clinicId), eq(shiftEquipmentCoordinator.shiftDate, shiftDate)))
     .limit(1);
 
-  if (stored) {
+  // Only a genuine human confirmation (`confirmShiftCoordinator`, source
+  // "confirmed") short-circuits to "confirmed". The sweep-escalation worker
+  // (server/workers/sweep-escalation.worker.ts) also writes rows to this
+  // table with source "auto" | "fallback_senior" as escalation bookkeeping
+  // — those are NOT a human confirmation, so fall through and re-derive
+  // status from the current eligibility set exactly as if no row were
+  // stored (pre-PR review, CRITICAL).
+  if (stored && stored.source === "confirmed") {
     return { coordinatorUserId: stored.coordinatorUserId, status: "confirmed", candidates, seniorTechUserId };
   }
 

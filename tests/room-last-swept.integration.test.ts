@@ -58,6 +58,10 @@ function buildApp() {
 let server: Server;
 let baseUrl: string;
 
+function isRecord(val: unknown): val is Record<string, unknown> {
+  return val !== null && typeof val === "object" && !Array.isArray(val);
+}
+
 async function api(path: string): Promise<{ status: number; json: unknown }> {
   const res = await fetch(`${baseUrl}${path}`, { headers: { "Content-Type": "application/json" } });
   let json: unknown = {};
@@ -254,6 +258,31 @@ describe.skipIf(!DATABASE_URL)("GET /api/rooms — last-swept fields (T3.4-i-b P
     expect(icu).toBeDefined();
     expect(icu!.lastSweptAt).toEqual(expect.any(String));
     expect(icu!.lastSweptByName).toBe("Dana Sweeper");
+  });
+
+  it("MAJOR (pre-PR review): GET /api/rooms/:id (single room) ALSO returns lastSweptAt/lastSweptByName — all-time, not shift-scoped", async () => {
+    const itemId = randomUUID();
+    await seedEquipment(itemId, ctx.clinicId, {
+      name: "Pump",
+      homeRoomId: ctx.roomId,
+      assetTypeId: ctx.assetTypeId,
+      custodyState: "returned",
+    });
+
+    await createAnchor(db, {
+      clinicId: ctx.clinicId,
+      equipmentId: itemId,
+      dockId: ctx.dockId,
+      roomId: ctx.roomId,
+      assertedById: ctx.sweeperUserId,
+      source: "sweep",
+    });
+
+    const res = await api(`/api/rooms/${ctx.roomId}`);
+    expect(res.status).toBe(200);
+    if (!isRecord(res.json)) throw new Error("expected object");
+    expect(res.json.lastSweptAt).toEqual(expect.any(String));
+    expect(res.json.lastSweptByName).toBe("Dana Sweeper");
   });
 
   it("returns lastSweptAt:null, lastSweptByName:null for a room with no sweep anchor", async () => {
