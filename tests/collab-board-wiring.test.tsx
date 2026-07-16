@@ -21,11 +21,14 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   act,
   cleanup,
+  fireEvent,
   render,
   renderHook,
   screen,
   waitFor,
 } from "@testing-library/react";
+import { Router } from "wouter";
+import { memoryLocation } from "wouter/memory-location";
 
 // ── Fake socket.io-client (reuse the real collab-socket primitive) ────────────
 interface FakeSocket {
@@ -86,6 +89,9 @@ import { setClerkTokenGetter } from "@/lib/auth-fetch";
 import { closeCollabSocket } from "@/lib/collab-socket";
 import { useBoardCoPresence } from "@/board/useBoardCoPresence";
 import { BoardCoPresenceOverlay } from "@/board/BoardCoPresenceOverlay";
+import { BoardCoPresenceProvider } from "@/board/board-copresence-context";
+import { CommandBoard } from "@/features/command-board/components/CommandBoard";
+import type { EquipmentCommandBoardSnapshot } from "@/types/safety-surfaces";
 import { t } from "@/lib/i18n";
 
 const JWT = "aaa.bbb.ccc"; // isLikelyJwt: three non-empty dot-parts
@@ -221,7 +227,6 @@ describe("BoardCoPresenceOverlay — render + degradation", () => {
       <BoardCoPresenceOverlay
         peerCursors={[{ userId: "peer-1", x: 0.5, y: 0.25 }]}
         presentMembers={[{ userId: "peer-1", displayName: "Dana" }]}
-        peerSelections={[]}
       />,
     );
     const cursor = screen.getByTestId("board-cursor-peer-1");
@@ -236,7 +241,6 @@ describe("BoardCoPresenceOverlay — render + degradation", () => {
       <BoardCoPresenceOverlay
         peerCursors={[]}
         presentMembers={[{ userId: "peer-1", displayName: "Dana" }]}
-        peerSelections={[]}
       />,
     );
     expect(screen.getByText(t.board.collab.present)).toBeTruthy();
@@ -247,7 +251,7 @@ describe("BoardCoPresenceOverlay — render + degradation", () => {
     render(
       <div>
         <div>BOARD CONTENT</div>
-        <BoardCoPresenceOverlay peerCursors={[]} presentMembers={[]} peerSelections={[]} />
+        <BoardCoPresenceOverlay peerCursors={[]} presentMembers={[]} />
       </div>,
     );
     // Board content is present and unaffected.
@@ -255,5 +259,123 @@ describe("BoardCoPresenceOverlay — render + degradation", () => {
     // No peer cursor / co-presence indicator elements exist.
     expect(screen.queryByTestId(/^board-cursor-/)).toBeNull();
     expect(screen.queryByText(t.board.collab.present)).toBeNull();
+  });
+});
+
+// ── Selection: real producer + visible highlight (board content wiring) ───────
+// The reviewer required Feature 2's selection third to be functional end-to-end:
+// `/board` must actually EMIT board-selection (a real producer), and a peer's
+// selection must render a VISIBLE highlight keyed to the entity — not an inert
+// hidden marker. These render the REAL CommandBoard content so the producer +
+// consumer are proven through the shipped component, not a stand-in.
+
+type BoardUnit = EquipmentCommandBoardSnapshot["criticalUnits"][number];
+
+function unit(equipmentId: string): BoardUnit {
+  // status !== ready/in_use → surfaces in the board's needs-attention UnitRow list.
+  return {
+    equipmentId,
+    displayName: `Unit ${equipmentId}`,
+    status: "blocked",
+    blockingReasons: [],
+    citationsCount: 0,
+    truthHref: "#",
+  };
+}
+
+function boardWith(units: BoardUnit[]): EquipmentCommandBoardSnapshot {
+  return {
+    generatedAt: "2026-07-16T00:00:00.000Z",
+    clinicId: "c1",
+    overview: {
+      totalCritical: units.length,
+      ready: 0,
+      inUse: 0,
+      blocked: units.length,
+      stale: 0,
+      overdue: 0,
+      unknown: 0,
+      belowThresholdTypes: 0,
+      activeEmergencyUnits: 0,
+    },
+    byType: [],
+    byLocation: [],
+    criticalUnits: units,
+    alerts: [], // no critical alerts → calm layout (deterministic UnitRow render)
+    roiSignals: {
+      overusedUnits: [],
+      underusedUnits: [],
+      repairReplaceCandidates: [],
+      typeShortages: [],
+      duplicatePurchaseRisks: [],
+    },
+  };
+}
+
+function renderBoardContent(
+  board: EquipmentCommandBoardSnapshot,
+  provider?: {
+    selectEntity?: (id: string | null) => void;
+    peerSelections?: { userId: string; entityId: string }[];
+    presentMembers?: { userId: string; displayName: string }[];
+  },
+) {
+  const { hook } = memoryLocation({ path: "/board" });
+  const content = (
+    <CommandBoard
+      board={board}
+      currentTime="2026-07-16T00:00:00.000Z"
+      currentShift={[]}
+      kioskMode={false}
+    />
+  );
+  return render(
+    <Router hook={hook}>
+      {provider ? (
+        <BoardCoPresenceProvider
+          selectEntity={provider.selectEntity ?? (() => {})}
+          peerSelections={provider.peerSelections ?? []}
+          presentMembers={provider.presentMembers ?? []}
+        >
+          {content}
+        </BoardCoPresenceProvider>
+      ) : (
+        content
+      )}
+    </Router>,
+  );
+}
+
+describe("board selection — real producer + visible highlight (R-RTC-1.3)", () => {
+  it("emits board-selection (entity id, NO userId) when a real board unit is highlighted", () => {
+    const selectEntity = vi.fn();
+    renderBoardContent(boardWith([unit("eq-1")]), { selectEntity });
+    const row = screen.getByTestId("board-unit-row-eq-1");
+    fireEvent.pointerEnter(row);
+    expect(selectEntity).toHaveBeenCalledWith("eq-1");
+    fireEvent.pointerLeave(row);
+    expect(selectEntity).toHaveBeenCalledWith(null);
+  });
+
+  it("renders a VISIBLE highlight (not a hidden marker) on the peer-selected unit, keyed to entity id", () => {
+    renderBoardContent(boardWith([unit("eq-9"), unit("eq-8")]), {
+      peerSelections: [{ userId: "peer-3", entityId: "eq-9" }],
+      presentMembers: [{ userId: "peer-3", displayName: "Noa" }],
+    });
+    const selected = screen.getByTestId("board-unit-row-eq-9");
+    const other = screen.getByTestId("board-unit-row-eq-8");
+    expect(selected.getAttribute("data-board-peer-selected")).toBe("true");
+    expect(selected.hasAttribute("hidden")).toBe(false); // visible, not the old inert marker
+    expect(selected.textContent).toContain("Noa"); // advisory: names who is looking
+    expect(other.getAttribute("data-board-peer-selected")).toBeNull(); // only the selected entity
+  });
+
+  it("renders the board unit with NO highlight and no error when there is no provider (degraded)", () => {
+    expect(() => renderBoardContent(boardWith([unit("eq-1")]))).not.toThrow();
+    const row = screen.getByTestId("board-unit-row-eq-1");
+    expect(row.getAttribute("data-board-peer-selected")).toBeNull();
+    // Hovering is a harmless no-op under the inert default context — nothing gated.
+    fireEvent.pointerEnter(row);
+    expect(row.getAttribute("data-board-peer-selected")).toBeNull();
   });
 });

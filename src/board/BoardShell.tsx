@@ -5,15 +5,23 @@ import { BoardErrorBoundary } from "./BoardErrorBoundary";
 import { useBoardAutoReload } from "./useBoardAutoReload";
 import { useBoardCoPresence } from "./useBoardCoPresence";
 import { BoardCoPresenceOverlay } from "./BoardCoPresenceOverlay";
+import { BoardCoPresenceProvider } from "./board-copresence-context";
 
 type Props = { children: ReactNode };
 
 /**
- * Chrome-only kiosk host for the /board platform target. Pure posture — it
- * imports nothing from the realtime transport and never reads the snapshot;
+ * Chrome-only kiosk host for the /board platform target. It never touches the
+ * FROZEN realtime transport (SSE `/api/realtime/*`) and never reads the snapshot;
  * CommandBoardScreen (the {children}) remains the single data-path owner, and
  * BoardShell renders {children}, never CommandBoardScreen itself, so the SSE
  * subscription refcount can never reach 2.
+ *
+ * It DOES mount the additive R-RTC-1.3 collaboration channel (socket.io, a
+ * DISTINCT ephemeral+advisory transport — not SSE): useBoardCoPresence lazily
+ * acquires the ref-counted collab socket and feeds peer cursors/presence to the
+ * overlay and per-entity selection to the board content via BoardCoPresenceProvider.
+ * This channel is glance-only — it never gates board rendering and degrades to a
+ * static board when the socket is unavailable.
  *
  * Behaviors, all from existing primitives:
  *   1. Dark full-bleed — fixed inset-0 bg-black. Deliberately NO `dark` class on
@@ -84,12 +92,17 @@ export function BoardShell({ children }: Props) {
           setResetSeq((n) => n + 1);
         }}
       >
-        {children}
+        <BoardCoPresenceProvider
+          selectEntity={coPresence.selectEntity}
+          peerSelections={coPresence.peerSelections}
+          presentMembers={coPresence.presentMembers}
+        >
+          {children}
+        </BoardCoPresenceProvider>
       </BoardErrorBoundary>
       <BoardCoPresenceOverlay
         peerCursors={coPresence.peerCursors}
         presentMembers={coPresence.presentMembers}
-        peerSelections={coPresence.peerSelections}
       />
     </div>
   );

@@ -35,8 +35,13 @@ import { resolveBearerToken } from "@/lib/auth-fetch";
 
 // ~15 emissions/s max — comfortably under the server's 20/s per-socket cap.
 const CURSOR_MIN_INTERVAL_MS = 66;
+// <=4 emissions/s — comfortably under the server's 5/s per-socket selection cap.
+const SELECTION_MIN_INTERVAL_MS = 250;
 // Drop a peer's cursor if it goes quiet (peer left / stopped moving / dropped event).
 const PEER_CURSOR_TTL_MS = 5_000;
+// Drop a peer's selection if it goes stale — there is no deselect event in the
+// contract, so a receiver-side TTL clears a highlight the peer moved off.
+const PEER_SELECTION_TTL_MS = 8_000;
 // Re-mint the handshake token below the Clerk session-token TTL (~60s).
 const TOKEN_REFRESH_MS = 45_000;
 
@@ -86,9 +91,11 @@ export function useBoardCoPresence(options: UseBoardCoPresenceOptions = {}): Boa
   const joinedRoomRef = useRef<string | null>(null);
   const tokenRef = useRef<string | null>(null);
   const lastCursorEmitRef = useRef(Number.NEGATIVE_INFINITY);
+  const lastSelectionEmitRef = useRef(Number.NEGATIVE_INFINITY);
   const nowRef = useRef(now);
   nowRef.current = now;
   const peerCursorTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  const peerSelectionTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
   const [isConnected, setIsConnected] = useState(false);
   const [presentMembers, setPresentMembers] = useState<BoardMember[]>([]);
@@ -103,6 +110,7 @@ export function useBoardCoPresence(options: UseBoardCoPresenceOptions = {}): Boa
     let acquired: CollabSocket | null = null;
     let refreshTimer: ReturnType<typeof setInterval> | null = null;
     const cursorTimers = peerCursorTimers.current;
+    const selectionTimers = peerSelectionTimers.current;
 
     const authSource: CollabAuthSource = () =>
       tokenRef.current ? { token: tokenRef.current } : null;
@@ -140,6 +148,13 @@ export function useBoardCoPresence(options: UseBoardCoPresenceOptions = {}): Boa
         const rest = prev.filter((s) => s.userId !== userId);
         return [...rest, { userId, entityId }];
       });
+      const existing = selectionTimers.get(userId);
+      if (existing) clearTimeout(existing);
+      const timer = setTimeout(() => {
+        selectionTimers.delete(userId);
+        setPeerSelections((prev) => prev.filter((s) => s.userId !== userId));
+      }, PEER_SELECTION_TTL_MS);
+      selectionTimers.set(userId, timer);
     };
 
     const handlePointerMove = (event: MouseEvent) => {
@@ -201,6 +216,8 @@ export function useBoardCoPresence(options: UseBoardCoPresenceOptions = {}): Boa
       if (refreshTimer) clearInterval(refreshTimer);
       for (const timer of cursorTimers.values()) clearTimeout(timer);
       cursorTimers.clear();
+      for (const timer of selectionTimers.values()) clearTimeout(timer);
+      selectionTimers.clear();
       if (acquired) {
         acquired.off("connect", handleConnect);
         acquired.off("disconnect", handleDisconnect);
@@ -216,6 +233,7 @@ export function useBoardCoPresence(options: UseBoardCoPresenceOptions = {}): Boa
       socketRef.current = null;
       tokenRef.current = null;
       lastCursorEmitRef.current = Number.NEGATIVE_INFINITY;
+      lastSelectionEmitRef.current = Number.NEGATIVE_INFINITY;
       setIsConnected(false);
       setPresentMembers([]);
       setPeerCursors([]);
@@ -227,7 +245,12 @@ export function useBoardCoPresence(options: UseBoardCoPresenceOptions = {}): Boa
     const socket = socketRef.current;
     if (!socket || !isCollabConnected()) return; // degrade — never gate on the socket
     const id = typeof entityId === "string" ? entityId.trim() : "";
+    // No deselect event in the contract; a null/empty clear is a local no-op and the
+    // peer-side TTL clears a stale highlight.
     if (!id) return;
+    const ts = nowRef.current();
+    if (ts - lastSelectionEmitRef.current < SELECTION_MIN_INTERVAL_MS) return; // client throttle
+    lastSelectionEmitRef.current = ts;
     socket.emit("board-selection", { entityId: id }); // NO userId — server attaches identity
   }, []);
 

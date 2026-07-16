@@ -1,10 +1,9 @@
 import { t } from "@/lib/i18n";
-import type { BoardMember, BoardPeerCursor, BoardPeerSelection } from "./useBoardCoPresence";
+import type { BoardMember, BoardPeerCursor } from "./useBoardCoPresence";
 
 type Props = {
   peerCursors: BoardPeerCursor[];
   presentMembers: BoardMember[];
-  peerSelections: BoardPeerSelection[];
 };
 
 /**
@@ -12,9 +11,11 @@ type Props = {
  * each peer's server-attached, NORMALIZED {x,y} back to the board viewport and
  * shows who is on the board. It owns no durable state, never fetches, and renders
  * NOTHING when there are no peers — so a socket-down board is byte-identical to
- * today's static kiosk. Selection highlights are advisory `data-` markers only.
+ * today's static kiosk. Peer SELECTION highlights are NOT drawn here — they render
+ * as a visible ring on the selected board entity itself (see useBoardEntityCoPresence),
+ * because a normalized cursor overlay cannot know an entity's on-screen rect.
  */
-export function BoardCoPresenceOverlay({ peerCursors, presentMembers, peerSelections }: Props) {
+export function BoardCoPresenceOverlay({ peerCursors, presentMembers }: Props) {
   const nameOf = (userId: string): string =>
     presentMembers.find((m) => m.userId === userId)?.displayName ?? "";
 
@@ -63,10 +64,6 @@ export function BoardCoPresenceOverlay({ peerCursors, presentMembers, peerSelect
             </span>
           )}
         </div>
-      ))}
-
-      {peerSelections.map((s) => (
-        <span key={`${s.userId}:${s.entityId}`} data-board-peer-selection={s.entityId} hidden />
       ))}
     </div>
   );
