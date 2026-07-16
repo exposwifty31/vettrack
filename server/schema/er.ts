@@ -1,6 +1,6 @@
 import { sql } from "drizzle-orm";
 import {
-  text, timestamp, boolean, integer,
+  text, timestamp, boolean, integer, bigint,
   index, uniqueIndex, primaryKey, jsonb,
 } from "drizzle-orm/pg-core";
 import { vtTable } from "./helpers.js";
@@ -129,3 +129,41 @@ export type CodeBlueSession = typeof codeBlueSessions.$inferSelect;
 export type CodeBlueLogEntry = typeof codeBlueLogEntries.$inferSelect;
 export type CodeBluePresence = typeof codeBluePresence.$inferSelect;
 export type CrashCartCheck = typeof crashCartChecks.$inferSelect;
+
+/**
+ * R-CBF-1.1a — durable idempotency CLAIM record for the one-tap Code Blue start.
+ *
+ * The FIRST transactional step of R-CBF-1.1's orchestration, written in its OWN
+ * durable write BEFORE any cart lookup or the session transaction. The
+ * per-gesture `(clinicId, token)` (R-CBF-1.3) is the natural key; a duplicate
+ * start is resolved by claim `state`:
+ *   - `claimed`  (fence, leaseUntil) — an in-flight owner holds a monotonic fence.
+ *   - `committed`                    — bound to a committed session; a retry REPLAYS.
+ *   - `released`                     — owner aborted its session txn; reclaimable now.
+ *
+ * `fence` is a MONOTONIC version token: a short TTL alone is unsafe against a
+ * slow-but-still-active owner, so reclamation issues a strictly higher fence and
+ * only the current fence-holder may flip the claim to `committed` (a superseded
+ * fence is rejected on commit). `sessionId` is a plain nullable ref (NOT a FK) —
+ * mirroring the soft-reserve rationale: the committed session is never deleted
+ * and a hard FK would add an equipment/code-blue schema cycle. Clinic-scoped on
+ * every query; state kept as TEXT + CHECK in the migration ($type-narrowed here).
+ */
+export const codeBlueStartClaims = vtTable(
+  "vt_code_blue_start_claims",
+  {
+    clinicId: text("clinic_id").notNull().references(() => clinics.id, { onDelete: "cascade" }),
+    token: text("token").notNull(),
+    fence: bigint("fence", { mode: "number" }).notNull(),
+    leaseUntil: timestamp("lease_until", { withTimezone: true }).notNull(),
+    state: text("state").$type<"claimed" | "committed" | "released">().notNull().default("claimed"),
+    sessionId: text("session_id"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    pk: primaryKey({ columns: [t.clinicId, t.token] }),
+    clinicStateIdx: index("idx_vt_code_blue_start_claims_clinic_state").on(t.clinicId, t.state),
+  }),
+);
+export type CodeBlueStartClaim = typeof codeBlueStartClaims.$inferSelect;
