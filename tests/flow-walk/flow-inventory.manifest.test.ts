@@ -217,6 +217,25 @@ describe("flow-walk manifest — outcome derivation", () => {
     expect(expectedNativeOutcome(row("emergency-wall"), "admin")).toMatchObject({ kind: "guard-redirect", to: "/home" });
   });
 
+  it("scan self-redirects on web (scan.tsx mobile-shell gate) but renders on native", () => {
+    expect(expectedWebOutcome(row("scan"), "admin")).toMatchObject({ kind: "redirect", to: "/equipment?scan=1" });
+    expect(expectedWebOutcome(row("scan"), "senior_technician")).toMatchObject({ kind: "redirect" });
+    // Non-management roles never reach ScanPage on web — the T-31 gate preempts it.
+    expect(expectedWebOutcome(row("scan"), "technician")).toMatchObject({ kind: "management-web-gate" });
+    expect(expectedNativeOutcome(row("scan"), "technician")).toMatchObject({ kind: "render" });
+  });
+
+  it("admin-floor pages (T22 ManagementAccessDenied) deny management.web roles below admin", () => {
+    for (const id of ["admin-home", "admin-config", "audit-log"]) {
+      expect(expectedWebOutcome(row(id), "admin"), `${id} admin`).toMatchObject({ kind: "render" });
+      expect(expectedWebOutcome(row(id), "senior_technician"), `${id} senior`).toMatchObject({ kind: "access-denied" });
+      // Below management.web the T-31 gate still preempts the in-page floor.
+      expect(expectedWebOutcome(row(id), "vet"), `${id} vet`).toMatchObject({ kind: "management-web-gate" });
+    }
+    // /admin/code-blue-history's floor is management.web — senior renders it (walk-verified).
+    expect(expectedWebOutcome(row("admin-history"), "senior_technician")).toMatchObject({ kind: "render" });
+  });
+
   it("pathMatchesTarget ignores query strings and treats an absent target as a match", () => {
     expect(pathMatchesTarget("/equipment?scan=1", "/equipment")).toBe(true);
     expect(pathMatchesTarget("/equipment", "/equipment")).toBe(true);
@@ -228,8 +247,20 @@ describe("flow-walk manifest — outcome derivation", () => {
     const meds = row("legacy-meds");
     for (const r of ROLE_ARCHETYPES) {
       expect(expectedWebOutcome(meds, r)).toMatchObject({ kind: "redirect", to: "/equipment/tasks" });
+      if (r === "student") continue; // native chains through Tasks' custody redirect — asserted below
       expect(expectedNativeOutcome(meds, r)).toMatchObject({ kind: "redirect", to: "/equipment/tasks" });
     }
+  });
+
+  it("native: Tasks inline-redirects the custody-only archetype, and its legacy aliases chain through", () => {
+    // Tasks.tsx bounces the student archetype to /equipment (walk-verified) — so a
+    // redirect that LANDS on /equipment/tasks continues to /equipment for students.
+    expect(expectedNativeOutcome(row("tasks"), "student")).toMatchObject({ kind: "redirect", to: "/equipment" });
+    expect(expectedNativeOutcome(row("legacy-tasks-alias"), "student")).toMatchObject({ kind: "redirect", to: "/equipment" });
+    expect(expectedNativeOutcome(row("legacy-meds"), "student")).toMatchObject({ kind: "redirect", to: "/equipment" });
+    // Non-custody roles stop at the declared target / render the page.
+    expect(expectedNativeOutcome(row("tasks"), "technician")).toMatchObject({ kind: "render" });
+    expect(expectedNativeOutcome(row("legacy-tasks-alias"), "admin")).toMatchObject({ kind: "redirect", to: "/equipment/tasks" });
   });
 
   it("web/board platform partitions are non-empty and disjoint from native-only rows", () => {

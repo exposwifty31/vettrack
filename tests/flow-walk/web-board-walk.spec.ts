@@ -88,10 +88,50 @@ async function probe(request: APIRequestContext): Promise<string | null> {
   return null;
 }
 
+/**
+ * "eq1" / "s1" are manifest placeholders; against a live DB they 400/404 every
+ * detail row (non-UUID ids are rejected). Resolve them to real seeded ids at
+ * walk start; if the lookup fails the placeholder walks as-is and the matrix
+ * shows the noise honestly.
+ */
+const idSubstitutions = new Map<string, string>();
+
+async function resolveSeededIds(request: APIRequestContext): Promise<void> {
+  try {
+    const eq = await request.get(`${BASE}/api/equipment`, { timeout: 8_000 });
+    if (eq.ok()) {
+      const body = (await eq.json()) as { id?: string }[] | { items?: { id?: string }[] };
+      const first = Array.isArray(body) ? body[0] : body.items?.[0];
+      if (first?.id) idSubstitutions.set("eq1", first.id);
+    }
+  } catch {
+    /* keep placeholder */
+  }
+  try {
+    const sh = await request.get(`${BASE}/api/shifts`, { timeout: 8_000 });
+    if (sh.ok()) {
+      const body = (await sh.json()) as { id?: string }[] | { shifts?: { id?: string }[] };
+      const first = Array.isArray(body) ? body[0] : body.shifts?.[0];
+      if (first?.id) idSubstitutions.set("s1", first.id);
+    }
+  } catch {
+    /* keep placeholder */
+  }
+}
+
+function substitutePlaceholders(path: string): string {
+  let out = path;
+  for (const [placeholder, real] of idSubstitutions) {
+    out = out.replace(new RegExp(`\\b${placeholder}\\b`, "g"), real);
+  }
+  return out;
+}
+
 test.describe.serial("Flow walk (dev-bypass) — web + board + marketing", () => {
   test.beforeAll(async ({ request }) => {
     unreachableReason = (await probe(request)) ?? "";
     reachable = unreachableReason === "";
+    if (reachable) await resolveSeededIds(request);
   });
 
   test.beforeEach(() => {
@@ -116,7 +156,7 @@ test.describe.serial("Flow walk (dev-bypass) — web + board + marketing", () =>
       for (const row of webWalkRows(role)) {
         consoleErrors.length = 0;
         failedRequests.length = 0;
-        const requestedPath = row.paths[0];
+        const requestedPath = substitutePlaceholders(row.paths[0]);
 
         let navigated = true;
         await page

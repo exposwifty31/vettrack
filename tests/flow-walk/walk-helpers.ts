@@ -59,8 +59,11 @@ export function attachObservers(page: Page): {
   });
   page.on("requestfailed", (req) => {
     const url = req.url();
-    if (url.includes("/api/")) {
-      failedRequests.push(`FAILED ${req.failure()?.errorText ?? "?"} ${url}`);
+    const err = req.failure()?.errorText ?? "?";
+    // ERR_ABORTED is normal teardown — the SSE stream and in-flight fetches are
+    // cancelled by the walk's next page.goto; recording it flags healthy rows.
+    if (url.includes("/api/") && err !== "net::ERR_ABORTED") {
+      failedRequests.push(`FAILED ${err} ${url}`);
     }
   });
   return { consoleErrors, failedRequests };
@@ -173,18 +176,25 @@ export function evaluateRow(args: {
   const { expected, actual, surfaces, finalUrl, consoleErrors } = args;
   const mismatchStatus: WalkStatus = expected.confidence === "observe" ? "observe" : "broken";
 
-  // Redirect / guard-redirect: the target must match.
+  // Redirect / guard-redirect: grade the REDIRECT — did the page leave the
+  // requested path and land on the declared target. What the destination itself
+  // renders (kiosk chrome on /board, ManagementWebGate for a non-management
+  // role, an admin-floor denial) is the destination's own contract, graded by
+  // that row — so `actual` (a surface classification) is deliberately not
+  // consulted here. The first full walk misgraded 33 correct redirects broken
+  // because the destination's surface marker preempted "redirect".
   if (expected.kind === "redirect" || expected.kind === "guard-redirect") {
-    if (actual !== "redirect") {
-      return { status: mismatchStatus, notes: `expected redirect→${expected.to}, got ${actual} (${relativePath(finalUrl)})` };
+    const final = relativePath(finalUrl);
+    if (final === args.requestedPath) {
+      return { status: mismatchStatus, notes: `expected redirect→${expected.to}, stayed on ${final}` };
     }
     if (!redirectMatches(finalUrl, expected.to)) {
-      return { status: mismatchStatus, notes: `redirected to ${relativePath(finalUrl)}, expected ${expected.to}` };
+      return { status: mismatchStatus, notes: `redirected to ${final}, expected ${expected.to}` };
     }
-    // The redirect matched — but the destination must also be healthy, or a flow
-    // that redirects onto a crashed/erroring page would be graded a false "pass".
+    // Landed on the right target — but the destination must be healthy, or a
+    // flow that redirects onto a crashed/erroring page would false-"pass".
     if (surfaces.hasCrash) {
-      return { status: "broken", notes: `redirect landed on a crashed page (${relativePath(finalUrl)})` };
+      return { status: "broken", notes: `redirect landed on a crashed page (${final})` };
     }
     if (consoleErrors.length > 0) {
       return { status: "degraded", notes: `redirect landed with ${consoleErrors.length} console error(s)` };

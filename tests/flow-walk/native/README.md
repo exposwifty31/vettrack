@@ -25,34 +25,38 @@ the only place that proves the guards that actually run on device:
 ## Prerequisites
 
 1. **A dev-bypass native shell pointed at a LOCAL server.** From the repo root, with a
-   local dev server running (`pnpm dev`, so the API is on `:3001` and Vite on `:5000`):
+   walk server running (`pnpm dev:walk` — API on `:3001`, Vite on `:5000`):
    ```bash
-   CAPACITOR_SERVER_URL=http://localhost:5000 pnpm cap:build:native   # live-reload build
-   pnpm cap:install:ios-sim                                           # install onto the booted sim
+   xcrun simctl boot "iPhone 17"   # then grab its UDID: xcrun simctl list devices booted
+   CAPACITOR_SERVER_URL=http://localhost:5000 npx cap sync ios
+   CAPACITOR_SERVER_URL=http://localhost:5000 npx cap run ios --target <sim-udid>
    ```
-   (See `docs/audit/phase-0-2-device-audit-*` for the SPM-not-Pods + live-reload playbook.)
+   Do **not** use `pnpm cap:build:native` here — `build-native-shell.sh` deliberately
+   strips `CAPACITOR_SERVER_URL` (App Review 4.2), so it always produces a *bundled*
+   shell. `capacitor.config.ts` reads the env at sync/run time, and the Simulator
+   shares the host network, so `localhost:5000` reaches the Mac's Vite server.
+   (See `docs/audit/phase-0-2-device-audit-*` for the SPM-not-Pods playbook.)
    Do **not** ship Clerk keys — the walk needs dev-bypass so the `vt:devRole` switch works.
 
-2. **Install this harness** (once):
+2. **Install this harness** (once) — with **npm**, not pnpm: running `pnpm add` in this
+   directory injects a `tests/flow-walk/native` importer into the ROOT `pnpm-lock.yaml`,
+   which would make every root install (and CI) pull Appium — exactly the coupling this
+   package exists to avoid. `package-lock.json` is the lockfile here.
    ```bash
    cd tests/flow-walk/native
-   pnpm install
-   pnpm appium:doctor          # verify the xcuitest driver toolchain
+   npm install
+   npm run appium:doctor       # verify the xcuitest driver toolchain
    ```
 
-3. **Boot a simulator** and export how to reach the app:
-   ```bash
-   xcrun simctl boot "iPhone 15"
-   export BUNDLE_ID=uk.vettrack.app        # the installed app…
-   # …or point at a freshly built .app instead:
-   export APP_PATH=/path/to/App.app
-   ```
+3. The app is reached via `BUNDLE_ID` (default `uk.vettrack.app`, already installed by
+   `cap run`); export `APP_PATH=/path/to/App.app` instead to install a fresh build.
 
 ## Run
 
 ```bash
-pnpm walk:iphone     # DEVICE=iphone
-pnpm walk:ipad       # DEVICE=ipad (exercises the master-detail tablet routes)
+# SIM_UDID pins the exact simulator (device names repeat across installed runtimes).
+SIM_UDID=<sim-udid> SIM_DEVICE_NAME="iPhone 17" npm run walk:iphone
+SIM_UDID=<sim-udid> SIM_DEVICE_NAME="iPad Pro 11-inch (M5)" npm run walk:ipad
 ```
 
 ## Permission prompts (Phase 0b)
