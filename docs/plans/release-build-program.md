@@ -2,7 +2,7 @@
 
 > **Owner decision 2026-07-16 (ultracode).** The App Store resubmission is the line in the sand: **all** planned production-ready functionality ships *before* build 26 resubmits. Post-resubmit = new features only, no going back to infra/architecture. Scope confirmed: **all 5 net-new feature subspecs + the 2 Code Blue races + socket.io (fully wired)**.
 >
-> Reconciled against git 2026-07-16 (doc trackers were stale): the 36-finding behavioral audit is otherwise DONE (34/36; all code T-cards landed via #86/#91). The 6 audit-10x feature subspecs were **spec-authored only — zero implementation**. Each ships through `/ship-phase` (SDD+TDD → panel → PR → CodeRabbit-green). Subspecs are Tier **O+R** (frozen/⚠SUB-SPEC).
+> Reconciled against git 2026-07-16 (doc trackers were stale): the 36-finding behavioral audit is otherwise DONE — 34/36 landed via #86/#91, and the last 2 open findings (CLICK-PATH-010/011) are **R-CB-stabilize, fixed as item 1 (PR #110)** → effectively 36/36 once #110 merges. The 6 audit-10x feature subspecs were **spec-authored only — zero implementation**. Each ships through `/ship-phase` (SDD+TDD → panel → PR → CodeRabbit-green). Subspecs are Tier **O+R** (frozen/⚠SUB-SPEC).
 
 ## Build order + status
 
