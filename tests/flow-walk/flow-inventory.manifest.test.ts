@@ -263,6 +263,14 @@ describe("flow-walk manifest — outcome derivation", () => {
     expect(expectedNativeOutcome(row("legacy-tasks-alias"), "admin")).toMatchObject({ kind: "redirect", to: "/equipment/tasks" });
   });
 
+  it("native: /equipment/scan chains through the mobile deep-link forward to /scan", () => {
+    // equipment-list.tsx / EquipmentMasterDetail forward ?scan=1 → /scan in the
+    // shell (the scanner is its own surface there); the desktop list consumes it.
+    expect(expectedNativeOutcome(row("scan-alias-redirect"), "admin")).toMatchObject({ kind: "redirect", to: "/scan" });
+    expect(expectedNativeOutcome(row("scan-alias-redirect"), "student")).toMatchObject({ kind: "redirect", to: "/scan" });
+    expect(expectedWebOutcome(row("scan-alias-redirect"), "admin")).toMatchObject({ kind: "redirect", to: "/equipment?scan=1" });
+  });
+
   it("web/board platform partitions are non-empty and disjoint from native-only rows", () => {
     expect(rowsForPlatform("web").length).toBeGreaterThan(10);
     expect(rowsForPlatform("board").length).toBeGreaterThan(0);

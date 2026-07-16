@@ -98,6 +98,11 @@ export interface FlowRow {
   /** Redirect target for `guard: "redirect"` (and the canonical kiosk redirects). */
   redirectTo?: string;
   /**
+   * Where the redirect chain SETTLES on the mobile shell when it differs from
+   * `redirectTo` (deep-link forwards: /equipment?scan=1 → /scan in the shell).
+   */
+  nativeRedirectTo?: string;
+  /**
    * The page itself redirects on non-mobile shells (e.g. scan.tsx renders
    * ScanScreen only in the mobile shell; desktop gets the equipment scan
    * overlay). Applies to management.web roles — others hit the T-31 gate first.
@@ -147,7 +152,7 @@ export const FLOW_ROWS: FlowRow[] = [
   { id: "equipment-edit", group: "core", paths: ["/equipment/eq1/edit"], guard: "auth", platforms: ["iphone", "ipad", "web"], roleGating: "open" },
   { id: "tasks", group: "core", paths: ["/equipment/tasks"], guard: "auth", platforms: ["iphone", "ipad", "web", "board"], roleGating: "open", notes: "Tasks.tsx inline-redirects the custody-only (student) archetype; frozen appointmentsPage.* keys." },
   { id: "scan", group: "core", paths: ["/scan"], guard: "auth", platforms: ["iphone", "ipad", "web"], roleGating: "open", webRedirectTo: "/equipment?scan=1", notes: "scan.tsx renders ScanScreen only in the mobile shell; desktop self-redirects to the equipment scan overlay (walk-verified)." },
-  { id: "scan-alias-redirect", group: "core", paths: ["/equipment/scan"], guard: "redirect", platforms: ["iphone", "ipad", "web"], roleGating: "open", redirectTo: "/equipment?scan=1", drift: true, notes: "DRIFT: doc listed /equipment/scan as a page; now redirects to the scanner overlay query." },
+  { id: "scan-alias-redirect", group: "core", paths: ["/equipment/scan"], guard: "redirect", platforms: ["iphone", "ipad", "web"], roleGating: "open", redirectTo: "/equipment?scan=1", nativeRedirectTo: "/scan", drift: true, notes: "DRIFT: doc listed /equipment/scan as a page; now redirects to the scanner overlay query. The mobile shell forwards ?scan=1 on to /scan (the scanner is its own surface there — equipment-list.tsx / EquipmentMasterDetail)." },
   { id: "equipment-ops-redirect", group: "core", paths: ["/equipment/maintenance", "/equipment/intelligence"], guard: "redirect", platforms: ["iphone", "ipad", "web"], roleGating: "open", redirectTo: "/equipment", drift: true, notes: "DRIFT: doc §Core 'Equipment ops' pages are now query-param redirects (/equipment?status=maintenance and /equipment)." },
   { id: "alerts", group: "core", paths: ["/alerts"], guard: "custody", platforms: ["iphone", "ipad", "web"], roleGating: "custody" },
   { id: "my-equipment", group: "core", paths: ["/my-equipment"], guard: "auth", platforms: ["iphone", "ipad", "web"], roleGating: "open" },
@@ -333,7 +338,9 @@ export function expectedNativeOutcome(row: FlowRow, role: RoleArchetype): Expect
   ) {
     return { kind: "redirect", to: "/equipment", confidence: "firm" };
   }
-  if (row.guard === "redirect") return { kind: "redirect", to: row.redirectTo, confidence: "firm" };
+  if (row.guard === "redirect") {
+    return { kind: "redirect", to: row.nativeRedirectTo ?? row.redirectTo, confidence: "firm" };
+  }
   if (row.guard === "web-only" || row.guard === "management") {
     return { kind: "guard-redirect", to: "/home", confidence: "firm" };
   }

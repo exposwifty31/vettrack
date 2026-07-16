@@ -9,6 +9,7 @@
     "appium:doctor": "appium driver doctor xcuitest"
   },
   "devDependencies": {
+    "@wdio/appium-service": "^9",
     "@wdio/cli": "^9.4.0",
     "@wdio/globals": "^9.4.0",
     "@wdio/local-runner": "^9.4.0",
