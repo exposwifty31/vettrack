@@ -87,6 +87,11 @@ export interface ClaimStartOptions {
   now?: Date;
 }
 
+export interface CommitReleaseOptions {
+  /** Injected clock for a deterministic `updatedAt`; defaults to `new Date()`. */
+  now?: Date;
+}
+
 /**
  * Durable storage port for the claim record. The Drizzle implementation issues
  * the clinic-scoped, fence-guarded compare-and-set SQL; tests inject a faithful
@@ -116,24 +121,26 @@ export interface StartClaimStore {
   }): Promise<boolean>;
   /**
    * Compare-and-set commit: only where the row carries `expectedFence` AND is
-   * still `claimed`. Sets `state='committed'`, `sessionId`. Returns true iff
-   * THIS call committed (a superseded fence or non-`claimed` state fails).
+   * still `claimed`. Sets `state='committed'`, `sessionId`, `updatedAt`. Returns
+   * true iff THIS call committed (a superseded fence or non-`claimed` state fails).
    */
   casCommit(input: {
     clinicId: string;
     token: string;
     expectedFence: number;
     sessionId: string;
+    updatedAt: Date;
   }): Promise<boolean>;
   /**
    * Compare-and-set release: only where the row carries `expectedFence` AND is
-   * still `claimed`. Sets `state='released'`. Returns true iff THIS call
-   * released.
+   * still `claimed`. Sets `state='released'`, `updatedAt`. Returns true iff THIS
+   * call released.
    */
   casRelease(input: {
     clinicId: string;
     token: string;
     expectedFence: number;
+    updatedAt: Date;
   }): Promise<boolean>;
 }
 
@@ -221,11 +228,12 @@ export class DrizzleStartClaimStore implements StartClaimStore {
     token: string;
     expectedFence: number;
     sessionId: string;
+    updatedAt: Date;
   }): Promise<boolean> {
-    const { clinicId, token, expectedFence, sessionId } = input;
+    const { clinicId, token, expectedFence, sessionId, updatedAt } = input;
     const updated = await this.executor
       .update(codeBlueStartClaims)
-      .set({ state: "committed", sessionId, updatedAt: new Date() })
+      .set({ state: "committed", sessionId, updatedAt })
       .where(
         and(
           eq(codeBlueStartClaims.clinicId, clinicId),
@@ -242,11 +250,12 @@ export class DrizzleStartClaimStore implements StartClaimStore {
     clinicId: string;
     token: string;
     expectedFence: number;
+    updatedAt: Date;
   }): Promise<boolean> {
-    const { clinicId, token, expectedFence } = input;
+    const { clinicId, token, expectedFence, updatedAt } = input;
     const updated = await this.executor
       .update(codeBlueStartClaims)
-      .set({ state: "released", updatedAt: new Date() })
+      .set({ state: "released", updatedAt })
       .where(
         and(
           eq(codeBlueStartClaims.clinicId, clinicId),
@@ -375,8 +384,10 @@ export async function commitClaim(
   token: string,
   fence: number,
   sessionId: string,
+  options: CommitReleaseOptions = {},
 ): Promise<CommitClaimResult> {
-  if (await store.casCommit({ clinicId, token, expectedFence: fence, sessionId })) {
+  const updatedAt = options.now ?? new Date();
+  if (await store.casCommit({ clinicId, token, expectedFence: fence, sessionId, updatedAt })) {
     return { committed: true, fence, sessionId };
   }
   const reason = await rejectionReason(store, clinicId, token, fence);
@@ -393,8 +404,10 @@ export async function releaseClaim(
   clinicId: string,
   token: string,
   fence: number,
+  options: CommitReleaseOptions = {},
 ): Promise<ReleaseClaimResult> {
-  if (await store.casRelease({ clinicId, token, expectedFence: fence })) {
+  const updatedAt = options.now ?? new Date();
+  if (await store.casRelease({ clinicId, token, expectedFence: fence, updatedAt })) {
     return { released: true };
   }
   const reason = await rejectionReason(store, clinicId, token, fence);
