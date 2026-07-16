@@ -3192,3 +3192,16 @@ The other 2 new tests (I-1's out-of-grace-window case, I-2's stage-1-skip case) 
 3. `pnpm add` inside `tests/flow-walk/native` leaks a `tests/flow-walk/native` importer into the ROOT `pnpm-lock.yaml` (would couple CI installs to Appium). Reverted; the dir is npm-managed (`package-lock.json`) and its README now says so.
 
 **Verdict:** VERIFIED — III.6 walk executed on all four surfaces with recorded evidence; FLOW_INVENTORY rows stamped from the matrices (31 rows: 30 pass, 1 degraded-with-finding).
+
+## R-CB-stabilize — 2 Code Blue races fixed (R-CB-02/03 · CLICK-PATH-010/011) — 2026-07-16
+
+**Claim:** the two open code items from the 2026-07-11 behavioral audit — both live async races on the FROZEN Code Blue path — are fixed via TDD, frozen doctrine preserved. Branch `claude/r-cb-stabilize` off origin/main, commit f7fd25706.
+
+**What was actually done + checked (not asserted):**
+- **Root cause confirmed against real code** (`src/hooks/useCodeBlueSession.ts`, read in full): R-CB-02 at the `subscribeKeepalive` effect (was `clearCachedSession()` + `setQueryData(session:null)` on any null keepalive — no grace); R-CB-03 in `logEntry` (was `previous = getQueryData(...)` snapshot restored whole on error).
+- **TDD RED→GREEN, watched fail first:** `tests/code-blue-null-keepalive-grace.test.tsx` (3 cases: within-grace retains + issues no refetch; after-grace stale keepalive retains a still-active session; after-grace confirmed-null clears via a confirming refetch) — all 3 RED on the old optimistic-clear, GREEN after. `tests/code-blue-logentry-rollback.test.tsx` (a teammate entry arriving mid-request survives a failed optimistic write) — RED on the whole-snapshot restore, GREEN after the surgical filter.
+- **GREEN impl:** R-CB-02 reads the current session from the cache in the keepalive callback (no stale closure), retains within `RECONCILE_GRACE_MS`, else a confirming `refetchQueries` (never a direct optimistic clear). R-CB-03 `cancelQueries` before the optimistic write; on error removes only the `optimistic-<idempotencyKey>` entry by id.
+- **Frozen doctrine preserved:** no transport change, no offline queueing, server-confirmed end only (the change makes the keepalive path LESS optimistic).
+- **Gates green (first-party):** the 2 new suites 4/4; existing Code Blue suites `code-blue-frontend` + `code-blue-outcome-cancel` 17/17 (no regression); a Code Blue + realtime deterministic net (incl. `phase-9-deterministic-drills`, `sync-engine-replay-headers`) 50/50; `pnpm typecheck` (frontend + server) clean.
+
+**Pending before PR:** adversarial delta review (dispatched) + finish→PR→CodeRabbit-green. Part of the release-build program (`docs/plans/release-build-program.md`, item 1).
