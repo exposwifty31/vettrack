@@ -36,12 +36,15 @@ const FORBIDDEN = [
  *   - dynamic: await import("../event-publisher.js")
  * A regex that only requires whitespace before the quote misses `import(` — the
  * gap that would let a future collab→emergency coupling slip through the ONLY
- * frozen-surface guard. Comment prose must NOT be flagged.
+ * frozen-surface guard. The dynamic form must also cover backtick template
+ * literals: dynamic `import()` legally permits `import(`../x`)`, so the specifier
+ * delimiter can be `'`, `"`, OR `` ` `` — all three must be caught. Comment prose
+ * must NOT be flagged.
  */
 function importsForbiddenModule(src: string, forbidden: string): boolean {
   const mod = forbidden.replace(/\//g, "\\/");
   const staticRe = new RegExp(`(import|from)\\s+["'][^"']*${mod}`);
-  const dynamicRe = new RegExp(`import\\s*\\(\\s*["'][^"']*${mod}`);
+  const dynamicRe = new RegExp(`import\\s*\\(\\s*["'\`][^"'\`]*${mod}`);
   return staticRe.test(src) || dynamicRe.test(src);
 }
 
@@ -141,12 +144,18 @@ describe("R-RTC-1.7 — emergency isolation merge gate", () => {
     // The collab code already uses dynamic import() (server.ts loads the Redis
     // adapter that way). A regex that only matches static `import x from "..."`
     // would let a future `await import("../event-publisher.js")` coupling defeat
-    // the merge gate silently. The scanner must catch every dynamic-import form.
+    // the merge gate silently. The scanner must catch EVERY dynamic-import form —
+    // single-quote, double-quote, AND backtick template literal (dynamic import()
+    // specifically permits template literals, so a backtick specifier is legal JS
+    // and must not be a one-character-different evasion of the merge gate).
     const dynamicForms = [
       `await import("../event-publisher.js");`,
       `const m = import('../lib/event-publisher');`,
       `void import( "../code-blue-keepalive.js" );`,
-      `await import(\`../routes/realtime\`)`.replace(/`/g, '"'),
+      // Raw backtick template-literal specifiers (NOT rewritten to quotes).
+      "await import(`../routes/realtime`)",
+      "const p = import(`../event-publisher.js`);",
+      "void import( `../code-blue-keepalive.js` );",
     ];
     for (const src of dynamicForms) {
       const caught = FORBIDDEN.some((forbidden) => importsForbiddenModule(src, forbidden));
@@ -160,6 +169,8 @@ describe("R-RTC-1.7 — emergency isolation merge gate", () => {
     // Comment prose and unrelated dynamic imports must NOT be flagged.
     expect(importsForbiddenModule(`// this file must never import event-publisher`, "event-publisher")).toBe(false);
     expect(importsForbiddenModule(`const { createAdapter } = await import("@socket.io/redis-adapter");`, "event-publisher")).toBe(false);
+    // Unrelated backtick dynamic import must NOT be flagged either.
+    expect(importsForbiddenModule("const a = await import(`@socket.io/redis-adapter`);", "event-publisher")).toBe(false);
   });
 
   it("telemetry: recordCollabMetric accepts ONLY the closed allowlist", () => {
