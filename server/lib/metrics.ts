@@ -325,7 +325,15 @@ type MetricName =
   | "sweep_escalation_stage_1_fired"
   | "sweep_escalation_stage_2_fired"
   | "sweep_escalation_stage_3_fired"
-  | "sweep_escalation_stage_4_fired";
+  | "sweep_escalation_stage_4_fired"
+  // R-RTC-1.7 — collaboration WS channel (bounded enum, no PII, no coordinates).
+  | "collab_ws_connected"
+  | "collab_ws_disconnected"
+  | "collab_typing"
+  | "collab_presence"
+  | "collab_cursor_dropped"
+  | "collab_board_rate_limited"
+  | "collab_record_presence";
 
 type MetricBuckets = Record<MetricName, number>;
 
@@ -975,6 +983,13 @@ const DEFAULT_COUNTERS: MetricBuckets = {
   sweep_escalation_stage_2_fired: 0,
   sweep_escalation_stage_3_fired: 0,
   sweep_escalation_stage_4_fired: 0,
+  collab_ws_connected: 0,
+  collab_ws_disconnected: 0,
+  collab_typing: 0,
+  collab_presence: 0,
+  collab_cursor_dropped: 0,
+  collab_board_rate_limited: 0,
+  collab_record_presence: 0,
 };
 
 const metrics: MetricBuckets = { ...DEFAULT_COUNTERS };
