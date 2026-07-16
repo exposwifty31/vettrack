@@ -3880,6 +3880,10 @@
       "present": "On the board"
     }
   },
+  "recordCollab": {
+    "editingThis": "{name} is editing this",
+    "someoneEditing": "Someone is editing this"
+  },
   "webOnlyGuard": {
     "title": "Best viewed on a larger screen",
     "description": "This view is built for desktop and wide tablet displays. Open it on a computer, or continue with the mobile-optimized view.",
