@@ -128,7 +128,12 @@ export function ShiftChatPanel({ isOpen, onClose, chat, collab }: ShiftChatPanel
     .map((id) => collab?.presentMembers.find((m) => m.userId === id)?.displayName)
     .filter((name): name is string => Boolean(name));
   const typingNames = [...new Set([...chat.typing, ...collabTypingNames])];
-  const onlineCount = collab?.isConnected ? collab.presentMembers.length : chat.onlineUserIds.length;
+  // Union the REST + collab presence by userId (both include self, same id
+  // space) so the count neither double-counts self nor flickers by one as the
+  // advisory socket connects/disconnects. Degraded → REST count alone.
+  const onlineCount = collab?.isConnected
+    ? new Set([...chat.onlineUserIds, ...collab.presentMembers.map((m) => m.userId)]).size
+    : chat.onlineUserIds.length;
 
   return (
     <Sheet open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>

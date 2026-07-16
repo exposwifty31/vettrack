@@ -94,6 +94,18 @@ async function resolveToken(): Promise<string | null> {
   return typeof stored === "string" ? stored.trim() : null;
 }
 
+/**
+ * Resolve the current bearer token EXACTLY as `authFetch` does: freshly minted
+ * from the Clerk getter when in Clerk mode (each call re-mints, so a token past
+ * its TTL is never returned), else the stored token (dev-bypass / tests).
+ *
+ * Exposed so non-fetch auth surfaces — the collab socket handshake — source the
+ * SAME fresh token instead of replaying a stale stored one on reconnect. — card SC.
+ */
+export async function resolveBearerToken(): Promise<string | null> {
+  return resolveToken();
+}
+
 export async function authFetch(url: string, options: RequestInit = {}): Promise<Response> {
   const resolvedUrl = resolveApiUrl(url);
   if (!url.startsWith("/api/")) {

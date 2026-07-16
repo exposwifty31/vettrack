@@ -11,12 +11,16 @@
  *      indicator), with the displayName resolved from server-attached presence.
  *   2. A `chat-nudge` triggers the EXISTING refetch, COALESCED by messageId so
  *      duplicate nudges + reconnect replays cause AT MOST ONE refetch per new
- *      message.
+ *      message. A nudge with a missing messageId is IGNORED (never refetches),
+ *      not coalesced under a shared empty key.
  *   3. With the socket unavailable (no token → getCollabSocket returns null) the
  *      panel still fully works via the REST-poll presence path and message
  *      send/receive is NEVER gated on the socket.
  *   4. The client NEVER sends its own userId — the server attaches identity from
  *      the DB session; `typing` carries only the on-flag.
+ *   5. The handshake sources a FRESH token from the SAME getter auth-fetch uses
+ *      (the Clerk getter), never the stale stored bearer — so a session token
+ *      that has rolled over past its TTL is not replayed on (re)connect.
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
@@ -26,6 +30,7 @@ import {
   render,
   renderHook,
   screen,
+  waitFor,
 } from "@testing-library/react";
 import type { ComponentProps } from "react";
 
@@ -88,6 +93,7 @@ vi.mock("@/hooks/use-auth", () => ({ useAuth: () => ({ userId: "me" }) }));
 vi.mock("@/hooks/use-experience", () => ({ useExperience: () => ({ can: () => true }) }));
 
 import { setAuthState } from "@/lib/auth-store";
+import { setClerkTokenGetter } from "@/lib/auth-fetch";
 import { closeCollabSocket } from "@/lib/collab-socket";
 import { useShiftChatCollab } from "@/features/shift-chat/hooks/useShiftChatCollab";
 import { ShiftChatPanel } from "@/features/shift-chat/components/ShiftChatPanel";
@@ -97,6 +103,12 @@ const JWT = "aaa.bbb.ccc"; // isLikelyJwt: three non-empty dot-parts
 
 function seedToken(token: string | null) {
   setAuthState({ userId: "me", email: "", name: "", bearerToken: token });
+}
+
+/** Flush the async fresh-token mint → connect, then assert the socket exists. */
+async function connectedSocket(): Promise<FakeSocket> {
+  await waitFor(() => expect(fakeSockets).toHaveLength(1));
+  return fakeSockets[0]!;
 }
 
 /** Resolve the ack callback the hook passed to the `join` emit and accept it. */
@@ -109,18 +121,19 @@ function acceptJoin(socket: FakeSocket, members: { userId: string; displayName: 
 afterEach(() => {
   cleanup();
   closeCollabSocket();
+  setClerkTokenGetter(null);
   ioMock.mockClear();
   fakeSockets.length = 0;
   seedToken(null);
 });
 
 describe("useShiftChatCollab — Feature 1 wiring (R-RTC-1.2)", () => {
-  it("surfaces a peer's typing (name from server-attached presence)", () => {
+  it("surfaces a peer's typing (name from server-attached presence)", async () => {
     seedToken(JWT);
     const { result } = renderHook(() =>
       useShiftChatCollab({ enabled: true, onNewMessage: vi.fn() }),
     );
-    const socket = fakeSockets[0]!;
+    const socket = await connectedSocket();
 
     act(() =>
       socket.trigger("presence", {
@@ -138,11 +151,11 @@ describe("useShiftChatCollab — Feature 1 wiring (R-RTC-1.2)", () => {
     expect(result.current.peerTypingUserIds).not.toContain("peer-1");
   });
 
-  it("coalesces duplicate nudges + reconnect replays into ONE refetch per messageId", () => {
+  it("coalesces duplicate nudges + reconnect replays into ONE refetch per messageId", async () => {
     seedToken(JWT);
     const onNewMessage = vi.fn();
     renderHook(() => useShiftChatCollab({ enabled: true, onNewMessage }));
-    const socket = fakeSockets[0]!;
+    const socket = await connectedSocket();
 
     act(() => {
       socket.trigger("chat-nudge", { messageId: "m-9" });
@@ -155,12 +168,31 @@ describe("useShiftChatCollab — Feature 1 wiring (R-RTC-1.2)", () => {
     expect(onNewMessage).toHaveBeenCalledTimes(2);
   });
 
-  it("emits `typing` with the on-flag ONLY — never a client-supplied userId", () => {
+  it("IGNORES a nudge with a missing messageId — never refetches, never poisons real ids", async () => {
+    seedToken(JWT);
+    const onNewMessage = vi.fn();
+    renderHook(() => useShiftChatCollab({ enabled: true, onNewMessage }));
+    const socket = await connectedSocket();
+
+    act(() => {
+      socket.trigger("chat-nudge", {}); // malformed — no messageId
+      socket.trigger("chat-nudge", { messageId: "" }); // empty string
+      socket.trigger("chat-nudge", { messageId: 123 }); // wrong type
+    });
+    // Malformed nudges are skipped entirely (NOT coalesced under a shared "" key).
+    expect(onNewMessage).not.toHaveBeenCalled();
+
+    // A real id after the malformed ones still refetches exactly once.
+    act(() => socket.trigger("chat-nudge", { messageId: "m-1" }));
+    expect(onNewMessage).toHaveBeenCalledTimes(1);
+  });
+
+  it("emits `typing` with the on-flag ONLY — never a client-supplied userId", async () => {
     seedToken(JWT);
     const { result } = renderHook(() =>
       useShiftChatCollab({ enabled: true, onNewMessage: vi.fn() }),
     );
-    const socket = fakeSockets[0]!;
+    const socket = await connectedSocket();
     acceptJoin(socket, []);
 
     act(() => result.current.notifyTyping());
@@ -171,12 +203,39 @@ describe("useShiftChatCollab — Feature 1 wiring (R-RTC-1.2)", () => {
     expect(typingCall![1]).not.toHaveProperty("userId");
   });
 
-  it("degrades with NO token: no socket is created and the hook stays inert", () => {
+  it("sources a FRESH token from the Clerk getter — never the stale bearer store", async () => {
+    // The fallback store holds a stale token; the Clerk getter mints a fresh one.
+    // authFetch authenticates from the getter, so the collab handshake must too.
+    seedToken("stale.stale.stale");
+    setClerkTokenGetter(async () => "fresh.aaa.bbb");
+
+    renderHook(() => useShiftChatCollab({ enabled: true, onNewMessage: vi.fn() }));
+    await connectedSocket();
+
+    // Invoke the auth callback io() was constructed with and inspect the token
+    // it delivers on (re)connect.
+    const ioOpts = ioMock.mock.calls[0]![1] as {
+      auth: (cb: (d: { token?: string }) => void) => void;
+    };
+    let delivered: { token?: string } | undefined;
+    ioOpts.auth((d) => {
+      delivered = d;
+    });
+    expect(delivered?.token).toBe("fresh.aaa.bbb");
+    expect(delivered?.token).not.toBe("stale.stale.stale");
+  });
+
+  it("degrades with NO token: no socket is created and the hook stays inert", async () => {
     seedToken(null);
     const onNewMessage = vi.fn();
     const { result } = renderHook(() =>
       useShiftChatCollab({ enabled: true, onNewMessage }),
     );
+
+    // Give the async mint a chance to run — it resolves null → never connects.
+    await act(async () => {
+      await Promise.resolve();
+    });
 
     expect(ioMock).not.toHaveBeenCalled();
     expect(fakeSockets).toHaveLength(0);
@@ -214,6 +273,24 @@ describe("ShiftChatPanel — collab typing/presence render + degradation", () =>
     // getByText throws if absent, so a returned element is the assertion.
     expect(screen.getByText(t.shiftChat.panel.typing("Dana"))).toBeTruthy();
     expect(screen.getByText(t.shiftChat.panel.onlineCount(1))).toBeTruthy();
+  });
+
+  it("de-duplicates the online count across the REST + collab sources (no double-count of self)", () => {
+    // Both sources include the same user ("me"); the count must union, not sum.
+    const chat = { ...baseChat, onlineUserIds: ["me"] };
+    const collab = {
+      isConnected: true,
+      peerTypingUserIds: [],
+      presentMembers: [
+        { userId: "me", displayName: "Me" },
+        { userId: "peer-1", displayName: "Dana" },
+      ],
+      notifyTyping: vi.fn(),
+    };
+    render(<ShiftChatPanel isOpen onClose={() => {}} chat={chat} collab={collab} />);
+
+    // {me, peer-1} → 2, NOT 3 (me counted once).
+    expect(screen.getByText(t.shiftChat.panel.onlineCount(2))).toBeTruthy();
   });
 
   it("with the socket unavailable, the panel loads via REST presence and message send is unaffected", () => {
