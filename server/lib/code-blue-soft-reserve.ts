@@ -60,6 +60,11 @@ export class DrizzleCartReservationStore implements CartReservationStore {
           eq(equipment.clinicId, clinicId),
           eq(equipment.id, cartId),
           isNull(equipment.reservedForSessionId),
+          // Re-assert eligibility at write time: a cart that left "ready" or was
+          // soft-deleted between candidate narrowing (outside the txn) and this CAS
+          // becomes a miss, and reserveNearestReadyCart advances to the next candidate.
+          eq(equipment.readinessState, "ready"),
+          isNull(equipment.deletedAt),
         ),
       )
       .returning({ id: equipment.id });

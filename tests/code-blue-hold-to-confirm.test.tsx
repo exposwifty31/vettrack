@@ -220,8 +220,12 @@ describe("LiveLogAnnouncer — throttled/batched aria-live (R-CBF-1.3)", () => {
     // Nothing announced synchronously per entry (throttle window not elapsed).
     expect(region.textContent).toBe("");
 
-    // One batched announcement after the throttle window.
+    // One batched announcement after the throttle window. The announcer clears then
+    // re-sets on the next tick so identical consecutive counts still re-announce
+    // (an unchanged aria-live text is dropped by screen readers), so the text lands
+    // one tick after the throttle timer fires.
     act(() => vi.advanceTimersByTime(throttleMs));
+    act(() => vi.advanceTimersByTime(1));
     expect(region.textContent).toBe(t.codeBlue.hold.newLogEntries(3));
   });
 });

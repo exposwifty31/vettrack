@@ -28,6 +28,7 @@ export function LiveLogAnnouncer({ entries, throttleMs = DEFAULT_THROTTLE_MS }: 
   // "N new log entries" — only entries that arrive after mount are announced.
   const announcedCountRef = useRef(entries.length);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const resetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const latestRef = useRef<LiveLogEntry[]>(entries);
   latestRef.current = entries;
 
@@ -47,13 +48,22 @@ export function LiveLogAnnouncer({ entries, throttleMs = DEFAULT_THROTTLE_MS }: 
       const total = latestRef.current.length;
       const delta = total - announcedCountRef.current;
       announcedCountRef.current = total;
-      if (delta > 0) setMessage(t.codeBlue.hold.newLogEntries(delta));
+      if (delta <= 0) return;
+      // Clear then re-set on a later tick so two consecutive windows with an
+      // IDENTICAL delta ("2 new log entries" twice) still register as a DOM change
+      // — an unchanged aria-live text is dropped by screen readers.
+      setMessage("");
+      resetTimerRef.current = setTimeout(() => {
+        resetTimerRef.current = null;
+        setMessage(t.codeBlue.hold.newLogEntries(delta));
+      }, 0);
     }, throttleMs);
   }, [entries, throttleMs]);
 
   useEffect(
     () => () => {
       if (timerRef.current !== null) clearTimeout(timerRef.current);
+      if (resetTimerRef.current !== null) clearTimeout(resetTimerRef.current);
     },
     [],
   );

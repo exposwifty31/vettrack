@@ -3375,3 +3375,19 @@ Reviewer returned 1 HIGH + 1 MEDIUM + 2 LOW on the committed sub-card; all four 
 - Command: `pnpm i18n:check` → deep key parity; `pnpm architecture:gates` → all G1 passed (0 dep violations, 0 new cycles); `pnpm tenant:lint:touched` → all new-code warnings verified benign (clinicId present inside `and(...)`/joins).
 
 **Verdict:** VERIFIED (behavioral for #1/#3/#7/#8; #4 type-checked, live-run deferred to CI)
+
+## 2026-07-16 — R-CBF-1 CodeRabbit round on PR #111 (6 fixes; 13 of 20 comments were false-positive/already-correct)
+
+**Claim:** CodeRabbit CHANGES_REQUESTED with 20 comments (2 "Critical"). Adversarial triage (4 file-group agents verifying each against real code): 7 REAL_FIX (6 distinct changes), 11 FALSE_POSITIVE, 2 ALREADY_CORRECT. **Both "Criticals" were false positives** — `code-blue.ts:679` conflated the durable in-txn `CODE_BLUE_STATUS_CHANGED` outbox row with the separate best-effort push fan-out; `phase-9-drills.spec.ts:552` claimed a `const roster`/`const snap` redeclaration TS compile error that does not exist (`snap` is in three separate `test()` scopes), independently disproven by CI's green Typecheck check.
+
+**Evidence (6 applied fixes):**
+- `server/lib/code-blue-one-tap.ts:285` — the best-effort `releaseClaim().catch` after an active-session conflict now logs (`console.warn` with clinic/token/fence) instead of swallowing, so a token stuck `claimed` until lease expiry is diagnosable. Behavior otherwise unchanged.
+- `server/lib/code-blue-soft-reserve.ts` `compareAndReserve` — CAS `UPDATE` predicate extended with `readinessState='ready'` + `deletedAt IS NULL`, closing the TOCTOU between candidate narrowing (outside the txn) and the reservation write; a now-ineligible cart is a CAS miss and `reserveNearestReadyCart` advances. (Resolves both the soft-reserve and the companion one-tap:415 comment.)
+- `migrations/171_vt_code_blue_start_claims.sql` — added `CHECK ((state='committed' AND session_id IS NOT NULL) OR (state IN ('claimed','released') AND session_id IS NULL))`; satisfied by every reachable lifecycle state (verified against `code-blue-start-claim.ts`), defense-in-depth only.
+- `server/routes/code-blue.ts` — `codeBlueInitiatorDenialObserver` converted to a factory `(endpoint) => middleware`; the denial audit metadata now records the real endpoint (`POST /api/code-blue/sessions` vs `.../one-tap`) instead of a hardcoded label shared by both routes.
+- `src/features/code-blue/LiveLogAnnouncer.tsx` — clear-then-set on a follow-up tick so two consecutive throttle windows with an IDENTICAL delta still register a DOM change (an unchanged `aria-live` text is dropped by SR). Updated the affected timing assertion in `tests/code-blue-hold-to-confirm.test.tsx` (+1 tick).
+- `docs/plans/release-build-program.md` — refreshed the stale R-CBF-1 row (was "STARTED / Next: build 1.2") to "IMPLEMENTED — PR #111".
+- Declined (evidence-backed replies posted): free-text crash-cart name match (no first-class marker exists in schema), rate-limiter on /one-tap (already covered by the global 100/min limiter; extra limiter is a doctrine risk), hardcoded Hebrew push body (code-blue.ts is on the sanctioned i18n known-debt allowlist), source-contract wiring-pin tests (deliberate + documented, behavior unit-tested elsewhere), forward-only migration-test shape (runner filters `.down.sql`), drill-uses-API-not-UI (UI wiring covered by RTL tests), the 2 false Criticals.
+- Command: `pnpm typecheck` → exit 0. `pnpm test` (full) → `Test Files 599 passed (599)`, `Tests 5395 passed | 11 skipped`, 0 failed. Migration CHECK verified by CI's Integration-ops job (applies migrations fresh).
+
+**Verdict:** VERIFIED

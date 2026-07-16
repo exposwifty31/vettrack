@@ -282,9 +282,16 @@ export async function orchestrateOneTapCodeBlue(
     // a superseded owner's release is a no-op; best-effort (the lease still frees
     // it eventually if the release write fails).
     if (err instanceof ActiveSessionExistsError) {
-      await releaseClaim(deps.claimStore, req.clinicId, req.token, claim.fence, { now }).catch(() => {
-        /* best-effort — the lease expiry is the durable fallback */
-      });
+      await releaseClaim(deps.claimStore, req.clinicId, req.token, claim.fence, { now }).catch(
+        (releaseErr) => {
+          // best-effort — the lease expiry is the durable fallback; log so a token
+          // left 'claimed' until lease expiry is diagnosable rather than silent.
+          console.warn(
+            "[code-blue-one-tap] claim release after active-session conflict failed; lease expiry is the durable fallback",
+            { clinicId: req.clinicId, token: req.token, fence: claim.fence, err: releaseErr },
+          );
+        },
+      );
       return { kind: "conflict", reason: "active_session_exists" };
     }
     // A genuine abort: propagate so the caller returns an error. The claim stays

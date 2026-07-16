@@ -34,7 +34,15 @@ CREATE TABLE IF NOT EXISTS vt_code_blue_start_claims (
   session_id   TEXT,
   created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  PRIMARY KEY (clinic_id, token)
+  PRIMARY KEY (clinic_id, token),
+  -- A committed claim MUST carry its session_id (replay returns it); claimed/released
+  -- MUST NOT. Defense-in-depth for the invariant the orchestrator already fails loud
+  -- on (server/lib/code-blue-one-tap.ts) — satisfied by every reachable state in the
+  -- code-blue-start-claim.ts lifecycle, so it can only trip on a corrupt out-of-band write.
+  CONSTRAINT vt_code_blue_start_claims_state_session_check CHECK (
+    (state = 'committed' AND session_id IS NOT NULL)
+    OR (state IN ('claimed', 'released') AND session_id IS NULL)
+  )
 );
 
 CREATE INDEX IF NOT EXISTS idx_vt_code_blue_start_claims_clinic_state

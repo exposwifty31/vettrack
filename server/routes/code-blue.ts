@@ -246,35 +246,33 @@ router.get("/events", requireAuth, requireAdmin, async (req, res) => {
  * (`__cbInitiatorGatePassed = true`) when the handler is reached. If it stays
  * `false` at response-finish AND status is 403, the gate denied.
  */
-function codeBlueInitiatorDenialObserver(
-  req: Request,
-  res: Response,
-  next: NextFunction,
-): void {
-  res.locals.__cbInitiatorGatePassed = false;
-  res.on("finish", () => {
-    if (res.locals.__cbInitiatorGatePassed) return;
-    if (res.statusCode !== 403) return;
-    try {
-      codeBlueManagerMetrics.initiatorDenied();
-      logAudit({
-        clinicId: req.clinicId ?? "",
-        actionType: "code_blue_initiator_authority_denied",
-        performedBy: req.authUser?.id ?? "",
-        performedByEmail: req.authUser?.email ?? "",
-        targetType: "code_blue_session",
-        actorRole: resolveAuditActorRole(req),
-        metadata: {
-          endpoint: "POST /api/code-blue/sessions",
-          denialPath: "actor_clinical_gate",
-          resolvedAt: new Date().toISOString(),
-        },
-      });
-    } catch (err) {
-      console.error("[code-blue] initiator-denial observer failed", err);
-    }
-  });
-  next();
+function codeBlueInitiatorDenialObserver(endpoint: string) {
+  return (req: Request, res: Response, next: NextFunction): void => {
+    res.locals.__cbInitiatorGatePassed = false;
+    res.on("finish", () => {
+      if (res.locals.__cbInitiatorGatePassed) return;
+      if (res.statusCode !== 403) return;
+      try {
+        codeBlueManagerMetrics.initiatorDenied();
+        logAudit({
+          clinicId: req.clinicId ?? "",
+          actionType: "code_blue_initiator_authority_denied",
+          performedBy: req.authUser?.id ?? "",
+          performedByEmail: req.authUser?.email ?? "",
+          targetType: "code_blue_session",
+          actorRole: resolveAuditActorRole(req),
+          metadata: {
+            endpoint,
+            denialPath: "actor_clinical_gate",
+            resolvedAt: new Date().toISOString(),
+          },
+        });
+      } catch (err) {
+        console.error("[code-blue] initiator-denial observer failed", err);
+      }
+    });
+    next();
+  };
 }
 
 function codeBlueInitiatorGatePassedMarker(
@@ -290,7 +288,7 @@ function codeBlueInitiatorGatePassedMarker(
 router.post(
   "/sessions",
   requireAuth,
-  codeBlueInitiatorDenialObserver,
+  codeBlueInitiatorDenialObserver("POST /api/code-blue/sessions"),
   requireClinicalUser,
   requireClinicalAuthority({
     allow: ["vet", "senior_technician", "technician"],
@@ -549,7 +547,7 @@ export const oneTapStartSchema = z.object({
 router.post(
   "/one-tap",
   requireAuth,
-  codeBlueInitiatorDenialObserver,
+  codeBlueInitiatorDenialObserver("POST /api/code-blue/one-tap"),
   requireClinicalUser,
   requireClinicalAuthority({
     allow: ["vet", "senior_technician", "technician"],
