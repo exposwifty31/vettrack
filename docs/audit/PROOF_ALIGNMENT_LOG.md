@@ -3431,3 +3431,28 @@ Reviewer returned 1 HIGH + 1 MEDIUM + 2 LOW on the committed sub-card; all four 
 - **Commands:** `pnpm typecheck` (frontend `tsc --noEmit` + server `tsconfig.server.json`) → exit 0. Collab suite `tests/collab-{board,emergency-isolation,integration,presence-store,ws-auth}.test.ts` → `Test Files 5 passed`, `Tests 31 passed`. Full `pnpm test` → `Test Files 605 passed (605)`, `Tests 5428 passed | 11 skipped`, 0 failed.
 
 **Verdict:** VERIFIED
+
+## 2026-07-16 — R-RTC-1 fix card C3 ADVERSARIAL REVIEW (reviewer, not implementer): CHANGES_REQUIRED
+
+**What I checked (against real code on claude/rrtc1-socketio):**
+- **Fix works (quoted dynamic import):** reproduced OLD regex vs NEW in node — `await import("../event-publisher.js")`, `import('../lib/event-publisher')`, `import( "../code-blue-keepalive.js" )`, `import("../routes/realtime")` all OLD=false → NEW=true. RED→GREEN is genuine (old static-only regex requires whitespace after `import`, so `import(` never matched). Non-tautological.
+- **No false positive:** the real `await import("@socket.io/redis-adapter")` (server.ts:123) → NEW=false against `realtime/` and `event-publisher`. Real STRUCTURAL scan still passes (7/7).
+- **No weakening:** static regex preserved verbatim; `.replace("/","\\/")`→`/\//g` is a strengthening (identical for ≤1-slash tokens). FORBIDDEN list unchanged, hoisted to module scope.
+- **Doctrine intact:** pure test-file change; no collab source touched; no SSE/emergency coupling introduced; telemetry closed-enum test still green; typecheck exit 0.
+- **RESIDUAL HOLE (my finding):** the broadened `dynamicRe` = `import\s*\(\s*["']…` accepts only `"`/`'`, NOT a backtick. `await import(\`../event-publisher.js\`)` — legal JS, one char off the caught form — still evades the guard (verified NEW=false). The inline comment at line 144 asserts "The scanner must catch **every** dynamic-import form," which the implementation does not satisfy. The author was demonstrably aware: test data line 149 writes `import(\`../routes/realtime\`)` then `.replace(/\`/g,'"')` to convert backticks away before asserting — deliberately sidestepping the exact form the scanner can't handle. For THE only frozen-surface merge gate, a known one-character evasion is a soundness gap. Trivial fix: include a backtick in the dynamic char-class (and the static one) + add a raw-backtick assertion.
+
+**Verdict:** CHANGES_REQUIRED (close the backtick template-literal evasion; everything else verified sound)
+
+## 2026-07-16 — R-RTC-1 fix card C3 RE-ATTEMPT: close the backtick template-literal dynamic-import evasion (reviewer HIGH)
+
+**Claim:** The reviewer's residual guard hole — `dynamicRe = import\s*\(\s*["']…` accepts only single/double quotes, NOT a backtick, so `await import(`../event-publisher.js`)` (legal JS; dynamic import() permits template literals) still evaded THE only frozen-surface merge gate — is closed by adding a backtick to the delimiter and negated-path char classes, without weakening any existing match.
+
+**Evidence:**
+- **Reproduced the gap:** node repro on the shipped regex → `current dynamicRe catches backtick? false` for `await import(`../event-publisher.js`)`.
+- **RED first (right reason):** added raw-backtick specifiers (NOT rewritten to quotes) to the STRUCTURAL-dynamic test's `dynamicForms` (`import(`../routes/realtime`)`, `import(`../event-publisher.js`)`, `import( `../code-blue-keepalive.js` )`) and replaced the prior line-149 `.replace(/`/g,'"')` sidestep. Pre-fix run FAILED at `tests/collab-emergency-isolation.test.ts:159` — `AssertionError: dynamic import not caught: await import(`../routes/realtime`): expected false to be true`. Failure is exactly the backtick evasion; the other 6 tests passed.
+- **GREEN:** widened `dynamicRe` to `import\s*\(\s*["'`][^"'`]*${mod}` (backtick added to both classes). Static regex left byte-for-byte unchanged. Post-fix `pnpm test -- tests/collab-emergency-isolation.test.ts` → `Tests 7 passed (7)`.
+- **No weakening / no false positives:** static forms still caught; comment prose → false; real `await import("@socket.io/redis-adapter")` → false; added unrelated-backtick negative `await import(`@socket.io/redis-adapter`)` → false. Real STRUCTURAL scan of collab source unchanged (still 7/7, server.ts:123 backtick-free real adapter import stays unflagged).
+- **Doctrine intact:** pure test-file change; no collab source touched; no SSE/emergency/outbox/Code-Blue coupling; clinicId-from-identity, closed-enum telemetry, non-fatal init all untouched.
+- **Commands:** `pnpm typecheck` → exit 0. Collab suite (5 files) → `Test Files 5 passed`, `Tests 31 passed`. Full `pnpm test` → `Test Files 605 passed (605)`, `Tests 5428 passed | 11 skipped`, 0 failed. Commit `8463bdb53`.
+
+**Verdict:** VERIFIED
