@@ -184,8 +184,10 @@ export async function initCollabServer(
     const { identity } = socket.data;
     recordCollabMetric("collab_ws_connected");
 
-    const emitPresence = (room: string) => {
-      io.to(room).emit("presence", { room, members: presence.getPresent(room) });
+    const emitPresence = async (room: string) => {
+      // Converged (cross-instance) member list — the local view alone diverges under
+      // the 2-instance topology the channel requires Redis for (card H5).
+      io.to(room).emit("presence", { room, members: await presence.getConvergedPresent(room) });
     };
 
     socket.on("join", async (req: unknown, ack?: (r: unknown) => void) => {
@@ -208,11 +210,11 @@ export async function initCollabServer(
       }
       await socket.join(decision.room);
       socket.data.rooms.add(decision.room);
-      if (presence.addLease(decision.room, { userId: identity.userId, displayName: identity.displayName }, socket.id)) {
+      if (await presence.register(decision.room, { userId: identity.userId, displayName: identity.displayName }, socket.id)) {
         recordCollabMetric("collab_presence");
       }
-      emitPresence(decision.room);
-      ack?.({ ok: true, room: decision.room, members: presence.getPresent(decision.room) });
+      await emitPresence(decision.room);
+      ack?.({ ok: true, room: decision.room, members: await presence.getConvergedPresent(decision.room) });
     });
 
     // ── Feature 1: shift-chat typing + presence + nudge (R-RTC-1.2) ────────────
@@ -226,7 +228,8 @@ export async function initCollabServer(
     });
 
     socket.on("presence-heartbeat", () => {
-      for (const room of socket.data.rooms) presence.touch(room, socket.id);
+      // Refresh both the local lease and its Redis mirror TTL (best-effort, never throws).
+      for (const room of socket.data.rooms) void presence.refresh(room, socket.id);
     });
 
     socket.on("chat-nudge", (payload: { messageId?: string }) => {
@@ -286,21 +289,21 @@ export async function initCollabServer(
       }
     });
 
-    socket.on("leave", (payload: { room?: string }) => {
+    socket.on("leave", async (payload: { room?: string }) => {
       if (rateLimiter.check(`leave:${socket.id}`, LEAVE_MAX_PER_SEC) !== "allow") return;
       const room = typeof payload?.room === "string" ? payload.room : "";
       if (!socket.data.rooms.has(room)) return;
       socket.leave(room);
       socket.data.rooms.delete(room);
-      presence.removeLease(room, socket.id);
-      emitPresence(room);
+      await presence.unregister(room, socket.id);
+      await emitPresence(room);
     });
 
-    socket.on("disconnect", () => {
+    socket.on("disconnect", async () => {
       recordCollabMetric("collab_ws_disconnected");
       for (const room of socket.data.rooms) {
-        presence.removeLease(room, socket.id);
-        emitPresence(room);
+        await presence.unregister(room, socket.id);
+        await emitPresence(room);
       }
       rateLimiter.reset(`cur:${socket.id}`);
       rateLimiter.reset(`sel:${socket.id}`);
