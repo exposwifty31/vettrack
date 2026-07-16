@@ -1,0 +1,74 @@
+# Native flow walk — iPad Pro 11-inch (M5) sim (Appium/XCUITest), 2026-07-16
+# App: uk.vettrack.app live-reload shell → http://localhost:5000 (pnpm dev:walk, dev-bypass)
+# Command: SIM_UDID=727A1E35-… SIM_DEVICE_NAME="iPad Pro 11-inch (M5)" npm run walk:ipad
+
+       ✓ home → render
+       ✓ equipment-list → render
+       ✓ equipment-new → render
+       ✓ equipment-detail → render
+       ✓ equipment-edit → render
+       ✓ tasks → render
+       ✓ scan → render
+       ✓ scan-alias-redirect → redirect (/scan)
+       ✓ equipment-ops-redirect → redirect (/equipment)
+       ✓ alerts → render
+       ✓ my-equipment → render
+       ✓ my-profile → render
+       ✓ rooms → render
+       ✓ locations → render
+       ✓ code-blue → render
+       ✓ crash-cart → render
+       ✓ handoff → render
+       ✓ emergency-kit → render
+       ✓ inventory → render
+       ✓ inventory-items → render
+       ✓ app-surfaces → render
+       ✓ app-surfaces-redirect → redirect (/home)
+       ✓ shift-chat → render
+       ✓ shift-ops-redirect → redirect (/equipment)
+       ✓ board-alias-redirect → redirect (/board)
+       ✓ admin-home → render
+       ✓ admin-config → render
+       ✓ admin-history → render
+       ✓ legacy-tasks-alias → redirect (/equipment/tasks)
+       ✓ legacy-med-integrity-redirect → redirect (/admin)
+       ✓ legacy-meds → redirect (/equipment/tasks)
+       ✓ legacy-patients → redirect (/equipment)
+       ✓ legacy-billing → redirect (/equipment)
+       ✓ legacy-er → redirect (/equipment)
+       ✓ home → render
+       ✓ equipment-list → render
+       ✓ equipment-new → render
+       ✓ equipment-detail → render
+       ✓ equipment-edit → render
+       ✓ tasks → redirect (/equipment)
+       ✓ scan → render
+       ✓ scan-alias-redirect → redirect (/scan)
+       ✓ equipment-ops-redirect → redirect (/equipment)
+       ✓ alerts → redirect (/equipment)
+       ✓ my-equipment → render
+       ✓ my-profile → render
+       ✓ rooms → redirect (/equipment)
+       ✓ locations → redirect (/equipment)
+       ✓ code-blue → render
+       ✓ crash-cart → render
+       ✓ handoff → render
+       ✓ emergency-kit → render
+       ✓ inventory → render
+       ✓ inventory-items → render
+       ✓ app-surfaces → render
+       ✓ app-surfaces-redirect → redirect (/home)
+       ✓ shift-chat → render
+       ✓ shift-ops-redirect → redirect (/equipment)
+       ✓ board-alias-redirect → redirect (/board)
+       ✓ admin-home → render
+       ✓ admin-config → render
+       ✓ admin-history → render
+       ✓ legacy-tasks-alias → redirect (/equipment)
+       ✓ legacy-med-integrity-redirect → redirect (/admin)
+       ✓ legacy-meds → redirect (/equipment)
+       ✓ legacy-patients → redirect (/equipment)
+       ✓ legacy-billing → redirect (/equipment)
+       ✓ legacy-er → redirect (/equipment)
+68 passing (1m 14.9s)
+Spec Files:	 1 passed, 1 total (100% completed) in 00:01:58  
