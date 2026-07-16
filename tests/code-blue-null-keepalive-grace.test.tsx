@@ -118,6 +118,33 @@ describe("R-CB-02 · null keepalive grace", () => {
     expect(result.current.session?.id).toBe("s1"); // retained — never optimistically cleared
   });
 
+  it("boundary: age RECONCILE_GRACE_MS−1 retains (within); exactly RECONCILE_GRACE_MS runs a confirming refetch", async () => {
+    const NOW = 1_700_000_000_000;
+    const nowSpy = vi.spyOn(Date, "now").mockReturnValue(NOW);
+    try {
+      // Session started (grace − 1) ago → age is exactly RECONCILE_GRACE_MS − 1 (within).
+      getActive.mockResolvedValue(activeSession(NOW - (RECONCILE_GRACE_MS - 1)));
+      const { result } = renderHook(() => useCodeBlueSession(), { wrapper });
+      await waitFor(() => expect(result.current.session?.id).toBe("s1"));
+
+      const callsWithin = getActive.mock.calls.length;
+      getActive.mockResolvedValue(noSession); // a refetch WOULD return null
+
+      fireNullKeepalive();
+      await new Promise((r) => setTimeout(r, 20));
+      expect(result.current.session?.id).toBe("s1"); // within (< grace) → retained
+      expect(getActive.mock.calls.length).toBe(callsWithin); // and no clearing refetch
+
+      // Advance the clock by 1ms → age is now exactly RECONCILE_GRACE_MS (the >= boundary).
+      nowSpy.mockReturnValue(NOW + 1);
+      fireNullKeepalive();
+      await waitFor(() => expect(result.current.session).toBeNull()); // >= grace → confirming refetch cleared it
+      expect(getActive.mock.calls.length).toBeGreaterThan(callsWithin);
+    } finally {
+      nowSpy.mockRestore();
+    }
+  });
+
   it("after grace: a confirmed null clears the session via a confirming refetch", async () => {
     getActive.mockResolvedValue(activeSession(Date.now() - 20 * RECONCILE_GRACE_MS)); // age >> grace
     const { result } = renderHook(() => useCodeBlueSession(), { wrapper });
