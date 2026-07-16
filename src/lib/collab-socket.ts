@@ -22,6 +22,14 @@ import { getConfiguredApiOrigin, needsRemoteApiOrigin } from "@/lib/api-origin";
 
 const COLLAB_PATH = "/collab-ws";
 const JOIN_ACK_TIMEOUT_MS = 5_000;
+/**
+ * Client presence-heartbeat cadence. The server prunes a socket's presence lease
+ * after `PRESENCE_TTL_MS = 90_000` (`server/lib/realtime-collab/config.ts`) unless
+ * refreshed via `presence-heartbeat`; 30s sits comfortably under that TTL. ONE
+ * heartbeat per SHARED socket refreshes ALL of its rooms' leases server-side, so
+ * this belongs in the primitive — a per-hook heartbeat would multi-emit.
+ */
+const COLLAB_HEARTBEAT_MS = 30_000;
 
 /**
  * A join request as the client asks for it — SHARED shape with the server's
@@ -101,6 +109,27 @@ function resolveCollabOrigin(): string {
 
 let socket: CollabSocket | null = null;
 let refCount = 0;
+let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
+
+/**
+ * Start the single presence-heartbeat interval for the shared socket. Idempotent.
+ * Emits ONLY while the socket is connected (a queued emit on a down socket would be
+ * pointless) — graceful degradation stays intact: no heartbeat, no error, no gated
+ * action. The event carries NO payload; identity is server-attached.
+ */
+function startHeartbeat(): void {
+  if (heartbeatTimer) return;
+  heartbeatTimer = setInterval(() => {
+    if (socket?.connected) socket.emit("presence-heartbeat");
+  }, COLLAB_HEARTBEAT_MS);
+}
+
+function stopHeartbeat(): void {
+  if (heartbeatTimer) {
+    clearInterval(heartbeatTimer);
+    heartbeatTimer = null;
+  }
+}
 
 /**
  * Acquire the shared collaboration socket (lazily creating it). Increments the
@@ -132,6 +161,7 @@ export function getCollabSocket(auth: CollabAuthSource | null, origin?: string):
     autoConnect: true,
   }) as CollabSocket;
   refCount = 1;
+  startHeartbeat();
   return socket;
 }
 
@@ -185,6 +215,7 @@ export function releaseCollabSocket(): void {
   if (!socket) return;
   refCount -= 1;
   if (refCount <= 0) {
+    stopHeartbeat();
     socket.removeAllListeners();
     socket.disconnect();
     socket = null;
@@ -197,6 +228,7 @@ export function releaseCollabSocket(): void {
  * NOT for per-surface unmount (that is `releaseCollabSocket`). — card H1.
  */
 export function closeCollabSocket(): void {
+  stopHeartbeat();
   if (socket) {
     socket.removeAllListeners();
     socket.disconnect();
