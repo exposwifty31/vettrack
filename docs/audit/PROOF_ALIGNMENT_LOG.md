@@ -3418,3 +3418,16 @@ Reviewer returned 1 HIGH + 1 MEDIUM + 2 LOW on the committed sub-card; all four 
 - **Commands:** `pnpm typecheck` (frontend `tsc --noEmit` + server `tsconfig.server.json`) → exit 0. Collab suite `tests/collab-{board,emergency-isolation,integration,presence-store,ws-auth,handshake-identity-clerk}.test.ts` → `Test Files 6 passed`, `Tests 32 passed`. Full `pnpm test` → `Test Files 605 passed (605)`, `Tests 5427 passed | 11 skipped`, 0 failed.
 
 **Verdict:** VERIFIED
+
+## 2026-07-16 — R-RTC-1 Phase-1 fix card C3: emergency-isolation guard missed dynamic import() (CRITICAL — guard hole in the ONLY frozen-surface merge gate)
+
+**Claim:** The STRUCTURAL scan in `tests/collab-emergency-isolation.test.ts` flags forbidden emergency/SSE/outbox imports in collab source, but its regex `(import|from)\s+["']…` requires whitespace-then-quote after `import`/`from`, so it matches static `import x from "…"` but NOT dynamic `await import("…")`. The collab code already uses dynamic import() (`server/lib/realtime-collab/server.ts:123` loads `@socket.io/redis-adapter` that way), so a future `await import("../event-publisher.js")` coupling would silently pass the only frozen-surface guard. Fixed by broadening the scanner to ALSO match the dynamic form (`import\s*\(\s*["']…`), keeping the static match unchanged (no weakening).
+
+**Evidence:**
+- **RED first (right reason):** extracted the scan into a shared `importsForbiddenModule(src, forbidden)` helper carrying ONLY the current static regex, then added `it("STRUCTURAL scanner catches a DYNAMIC import() of a forbidden emergency module")`. Pre-fix run FAILED at `tests/collab-emergency-isolation.test.ts:152` — `AssertionError: dynamic import not caught: await import("../event-publisher.js");: expected false to be true`. The failure is exactly the guard hole (static-only regex misses `import(`), not a test-authoring mistake; the other 6 tests passed.
+- **GREEN:** added `const dynamicRe = new RegExp(\`import\\s*\\(\\s*["'][^"']*${mod}\`)` to the helper (`return staticRe.test(src) || dynamicRe.test(src)`). Post-fix `pnpm test -- tests/collab-emergency-isolation.test.ts` → `Tests 7 passed (7)`.
+- **No weakening / no false positives asserted by the new test:** static forms still caught (`import { publish } from "../event-publisher.js"`, `import "../routes/code-blue"` → true); comment prose (`// … import event-publisher`) → false; the real unrelated dynamic import (`await import("@socket.io/redis-adapter")`) → false. The existing STRUCTURAL test was refactored to call the same helper, so both share one detection path. Also broadened `forbidden.replace("/", "\\/")` (first-slash-only) to a global `/\//g` replace in the helper — no behavioral change (each forbidden token has ≤1 slash) but robust to multi-slash entries.
+- **Design untouched:** pure test-file change; no collab source modified, no doctrine weakened. The FORBIDDEN list is unchanged (hoisted to module scope, same 9 tokens).
+- **Commands:** `pnpm typecheck` (frontend `tsc --noEmit` + server `tsconfig.server.json`) → exit 0. Collab suite `tests/collab-{board,emergency-isolation,integration,presence-store,ws-auth}.test.ts` → `Test Files 5 passed`, `Tests 31 passed`. Full `pnpm test` → `Test Files 605 passed (605)`, `Tests 5428 passed | 11 skipped`, 0 failed.
+
+**Verdict:** VERIFIED
