@@ -9,7 +9,7 @@
 | # | Item | Spec | Size | Status |
 |---|---|---|---|---|
 | 1 | **R-CB-stabilize** — 2 Code Blue races (CLICK-PATH-010/011) | `consolidated-audit-10x/subspecs/R-CB-stabilize-*.plan.md` | Small (1 hook + 2 tests) | 🟢 **build GREEN** (branch `claude/r-cb-stabilize`, f7fd25706) · panel + PR pending |
-| 2 | **R-CBF-1** — one-tap Code Blue (frozen) | `…/R-CBF-1-code-blue-one-tap.plan.md` | Large | ⏳ gated behind #1 |
+| 2 | **R-CBF-1** — one-tap Code Blue (frozen) | `…/R-CBF-1-code-blue-one-tap.plan.md` | Large | 🟢 **IMPLEMENTED — PR #111** (branch `claude/r-cbf-1-one-tap`). R-CBF-1.1a–1.5 + 1.2 all built via TDD + 7-lens pre-PR panel (0 critical / 0 frozen-doctrine) + fix wave (`03ef599`) + clean adversarial re-review. CI green; CodeRabbit round in progress. Schema: `vt_equipment.reservedForSessionId` (mig 170) + `vt_code_blue_start_claims` (mig 171); nearest-ready-cart resolver net-new. |
 | 3 | **R-M1** — RFID-gate e2e (managed reader + directional gates + board producer) | `…/R-M1-rfid-gate-e2e.plan.md` | Massive | ⏳ shares board seam w/ #4 |
 | 4 | **R-BDF-1** — ambient board anomaly alerts | `…/R-BDF-1-ambient-board-alerts.plan.md` | Medium | ⏳ build on #3's board producer |
 | 5 | **R-SH-F1** — shift handover + Priza | `…/R-SH-F1-shift-handover.plan.md` | Large (new table + generator + PMS seam) | ⏳ independent |

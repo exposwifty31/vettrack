@@ -122,6 +122,53 @@ export interface EndCodeBlueRequest {
   outcome: "rosc" | "died" | "transferred" | "ongoing";
 }
 
+/** Bounded durable delivery state of the one-tap team-page outbox row (R-CBF-1.1). */
+export type OneTapPagingState = "queued" | "processing" | "sent" | "failed";
+
+/**
+ * R-CBF-1.1 — one-tap Code Blue orchestration request. The client generates one
+ * idempotency token per hold gesture (R-CBF-1.3) and persists it across retries;
+ * `locationHint` is an optimistic hint only — the server re-derives the
+ * initiating location authoritatively and never trusts the client value to steer
+ * cart selection.
+ */
+export interface OneTapCodeBlueRequest {
+  idempotencyToken: string;
+  managerUserId: string;
+  managerUserName: string;
+  preCheckPassed?: boolean;
+  /** Optimistic client location hint — re-validated server-side, never trusted to steer. */
+  locationHint?: { roomId: string | null };
+}
+
+/**
+ * R-CBF-1.1 — retryable conflict reason codes for a one-tap start. These are
+ * NOT part of the success response body: a conflict is returned as HTTP 409, so
+ * the `api.codeBlue.oneTap` wrapper (via `request()`) THROWS an `ApiError` whose
+ * payload `reason` is one of these UPPERCASED codes — it is never deserialized
+ * into {@link OneTapCodeBlueResponse}. Callers read it off the thrown error.
+ */
+export type OneTapCodeBlueConflictReason =
+  | "ACTIVE_LEASE"
+  | "FENCE_SUPERSEDED"
+  | "ACTIVE_SESSION_EXISTS";
+
+/**
+ * R-CBF-1.1 — one-tap Code Blue orchestration SUCCESS response (HTTP 201 created
+ * / 200 replay). A retryable conflict is NOT modelled here — it is surfaced as a
+ * thrown `ApiError` (409, `CODE_BLUE_START_CONFLICT`, see
+ * {@link OneTapCodeBlueConflictReason}) because `request()` rejects on non-2xx.
+ */
+export interface OneTapCodeBlueResponse {
+  /** How the request resolved: a fresh start, or an idempotent replay. */
+  outcome: "created" | "replay";
+  sessionId: string;
+  /** The advisory soft-reserved nearest-ready cart, or null when none was available. */
+  reservedCartId?: string | null;
+  /** CURRENT durable paging state of the team page (never a static "success"). */
+  pagingState?: OneTapPagingState | null;
+}
+
 export interface CodeBlueDispense {
   id: string;
   sessionId: string;

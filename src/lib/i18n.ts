@@ -565,6 +565,10 @@ const translations = {
       managerOpenedBy: (manager: string, opener: string) =>
         tr(d.codeBlue.history.managerOpenedBy, { manager, opener }),
     },
+    hold: {
+      ...d.codeBlue.hold,
+      newLogEntries: (count: number) => tr(d.codeBlue.hold.newLogEntries, { count }),
+    },
     reconciliation: {
       ...d.codeBlue.reconciliation,
       toast: { ...d.codeBlue.reconciliation.toast },

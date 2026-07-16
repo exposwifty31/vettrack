@@ -1,0 +1,649 @@
+/**
+ * R-CBF-1.1a · Durable idempotency CLAIM record + fencing lifecycle.
+ *
+ * This is the FIRST transactional step of the R-CBF-1.1 one-tap Code Blue
+ * orchestration (endpoint + cart resolver are OTHER sub-cards). The claim is a
+ * SEPARATE durable record, written in its own durable write BEFORE any cart
+ * lookup or session transaction, with states:
+ *
+ *   claimed(fence, leaseUntil) → committed → released
+ *
+ * Fencing (pinned): a short TTL alone is unsafe against a slow-but-still-active
+ * owner, so the claim carries a MONOTONIC fence. Reclamation issues a NEW
+ * (higher) fence, and only the CURRENT fence-holder may flip the claim to
+ * `committed` — an owner whose fence was superseded is REJECTED on commit, so a
+ * retry can never create a second session that then races the original commit.
+ *
+ * Retry semantics (from the claim's view — the endpoint maps these to
+ * REPLAY / retryable-conflict / RECLAIM):
+ *   - `committed`                          → REPLAY the stored session id.
+ *   - `claimed` + lease NOT expired        → ACTIVE-LEASE (retryable conflict);
+ *                                            never reclaimed, never replayed.
+ *   - `claimed` + lease expired, or `released` (owner aborted after a session
+ *                                            -txn abort) → RECLAIM with a fresh
+ *                                            higher fence.
+ *
+ * Frozen Code Blue doctrine: every query is clinic-scoped; the committed claim
+ * is bound to a committed session and is never deleted.
+ *
+ * Coverage: the fast in-memory model (a faithful re-implementation of the CAS
+ * semantics) drives every lifecycle path, INCLUDING the lost-insert-race branch
+ * of `claimStart`. An OPT-IN DB-integration section (gated on `CBF_CLAIM_DB_IT`
+ * + a real `DATABASE_URL`) exercises the actual Postgres compare-and-set SQL of
+ * `DrizzleStartClaimStore` so the durable fence-guarded UPDATEs are proven, not
+ * just modelled.
+ */
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import fs from "node:fs";
+import path from "node:path";
+import { randomUUID } from "node:crypto";
+import {
+  claimStart,
+  commitClaim,
+  releaseClaim,
+  DEFAULT_LEASE_MS,
+  DrizzleStartClaimStore,
+  type StartClaimStore,
+  type StartClaimRow,
+} from "../server/lib/code-blue-start-claim.js";
+import { db, pool, clinics, codeBlueStartClaims } from "../server/db.js";
+import { and, eq } from "drizzle-orm";
+
+const CLINIC = "clinic-1";
+const OTHER_CLINIC = "clinic-2";
+const T0 = new Date("2026-07-16T10:00:00.000Z");
+const later = (ms: number) => new Date(T0.getTime() + ms);
+
+/**
+ * Faithful in-memory model of the durable CAS semantics the Drizzle store
+ * issues against Postgres:
+ *   - insertClaimed is guarded by the unique (clinicId, token) key: a second
+ *     concurrent insert of the same key loses.
+ *   - every CAS UPDATE is guarded by the CURRENT fence (and clinic + token), so
+ *     a superseded fence-holder can never mutate the row.
+ *   - reclaim only succeeds from an expired `claimed` lease or a `released`
+ *     claim; commit/release only succeed from a `claimed` state.
+ *
+ * The composite map key uses a printable `|` separator (NOT a NUL byte) so the
+ * committed test file stays a plain-text, diffable blob on this frozen surface.
+ */
+class InMemoryStartClaimStore implements StartClaimStore {
+  readonly rows = new Map<string, StartClaimRow>();
+
+  protected key(clinicId: string, token: string): string {
+    return `${clinicId}|${token}`;
+  }
+
+  peek(clinicId: string, token: string): StartClaimRow | undefined {
+    const r = this.rows.get(this.key(clinicId, token));
+    return r ? { ...r } : undefined;
+  }
+
+  async read(clinicId: string, token: string): Promise<StartClaimRow | null> {
+    const r = this.rows.get(this.key(clinicId, token));
+    return r ? { ...r } : null;
+  }
+
+  async insertClaimed(row: StartClaimRow): Promise<boolean> {
+    const k = this.key(row.clinicId, row.token);
+    if (this.rows.has(k)) return false; // unique(clinicId, token) violation
+    this.rows.set(k, { ...row });
+    return true;
+  }
+
+  async casReclaim(input: {
+    clinicId: string;
+    token: string;
+    expectedFence: number;
+    newFence: number;
+    leaseUntil: Date;
+    asOf: Date;
+  }): Promise<boolean> {
+    const k = this.key(input.clinicId, input.token);
+    const r = this.rows.get(k);
+    if (!r || r.fence !== input.expectedFence) return false;
+    const reclaimable =
+      r.state === "released" ||
+      (r.state === "claimed" && r.leaseUntil.getTime() <= input.asOf.getTime());
+    if (!reclaimable) return false;
+    this.rows.set(k, {
+      ...r,
+      state: "claimed",
+      fence: input.newFence,
+      leaseUntil: input.leaseUntil,
+      sessionId: null,
+    });
+    return true;
+  }
+
+  async casCommit(input: {
+    clinicId: string;
+    token: string;
+    expectedFence: number;
+    sessionId: string;
+    updatedAt: Date;
+  }): Promise<boolean> {
+    const k = this.key(input.clinicId, input.token);
+    const r = this.rows.get(k);
+    if (!r || r.fence !== input.expectedFence || r.state !== "claimed") return false;
+    this.rows.set(k, { ...r, state: "committed", sessionId: input.sessionId });
+    return true;
+  }
+
+  async casRelease(input: {
+    clinicId: string;
+    token: string;
+    expectedFence: number;
+    updatedAt: Date;
+  }): Promise<boolean> {
+    const k = this.key(input.clinicId, input.token);
+    const r = this.rows.get(k);
+    if (!r || r.fence !== input.expectedFence || r.state !== "claimed") return false;
+    this.rows.set(k, { ...r, state: "released" });
+    return true;
+  }
+}
+
+/**
+ * Simulates LOSING the durable insert race inside `claimStart`: the caller's
+ * initial `read` sees no row, but a concurrent winner commits its insert first,
+ * so THIS `insertClaimed` fails and the follow-up re-read reveals whatever the
+ * winner left behind (`winner`). A `null` winner models the winner's row then
+ * (illegally) vanishing — `claimStart` must fail loud, not mint a 2nd session.
+ */
+class LostInsertRaceStore extends InMemoryStartClaimStore {
+  constructor(private readonly winner: StartClaimRow | null) {
+    super();
+  }
+
+  async insertClaimed(_row: StartClaimRow): Promise<boolean> {
+    if (this.winner) {
+      this.rows.set(this.key(this.winner.clinicId, this.winner.token), { ...this.winner });
+    }
+    return false; // our insert loses the unique (clinicId, token) race
+  }
+}
+
+describe("R-CBF-1.1a · claim → commit happy path (replay after commit)", () => {
+  it("a fresh token is claimed with an initial fence, then committed by the fence-holder", async () => {
+    const store = new InMemoryStartClaimStore();
+
+    const first = await claimStart(store, CLINIC, "tok-1", { now: T0 });
+    expect(first.outcome).toBe("claimed");
+    expect(first.state).toBe("claimed");
+    expect(first.sessionId).toBeNull();
+    expect(first.fence).toBeGreaterThan(0);
+
+    const commit = await commitClaim(store, CLINIC, "tok-1", first.fence, "sess-1", { now: T0 });
+    expect(commit.committed).toBe(true);
+    expect(commit.sessionId).toBe("sess-1");
+
+    // A duplicate-token retry after commit REPLAYS the committed session id with
+    // NO reclaim and NO fence change.
+    const replay = await claimStart(store, CLINIC, "tok-1", { now: later(1) });
+    expect(replay.outcome).toBe("committed");
+    expect(replay.state).toBe("committed");
+    expect(replay.sessionId).toBe("sess-1");
+    expect(replay.fence).toBe(first.fence);
+  });
+});
+
+describe("R-CBF-1.1a · active lease is a retryable conflict (never reclaimed, never replayed)", () => {
+  it("a retry while the lease is still valid returns active_lease and does NOT bump the fence", async () => {
+    const store = new InMemoryStartClaimStore();
+
+    const owner = await claimStart(store, CLINIC, "tok-1", { now: T0 });
+    expect(owner.outcome).toBe("claimed");
+
+    // Well within the lease window.
+    const retry = await claimStart(store, CLINIC, "tok-1", { now: later(DEFAULT_LEASE_MS - 1) });
+    expect(retry.outcome).toBe("active_lease");
+    expect(retry.sessionId).toBeNull();
+    // No reclaim happened: the durable fence is unchanged (no second owner).
+    expect(store.peek(CLINIC, "tok-1")?.fence).toBe(owner.fence);
+    expect(store.peek(CLINIC, "tok-1")?.state).toBe("claimed");
+  });
+});
+
+describe("R-CBF-1.1a · fencing — a superseded fence-holder is REJECTED on commit", () => {
+  it("an expired claim reclaims with a fresh higher fence; the old fence cannot commit", async () => {
+    const store = new InMemoryStartClaimStore();
+
+    const a = await claimStart(store, CLINIC, "tok-1", { now: T0 });
+    expect(a.outcome).toBe("claimed");
+
+    // Lease elapses; a retry RECLAIMS with a strictly higher fence.
+    const b = await claimStart(store, CLINIC, "tok-1", { now: later(DEFAULT_LEASE_MS + 1) });
+    expect(b.outcome).toBe("reclaimed");
+    expect(b.fence).toBeGreaterThan(a.fence);
+    expect(b.sessionId).toBeNull();
+
+    // The superseded owner A can NOT commit — its fence was taken over.
+    const stale = await commitClaim(store, CLINIC, "tok-1", a.fence, "sess-A");
+    expect(stale.committed).toBe(false);
+    expect(stale.reason).toBe("fence_superseded");
+
+    // The current fence-holder B commits exactly one session.
+    const win = await commitClaim(store, CLINIC, "tok-1", b.fence, "sess-B");
+    expect(win.committed).toBe(true);
+
+    const replay = await claimStart(store, CLINIC, "tok-1", { now: later(DEFAULT_LEASE_MS + 2) });
+    expect(replay.outcome).toBe("committed");
+    expect(replay.sessionId).toBe("sess-B");
+  });
+});
+
+describe("R-CBF-1.1a · an aborted claim (released by the owner) is reclaimable immediately", () => {
+  it("releaseClaim by the fence-holder makes the claim reclaimable even before the lease elapses", async () => {
+    const store = new InMemoryStartClaimStore();
+
+    const a = await claimStart(store, CLINIC, "tok-1", { now: T0 });
+    expect(a.outcome).toBe("claimed");
+
+    // Owner aborts its session transaction and releases the claim.
+    const rel = await releaseClaim(store, CLINIC, "tok-1", a.fence, { now: T0 });
+    expect(rel.released).toBe(true);
+
+    // A retry WITHIN the original lease window still reclaims (released == free),
+    // with a fresh higher fence and no empty replay / permanent rejection.
+    const b = await claimStart(store, CLINIC, "tok-1", { now: later(1) });
+    expect(b.outcome).toBe("reclaimed");
+    expect(b.fence).toBeGreaterThan(a.fence);
+
+    // A superseded owner can no longer release the now-reclaimed claim.
+    const staleRelease = await releaseClaim(store, CLINIC, "tok-1", a.fence);
+    expect(staleRelease.released).toBe(false);
+    expect(staleRelease.reason).toBe("fence_superseded");
+  });
+});
+
+describe("R-CBF-1.1a · concurrent starts with the same token yield exactly ONE committed session", () => {
+  it("the second start observes the active claim (conflict) and, once committed, a later retry replays", async () => {
+    const store = new InMemoryStartClaimStore();
+
+    // Two starts race for the same (clinic, token). A wins the durable insert.
+    const a = await claimStart(store, CLINIC, "tok-1", { now: T0 });
+    const b = await claimStart(store, CLINIC, "tok-1", { now: T0 });
+    expect(a.outcome).toBe("claimed");
+    expect(b.outcome).toBe("active_lease");
+
+    // A commits its one session.
+    expect((await commitClaim(store, CLINIC, "tok-1", a.fence, "sess-A")).committed).toBe(true);
+
+    // Even if B (buggy) tried to commit its observed fence after A committed, it
+    // is rejected — the state is no longer `claimed`.
+    const bCommit = await commitClaim(store, CLINIC, "tok-1", b.fence, "sess-B");
+    expect(bCommit.committed).toBe(false);
+
+    // A later retry replays the single committed session.
+    const replay = await claimStart(store, CLINIC, "tok-1", { now: later(1) });
+    expect(replay.outcome).toBe("committed");
+    expect(replay.sessionId).toBe("sess-A");
+  });
+});
+
+describe("R-CBF-1.1a · lost-insert race (a concurrent winner beat this start's insert)", () => {
+  it("the winner already committed → the losing start REPLAYS the winner's session (no 2nd claim)", async () => {
+    const winner: StartClaimRow = {
+      clinicId: CLINIC,
+      token: "tok-race",
+      fence: 7,
+      leaseUntil: later(DEFAULT_LEASE_MS),
+      state: "committed",
+      sessionId: "winner-sess",
+    };
+    const store = new LostInsertRaceStore(winner);
+
+    // read() → null, insertClaimed() → false (race lost), re-read → committed winner.
+    const r = await claimStart(store, CLINIC, "tok-race", { now: T0 });
+    expect(r.outcome).toBe("committed");
+    expect(r.state).toBe("committed");
+    expect(r.sessionId).toBe("winner-sess");
+    expect(r.fence).toBe(7);
+  });
+
+  it("the winner holds an active lease → the losing start returns ACTIVE-LEASE (no reservation)", async () => {
+    const winner: StartClaimRow = {
+      clinicId: CLINIC,
+      token: "tok-race",
+      fence: 3,
+      leaseUntil: later(DEFAULT_LEASE_MS),
+      state: "claimed",
+      sessionId: null,
+    };
+    const store = new LostInsertRaceStore(winner);
+
+    const r = await claimStart(store, CLINIC, "tok-race", { now: T0 });
+    expect(r.outcome).toBe("active_lease");
+    expect(r.state).toBe("claimed");
+    expect(r.sessionId).toBeNull();
+    expect(r.fence).toBe(3);
+  });
+
+  it("the row vanishes after a lost insert (an illegal delete) → claimStart FAILS LOUD", async () => {
+    // insertClaimed() → false but no row is present on the re-read: the only way
+    // this happens is a (forbidden) delete of a committed session. Fail rather
+    // than silently mint a second session for the same (clinic, token).
+    const store = new LostInsertRaceStore(null);
+
+    await expect(claimStart(store, CLINIC, "tok-gone", { now: T0 })).rejects.toThrow(
+      /disappeared after an insert conflict/,
+    );
+  });
+});
+
+describe("R-CBF-1.1a · cross-clinic isolation", () => {
+  it("the same token in two clinics is two independent claims", async () => {
+    const store = new InMemoryStartClaimStore();
+
+    const a = await claimStart(store, CLINIC, "tok-shared", { now: T0 });
+    const x = await claimStart(store, OTHER_CLINIC, "tok-shared", { now: T0 });
+    expect(a.outcome).toBe("claimed");
+    expect(x.outcome).toBe("claimed");
+
+    // Committing in CLINIC must not touch OTHER_CLINIC's claim.
+    expect((await commitClaim(store, CLINIC, "tok-shared", a.fence, "sess-A")).committed).toBe(true);
+
+    const clinicReplay = await claimStart(store, CLINIC, "tok-shared", { now: later(1) });
+    expect(clinicReplay.outcome).toBe("committed");
+    expect(clinicReplay.sessionId).toBe("sess-A");
+
+    // OTHER_CLINIC is still an in-flight active lease — never committed by the
+    // cross-clinic commit.
+    const otherRetry = await claimStart(store, OTHER_CLINIC, "tok-shared", { now: later(1) });
+    expect(otherRetry.outcome).toBe("active_lease");
+    expect(otherRetry.sessionId).toBeNull();
+
+    // A commit issued for OTHER_CLINIC's fence never leaks into CLINIC and vice
+    // versa (distinct rows).
+    expect((await commitClaim(store, OTHER_CLINIC, "tok-shared", x.fence, "sess-X")).committed).toBe(true);
+    expect(store.peek(CLINIC, "tok-shared")?.sessionId).toBe("sess-A");
+    expect(store.peek(OTHER_CLINIC, "tok-shared")?.sessionId).toBe("sess-X");
+  });
+});
+
+describe("R-CBF-1.1a · commit/release rejection reasons", () => {
+  it("committing a non-existent or non-claimed token reports a reason without throwing", async () => {
+    const store = new InMemoryStartClaimStore();
+
+    const missing = await commitClaim(store, CLINIC, "nope", 1, "sess");
+    expect(missing.committed).toBe(false);
+    expect(missing.reason).toBe("not_claimable");
+
+    const a = await claimStart(store, CLINIC, "tok-1", { now: T0 });
+    expect((await commitClaim(store, CLINIC, "tok-1", a.fence, "sess-A")).committed).toBe(true);
+    // A second commit of an already-committed claim is rejected (not re-committed).
+    const again = await commitClaim(store, CLINIC, "tok-1", a.fence, "sess-A2");
+    expect(again.committed).toBe(false);
+    expect(again.reason).toBe("not_claimable");
+  });
+});
+
+describe("R-CBF-1.1a · additive schema + clinic-scoped Drizzle store", () => {
+  it("vt_code_blue_start_claims exposes the token + fence + state columns", () => {
+    expect(codeBlueStartClaims.token).toBeDefined();
+    expect(codeBlueStartClaims.fence).toBeDefined();
+    expect(codeBlueStartClaims.state).toBeDefined();
+    expect(codeBlueStartClaims.sessionId).toBeDefined();
+    expect(codeBlueStartClaims.leaseUntil).toBeDefined();
+  });
+
+  it("DrizzleStartClaimStore is constructible and clinic-scopes every query", () => {
+    // Constructs against the default pool without issuing a query.
+    expect(() => new DrizzleStartClaimStore()).not.toThrow();
+    const source = fs.readFileSync(
+      path.join(process.cwd(), "server/lib/code-blue-start-claim.ts"),
+      "utf8",
+    );
+    // Every CAS/read path is clinic-scoped and fence-guarded.
+    expect(source).toContain("eq(codeBlueStartClaims.clinicId, clinicId)");
+    expect(source).toContain("eq(codeBlueStartClaims.fence, expectedFence)");
+    // Insert uses the durable unique (clinicId, token) key to lose a concurrent race.
+    expect(source).toContain("onConflictDoNothing");
+  });
+
+  it("ships a hand-authored additive migration creating the claim table", () => {
+    const dir = path.join(process.cwd(), "migrations");
+    const file = fs
+      .readdirSync(dir)
+      .find((f) => f.endsWith(".sql") && f.includes("code_blue_start_claim"));
+    expect(file, "migration creating vt_code_blue_start_claims must exist").toBeTruthy();
+    const sql = fs.readFileSync(path.join(dir, file as string), "utf8");
+    expect(sql).toMatch(/CREATE TABLE IF NOT EXISTS vt_code_blue_start_claims/);
+  });
+});
+
+/**
+ * OPT-IN DB integration: proves the REAL Postgres compare-and-set SQL of
+ * `DrizzleStartClaimStore` — the durable fence-guarded UPDATEs the in-memory
+ * model only re-implements. Skipped by default (the unit run has no real DB);
+ * run with:
+ *
+ *   CBF_CLAIM_DB_IT=1 DATABASE_URL=postgres://vettrack:vettrack@localhost:5432/vettrack \
+ *     pnpm exec vitest run tests/code-blue-start-claim.test.ts
+ *
+ * Requires migration 171 applied. Uses per-run UUID tokens (never collides with
+ * real rows) and deletes exactly its own rows afterwards.
+ */
+describe.skipIf(!process.env.CBF_CLAIM_DB_IT)(
+  "R-CBF-1.1a · DB integration — real Postgres fence-guarded CAS",
+  () => {
+    const store = new DrizzleStartClaimStore(db);
+    const inserted: Array<{ clinicId: string; token: string }> = [];
+    let clinicA = "";
+    let clinicB = "";
+    const now = new Date();
+
+    const freshToken = (label: string) => `cbf11a-it-${label}-${randomUUID()}`;
+    const track = (clinicId: string, token: string) => {
+      inserted.push({ clinicId, token });
+      return token;
+    };
+
+    beforeAll(async () => {
+      const rows = await db.select({ id: clinics.id }).from(clinics).limit(2);
+      if (rows.length < 2) {
+        throw new Error(
+          "DB integration needs ≥2 clinics; seed the dev DB (pnpm seed:dev) before running",
+        );
+      }
+      clinicA = rows[0].id;
+      clinicB = rows[1].id;
+    });
+
+    afterAll(async () => {
+      for (const { clinicId, token } of inserted) {
+        await db
+          .delete(codeBlueStartClaims)
+          .where(and(eq(codeBlueStartClaims.clinicId, clinicId), eq(codeBlueStartClaims.token, token)));
+      }
+      await pool.end();
+    });
+
+    it("insertClaimed is idempotent on the unique (clinicId, token) key", async () => {
+      const token = track(clinicA, freshToken("insert"));
+      const first = await store.insertClaimed({
+        clinicId: clinicA,
+        token,
+        fence: 1,
+        leaseUntil: new Date(now.getTime() + DEFAULT_LEASE_MS),
+        state: "claimed",
+        sessionId: null,
+      });
+      expect(first).toBe(true);
+
+      const second = await store.insertClaimed({
+        clinicId: clinicA,
+        token,
+        fence: 99,
+        leaseUntil: new Date(now.getTime() + DEFAULT_LEASE_MS),
+        state: "claimed",
+        sessionId: null,
+      });
+      expect(second).toBe(false); // onConflictDoNothing
+
+      const row = await store.read(clinicA, token);
+      expect(row?.fence).toBe(1); // the conflicting insert did NOT overwrite
+      expect(row?.state).toBe("claimed");
+    });
+
+    it("casCommit flips claimed→committed only for the current fence-holder", async () => {
+      const token = track(clinicA, freshToken("commit"));
+      await store.insertClaimed({
+        clinicId: clinicA,
+        token,
+        fence: 1,
+        leaseUntil: new Date(now.getTime() + DEFAULT_LEASE_MS),
+        state: "claimed",
+        sessionId: null,
+      });
+
+      // Wrong (superseded) fence is rejected.
+      const stale = await store.casCommit({
+        clinicId: clinicA,
+        token,
+        expectedFence: 999,
+        sessionId: "sess-stale",
+        updatedAt: now,
+      });
+      expect(stale).toBe(false);
+
+      // Current fence-holder commits.
+      const ok = await store.casCommit({
+        clinicId: clinicA,
+        token,
+        expectedFence: 1,
+        sessionId: "sess-db",
+        updatedAt: now,
+      });
+      expect(ok).toBe(true);
+
+      // A second commit on an already-committed row is rejected (state guard).
+      const again = await store.casCommit({
+        clinicId: clinicA,
+        token,
+        expectedFence: 1,
+        sessionId: "sess-again",
+        updatedAt: now,
+      });
+      expect(again).toBe(false);
+
+      const row = await store.read(clinicA, token);
+      expect(row?.state).toBe("committed");
+      expect(row?.sessionId).toBe("sess-db");
+    });
+
+    it("casReclaim only reclaims an expired lease / released claim, under a higher fence", async () => {
+      const token = track(clinicA, freshToken("reclaim"));
+      const leaseUntil = new Date(now.getTime() + DEFAULT_LEASE_MS);
+      await store.insertClaimed({
+        clinicId: clinicA,
+        token,
+        fence: 1,
+        leaseUntil,
+        state: "claimed",
+        sessionId: null,
+      });
+
+      // Lease NOT expired → not reclaimable.
+      const early = await store.casReclaim({
+        clinicId: clinicA,
+        token,
+        expectedFence: 1,
+        newFence: 2,
+        leaseUntil,
+        asOf: now, // before leaseUntil
+      });
+      expect(early).toBe(false);
+
+      // Lease expired → reclaims with the higher fence.
+      const reclaimed = await store.casReclaim({
+        clinicId: clinicA,
+        token,
+        expectedFence: 1,
+        newFence: 2,
+        leaseUntil: new Date(now.getTime() + 2 * DEFAULT_LEASE_MS),
+        asOf: new Date(leaseUntil.getTime() + 1),
+      });
+      expect(reclaimed).toBe(true);
+
+      const row = await store.read(clinicA, token);
+      expect(row?.fence).toBe(2);
+      expect(row?.state).toBe("claimed");
+      expect(row?.sessionId).toBeNull();
+    });
+
+    it("casRelease frees a claimed row (fence-guarded) and makes it reclaimable now", async () => {
+      const token = track(clinicA, freshToken("release"));
+      await store.insertClaimed({
+        clinicId: clinicA,
+        token,
+        fence: 5,
+        leaseUntil: new Date(now.getTime() + DEFAULT_LEASE_MS),
+        state: "claimed",
+        sessionId: null,
+      });
+
+      const wrongFence = await store.casRelease({
+        clinicId: clinicA,
+        token,
+        expectedFence: 4,
+        updatedAt: now,
+      });
+      expect(wrongFence).toBe(false);
+
+      const released = await store.casRelease({
+        clinicId: clinicA,
+        token,
+        expectedFence: 5,
+        updatedAt: now,
+      });
+      expect(released).toBe(true);
+      expect((await store.read(clinicA, token))?.state).toBe("released");
+
+      // A released claim is reclaimable even before its lease elapses.
+      const reclaimed = await store.casReclaim({
+        clinicId: clinicA,
+        token,
+        expectedFence: 5,
+        newFence: 6,
+        leaseUntil: new Date(now.getTime() + DEFAULT_LEASE_MS),
+        asOf: now,
+      });
+      expect(reclaimed).toBe(true);
+      expect((await store.read(clinicA, token))?.fence).toBe(6);
+    });
+
+    it("the full claimStart→commit→replay lifecycle runs against real Postgres", async () => {
+      const token = track(clinicA, freshToken("lifecycle"));
+
+      const claimed = await claimStart(store, clinicA, token, { now });
+      expect(claimed.outcome).toBe("claimed");
+
+      const committed = await commitClaim(store, clinicA, token, claimed.fence, "sess-life", { now });
+      expect(committed.committed).toBe(true);
+
+      const replay = await claimStart(store, clinicA, token, { now: new Date(now.getTime() + 1) });
+      expect(replay.outcome).toBe("committed");
+      expect(replay.sessionId).toBe("sess-life");
+    });
+
+    it("the same token in two clinics is two independent durable claims", async () => {
+      const token = freshToken("xclinic");
+      track(clinicA, token);
+      track(clinicB, token);
+
+      const a = await claimStart(store, clinicA, token, { now });
+      const b = await claimStart(store, clinicB, token, { now });
+      expect(a.outcome).toBe("claimed");
+      expect(b.outcome).toBe("claimed");
+
+      await commitClaim(store, clinicA, token, a.fence, "sess-A", { now });
+
+      // clinicB is untouched by clinicA's commit.
+      expect((await store.read(clinicB, token))?.state).toBe("claimed");
+      expect((await store.read(clinicA, token))?.state).toBe("committed");
+      expect((await store.read(clinicA, token))?.sessionId).toBe("sess-A");
+    });
+  },
+);

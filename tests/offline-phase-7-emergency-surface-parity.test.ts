@@ -68,6 +68,7 @@ function scanAllEmergencySurfaceRoutes(): string[] {
 function isCodeBlueOfflineBlockMutation(routeKey: string): boolean {
   const [method, path] = routeKey.split(" ", 2);
   if (method === "POST" && path === "/api/code-blue/sessions") return true;
+  if (method === "POST" && path === "/api/code-blue/one-tap") return true;
   if (method === "POST" && /^\/api\/code-blue\/sessions\/:id\/logs$/.test(path)) {
     return true;
   }

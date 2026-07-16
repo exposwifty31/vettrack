@@ -1073,6 +1073,17 @@ export const api = {
         request<void>(`/api/code-blue/sessions/${sessionId}/presence`, {
           method: "PATCH",
         }, undefined, true),
+      /**
+       * R-CBF-1.1 — one-tap orchestration: claim → nearest-ready cart → CAS
+       * reserve → session → outbox paging, resolved by the durable idempotency
+       * token. Emergency mutation: goes through `request()` (offline-blocked via
+       * `classifyEmergencyEndpoint`), never a raw fetch, never queued offline.
+       */
+      oneTap: (body: import("@/types").OneTapCodeBlueRequest) =>
+        request<import("@/types").OneTapCodeBlueResponse>("/api/code-blue/one-tap", {
+          method: "POST",
+          body: JSON.stringify(body),
+        }),
     },
     startEvent: (data: import("@/types").StartCodeBlueRequest) =>
       request<import("@/types").StartCodeBlueResponse>("/api/code-blue/events", {

@@ -2692,7 +2692,6 @@ export interface TStructure {
   codeBlue: {
     openTitle: string;
     openButton: string;
-    proceedWithoutFullCheck: string;
     managerLabel: string;
     managerLabelShort: string;
     managerInstruction: string;
@@ -2791,6 +2790,37 @@ export interface TStructure {
         died: string;
         transferred: string;
         ongoing: string;
+      };
+    };
+    hold: {
+      instruction: string;
+      hint: string;
+      starting: string;
+      cancel: string;
+      newLogEntries: string;
+    };
+    drugReference: {
+      title: string;
+      subtitle: string;
+      show: string;
+      hide: string;
+      disclaimer: string;
+      provenanceHeading: string;
+      sourceLabel: string;
+      versionLabel: string;
+      effectiveLabel: string;
+      reviewOwnerLabel: string;
+      indicationLabel: string;
+      doseLabel: string;
+      routeLabel: string;
+      speciesLabel: string;
+      weightBandLabel: string;
+      concentrationLabel: string;
+      doseUnitLabel: string;
+      kg: string;
+      species: {
+        canine: string;
+        feline: string;
       };
     };
     reconciliation: {

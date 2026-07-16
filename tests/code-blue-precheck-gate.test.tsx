@@ -1,19 +1,23 @@
 /**
  * @vitest-environment happy-dom
  *
- * C1 (UX audit, clinical-risk) — the CODE BLUE start button rendered armed
- * but silently no-oped: `disabled` gated on managerId only while the click
- * handler also required managerName, and managerName was seeded into state
- * from `useAuth().name` at mount (frequently still empty). These tests lock
- * the fixed contract: the disabled state and the click gate are the SAME
- * condition, a missing display name never blocks an eligible manager, and
- * the in-flight state visibly disables the button.
+ * C1 (UX audit, clinical-risk) — the CODE BLUE commit affordance must never be
+ * armed-but-silent: the gate that DISABLES it and the gate that lets it COMMIT
+ * are the SAME condition (an event manager is resolved), a missing display name
+ * never blocks an eligible manager, and the in-flight state visibly disables it.
+ *
+ * R-CBF-1.3 replaced the plain start button with the arm→hold-to-confirm control
+ * (a completed 800ms hold commits, carrying the per-gesture idempotency token).
+ * These tests lock the same C1 contract against the hold control.
  */
-import { describe, it, expect, vi, afterEach } from "vitest";
-import { render, screen, fireEvent, cleanup } from "@testing-library/react";
+import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
+import { render, screen, fireEvent, act, cleanup } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { t } from "@/lib/i18n";
-import { PreCheckGate } from "@/pages/code-blue";
+
+vi.mock("@/lib/haptics", () => ({
+  haptics: { warning: vi.fn(), locked: vi.fn(), error: vi.fn(), tap: vi.fn(), scanSuccess: vi.fn() },
+}));
 
 const authState: { userId: string | null; role: string; name: string | null } = {
   userId: "u-vet-1",
@@ -24,6 +28,8 @@ const authState: { userId: string | null; role: string; name: string | null } = 
 vi.mock("@/hooks/use-auth", () => ({
   useAuth: () => authState,
 }));
+
+import { PreCheckGate } from "@/pages/code-blue";
 
 function renderGate(props: { onStart?: ReturnType<typeof vi.fn>; starting?: boolean } = {}) {
   const onStart = props.onStart ?? vi.fn();
@@ -36,69 +42,83 @@ function renderGate(props: { onStart?: ReturnType<typeof vi.fn>; starting?: bool
   return { onStart };
 }
 
-describe("PreCheckGate — C1 start-button contract", () => {
+function holdButton(): HTMLButtonElement {
+  return screen.getByRole("button", { name: t.codeBlue.hold.instruction }) as HTMLButtonElement;
+}
+
+/** Complete an exactly-800ms press-and-hold on the commit control. */
+function completeHold(el: HTMLButtonElement) {
+  fireEvent.pointerDown(el);
+  act(() => vi.advanceTimersByTime(800));
+}
+
+describe("PreCheckGate — C1 commit-gate contract (arm→hold)", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
   afterEach(() => {
+    vi.runOnlyPendingTimers();
+    vi.useRealTimers();
     cleanup();
+    vi.clearAllMocks();
     authState.userId = "u-vet-1";
     authState.role = "vet";
     authState.name = "";
   });
 
-  it("eligible manager with an EMPTY display name can still start (fallback label)", () => {
+  it("eligible manager with an EMPTY display name can still commit (fallback label)", () => {
     const { onStart } = renderGate();
-    const button = screen.getByTestId("code-blue-start") as HTMLButtonElement;
-    expect(button.disabled).toBe(false);
+    const hold = holdButton();
+    expect(hold.disabled).toBe(false);
 
-    fireEvent.click(button);
+    completeHold(hold);
     expect(onStart).toHaveBeenCalledTimes(1);
-    expect(onStart).toHaveBeenCalledWith(false, {
-      id: "u-vet-1",
-      name: t.codeBlue.managerFallbackName,
-    });
+    expect(onStart).toHaveBeenCalledWith(
+      false,
+      { id: "u-vet-1", name: t.codeBlue.managerFallbackName },
+      expect.any(String),
+    );
   });
 
   it("eligible manager with a name passes the real name through", () => {
     authState.name = "Dr. Vet";
     const { onStart } = renderGate();
-    fireEvent.click(screen.getByTestId("code-blue-start"));
-    expect(onStart).toHaveBeenCalledWith(false, { id: "u-vet-1", name: "Dr. Vet" });
+    completeHold(holdButton());
+    expect(onStart).toHaveBeenCalledWith(false, { id: "u-vet-1", name: "Dr. Vet" }, expect.any(String));
   });
 
-  it("non-eligible user without a picked manager: disabled state matches the click gate + reason shown", () => {
+  it("non-eligible user without a picked manager: disabled state matches the commit gate + reason shown", () => {
     authState.role = "technician";
     const { onStart } = renderGate();
-    const button = screen.getByTestId("code-blue-start") as HTMLButtonElement;
-    expect(button.disabled).toBe(true);
+    const hold = holdButton();
+    expect(hold.disabled).toBe(true);
     expect(screen.getByText(t.codeBlue.startDisabledReason)).toBeTruthy();
 
-    fireEvent.click(button);
+    completeHold(hold);
     expect(onStart).not.toHaveBeenCalled();
   });
 
-  it("admin is NOT auto-selected as the event manager (F3): start stays disabled until one is picked", () => {
-    // F3 / CodeRabbit: an identity-admin is no longer auto-filled as the clinical
-    // event manager (that was the Round-1 bug — armed + enabled, then 403'd). Like
-    // any non-eligible user they must pick a manager, so the start is disabled.
+  it("admin is NOT auto-selected as the event manager (F3): commit stays disabled until one is picked", () => {
     authState.role = "admin";
     authState.userId = "u-admin-1";
     const { onStart } = renderGate();
-    const button = screen.getByTestId("code-blue-start") as HTMLButtonElement;
-    expect(button.disabled).toBe(true);
+    const hold = holdButton();
+    expect(hold.disabled).toBe(true);
     expect(screen.getByText(t.codeBlue.startDisabledReason)).toBeTruthy();
     // The auto-fill "…(you)" manager card is NOT rendered for an admin.
     expect(screen.queryByText(t.codeBlue.you)).toBeNull();
 
-    fireEvent.click(button);
+    completeHold(hold);
     expect(onStart).not.toHaveBeenCalled();
   });
 
-  it("while starting, the button is disabled and shows the in-flight label", () => {
+  it("while starting, the control is disabled and shows the in-flight label", () => {
     const { onStart } = renderGate({ starting: true });
-    const button = screen.getByTestId("code-blue-start") as HTMLButtonElement;
-    expect(button.disabled).toBe(true);
-    expect(button.textContent).toContain(t.codeBlue.startingSession);
+    const hold = holdButton();
+    expect(hold.disabled).toBe(true);
+    expect(screen.getByText(t.codeBlue.startingSession)).toBeTruthy();
 
-    fireEvent.click(button);
+    completeHold(hold);
     expect(onStart).not.toHaveBeenCalled();
   });
 });

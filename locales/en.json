@@ -2689,7 +2689,6 @@
   "codeBlue": {
     "openTitle": "OPEN CODE BLUE",
     "openButton": "⚠ OPEN CODE BLUE",
-    "proceedWithoutFullCheck": "Continue without full check",
     "managerLabel": "Event manager",
     "managerLabelShort": "Event manager:",
     "managerInstruction": "Required. The event manager is the responsible vet. Only they can close the event.",
@@ -2788,6 +2787,37 @@
         "died": "Deceased",
         "transferred": "Transferred",
         "ongoing": "Ongoing"
+      }
+    },
+    "hold": {
+      "instruction": "Hold to open CODE BLUE",
+      "hint": "Press and hold — releasing cancels",
+      "starting": "Opening CODE BLUE…",
+      "cancel": "Cancel",
+      "newLogEntries": "{count} new log entries"
+    },
+    "drugReference": {
+      "title": "Emergency dose reference",
+      "subtitle": "Reference only — always confirm against the patient",
+      "show": "Show dose reference",
+      "hide": "Hide dose reference",
+      "disclaimer": "Static clinician-approved reference. Not a prescription — verify every dose against the patient's current weight and status.",
+      "provenanceHeading": "Provenance",
+      "sourceLabel": "Source",
+      "versionLabel": "Version",
+      "effectiveLabel": "Effective",
+      "reviewOwnerLabel": "Review owner",
+      "indicationLabel": "Indication",
+      "doseLabel": "Dose",
+      "routeLabel": "Route",
+      "speciesLabel": "Species",
+      "weightBandLabel": "Weight band",
+      "concentrationLabel": "Concentration",
+      "doseUnitLabel": "Unit",
+      "kg": "kg",
+      "species": {
+        "canine": "Canine",
+        "feline": "Feline"
       }
     },
     "reconciliation": {

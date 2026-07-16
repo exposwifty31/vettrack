@@ -510,3 +510,152 @@ test("cross-cutting — Phase 9 snapshot keys do not introduce high-cardinality 
     }
   }
 });
+
+// ─── Drill 9 (R-CBF-1.5) — one-tap arm→hold acceptance bar ─────────────────────
+//
+// Doctrine assertion (R-CBF-1.5 "e2e drill + doctrine verification"):
+//   One arm→hold (POST /api/code-blue/one-tap, the composed R-CBF-1.1 endpoint)
+//   drives, observed live against the real Express + outbox stack:
+//     (a) a server-confirmed session is CREATED;
+//     (b) the nearest-ready cart is soft-reserved — advisory, so a null
+//         reservedCartId (no ready cart available) is doctrine-legal (R-CBF-1.2);
+//     (c) the team page is ENQUEUED — paging state is observed as `queued` or
+//         `processing` AT MINIMUM and is NEVER asserted `sent` synchronously
+//         (delivery is async via startEventOutboxPublisher, the sole outbox
+//         reader);
+//     (d) board propagation: the session appears in the SERVER-authoritative
+//         active-session snapshot (never a locally-fabricated overlay);
+//     (e) a duplicate-token retry REPLAYS the same session and reports the
+//         CURRENT durable paging state (never a static "success"), with no
+//         second cart reservation.
+//   Server-confirmed end is untouched: the drill never optimistically terminates
+//   the session — end still follows the SSE/PATCH path.
+//
+// This drill needs real DB state (a Code-Blue-eligible manager, and ideally a
+// ready crash cart) that only the seeded dev-bypass server provides. When the
+// running server cannot produce a fresh `created` outcome — Clerk-authed (no
+// metrics/roster), a clinical-gate denial (403), an in-flight lease or an
+// existing active session (409), or an un-seeded roster — the drill SKIPS rather
+// than assert against an environment it cannot set up, the same guard-and-skip
+// discipline every metrics drill above uses.
+
+test("drill 9 (R-CBF-1.5) — one-tap arm→hold reserves a cart, ENQUEUES the page (never `sent` synchronously), and a duplicate token replays the CURRENT state", async ({
+  request,
+}) => {
+  // Server up + dev-bypass reachable? (metrics is dev-bypass-open in CI.)
+  const before = await readMetrics(request);
+  test.skip(before === null, "metrics endpoint not accessible (server down / not dev-bypass)");
+
+  // Resolve a Code-Blue-eligible manager (active vet or admin) from the roster.
+  const usersRes = await request.get(`${BASE_URL}/api/users`);
+  test.skip(!usersRes.ok(), `users roster not accessible (status ${usersRes.status()})`);
+  const roster = (await usersRes.json()) as Array<{ id: string; role: string; status: string }>;
+  const manager = Array.isArray(roster)
+    ? roster.find((u) => u.status === "active" && (u.role === "vet" || u.role === "admin"))
+    : undefined;
+  test.skip(!manager, "no active vet/admin manager in the seeded roster");
+  if (!manager) return;
+
+  // One arm→hold = one per-gesture idempotency token, persisted across retries.
+  // No client location steering: the server re-derives the initiating location
+  // authoritatively (check-in → last-scan → none), so the hint is inert here.
+  const token = `drill9-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  const body = {
+    idempotencyToken: token,
+    managerUserId: manager.id,
+    managerUserName: "drill-manager",
+    preCheckPassed: true,
+    locationHint: { roomId: null },
+  };
+
+  const first = await request.post(`${BASE_URL}/api/code-blue/one-tap`, {
+    headers: { "Content-Type": "application/json" },
+    data: body,
+  });
+
+  // The environment must be able to START a fresh session for the acceptance
+  // bar to mean anything: a clinical-gate denial (403), an existing active
+  // session or in-flight lease (409), or an auth failure (401) is an un-seeded
+  // environment, not a doctrine failure — skip rather than assert against it.
+  test.skip(
+    first.status() !== 201,
+    `environment cannot create a fresh session (one-tap returned ${first.status()})`,
+  );
+
+  const created = (await first.json()) as {
+    outcome: string;
+    sessionId: string;
+    reservedCartId?: string | null;
+    pagingState?: string | null;
+  };
+
+  try {
+  // (a) A fresh, server-confirmed start.
+  expect(created.outcome).toBe("created");
+  expect(created.sessionId, "created session must carry an id").toBeTruthy();
+
+  // (b) Nearest-ready cart soft-reserved (advisory): the field is part of the
+  //     contract; when a cart WAS available it is a string, and a null value
+  //     (no ready cart) is doctrine-legal — the session still started.
+  expect(created, "response must carry the advisory reservedCartId field").toHaveProperty(
+    "reservedCartId",
+  );
+  if (created.reservedCartId != null) {
+    expect(typeof created.reservedCartId).toBe("string");
+  }
+
+  // (c) Team page ENQUEUED — `queued` or `processing` AT MINIMUM. Delivery is
+  //     async via startEventOutboxPublisher; `sent` must NEVER be asserted
+  //     synchronously (R-CBF-1.5 acceptance bar).
+  expect(["queued", "processing"]).toContain(created.pagingState);
+  expect(created.pagingState).not.toBe("sent");
+
+  // (d) Board propagation: the session is visible in the SERVER-authoritative
+  //     active-session snapshot — never a locally-fabricated overlay.
+  await expect
+    .poll(
+      async () => {
+        const activeRes = await request.get(`${BASE_URL}/api/code-blue/sessions/active`);
+        if (!activeRes.ok()) return null;
+        const snap = (await activeRes.json()) as { session?: { id?: string } | null };
+        return snap.session?.id ?? null;
+      },
+      { timeout: 10_000 },
+    )
+    .toBe(created.sessionId);
+
+  // (e) A duplicate-token retry REPLAYS the same committed session and reports
+  //     the CURRENT durable paging state (never a static "success"); the losing
+  //     duplicate never re-reserves a cart.
+  const replay = await request.post(`${BASE_URL}/api/code-blue/one-tap`, {
+    headers: { "Content-Type": "application/json" },
+    data: body,
+  });
+  expect(replay.status(), "a committed-token retry replays with 200").toBe(200);
+  const replayed = (await replay.json()) as {
+    outcome: string;
+    sessionId: string;
+    pagingState?: string | null;
+  };
+  expect(replayed.outcome).toBe("replay");
+  expect(replayed.sessionId).toBe(created.sessionId);
+  // The replayed state reflects the CURRENT durable delivery state, which may
+  // have advanced (queued → processing → sent) or DLQ'd (failed) by now.
+  expect(["queued", "processing", "sent", "failed"]).toContain(replayed.pagingState);
+
+  // Doctrine: server-confirmed end only. The drill's ASSERTIONS never
+  // optimistically end the session — termination follows the SSE/PATCH path.
+  } finally {
+    // Best-effort teardown via the SERVER-CONFIRMED end path (doctrine-legal, not
+    // optimistic): release this run's session so a lingering active session does
+    // not 409-skip every later run against a shared seeded DB. Manager-gated, so it
+    // clears when the drill's caller is the session manager and is otherwise a
+    // harmless no-op.
+    await request
+      .patch(`${BASE_URL}/api/code-blue/sessions/${created.sessionId}/end`, {
+        headers: { "Content-Type": "application/json" },
+        data: { outcome: "transferred" },
+      })
+      .catch(() => {});
+  }
+});

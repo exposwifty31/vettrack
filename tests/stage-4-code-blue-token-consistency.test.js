@@ -44,8 +44,16 @@ describe("Stage 4 Code Blue — no hardcoded palette (restyle to tokens)", () =>
 describe("Stage 4 Code Blue — frozen clinical behavior intact (restyle only)", () => {
   it("keeps the server-confirmed session mutations", () => {
     expect(src.includes("api.codeBlue.sessions.start")).toBe(true);
+    // R-CBF-1.3: the pocket-emergency armed screen commits through the
+    // R-CBF-1.1 one-tap orchestration; the equipment-initiated path keeps the
+    // classic start. Both remain server-confirmed.
+    expect(src.includes("api.codeBlue.sessions.oneTap")).toBe(true);
     expect(src.includes("api.codeBlue.sessions.end")).toBe(true);
-    expect(src.includes("idempotencyKey: crypto.randomUUID()")).toBe(true);
+    // The emergency start is keyed by the per-gesture hold token (a fresh
+    // idempotency token per gesture, persisted across retries) — no longer a
+    // per-call inline UUID.
+    expect(src.includes("idempotencyKey: token")).toBe(true);
+    expect(src.includes("idempotencyToken: token")).toBe(true);
   });
   it("keeps the critical alert tone + session hook", () => {
     expect(src.includes("playCriticalAlertTone")).toBe(true);

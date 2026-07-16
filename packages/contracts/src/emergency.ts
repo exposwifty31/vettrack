@@ -16,6 +16,9 @@ export type EmergencyOfflineBlockMutation = {
 
 export const EMERGENCY_OFFLINE_BLOCK_MUTATIONS: readonly EmergencyOfflineBlockMutation[] = [
   { method: "POST", pathPattern: /^\/api\/code-blue\/sessions$/, class: "start", samplePathname: "/api/code-blue/sessions" },
+  // R-CBF-1.1 — one-tap orchestration start. Composes claim → nearest cart → CAS
+  // reserve → session → outbox paging; a `start` emergency mutation, never queued.
+  { method: "POST", pathPattern: /^\/api\/code-blue\/one-tap$/, class: "start", samplePathname: "/api/code-blue/one-tap" },
   { method: "POST", pathPattern: /^\/api\/code-blue\/sessions\/[^/]+\/logs$/, class: "log", samplePathname: "/api/code-blue/sessions/abc-123/logs" },
   { method: "PATCH", pathPattern: /^\/api\/code-blue\/sessions\/[^/]+\/end$/, class: "end", samplePathname: "/api/code-blue/sessions/abc-123/end" },
   { method: "PATCH", pathPattern: /^\/api\/code-blue\/sessions\/[^/]+\/presence$/, class: "presence", samplePathname: "/api/code-blue/sessions/abc-123/presence" },
@@ -41,6 +44,7 @@ export const EMERGENCY_SERVER_ROUTE_ALLOWLIST: readonly string[] = [
   "PATCH /api/code-blue/events/:id",
   "GET /api/code-blue/events",
   "POST /api/code-blue/sessions",
+  "POST /api/code-blue/one-tap",
   "GET /api/code-blue/sessions/active",
   "POST /api/code-blue/sessions/:id/logs",
   "PATCH /api/code-blue/sessions/:id/presence",
