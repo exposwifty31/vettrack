@@ -23,7 +23,10 @@ const DEFAULT_THROTTLE_MS = 1500;
 
 export function LiveLogAnnouncer({ entries, throttleMs = DEFAULT_THROTTLE_MS }: LiveLogAnnouncerProps) {
   const [message, setMessage] = useState("");
-  const announcedCountRef = useRef(0);
+  // Seed the baseline to the mount-time entry count so re-entering an ALREADY-active
+  // Code Blue (timeline already holds N rows) does NOT announce the whole history as
+  // "N new log entries" — only entries that arrive after mount are announced.
+  const announcedCountRef = useRef(entries.length);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const latestRef = useRef<LiveLogEntry[]>(entries);
   latestRef.current = entries;

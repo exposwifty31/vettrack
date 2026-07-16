@@ -2689,7 +2689,6 @@
   "codeBlue": {
     "openTitle": "OPEN CODE BLUE",
     "openButton": "⚠ OPEN CODE BLUE",
-    "proceedWithoutFullCheck": "Continue without full check",
     "managerLabel": "Event manager",
     "managerLabelShort": "Event manager:",
     "managerInstruction": "Required. The event manager is the responsible vet. Only they can close the event.",
@@ -2792,7 +2791,6 @@
     },
     "hold": {
       "instruction": "Hold to open CODE BLUE",
-      "action": "Hold to open",
       "hint": "Press and hold — releasing cancels",
       "starting": "Opening CODE BLUE…",
       "cancel": "Cancel",

@@ -589,6 +589,7 @@ test("drill 9 (R-CBF-1.5) — one-tap arm→hold reserves a cart, ENQUEUES the p
     pagingState?: string | null;
   };
 
+  try {
   // (a) A fresh, server-confirmed start.
   expect(created.outcome).toBe("created");
   expect(created.sessionId, "created session must carry an id").toBeTruthy();
@@ -642,6 +643,19 @@ test("drill 9 (R-CBF-1.5) — one-tap arm→hold reserves a cart, ENQUEUES the p
   // have advanced (queued → processing → sent) or DLQ'd (failed) by now.
   expect(["queued", "processing", "sent", "failed"]).toContain(replayed.pagingState);
 
-  // Doctrine: server-confirmed end only. The drill NEVER optimistically ends the
-  // session locally — termination follows the SSE/PATCH path, not this test.
+  // Doctrine: server-confirmed end only. The drill's ASSERTIONS never
+  // optimistically end the session — termination follows the SSE/PATCH path.
+  } finally {
+    // Best-effort teardown via the SERVER-CONFIRMED end path (doctrine-legal, not
+    // optimistic): release this run's session so a lingering active session does
+    // not 409-skip every later run against a shared seeded DB. Manager-gated, so it
+    // clears when the drill's caller is the session manager and is otherwise a
+    // harmless no-op.
+    await request
+      .patch(`${BASE_URL}/api/code-blue/sessions/${created.sessionId}/end`, {
+        headers: { "Content-Type": "application/json" },
+        data: { outcome: "transferred" },
+      })
+      .catch(() => {});
+  }
 });

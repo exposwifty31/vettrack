@@ -24,6 +24,10 @@ import {
 } from "../lib/code-blue-one-tap.js";
 import { DrizzleStartClaimStore } from "../lib/code-blue-start-claim.js";
 import {
+  DrizzleCartReservationStore,
+  clearReservationForSession,
+} from "../lib/code-blue-soft-reserve.js";
+import {
   resolveNearestReadyCart,
   DrizzleInitiatingLocationSource,
   DrizzleReadyCartCandidateSource,
@@ -1136,6 +1140,11 @@ router.patch("/sessions/:id/end", requireAuth, validateUuid("id"), validateBody(
         .update(codeBlueSessions)
         .set({ status: "ended", outcome, endedAt })
         .where(and(eq(codeBlueSessions.id, sessionId), eq(codeBlueSessions.clinicId, clinicId)));
+      // R-CBF-1: release this session's advisory cart soft-reserve in the SAME txn,
+      // so the nearest-ready-cart resolver returns the cart to the ready pool on end.
+      // Without this, every ended one-tap session permanently removes its cart
+      // (the resolver excludes rows where reservedForSessionId IS NOT NULL).
+      await clearReservationForSession(new DrizzleCartReservationStore(tx), clinicId, sessionId);
       await insertRealtimeDomainEvent(tx, {
         clinicId,
         type: "CODE_BLUE_STATUS_CHANGED",

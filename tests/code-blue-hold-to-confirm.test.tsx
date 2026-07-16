@@ -53,7 +53,7 @@ function renderControl(
   const onCommit = props.onCommit ?? vi.fn();
   const onCancel = props.onCancel ?? vi.fn();
   render(<HoldToStart {...props} onCommit={onCommit} onCancel={onCancel} />);
-  const hold = screen.getByRole("button", { name: t.codeBlue.hold.action });
+  const hold = screen.getByRole("button", { name: t.codeBlue.hold.instruction });
   return { onCommit, onCancel, hold };
 }
 
@@ -140,7 +140,7 @@ describe("HoldToStart — arm→hold-to-confirm (R-CBF-1.3)", () => {
         <HoldToStart onCommit={vi.fn()} onCancel={onCancel} triggerRef={triggerRef} />
       </>,
     );
-    const hold = screen.getByRole("button", { name: t.codeBlue.hold.action });
+    const hold = screen.getByRole("button", { name: t.codeBlue.hold.instruction });
     expect(document.activeElement).toBe(hold);
 
     fireEvent.click(screen.getByRole("button", { name: t.codeBlue.hold.cancel }));

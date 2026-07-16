@@ -43,7 +43,7 @@ function renderGate(props: { onStart?: ReturnType<typeof vi.fn>; starting?: bool
 }
 
 function holdButton(): HTMLButtonElement {
-  return screen.getByRole("button", { name: t.codeBlue.hold.action }) as HTMLButtonElement;
+  return screen.getByRole("button", { name: t.codeBlue.hold.instruction }) as HTMLButtonElement;
 }
 
 /** Complete an exactly-800ms press-and-hold on the commit control. */

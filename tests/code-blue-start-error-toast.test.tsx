@@ -80,7 +80,7 @@ function renderPage() {
 
 /** Complete an exactly-800ms press-and-hold, then flush the async commit. */
 async function holdToCommit() {
-  const hold = screen.getByRole("button", { name: t.codeBlue.hold.action });
+  const hold = screen.getByRole("button", { name: t.codeBlue.hold.instruction });
   fireEvent.pointerDown(hold);
   await act(async () => {
     vi.advanceTimersByTime(800);

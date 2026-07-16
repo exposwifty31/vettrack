@@ -2689,7 +2689,6 @@
   "codeBlue": {
     "openTitle": "פתיחת CODE BLUE",
     "openButton": "⚠ פתח CODE BLUE",
-    "proceedWithoutFullCheck": "המשך ללא בדיקה מלאה",
     "managerLabel": "מנהל האירוע",
     "managerLabelShort": "מנהל אירוע:",
     "managerInstruction": "חובה. מנהל האירוע הוא הרופא האחראי. רק הוא יוכל לסגור את האירוע.",
@@ -2792,7 +2791,6 @@
     },
     "hold": {
       "instruction": "החזק לפתיחת CODE BLUE",
-      "action": "החזק לפתיחה",
       "hint": "לחץ והחזק — שחרור מבטל",
       "starting": "פותח CODE BLUE…",
       "cancel": "ביטול",

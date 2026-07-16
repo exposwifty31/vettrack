@@ -2692,7 +2692,6 @@ export interface TStructure {
   codeBlue: {
     openTitle: string;
     openButton: string;
-    proceedWithoutFullCheck: string;
     managerLabel: string;
     managerLabelShort: string;
     managerInstruction: string;
@@ -2795,7 +2794,6 @@ export interface TStructure {
     };
     hold: {
       instruction: string;
-      action: string;
       hint: string;
       starting: string;
       cancel: string;

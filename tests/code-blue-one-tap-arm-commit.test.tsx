@@ -81,7 +81,7 @@ describe("CodeBluePage — hold-to-confirm fires the one-tap orchestration (R-CB
 
   it("a completed hold fires oneTap once with the per-gesture token + manager", () => {
     renderPage();
-    const hold = screen.getByRole("button", { name: t.codeBlue.hold.action });
+    const hold = screen.getByRole("button", { name: t.codeBlue.hold.instruction });
     fireEvent.pointerDown(hold);
     act(() => vi.advanceTimersByTime(800));
 
@@ -100,7 +100,7 @@ describe("CodeBluePage — hold-to-confirm fires the one-tap orchestration (R-CB
 
   it("a single tap does NOT fire oneTap", () => {
     renderPage();
-    const hold = screen.getByRole("button", { name: t.codeBlue.hold.action });
+    const hold = screen.getByRole("button", { name: t.codeBlue.hold.instruction });
     fireEvent.pointerDown(hold);
     fireEvent.pointerUp(hold);
     act(() => vi.advanceTimersByTime(1500));
@@ -109,7 +109,7 @@ describe("CodeBluePage — hold-to-confirm fires the one-tap orchestration (R-CB
 
   it("follows the server-confirmed transition (refetch) after a successful start", async () => {
     renderPage();
-    const hold = screen.getByRole("button", { name: t.codeBlue.hold.action });
+    const hold = screen.getByRole("button", { name: t.codeBlue.hold.instruction });
     fireEvent.pointerDown(hold);
     await act(async () => {
       vi.advanceTimersByTime(800);

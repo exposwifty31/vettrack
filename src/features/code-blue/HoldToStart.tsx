@@ -150,7 +150,7 @@ export function HoldToStart({
         type="button"
         disabled={inert}
         data-testid={testId}
-        aria-label={t.codeBlue.hold.action}
+        aria-label={t.codeBlue.hold.instruction}
         aria-describedby={hintId}
         onPointerDown={startHold}
         onPointerUp={cancelHold}
