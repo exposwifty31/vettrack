@@ -151,8 +151,8 @@ export const FLOW_ROWS: FlowRow[] = [
   { id: "equipment-detail", group: "core", paths: ["/equipment/eq1"], guard: "auth", platforms: ["iphone", "ipad", "web"], roleGating: "open", notes: "Device audit gotcha: non-UUID ids like 'eq1' may 404 against a real DB; walk against a seeded id." },
   { id: "equipment-edit", group: "core", paths: ["/equipment/eq1/edit"], guard: "auth", platforms: ["iphone", "ipad", "web"], roleGating: "open" },
   { id: "tasks", group: "core", paths: ["/equipment/tasks"], guard: "auth", platforms: ["iphone", "ipad", "web", "board"], roleGating: "open", notes: "Tasks.tsx inline-redirects the custody-only (student) archetype; frozen appointmentsPage.* keys." },
-  { id: "scan", group: "core", paths: ["/scan"], guard: "auth", platforms: ["iphone", "ipad", "web"], roleGating: "open", webRedirectTo: "/equipment?scan=1", notes: "scan.tsx renders ScanScreen only in the mobile shell; desktop self-redirects to the equipment scan overlay (walk-verified)." },
-  { id: "scan-alias-redirect", group: "core", paths: ["/equipment/scan"], guard: "redirect", platforms: ["iphone", "ipad", "web"], roleGating: "open", redirectTo: "/equipment?scan=1", nativeRedirectTo: "/scan", drift: true, notes: "DRIFT: doc listed /equipment/scan as a page; now redirects to the scanner overlay query. The mobile shell forwards ?scan=1 on to /scan (the scanner is its own surface there — equipment-list.tsx / EquipmentMasterDetail)." },
+  { id: "scan", group: "core", paths: ["/scan"], guard: "auth", platforms: ["iphone", "ipad", "web"], roleGating: "open", webRedirectTo: "/equipment", notes: "scan.tsx renders ScanScreen only in the mobile shell; desktop self-redirects toward /equipment?scan=1, but web has no scanner (BUG-016) so the settled URL is pathname /equipment — the scan=1 query is inert there and matched pathname-only." },
+  { id: "scan-alias-redirect", group: "core", paths: ["/equipment/scan"], guard: "redirect", platforms: ["iphone", "ipad", "web"], roleGating: "open", redirectTo: "/equipment?scan=1", webRedirectTo: "/equipment", nativeRedirectTo: "/scan", drift: true, notes: "DRIFT: doc listed /equipment/scan as a page; now <Redirect> to /equipment?scan=1. WEB settles at pathname /equipment (scan=1 is inert — no web scanner, BUG-016 — and non-deterministic in the settled URL: the desktop list cleans it, the T-31 gate leaves it), so web matches pathname-only. The mobile shell forwards ?scan=1 on to /scan (the scanner is its own surface there — equipment-list.tsx / EquipmentMasterDetail)." },
   { id: "equipment-ops-redirect", group: "core", paths: ["/equipment/maintenance", "/equipment/intelligence"], guard: "redirect", platforms: ["iphone", "ipad", "web"], roleGating: "open", redirectTo: "/equipment", drift: true, notes: "DRIFT: doc §Core 'Equipment ops' pages are now query-param redirects (/equipment?status=maintenance and /equipment)." },
   { id: "alerts", group: "core", paths: ["/alerts"], guard: "custody", platforms: ["iphone", "ipad", "web"], roleGating: "custody" },
   { id: "my-equipment", group: "core", paths: ["/my-equipment"], guard: "auth", platforms: ["iphone", "ipad", "web"], roleGating: "open" },
@@ -229,7 +229,25 @@ export function rowsForPlatform(platform: Platform): FlowRow[] {
  */
 export function pathMatchesTarget(actualPath: string, target?: string): boolean {
   if (!target) return true;
-  return actualPath === target || actualPath.split("?")[0] === target.split("?")[0];
+  const [actualPathname, actualQuery = ""] = splitPathQuery(actualPath);
+  const [targetPathname, targetQuery = ""] = splitPathQuery(target);
+  if (actualPathname !== targetPathname) return false;
+  // Every query param the TARGET declares must be present with the same value in
+  // the actual URL (extra params are allowed — a redirect may append its own).
+  // Pathname-only matching let /equipment pass for a /equipment?scan=1 target,
+  // so a scan redirect that never opened the scanner overlay false-passed.
+  if (!targetQuery) return true;
+  const actualParams = new URLSearchParams(actualQuery);
+  for (const [key, value] of new URLSearchParams(targetQuery)) {
+    if (actualParams.get(key) !== value) return false;
+  }
+  return true;
+}
+
+/** Split "/path?a=1" → ["/path", "a=1"]; no query → ["/path", ""]. */
+function splitPathQuery(path: string): [string, string] {
+  const q = path.indexOf("?");
+  return q === -1 ? [path, ""] : [path.slice(0, q), path.slice(q + 1)];
 }
 
 /** Deduped union of web + board + marketing rows (what the browser walk can reach). */
@@ -288,7 +306,10 @@ function roleIsCustodyOnly(role: RoleArchetype): boolean {
  * `expectedNativeOutcome`.
  */
 export function expectedWebOutcome(row: FlowRow, role: RoleArchetype): ExpectedOutcome {
-  if (row.guard === "redirect") return { kind: "redirect", to: row.redirectTo, confidence: "firm" };
+  // webRedirectTo is the web-settled target when it differs from redirectTo — a
+  // deep-link query consumed/cleaned on web (e.g. /equipment/scan settles at
+  // pathname /equipment, scan=1 inert per BUG-016). Falls back to redirectTo.
+  if (row.guard === "redirect") return { kind: "redirect", to: row.webRedirectTo ?? row.redirectTo, confidence: "firm" };
   if (row.guard === "marketing") {
     // The walk is permanently authenticated (dev-bypass has no signed-out state),
     // and a signed-in visit to /signin or /signup bounces to /home (the pages'
@@ -339,6 +360,10 @@ export function expectedNativeOutcome(row: FlowRow, role: RoleArchetype): Expect
     return { kind: "redirect", to: "/equipment", confidence: "firm" };
   }
   if (row.guard === "redirect") {
+    // Native uses nativeRedirectTo when the mobile shell forwards elsewhere
+    // (e.g. /equipment/scan → /scan); otherwise the declared redirectTo. Note:
+    // webRedirectTo is deliberately NOT consulted here — it is the web-settled
+    // target, and native has its own shell behavior.
     return { kind: "redirect", to: row.nativeRedirectTo ?? row.redirectTo, confidence: "firm" };
   }
   if (row.guard === "web-only" || row.guard === "management") {

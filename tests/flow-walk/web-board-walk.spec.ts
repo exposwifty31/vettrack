@@ -29,6 +29,7 @@ import {
 import {
   applyDevRole,
   artifactPath,
+  artifactRelPath,
   attachObservers,
   classifyActual,
   evaluateRow,
@@ -97,26 +98,27 @@ async function probe(request: APIRequestContext): Promise<string | null> {
 const idSubstitutions = new Map<string, string>();
 
 async function resolveSeededIds(request: APIRequestContext): Promise<void> {
-  try {
-    const eq = await request.get(`${BASE}/api/equipment`, { timeout: 8_000 });
-    if (eq.ok()) {
-      const body = (await eq.json()) as { id?: string }[] | { items?: { id?: string }[] };
-      const first = Array.isArray(body) ? body[0] : body.items?.[0];
-      if (first?.id) idSubstitutions.set("eq1", first.id);
-    }
-  } catch {
-    /* keep placeholder */
-  }
-  try {
-    const sh = await request.get(`${BASE}/api/shifts`, { timeout: 8_000 });
-    if (sh.ok()) {
-      const body = (await sh.json()) as { id?: string }[] | { shifts?: { id?: string }[] };
-      const first = Array.isArray(body) ? body[0] : body.shifts?.[0];
-      if (first?.id) idSubstitutions.set("s1", first.id);
-    }
-  } catch {
-    /* keep placeholder */
-  }
+  // A non-OK/empty response is a HARD failure, not a fallback: retaining the
+  // eq1/s1 placeholders would make the detail/edit/qr/shift-chat rows walk known-
+  // bad ids and stamp placeholder 400/404s as evidence (CodeRabbit #109). Seed
+  // the dev DB (`pnpm seed:dev`) before walking.
+  const eq = await request.get(`${BASE}/api/equipment`, { timeout: 8_000 }).catch((e) => {
+    throw new Error(`resolveSeededIds: GET /api/equipment failed — ${String(e)}`);
+  });
+  if (!eq.ok()) throw new Error(`resolveSeededIds: GET /api/equipment returned HTTP ${eq.status()}`);
+  const eqBody = (await eq.json()) as { id?: string }[] | { items?: { id?: string }[] };
+  const firstEq = Array.isArray(eqBody) ? eqBody[0] : eqBody.items?.[0];
+  if (!firstEq?.id) throw new Error("resolveSeededIds: no seeded equipment — run `pnpm seed:dev` before walking");
+  idSubstitutions.set("eq1", firstEq.id);
+
+  const sh = await request.get(`${BASE}/api/shifts`, { timeout: 8_000 }).catch((e) => {
+    throw new Error(`resolveSeededIds: GET /api/shifts failed — ${String(e)}`);
+  });
+  if (!sh.ok()) throw new Error(`resolveSeededIds: GET /api/shifts returned HTTP ${sh.status()}`);
+  const shBody = (await sh.json()) as { id?: string }[] | { shifts?: { id?: string }[] };
+  const firstSh = Array.isArray(shBody) ? shBody[0] : shBody.shifts?.[0];
+  if (!firstSh?.id) throw new Error("resolveSeededIds: no seeded shift — run `pnpm seed:dev` before walking");
+  idSubstitutions.set("s1", firstSh.id);
 }
 
 function substitutePlaceholders(path: string): string {
@@ -198,8 +200,10 @@ test.describe.serial("Flow walk (dev-bypass) — web + board + marketing", () =>
           consoleErrors: [...consoleErrors],
         });
 
-        const shot = artifactPath("screenshots", screenshotName(row, role, platform));
-        await page.screenshot({ path: shot, fullPage: false }).catch(() => {});
+        const shotName = screenshotName(row, role, platform);
+        await page
+          .screenshot({ path: artifactPath("screenshots", shotName), fullPage: false })
+          .catch(() => {});
 
         results.push({
           rowId: row.id,
@@ -211,7 +215,9 @@ test.describe.serial("Flow walk (dev-bypass) — web + board + marketing", () =>
           actual,
           status,
           finalUrl: relativePath(page.url()),
-          screenshot: shot,
+          // Repo-relative, not the absolute local path — the matrix is committed
+          // evidence and must not carry a workstation `/Users/…` prefix.
+          screenshot: artifactRelPath("screenshots", shotName),
           consoleErrors: [...consoleErrors],
           failedRequests: [...failedRequests],
           notes,
@@ -228,6 +234,14 @@ test.describe.serial("Flow walk (dev-bypass) — web + board + marketing", () =>
 
   test("matrix assertions — no broken rows across all roles", () => {
     expect(results.length, "walk recorded no rows").toBeGreaterThan(0);
+    // A regression that drops an entire role would still satisfy length>0 — so
+    // assert every archetype actually produced rows (CodeRabbit #109).
+    for (const role of ROLE_ARCHETYPES) {
+      expect(
+        results.some((r) => r.role === role),
+        `walk recorded no rows for ${role}`,
+      ).toBe(true);
+    }
     for (const r of results) {
       expect
         .soft(r.status !== "broken", `${r.role} ${r.path}: ${r.notes ?? r.status}`)
@@ -239,7 +253,7 @@ test.describe.serial("Flow walk (dev-bypass) — web + board + marketing", () =>
     if (!reachable || results.length === 0) return;
     writeMatrix(
       results,
-      { target: BASE, platform: "web+board", generatedAt: new Date().toISOString() },
+      { target: BASE, platform: "web+board+marketing", generatedAt: new Date().toISOString() },
       artifactPath("web-matrix.json"),
     );
   });

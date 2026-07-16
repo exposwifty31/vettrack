@@ -85,7 +85,10 @@ async function settledPath(): Promise<string> {
     if (cur === prev && i >= 2) return cur;
     prev = cur;
   }
-  return prev;
+  // Exhausting the budget is a FAILED navigation, not a settle — returning the
+  // last path would let a still-moving redirect chain that transiently matches
+  // the expected route produce false-positive evidence (CodeRabbit #109).
+  throw new Error(`navigation did not settle after ${24 * 200}ms (last: ${prev})`);
 }
 
 async function isVisible(testid: string): Promise<boolean> {
@@ -125,9 +128,14 @@ describe(`VetTrack native flow walk (${PLATFORM})`, () => {
             return;
           }
 
-          // expected: render — still on the row's path (query/detail extensions ok)…
+          // expected: render — still on the row's path (query/detail extensions ok),
+          // but the extension must be at a path-segment boundary: a bare
+          // startsWith(base) would accept /tasks-other for /tasks, and everything
+          // for base "/" (CodeRabbit #109).
           const base = pathForRow(row);
-          if (!pathMatchesTarget(final, base) && !final.startsWith(base)) {
+          const basePrefix = base.endsWith("/") ? base : `${base}/`;
+          const isAllowedExtension = final.startsWith(basePrefix) || final.startsWith(`${base}?`);
+          if (!pathMatchesTarget(final, base) && !isAllowedExtension) {
             throw new Error(`${row.id}: expected to stay on ${base}, landed on ${final}`);
           }
           // …with no error boundary mounted.

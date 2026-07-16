@@ -250,6 +250,16 @@ export function artifactPath(...parts: string[]): string {
   return join(process.cwd(), "artifacts", "flow-walk", ...parts);
 }
 
+/**
+ * Repo-relative artifact path — what gets RECORDED in the matrix. The absolute
+ * `artifactPath` is only for the local filesystem write; storing it in the
+ * committed evidence would leak the generating machine's `/Users/<name>/…` path
+ * and make the reference unusable elsewhere (CodeRabbit #109).
+ */
+export function artifactRelPath(...parts: string[]): string {
+  return join("artifacts", "flow-walk", ...parts);
+}
+
 /** Ordered by group so the matrix reads like FLOW_INVENTORY.md. */
 export function screenshotName(row: FlowRow, role: RoleArchetype, platform: string): string {
   return `${platform}__${row.group}__${row.id}__${role}.png`;

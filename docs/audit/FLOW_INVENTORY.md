@@ -7,7 +7,7 @@ Per rule III.6, every flow in the app must be provable 100% functioning across p
 ## What is verified here vs. pending
 
 - ✅ **Verified now (static, from code):** route registration, guard, and therefore **platform availability** (native / web / board / marketing). These are read directly from `routes.tsx` and the platform resolver — not inferred.
-- ✅ **Live walk EXECUTED (2026-07-16):** the III.6 end-to-end walk ran in the real running app on all four surfaces. **Web + board + marketing** (Playwright, desktop 1440×900, all 5 role archetypes): **147 rows — 145 pass, 0 broken, 2 degraded**. **Native iPhone** (Appium/XCUITest, iPhone 17 sim, admin + student): **68/68 pass**. **Native iPad** (iPad Pro 11-inch (M5) sim): **68/68 pass**. Evidence: `docs/audit/evidence/flow-walk-web-matrix-2026-07-16.json` + `flow-walk-native-{iphone,ipad}-2026-07-16.txt` (149 row screenshots in gitignored `artifacts/flow-walk/`). The 2 degraded rows are one real finding (shift-chat archive 404 — see the Shift-ops row).
+- ✅ **Live walk EXECUTED (2026-07-16):** the III.6 end-to-end walk ran in the real running app across every surface — the four platform targets (web · board · native iPhone · native iPad) **plus** the marketing surface, five in total. **Web + board + marketing** (Playwright, desktop 1440×900, all 5 role archetypes): **147 rows — 145 pass, 0 broken, 2 degraded**. **Native iPhone** (Appium/XCUITest, iPhone 17 sim, admin + student): **68/68 pass**. **Native iPad** (iPad Pro 11-inch (M5) sim): **68/68 pass**. Evidence: `docs/audit/evidence/flow-walk-web-matrix-2026-07-16.json` + `flow-walk-native-{iphone,ipad}-2026-07-16.txt` (149 row screenshots in gitignored `artifacts/flow-walk/`). The 2 degraded rows are one real finding (shift-chat archive 404 — see the Shift-ops row).
 
 **Status legend (for the live walk):** `pass` · `broken` · `degraded` · `unreachable` · `⏳ pending` (not yet walked).
 
@@ -67,7 +67,7 @@ Per rule III.6, every flow in the app must be provable 100% functioning across p
 
 | Path | Purpose | Role gating | Live-walk |
 |---|---|---|---|
-| `/equipment/board` | Command Center board | all (kiosk) | pass ✅ 2026-07-16 (redirects → canonical /board kiosk; this row predates the Phase-4 end-state) |
+| `/equipment/board` | **Legacy alias → `/board`** (not a distinct board surface) | all | pass ✅ 2026-07-16 (redirects to the canonical `/board` kiosk; the ¹²³ guard footnotes above record the pre-Phase-4 structure — `/board` is the sole canonical kiosk entry now) |
 | `/equipment/:id/qr` · `/print` | QR / print sheets | all | pass ✅ 2026-07-16 |
 | `/code-blue/display` · `/emergency-equipment-wall` | Emergency wall displays | all | pass ✅ 2026-07-16 |
 | `/dashboard` | Management dashboard | admin/management | pass ✅ 2026-07-16 (management.web renders; others T-31 gate by design) |

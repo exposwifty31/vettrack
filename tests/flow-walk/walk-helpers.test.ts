@@ -139,7 +139,7 @@ describe("evaluateRow — render rows", () => {
     expect(r.status).toBe("broken");
   });
 
-  it("degrades a rendered page with console errors; breaks one with an error boundary", () => {
+  it("degrades a rendered page that logged console errors", () => {
     expect(
       grade({
         requestedPath: "/home",
@@ -149,6 +149,9 @@ describe("evaluateRow — render rows", () => {
         consoleErrors: ["boom"],
       }).status,
     ).toBe("degraded");
+  });
+
+  it("breaks a rendered page that mounted an error boundary", () => {
     expect(
       grade({
         requestedPath: "/home",
@@ -162,8 +165,16 @@ describe("evaluateRow — render rows", () => {
 });
 
 describe("classifyActual", () => {
-  it("kiosk marker wins over everything", () => {
-    expect(classifyActual("/board", "http://x/board", surfaces({ hasKiosk: true }))).toBe("kiosk");
+  it("kiosk marker wins over every competing surface marker", () => {
+    // All other markers also set → proves kiosk genuinely takes precedence,
+    // not just that it's the only one present (CodeRabbit #109).
+    expect(
+      classifyActual(
+        "/board",
+        "http://x/board",
+        surfaces({ hasKiosk: true, hasWebGate: true, hasGuardScreen: true, hasDenied: true }),
+      ),
+    ).toBe("kiosk");
   });
 
   it("staying on the path (with or without extra query) is render", () => {

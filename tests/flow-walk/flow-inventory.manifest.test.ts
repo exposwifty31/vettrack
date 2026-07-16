@@ -217,9 +217,10 @@ describe("flow-walk manifest — outcome derivation", () => {
     expect(expectedNativeOutcome(row("emergency-wall"), "admin")).toMatchObject({ kind: "guard-redirect", to: "/home" });
   });
 
-  it("scan self-redirects on web (scan.tsx mobile-shell gate) but renders on native", () => {
-    expect(expectedWebOutcome(row("scan"), "admin")).toMatchObject({ kind: "redirect", to: "/equipment?scan=1" });
-    expect(expectedWebOutcome(row("scan"), "senior_technician")).toMatchObject({ kind: "redirect" });
+  it("scan self-redirects on web to /equipment (scan=1 inert, BUG-016) but renders on native", () => {
+    // Web settles at pathname /equipment (no web scanner); pathname-only match.
+    expect(expectedWebOutcome(row("scan"), "admin")).toMatchObject({ kind: "redirect", to: "/equipment" });
+    expect(expectedWebOutcome(row("scan"), "senior_technician")).toMatchObject({ kind: "redirect", to: "/equipment" });
     // Non-management roles never reach ScanPage on web — the T-31 gate preempts it.
     expect(expectedWebOutcome(row("scan"), "technician")).toMatchObject({ kind: "management-web-gate" });
     expect(expectedNativeOutcome(row("scan"), "technician")).toMatchObject({ kind: "render" });
@@ -236,11 +237,20 @@ describe("flow-walk manifest — outcome derivation", () => {
     expect(expectedWebOutcome(row("admin-history"), "senior_technician")).toMatchObject({ kind: "render" });
   });
 
-  it("pathMatchesTarget ignores query strings and treats an absent target as a match", () => {
-    expect(pathMatchesTarget("/equipment?scan=1", "/equipment")).toBe(true);
+  it("pathMatchesTarget matches pathname + REQUIRES the target's query params (extra params allowed)", () => {
+    // Absent target → any path matches; target without query → pathname-only.
+    expect(pathMatchesTarget("/anything", undefined)).toBe(true);
+    expect(pathMatchesTarget("/equipment?scan=1", "/equipment")).toBe(true); // extra param ok when target declares none
     expect(pathMatchesTarget("/equipment", "/equipment")).toBe(true);
     expect(pathMatchesTarget("/home", "/equipment")).toBe(false);
-    expect(pathMatchesTarget("/anything", undefined)).toBe(true);
+    // Target WITH a query param: the actual URL must carry it. This is the
+    // scanner-overlay trigger — /equipment (no scan=1) must NOT pass for a
+    // /equipment?scan=1 target, or a redirect that never opens the scanner
+    // would false-pass (CodeRabbit #109).
+    expect(pathMatchesTarget("/equipment?scan=1", "/equipment?scan=1")).toBe(true);
+    expect(pathMatchesTarget("/equipment", "/equipment?scan=1")).toBe(false); // missing scan=1
+    expect(pathMatchesTarget("/equipment?scan=0", "/equipment?scan=1")).toBe(false); // wrong value
+    expect(pathMatchesTarget("/equipment?scan=1&x=2", "/equipment?scan=1")).toBe(true); // extra param ok
   });
 
   it("redirect rows redirect to their declared target on every platform", () => {
@@ -263,12 +273,15 @@ describe("flow-walk manifest — outcome derivation", () => {
     expect(expectedNativeOutcome(row("legacy-tasks-alias"), "admin")).toMatchObject({ kind: "redirect", to: "/equipment/tasks" });
   });
 
-  it("native: /equipment/scan chains through the mobile deep-link forward to /scan", () => {
+  it("native: /equipment/scan forwards to /scan; web settles at pathname /equipment", () => {
     // equipment-list.tsx / EquipmentMasterDetail forward ?scan=1 → /scan in the
-    // shell (the scanner is its own surface there); the desktop list consumes it.
+    // shell (the scanner is its own surface there).
     expect(expectedNativeOutcome(row("scan-alias-redirect"), "admin")).toMatchObject({ kind: "redirect", to: "/scan" });
     expect(expectedNativeOutcome(row("scan-alias-redirect"), "student")).toMatchObject({ kind: "redirect", to: "/scan" });
-    expect(expectedWebOutcome(row("scan-alias-redirect"), "admin")).toMatchObject({ kind: "redirect", to: "/equipment?scan=1" });
+    // Web settles at pathname /equipment for every role — the desktop list cleans
+    // scan=1, the T-31 gate leaves it; pathname-only match covers both (BUG-016).
+    expect(expectedWebOutcome(row("scan-alias-redirect"), "admin")).toMatchObject({ kind: "redirect", to: "/equipment" });
+    expect(expectedWebOutcome(row("scan-alias-redirect"), "student")).toMatchObject({ kind: "redirect", to: "/equipment" });
   });
 
   it("web/board platform partitions are non-empty and disjoint from native-only rows", () => {

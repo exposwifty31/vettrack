@@ -5,9 +5,12 @@ across **marketing · web · board · iPhone · iPad**, under each role archetyp
 records a pass/broken/degraded/observe/unreachable matrix — the III.6 evidence the
 program-plan.md resubmission gate (Phase 10) requires.
 
-> **Status:** the harness is stood up and self-verifying, but the *walk itself has not
-> been run* (no booted sim / running app when authored). Running it is the Phase-10
-> gate step — see "When to run" below.
+> **Status:** the harness is stood up, self-verifying, and **executed green 2026-07-16**
+> on all five surfaces — web+board+marketing **147 rows / 145 pass / 0 broken / 2 degraded**
+> (5 roles), native **iPhone 68/68**, native **iPad 68/68**. Evidence in
+> `docs/audit/evidence/flow-walk-*-2026-07-16.*`; rows stamped in
+> `docs/audit/FLOW_INVENTORY.md`. The commands below are **rerun** instructions (re-stamp
+> per phase, per III.6).
 
 ## Files
 
