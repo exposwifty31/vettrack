@@ -2793,6 +2793,14 @@ export interface TStructure {
         ongoing: string;
       };
     };
+    hold: {
+      instruction: string;
+      action: string;
+      hint: string;
+      starting: string;
+      cancel: string;
+      newLogEntries: string;
+    };
     reconciliation: {
       title: string;
       documentTitle: string;

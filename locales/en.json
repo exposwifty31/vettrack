@@ -2790,6 +2790,14 @@
         "ongoing": "Ongoing"
       }
     },
+    "hold": {
+      "instruction": "Hold to open CODE BLUE",
+      "action": "Hold to open",
+      "hint": "Press and hold — releasing cancels",
+      "starting": "Opening CODE BLUE…",
+      "cancel": "Cancel",
+      "newLogEntries": "{count} new log entries"
+    },
     "reconciliation": {
       "title": "Code Blue Reconciliation",
       "documentTitle": "Code Blue Reconciliation — VetTrack",

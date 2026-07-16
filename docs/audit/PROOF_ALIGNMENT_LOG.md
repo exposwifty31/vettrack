@@ -3287,3 +3287,17 @@ Reviewer returned 1 HIGH + 1 MEDIUM + 2 LOW on the committed sub-card; all four 
 - **LOW — `ActiveSessionExistsError` left the token locked for the full lease:** the conflict rolled back but left the claim `claimed` for ~10s, so same-token retries got spurious `active_lease` conflicts even though the real blocker is a pre-existing active session, not an in-flight owner. **Fix:** the orchestrator now `releaseClaim(...)`s under the held fence on `ActiveSessionExistsError` (fence-guarded, best-effort — the lease is the durable fallback) before returning the conflict, freeing the token immediately. New unit case asserts the claim ends `released` (not `claimed`) with no partial session/reservation.
 
 **Re-verified gates:** `pnpm typecheck` (frontend + server) **clean, zero errors**; `pnpm exec vitest run tests/code-blue-one-tap-orchestration.test.ts` **19 passed** (unit; DB section skipped); the gated DB run `CBF_ONETAP_DB_IT=1 DATABASE_URL=… pnpm exec vitest run tests/code-blue-one-tap-orchestration.test.ts` **24 passed** (5 real-Postgres cases exercised, incl. the HIGH regression guard); full `pnpm test` **5305 passed / 11 skipped (593 files)** — no regressions.
+
+## 2026-07-16 — R-CBF-1.3a: arm→hold-to-confirm control + batched live-log announcer (uncommitted)
+
+**Claim:** Built the client "safe one tap" primitives for R-CBF-1.3 — `HoldToStart` (exactly-800ms press-and-hold, `haptics.warning()`→`haptics.locked()` ramp, filling ring with reduced-motion fallback, always-visible Cancel, keyboard/switch operable, focus-enter-on-open + focus-return-to-trigger-on-cancel, ≥56px targets, per-gesture idempotency token) and `LiveLogAnnouncer` (throttled/batched `aria-live` — one announcement per burst, not one-per-entry). Added `codeBlue.hold.*` i18n keys (he+en parity) with a `newLogEntries(count)` interpolation. No server/schema change (the R-CBF-1.1 `oneTap` endpoint + claim table already exist on this branch).
+
+**Evidence:**
+- `src/features/code-blue/HoldToStart.tsx:97` — `timerRef.current = setTimeout(completeHold, HOLD_MS)` with `HOLD_MS = 800`; `startHold` guards on `inert`/`holding`; `completeHold` fires `haptics.locked()` + `onCommit(token)`; early `cancelHold` clears the timer (early release never fires).
+- `src/features/code-blue/HoldToStart.tsx:74` — `useEffect(() => { if (!disabled) holdRef.current?.focus(); })` (focus enters on open); `handleCancel` calls `triggerRef?.current?.focus()` (returns to trigger).
+- `src/features/code-blue/LiveLogAnnouncer.tsx:40` — single pending-timer guard (`if (timerRef.current !== null) return`) coalesces a burst; the timeout reads `latestRef.current.length` so 3 rapid entries announce once as `newLogEntries(3)`.
+- Test: `pnpm test -- tests/code-blue-hold-to-confirm.test.tsx` → `Test Files 1 passed (1)`, `Tests 13 passed (13)` (RED confirmed first: pre-implementation run failed with the `@/features/code-blue/HoldToStart` import unresolved).
+- Command: `pnpm typecheck` (frontend `tsc --noEmit` + server `tsconfig.server.json`) → exit 0, no errors.
+- Command: `pnpm i18n:check` → "locales/en.json and locales/he.json are in deep key parity."
+
+**Verdict:** VERIFIED

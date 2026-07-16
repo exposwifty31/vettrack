@@ -2790,6 +2790,14 @@
         "ongoing": "ממשיך"
       }
     },
+    "hold": {
+      "instruction": "החזק לפתיחת CODE BLUE",
+      "action": "החזק לפתיחה",
+      "hint": "לחץ והחזק — שחרור מבטל",
+      "starting": "פותח CODE BLUE…",
+      "cancel": "ביטול",
+      "newLogEntries": "{count} רשומות יומן חדשות"
+    },
     "reconciliation": {
       "title": "גישור קוד כחול",
       "documentTitle": "גישור קוד כחול — VetTrack",
