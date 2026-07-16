@@ -17,6 +17,7 @@ import { toast } from "sonner";
 import { haptics } from "@/lib/haptics";
 import { playCriticalAlertTone } from "@/lib/sounds";
 import { HoldToStart } from "@/features/code-blue/HoldToStart";
+import { LiveLogAnnouncer } from "@/features/code-blue/LiveLogAnnouncer";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -526,6 +527,9 @@ function ActiveSession() {
             <p className="text-xs text-emergency-text2">{t.codeBlue.noEventsYet}</p>
           )}
         </div>
+        {/* R-CBF-1.3: a burst of log entries mid-emergency is announced to
+            screen readers as ONE batched polite message, never one-per-entry. */}
+        <LiveLogAnnouncer entries={logEntries.map((e) => ({ id: e.id, label: e.label }))} />
       </div>
 
       <div className="p-4">

@@ -3316,3 +3316,15 @@ Reviewer returned 1 HIGH + 1 MEDIUM + 2 LOW on the committed sub-card; all four 
 - Command: `pnpm test` (full) → `Test Files 595 passed (595)`, `Tests 5321 passed | 11 skipped`, 0 failed.
 
 **Verdict:** VERIFIED
+
+## 2026-07-16 — R-CBF-1.3c: mount the batched live-log announcer in ActiveSession (uncommitted)
+
+**Claim:** `LiveLogAnnouncer` is now mounted in the Code Blue live timeline (`ActiveSession` in `src/pages/code-blue.tsx`), so a mid-emergency burst of log entries is announced to screen readers as one batched polite message rather than one-per-entry (and the primitive is no longer unused).
+
+**Evidence:**
+- `src/pages/code-blue.tsx` — `<LiveLogAnnouncer entries={logEntries.map((e) => ({ id: e.id, label: e.label }))} />` rendered directly after the timeline list.
+- Command: `pnpm typecheck` → exit 0.
+- Test: `pnpm test -- tests/code-blue-outcome-cancel.test.tsx tests/code-blue-hold-to-confirm.test.tsx tests/t25-polish-sweep.test.tsx` → 30 passed (ActiveSession-driving suites unaffected).
+- Command: `pnpm test` (full) → `Test Files 595 passed (595)`, `Tests 5321 passed | 11 skipped`, 0 failed.
+
+**Verdict:** VERIFIED
