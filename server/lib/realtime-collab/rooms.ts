@@ -68,17 +68,27 @@ export type JoinDecision =
  */
 export async function authorizeRoomJoin(
   identity: CollabIdentity,
-  req: JoinRequest,
+  req: unknown,
   recordAccess: RecordAccessCheck,
 ): Promise<JoinDecision> {
-  if (req.kind === "chat") return { ok: true, room: chatRoom(identity.clinicId) };
-  if (req.kind === "board") return { ok: true, room: boardRoom(identity.clinicId) };
+  // Guard first: socket.io delivers whatever the client sent (including `null`,
+  // `undefined`, a bare string, or `{}`). Narrow before touching `.kind` so a
+  // malformed request can never throw a TypeError into the async join listener
+  // (which would surface as an unhandled promise rejection). — card H3.
+  if (typeof req !== "object" || req === null || !("kind" in req)) {
+    return { ok: false, reason: "INVALID_JOIN_REQUEST" };
+  }
+  const { kind } = req as { kind: unknown };
+  if (kind === "chat") return { ok: true, room: chatRoom(identity.clinicId) };
+  if (kind === "board") return { ok: true, room: boardRoom(identity.clinicId) };
+  if (kind !== "record") return { ok: false, reason: "INVALID_JOIN_REQUEST" };
 
   // record
-  if (!isRecordType(req.recordType)) return { ok: false, reason: "UNKNOWN_RECORD_TYPE" };
-  const id = sanitizeId(req.recordId);
+  const { recordType, recordId } = req as { recordType?: unknown; recordId?: unknown };
+  if (!isRecordType(recordType)) return { ok: false, reason: "UNKNOWN_RECORD_TYPE" };
+  const id = sanitizeId(recordId);
   if (!id) return { ok: false, reason: "INVALID_RECORD_ID" };
-  const allowed = await recordAccess(identity, req.recordType, id);
+  const allowed = await recordAccess(identity, recordType, id);
   if (!allowed) return { ok: false, reason: "RECORD_ACCESS_DENIED" };
-  return { ok: true, room: recordRoom(identity.clinicId, req.recordType, id) };
+  return { ok: true, room: recordRoom(identity.clinicId, recordType, id) };
 }

@@ -28,6 +28,26 @@ export const MAX_EVENT_BYTES = 2_048;
 export const RATE_DISCONNECT_MULTIPLIER = 5;
 
 /**
+ * Per-socket rate limits for the non-board control events (R-RTC-1 DoS hardening,
+ * card H2). `join` is throttled BEFORE its DB round-trip; `chat-nudge` is kept low
+ * because each accepted nudge fans out to every clinic member (amplification). Over
+ * budget → the event is dropped (join acks `RATE_LIMITED`, the others silently drop).
+ */
+export const JOIN_MAX_PER_SEC = 30;
+export const TYPING_MAX_PER_SEC = 10;
+export const NUDGE_MAX_PER_SEC = 5;
+export const RECORD_PRESENCE_MAX_PER_SEC = 10;
+export const LEAVE_MAX_PER_SEC = 20;
+
+/**
+ * Hard cap on how many rooms a single socket may hold at once (R-RTC-1 card H2).
+ * Bounds `socket.data.rooms`; a join that would exceed it is rejected with
+ * `ROOM_LIMIT_EXCEEDED`. Kept below JOIN_MAX_PER_SEC so the cap is reachable within
+ * one rate window (a legitimate client joins far fewer rooms than this).
+ */
+export const MAX_ROOMS_PER_SOCKET = 20;
+
+/**
  * Explicit disable switch (R-RTC-1.7). Default-enabled, but any of these turns the
  * whole channel off cleanly. `COLLAB_WS_ENABLED=false` is the documented kill switch.
  */

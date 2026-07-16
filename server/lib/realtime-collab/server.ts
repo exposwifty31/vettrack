@@ -20,6 +20,12 @@ import {
   SELECTION_MAX_PER_SEC,
   BOARD_ROOM_AGGREGATE_MAX_PER_SEC,
   MAX_EVENT_BYTES,
+  JOIN_MAX_PER_SEC,
+  TYPING_MAX_PER_SEC,
+  NUDGE_MAX_PER_SEC,
+  RECORD_PRESENCE_MAX_PER_SEC,
+  LEAVE_MAX_PER_SEC,
+  MAX_ROOMS_PER_SOCKET,
 } from "./config.js";
 import { validateHandshake } from "./handshake.js";
 import { resolveHandshakeIdentity } from "./identity.js";
@@ -28,7 +34,6 @@ import {
   boardRoom,
   chatRoom,
   type CollabIdentity,
-  type JoinRequest,
   type RecordAccessCheck,
 } from "./rooms.js";
 import { defaultRecordAccessCheck } from "./record-access.js";
@@ -183,10 +188,22 @@ export async function initCollabServer(
       io.to(room).emit("presence", { room, members: presence.getPresent(room) });
     };
 
-    socket.on("join", async (req: JoinRequest, ack?: (r: unknown) => void) => {
+    socket.on("join", async (req: unknown, ack?: (r: unknown) => void) => {
+      // Rate-limit BEFORE authorization — a join is a DB round-trip (record ACL),
+      // so throttling here caps the DB work a misbehaving socket can force. — H2.
+      if (rateLimiter.check(`join:${socket.id}`, JOIN_MAX_PER_SEC) !== "allow") {
+        ack?.({ ok: false, reason: "RATE_LIMITED" });
+        return;
+      }
       const decision = await authorizeRoomJoin(identity, req, recordAccess);
       if (!decision.ok) {
         ack?.({ ok: false, reason: decision.reason });
+        return;
+      }
+      // Bound socket.data.rooms so it can't grow without limit (a distinct room per
+      // join otherwise accumulates forever). Re-joining a held room is always ok. — H2.
+      if (!socket.data.rooms.has(decision.room) && socket.data.rooms.size >= MAX_ROOMS_PER_SOCKET) {
+        ack?.({ ok: false, reason: "ROOM_LIMIT_EXCEEDED" });
         return;
       }
       await socket.join(decision.room);
@@ -202,6 +219,7 @@ export async function initCollabServer(
     socket.on("typing", (payload: { on?: boolean }) => {
       const room = chatRoom(identity.clinicId);
       if (!socket.data.rooms.has(room)) return;
+      if (rateLimiter.check(`typing:${socket.id}`, TYPING_MAX_PER_SEC) !== "allow") return;
       recordCollabMetric("collab_typing");
       // Identity is server-attached; a client-supplied userId is never read.
       socket.to(room).emit("peer-typing", { userId: identity.userId, on: payload?.on === true });
@@ -214,6 +232,9 @@ export async function initCollabServer(
     socket.on("chat-nudge", (payload: { messageId?: string }) => {
       const room = chatRoom(identity.clinicId);
       if (!socket.data.rooms.has(room)) return;
+      // Each accepted nudge fans out to every clinic member (each then refetches) —
+      // throttle hard to bound that amplification. — H2.
+      if (rateLimiter.check(`nudge:${socket.id}`, NUDGE_MAX_PER_SEC) !== "allow") return;
       // Advisory refetch nudge only — WS never stores messages. The messageId lets
       // the client coalesce repeated emissions into one refetch.
       socket.to(room).emit("chat-nudge", { messageId: String(payload?.messageId ?? "") });
@@ -252,6 +273,7 @@ export async function initCollabServer(
 
     // ── Feature 3: record co-presence (advisory) (R-RTC-1.4) ───────────────────
     socket.on("record-presence", (payload: { editing?: boolean }) => {
+      if (rateLimiter.check(`recpres:${socket.id}`, RECORD_PRESENCE_MAX_PER_SEC) !== "allow") return;
       // recordType/recordId are DERIVED from the socket's authorized record rooms —
       // never from the client payload. Advisory only; never gates the OCC guard.
       for (const room of socket.data.rooms) {
@@ -265,6 +287,7 @@ export async function initCollabServer(
     });
 
     socket.on("leave", (payload: { room?: string }) => {
+      if (rateLimiter.check(`leave:${socket.id}`, LEAVE_MAX_PER_SEC) !== "allow") return;
       const room = typeof payload?.room === "string" ? payload.room : "";
       if (!socket.data.rooms.has(room)) return;
       socket.leave(room);
@@ -281,6 +304,11 @@ export async function initCollabServer(
       }
       rateLimiter.reset(`cur:${socket.id}`);
       rateLimiter.reset(`sel:${socket.id}`);
+      rateLimiter.reset(`join:${socket.id}`);
+      rateLimiter.reset(`typing:${socket.id}`);
+      rateLimiter.reset(`nudge:${socket.id}`);
+      rateLimiter.reset(`recpres:${socket.id}`);
+      rateLimiter.reset(`leave:${socket.id}`);
     });
   });
 
