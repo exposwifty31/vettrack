@@ -20,9 +20,13 @@ describe("STEP 6 — Code Blue mutations via api.request()", () => {
     expect(src).not.toMatch(/authFetch\s*\(\s*[`'"]\/api\/code-blue\/sessions/);
   });
 
-  it("optimistic log rolls back on failure", () => {
+  it("optimistic log rolls back only its own entry on failure (R-CB-03)", () => {
     const src = readFileSync("src/hooks/useCodeBlueSession.ts", "utf8");
-    expect(src).toContain("queryClient.setQueryData(ACTIVE_SESSION_QUERY_KEY, previous)");
+    // Surgical rollback: on error remove ONLY the optimistic entry by its id —
+    // never restore a whole pre-request snapshot (which erased teammates'
+    // concurrent entries mid-request, CLICK-PATH-011).
+    expect(src).toContain("filter((e) => e.id !== optimisticId)");
+    expect(src).not.toMatch(/setQueryData\(ACTIVE_SESSION_QUERY_KEY,\s*previous\)/);
   });
 
   it("vt_cb_cache clears when session is absent or ended", () => {

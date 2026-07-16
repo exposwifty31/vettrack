@@ -56,6 +56,14 @@ export interface SessionPollResult {
 const SESSION_CACHE_KEY = "vt_cb_cache";
 const ACTIVE_SESSION_QUERY_KEY = ["/api/code-blue/sessions/active"] as const;
 
+/**
+ * Grace window (R-CB-02 · CLICK-PATH-010) protecting a just-started Code Blue
+ * session from a stale/racing `activeCodeBlueSessionId: null` keepalive. A null
+ * keepalive younger than this is ignored (retain, no clearing refetch); only
+ * after it may a confirming refetch clear — server-confirmed end only.
+ */
+export const RECONCILE_GRACE_MS = 5_000;
+
 /** Clears tab-local CB poll cache (session end / server reports no active session). */
 export function clearCodeBlueSessionCache(): void {
   try {
@@ -119,11 +127,20 @@ export function useCodeBlueSession() {
   useEffect(() => {
     return subscribeKeepalive((payload) => {
       if (payload.activeCodeBlueSessionId !== null) return;
-      clearCachedSession();
-      queryClient.setQueryData<SessionPollResult>(ACTIVE_SESSION_QUERY_KEY, (prev) => {
-        if (!prev) return prev;
-        return { ...prev, session: null };
-      });
+      // R-CB-02: a null keepalive must NOT optimistically clear a live session
+      // (frozen doctrine — server-confirmed end only). Read the CURRENT session
+      // from the cache (never a stale closure). Within the grace window of the
+      // session start, retain and issue NO clearing refetch — the keepalive is
+      // likely racing a just-started session. Only after grace may a confirming
+      // refetch run; it clears solely on a confirmed null and retains if the
+      // session is in fact still active.
+      const current = queryClient.getQueryData<SessionPollResult>(ACTIVE_SESSION_QUERY_KEY);
+      if (!current?.session) return;
+      const startedAtMs = current.session.startedAt
+        ? new Date(current.session.startedAt).getTime()
+        : 0;
+      if (Date.now() - startedAtMs < RECONCILE_GRACE_MS) return; // within grace → retain
+      void queryClient.refetchQueries({ queryKey: ACTIVE_SESSION_QUERY_KEY }); // confirming refetch decides
     });
   }, [queryClient]);
 
@@ -161,8 +178,11 @@ export function useCodeBlueSession() {
         elapsedMs,
         ...entry,
       };
+      const optimisticId = `optimistic-${payload.idempotencyKey}`;
 
-      const previous = queryClient.getQueryData<SessionPollResult>(ACTIVE_SESSION_QUERY_KEY);
+      // R-CB-03: cancel any in-flight refetch so it can't clobber the optimistic
+      // write, then append the optimistic entry.
+      await queryClient.cancelQueries({ queryKey: ACTIVE_SESSION_QUERY_KEY });
 
       queryClient.setQueryData<SessionPollResult>(ACTIVE_SESSION_QUERY_KEY, (prev) => {
         if (!prev?.session) return prev;
@@ -171,7 +191,7 @@ export function useCodeBlueSession() {
           logEntries: [
             ...(prev.logEntries ?? []),
             {
-              id: `optimistic-${payload.idempotencyKey}`,
+              id: optimisticId,
               sessionId,
               elapsedMs,
               label: entry.label,
@@ -188,11 +208,13 @@ export function useCodeBlueSession() {
       try {
         await api.codeBlue.sessions.appendLog(sessionId, payload);
       } catch (err) {
-        if (previous !== undefined) {
-          queryClient.setQueryData(ACTIVE_SESSION_QUERY_KEY, previous);
-        } else {
-          void queryClient.invalidateQueries({ queryKey: ACTIVE_SESSION_QUERY_KEY });
-        }
+        // R-CB-03: remove ONLY the optimistic entry by its client id — never
+        // restore a pre-request snapshot, which would erase teammates' entries
+        // (and presence) that arrived via the 2s poll during this request.
+        queryClient.setQueryData<SessionPollResult>(ACTIVE_SESSION_QUERY_KEY, (prev) => {
+          if (!prev) return prev;
+          return { ...prev, logEntries: (prev.logEntries ?? []).filter((e) => e.id !== optimisticId) };
+        });
         if (!(err instanceof OfflineEmergencyMutationBlockedError)) {
           toast.error(t.api.networkUnavailable, { id: "cb-log-failed" });
         }
