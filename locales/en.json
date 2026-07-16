@@ -3875,7 +3875,10 @@
     "waitlist": "Waitlist",
     "staging": "Staging",
     "inQueue": "in queue",
-    "highLoad": "High load"
+    "highLoad": "High load",
+    "collab": {
+      "present": "On the board"
+    }
   },
   "webOnlyGuard": {
     "title": "Best viewed on a larger screen",

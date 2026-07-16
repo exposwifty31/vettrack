@@ -3875,7 +3875,10 @@
     "waitlist": "רשימת המתנה",
     "staging": "היערכות",
     "inQueue": "בתור",
-    "highLoad": "עומס גבוה"
+    "highLoad": "עומס גבוה",
+    "collab": {
+      "present": "נוכחים בלוח"
+    }
   },
   "webOnlyGuard": {
     "title": "מיטבי לצפייה במסך גדול יותר",

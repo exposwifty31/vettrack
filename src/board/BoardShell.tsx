@@ -3,6 +3,8 @@ import { useLocation } from "wouter";
 import { KioskAwake } from "./KioskAwake";
 import { BoardErrorBoundary } from "./BoardErrorBoundary";
 import { useBoardAutoReload } from "./useBoardAutoReload";
+import { useBoardCoPresence } from "./useBoardCoPresence";
+import { BoardCoPresenceOverlay } from "./BoardCoPresenceOverlay";
 
 type Props = { children: ReactNode };
 
@@ -32,6 +34,12 @@ export function BoardShell({ children }: Props) {
   // Confirmed-SW-update → reload, deferred while a Code Blue is active. Reads the
   // snapshot cache read-only; owns no poller. (See useBoardAutoReload.)
   useBoardAutoReload();
+
+  // R-RTC-1.3 · Feature 2 — EPHEMERAL board co-presence (peer cursors / presence /
+  // selection). Pure additive overlay: lazily acquires the ref-counted collab
+  // socket on mount, degrades to a static board when unavailable, and NEVER gates
+  // board rendering on the socket.
+  const coPresence = useBoardCoPresence();
 
   // Fullscreen on the first user gesture (Fullscreen API requires one). First of
   // either pointerdown/keydown fires it, then removes both listeners.
@@ -78,6 +86,11 @@ export function BoardShell({ children }: Props) {
       >
         {children}
       </BoardErrorBoundary>
+      <BoardCoPresenceOverlay
+        peerCursors={coPresence.peerCursors}
+        presentMembers={coPresence.presentMembers}
+        peerSelections={coPresence.peerSelections}
+      />
     </div>
   );
 }
