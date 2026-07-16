@@ -141,17 +141,32 @@ export interface OneTapCodeBlueRequest {
   locationHint?: { roomId: string | null };
 }
 
-/** R-CBF-1.1 — one-tap Code Blue orchestration response. */
+/**
+ * R-CBF-1.1 — retryable conflict reason codes for a one-tap start. These are
+ * NOT part of the success response body: a conflict is returned as HTTP 409, so
+ * the `api.codeBlue.oneTap` wrapper (via `request()`) THROWS an `ApiError` whose
+ * payload `reason` is one of these UPPERCASED codes — it is never deserialized
+ * into {@link OneTapCodeBlueResponse}. Callers read it off the thrown error.
+ */
+export type OneTapCodeBlueConflictReason =
+  | "ACTIVE_LEASE"
+  | "FENCE_SUPERSEDED"
+  | "ACTIVE_SESSION_EXISTS";
+
+/**
+ * R-CBF-1.1 — one-tap Code Blue orchestration SUCCESS response (HTTP 201 created
+ * / 200 replay). A retryable conflict is NOT modelled here — it is surfaced as a
+ * thrown `ApiError` (409, `CODE_BLUE_START_CONFLICT`, see
+ * {@link OneTapCodeBlueConflictReason}) because `request()` rejects on non-2xx.
+ */
 export interface OneTapCodeBlueResponse {
-  /** How the request resolved: a fresh start, an idempotent replay, or a retryable conflict. */
-  outcome: "created" | "replay" | "conflict";
-  sessionId?: string;
+  /** How the request resolved: a fresh start, or an idempotent replay. */
+  outcome: "created" | "replay";
+  sessionId: string;
   /** The advisory soft-reserved nearest-ready cart, or null when none was available. */
   reservedCartId?: string | null;
   /** CURRENT durable paging state of the team page (never a static "success"). */
   pagingState?: OneTapPagingState | null;
-  /** Present on `conflict` — a retryable reason code. */
-  reason?: "active_lease" | "fence_superseded" | "active_session_exists";
 }
 
 export interface CodeBlueDispense {

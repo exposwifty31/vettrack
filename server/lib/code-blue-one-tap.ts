@@ -43,6 +43,7 @@ import { db, codeBlueSessions, codeBlueLogEntries, equipment } from "../db.js";
 import {
   claimStart,
   commitClaim,
+  releaseClaim,
   DrizzleStartClaimStore,
   type StartClaimStore,
   type ClaimStartResult,
@@ -54,28 +55,57 @@ import {
 } from "./code-blue-soft-reserve.js";
 import { insertRealtimeDomainEvent } from "./realtime-outbox.js";
 
-/** Outbox event type carrying the durable team-page delivery state. */
+/** Outbox event type of the REQUEST to page the team (its fan-out ≠ delivery). */
 export const CODE_BLUE_PAGE_EVENT_TYPE = "NOTIFICATION_REQUESTED";
+/** Terminal outbox event type recording a delivered team page (server/lib/push.ts). */
+export const CODE_BLUE_PAGE_SENT_EVENT_TYPE = "NOTIFICATION_SENT";
+/** Terminal outbox event type recording an undeliverable/DLQ'd team page (server/lib/push.ts). */
+export const CODE_BLUE_PAGE_FAILED_EVENT_TYPE = "NOTIFICATION_FAILED";
 
 /** Bounded durable delivery state of the team-page outbox row. */
 export type PagingState = "queued" | "processing" | "sent" | "failed";
 
+/** The correlated Web-Push delivery outcome, from a NOTIFICATION_SENT/_FAILED row. */
+export type TerminalPagingOutcome = "sent" | "failed" | null;
+
 /**
- * Derive the bounded paging state from a team-page outbox row's delivery
- * metadata. Mirrors `startEventOutboxPublisher`'s semantics: a published row is
- * `sent`; a DLQ'd row (`error_type = 'permanent'`) is `failed`; a row that has
- * been attempted but not yet published is `processing`; an untouched row is
- * `queued`.
+ * Derive the bounded durable paging state from BOTH signals that describe a
+ * team page's fate:
+ *
+ *  1. `terminal` — the ACTUAL Web-Push delivery outcome, carried on a SEPARATE
+ *     `NOTIFICATION_SENT` / `NOTIFICATION_FAILED` outbox row that back-points to
+ *     the `NOTIFICATION_REQUESTED` row via `requestedOutboxId` (written by
+ *     `server/lib/push.ts`). This is the ONLY source of a `sent` / `failed`
+ *     terminal state.
+ *  2. `requested` — the `NOTIFICATION_REQUESTED` row's OWN delivery metadata.
+ *     Its `publishedAt` is set the instant the row is fanned out to the realtime
+ *     bus (`event-publisher.ts` — no type filter), which means "picked up by the
+ *     notification worker", NOT "team page delivered". It therefore only ever
+ *     distinguishes `queued` from `processing` while no terminal row exists — it
+ *     must NEVER be read as `sent`.
+ *
+ * Precedence: a correlated terminal outcome wins; otherwise a requested row that
+ * itself DLQ'd (`error_type = 'permanent'`) can never deliver → `failed`; a
+ * requested row that has been fanned out or attempted is `processing`; an
+ * untouched requested row is `queued`.
  */
-export function deriveOutboxPagingState(row: {
-  publishedAt: Date | null;
-  errorType: string | null;
-  retryCount: number;
-  lastAttemptAt: Date | null;
+export function deriveOutboxPagingState(input: {
+  requested: {
+    publishedAt: Date | null;
+    errorType: string | null;
+    retryCount: number;
+    lastAttemptAt: Date | null;
+  };
+  terminal: TerminalPagingOutcome;
 }): PagingState {
-  if (row.publishedAt) return "sent";
-  if (row.errorType === "permanent") return "failed";
-  if (row.retryCount > 0 || row.lastAttemptAt) return "processing";
+  // The correlated Web-Push delivery outcome is the source of truth for delivery.
+  if (input.terminal === "sent") return "sent";
+  if (input.terminal === "failed") return "failed";
+  // No terminal outcome yet. The requested row's OWN metadata only distinguishes
+  // queued vs processing (publishedAt = fanned out, NOT delivered).
+  const { publishedAt, errorType, retryCount, lastAttemptAt } = input.requested;
+  if (errorType === "permanent") return "failed"; // the requested row itself DLQ'd
+  if (publishedAt || retryCount > 0 || lastAttemptAt) return "processing";
   return "queued";
 }
 
@@ -245,8 +275,16 @@ export async function orchestrateOneTapCodeBlue(
       return { kind: "conflict", reason: "fence_superseded" };
     }
     // The clinic already has an active session — the frozen single-active-session
-    // guarantee. The transaction rolled back; the claim stays `claimed`.
+    // guarantee. The transaction rolled back. The real blocker is a PRE-EXISTING
+    // session, NOT an in-flight owner of THIS token, so RELEASE the claim we hold
+    // to free the token immediately — otherwise a retry with the same token gets
+    // spurious `active_lease` conflicts for the full lease window. Fence-guarded:
+    // a superseded owner's release is a no-op; best-effort (the lease still frees
+    // it eventually if the release write fails).
     if (err instanceof ActiveSessionExistsError) {
+      await releaseClaim(deps.claimStore, req.clinicId, req.token, claim.fence, { now }).catch(() => {
+        /* best-effort — the lease expiry is the durable fallback */
+      });
       return { kind: "conflict", reason: "active_session_exists" };
     }
     // A genuine abort: propagate so the caller returns an error. The claim stays
@@ -273,8 +311,10 @@ export class DrizzlePagingStateStore implements PagingStateStore {
   }
 
   async readStateForSession(clinicId: string, sessionId: string): Promise<PagingState | null> {
-    const result = await this.executor.execute(sql`
-      SELECT published_at, error_type, retry_count, last_attempt_at
+    // 1. The NOTIFICATION_REQUESTED row for this session — its OWN metadata only
+    //    tells us queued vs processing (its publishedAt = fanned out to the bus).
+    const requestedResult = await this.executor.execute(sql`
+      SELECT id, published_at, error_type, retry_count, last_attempt_at
       FROM vt_event_outbox
       WHERE clinic_id = ${clinicId}
         AND type = ${CODE_BLUE_PAGE_EVENT_TYPE}
@@ -282,18 +322,46 @@ export class DrizzlePagingStateStore implements PagingStateStore {
       ORDER BY id DESC
       LIMIT 1
     `);
-    const row = (result.rows as Array<{
+    const requested = (requestedResult.rows as Array<{
+      id: number | string;
       published_at: Date | string | null;
       error_type: string | null;
       retry_count: number | string | null;
       last_attempt_at: Date | string | null;
     }>)[0];
-    if (!row) return null;
+    if (!requested) return null;
+
+    // 2. The correlated terminal Web-Push outcome — the SEPARATE
+    //    NOTIFICATION_SENT / NOTIFICATION_FAILED row back-pointing to this
+    //    requested row via `requestedOutboxId` (server/lib/push.ts). This is the
+    //    ONLY source of a `sent` / `failed` delivery state — the requested row's
+    //    own publishedAt must never be read as `sent`.
+    const requestedOutboxId = String(requested.id);
+    const terminalResult = await this.executor.execute(sql`
+      SELECT type
+      FROM vt_event_outbox
+      WHERE clinic_id = ${clinicId}
+        AND type IN (${CODE_BLUE_PAGE_SENT_EVENT_TYPE}, ${CODE_BLUE_PAGE_FAILED_EVENT_TYPE})
+        AND payload->>'requestedOutboxId' = ${requestedOutboxId}
+      ORDER BY id DESC
+      LIMIT 1
+    `);
+    const terminalRow = (terminalResult.rows as Array<{ type: string }>)[0];
+    const terminal: TerminalPagingOutcome =
+      terminalRow?.type === CODE_BLUE_PAGE_SENT_EVENT_TYPE
+        ? "sent"
+        : terminalRow?.type === CODE_BLUE_PAGE_FAILED_EVENT_TYPE
+          ? "failed"
+          : null;
+
     return deriveOutboxPagingState({
-      publishedAt: row.published_at ? new Date(row.published_at) : null,
-      errorType: row.error_type ?? null,
-      retryCount: Number(row.retry_count ?? 0),
-      lastAttemptAt: row.last_attempt_at ? new Date(row.last_attempt_at) : null,
+      requested: {
+        publishedAt: requested.published_at ? new Date(requested.published_at) : null,
+        errorType: requested.error_type ?? null,
+        retryCount: Number(requested.retry_count ?? 0),
+        lastAttemptAt: requested.last_attempt_at ? new Date(requested.last_attempt_at) : null,
+      },
+      terminal,
     });
   }
 }

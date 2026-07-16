@@ -29,14 +29,18 @@
  * offline-blocked via `classifyEmergencyEndpoint` and reached only through the
  * typed `src/lib/api.ts` guard.
  */
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeAll, afterAll } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
+import { randomUUID } from "node:crypto";
+import { and, eq, sql } from "drizzle-orm";
 import {
   orchestrateOneTapCodeBlue,
   FenceSupersededError,
   ActiveSessionExistsError,
   deriveOutboxPagingState,
+  DrizzleOneTapSessionTransaction,
+  DrizzlePagingStateStore,
   type PagingState,
   type PagingStateStore,
   type OneTapSessionTransaction,
@@ -47,10 +51,22 @@ import {
 import {
   claimStart,
   commitClaim,
+  DrizzleStartClaimStore,
   DEFAULT_LEASE_MS,
   type StartClaimStore,
   type StartClaimRow,
 } from "../server/lib/code-blue-start-claim.js";
+import { insertRealtimeDomainEvent } from "../server/lib/realtime-outbox.js";
+import {
+  db,
+  pool,
+  clinics,
+  equipment as equipmentTable,
+  codeBlueSessions,
+  codeBlueLogEntries,
+  codeBlueStartClaims,
+  eventOutbox,
+} from "../server/db.js";
 import {
   reserveNearestReadyCart,
   clearReservationForSession,
@@ -171,16 +187,70 @@ class InMemoryCartReservationStore implements CartReservationStore {
   }
 }
 
+/**
+ * Faithful in-memory model of the DURABLE paging-state derivation the Drizzle
+ * store performs — it does NOT store a `PagingState` directly. Instead it models
+ * the two real signals and routes them through the SHARED `deriveOutboxPagingState`:
+ *
+ *   1. the `NOTIFICATION_REQUESTED` outbox row's OWN delivery metadata
+ *      (`publishedAt` = fanned out to the realtime bus / picked up by the
+ *      notification worker — NOT "team page delivered"), and
+ *   2. the correlated terminal outcome carried on a SEPARATE
+ *      `NOTIFICATION_SENT` / `NOTIFICATION_FAILED` row (the ACTUAL Web-Push
+ *      delivery result, back-pointing via `requestedOutboxId`).
+ *
+ * Modelling both signals — rather than poking a `PagingState` enum directly —
+ * is what proves the fix: `sent` MUST come from a terminal `NOTIFICATION_SENT`
+ * row, never from the requested row's `publishedAt`; a DLQ'd page is `failed`,
+ * never replayed as `sent`.
+ */
+interface RequestedRowModel {
+  publishedAt: Date | null;
+  errorType: string | null;
+  retryCount: number;
+  lastAttemptAt: Date | null;
+  terminal: "sent" | "failed" | null;
+}
 class InMemoryPagingStateStore implements PagingStateStore {
-  readonly states = new Map<string, PagingState>(); // clinic|session -> state
+  readonly rows = new Map<string, RequestedRowModel>(); // clinic|session -> requested-row model
   private key(clinicId: string, sessionId: string) {
     return `${clinicId}|${sessionId}`;
   }
-  set(clinicId: string, sessionId: string, state: PagingState): void {
-    this.states.set(this.key(clinicId, sessionId), state);
+  get size(): number {
+    return this.rows.size;
+  }
+  /** The atomic session transaction wrote a queued NOTIFICATION_REQUESTED outbox row. */
+  recordRequested(clinicId: string, sessionId: string): void {
+    this.rows.set(this.key(clinicId, sessionId), {
+      publishedAt: null,
+      errorType: null,
+      retryCount: 0,
+      lastAttemptAt: null,
+      terminal: null,
+    });
+  }
+  /** The outbox publisher fanned the requested row out to the bus (NOT delivery). */
+  markRequestedPublished(clinicId: string, sessionId: string, at: Date): void {
+    const r = this.rows.get(this.key(clinicId, sessionId));
+    if (r) r.publishedAt = at;
+  }
+  /** A correlated NOTIFICATION_SENT / NOTIFICATION_FAILED terminal row recorded the delivery outcome. */
+  recordTerminal(clinicId: string, sessionId: string, terminal: "sent" | "failed"): void {
+    const r = this.rows.get(this.key(clinicId, sessionId));
+    if (r) r.terminal = terminal;
   }
   async readStateForSession(clinicId: string, sessionId: string): Promise<PagingState | null> {
-    return this.states.get(this.key(clinicId, sessionId)) ?? null;
+    const r = this.rows.get(this.key(clinicId, sessionId));
+    if (!r) return null;
+    return deriveOutboxPagingState({
+      requested: {
+        publishedAt: r.publishedAt,
+        errorType: r.errorType,
+        retryCount: r.retryCount,
+        lastAttemptAt: r.lastAttemptAt,
+      },
+      terminal: r.terminal,
+    });
   }
 }
 
@@ -248,7 +318,7 @@ class InMemoryOneTapSessionTransaction implements OneTapSessionTransaction {
       this.sessions.set(sessionId, { clinicId: input.clinicId, reservedCartId });
       this.activeClinics.add(input.clinicId);
       const pagingOutboxId = this.outboxSeq++;
-      this.pagingStore.set(input.clinicId, sessionId, "queued");
+      this.pagingStore.recordRequested(input.clinicId, sessionId);
       return { sessionId, reservedCartId, pagingOutboxId, pagingState: "queued" };
     } catch (err) {
       // Model transaction rollback: the reservation write is undone.
@@ -453,11 +523,36 @@ describe("R-CBF-1.1 · aborted session transaction leaves claim `claimed` + no p
     // No partial: no session, no lingering reservation, no outbox paging state.
     expect(h.sessionTx.sessions.size).toBe(0);
     expect(h.reservationStore.count(CLINIC)).toBe(0);
-    expect(h.pagingStore.states.size).toBe(0);
+    expect(h.pagingStore.size).toBe(0);
     // The durable claim survives in `claimed` (reclaimable once its lease lapses).
     const claim = h.claimStore.peek(CLINIC, "tok-1");
     expect(claim?.state).toBe("claimed");
     expect(claim?.sessionId).toBeNull();
+  });
+});
+
+describe("R-CBF-1.1 · an ActiveSessionExists conflict frees the token immediately (releases the claim)", () => {
+  it("a pre-existing active session yields `active_session_exists` AND releases the claim (no full-lease wait)", async () => {
+    const h = makeHarness({ [CLINIC]: [{ id: "cart-a", roomId: "room-1" }] }, "room-1");
+    // A Code Blue session is already active for this clinic — the real blocker is
+    // a pre-existing session, NOT an in-flight owner of THIS token.
+    h.sessionTx.activeClinics.add(CLINIC);
+
+    const out = await orchestrateOneTapCodeBlue(h.deps, {
+      clinicId: CLINIC,
+      token: "tok-1",
+      initiatingUserId: USER,
+    });
+
+    expect(out.kind).toBe("conflict");
+    if (out.kind !== "conflict") throw new Error("unreachable");
+    expect(out.reason).toBe("active_session_exists");
+    // The claim is RELEASED (freed immediately) — NOT left `claimed` for the full
+    // lease — so a retry with the same token is not forced to wait out the lease.
+    expect(h.claimStore.peek(CLINIC, "tok-1")?.state).toBe("released");
+    // No partial: no session, no lingering reservation.
+    expect(h.sessionTx.sessions.size).toBe(0);
+    expect(h.reservationStore.count(CLINIC)).toBe(0);
   });
 });
 
@@ -493,7 +588,7 @@ describe("R-CBF-1.1 · expired/aborted claim RECLAIMS and creates a fresh sessio
 });
 
 describe("R-CBF-1.1 · replay reports the CURRENT durable paging state", () => {
-  it("a replay reflects a `sent` page, not a static success", async () => {
+  it("a replay reflects a `sent` page (from a correlated NOTIFICATION_SENT row), not a static success", async () => {
     const h = makeHarness({ [CLINIC]: [{ id: "cart-a", roomId: "room-1" }] }, "room-1");
     const first = await orchestrateOneTapCodeBlue(h.deps, {
       clinicId: CLINIC,
@@ -502,8 +597,9 @@ describe("R-CBF-1.1 · replay reports the CURRENT durable paging state", () => {
     });
     if (first.kind !== "created") throw new Error("unreachable");
 
-    // The outbox publisher delivered the page since the create.
-    h.pagingStore.set(CLINIC, first.sessionId, "sent");
+    // Web Push actually delivered the page → a correlated NOTIFICATION_SENT
+    // terminal row (back-pointing via requestedOutboxId) records the outcome.
+    h.pagingStore.recordTerminal(CLINIC, first.sessionId, "sent");
 
     const replay = await orchestrateOneTapCodeBlue(h.deps, {
       clinicId: CLINIC,
@@ -512,6 +608,32 @@ describe("R-CBF-1.1 · replay reports the CURRENT durable paging state", () => {
     });
     if (replay.kind !== "replay") throw new Error("unreachable");
     expect(replay.pagingState).toBe("sent");
+  });
+
+  it("a fanned-out page with NO terminal delivery outcome replays as `processing`, NEVER `sent`", async () => {
+    const h = makeHarness({ [CLINIC]: [{ id: "cart-a", roomId: "room-1" }] }, "room-1");
+    const first = await orchestrateOneTapCodeBlue(h.deps, {
+      clinicId: CLINIC,
+      token: "tok-1",
+      initiatingUserId: USER,
+    });
+    if (first.kind !== "created") throw new Error("unreachable");
+
+    // The requested outbox row was fanned out to the realtime bus / picked up by
+    // the notification worker (publishedAt set) — but Web-Push delivery has NOT
+    // completed, so there is NO NOTIFICATION_SENT / NOTIFICATION_FAILED row yet.
+    // A replay must report `processing` (in-flight), NOT `sent` — the requested
+    // row's own publishedAt is "fanned out", not "delivered".
+    h.pagingStore.markRequestedPublished(CLINIC, first.sessionId, new Date());
+
+    const replay = await orchestrateOneTapCodeBlue(h.deps, {
+      clinicId: CLINIC,
+      token: "tok-1",
+      initiatingUserId: USER,
+    });
+    if (replay.kind !== "replay") throw new Error("unreachable");
+    expect(replay.pagingState).toBe("processing");
+    expect(replay.pagingState).not.toBe("sent");
   });
 });
 
@@ -525,8 +647,9 @@ describe("R-CBF-1.1 · exhausted-retry `failed` is reported WITHOUT deleting the
     });
     if (first.kind !== "created") throw new Error("unreachable");
 
-    // The page job exhausted its retries and landed in the DLQ.
-    h.pagingStore.set(CLINIC, first.sessionId, "failed");
+    // The page job exhausted its retries / had no active subscription and landed
+    // in the DLQ → a correlated NOTIFICATION_FAILED terminal row records `failed`.
+    h.pagingStore.recordTerminal(CLINIC, first.sessionId, "failed");
 
     const replay = await orchestrateOneTapCodeBlue(h.deps, {
       clinicId: CLINIC,
@@ -575,19 +698,46 @@ describe("R-CBF-1.1 · cross-clinic isolation", () => {
 
 // ─── paging-state derivation (outbox row → durable state) ─────────────────────
 
-describe("R-CBF-1.1 · outbox paging-state derivation", () => {
-  it("maps an outbox row's delivery metadata onto the bounded paging enum", () => {
+describe("R-CBF-1.1 · outbox paging-state derivation (terminal-row-aware)", () => {
+  const req = (over: Partial<{ publishedAt: Date | null; errorType: string | null; retryCount: number; lastAttemptAt: Date | null }> = {}) => ({
+    publishedAt: null,
+    errorType: null,
+    retryCount: 0,
+    lastAttemptAt: null,
+    ...over,
+  });
+
+  it("queued: requested row untouched, no terminal outcome", () => {
+    expect(deriveOutboxPagingState({ requested: req(), terminal: null })).toBe("queued");
+  });
+
+  it("processing: requested row FANNED OUT to the bus (publishedAt) but NO terminal outcome — NOT `sent`", () => {
+    // The HIGH regression guard: the requested row's own publishedAt means
+    // "fanned out to the realtime bus", NOT "team page delivered".
+    expect(deriveOutboxPagingState({ requested: req({ publishedAt: new Date() }), terminal: null })).toBe(
+      "processing",
+    );
+  });
+
+  it("processing: requested row attempted (retry) but no terminal outcome", () => {
     expect(
-      deriveOutboxPagingState({ publishedAt: null, errorType: null, retryCount: 0, lastAttemptAt: null }),
-    ).toBe("queued");
-    expect(
-      deriveOutboxPagingState({ publishedAt: null, errorType: "transient", retryCount: 2, lastAttemptAt: new Date() }),
+      deriveOutboxPagingState({ requested: req({ errorType: "transient", retryCount: 2, lastAttemptAt: new Date() }), terminal: null }),
     ).toBe("processing");
+  });
+
+  it("sent ONLY from a correlated NOTIFICATION_SENT terminal row", () => {
+    expect(deriveOutboxPagingState({ requested: req({ publishedAt: new Date() }), terminal: "sent" })).toBe("sent");
+  });
+
+  it("failed from a correlated NOTIFICATION_FAILED terminal row (even though the requested row published)", () => {
+    expect(deriveOutboxPagingState({ requested: req({ publishedAt: new Date() }), terminal: "failed" })).toBe(
+      "failed",
+    );
+  });
+
+  it("failed when the requested row itself DLQ'd (permanent) before any delivery could be attempted", () => {
     expect(
-      deriveOutboxPagingState({ publishedAt: new Date(), errorType: null, retryCount: 0, lastAttemptAt: null }),
-    ).toBe("sent");
-    expect(
-      deriveOutboxPagingState({ publishedAt: null, errorType: "permanent", retryCount: 50, lastAttemptAt: new Date() }),
+      deriveOutboxPagingState({ requested: req({ errorType: "permanent", retryCount: 50, lastAttemptAt: new Date() }), terminal: null }),
     ).toBe("failed");
   });
 });
@@ -608,3 +758,145 @@ describe("R-CBF-1.1 · frozen Code Blue doctrine — emergency-mutation guard", 
     expect(apiSrc).toContain("OneTapCodeBlueResponse");
   });
 });
+
+// ─── OPT-IN DB integration — the REAL emergency-critical DB path ──────────────
+//
+// Exercises the shipped `DrizzleOneTapSessionTransaction` (advisory lock →
+// single-active-session guard → CAS soft-reserve → session insert → dual outbox
+// insert → fenced commitClaim) AND `DrizzlePagingStateStore` against real
+// Postgres — the paging-state derivation the in-memory model only approximates.
+// This is the guard the reviewer required: it proves, against real rows, that a
+// fanned-out (published) NOTIFICATION_REQUESTED row with NO correlated terminal
+// row reads `processing` — NOT `sent` — and that `sent`/`failed` come only from
+// the correlated NOTIFICATION_SENT / NOTIFICATION_FAILED rows.
+//
+// Skipped by default (the unit run has no real DB). Run with:
+//
+//   CBF_ONETAP_DB_IT=1 DATABASE_URL=postgres://vettrack:vettrack@localhost:5432/vettrack \
+//     pnpm exec vitest run tests/code-blue-one-tap-orchestration.test.ts
+//
+// Uses a per-run throwaway clinic (random id) and deletes exactly its own rows.
+describe.skipIf(!process.env.CBF_ONETAP_DB_IT)(
+  "R-CBF-1.1 · DB integration — real session transaction + paging-state derivation",
+  () => {
+    const clinicId = `cbf11c-it-${randomUUID()}`;
+    const cartId = `cart-${randomUUID()}`;
+    const token = `cbf11c-tok-${randomUUID()}`;
+    const userId = `user-${randomUUID()}`;
+    const store = new DrizzlePagingStateStore(db);
+    let sessionId = "";
+    let pagingOutboxId: number | null = null;
+
+    beforeAll(async () => {
+      await db.insert(clinics).values({ id: clinicId }).onConflictDoNothing();
+      await db.insert(equipmentTable).values({ id: cartId, clinicId, name: "IT Crash Cart" });
+
+      // Step 1 (the orchestrator's job): write the durable claim so the atomic
+      // transaction can fence-commit it in the same commit.
+      const claim = await claimStart(new DrizzleStartClaimStore(db), clinicId, token, { now: new Date() });
+      expect(claim.outcome).toBe("claimed");
+
+      const tx = new DrizzleOneTapSessionTransaction({
+        startedByUserId: userId,
+        startedByName: "IT Initiator",
+        managerUserId: userId,
+        managerUserName: "IT Manager",
+        preCheckPassed: true,
+      });
+      const result = await tx.run({
+        clinicId,
+        token,
+        fence: claim.fence,
+        initiatingUserId: userId,
+        orderedCartIds: [cartId],
+        now: new Date(),
+      });
+      sessionId = result.sessionId;
+      pagingOutboxId = result.pagingOutboxId;
+    });
+
+    afterAll(async () => {
+      await db.delete(codeBlueLogEntries).where(eq(codeBlueLogEntries.clinicId, clinicId));
+      await db.delete(codeBlueSessions).where(eq(codeBlueSessions.clinicId, clinicId));
+      await db.delete(codeBlueStartClaims).where(eq(codeBlueStartClaims.clinicId, clinicId));
+      await db.delete(eventOutbox).where(eq(eventOutbox.clinicId, clinicId));
+      await db.delete(equipmentTable).where(eq(equipmentTable.clinicId, clinicId));
+      await db.delete(clinics).where(eq(clinics.id, clinicId));
+      await pool.end();
+    });
+
+    it("commits the session, reserves the cart, writes the paging outbox row, and fence-commits the claim", async () => {
+      const [session] = await db
+        .select({ status: codeBlueSessions.status })
+        .from(codeBlueSessions)
+        .where(eq(codeBlueSessions.id, sessionId));
+      expect(session?.status).toBe("active");
+
+      // Advisory soft-reserve set to THIS session.
+      const [cart] = await db
+        .select({ reservedForSessionId: equipmentTable.reservedForSessionId })
+        .from(equipmentTable)
+        .where(eq(equipmentTable.id, cartId));
+      expect(cart?.reservedForSessionId).toBe(sessionId);
+
+      // The NOTIFICATION_REQUESTED row exists and is the returned paging handle.
+      const reqRows = await db.execute(sql`
+        SELECT id FROM vt_event_outbox
+        WHERE clinic_id = ${clinicId} AND type = 'NOTIFICATION_REQUESTED'
+          AND payload->>'sessionId' = ${sessionId}
+      `);
+      expect(reqRows.rows.length).toBe(1);
+      expect(Number((reqRows.rows[0] as { id: number | string }).id)).toBe(pagingOutboxId);
+
+      // Claim fence-committed and bound to the session.
+      const [claim] = await db
+        .select({ state: codeBlueStartClaims.state, sessionId: codeBlueStartClaims.sessionId })
+        .from(codeBlueStartClaims)
+        .where(and(eq(codeBlueStartClaims.clinicId, clinicId), eq(codeBlueStartClaims.token, token)));
+      expect(claim?.state).toBe("committed");
+      expect(claim?.sessionId).toBe(sessionId);
+    });
+
+    it("derives `queued` from a pristine requested row (not fanned out, no terminal outcome)", async () => {
+      await db.execute(sql`
+        UPDATE vt_event_outbox
+        SET published_at = NULL, error_type = NULL, retry_count = 0, last_attempt_at = NULL
+        WHERE id = ${pagingOutboxId}
+      `);
+      expect(await store.readStateForSession(clinicId, sessionId)).toBe("queued");
+    });
+
+    it("derives `processing`, NOT `sent`, from a FANNED-OUT requested row with no terminal outcome (HIGH regression guard)", async () => {
+      // published_at set = fanned out to the realtime bus / worker — NOT delivered.
+      await db.execute(sql`UPDATE vt_event_outbox SET published_at = NOW() WHERE id = ${pagingOutboxId}`);
+      const state = await store.readStateForSession(clinicId, sessionId);
+      expect(state).toBe("processing");
+      expect(state).not.toBe("sent");
+    });
+
+    it("derives `sent` ONLY from a correlated NOTIFICATION_SENT row (requestedOutboxId back-pointer)", async () => {
+      await insertRealtimeDomainEvent(db, {
+        clinicId,
+        type: "NOTIFICATION_SENT",
+        payload: { requestedOutboxId: pagingOutboxId, scope: "aggregate" },
+      });
+      expect(await store.readStateForSession(clinicId, sessionId)).toBe("sent");
+    });
+
+    it("derives `failed` from a later correlated NOTIFICATION_FAILED row — and NEVER deletes the committed session", async () => {
+      await insertRealtimeDomainEvent(db, {
+        clinicId,
+        type: "NOTIFICATION_FAILED",
+        payload: { requestedOutboxId: pagingOutboxId, reason: "no_active_subscription" },
+      });
+      // The latest terminal row (FAILED, higher id) wins.
+      expect(await store.readStateForSession(clinicId, sessionId)).toBe("failed");
+      // Server-confirmed end only: a DLQ'd page must not delete the session.
+      const [session] = await db
+        .select({ status: codeBlueSessions.status })
+        .from(codeBlueSessions)
+        .where(eq(codeBlueSessions.id, sessionId));
+      expect(session?.status).toBe("active");
+    });
+  },
+);
