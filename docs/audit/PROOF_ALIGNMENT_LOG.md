@@ -3328,3 +3328,19 @@ Reviewer returned 1 HIGH + 1 MEDIUM + 2 LOW on the committed sub-card; all four 
 - Command: `pnpm test` (full) → `Test Files 595 passed (595)`, `Tests 5321 passed | 11 skipped`, 0 failed.
 
 **Verdict:** VERIFIED
+
+## 2026-07-16 — R-CBF-1.4: inline drug-dose reference in the timed log (committed 71d16807e / 95905f537 / d6f91a806)
+
+**Claim:** Built the static, versioned, clinician-approved drug-dose reference rendered inline in the Code Blue timed-log view. Provenance is MANDATORY and enforced: `validateDrugDoseEntry` rejects a missing OR empty/placeholder source/owner, a malformed version/effective-date, and an out-of-scope species/weight/concentration/unit (presence alone never passes). Drug/dose/unit values live as data in code, NOT in the locale dicts (the `codeBlue.drugs`/`codeBlue.units` lock is preserved); only chrome/species labels are localized (he+en). No new server endpoint, no network dependency, no PII.
+
+**Evidence:**
+- `src/features/code-blue/drug-reference.ts` — `validateDrugDoseEntry(entry: unknown)` enforces: placeholder-reject regex for source/reviewOwner/drug/indication/dose/route; `VERSION_RE=/^\d+\.\d+\.\d+$/`; real-ISO-calendar-date check (round-trips through `Date.UTC`, rejects `2026-02-30`/`2026-13-40`); `SUPPORTED_SPECIES`/`SUPPORTED_UNITS` membership; in-scope weight band (`0<min<max<=200`, finite); positive-magnitude concentration. `DRUG_DOSE_REFERENCE` (v1.0.0, 6 entries) + `approvedDrugDoseEntries()` filters to valid-only.
+- `src/features/code-blue/DrugDoseReference.tsx` — collapsible disclosure (`aria-expanded`/`aria-controls`, ≥44px), renders only `approvedDrugDoseEntries()`; per-entry + table-level provenance + not-a-prescription disclaimer; species localized via `t.codeBlue.drugReference.species.*`.
+- `src/pages/code-blue.tsx` — `<DrugDoseReference />` mounted inline beneath the live timeline in `ActiveSession`.
+- i18n: `codeBlue.drugReference.*` chrome added to `locales/en.json` + `locales/he.json`; `pnpm i18n:check` → "deep key parity"; types regenerated (`src/lib/i18n.generated.d.ts`). No `codeBlue.drugs`/`codeBlue.units` added (lock intact).
+- Guardrail check: R-CBF-1.4 adds NO server mutation/endpoint, so `classifyEmergencyEndpoint` is not implicated; reference is bundled (no fetch — test asserts `fetchSpy` uncalled).
+- Test: RED first — `pnpm test -- tests/code-blue-drug-reference.test.tsx` failed with `Failed to resolve import "@/features/code-blue/drug-reference"`. GREEN — `Test Files 1 passed (1)`, `Tests 66 passed (66)`.
+- Command: `pnpm typecheck` (frontend `tsc --noEmit` + server `tsconfig.server.json`) → exit 0, no errors.
+- Command: `pnpm test` (full) → `Test Files 596 passed (596)`, `Tests 5387 passed | 11 skipped`, 0 failed.
+
+**Verdict:** VERIFIED
