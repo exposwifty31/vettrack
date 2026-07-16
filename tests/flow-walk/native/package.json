@@ -9,13 +9,14 @@
     "appium:doctor": "appium driver doctor xcuitest"
   },
   "devDependencies": {
+    "@wdio/appium-service": "^9",
     "@wdio/cli": "^9.4.0",
     "@wdio/globals": "^9.4.0",
     "@wdio/local-runner": "^9.4.0",
     "@wdio/mocha-framework": "^9.4.0",
     "@wdio/spec-reporter": "^9.4.0",
     "appium": "^3.0.0",
-    "appium-xcuitest-driver": "^11.0.0",
+    "appium-xcuitest-driver": "^11.17.7",
     "cross-env": "^7.0.3",
     "ts-node": "^10.9.2",
     "typescript": "^5.5.0"

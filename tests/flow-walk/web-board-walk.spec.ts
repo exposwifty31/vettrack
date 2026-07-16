@@ -6,13 +6,17 @@
  * each row pass/broken/degraded/observe/unreachable, screenshots it, and writes
  * `artifacts/flow-walk/web-matrix.json` — the recorded III.6 evidence.
  *
- * Prerequisites: a LOCAL dev-bypass server (`pnpm dev`, clinicId=dev-clinic-default,
- * no Clerk key). Never point this at staging/production — it cycles dev-role headers.
+ * Prerequisites: a LOCAL walk server — `pnpm dev:walk` (dev-bypass client+server,
+ * clinicId=dev-clinic-default, PLAYWRIGHT_E2E=true so the global per-IP API rate
+ * limiter is skipped: a 5-role walk is hundreds of /api calls, and a single 429 on
+ * /api/users/me flips the client signed-out for every row after it). Never point
+ * this at staging/production — it cycles dev-role headers.
  *
  * Discovery: allowlisted only via `PW_SUITE=flow-walk` (see playwright.shared.ts);
- * the default CI suite never runs it, and it self-skips if the app is unreachable.
+ * the default CI suite never runs it, and it self-skips (with the reason) when the
+ * target is missing, is the API-only port, or is not a dev-bypass server.
  *
- *   pnpm dev            # in one terminal
+ *   pnpm dev:walk       # in one terminal
  *   pnpm test:playwright:flow-walk
  */
 import { test, expect, type APIRequestContext } from "@playwright/test";
@@ -25,6 +29,7 @@ import {
 import {
   applyDevRole,
   artifactPath,
+  artifactRelPath,
   attachObservers,
   classifyActual,
   evaluateRow,
@@ -36,35 +41,112 @@ import {
   type WalkResult,
 } from "./walk-helpers";
 
-const BASE = process.env.TEST_BASE_URL ?? "http://127.0.0.1:3001";
+// In dev the SPA lives on the Vite port (:5000; /api proxied to :3001) — the API
+// port serves no frontend. Single-port deployments can override via TEST_BASE_URL.
+const BASE = process.env.TEST_BASE_URL ?? "http://127.0.0.1:5000";
 const results: WalkResult[] = [];
 let reachable = false;
+let unreachableReason = "";
 
-async function probe(request: APIRequestContext): Promise<boolean> {
+/**
+ * Fail fast with a reason instead of walking 45 bogus rows. The target must be
+ * up, must serve the SPA (not the dev API-only port), and must honor the
+ * dev-role override (a dev-bypass server) — the exact misconfigurations that
+ * previously produced all-/signin matrices.
+ */
+async function probe(request: APIRequestContext): Promise<string | null> {
   try {
-    const res = await request.get(`${BASE}/api/healthz`, { timeout: 4_000 });
-    return res.ok();
+    const hz = await request.get(`${BASE}/api/healthz`, { timeout: 4_000 });
+    if (!hz.ok()) {
+      return `API unhealthy at ${BASE}/api/healthz (HTTP ${hz.status()}) — start \`pnpm dev:walk\`.`;
+    }
   } catch {
-    return false;
+    return `App not reachable at ${BASE}. Start a local walk server first: \`pnpm dev:walk\`.`;
   }
+  try {
+    const root = await request.get(`${BASE}/`, { timeout: 8_000 });
+    if (!(await root.text()).includes('id="root"')) {
+      return `${BASE} answers /api but serves no app shell — in dev, walk the Vite port (:5000), not the API port (:3001).`;
+    }
+  } catch {
+    return `${BASE}/ did not return the app shell.`;
+  }
+  try {
+    const me = await request.get(`${BASE}/api/users/me`, {
+      headers: { "x-dev-role-override": "student" },
+      timeout: 8_000,
+    });
+    if (!me.ok()) {
+      return `/api/users/me returned HTTP ${me.status()} — server not in dev-bypass? Start \`pnpm dev:walk\`.`;
+    }
+    const body = (await me.json()) as { effectiveRole?: string; role?: string };
+    if ((body.effectiveRole ?? body.role) !== "student") {
+      return `server ignored x-dev-role-override (role stayed ${body.effectiveRole ?? body.role ?? "?"}) — not a dev-bypass server. Start \`pnpm dev:walk\` (CLERK_ENABLED=false).`;
+    }
+  } catch {
+    return `/api/users/me probe failed — server not in dev-bypass? Start \`pnpm dev:walk\`.`;
+  }
+  return null;
+}
+
+/**
+ * "eq1" / "s1" are manifest placeholders; against a live DB they 400/404 every
+ * detail row (non-UUID ids are rejected). Resolve them to real seeded ids at
+ * walk start; if the lookup fails the placeholder walks as-is and the matrix
+ * shows the noise honestly.
+ */
+const idSubstitutions = new Map<string, string>();
+
+async function resolveSeededIds(request: APIRequestContext): Promise<void> {
+  // A non-OK/empty response is a HARD failure, not a fallback: retaining the
+  // eq1/s1 placeholders would make the detail/edit/qr/shift-chat rows walk known-
+  // bad ids and stamp placeholder 400/404s as evidence (CodeRabbit #109). Seed
+  // the dev DB (`pnpm seed:dev`) before walking.
+  const eq = await request.get(`${BASE}/api/equipment`, { timeout: 8_000 }).catch((e) => {
+    throw new Error(`resolveSeededIds: GET /api/equipment failed — ${String(e)}`);
+  });
+  if (!eq.ok()) throw new Error(`resolveSeededIds: GET /api/equipment returned HTTP ${eq.status()}`);
+  const eqBody = (await eq.json()) as { id?: string }[] | { items?: { id?: string }[] };
+  const firstEq = Array.isArray(eqBody) ? eqBody[0] : eqBody.items?.[0];
+  if (!firstEq?.id) throw new Error("resolveSeededIds: no seeded equipment — run `pnpm seed:dev` before walking");
+  idSubstitutions.set("eq1", firstEq.id);
+
+  const sh = await request.get(`${BASE}/api/shifts`, { timeout: 8_000 }).catch((e) => {
+    throw new Error(`resolveSeededIds: GET /api/shifts failed — ${String(e)}`);
+  });
+  if (!sh.ok()) throw new Error(`resolveSeededIds: GET /api/shifts returned HTTP ${sh.status()}`);
+  const shBody = (await sh.json()) as { id?: string }[] | { shifts?: { id?: string }[] };
+  const firstSh = Array.isArray(shBody) ? shBody[0] : shBody.shifts?.[0];
+  if (!firstSh?.id) throw new Error("resolveSeededIds: no seeded shift — run `pnpm seed:dev` before walking");
+  idSubstitutions.set("s1", firstSh.id);
+}
+
+function substitutePlaceholders(path: string): string {
+  let out = path;
+  for (const [placeholder, real] of idSubstitutions) {
+    out = out.replace(new RegExp(`\\b${placeholder}\\b`, "g"), real);
+  }
+  return out;
 }
 
 test.describe.serial("Flow walk (dev-bypass) — web + board + marketing", () => {
   test.beforeAll(async ({ request }) => {
-    reachable = await probe(request);
+    unreachableReason = (await probe(request)) ?? "";
+    reachable = unreachableReason === "";
+    if (reachable) await resolveSeededIds(request);
   });
 
   test.beforeEach(() => {
-    test.skip(
-      !reachable,
-      `App not reachable at ${BASE}. Start a local dev-bypass server first: \`pnpm dev\`.`,
-    );
+    test.skip(!reachable, unreachableReason);
   });
 
   for (const role of ROLE_ARCHETYPES) {
     test(`walk as ${role}${roleHasManagementWeb(role) ? " (management.web)" : " (gated on web)"}`, async ({
       browser,
     }) => {
+      // A role walks ~35 rows; against a Vite dev server each cold lazy route
+      // compiles on first navigation, so the 30s suite default is far too short.
+      test.setTimeout(10 * 60_000);
       const context = await browser.newContext({
         viewport: { width: 1440, height: 900 }, // >=1024 so WebOnlyGuard renders, not the guard screen
         baseURL: BASE,
@@ -76,7 +158,7 @@ test.describe.serial("Flow walk (dev-bypass) — web + board + marketing", () =>
       for (const row of webWalkRows(role)) {
         consoleErrors.length = 0;
         failedRequests.length = 0;
-        const requestedPath = row.paths[0];
+        const requestedPath = substitutePlaceholders(row.paths[0]);
 
         let navigated = true;
         await page
@@ -118,8 +200,10 @@ test.describe.serial("Flow walk (dev-bypass) — web + board + marketing", () =>
           consoleErrors: [...consoleErrors],
         });
 
-        const shot = artifactPath("screenshots", screenshotName(row, role, platform));
-        await page.screenshot({ path: shot, fullPage: false }).catch(() => {});
+        const shotName = screenshotName(row, role, platform);
+        await page
+          .screenshot({ path: artifactPath("screenshots", shotName), fullPage: false })
+          .catch(() => {});
 
         results.push({
           rowId: row.id,
@@ -131,27 +215,45 @@ test.describe.serial("Flow walk (dev-bypass) — web + board + marketing", () =>
           actual,
           status,
           finalUrl: relativePath(page.url()),
-          screenshot: shot,
+          // Repo-relative, not the absolute local path — the matrix is committed
+          // evidence and must not carry a workstation `/Users/…` prefix.
+          screenshot: artifactRelPath("screenshots", shotName),
           consoleErrors: [...consoleErrors],
           failedRequests: [...failedRequests],
           notes,
         });
 
-        // A walk records everything; only a hard mismatch on a firm expectation fails.
-        expect
-          .soft(status !== "broken", `${role} ${requestedPath}: ${notes ?? status}`)
-          .toBe(true);
+        // Recording only — the assertions live in the final "matrix assertions"
+        // test. In a serial group a failing role test would skip every remaining
+        // role's walk (the admin run's failures silenced roles 2-5 entirely).
       }
 
       await context.close();
     });
   }
 
+  test("matrix assertions — no broken rows across all roles", () => {
+    expect(results.length, "walk recorded no rows").toBeGreaterThan(0);
+    // A regression that drops an entire role would still satisfy length>0 — so
+    // assert every archetype actually produced rows (CodeRabbit #109).
+    for (const role of ROLE_ARCHETYPES) {
+      expect(
+        results.some((r) => r.role === role),
+        `walk recorded no rows for ${role}`,
+      ).toBe(true);
+    }
+    for (const r of results) {
+      expect
+        .soft(r.status !== "broken", `${r.role} ${r.path}: ${r.notes ?? r.status}`)
+        .toBe(true);
+    }
+  });
+
   test.afterAll(() => {
     if (!reachable || results.length === 0) return;
     writeMatrix(
       results,
-      { target: BASE, platform: "web+board", generatedAt: new Date().toISOString() },
+      { target: BASE, platform: "web+board+marketing", generatedAt: new Date().toISOString() },
       artifactPath("web-matrix.json"),
     );
   });

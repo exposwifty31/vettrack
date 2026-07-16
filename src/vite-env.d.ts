@@ -16,6 +16,13 @@ interface Window {
 
 interface ImportMetaEnv {
   readonly VITE_CLERK_PUBLISHABLE_KEY: string;
+  /**
+   * Dev-only escape hatch: `"true"` forces client dev-bypass even when a Clerk key
+   * is present (for role-cycling tooling — the flow-walk, DevRoleSwitcher). Honored
+   * only under `import.meta.env.DEV`; inert in production/native builds. Start via
+   * `pnpm dev:bypass`. See `isClerkEnabled()` in `src/lib/auth-fetch.ts`.
+   */
+  readonly VITE_FORCE_DEV_BYPASS?: string;
   /** Production API host for bundled Capacitor shell (e.g. https://vettrack.uk). */
   readonly VITE_API_ORIGIN?: string;
   readonly VITE_WHATSAPP_PHONE: string;

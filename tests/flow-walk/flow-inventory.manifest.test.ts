@@ -201,7 +201,12 @@ describe("flow-walk manifest — outcome derivation", () => {
   it("kiosk + marketing escape the desktop console gate for every role", () => {
     for (const r of ROLE_ARCHETYPES) {
       expect(expectedWebOutcome(row("board-kiosk"), r), `board ${r}`).toMatchObject({ kind: "kiosk" });
-      expect(expectedWebOutcome(row("signin"), r), `signin ${r}`).toMatchObject({ kind: "render" });
+      // The walk runs permanently authenticated (dev-bypass has no signed-out
+      // state): a signed-in visit to /signin or /signup bounces to /home
+      // (signin.tsx / signup.tsx redirect effects). Legal pages never bounce.
+      expect(expectedWebOutcome(row("signin"), r), `signin ${r}`).toMatchObject({ kind: "redirect", to: "/home" });
+      expect(expectedWebOutcome(row("signup"), r), `signup ${r}`).toMatchObject({ kind: "redirect", to: "/home" });
+      expect(expectedWebOutcome(row("legal-support"), r), `legal ${r}`).toMatchObject({ kind: "render" });
     }
   });
 
@@ -212,19 +217,71 @@ describe("flow-walk manifest — outcome derivation", () => {
     expect(expectedNativeOutcome(row("emergency-wall"), "admin")).toMatchObject({ kind: "guard-redirect", to: "/home" });
   });
 
-  it("pathMatchesTarget ignores query strings and treats an absent target as a match", () => {
-    expect(pathMatchesTarget("/equipment?scan=1", "/equipment")).toBe(true);
+  it("scan self-redirects on web to /equipment (scan=1 inert, BUG-016) but renders on native", () => {
+    // Web settles at pathname /equipment (no web scanner); pathname-only match.
+    expect(expectedWebOutcome(row("scan"), "admin")).toMatchObject({ kind: "redirect", to: "/equipment" });
+    expect(expectedWebOutcome(row("scan"), "senior_technician")).toMatchObject({ kind: "redirect", to: "/equipment" });
+    // Non-management roles never reach ScanPage on web — the T-31 gate preempts it.
+    expect(expectedWebOutcome(row("scan"), "technician")).toMatchObject({ kind: "management-web-gate" });
+    expect(expectedNativeOutcome(row("scan"), "technician")).toMatchObject({ kind: "render" });
+  });
+
+  it("admin-floor pages (T22 ManagementAccessDenied) deny management.web roles below admin", () => {
+    for (const id of ["admin-home", "admin-config", "audit-log"]) {
+      expect(expectedWebOutcome(row(id), "admin"), `${id} admin`).toMatchObject({ kind: "render" });
+      expect(expectedWebOutcome(row(id), "senior_technician"), `${id} senior`).toMatchObject({ kind: "access-denied" });
+      // Below management.web the T-31 gate still preempts the in-page floor.
+      expect(expectedWebOutcome(row(id), "vet"), `${id} vet`).toMatchObject({ kind: "management-web-gate" });
+    }
+    // /admin/code-blue-history's floor is management.web — senior renders it (walk-verified).
+    expect(expectedWebOutcome(row("admin-history"), "senior_technician")).toMatchObject({ kind: "render" });
+  });
+
+  it("pathMatchesTarget matches pathname + REQUIRES the target's query params (extra params allowed)", () => {
+    // Absent target → any path matches; target without query → pathname-only.
+    expect(pathMatchesTarget("/anything", undefined)).toBe(true);
+    expect(pathMatchesTarget("/equipment?scan=1", "/equipment")).toBe(true); // extra param ok when target declares none
     expect(pathMatchesTarget("/equipment", "/equipment")).toBe(true);
     expect(pathMatchesTarget("/home", "/equipment")).toBe(false);
-    expect(pathMatchesTarget("/anything", undefined)).toBe(true);
+    // Target WITH a query param: the actual URL must carry it. This is the
+    // scanner-overlay trigger — /equipment (no scan=1) must NOT pass for a
+    // /equipment?scan=1 target, or a redirect that never opens the scanner
+    // would false-pass (CodeRabbit #109).
+    expect(pathMatchesTarget("/equipment?scan=1", "/equipment?scan=1")).toBe(true);
+    expect(pathMatchesTarget("/equipment", "/equipment?scan=1")).toBe(false); // missing scan=1
+    expect(pathMatchesTarget("/equipment?scan=0", "/equipment?scan=1")).toBe(false); // wrong value
+    expect(pathMatchesTarget("/equipment?scan=1&x=2", "/equipment?scan=1")).toBe(true); // extra param ok
   });
 
   it("redirect rows redirect to their declared target on every platform", () => {
     const meds = row("legacy-meds");
     for (const r of ROLE_ARCHETYPES) {
       expect(expectedWebOutcome(meds, r)).toMatchObject({ kind: "redirect", to: "/equipment/tasks" });
+      if (r === "student") continue; // native chains through Tasks' custody redirect — asserted below
       expect(expectedNativeOutcome(meds, r)).toMatchObject({ kind: "redirect", to: "/equipment/tasks" });
     }
+  });
+
+  it("native: Tasks inline-redirects the custody-only archetype, and its legacy aliases chain through", () => {
+    // Tasks.tsx bounces the student archetype to /equipment (walk-verified) — so a
+    // redirect that LANDS on /equipment/tasks continues to /equipment for students.
+    expect(expectedNativeOutcome(row("tasks"), "student")).toMatchObject({ kind: "redirect", to: "/equipment" });
+    expect(expectedNativeOutcome(row("legacy-tasks-alias"), "student")).toMatchObject({ kind: "redirect", to: "/equipment" });
+    expect(expectedNativeOutcome(row("legacy-meds"), "student")).toMatchObject({ kind: "redirect", to: "/equipment" });
+    // Non-custody roles stop at the declared target / render the page.
+    expect(expectedNativeOutcome(row("tasks"), "technician")).toMatchObject({ kind: "render" });
+    expect(expectedNativeOutcome(row("legacy-tasks-alias"), "admin")).toMatchObject({ kind: "redirect", to: "/equipment/tasks" });
+  });
+
+  it("native: /equipment/scan forwards to /scan; web settles at pathname /equipment", () => {
+    // equipment-list.tsx / EquipmentMasterDetail forward ?scan=1 → /scan in the
+    // shell (the scanner is its own surface there).
+    expect(expectedNativeOutcome(row("scan-alias-redirect"), "admin")).toMatchObject({ kind: "redirect", to: "/scan" });
+    expect(expectedNativeOutcome(row("scan-alias-redirect"), "student")).toMatchObject({ kind: "redirect", to: "/scan" });
+    // Web settles at pathname /equipment for every role — the desktop list cleans
+    // scan=1, the T-31 gate leaves it; pathname-only match covers both (BUG-016).
+    expect(expectedWebOutcome(row("scan-alias-redirect"), "admin")).toMatchObject({ kind: "redirect", to: "/equipment" });
+    expect(expectedWebOutcome(row("scan-alias-redirect"), "student")).toMatchObject({ kind: "redirect", to: "/equipment" });
   });
 
   it("web/board platform partitions are non-empty and disjoint from native-only rows", () => {

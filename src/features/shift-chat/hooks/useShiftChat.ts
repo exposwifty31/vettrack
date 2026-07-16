@@ -30,7 +30,7 @@ function patchMessageById(
 }
 
 export function useShiftChat(isOpen: boolean) {
-  const { userId } = useAuth();
+  const { userId, effectiveRole } = useAuth();
   const queryClient = useQueryClient();
   const afterRef    = useRef<string | undefined>(undefined);
   const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -39,7 +39,11 @@ export function useShiftChat(isOpen: boolean) {
   const { data, isLoading } = useQuery({
     queryKey: QUERY_KEY,
     queryFn: () => shiftChatApi.getMessages(afterRef.current),
-    enabled: !!userId,
+    // Mirror the server floor (GET /api/shift-chat/messages is
+    // requireEffectiveRole("technician")): polling below it only 403-spams the
+    // console on every page. Gating on effectiveRole — not the permanent role —
+    // preserves the deliberate carve-out for a student elevated on shift.
+    enabled: !!userId && effectiveRole !== "student",
     refetchInterval: isOpen ? POLL_INTERVAL_OPEN_MS : POLL_INTERVAL_CLOSED_MS,
     refetchIntervalInBackground: false,
     refetchOnWindowFocus: false,

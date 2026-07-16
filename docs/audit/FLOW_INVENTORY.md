@@ -7,7 +7,7 @@ Per rule III.6, every flow in the app must be provable 100% functioning across p
 ## What is verified here vs. pending
 
 - ✅ **Verified now (static, from code):** route registration, guard, and therefore **platform availability** (native / web / board / marketing). These are read directly from `routes.tsx` and the platform resolver — not inferred.
-- ⏳ **Pending live-walk:** the III.6 requirement is an end-to-end walk **in the real running app** (sim/browser), never inferred from unit tests. No booted simulator or running app was available in this session, so **no row below is stamped `pass`** — doing so would violate III.4 (verify before claiming). Each flow's live status is `⏳ pending`. The walk protocol is at the end; it uses the Phase 0 dev-role switcher to cycle roles.
+- ✅ **Live walk EXECUTED (2026-07-16):** the III.6 end-to-end walk ran in the real running app across every surface — the four platform targets (web · board · native iPhone · native iPad) **plus** the marketing surface, five in total. **Web + board + marketing** (Playwright, desktop 1440×900, all 5 role archetypes): **147 rows — 145 pass, 0 broken, 2 degraded**. **Native iPhone** (Appium/XCUITest, iPhone 17 sim, admin + student): **68/68 pass**. **Native iPad** (iPad Pro 11-inch (M5) sim): **68/68 pass**. Evidence: `docs/audit/evidence/flow-walk-web-matrix-2026-07-16.json` + `flow-walk-native-{iphone,ipad}-2026-07-16.txt` (149 row screenshots in gitignored `artifacts/flow-walk/`). The 2 degraded rows are one real finding (shift-chat archive 404 — see the Shift-ops row).
 
 **Status legend (for the live walk):** `pass` · `broken` · `degraded` · `unreachable` · `⏳ pending` (not yet walked).
 
@@ -16,7 +16,9 @@ Per rule III.6, every flow in the app must be provable 100% functioning across p
 > is the reconciled row set (web via Playwright, iPhone/iPad via Appium);
 > `flow-inventory.manifest.test.ts` is a **drift guard** that fails if a route's
 > guard classification diverges from `src/app/routes.tsx`. Run the web/board walk
-> with `pnpm dev` + `pnpm test:playwright:flow-walk`. Two corrections it encodes that
+> with `pnpm dev:walk` + `pnpm test:playwright:flow-walk` (never plain `pnpm dev` —
+> the per-IP API rate limiter poisons auth ~9 pages in; `dev:walk` sets
+> `PLAYWRIGHT_E2E=true`, the sanctioned skip). Two corrections it encodes that
 > this table (generated 2026-07-06) predates: several rows are now redirects
 > (`/equipment/scan|maintenance|intelligence`, `/shift-handover`, `/pending*`,
 > `/equipment/board`·`/display`→`/board`), and **the desktop web app is
@@ -40,46 +42,46 @@ Per rule III.6, every flow in the app must be provable 100% functioning across p
 
 | Path | Component | Live-walk |
 |---|---|---|
-| `/signin`, `/signin/*?` | signin | ⏳ pending |
-| `/signup`, `/signup/*?` | signup | ⏳ pending |
-| `/privacy` · `/terms` · `/support` | legal/support | ⏳ pending |
+| `/signin`, `/signin/*?` | signin | pass ✅ 2026-07-16 (authed walk bounces → /home by design) |
+| `/signup`, `/signup/*?` | signup | pass ✅ 2026-07-16 (authed walk bounces → /home by design) |
+| `/privacy` · `/terms` · `/support` | legal/support | pass ✅ 2026-07-16 |
 
 ## Core operational (AuthGuard — all app platforms, all roles unless nav-gated)
 
 | Path | Purpose | Role gating (⚠️ nav-linkage re-verified Phase 2) | Live-walk |
 |---|---|---|---|
-| `/` , `/home` | Root / home surface | all | ⏳ pending |
-| `/equipment`, `/equipment/new`, `/equipment/:id`, `/equipment/:id/edit` | Equipment list/detail/edit | all (vet/admin actions gated in-page) | ⏳ pending |
-| `/equipment/tasks` | Unified task model (Tasks) | all | ⏳ pending |
-| `/scan`, `/equipment/scan` | Scan / custody | all | ⏳ pending |
-| `/equipment/maintenance`, `/equipment/intelligence` | Equipment ops | all | ⏳ pending |
-| `/alerts` · `/my-equipment` · `/my-profile` | Alerts, custody, profile | all | ⏳ pending |
-| `/rooms`, `/rooms/:id`, `/locations`, `/locations/:id` | Rooms / locations | all | ⏳ pending |
-| `/code-blue` · `/crash-cart` · `/handoff` | Emergency + handover | all (initiate gated server-side) | ⏳ pending |
-| `/critical-kit-check` · `/emergency-equipment-log` · `/emergency-equipment-history` | Emergency kit | all | ⏳ pending |
-| `/inventory`, `/inventory-items`, `/inventory-items/:id` | Inventory | all | ⏳ pending |
-| `/settings` · `/help` · `/whats-new` · `/app-tour` · `/stability` | App surfaces | all | ⏳ pending |
-| `/shift-chat/:shiftId` · `/shift-handover` · `/pending` · `/pending-emergencies` | Shift ops | all | ⏳ pending |
+| `/` , `/home` | Root / home surface | all | pass ✅ 2026-07-16 (web ×5 roles + iPhone + iPad) |
+| `/equipment`, `/equipment/new`, `/equipment/:id`, `/equipment/:id/edit` | Equipment list/detail/edit | all (vet/admin actions gated in-page) | pass ✅ 2026-07-16 (detail/edit against a seeded UUID) |
+| `/equipment/tasks` | Unified task model (Tasks) | all | pass ✅ 2026-07-16 (native student → /equipment custody redirect, by design) |
+| `/scan`, `/equipment/scan` | Scan / custody | all | pass ✅ 2026-07-16 (desktop self-redirects → /equipment?scan=1; shell renders /scan, alias chains → /scan) |
+| `/equipment/maintenance`, `/equipment/intelligence` | Equipment ops | all | pass ✅ 2026-07-16 (redirects confirmed) |
+| `/alerts` · `/my-equipment` · `/my-profile` | Alerts, custody, profile | all | pass ✅ 2026-07-16 |
+| `/rooms`, `/rooms/:id`, `/locations`, `/locations/:id` | Rooms / locations | all | pass ✅ 2026-07-16 |
+| `/code-blue` · `/crash-cart` · `/handoff` | Emergency + handover | all (initiate gated server-side) | pass ✅ 2026-07-16 |
+| `/critical-kit-check` · `/emergency-equipment-log` · `/emergency-equipment-history` | Emergency kit | all | pass ✅ 2026-07-16 |
+| `/inventory`, `/inventory-items`, `/inventory-items/:id` | Inventory | all | pass ✅ 2026-07-16 |
+| `/settings` · `/help` · `/whats-new` · `/app-tour` · `/stability` | App surfaces | all | pass ✅ 2026-07-16 (/app-tour + /stability now redirect → /home — drift) |
+| `/shift-chat/:shiftId` · `/shift-handover` · `/pending` · `/pending-emergencies` | Shift ops | all | degraded ⚠️ 2026-07-16 (/shift-chat/:id renders but GET /api/shift-chat/archive/:id 404s → console error, admin+senior web — finding logged; redirects pass) |
 
 ## Web-only / large-format (AuthGuard > WebOnlyGuard — web + board; native redirects)
 
 | Path | Purpose | Role gating | Live-walk |
 |---|---|---|---|
-| `/equipment/board` | Command Center board | all (kiosk) | ⏳ pending |
-| `/equipment/:id/qr` · `/print` | QR / print sheets | all | ⏳ pending |
-| `/code-blue/display` · `/emergency-equipment-wall` | Emergency wall displays | all | ⏳ pending |
-| `/dashboard` | Management dashboard | admin/management | ⏳ pending |
-| `/analytics`, `/analytics/shift-leaderboard`, `/analytics/outcome-kpi` | Analytics | admin/management | ⏳ pending |
-| `/procurement` | Procurement | admin/management | ⏳ pending |
-| `/audit-log` | Audit log | admin | ⏳ pending |
+| `/equipment/board` | **Legacy alias → `/board`** (not a distinct board surface) | all | pass ✅ 2026-07-16 (redirects to the canonical `/board` kiosk; the ¹²³ guard footnotes above record the pre-Phase-4 structure — `/board` is the sole canonical kiosk entry now) |
+| `/equipment/:id/qr` · `/print` | QR / print sheets | all | pass ✅ 2026-07-16 |
+| `/code-blue/display` · `/emergency-equipment-wall` | Emergency wall displays | all | pass ✅ 2026-07-16 |
+| `/dashboard` | Management dashboard | admin/management | pass ✅ 2026-07-16 (management.web renders; others T-31 gate by design) |
+| `/analytics`, `/analytics/shift-leaderboard`, `/analytics/outcome-kpi` | Analytics | admin/management | pass ✅ 2026-07-16 |
+| `/procurement` | Procurement | admin/management | pass ✅ 2026-07-16 |
+| `/audit-log` | Audit log | admin | pass ✅ 2026-07-16 (admin renders; senior_technician → T22 access-denied by design) |
 
 ## Admin / management (AuthGuard; nav `adminOnly` — **not** all WebOnly-fenced today, II.1)
 
 | Path | Purpose | Fenced? | Live-walk |
 |---|---|---|---|
-| `/admin` · `/admin/metrics` | Admin home / metrics | **not** WebOnlyGuard-fenced (Phase 6 restages) | ⏳ pending |
-| `/admin/shifts` · `/admin/asset-types` · `/admin/docks` | Admin config | AuthGuard | ⏳ pending |
-| `/admin/code-blue-history` · `/admin/medication-integrity` | Admin history | AuthGuard | ⏳ pending |
+| `/admin` · `/admin/metrics` | Admin home / metrics | **not** WebOnlyGuard-fenced (Phase 6 restages) | pass ✅ 2026-07-16 (admin renders; senior → T22 access-denied by design) |
+| `/admin/shifts` · `/admin/asset-types` · `/admin/docks` | Admin config | AuthGuard | pass ✅ 2026-07-16 (admin renders; senior → T22 access-denied by design) |
+| `/admin/code-blue-history` · `/admin/medication-integrity` | Admin history | AuthGuard | pass ✅ 2026-07-16 (senior renders history; medication-integrity → /admin redirect) |
 
 ## Legacy redirects & removed scope (expected: redirect, not render)
 
@@ -87,17 +89,17 @@ Per `docs/scope-change-2026.md` (migrations 142–143), patient/ER/med domains w
 
 | Path | Expected | Live-walk |
 |---|---|---|
-| `/appointments`, `/equipment-tasks` | → `/equipment/tasks` | ⏳ pending |
-| `/display`, `/equipment-board` | → `/equipment/board` | ⏳ pending |
-| `/meds` · `/pharmacy-forecast` | removed → redirect | ⏳ pending (confirm redirect) |
-| `/patients`, `/patients/:id` | removed → redirect | ⏳ pending (confirm redirect) |
-| `/billing`, `/billing/:rest*` | removed → redirect | ⏳ pending (confirm redirect) |
-| `/er`, `/er/:rest*` | removed → redirect | ⏳ pending (confirm redirect) |
+| `/appointments`, `/equipment-tasks` | → `/equipment/tasks` | pass ✅ 2026-07-16 (native student chains on → /equipment, by design) |
+| `/display`, `/equipment-board` | → `/equipment/board` | pass ✅ 2026-07-16 (→ **/board**, the canonical kiosk — target updated post-Phase-4) |
+| `/meds` · `/pharmacy-forecast` | removed → redirect | pass ✅ 2026-07-16 (redirect confirmed — nothing renders) |
+| `/patients`, `/patients/:id` | removed → redirect | pass ✅ 2026-07-16 (redirect confirmed — nothing renders) |
+| `/billing`, `/billing/:rest*` | removed → redirect | pass ✅ 2026-07-16 (redirect confirmed — nothing renders) |
+| `/er`, `/er/:rest*` | removed → redirect | pass ✅ 2026-07-16 (redirect confirmed — nothing renders) |
 
-## How to complete the live walk (the pending III.6 step)
+## How to re-run the live walk (III.6 — executed 2026-07-16; re-stamp per phase)
 
-1. **Web + board:** `pnpm dev` (dev-bypass auth, `clinicId=dev-clinic-default`), then walk each web/board/marketing row in a desktop browser (≥1024px). Use the **Phase 0 dev-role switcher** (Settings → *Developer · role override*) to cycle `admin → vet → senior_technician → technician → student` and re-walk role-gated rows. Stamp each `pass/broken/degraded/unreachable`.
-2. **iPhone + iPad:** `pnpm cap:build:native && pnpm cap:install:ios-sim`; walk the AuthGuard rows on both device classes; confirm every WebOnlyGuard row **redirects** (never renders a broken desktop layout) on native.
+1. **Web + board:** `pnpm dev:walk` (dev-bypass + `PLAYWRIGHT_E2E=true`, `clinicId=dev-clinic-default`), then `pnpm test:playwright:flow-walk`. Cycles all 5 role archetypes automatically and writes `artifacts/flow-walk/web-matrix.json` + screenshots.
+2. **iPhone + iPad:** live-reload shell — `CAPACITOR_SERVER_URL=http://localhost:5000 npx cap sync ios && npx cap run ios --target <sim-udid>` (NOT `cap:build:native`, which strips the env by design), then `cd tests/flow-walk/native && SIM_UDID=<udid> npm run walk:iphone` / `walk:ipad`. See `tests/flow-walk/native/README.md`.
 3. **Role note (II.1):** the server collapses `lead_technician`/`vet_tech` → `student`; exercise the **lead** archetype via `senior_technician` and **tech** via `technician`. `admin` is the dev-bypass default when the override is cleared.
 4. Re-stamp touched rows in every phase; Phase 10 re-verifies the full inventory across all four platforms.
 

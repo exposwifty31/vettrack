@@ -14,6 +14,8 @@
     "start:playwright-api": "cross-env PORT=3001 NODE_ENV=development PLAYWRIGHT_E2E=true tsx server/index.ts",
     "dev:web": "vite --port 5000 --host",
     "dev": "concurrently -k -p \"[{name}]\" -n \"api,web\" -c \"cyan,teal\" \"pnpm dev:api:watch\" \"pnpm dev:web\"",
+    "dev:bypass": "cross-env VITE_FORCE_DEV_BYPASS=true CLERK_ENABLED=false pnpm dev",
+    "dev:walk": "cross-env PLAYWRIGHT_E2E=true pnpm dev:bypass",
     "build": "vite build",
     "resubmit": "bash scripts/resubmit.sh --resubmit",
     "resubmit:release": "bash scripts/resubmit.sh --release",

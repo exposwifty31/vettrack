@@ -7,6 +7,7 @@ import { type AccessDeniedReason, useAuth } from "@/hooks/use-auth";
 import { markNfcSignInToastShown, wasNfcSignInToastShownRecently } from "@/lib/nfc-equipment-toggle";
 import { t } from "@/lib/i18n";
 import { usePlatformTarget } from "@/app/platform";
+import { isClerkEnabled } from "@/lib/auth-fetch";
 import { useExperience } from "@/hooks/use-experience";
 import { ManagementWebGate } from "@/app/platform/guards/ManagementWebGate";
 
@@ -16,8 +17,7 @@ import { ManagementWebGate } from "@/app/platform/guards/ManagementWebGate";
  */
 function buildDevTimeoutDiagnostics(): string[] {
   const envMode = (typeof import.meta !== "undefined" && import.meta.env?.MODE) || "unknown";
-  const pub = (typeof import.meta !== "undefined" && import.meta.env?.VITE_CLERK_PUBLISHABLE_KEY) || "";
-  const clientMode = pub ? "clerk" : "dev-bypass";
+  const clientMode = isClerkEnabled() ? "clerk" : "dev-bypass";
   return [
     `mode=${clientMode} env=${envMode}`,
     "Likely causes: API server down, wrong DATABASE_URL, pending user, or Clerk/server mode mismatch.",

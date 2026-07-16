@@ -6,13 +6,14 @@ import { RouteFallback } from "@/components/route-fallback";
 import { PageErrorBoundary } from "@/components/ui/page-error-boundary";
 import { useAuth } from "@/hooks/use-auth";
 import { isCapacitorNative } from "@/lib/capacitor-runtime";
+import { isClerkEnabled } from "@/lib/auth-fetch";
 import { WebOnlyGuard } from "@/app/platform/guards/WebOnlyGuard";
 import { CustodyGuard } from "@/app/platform/guards/CustodyGuard";
 import { ManagementGuard } from "@/desktop/management";
 import { useIsNativeTablet } from "@/native/tablet/useIsNativeTablet";
 import { hasStoredDisplayToken } from "@/lib/display-token-store";
 
-const CLERK_ENABLED = Boolean(import.meta.env.VITE_CLERK_PUBLISHABLE_KEY);
+const CLERK_ENABLED = isClerkEnabled();
 
 // --- Always-available pages ---
 const HomePage = lazy(() => import("@/pages/home"));

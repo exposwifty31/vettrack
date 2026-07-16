@@ -36,13 +36,13 @@ export type Guard =
 /**
  * Terminal state a walk row is expected to reach on a given platform.
  *
- * Note: `guard-screen` and `access-denied` are **observed-only** — `classifyActual`
- * (walk-helpers) returns them to name a wrong-surface if one appears, but the
- * expected-outcome derivations never produce them by design: the web walk runs at a
- * desktop viewport (so WebOnlyGuard renders rather than showing its <1024 screen) and
- * the T-31 console gate preempts ManagementGuard's inline denial. They exist so a
- * WebOnlyGuard/ManagementGuard route that *wrongly* renders one of those surfaces is
- * caught as a mismatch instead of silently graded "render".
+ * Note: `guard-screen` is **observed-only** — `classifyActual` (walk-helpers)
+ * returns it to name a wrong-surface if one appears, but the derivations never
+ * produce it: the web walk runs at a desktop viewport, so WebOnlyGuard renders
+ * rather than showing its <1024 screen. `access-denied` IS derived for
+ * `webAdminFloor` rows (T22: pages with a literal-admin floor render
+ * ManagementAccessDenied for management.web roles below admin, walk-verified);
+ * anywhere else it appears it is a wrong-surface mismatch.
  */
 export type OutcomeKind =
   | "render" // page renders without a crash surface
@@ -97,6 +97,24 @@ export interface FlowRow {
   roleGating: RoleGating;
   /** Redirect target for `guard: "redirect"` (and the canonical kiosk redirects). */
   redirectTo?: string;
+  /**
+   * Where the redirect chain SETTLES on the mobile shell when it differs from
+   * `redirectTo` (deep-link forwards: /equipment?scan=1 → /scan in the shell).
+   */
+  nativeRedirectTo?: string;
+  /**
+   * The page itself redirects on non-mobile shells (e.g. scan.tsx renders
+   * ScanScreen only in the mobile shell; desktop gets the equipment scan
+   * overlay). Applies to management.web roles — others hit the T-31 gate first.
+   */
+  webRedirectTo?: string;
+  /**
+   * Page enforces a literal-admin floor INSIDE the console (T22
+   * ManagementAccessDenied): management.web roles below admin see access-denied
+   * on web. (Server-side these surfaces are requireAdmin-only; contrast
+   * /admin/code-blue-history, whose floor is management.web.)
+   */
+  webAdminFloor?: boolean;
   /** iPad-native serves this via a master-detail route instead of the list path. */
   tabletMasterDetail?: boolean;
   /** True when the doc listed this as a page but routes.tsx now redirects/reshapes it. */
@@ -133,8 +151,8 @@ export const FLOW_ROWS: FlowRow[] = [
   { id: "equipment-detail", group: "core", paths: ["/equipment/eq1"], guard: "auth", platforms: ["iphone", "ipad", "web"], roleGating: "open", notes: "Device audit gotcha: non-UUID ids like 'eq1' may 404 against a real DB; walk against a seeded id." },
   { id: "equipment-edit", group: "core", paths: ["/equipment/eq1/edit"], guard: "auth", platforms: ["iphone", "ipad", "web"], roleGating: "open" },
   { id: "tasks", group: "core", paths: ["/equipment/tasks"], guard: "auth", platforms: ["iphone", "ipad", "web", "board"], roleGating: "open", notes: "Tasks.tsx inline-redirects the custody-only (student) archetype; frozen appointmentsPage.* keys." },
-  { id: "scan", group: "core", paths: ["/scan"], guard: "auth", platforms: ["iphone", "ipad", "web"], roleGating: "open" },
-  { id: "scan-alias-redirect", group: "core", paths: ["/equipment/scan"], guard: "redirect", platforms: ["iphone", "ipad", "web"], roleGating: "open", redirectTo: "/equipment?scan=1", drift: true, notes: "DRIFT: doc listed /equipment/scan as a page; now redirects to the scanner overlay query." },
+  { id: "scan", group: "core", paths: ["/scan"], guard: "auth", platforms: ["iphone", "ipad", "web"], roleGating: "open", webRedirectTo: "/equipment", notes: "scan.tsx renders ScanScreen only in the mobile shell; desktop self-redirects toward /equipment?scan=1, but web has no scanner (BUG-016) so the settled URL is pathname /equipment — the scan=1 query is inert there and matched pathname-only." },
+  { id: "scan-alias-redirect", group: "core", paths: ["/equipment/scan"], guard: "redirect", platforms: ["iphone", "ipad", "web"], roleGating: "open", redirectTo: "/equipment?scan=1", webRedirectTo: "/equipment", nativeRedirectTo: "/scan", drift: true, notes: "DRIFT: doc listed /equipment/scan as a page; now <Redirect> to /equipment?scan=1. WEB settles at pathname /equipment (scan=1 is inert — no web scanner, BUG-016 — and non-deterministic in the settled URL: the desktop list cleans it, the T-31 gate leaves it), so web matches pathname-only. The mobile shell forwards ?scan=1 on to /scan (the scanner is its own surface there — equipment-list.tsx / EquipmentMasterDetail)." },
   { id: "equipment-ops-redirect", group: "core", paths: ["/equipment/maintenance", "/equipment/intelligence"], guard: "redirect", platforms: ["iphone", "ipad", "web"], roleGating: "open", redirectTo: "/equipment", drift: true, notes: "DRIFT: doc §Core 'Equipment ops' pages are now query-param redirects (/equipment?status=maintenance and /equipment)." },
   { id: "alerts", group: "core", paths: ["/alerts"], guard: "custody", platforms: ["iphone", "ipad", "web"], roleGating: "custody" },
   { id: "my-equipment", group: "core", paths: ["/my-equipment"], guard: "auth", platforms: ["iphone", "ipad", "web"], roleGating: "open" },
@@ -160,11 +178,11 @@ export const FLOW_ROWS: FlowRow[] = [
   { id: "management-dashboard", group: "web-only", paths: ["/dashboard"], guard: "management", platforms: ["web", "board"], roleGating: "management" },
   { id: "analytics", group: "web-only", paths: ["/analytics", "/analytics/shift-leaderboard"], guard: "management", platforms: ["web", "board"], roleGating: "management", notes: "/analytics/shift-leaderboard is WebOnlyGuard w/o ManagementGuard; /analytics/outcome-kpi redirects to /analytics." },
   { id: "procurement", group: "web-only", paths: ["/procurement"], guard: "management", platforms: ["web", "board"], roleGating: "management" },
-  { id: "audit-log", group: "web-only", paths: ["/audit-log"], guard: "web-only", platforms: ["web", "board"], roleGating: "open", notes: "Legacy audit surface (WebOnlyGuard, no ManagementGuard). Distinct from the new /admin/audit-log console." },
+  { id: "audit-log", group: "web-only", paths: ["/audit-log"], guard: "web-only", platforms: ["web", "board"], roleGating: "open", webAdminFloor: true, notes: "Legacy audit surface (WebOnlyGuard, no ManagementGuard) with an in-page literal-admin floor (T22). Distinct from the new /admin/audit-log console." },
 
   // ── Admin / management (AuthGuard; not WebOnly-fenced, II.1) — FLOW_INVENTORY §Admin ──
-  { id: "admin-home", group: "admin", paths: ["/admin", "/admin/metrics"], guard: "auth", platforms: ["iphone", "ipad", "web", "board"], roleGating: "open", notes: "II.1: /admin + /admin/metrics are AuthGuard-only (NOT WebOnly-fenced). Server enforces admin actions." },
-  { id: "admin-config", group: "admin", paths: ["/admin/shifts", "/admin/asset-types", "/admin/docks"], guard: "auth", platforms: ["iphone", "ipad", "web"], roleGating: "open" },
+  { id: "admin-home", group: "admin", paths: ["/admin", "/admin/metrics"], guard: "auth", platforms: ["iphone", "ipad", "web", "board"], roleGating: "open", webAdminFloor: true, notes: "II.1: /admin + /admin/metrics are AuthGuard-only (NOT WebOnly-fenced). Server enforces admin actions; the pages render the T22 denial below literal admin." },
+  { id: "admin-config", group: "admin", paths: ["/admin/shifts", "/admin/asset-types", "/admin/docks"], guard: "auth", platforms: ["iphone", "ipad", "web"], roleGating: "open", webAdminFloor: true },
   { id: "admin-history", group: "admin", paths: ["/admin/code-blue-history"], guard: "auth", platforms: ["iphone", "ipad", "web"], roleGating: "open", notes: "/admin/medication-integrity now redirects to /admin (see legacy-med-integrity-redirect)." },
 
   // ── Post-inventory: Phase-6 web management console (routes.tsx, absent from the 2026-07-06 doc) ──
@@ -211,7 +229,25 @@ export function rowsForPlatform(platform: Platform): FlowRow[] {
  */
 export function pathMatchesTarget(actualPath: string, target?: string): boolean {
   if (!target) return true;
-  return actualPath === target || actualPath.split("?")[0] === target.split("?")[0];
+  const [actualPathname, actualQuery = ""] = splitPathQuery(actualPath);
+  const [targetPathname, targetQuery = ""] = splitPathQuery(target);
+  if (actualPathname !== targetPathname) return false;
+  // Every query param the TARGET declares must be present with the same value in
+  // the actual URL (extra params are allowed — a redirect may append its own).
+  // Pathname-only matching let /equipment pass for a /equipment?scan=1 target,
+  // so a scan redirect that never opened the scanner overlay false-passed.
+  if (!targetQuery) return true;
+  const actualParams = new URLSearchParams(actualQuery);
+  for (const [key, value] of new URLSearchParams(targetQuery)) {
+    if (actualParams.get(key) !== value) return false;
+  }
+  return true;
+}
+
+/** Split "/path?a=1" → ["/path", "a=1"]; no query → ["/path", ""]. */
+function splitPathQuery(path: string): [string, string] {
+  const q = path.indexOf("?");
+  return q === -1 ? [path, ""] : [path.slice(0, q), path.slice(q + 1)];
 }
 
 /** Deduped union of web + board + marketing rows (what the browser walk can reach). */
@@ -270,8 +306,20 @@ function roleIsCustodyOnly(role: RoleArchetype): boolean {
  * `expectedNativeOutcome`.
  */
 export function expectedWebOutcome(row: FlowRow, role: RoleArchetype): ExpectedOutcome {
-  if (row.guard === "redirect") return { kind: "redirect", to: row.redirectTo, confidence: "firm" };
-  if (row.guard === "marketing") return { kind: "render", confidence: "firm" };
+  // webRedirectTo is the web-settled target when it differs from redirectTo — a
+  // deep-link query consumed/cleaned on web (e.g. /equipment/scan settles at
+  // pathname /equipment, scan=1 inert per BUG-016). Falls back to redirectTo.
+  if (row.guard === "redirect") return { kind: "redirect", to: row.webRedirectTo ?? row.redirectTo, confidence: "firm" };
+  if (row.guard === "marketing") {
+    // The walk is permanently authenticated (dev-bypass has no signed-out state),
+    // and a signed-in visit to /signin or /signup bounces to /home (the pages'
+    // redirect effects; signup goes via "/", which resolves to /home under auth).
+    // Legal pages (/privacy, /terms, /support) have no bounce and render for all.
+    if (row.id === "signin" || row.id === "signup") {
+      return { kind: "redirect", to: "/home", confidence: "firm" };
+    }
+    return { kind: "render", confidence: "firm" };
+  }
   if (row.guard === "kiosk") return { kind: "kiosk", confidence: "firm" };
 
   // Every remaining guard (auth/custody/web-only/management) is a `desktop`-target
@@ -280,8 +328,18 @@ export function expectedWebOutcome(row: FlowRow, role: RoleArchetype): ExpectedO
     return { kind: "management-web-gate", confidence: "firm" };
   }
 
-  // management.web roles (admin, senior_technician/lead) clear the console gate,
-  // WebOnlyGuard (desktop), and ManagementGuard — so the page renders.
+  // management.web roles reach the page itself — which may self-redirect on
+  // non-mobile shells (scan.tsx) …
+  if (row.webRedirectTo) {
+    return { kind: "redirect", to: row.webRedirectTo, confidence: "firm" };
+  }
+  // … or enforce a literal-admin floor inside the console (T22).
+  if (row.webAdminFloor && role !== "admin") {
+    return { kind: "access-denied", confidence: "firm" };
+  }
+
+  // Otherwise the role clears the console gate, WebOnlyGuard (desktop), and
+  // ManagementGuard — the page renders.
   return { kind: "render", confidence: "firm" };
 }
 
@@ -291,7 +349,23 @@ export function expectedWebOutcome(row: FlowRow, role: RoleArchetype): ExpectedO
  * still redirect; everything else renders in the mobile/tablet shell.
  */
 export function expectedNativeOutcome(row: FlowRow, role: RoleArchetype): ExpectedOutcome {
-  if (row.guard === "redirect") return { kind: "redirect", to: row.redirectTo, confidence: "firm" };
+  // Tasks.tsx inline-redirects the custody-only archetype to /equipment (see the
+  // "tasks" row note) — so both the surface itself AND any redirect landing on
+  // /equipment/tasks (/appointments, /meds, …) chain through for students.
+  // Web never sees this: the T-31 console gate preempts the page there.
+  if (
+    roleIsCustodyOnly(role) &&
+    (row.id === "tasks" || row.redirectTo === "/equipment/tasks")
+  ) {
+    return { kind: "redirect", to: "/equipment", confidence: "firm" };
+  }
+  if (row.guard === "redirect") {
+    // Native uses nativeRedirectTo when the mobile shell forwards elsewhere
+    // (e.g. /equipment/scan → /scan); otherwise the declared redirectTo. Note:
+    // webRedirectTo is deliberately NOT consulted here — it is the web-settled
+    // target, and native has its own shell behavior.
+    return { kind: "redirect", to: row.nativeRedirectTo ?? row.redirectTo, confidence: "firm" };
+  }
   if (row.guard === "web-only" || row.guard === "management") {
     return { kind: "guard-redirect", to: "/home", confidence: "firm" };
   }
