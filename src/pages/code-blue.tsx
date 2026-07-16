@@ -18,6 +18,7 @@ import { haptics } from "@/lib/haptics";
 import { playCriticalAlertTone } from "@/lib/sounds";
 import { HoldToStart } from "@/features/code-blue/HoldToStart";
 import { LiveLogAnnouncer } from "@/features/code-blue/LiveLogAnnouncer";
+import { DrugDoseReference } from "@/features/code-blue/DrugDoseReference";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -530,6 +531,11 @@ function ActiveSession() {
         {/* R-CBF-1.3: a burst of log entries mid-emergency is announced to
             screen readers as ONE batched polite message, never one-per-entry. */}
         <LiveLogAnnouncer entries={logEntries.map((e) => ({ id: e.id, label: e.label }))} />
+
+        {/* R-CBF-1.4: inline static, versioned, clinician-approved dose reference. */}
+        <div className="mt-4">
+          <DrugDoseReference />
+        </div>
       </div>
 
       <div className="p-4">
