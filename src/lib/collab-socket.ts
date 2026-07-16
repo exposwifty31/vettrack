@@ -10,10 +10,61 @@
  * Identity is server-attached from the DB session; this client sends only the
  * bearer token (and, in dev-bypass, the role override) in `auth`. It never claims
  * a userId — the server ignores client-claimed identity.
+ *
+ * Lifecycle (card H1): the single socket is a SHARED singleton reference-counted
+ * across consumers. `getCollabSocket` acquires (one ref); `releaseCollabSocket`
+ * releases and disconnects ONLY when the last holder lets go — a single consumer
+ * unmount must never disconnect the socket out from under other mounted surfaces.
+ * `closeCollabSocket` is the hard sign-out teardown (drops all refs at once).
  */
 import { io, type Socket } from "socket.io-client";
+import { getConfiguredApiOrigin, needsRemoteApiOrigin } from "@/lib/api-origin";
 
 const COLLAB_PATH = "/collab-ws";
+const JOIN_ACK_TIMEOUT_MS = 5_000;
+
+/**
+ * A join request as the client asks for it — SHARED shape with the server's
+ * `JoinRequest` (`server/lib/realtime-collab/rooms.ts`). The server derives the
+ * clinicId from the authenticated session; the client never supplies one.
+ */
+export type CollabJoinRequest =
+  | { kind: "chat" }
+  | { kind: "board" }
+  | { kind: "record"; recordType: string; recordId: string };
+
+/** The server's join ack (mirrors the `authorizeRoomJoin` decision + presence). */
+export interface CollabJoinAck {
+  ok: boolean;
+  room?: string;
+  members?: { userId: string; displayName: string }[];
+  reason?: string;
+}
+
+/** Server → client events (mirrors `server/lib/realtime-collab/server.ts` emits). */
+export interface ServerToClientEvents {
+  presence: (payload: { room: string; members: { userId: string; displayName: string }[] }) => void;
+  "peer-typing": (payload: { userId: string; on: boolean }) => void;
+  "chat-nudge": (payload: { messageId: string }) => void;
+  "peer-cursor": (payload: { userId: string; x: number; y: number }) => void;
+  "peer-selection": (payload: { userId: string; entityId: string }) => void;
+  "peer-record": (payload: { userId: string; mode: "editing" | "viewing" }) => void;
+}
+
+/** Client → server events (mirrors the server's `socket.on(...)` handlers). */
+export interface ClientToServerEvents {
+  join: (req: CollabJoinRequest, ack: (res: CollabJoinAck) => void) => void;
+  leave: (payload: { room: string }) => void;
+  typing: (payload: { on: boolean }) => void;
+  "presence-heartbeat": () => void;
+  "chat-nudge": (payload: { messageId: string }) => void;
+  "board-cursor": (payload: { x: number; y: number }) => void;
+  "board-selection": (payload: { entityId: string }) => void;
+  "record-presence": (payload: { editing: boolean }) => void;
+}
+
+/** The typed collaboration socket callers hold. */
+export type CollabSocket = Socket<ServerToClientEvents, ClientToServerEvents>;
 
 export interface CollabAuth {
   /** Clerk session token (bearer). In dev-bypass any non-empty placeholder works. */
@@ -22,24 +73,65 @@ export interface CollabAuth {
   dev?: { role?: string; userId?: string; clinicId?: string };
 }
 
-let socket: Socket | null = null;
+/**
+ * Auth source — either a static value or a getter re-read on every (re)connect.
+ * Prefer the getter form so a refreshed session token is used on reconnect rather
+ * than replaying the original (possibly expired) token forever. — card H6.
+ */
+export type CollabAuthSource = CollabAuth | (() => CollabAuth | null);
+
+function resolveAuth(source: CollabAuthSource): CollabAuth | null {
+  const auth = typeof source === "function" ? source() : source;
+  if (!auth || !auth.token) return null;
+  return auth;
+}
 
 /**
- * Get (lazily creating) the single collaboration socket. Returns null if no auth
- * token is available — callers must treat null as "degrade, show no peer signals".
+ * Resolve the origin the collab socket connects to. `window.location.origin` is
+ * dead in the Capacitor bundled shell (`capacitor://localhost`), so reuse the
+ * same remote-origin resolution the REST client uses. — card H4.
  */
-export function getCollabSocket(auth: CollabAuth | null, origin: string = window.location.origin): Socket | null {
-  if (!auth || !auth.token) return null;
-  if (socket) return socket;
-  socket = io(origin, {
+function resolveCollabOrigin(): string {
+  if (needsRemoteApiOrigin()) {
+    const configured = getConfiguredApiOrigin();
+    if (configured) return configured;
+  }
+  return typeof window !== "undefined" ? window.location.origin : "";
+}
+
+let socket: CollabSocket | null = null;
+let refCount = 0;
+
+/**
+ * Acquire the shared collaboration socket (lazily creating it). Increments the
+ * ref count; the caller MUST pair each successful acquire with a
+ * `releaseCollabSocket()`. Returns null when no auth token is available — callers
+ * must treat null as "degrade, show no peer signals" (and must NOT release).
+ */
+export function getCollabSocket(auth: CollabAuthSource | null, origin?: string): CollabSocket | null {
+  if (auth === null) return null;
+  if (!resolveAuth(auth)) return null;
+
+  if (socket) {
+    refCount += 1;
+    return socket;
+  }
+
+  socket = io(origin ?? resolveCollabOrigin(), {
     path: COLLAB_PATH,
     transports: ["websocket"],
-    auth: { token: auth.token, dev: auth.dev },
+    // Auth is a CALLBACK so each (re)connect reads a FRESH token instead of
+    // replaying the original one forever under reconnectionAttempts: Infinity. — H6.
+    auth: (cb: (data: Record<string, unknown>) => void) => {
+      const resolved = resolveAuth(auth);
+      cb({ token: resolved?.token ?? "", dev: resolved?.dev });
+    },
     reconnection: true,
     reconnectionAttempts: Infinity,
     reconnectionDelay: 1_000,
     autoConnect: true,
-  });
+  }) as CollabSocket;
+  refCount = 1;
   return socket;
 }
 
@@ -48,11 +140,16 @@ export function isCollabConnected(): boolean {
   return socket?.connected === true;
 }
 
-/** Join a collaboration room; resolves with the ack (or null on no-socket/timeout). */
-export function joinCollabRoom(
-  s: Socket,
-  req: { kind: "chat" } | { kind: "board" } | { kind: "record"; recordType: string; recordId: string },
-): Promise<{ ok: boolean; room?: string; members?: { userId: string; displayName: string }[]; reason?: string } | null> {
+function isJoinAck(value: unknown): value is CollabJoinAck {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    typeof (value as { ok?: unknown }).ok === "boolean"
+  );
+}
+
+/** Join a collaboration room; resolves with the ack (or null on timeout/bad ack). */
+export function joinCollabRoom(s: CollabSocket, req: CollabJoinRequest): Promise<CollabJoinAck | null> {
   return new Promise((resolve) => {
     let settled = false;
     const timer = setTimeout(() => {
@@ -60,21 +157,50 @@ export function joinCollabRoom(
         settled = true;
         resolve(null); // degrade silently — no peer presence shown
       }
-    }, 5_000);
+    }, JOIN_ACK_TIMEOUT_MS);
     s.emit("join", req, (ack: unknown) => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
-      resolve(ack as never);
+      resolve(isJoinAck(ack) ? ack : null);
     });
   });
 }
 
-/** Tear down the collaboration socket (surface unmount / sign-out). */
+/**
+ * Leave a single collaboration room WITHOUT tearing down the shared socket — a
+ * consumer that navigates away from one surface (e.g. a record detail) leaves its
+ * room but other mounted surfaces keep the connection. — card H1.
+ */
+export function leaveCollabRoom(s: CollabSocket, room: string): void {
+  s.emit("leave", { room });
+}
+
+/**
+ * Release one acquire. Disconnects and clears the singleton ONLY when the last
+ * holder releases (ref count reaches zero). A single consumer unmount must never
+ * disconnect the socket out from under other mounted consumers. — card H1.
+ */
+export function releaseCollabSocket(): void {
+  if (!socket) return;
+  refCount -= 1;
+  if (refCount <= 0) {
+    socket.removeAllListeners();
+    socket.disconnect();
+    socket = null;
+    refCount = 0;
+  }
+}
+
+/**
+ * Hard teardown — drops ALL refs and disconnects immediately. Use for sign-out,
+ * NOT for per-surface unmount (that is `releaseCollabSocket`). — card H1.
+ */
 export function closeCollabSocket(): void {
   if (socket) {
     socket.removeAllListeners();
     socket.disconnect();
     socket = null;
   }
+  refCount = 0;
 }
