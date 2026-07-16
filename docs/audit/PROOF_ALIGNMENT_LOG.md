@@ -3344,3 +3344,17 @@ Reviewer returned 1 HIGH + 1 MEDIUM + 2 LOW on the committed sub-card; all four 
 - Command: `pnpm test` (full) → `Test Files 596 passed (596)`, `Tests 5387 passed | 11 skipped`, 0 failed.
 
 **Verdict:** VERIFIED
+
+## 2026-07-16 — R-CBF-1.5: e2e drill + doctrine verification acceptance bar (committed 65da50a09 / 07b8acd98)
+
+**Claim:** Landed the R-CBF-1.5 acceptance bar for one-tap Code Blue. No new runtime was required — the composed endpoint, durable claim/paging lifecycle, soft-reserve, classifier registration, and typed api wrapper were all built in R-CBF-1.1–1.4. R-CBF-1.5 is the acceptance/verification card: (a) the offline-block doctrine test for `POST /api/code-blue/one-tap`, and (b) the live arm→hold e2e Playwright drill. Durable paging-state acceptance (`queued|processing|sent|failed`, replay reports CURRENT state, exhausted-retry `failed` without deleting the session) is already asserted in `tests/code-blue-one-tap-orchestration.test.ts`; server-confirmed end is unchanged.
+
+**Evidence:**
+- `tests/code-blue-one-tap-offline-block.test.ts` (1.5a, committed 65da50a09) — proves the composed one-tap mutation is classified as an emergency `start`, fails loud via `OfflineEmergencyMutationBlockedError`, is NEVER enqueued to `pendingSync`, records only to the tab-local FIFO buffer, and emits the bounded `offlineEmergencyMutationBlocked: "start"` telemetry only when the server is reachable (never posted while truly offline). `pnpm test -- tests/code-blue-one-tap-offline-block.test.ts` → `Test Files 1 passed (1)`, `Tests 4 passed`.
+- `tests/phase-9-drills.spec.ts` drill 9 (1.5b, committed 07b8acd98) — one arm→hold via `POST /api/code-blue/one-tap` asserts: created session; advisory `reservedCartId` (null legal per R-CBF-1.2); team page ENQUEUED with pagingState ∈ {`queued`,`processing`} and explicitly NEVER `sent` synchronously; board propagation via the server-authoritative `GET /api/code-blue/sessions/active` snapshot; duplicate-token retry replays the same session with the CURRENT durable pagingState and no second reservation. Skip-guarded (dev-bypass metrics + eligible manager + fresh-create precondition) exactly like the 8 existing metrics drills; CI starts the server externally.
+- Discovery/parse: `npx playwright test --config=playwright.config.ts --list` → `phase-9-drills.spec.ts:542 › drill 9 (R-CBF-1.5) …` present in chromium/firefox/webkit; `Total: 150 tests in 13 files`. Drill is in the `ci` + `phase9` suites (`playwright.shared.ts:43,50`). No local server was up (`curl 127.0.0.1:3001/api/health` → no-server), so the drill executes in CI, matching the established drill pattern.
+- Durable paging-state acceptance already locked: `tests/code-blue-one-tap-orchestration.test.ts` — replay reflects a `sent` page only from a correlated `NOTIFICATION_SENT` row; a fanned-out page with no terminal outcome replays as `processing`, never `sent`; exhausted-retry `failed` reported WITHOUT deleting the session. `pnpm test -- tests/code-blue-one-tap-offline-block.test.ts tests/code-blue-one-tap-orchestration.test.ts` → `Tests 23 passed | 5 skipped`.
+- Command: `pnpm typecheck` (frontend `tsc --noEmit` + server `tsconfig.server.json`) → exit 0, no errors.
+- Command: `pnpm test` (full) → `Test Files 597 passed (597)`, `Tests 5391 passed | 11 skipped`, 0 failed.
+
+**Verdict:** VERIFIED
