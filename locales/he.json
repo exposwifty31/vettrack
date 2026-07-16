@@ -2798,6 +2798,30 @@
       "cancel": "ביטול",
       "newLogEntries": "{count} רשומות יומן חדשות"
     },
+    "drugReference": {
+      "title": "מדריך מינונים לחירום",
+      "subtitle": "לעיון בלבד — יש לאמת תמיד מול המטופל",
+      "show": "הצג מדריך מינונים",
+      "hide": "הסתר מדריך מינונים",
+      "disclaimer": "מדריך סטטי מאושר קלינית. אינו מרשם — יש לאמת כל מינון מול משקל ומצב המטופל הנוכחי.",
+      "provenanceHeading": "מקור ואישור",
+      "sourceLabel": "מקור",
+      "versionLabel": "גרסה",
+      "effectiveLabel": "בתוקף מ־",
+      "reviewOwnerLabel": "אחראי עדכון",
+      "indicationLabel": "התוויה",
+      "doseLabel": "מינון",
+      "routeLabel": "דרך מתן",
+      "speciesLabel": "מין",
+      "weightBandLabel": "טווח משקל",
+      "concentrationLabel": "ריכוז",
+      "doseUnitLabel": "יחידה",
+      "kg": "ק\"ג",
+      "species": {
+        "canine": "כלב",
+        "feline": "חתול"
+      }
+    },
     "reconciliation": {
       "title": "גישור קוד כחול",
       "documentTitle": "גישור קוד כחול — VetTrack",

@@ -2801,6 +2801,30 @@ export interface TStructure {
       cancel: string;
       newLogEntries: string;
     };
+    drugReference: {
+      title: string;
+      subtitle: string;
+      show: string;
+      hide: string;
+      disclaimer: string;
+      provenanceHeading: string;
+      sourceLabel: string;
+      versionLabel: string;
+      effectiveLabel: string;
+      reviewOwnerLabel: string;
+      indicationLabel: string;
+      doseLabel: string;
+      routeLabel: string;
+      speciesLabel: string;
+      weightBandLabel: string;
+      concentrationLabel: string;
+      doseUnitLabel: string;
+      kg: string;
+      species: {
+        canine: string;
+        feline: string;
+      };
+    };
     reconciliation: {
       title: string;
       documentTitle: string;

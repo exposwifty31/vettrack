@@ -2798,6 +2798,30 @@
       "cancel": "Cancel",
       "newLogEntries": "{count} new log entries"
     },
+    "drugReference": {
+      "title": "Emergency dose reference",
+      "subtitle": "Reference only — always confirm against the patient",
+      "show": "Show dose reference",
+      "hide": "Hide dose reference",
+      "disclaimer": "Static clinician-approved reference. Not a prescription — verify every dose against the patient's current weight and status.",
+      "provenanceHeading": "Provenance",
+      "sourceLabel": "Source",
+      "versionLabel": "Version",
+      "effectiveLabel": "Effective",
+      "reviewOwnerLabel": "Review owner",
+      "indicationLabel": "Indication",
+      "doseLabel": "Dose",
+      "routeLabel": "Route",
+      "speciesLabel": "Species",
+      "weightBandLabel": "Weight band",
+      "concentrationLabel": "Concentration",
+      "doseUnitLabel": "Unit",
+      "kg": "kg",
+      "species": {
+        "canine": "Canine",
+        "feline": "Feline"
+      }
+    },
     "reconciliation": {
       "title": "Code Blue Reconciliation",
       "documentTitle": "Code Blue Reconciliation — VetTrack",
