@@ -16,6 +16,7 @@ import { useNativeShellContext } from "@/native/NativeShellContext";
 import { toast } from "sonner";
 import { haptics } from "@/lib/haptics";
 import { playCriticalAlertTone } from "@/lib/sounds";
+import { HoldToStart } from "@/features/code-blue/HoldToStart";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -81,7 +82,7 @@ export function PreCheckGate({
   starting,
   initialEquipmentName,
 }: {
-  onStart: (passed: boolean, manager: { id: string; name: string }) => void;
+  onStart: (passed: boolean, manager: { id: string; name: string }, token: string) => void;
   starting: boolean;
   initialEquipmentName?: string;
 }) {
@@ -121,9 +122,9 @@ export function PreCheckGate({
 
   const toggle = (key: string) => setChecked((p) => ({ ...p, [key]: !p[key] }));
 
-  const handleStart = (passed: boolean) => {
+  const commit = (token: string) => {
     if (!manager || starting) return;
-    onStart(passed, manager);
+    onStart(allChecked, manager, token);
   };
 
   return (
@@ -203,29 +204,26 @@ export function PreCheckGate({
         </div>
       </div>
 
-      <Button
-        className="w-full bg-emergency-accent hover:bg-emergency-accent/90 text-white font-bold disabled:bg-emergency-accent/35 disabled:text-white/70"
+      {/* Arm→hold-to-confirm (R-CBF-1.3): tap = arm (this screen), commit = an
+          exactly-800ms press-and-hold. The completed hold generates the
+          per-gesture idempotency token and fires the R-CBF-1.1 one-tap
+          orchestration. Cancel never traps — it leaves the setup. */}
+      <HoldToStart
+        testId="code-blue-start"
         disabled={!canStart}
-        onClick={() => handleStart(allChecked)}
-        data-testid="code-blue-start"
-      >
-        {starting && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}
-        {starting ? t.codeBlue.startingSession : t.codeBlue.openButton}
-      </Button>
-      {!manager && !starting && (
-        <p className="mt-2 text-xs text-emergency-text2 text-center" role="status">
-          {t.codeBlue.startDisabledReason}
+        busy={starting}
+        onCommit={commit}
+        onCancel={() => navigate("/home")}
+      />
+      {starting && (
+        <p className="mt-3 text-xs text-emergency-text2 text-center" role="status">
+          {t.codeBlue.startingSession}
         </p>
       )}
-      {!allChecked && (
-        <button
-          type="button"
-          disabled={!canStart}
-          className="w-full mt-2 min-h-[44px] rounded-lg border border-emergency-border/50 text-xs text-emergency-text2/80 hover:text-emergency-text2 hover:bg-emergency-border/30 transition-colors disabled:opacity-50 disabled:pointer-events-none"
-          onClick={() => handleStart(false)}
-        >
-          {t.codeBlue.proceedWithoutFullCheck}
-        </button>
+      {!manager && !starting && (
+        <p className="mt-3 text-xs text-emergency-text2 text-center" role="status">
+          {t.codeBlue.startDisabledReason}
+        </p>
       )}
       </div>
     </div>
@@ -574,16 +572,35 @@ export default function CodeBluePage() {
     enabled: !!userId && !!initEquipmentId,
   });
 
-  const handleStart = async (preCheckPassed: boolean, manager: { id: string; name: string }) => {
+  const handleStart = async (
+    preCheckPassed: boolean,
+    manager: { id: string; name: string },
+    token: string,
+  ) => {
     setStarting(true);
     try {
-      await api.codeBlue.sessions.start({
-        idempotencyKey: crypto.randomUUID(),
-        managerUserId: manager.id,
-        managerUserName: manager.name,
-        preCheckPassed,
-        ...(initEquipmentId ? { equipmentId: initEquipmentId } : {}),
-      });
+      if (initEquipmentId) {
+        // Equipment-initiated start keeps the explicit asset linkage — the
+        // one-tap nearest-cart orchestration does not take a pre-selected
+        // equipment id, so this path stays on the classic start endpoint.
+        await api.codeBlue.sessions.start({
+          idempotencyKey: token,
+          managerUserId: manager.id,
+          managerUserName: manager.name,
+          preCheckPassed,
+          equipmentId: initEquipmentId,
+        });
+      } else {
+        // R-CBF-1.3 → R-CBF-1.1: the pocket-emergency armed screen fires the
+        // one-tap orchestration (claim → nearest ready cart → CAS reserve →
+        // session → outbox team page), keyed by the per-gesture hold token.
+        await api.codeBlue.sessions.oneTap({
+          idempotencyToken: token,
+          managerUserId: manager.id,
+          managerUserName: manager.name,
+          preCheckPassed,
+        });
+      }
       haptics.error();
       void playCriticalAlertTone();
       // Server-confirmed transition: pull the active session now instead of

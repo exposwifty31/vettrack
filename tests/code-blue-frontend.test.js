@@ -103,9 +103,12 @@ describe("Code Blue page — equipment picker", () => {
 // Code Blue page — quick log idempotency
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe("Code Blue page — quick log idempotency", () => {
-  it.skipIf(page === null)("each log action generates a fresh UUID as idempotency key", () => {
-    expect(page).toContain("randomUUID");
+describe("Code Blue page — emergency mutation idempotency", () => {
+  it.skipIf(page === null)("keys the emergency start with a fresh per-gesture idempotency token", () => {
+    // R-CBF-1.3: the hold control generates one idempotency token per gesture
+    // (crypto.randomUUID under the hood, in src/features/code-blue/hold-token.ts);
+    // the page threads it into both start paths as the idempotency key.
+    expect(page).toContain("idempotencyToken");
     expect(page).toContain("idempotencyKey");
   });
 });

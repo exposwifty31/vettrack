@@ -54,6 +54,8 @@ export interface HoldToStartProps {
   disabled?: boolean;
   /** Focus returns here on cancel/close (accidental entry must never trap). */
   triggerRef?: React.RefObject<HTMLElement | null>;
+  /** Optional test id applied to the hold button (launch-form probe). */
+  testId?: string;
 }
 
 export function HoldToStart({
@@ -62,6 +64,7 @@ export function HoldToStart({
   busy = false,
   disabled = false,
   triggerRef,
+  testId,
 }: HoldToStartProps) {
   const holdRef = useRef<HTMLButtonElement>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -146,6 +149,7 @@ export function HoldToStart({
         ref={holdRef}
         type="button"
         disabled={inert}
+        data-testid={testId}
         aria-label={t.codeBlue.hold.action}
         aria-describedby={hintId}
         onPointerDown={startHold}

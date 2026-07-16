@@ -3301,3 +3301,18 @@ Reviewer returned 1 HIGH + 1 MEDIUM + 2 LOW on the committed sub-card; all four 
 - Command: `pnpm i18n:check` → "locales/en.json and locales/he.json are in deep key parity."
 
 **Verdict:** VERIFIED
+
+## 2026-07-16 — R-CBF-1.3b: wire arm→hold into the armed screen → fire R-CBF-1.1 one-tap (uncommitted)
+
+**Claim:** The Code Blue armed screen (`PreCheckGate` in `src/pages/code-blue.tsx`) now commits via the `HoldToStart` arm→hold control instead of a plain button. A completed hold generates the per-gesture idempotency token and, for the pocket-emergency path (no pre-selected equipment), fires `api.codeBlue.sessions.oneTap` (R-CBF-1.1). The equipment-initiated path (`?equipmentId=`) keeps `api.codeBlue.sessions.start` with the explicit asset linkage, keyed by the same token. The C1 commit-gate contract and the T3 fail-loud error contract are preserved against the new affordance.
+
+**Evidence:**
+- `src/pages/code-blue.tsx:597` — `await api.codeBlue.sessions.oneTap({ idempotencyToken: token, managerUserId, managerUserName, preCheckPassed })` in the no-equipment branch; `src/pages/code-blue.tsx:586` — equipment branch keeps `sessions.start({ idempotencyKey: token, …, equipmentId })`. Success still does `haptics.error()` + `playCriticalAlertTone()` + `await refetch()` (server-confirmed); the ApiError mapping is unchanged.
+- `src/pages/code-blue.tsx` PreCheckGate — the start `<Button>` + "proceed without full check" secondary button were replaced by `<HoldToStart testId="code-blue-start" disabled={!canStart} busy={starting} onCommit={commit} onCancel={() => navigate("/home")} />`; `commit(token)` calls `onStart(allChecked, manager, token)`.
+- `packages/contracts/src/emergency.ts:21` — `/api/code-blue/one-tap` is class `start` in the emergency manifest, so `classifyEmergencyEndpoint` blocks it offline (guardrail preserved; no client change needed).
+- Test (new): `pnpm test -- tests/code-blue-one-tap-arm-commit.test.tsx` → 3 passed (completed hold fires oneTap once with the token + manager; single tap fires nothing; refetch follows success). RED confirmed first (getByRole hold.action unresolved pre-wiring).
+- Tests (updated to the hold affordance, intent preserved): `code-blue-precheck-gate.test.tsx` (C1), `code-blue-start-error-toast.test.tsx` (T3 fail-loud → oneTap), and two stale source-string guards (`stage-4-code-blue-token-consistency.test.js`, `code-blue-frontend.test.js`) rewritten from the removed inline `crypto.randomUUID()` literal to the per-gesture token wiring.
+- Command: `pnpm typecheck` (frontend + server) → exit 0, no errors.
+- Command: `pnpm test` (full) → `Test Files 595 passed (595)`, `Tests 5321 passed | 11 skipped`, 0 failed.
+
+**Verdict:** VERIFIED
