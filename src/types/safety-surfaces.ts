@@ -122,6 +122,38 @@ export interface EndCodeBlueRequest {
   outcome: "rosc" | "died" | "transferred" | "ongoing";
 }
 
+/** Bounded durable delivery state of the one-tap team-page outbox row (R-CBF-1.1). */
+export type OneTapPagingState = "queued" | "processing" | "sent" | "failed";
+
+/**
+ * R-CBF-1.1 — one-tap Code Blue orchestration request. The client generates one
+ * idempotency token per hold gesture (R-CBF-1.3) and persists it across retries;
+ * `locationHint` is an optimistic hint only — the server re-derives the
+ * initiating location authoritatively and never trusts the client value to steer
+ * cart selection.
+ */
+export interface OneTapCodeBlueRequest {
+  idempotencyToken: string;
+  managerUserId: string;
+  managerUserName: string;
+  preCheckPassed?: boolean;
+  /** Optimistic client location hint — re-validated server-side, never trusted to steer. */
+  locationHint?: { roomId: string | null };
+}
+
+/** R-CBF-1.1 — one-tap Code Blue orchestration response. */
+export interface OneTapCodeBlueResponse {
+  /** How the request resolved: a fresh start, an idempotent replay, or a retryable conflict. */
+  outcome: "created" | "replay" | "conflict";
+  sessionId?: string;
+  /** The advisory soft-reserved nearest-ready cart, or null when none was available. */
+  reservedCartId?: string | null;
+  /** CURRENT durable paging state of the team page (never a static "success"). */
+  pagingState?: OneTapPagingState | null;
+  /** Present on `conflict` — a retryable reason code. */
+  reason?: "active_lease" | "fence_superseded" | "active_session_exists";
+}
+
 export interface CodeBlueDispense {
   id: string;
   sessionId: string;
