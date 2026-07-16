@@ -3,6 +3,7 @@ import { Sheet, SheetContent, SheetTitle, SheetDescription } from "@/components/
 import { EmptyState } from "@/components/ui/empty-state";
 import { cn } from "@/lib/utils";
 import type { useShiftChat } from "../hooks/useShiftChat";
+import type { ShiftChatCollabState } from "../hooks/useShiftChatCollab";
 import { MessageBubble } from "./MessageBubble";
 import { BroadcastCard } from "./BroadcastCard";
 import { SystemCard } from "./SystemCard";
@@ -19,12 +20,18 @@ interface ShiftChatPanelProps {
   isOpen: boolean;
   onClose: () => void;
   chat: ChatState;
+  /**
+   * Ephemeral + advisory collaboration signals (R-RTC-1.2). Optional: when the
+   * socket is unavailable it is omitted and the panel degrades to the REST-poll
+   * presence/typing path with no loss of core functionality.
+   */
+  collab?: ShiftChatCollabState;
 }
 
 const UNIQUE_ROOM_TAGS = (msgs: { roomTag: string | null }[]) =>
   [...new Set(msgs.map((m) => m.roomTag).filter(Boolean))] as string[];
 
-export function ShiftChatPanel({ isOpen, onClose, chat }: ShiftChatPanelProps) {
+export function ShiftChatPanel({ isOpen, onClose, chat, collab }: ShiftChatPanelProps) {
   const { userId } = useAuth();
   const experience = useExperience();
   const { sendMessage, isSending, notifyTyping, ackMessage, reactToMessage, pinMessage } = chat;
@@ -108,9 +115,20 @@ export function ShiftChatPanel({ isOpen, onClose, chat }: ShiftChatPanelProps) {
   const handleBodyChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setBody(e.target.value);
     notifyTyping();
+    // Advisory live typing ping — no-op when the collab socket is unavailable.
+    collab?.notifyTyping();
   };
 
   const roomTags = UNIQUE_ROOM_TAGS(chat.messages);
+
+  // Merge the ephemeral collab signals with the REST-poll source of truth.
+  // Peer-typing userIds are resolved to display names via server-attached
+  // presence; unresolved peers are simply not shown (advisory only).
+  const collabTypingNames = (collab?.peerTypingUserIds ?? [])
+    .map((id) => collab?.presentMembers.find((m) => m.userId === id)?.displayName)
+    .filter((name): name is string => Boolean(name));
+  const typingNames = [...new Set([...chat.typing, ...collabTypingNames])];
+  const onlineCount = collab?.isConnected ? collab.presentMembers.length : chat.onlineUserIds.length;
 
   return (
     <Sheet open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
@@ -126,7 +144,7 @@ export function ShiftChatPanel({ isOpen, onClose, chat }: ShiftChatPanelProps) {
             <div className="w-2 h-2 bg-[hsl(var(--status-ok))] rounded-full shadow-[0_0_6px_hsl(var(--status-ok))]" />
             <SheetTitle className="font-bold text-sm">{t.shiftChat.panel.title}</SheetTitle>
             <span className="text-xs text-muted-foreground">
-              {t.shiftChat.panel.onlineCount(chat.onlineUserIds.length)}
+              {t.shiftChat.panel.onlineCount(onlineCount)}
             </span>
           </div>
           <button
@@ -220,9 +238,9 @@ export function ShiftChatPanel({ isOpen, onClose, chat }: ShiftChatPanelProps) {
             );
           })}
 
-          {chat.typing.length > 0 && (
+          {typingNames.length > 0 && (
             <div className="flex items-center gap-2 text-[10px] text-muted-foreground italic px-1">
-              <span>{t.shiftChat.panel.typing(chat.typing.join(", "))}</span>
+              <span>{t.shiftChat.panel.typing(typingNames.join(", "))}</span>
               <span className="flex gap-0.5">
                 {[0, 1, 2].map((i) => (
                   <span
