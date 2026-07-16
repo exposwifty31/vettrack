@@ -164,6 +164,18 @@ export const equipment = vtTable("vt_equipment", {
   readinessStateSince: timestamp("readiness_state_since"),
   usageState: text("usage_state").notNull().default("available"),
   usageStateSince: timestamp("usage_state_since"),
+  /**
+   * R-CBF-1.2 — Code Blue soft-reserve. Nullable ADVISORY hint that a crash-cart
+   * unit is the nearest-ready cart reserved for an active Code Blue session. It
+   * NEVER blocks a clinician grabbing a different cart and does not participate in
+   * custody-toggle semantics. Deliberately a plain nullable text column (NOT a FK
+   * to vt_code_blue_sessions): a hard FK would create an equipment.ts↔er.ts import
+   * cycle and could null/cascade in ways that fight "advisory, never blocks"
+   * (end is server-confirmed only — a committed session is never deleted). Set via
+   * compare-and-set (write only where NULL) and cleared scoped by session id in
+   * server/lib/code-blue-soft-reserve.ts.
+   */
+  reservedForSessionId: text("reserved_for_session_id"),
 }, (table) => ({
   clinicRfidTagLookup: index("vt_equipment_clinic_rfid_tag_epc_idx").on(table.clinicId, table.rfidTagEpc),
   clinicRfidTagUnique: uniqueIndex("vt_equipment_clinic_rfid_tag_epc_uq")
