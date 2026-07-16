@@ -14,6 +14,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { createServer, type Server as HttpServer } from "node:http";
+import { type AddressInfo } from "node:net";
 import { initCollabServer } from "../server/lib/realtime-collab/server.js";
 import { recordCollabMetric, isCollabMetric, COLLAB_METRICS } from "../server/lib/realtime-collab/telemetry.js";
 
@@ -49,6 +50,51 @@ describe("R-RTC-1.7 — emergency isolation merge gate", () => {
     // SSE, outbox, and Code Blue are unaffected.
     expect(collab.enabled).toBe(false);
     expect(collab.reason).toBe("REDIS_REQUIRED");
+  });
+
+  it("Redis-absent disable (REDIS_REQUIRED) NEVER stops the shared http.Server it was attached to", async () => {
+    process.env.NODE_ENV = "production";
+    process.env.COLLAB_WS_ENABLED = "true";
+    delete process.env.COLLAB_WS_ALLOW_SINGLE_INSTANCE;
+    delete process.env.REDIS_URL;
+    delete process.env.PGBOUNCER_URL;
+    // A LIVE, listening server — exactly the shared server Express + SSE + Code Blue run on.
+    await new Promise<void>((r) => httpServer.listen(0, "127.0.0.1", r));
+    expect(httpServer.listening).toBe(true);
+
+    const collab = await initCollabServer(httpServer);
+    expect(collab.enabled).toBe(false);
+    expect(collab.reason).toBe("REDIS_REQUIRED");
+    // The shared production server must still be up — collab must NOT have torn it down.
+    expect(httpServer.listening).toBe(true);
+    await expect(collab.close()).resolves.toBeUndefined();
+    expect(httpServer.listening).toBe(true);
+  });
+
+  it("adapter-wiring throw (REDIS_ADAPTER_FAILED) NEVER stops the shared http.Server", async () => {
+    process.env.COLLAB_WS_ENABLED = "true";
+    await new Promise<void>((r) => httpServer.listen(0, "127.0.0.1", r));
+    const addr = httpServer.address() as AddressInfo;
+    expect(httpServer.listening).toBe(true);
+
+    // Force the Redis adapter wiring to throw AFTER io was created (the branch that
+    // currently io.close()s the shared server). A fake client whose duplicate() throws
+    // routes through the REDIS_ADAPTER_FAILED catch.
+    const explodingRedis = {
+      duplicate() {
+        throw new Error("boom: adapter wiring");
+      },
+    };
+    const collab = await initCollabServer(httpServer, {
+      getRedisClient: async () => explodingRedis as never,
+    });
+    expect(collab.enabled).toBe(false);
+    expect(collab.reason).toBe("REDIS_ADAPTER_FAILED");
+    // Shared server untouched, same address still bound.
+    expect(httpServer.listening).toBe(true);
+    expect((httpServer.address() as AddressInfo).port).toBe(addr.port);
+    await expect(collab.close()).resolves.toBeUndefined();
+    expect(httpServer.listening).toBe(true);
   });
 
   it("STRUCTURAL: no collab source file imports an emergency / SSE / outbox module", () => {

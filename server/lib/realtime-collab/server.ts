@@ -9,6 +9,7 @@
  */
 import type { Server as HttpServer } from "http";
 import { Server, type Socket, type DefaultEventsMap } from "socket.io";
+import type { Redis } from "ioredis";
 import { getRedis } from "../redis.js";
 import {
   COLLAB_SOCKET_PATH,
@@ -55,6 +56,8 @@ export interface InitCollabOptions {
   skipRedisAdapter?: boolean;
   /** Test seam: inject the handshake identity resolver (defaults to the DB path). */
   resolveIdentity?: typeof resolveHandshakeIdentity;
+  /** Test seam: inject the Redis client factory (defaults to the shared getRedis). */
+  getRedisClient?: () => Promise<Redis | null>;
 }
 
 /**
@@ -72,6 +75,7 @@ export async function initCollabServer(
   const presence = opts.presence ?? createPresenceStore();
   const recordAccess = opts.recordAccess ?? defaultRecordAccessCheck;
   const rateLimiter = createRateLimiter();
+  const getRedisClient = opts.getRedisClient ?? getRedis;
 
   let io: Server;
   try {
@@ -86,28 +90,53 @@ export async function initCollabServer(
     return { enabled: false, reason: "SOCKET_INIT_FAILED", async close() {} };
   }
 
+  // Teardown that NEVER stops the shared http.Server. `io.close()` internally calls
+  // `httpServer.close()`, which would tear down the SHARED production server that
+  // Express + SSE + Code Blue run on. Instead we only disconnect collab sockets and
+  // close the engine (the WS layer), and quit the Redis-adapter sub connection — the
+  // shared server stays up. This runs on every disable branch AND on graceful close,
+  // preserving the R-RTC-1.7 non-fatal invariant.
+  let adapterSub: Redis | undefined;
+  const teardown = async (): Promise<void> => {
+    try {
+      io.disconnectSockets(true);
+      io.engine.close();
+    } catch (err) {
+      console.error("[collab-ws] teardown error (non-fatal)", err);
+    }
+    if (adapterSub) {
+      try {
+        await adapterSub.quit();
+      } catch {
+        // best-effort — a sub that never fully connected may reject on quit.
+      }
+      adapterSub = undefined;
+    }
+  };
+
   // Redis adapter for cross-instance fan-out. Prod REQUIRES it (fail the channel
   // loudly, never the process) unless single-instance is an explicit dev/opt-in.
   if (!opts.skipRedisAdapter) {
     try {
-      const redis = await getRedis();
+      const redis = await getRedisClient();
       if (redis) {
         const { createAdapter } = await import("@socket.io/redis-adapter");
         const sub = redis.duplicate();
+        adapterSub = sub;
         io.adapter(createAdapter(redis, sub));
       } else if (!allowsInProcessFallback()) {
         console.error(
           "[collab-ws] Redis required in production but unavailable — collaboration channel DISABLED. " +
             "Set COLLAB_WS_ALLOW_SINGLE_INSTANCE=true only for a genuine single-instance deployment.",
         );
-        await io.close();
+        await teardown();
         return { enabled: false, reason: "REDIS_REQUIRED", async close() {} };
       } else {
         console.warn("[collab-ws] No Redis — single-instance in-process fan-out (explicit opt-in).");
       }
     } catch (err) {
       console.error("[collab-ws] Redis adapter wiring failed — channel disabled (non-fatal)", err);
-      await io.close();
+      await teardown();
       return { enabled: false, reason: "REDIS_ADAPTER_FAILED", async close() {} };
     }
   }
@@ -259,8 +288,6 @@ export async function initCollabServer(
   return {
     enabled: true,
     io,
-    async close() {
-      await io.close();
-    },
+    close: teardown,
   };
 }
