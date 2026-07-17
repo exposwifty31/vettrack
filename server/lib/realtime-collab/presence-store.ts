@@ -23,9 +23,13 @@
  * is O(members-in-the-room) — it NEVER scans the shared Redis keyspace, so its cost
  * no longer scales with BullMQ/outbox/session keys on a busy clinic (card #4). The
  * mirror follows the `display-heartbeat-store` convention (`recordRedisFallback` /
- * `timedRedisOp`, best-effort, never throws) so a crashed instance's leases
- * self-expire via TTL (they linger in the ZSET only until the next read prunes them)
- * and Redis absence degrades cleanly to the per-instance local view. The room name
+ * `timedRedisOp`, best-effort, never throws). Each write ALSO re-arms a best-effort
+ * key-level TTL (`PEXPIRE`, lease TTL + margin) on the room's ZSET, so a crashed
+ * instance's leases self-expire two ways: a room still being read has expired members
+ * pruned on the next read (ZREMRANGEBYSCORE); a room that is ABANDONED (never read
+ * again) has its whole ZSET key auto-deleted by Redis when the TTL lapses — it does
+ * NOT linger on the shared keyspace.
+ * Redis absence degrades cleanly to the per-instance local view. The room name
  * embeds the clinicId, so the ZSET key is clinic-scoped — no cross-tenant leak.
  */
 import type { Redis } from "ioredis";
@@ -33,6 +37,7 @@ import { getRedis, recordRedisFallback, timedRedisOp } from "../redis.js";
 import {
   COLLAB_REDIS_PREFIX,
   PRESENCE_TTL_MS,
+  PRESENCE_KEY_EXPIRE_MARGIN_MS,
   FALLBACK_MAP_MAX_ROOMS,
   FALLBACK_MAP_MAX_LEASES_PER_ROOM,
 } from "./config.js";
@@ -201,9 +206,24 @@ export function createPresenceStore(opts: PresenceStoreOptions = {}): PresenceSt
         recordRedisFallback("collabPresence:write");
         return;
       }
+      const key = presenceKey(room);
       const score = now() + ttlMs;
       const m = leaseMember(member.userId, socketId, member.displayName);
-      await timedRedisOp("collabPresence:write", () => redis.zadd(presenceKey(room), score, m));
+      await timedRedisOp("collabPresence:write", async () => {
+        await redis.zadd(key, score, m);
+        // Best-effort key-level TTL alongside the ZADD (re-armed on every write /
+        // heartbeat). Without it, an ABANDONED room — a crashed / ungraceful instance
+        // whose members are never ZREM'd and whose ZSET is never read again (plausible
+        // for the many per-equipment record-presence rooms) — would persist forever on
+        // the SHARED Redis, re-introducing the very keyspace pollution this store
+        // removed. The margin keeps the key alive strictly longer than its newest
+        // member's expiry score, so read-time ZREMRANGEBYSCORE still governs membership
+        // within the key's life. Mirrors the self-expiring `SET … PX/EX` convention of
+        // the per-key store this replaced and of display-heartbeat-store.
+        if (typeof redis.pexpire === "function") {
+          await redis.pexpire(key, ttlMs + PRESENCE_KEY_EXPIRE_MARGIN_MS);
+        }
+      });
     } catch {
       /* ephemeral — presence loss under a Redis hiccup is acceptable, never an error */
     }

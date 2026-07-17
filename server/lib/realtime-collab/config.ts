@@ -14,6 +14,16 @@ export const COLLAB_SOCKET_PATH = "/collab-ws";
 export const COLLAB_REDIS_PREFIX = "vettrack:collab:";
 export const PRESENCE_TTL_MS = 90_000; // 3× the client heartbeat cadence
 export const PRESENCE_HEARTBEAT_MS = 30_000;
+/**
+ * Extra life given to a room's presence ZSET *key* (via PEXPIRE) beyond the lease
+ * TTL, so an ABANDONED room (a crashed/ungraceful instance whose members are never
+ * ZREM'd and whose room is never read again) self-expires off the shared Redis
+ * instead of lingering forever — the same self-expiring behavior the old per-key
+ * `SET ... PX` had and that display-heartbeat-store's `SET ... EX` keeps. The margin
+ * is > 0 so the key always outlives its newest member's score; read-time
+ * ZREMRANGEBYSCORE still governs membership within the key's lifetime.
+ */
+export const PRESENCE_KEY_EXPIRE_MARGIN_MS = 10_000;
 
 /** Bounded in-process fallback caps (no unbounded growth when Redis is absent). */
 export const FALLBACK_MAP_MAX_ROOMS = 2_000;
