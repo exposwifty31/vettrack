@@ -166,6 +166,10 @@ describe("BoardAttentionSection — glance-only guardrail", () => {
     const section = getByTestId("board-attention");
     const interactive = within(section).queryAllByRole("button");
     expect(interactive).toHaveLength(0);
-    expect(section.querySelectorAll("button, a, input, [role='button'], [tabindex]")).toHaveLength(0);
+    expect(
+      section.querySelectorAll(
+        "button, a[href], input, select, textarea, summary, [contenteditable], [role='button'], [role='link'], [tabindex]",
+      ),
+    ).toHaveLength(0);
   });
 });

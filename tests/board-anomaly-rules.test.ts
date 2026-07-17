@@ -226,10 +226,24 @@ describe("deriveBoardAnomalies — cart_unverified", () => {
     const snap1 = deriveBoardAnomalies(
       baseInput({ carts: [{ clinicId: CLINIC, equipmentId: "cart-1", lastVerifiedAt: v1 }] }),
     );
+    const since1 = byType(snap1, "cart_unverified")[0].since;
+
+    // Same lastVerifiedAt on a later snapshot => the SAME onset-derived since (stability).
     const snap2 = deriveBoardAnomalies(
       baseInput({ now: new Date(NOW.getTime() + 5000), carts: [{ clinicId: CLINIC, equipmentId: "cart-1", lastVerifiedAt: v1 }] }),
     );
-    expect(byType(snap1, "cart_unverified")[0].since).toBe(byType(snap2, "cart_unverified")[0].since);
+    expect(byType(snap2, "cart_unverified")[0].since).toBe(since1);
+
+    // Re-verified — a NEWER lastVerifiedAt still past the 7-day budget — earns a NEW, later
+    // since anchored to the new verification instant (since = lastVerifiedAt + 7d).
+    const v2 = agoMs(CART_UNVERIFIED_MAX_AGE_MS + 30_000); // 30s past threshold, newer than v1
+    const snap3 = deriveBoardAnomalies(
+      baseInput({ carts: [{ clinicId: CLINIC, equipmentId: "cart-1", lastVerifiedAt: v2 }] }),
+    );
+    const since3 = byType(snap3, "cart_unverified")[0].since;
+    expect(since3).toBe(new Date(v2.getTime() + CART_UNVERIFIED_MAX_AGE_MS).toISOString());
+    expect(since3).not.toBe(since1);
+    expect(new Date(since3).getTime()).toBeGreaterThan(new Date(since1).getTime());
   });
 
   it("FAIL-SAFE: null / invalid lastVerifiedAt yields NO anomaly and does not suppress others", () => {
@@ -378,15 +392,18 @@ describe("deriveBoardAnomalies — all three rules together", () => {
     );
   });
 
-  it("never throws on a fully-malformed input batch", () => {
-    expect(() =>
-      deriveBoardAnomalies(
+  it("never throws on a fully-malformed input batch and derives an EMPTY set", () => {
+    let result: BoardAnomaly[] | undefined;
+    expect(() => {
+      result = deriveBoardAnomalies(
         baseInput({
           batteries: [{ clinicId: CLINIC, equipmentId: "eq-1", batteryPercent: Number.NaN }],
           carts: [{ clinicId: CLINIC, equipmentId: "cart-1", lastVerifiedAt: new Date("x") }],
           readers: [{ clinicId: CLINIC, readerId: "rdr-1", status: "active", lastReaderHeartbeatAt: null }],
         }),
-      ),
-    ).not.toThrow();
+      );
+    }).not.toThrow();
+    // Each malformed row fail-safes to NO anomaly, so the batch yields [] — never a false alert.
+    expect(result).toEqual([]);
   });
 });

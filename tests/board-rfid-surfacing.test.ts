@@ -163,8 +163,7 @@ describe("deriveUnitRfid — possible_egress (branch 3)", () => {
 });
 
 describe("deriveUnitRfid — precedence (branch 4): human room stays resolved", () => {
-  it("RFID conflict never overrides the human-confirmed resolved location", () => {
-    const humanRoomName = "Ward";
+  it("carries NO top-level resolved-location field, so a board producer merge can't clobber the human room", () => {
     const d = deriveUnitRfid(
       input({
         humanRoomId: "room-ward",
@@ -173,10 +172,21 @@ describe("deriveUnitRfid — precedence (branch 4): human room stays resolved", 
       }),
       readerMap(),
     );
-    // Simulate the board producer applying the derivation to a base unit whose
-    // locationName is the human-confirmed room. The derivation must NOT touch it.
-    const baseUnit = { locationName: humanRoomName, rfid: d.rfid, evidenceConflict: d.evidenceConflict };
-    expect(baseUnit.locationName).toBe("Ward"); // human room unchanged
+
+    // STRUCTURAL guard: the derivation output exposes ONLY { rfid, evidenceConflict, alerts } —
+    // never a top-level location that the producer would treat as the resolved room. If someone
+    // added a top-level `locationName`/`locationId`/`roomId`, the spread-merge below would begin
+    // overwriting the human-confirmed room and this test would fail.
+    for (const forbidden of ["locationName", "locationId", "roomId", "resolvedLocation"]) {
+      expect(Object.prototype.hasOwnProperty.call(d, forbidden)).toBe(false);
+    }
+
+    // Merge the derivation over a base unit whose locationName is the human-confirmed room —
+    // the exact shape buildCommandBoardSnapshot composes (row.roomName + the additive rfid block).
+    // The full DB composition path is pinned by rfid-gate-e2e / rfid-scan-only-golden; here we pin
+    // that the pure transform cannot participate in an override at all.
+    const merged = { locationName: "Ward", ...d };
+    expect(merged.locationName).toBe("Ward"); // human room survives the merge
     expect(d.rfid?.locationName).toBe("ER"); // RFID evidence lives only in the rfid block
     expect(d.evidenceConflict?.type).toBe("rfid_location_conflict");
   });

@@ -171,6 +171,8 @@ describe("R-BDF-1.3 server — closed board-anomaly enum → 1:1 metric ids", ()
     expect(incrementMetric).toHaveBeenCalledWith("board_anomaly_battery_critical");
     expect(incrementMetric).not.toHaveBeenCalledWith("board_anomaly_reader_offline");
     expect(incrementMetric).not.toHaveBeenCalledWith("board_anomaly_cart_unverified");
+    // EXACTLY one increment — no duplicate or unrelated counter inflates telemetry.
+    expect(incrementMetric).toHaveBeenCalledTimes(1);
   });
 
   it("rfid_reader_offline → board_anomaly_reader_offline (and no other board counter)", async () => {
@@ -182,6 +184,7 @@ describe("R-BDF-1.3 server — closed board-anomaly enum → 1:1 metric ids", ()
     expect(incrementMetric).toHaveBeenCalledWith("board_anomaly_reader_offline");
     expect(incrementMetric).not.toHaveBeenCalledWith("board_anomaly_battery_critical");
     expect(incrementMetric).not.toHaveBeenCalledWith("board_anomaly_cart_unverified");
+    expect(incrementMetric).toHaveBeenCalledTimes(1);
   });
 
   it("cart_unverified → board_anomaly_cart_unverified (and no other board counter)", async () => {
@@ -193,6 +196,7 @@ describe("R-BDF-1.3 server — closed board-anomaly enum → 1:1 metric ids", ()
     expect(incrementMetric).toHaveBeenCalledWith("board_anomaly_cart_unverified");
     expect(incrementMetric).not.toHaveBeenCalledWith("board_anomaly_battery_critical");
     expect(incrementMetric).not.toHaveBeenCalledWith("board_anomaly_reader_offline");
+    expect(incrementMetric).toHaveBeenCalledTimes(1);
   });
 
   it("rejects an out-of-enum type without bumping any board counter (unconditional)", async () => {
@@ -205,6 +209,8 @@ describe("R-BDF-1.3 server — closed board-anomaly enum → 1:1 metric ids", ()
     expect(incrementMetric).not.toHaveBeenCalledWith("board_anomaly_reader_offline");
     expect(incrementMetric).not.toHaveBeenCalledWith("board_anomaly_cart_unverified");
     expect(incrementMetric).toHaveBeenCalledWith("telemetry_payload_rejected_enum_mismatch");
+    // A single enum-mismatch bump — no board counter, no duplicate.
+    expect(incrementMetric).toHaveBeenCalledTimes(1);
   });
 
   it("does nothing when boardAnomalyActivated is absent", async () => {
@@ -217,5 +223,7 @@ describe("R-BDF-1.3 server — closed board-anomaly enum → 1:1 metric ids", ()
     expect(incrementMetric).not.toHaveBeenCalledWith("board_anomaly_reader_offline");
     expect(incrementMetric).not.toHaveBeenCalledWith("board_anomaly_cart_unverified");
     expect(incrementMetric).not.toHaveBeenCalledWith("telemetry_payload_rejected_enum_mismatch");
+    // An absent field bumps NOTHING at all.
+    expect(incrementMetric).toHaveBeenCalledTimes(0);
   });
 });

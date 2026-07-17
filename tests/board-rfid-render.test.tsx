@@ -117,6 +117,8 @@ describe("CommandBoard — RFID chip discriminator render", () => {
       ]),
     );
     const externalChip = external.getByTestId("board-unit-rfid-ext");
+    // Capture the rendered label BEFORE cleanup unmounts the tree.
+    const externalText = externalChip.textContent?.trim() ?? "";
     cleanup();
     const unresolved = renderBoard(
       board([
@@ -127,6 +129,11 @@ describe("CommandBoard — RFID chip discriminator render", () => {
       ]),
     );
     const unresolvedChip = unresolved.getByTestId("board-unit-rfid-unr");
+    const unresolvedText = unresolvedChip.textContent?.trim() ?? "";
+    // Each surface renders its own localized label — and the two are DISTINCT (neither collapses).
+    expect(externalText).toContain(t.board.rfidExternalZone);
+    expect(unresolvedText).toContain(t.board.rfidUnresolved);
+    expect(externalText).not.toBe(unresolvedText);
     expect(externalChip.getAttribute("data-rfid-kind")).not.toBe(
       unresolvedChip.getAttribute("data-rfid-kind"),
     );
