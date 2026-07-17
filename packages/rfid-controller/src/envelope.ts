@@ -16,10 +16,19 @@ import {
  *   1. `readAt` is serialized via `Date.toISOString()` (RFC-3339 `Z`), never
  *      `Date.toString()` — the route's strict `z.string().datetime()` 400s
  *      otherwise.
- *   2. Only `{tagEpc, gatewayCode, readAt}` reach the wire. Directional evidence
- *      (fromGateway) is dropped here — the route schema is non-`.strict()` and
- *      would silently strip it, so emitting it would make e2e falsely pass on
- *      data that never arrives.
+ *   2. Only `{tagEpc, gatewayCode, readAt}` reach the wire. Directional emission
+ *      is DELIBERATELY DEFERRED. Post-R-M1 the route schema DOES accept optional
+ *      directional fields (`direction` enum + a both-or-neither `fromGateway`/
+ *      `toGateway` pair; a partial pair is a HARD reject, not a silent strip) —
+ *      and the Module 0 contract validates that same shape for parity. But the
+ *      controller has no gateway-role geometry to classify entered vs exited
+ *      (hardware-track, ADR-004/006), so emitting a partial directional payload
+ *      would be incomplete evidence. It therefore emits the minimal safe subset
+ *      and leaves directional emission to the hardware direction track; the
+ *      internal `MovementEvent.fromGateway` is retained for logging only. This
+ *      is a documented deferral, not an accidental gap: the schema/contract are
+ *      already ready, so `toWireEvent` can additively surface the gateway pair
+ *      later without touching validation.
  *
  * The body is serialized ONCE and returned as the exact bytes to sign and send
  * (Module 6 must sign THIS buffer and Module 8 must POST THIS buffer — any

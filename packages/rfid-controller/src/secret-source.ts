@@ -1,14 +1,16 @@
 /**
- * Module 7 — secret source + hot-swap on rotation (REFRAMED).
+ * Module 7 — secret source + hot-swap on rotation.
  *
- * DEVIATION FROM PLAN: the plan's "current-OR-previous grace" verification
- * depends on R-M1's M1.1c landing a server-side grace verifier. On this branch
- * it has NOT landed — `verifyVetTrackWebhookSignature` checks exactly ONE
- * secret and `getCredentials` returns one blob (verified against the real
- * server). So the controller ships secret source + hot-swap ONLY, and never
- * dual-signs. The operational rotation procedure is: rotate the server's
- * per-clinic `webhook_secret`, then hot-swap the controller's source. The
- * previous secret is retained for observability, NOT for signing.
+ * Rotation grace is SERVER-SIDE (R-M1 M1.1c): during a rotation window
+ * `getRfidVerificationSecrets` returns `[current, previous]` and the ingest
+ * route (rfid.ts) verifies the request signature against each in turn. Because
+ * the server owns the overlap, the controller signs with exactly ONE current
+ * secret and simply HOT-SWAPS it on rotation — it never dual-signs. The
+ * operational rotation procedure is: rotate the server's per-clinic
+ * `webhook_secret` (opening the server-side grace), then hot-swap the
+ * controller's source; the server grace covers requests in flight across the
+ * swap. The previous secret is retained here for observability only, NOT for
+ * signing.
  *
  * Secrets are read from env/config, never from argv, and never logged.
  */

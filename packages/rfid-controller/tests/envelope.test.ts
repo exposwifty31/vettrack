@@ -23,12 +23,16 @@ describe("buildEnvelope", () => {
     expect(batch.events[0].readAt).not.toContain("GMT");
   });
 
-  it("emits ONLY {tagEpc, gatewayCode, readAt} on the wire — no directional fields", () => {
+  it("emits ONLY {tagEpc, gatewayCode, readAt} on the wire — directional emission deferred", () => {
     const { batch } = buildEnvelope([mv("E1", "GW-2", "2026-07-17T18:00:00.000Z", "GW-1")]);
     expect(Object.keys(batch.events[0]).sort()).toEqual(["gatewayCode", "readAt", "tagEpc"]);
-    // The non-.strict() route schema would silently strip these, so they must
-    // never be serialized (otherwise e2e would falsely pass on dropped data).
+    // Deliberate deferral (see envelope.ts header): post-R-M1 the route schema
+    // and Module 0 contract DO accept directional fields, but the controller has
+    // no gateway-role geometry to classify entered/exited, so it emits the
+    // minimal safe subset. fromGateway stays internal-only until the hardware
+    // direction track wires emission additively.
     expect(batch.events[0]).not.toHaveProperty("fromGateway");
+    expect(batch.events[0]).not.toHaveProperty("toGateway");
     expect(batch.events[0]).not.toHaveProperty("direction");
   });
 

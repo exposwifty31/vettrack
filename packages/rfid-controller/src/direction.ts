@@ -1,26 +1,27 @@
 import type { RfidRead } from "./adapter";
 
 /**
- * Module 3 — direction inference (DESCOPED to internal evidence on this branch).
+ * Module 3 — direction inference (internal movement evidence).
  *
- * DEVIATION FROM PLAN: the plan expected R-M1's M1.2 to have added
- * `direction`/`fromGateway`/`toGateway` to the ingest `RfidBatchSchema`. On this
- * branch R-M1 has NOT landed (the schema is still `{tagEpc, gatewayCode, readAt}`
- * — verified against `server/routes/rfid-batch.schema.ts` and ADR-006's
- * vendor-neutral contract). Because the route schema is non-`.strict()`, any
- * directional field the controller emitted would be SILENTLY STRIPPED — it
- * would never arrive, and an e2e "assert 202" would falsely pass.
+ * R-M1 HAS landed: the ingest `RfidBatchSchema` (server/routes/rfid.ts) now
+ * accepts optional directional fields — `direction` (enum entered|exited) plus a
+ * both-or-neither `fromGateway`/`toGateway` pair — and the controller's Module 0
+ * contract validates that same shape (pinned by `tests/contract-parity.test.ts`).
  *
- * So this tracker computes movement direction from time/sequence ONLY (last
- * gateway a tag was seen at → new gateway), and that direction is treated as
- * INTERNAL evidence: it drives Module 4's "is this a crossing?" decision and is
- * available for logging, but it is NEVER serialized onto the wire. The envelope
- * (Module 5) carries only `{tagEpc, gatewayCode, readAt}` where `gatewayCode` is
- * the destination gateway. Antenna-geometry / RSSI / loiter/tailgate inference
- * is hardware-track (ADR-004/006) and explicitly out of this core.
+ * This tracker computes movement from time/sequence ONLY (last gateway a tag was
+ * seen at → new gateway). That movement is INTERNAL evidence: it drives Module
+ * 4's "is this a crossing?" decision and is available for logging. `fromGateway`
+ * is carried on the internal Movement/MovementEvent but is NOT serialized onto
+ * the wire — directional emission is a DELIBERATE DEFERRAL documented on the
+ * envelope (Module 5). The controller has no gateway-role geometry to classify a
+ * crossing as entered vs exited (antenna-geometry / RSSI / loiter/tailgate
+ * inference is hardware-track, ADR-004/006, out of this core), so it emits the
+ * minimal safe `{tagEpc, gatewayCode, readAt}` where `gatewayCode` is the
+ * destination gateway, and leaves directional emission to the hardware track.
  *
- * When R-M1's directional schema lands, Module 5 can additively surface
- * `fromGateway`/`toGateway` from this tracker without changing its logic.
+ * When that hardware track lands, Module 5 can additively surface
+ * `fromGateway`/`toGateway` from this tracker without changing its logic — the
+ * schema and contract already accept them.
  */
 export type Movement =
   | { kind: "same"; tagEpc: string; gatewayCode: string; readAt: Date }
