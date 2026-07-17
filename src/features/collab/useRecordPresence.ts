@@ -1,42 +1,25 @@
-import { useEffect, useRef, useState } from "react";
-import {
-  getCollabSocket,
-  isCollabConnected,
-  joinCollabRoom,
-  leaveCollabRoom,
-  releaseCollabSocket,
-  type CollabAuthSource,
-  type CollabSocket,
-} from "@/lib/collab-socket";
-import { resolveBearerToken } from "@/lib/auth-fetch";
+import { useCallback, useEffect, useState } from "react";
+import { isCollabConnected } from "@/lib/collab-socket";
+import { useCollabRoom, type CollabRoomBinding } from "@/features/collab/useCollabRoom";
 
 /**
  * R-RTC-1.4 · Feature 3 — wires the EPHEMERAL + STRICTLY ADVISORY collaboration
  * channel into a record detail (equipment / inventory item): "who is viewing /
  * editing this record".
  *
- * FROZEN guardrails honoured here:
+ * The SHARED socket lifecycle (lazy connect, fresh-token handshake, re-join on
+ * reconnect, presence room-filter, graceful degradation, ref-count release) lives
+ * in `useCollabRoom`; this hook layers ONLY the record's own logic on top:
  *  - STRICTLY ADVISORY: this hook exposes co-presence ONLY. It NEVER locks,
  *    blocks, or alters an edit — there is no "locked" output and no gate. The
  *    server OCC/version guard remains the SOLE conflict authority.
- *  - LAZY connect: the ref-counted socket is acquired only while the detail is
- *    mounted and released on unmount — never app-wide.
- *  - GRACEFUL DEGRADATION: when the socket is unavailable (no token / not
- *    connected / no recordId) this hook is inert — the detail renders + edits
- *    EXACTLY as today with no indicator. Nothing about the record is gated on it.
  *  - The client sends the record binding ONLY in the join room request
  *    ({ kind:"record", recordType, recordId }); the ongoing `record-presence`
  *    emit carries the INTENT ONLY ({ editing }). The server derives recordType +
  *    recordId from the authorized room membership and attaches userId from the DB
  *    session — the client never sends a trusted recordId/recordType nor a userId.
- *  - FRESH token: the handshake token is minted from the SAME getter `authFetch`
- *    uses (`resolveBearerToken` → the Clerk getter), re-read on every (re)connect
- *    and refreshed on a cadence below the token TTL — a rolled-over token is never
- *    replayed under the infinite-reconnect loop.
+ *  - Degrades to inert (no indicator, no emit) with no token / no recordId.
  */
-
-// Re-mint the handshake token below the Clerk session-token TTL (~60s).
-const TOKEN_REFRESH_MS = 45_000;
 
 export interface RecordPresenceMember {
   userId: string;
@@ -62,13 +45,6 @@ export interface UseRecordPresenceOptions {
 export function useRecordPresence(options: UseRecordPresenceOptions): RecordPresenceState {
   const { recordType, recordId, enabled = true, editing = false } = options;
 
-  const socketRef = useRef<CollabSocket | null>(null);
-  const joinedRoomRef = useRef<string | null>(null);
-  const tokenRef = useRef<string | null>(null);
-
-  const [isConnected, setIsConnected] = useState(false);
-  const [joined, setJoined] = useState(false);
-  const [presentMembers, setPresentMembers] = useState<RecordPresenceMember[]>([]);
   // Peers whose LAST intent was "editing". Resolved against presentMembers so a
   // departed peer (dropped from presence) is excluded even before an explicit
   // viewing/off — advisory only, never a lock.
@@ -76,48 +52,7 @@ export function useRecordPresence(options: UseRecordPresenceOptions): RecordPres
 
   const active = enabled && !!recordId;
 
-  useEffect(() => {
-    if (!active) return;
-
-    let cancelled = false;
-    let acquired: CollabSocket | null = null;
-    let refreshTimer: ReturnType<typeof setInterval> | null = null;
-
-    const authSource: CollabAuthSource = () =>
-      tokenRef.current ? { token: tokenRef.current } : null;
-
-    // Re-emit join on EVERY (re)connect. socket.io rooms are per-connection and
-    // reconnection is ON (Infinity), so after any WS blip the reconnected socket
-    // has NO room membership — without re-joining, the co-presence advisory
-    // silently dies while isConnected stays true. Idempotent server-side. — panel #1.
-    const doJoin = () => {
-      const socket = socketRef.current;
-      if (!socket) return;
-      void joinCollabRoom(socket, { kind: "record", recordType, recordId }).then((ack) => {
-        if (cancelled) return;
-        if (ack?.ok) {
-          if (ack.room) joinedRoomRef.current = ack.room;
-          if (ack.members) setPresentMembers(ack.members);
-          setJoined(true);
-        }
-      });
-    };
-
-    const handleConnect = () => {
-      setIsConnected(true);
-      doJoin();
-    };
-    const handleDisconnect = () => setIsConnected(false);
-
-    const handlePresence = (payload: { room: string; members: RecordPresenceMember[] }) => {
-      // Drop presence for any OTHER room — on the SHARED ref-counted socket a
-      // room-A event (e.g. co-mounted chat) must not overwrite this record's room-B
-      // roster. The record's own initial roster still arrives via the join
-      // ack.members. — panel #3 (MEDIUM).
-      if (joinedRoomRef.current && payload?.room !== joinedRoomRef.current) return;
-      setPresentMembers(Array.isArray(payload?.members) ? payload.members : []);
-    };
-
+  const bindEvents = useCallback(({ on }: CollabRoomBinding) => {
     const handlePeerRecord = (payload: { userId: string; mode: "editing" | "viewing" }) => {
       const userId = payload?.userId;
       if (!userId) return;
@@ -129,69 +64,26 @@ export function useRecordPresence(options: UseRecordPresenceOptions): RecordPres
       });
     };
 
-    const connect = () => {
-      if (cancelled) return;
-      const socket = getCollabSocket(authSource);
-      if (!socket) return; // degrade — no token / channel unavailable
-      acquired = socket;
-      socketRef.current = socket;
-
-      socket.on("connect", handleConnect);
-      socket.on("disconnect", handleDisconnect);
-      socket.on("presence", handlePresence);
-      socket.on("peer-record", handlePeerRecord);
-      // If the socket is ALREADY connected when listeners are bound, the `connect`
-      // event has already fired and handleConnect won't run — join once explicitly
-      // now. Every later (re)connect re-runs doJoin via handleConnect. — panel #1.
-      if (isCollabConnected()) {
-        setIsConnected(true);
-        doJoin();
-      }
-    };
-
-    // Mint a FRESH token before the first connect, then re-mint on a cadence so the
-    // shared socket's infinite reconnects always read a valid token.
-    void resolveBearerToken().then((token) => {
-      if (cancelled) return;
-      tokenRef.current = token;
-      connect();
-    });
-    refreshTimer = setInterval(() => {
-      void resolveBearerToken().then((token) => {
-        if (!cancelled) tokenRef.current = token;
-      });
-    }, TOKEN_REFRESH_MS);
+    on("peer-record", handlePeerRecord);
 
     return () => {
-      cancelled = true;
-      if (refreshTimer) clearInterval(refreshTimer);
-      if (acquired) {
-        acquired.off("connect", handleConnect);
-        acquired.off("disconnect", handleDisconnect);
-        acquired.off("presence", handlePresence);
-        acquired.off("peer-record", handlePeerRecord);
-        if (joinedRoomRef.current) leaveCollabRoom(acquired, joinedRoomRef.current);
-        // Only release when a socket was actually acquired — a null (degraded)
-        // getCollabSocket must NOT be paired with a release.
-        releaseCollabSocket();
-      }
-      joinedRoomRef.current = null;
-      socketRef.current = null;
-      tokenRef.current = null;
-      setJoined(false);
-      setIsConnected(false);
-      setPresentMembers([]);
       setPeerEditingIds([]);
     };
-  }, [active, recordType, recordId]);
+  }, []);
+
+  const { isConnected, isJoined, presentMembers, socketRef } = useCollabRoom({
+    enabled: active,
+    joinRequest: { kind: "record", recordType, recordId },
+    bindEvents,
+  });
 
   // Emit the local INTENT ({ editing } ONLY) once joined and whenever it flips.
   // One emit per (joined, editing) transition — deterministic and advisory.
   useEffect(() => {
     const socket = socketRef.current;
-    if (!active || !joined || !socket || !isCollabConnected()) return;
+    if (!active || !socket || !isCollabConnected() || !isJoined) return;
     socket.emit("record-presence", { editing }); // NO userId / recordId — server derives both
-  }, [active, joined, editing]);
+  }, [active, isJoined, editing, socketRef]);
 
   // Resolve editing peers against present members: excludes self (peer-record is
   // peer-only) and any peer who has left the record. Advisory list only.

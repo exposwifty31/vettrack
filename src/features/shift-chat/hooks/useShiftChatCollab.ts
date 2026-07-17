@@ -1,33 +1,18 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import {
-  getCollabSocket,
-  isCollabConnected,
-  joinCollabRoom,
-  leaveCollabRoom,
-  releaseCollabSocket,
-  type CollabAuthSource,
-  type CollabSocket,
-} from "@/lib/collab-socket";
-import { resolveBearerToken } from "@/lib/auth-fetch";
+import { useCallback, useRef, useState } from "react";
+import { isCollabConnected } from "@/lib/collab-socket";
+import { useCollabRoom, type CollabRoomBinding } from "@/features/collab/useCollabRoom";
 
 /**
  * R-RTC-1.2 · Feature 1 — wires the EPHEMERAL + ADVISORY collaboration channel
  * into shift-chat: peer typing, presence, and a coalesced "new message" nudge.
  *
- * FROZEN guardrails honoured here:
- *  - LAZY connect: the ref-counted socket is acquired only while the panel is
- *    open (`enabled`) and released on close/unmount — never app-wide.
- *  - GRACEFUL DEGRADATION: when the socket is unavailable (no token / not
- *    connected) this hook is inert — the panel keeps working via the existing
- *    REST-poll `getPresence`/`typing` path and message send/receive is NEVER
- *    gated on the socket.
- *  - The client NEVER sends its own userId; `typing` carries only the on-flag
- *    and the server attaches identity from the DB session.
- *  - FRESH token: the handshake token is minted from the SAME getter `authFetch`
- *    uses (`resolveBearerToken` → the Clerk getter), re-read on every (re)connect
- *    and refreshed on a cadence below the token TTL — a token that has rolled
- *    over is never replayed under the infinite-reconnect loop. — card SC (HIGH).
- *  - The nudge is advisory: it only triggers the EXISTING REST refetch and is
+ * The SHARED socket lifecycle (lazy connect, fresh-token handshake, re-join on
+ * reconnect, presence room-filter, graceful degradation, ref-count release) lives
+ * in `useCollabRoom`; this hook layers ONLY shift-chat's own logic on top:
+ *  - Peer typing indicator with a receiver-side TTL (a lost "off" self-expires).
+ *  - A debounced local `typing` ping — carrying the on-flag ONLY, never a
+ *    client-supplied userId (the server attaches identity). No-op when degraded.
+ *  - An advisory "new message" nudge that only triggers the EXISTING REST refetch,
  *    coalesced by messageId so duplicate emissions + reconnect replays cause at
  *    most one refetch per new message. A malformed (missing-id) nudge is ignored
  *    outright, never coalesced under a shared empty key. WS is never the message
@@ -37,9 +22,6 @@ import { resolveBearerToken } from "@/lib/auth-fetch";
 const TYPING_DEBOUNCE_MS = 1_500;
 const PEER_TYPING_TTL_MS = 4_000;
 const MAX_SEEN_NUDGES = 500;
-// Re-mint the handshake token below the Clerk session-token TTL (~60s) so any
-// reconnect the shared socket performs reads a still-valid token. — card SC.
-const TOKEN_REFRESH_MS = 45_000;
 
 export interface CollabMember {
   userId: string;
@@ -68,69 +50,18 @@ export function useShiftChatCollab({
   enabled,
   onNewMessage,
 }: UseShiftChatCollabOptions): ShiftChatCollabState {
-  const socketRef = useRef<CollabSocket | null>(null);
-  const joinedRoomRef = useRef<string | null>(null);
   const seenNudgeIds = useRef<Set<string>>(new Set());
   const typingOffTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const typingActiveRef = useRef(false);
   const peerTypingTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
-  // Latest freshly-minted bearer token. The (sync) collab auth source re-reads
-  // this on every (re)connect, so keeping it fresh keeps reconnects authorised.
-  const tokenRef = useRef<string | null>(null);
 
-  // Keep the callback fresh without re-running the connect effect.
+  // Keep the callback fresh without re-binding the socket listeners.
   const onNewMessageRef = useRef(onNewMessage);
   onNewMessageRef.current = onNewMessage;
 
-  const [isConnected, setIsConnected] = useState(false);
   const [peerTypingUserIds, setPeerTypingUserIds] = useState<string[]>([]);
-  const [presentMembers, setPresentMembers] = useState<CollabMember[]>([]);
 
-  useEffect(() => {
-    if (!enabled) return;
-
-    let cancelled = false;
-    let acquired: CollabSocket | null = null;
-    let refreshTimer: ReturnType<typeof setInterval> | null = null;
-
-    /**
-     * Fresh-token auth source. Re-read the latest minted token on every
-     * (re)connect — never a static/stale snapshot. Returns null (→ degrade) when
-     * no token is available (dev-bypass / signed-out).
-     */
-    const authSource: CollabAuthSource = () =>
-      tokenRef.current ? { token: tokenRef.current } : null;
-
-    // Re-emit join on EVERY (re)connect. socket.io rooms are per-connection and
-    // reconnection is ON (Infinity), so after any WS blip the reconnected socket
-    // has NO room membership — without re-joining, typing/presence/nudge silently
-    // die while isConnected stays true. Idempotent server-side. — panel #1 (HIGH).
-    const doJoin = () => {
-      const socket = socketRef.current;
-      if (!socket) return;
-      void joinCollabRoom(socket, { kind: "chat" }).then((ack) => {
-        if (cancelled) return;
-        if (ack?.ok) {
-          if (ack.room) joinedRoomRef.current = ack.room;
-          if (ack.members) setPresentMembers(ack.members);
-        }
-      });
-    };
-
-    const handleConnect = () => {
-      setIsConnected(true);
-      doJoin();
-    };
-    const handleDisconnect = () => setIsConnected(false);
-
-    const handlePresence = (payload: { room: string; members: CollabMember[] }) => {
-      // Drop presence for any OTHER room — on the SHARED ref-counted socket a
-      // room-A event must not overwrite this hook's room-B roster. The hook's own
-      // initial roster still arrives via the join ack.members. — panel #3 (MEDIUM).
-      if (joinedRoomRef.current && payload?.room !== joinedRoomRef.current) return;
-      setPresentMembers(Array.isArray(payload?.members) ? payload.members : []);
-    };
-
+  const bindEvents = useCallback(({ on }: CollabRoomBinding) => {
     const handlePeerTyping = (payload: { userId: string; on: boolean }) => {
       const userId = payload?.userId;
       if (!userId) return;
@@ -169,71 +100,27 @@ export function useShiftChatCollab({
       onNewMessageRef.current();
     };
 
-    const connect = () => {
-      if (cancelled) return;
-      const socket = getCollabSocket(authSource);
-      if (!socket) return; // degrade — no token / channel unavailable
-      acquired = socket;
-      socketRef.current = socket;
-
-      socket.on("connect", handleConnect);
-      socket.on("disconnect", handleDisconnect);
-      socket.on("presence", handlePresence);
-      socket.on("peer-typing", handlePeerTyping);
-      socket.on("chat-nudge", handleNudge);
-      // If the socket is ALREADY connected when listeners are bound, the `connect`
-      // event has already fired and handleConnect won't run — join once explicitly
-      // now. Every later (re)connect re-runs doJoin via handleConnect. — panel #1.
-      if (isCollabConnected()) {
-        setIsConnected(true);
-        doJoin();
-      }
-    };
-
-    // Mint a FRESH token before the first connect (fixes the "panel opened past
-    // the token TTL → expired handshake" bug), then re-mint on a cadence so the
-    // shared socket's infinite reconnects always read a valid token.
-    void resolveBearerToken().then((token) => {
-      if (cancelled) return;
-      tokenRef.current = token;
-      connect();
-    });
-    refreshTimer = setInterval(() => {
-      void resolveBearerToken().then((token) => {
-        if (!cancelled) tokenRef.current = token;
-      });
-    }, TOKEN_REFRESH_MS);
+    on("peer-typing", handlePeerTyping);
+    on("chat-nudge", handleNudge);
 
     return () => {
-      cancelled = true;
-      if (refreshTimer) clearInterval(refreshTimer);
       if (typingOffTimer.current) {
         clearTimeout(typingOffTimer.current);
         typingOffTimer.current = null;
       }
       for (const timer of peerTypingTimers.current.values()) clearTimeout(timer);
       peerTypingTimers.current.clear();
-      if (acquired) {
-        acquired.off("connect", handleConnect);
-        acquired.off("disconnect", handleDisconnect);
-        acquired.off("presence", handlePresence);
-        acquired.off("peer-typing", handlePeerTyping);
-        acquired.off("chat-nudge", handleNudge);
-        if (joinedRoomRef.current) leaveCollabRoom(acquired, joinedRoomRef.current);
-        // Only release when a socket was actually acquired — a null (degraded)
-        // getCollabSocket must NOT be paired with a release. — collab-socket contract.
-        releaseCollabSocket();
-      }
-      joinedRoomRef.current = null;
-      socketRef.current = null;
       typingActiveRef.current = false;
-      tokenRef.current = null;
       seenNudgeIds.current.clear();
-      setIsConnected(false);
       setPeerTypingUserIds([]);
-      setPresentMembers([]);
     };
-  }, [enabled]);
+  }, []);
+
+  const { isConnected, presentMembers, socketRef } = useCollabRoom({
+    enabled,
+    joinRequest: { kind: "chat" },
+    bindEvents,
+  });
 
   const notifyTyping = useCallback(() => {
     const socket = socketRef.current;
@@ -247,7 +134,7 @@ export function useShiftChatCollab({
       typingActiveRef.current = false;
       socketRef.current?.emit("typing", { on: false });
     }, TYPING_DEBOUNCE_MS);
-  }, []);
+  }, [socketRef]);
 
   return { isConnected, peerTypingUserIds, presentMembers, notifyTyping };
 }

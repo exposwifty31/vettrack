@@ -1,36 +1,21 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import {
-  getCollabSocket,
-  isCollabConnected,
-  joinCollabRoom,
-  leaveCollabRoom,
-  releaseCollabSocket,
-  type CollabAuthSource,
-  type CollabSocket,
-} from "@/lib/collab-socket";
-import { resolveBearerToken } from "@/lib/auth-fetch";
+import { isCollabConnected } from "@/lib/collab-socket";
+import { useCollabRoom, type CollabRoomBinding } from "@/features/collab/useCollabRoom";
 
 /**
  * R-RTC-1.3 · Feature 2 — wires the EPHEMERAL + ADVISORY collaboration channel
  * into `/board`: peer cursors, co-presence, and selection highlights.
  *
- * FROZEN guardrails honoured here:
- *  - LAZY connect: the ref-counted socket is acquired only while the board is
- *    mounted (BoardShell) and released on unmount — never app-wide.
- *  - GRACEFUL DEGRADATION: when the socket is unavailable (no token / not
- *    connected) this hook is inert — the board renders EXACTLY as today (static,
- *    no peer overlay) and NOTHING about board rendering is gated on the socket.
- *  - The client NEVER sends its own userId. `board-cursor` carries only the
- *    NORMALIZED {x,y}; `board-selection` only the entityId. The server attaches
- *    identity from the DB session before fanning out.
+ * The SHARED socket lifecycle (lazy connect, fresh-token handshake, re-join on
+ * reconnect, presence room-filter, graceful degradation, ref-count release) lives
+ * in `useCollabRoom`; this hook layers ONLY the board's own logic on top:
  *  - CLIENT-THROTTLED cursor emission (~<=15/s, under the server 20/s cap) so a
  *    steady pointer stream can never approach the server rate limit.
- *  - Coordinates are normalized to [0,1] (pointer / viewport) and clamped — a raw
+ *  - Coordinates normalized to [0,1] (pointer / viewport) and clamped — a raw
  *    pixel coordinate is never relayed, and no coordinate is ever put in telemetry.
- *  - FRESH token: the handshake token is minted from the SAME getter `authFetch`
- *    uses (`resolveBearerToken` → the Clerk getter), re-read on every (re)connect
- *    and refreshed on a cadence below the token TTL — a rolled-over token is never
- *    replayed under the infinite-reconnect loop.
+ *  - Peer cursors / selections with receiver-side TTLs (no deselect event in the
+ *    contract), and a throttled `board-selection` emit.
+ *  - The client NEVER sends its own userId; the server attaches identity.
  */
 
 // ~15 emissions/s max — comfortably under the server's 20/s per-socket cap.
@@ -42,8 +27,6 @@ const PEER_CURSOR_TTL_MS = 5_000;
 // Drop a peer's selection if it goes stale — there is no deselect event in the
 // contract, so a receiver-side TTL clears a highlight the peer moved off.
 const PEER_SELECTION_TTL_MS = 8_000;
-// Re-mint the handshake token below the Clerk session-token TTL (~60s).
-const TOKEN_REFRESH_MS = 45_000;
 
 export interface BoardMember {
   userId: string;
@@ -87,9 +70,6 @@ function clamp01(value: number): number {
 export function useBoardCoPresence(options: UseBoardCoPresenceOptions = {}): BoardCoPresenceState {
   const { enabled = true, now = Date.now } = options;
 
-  const socketRef = useRef<CollabSocket | null>(null);
-  const joinedRoomRef = useRef<string | null>(null);
-  const tokenRef = useRef<string | null>(null);
   const lastCursorEmitRef = useRef(Number.NEGATIVE_INFINITY);
   const lastSelectionEmitRef = useRef(Number.NEGATIVE_INFINITY);
   const nowRef = useRef(now);
@@ -97,53 +77,12 @@ export function useBoardCoPresence(options: UseBoardCoPresenceOptions = {}): Boa
   const peerCursorTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
   const peerSelectionTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
-  const [isConnected, setIsConnected] = useState(false);
-  const [presentMembers, setPresentMembers] = useState<BoardMember[]>([]);
   const [peerCursors, setPeerCursors] = useState<BoardPeerCursor[]>([]);
   const [peerSelections, setPeerSelections] = useState<BoardPeerSelection[]>([]);
 
-  useEffect(() => {
-    if (!enabled) return;
-    if (typeof window === "undefined") return;
-
-    let cancelled = false;
-    let acquired: CollabSocket | null = null;
-    let refreshTimer: ReturnType<typeof setInterval> | null = null;
+  const bindEvents = useCallback(({ on }: CollabRoomBinding) => {
     const cursorTimers = peerCursorTimers.current;
     const selectionTimers = peerSelectionTimers.current;
-
-    const authSource: CollabAuthSource = () =>
-      tokenRef.current ? { token: tokenRef.current } : null;
-
-    // Re-emit join on EVERY (re)connect. socket.io rooms are per-connection and
-    // reconnection is ON (Infinity), so after any WS blip the reconnected socket
-    // has NO room membership — PERMANENT death for the overlay on the long-lived
-    // /board kiosk unless we re-join. Idempotent server-side. — panel #1 (HIGH).
-    const doJoin = () => {
-      const socket = socketRef.current;
-      if (!socket) return;
-      void joinCollabRoom(socket, { kind: "board" }).then((ack) => {
-        if (cancelled) return;
-        if (ack?.ok) {
-          if (ack.room) joinedRoomRef.current = ack.room;
-          if (ack.members) setPresentMembers(ack.members);
-        }
-      });
-    };
-
-    const handleConnect = () => {
-      setIsConnected(true);
-      doJoin();
-    };
-    const handleDisconnect = () => setIsConnected(false);
-
-    const handlePresence = (payload: { room: string; members: BoardMember[] }) => {
-      // Drop presence for any OTHER room — on the SHARED ref-counted socket a
-      // room-A event must not overwrite the board's room-B roster. The board's own
-      // initial roster still arrives via the join ack.members. — panel #3 (MEDIUM).
-      if (joinedRoomRef.current && payload?.room !== joinedRoomRef.current) return;
-      setPresentMembers(Array.isArray(payload?.members) ? payload.members : []);
-    };
 
     const handlePeerCursor = (payload: { userId: string; x: number; y: number }) => {
       const userId = payload?.userId;
@@ -180,6 +119,33 @@ export function useBoardCoPresence(options: UseBoardCoPresenceOptions = {}): Boa
       selectionTimers.set(userId, timer);
     };
 
+    on("peer-cursor", handlePeerCursor);
+    on("peer-selection", handlePeerSelection);
+
+    return () => {
+      for (const timer of cursorTimers.values()) clearTimeout(timer);
+      cursorTimers.clear();
+      for (const timer of selectionTimers.values()) clearTimeout(timer);
+      selectionTimers.clear();
+      setPeerCursors([]);
+      setPeerSelections([]);
+    };
+  }, []);
+
+  // The base owns `presentMembers` (BoardMember is structurally CollabRoomMember).
+  const { isConnected, presentMembers, socketRef } = useCollabRoom({
+    enabled,
+    joinRequest: { kind: "board" },
+    bindEvents,
+  });
+
+  // Client-throttled cursor emission. This listener is independent of the socket
+  // acquire — it reads `socketRef.current` at emit time and no-ops when the socket
+  // is unavailable, so the board is NEVER gated on the socket. — degradation.
+  useEffect(() => {
+    if (!enabled) return;
+    if (typeof window === "undefined") return;
+
     const handlePointerMove = (event: MouseEvent) => {
       const socket = socketRef.current;
       if (!socket || !isCollabConnected()) return; // degrade — never gate on the socket
@@ -195,85 +161,35 @@ export function useBoardCoPresence(options: UseBoardCoPresenceOptions = {}): Boa
       });
     };
 
-    const connect = () => {
-      if (cancelled) return;
-      const socket = getCollabSocket(authSource);
-      if (!socket) return; // degrade — no token / channel unavailable
-      acquired = socket;
-      socketRef.current = socket;
-
-      socket.on("connect", handleConnect);
-      socket.on("disconnect", handleDisconnect);
-      socket.on("presence", handlePresence);
-      socket.on("peer-cursor", handlePeerCursor);
-      socket.on("peer-selection", handlePeerSelection);
-      // If the socket is ALREADY connected when listeners are bound, the `connect`
-      // event has already fired and handleConnect won't run — join once explicitly
-      // now. Every later (re)connect re-runs doJoin via handleConnect. — panel #1.
-      if (isCollabConnected()) {
-        setIsConnected(true);
-        doJoin();
-      }
-    };
-
-    // Mint a FRESH token before the first connect, then re-mint on a cadence so the
-    // shared socket's infinite reconnects always read a valid token.
-    void resolveBearerToken().then((token) => {
-      if (cancelled) return;
-      tokenRef.current = token;
-      connect();
-    });
-    refreshTimer = setInterval(() => {
-      void resolveBearerToken().then((token) => {
-        if (!cancelled) tokenRef.current = token;
-      });
-    }, TOKEN_REFRESH_MS);
-
     window.addEventListener("pointermove", handlePointerMove);
-
     return () => {
-      cancelled = true;
       window.removeEventListener("pointermove", handlePointerMove);
-      if (refreshTimer) clearInterval(refreshTimer);
-      for (const timer of cursorTimers.values()) clearTimeout(timer);
-      cursorTimers.clear();
-      for (const timer of selectionTimers.values()) clearTimeout(timer);
-      selectionTimers.clear();
-      if (acquired) {
-        acquired.off("connect", handleConnect);
-        acquired.off("disconnect", handleDisconnect);
-        acquired.off("presence", handlePresence);
-        acquired.off("peer-cursor", handlePeerCursor);
-        acquired.off("peer-selection", handlePeerSelection);
-        if (joinedRoomRef.current) leaveCollabRoom(acquired, joinedRoomRef.current);
-        // Only release when a socket was actually acquired — a null (degraded)
-        // getCollabSocket must NOT be paired with a release.
-        releaseCollabSocket();
-      }
-      joinedRoomRef.current = null;
-      socketRef.current = null;
-      tokenRef.current = null;
       lastCursorEmitRef.current = Number.NEGATIVE_INFINITY;
       lastSelectionEmitRef.current = Number.NEGATIVE_INFINITY;
-      setIsConnected(false);
-      setPresentMembers([]);
-      setPeerCursors([]);
-      setPeerSelections([]);
     };
-  }, [enabled]);
+  }, [enabled, socketRef]);
 
-  const selectEntity = useCallback((entityId: string | null) => {
-    const socket = socketRef.current;
-    if (!socket || !isCollabConnected()) return; // degrade — never gate on the socket
-    const id = typeof entityId === "string" ? entityId.trim() : "";
-    // No deselect event in the contract; a null/empty clear is a local no-op and the
-    // peer-side TTL clears a stale highlight.
-    if (!id) return;
-    const ts = nowRef.current();
-    if (ts - lastSelectionEmitRef.current < SELECTION_MIN_INTERVAL_MS) return; // client throttle
-    lastSelectionEmitRef.current = ts;
-    socket.emit("board-selection", { entityId: id }); // NO userId — server attaches identity
-  }, []);
+  const selectEntity = useCallback(
+    (entityId: string | null) => {
+      const socket = socketRef.current;
+      if (!socket || !isCollabConnected()) return; // degrade — never gate on the socket
+      const id = typeof entityId === "string" ? entityId.trim() : "";
+      // No deselect event in the contract; a null/empty clear is a local no-op and the
+      // peer-side TTL clears a stale highlight.
+      if (!id) return;
+      const ts = nowRef.current();
+      if (ts - lastSelectionEmitRef.current < SELECTION_MIN_INTERVAL_MS) return; // client throttle
+      lastSelectionEmitRef.current = ts;
+      socket.emit("board-selection", { entityId: id }); // NO userId — server attaches identity
+    },
+    [socketRef],
+  );
 
-  return { isConnected, presentMembers, peerCursors, peerSelections, selectEntity };
+  return {
+    isConnected,
+    presentMembers,
+    peerCursors,
+    peerSelections,
+    selectEntity,
+  };
 }
