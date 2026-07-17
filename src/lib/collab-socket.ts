@@ -112,6 +112,16 @@ let refCount = 0;
 let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
 
 /**
+ * Registry of the ACTIVE auth providers on the SHARED socket. The `io()` auth
+ * callback closes over THIS set, not over the first acquirer's source — so when
+ * the first consumer releases while peers remain, its (now stale/null) token is
+ * NOT replayed on reconnect; a still-active consumer's fresh token is resolved
+ * instead. Each acquire adds its source; each release removes it; a hard close
+ * clears all. — multi-consumer auth-capture fix (extends card H6).
+ */
+const activeAuthSources = new Set<CollabAuthSource>();
+
+/**
  * Start the single presence-heartbeat interval for the shared socket. Idempotent.
  * Emits ONLY while the socket is connected (a queued emit on a down socket would be
  * pointless) — graceful degradation stays intact: no heartbeat, no error, no gated
@@ -141,6 +151,9 @@ export function getCollabSocket(auth: CollabAuthSource | null, origin?: string):
   if (auth === null) return null;
   if (!resolveAuth(auth)) return null;
 
+  // Register this consumer's source among the ACTIVE providers on the shared socket.
+  activeAuthSources.add(auth);
+
   if (socket) {
     refCount += 1;
     return socket;
@@ -150,10 +163,19 @@ export function getCollabSocket(auth: CollabAuthSource | null, origin?: string):
     path: COLLAB_PATH,
     transports: ["websocket"],
     // Auth is a CALLBACK so each (re)connect reads a FRESH token instead of
-    // replaying the original one forever under reconnectionAttempts: Infinity. — H6.
+    // replaying the original one forever under reconnectionAttempts: Infinity (— H6).
+    // It resolves the FIRST still-ACTIVE registered source that yields a non-empty
+    // token, skipping released/null ones — a released first acquirer must never
+    // fail reconnect auth for peers that still hold fresh tokens.
     auth: (cb: (data: Record<string, unknown>) => void) => {
-      const resolved = resolveAuth(auth);
-      cb({ token: resolved?.token ?? "", dev: resolved?.dev });
+      for (const source of activeAuthSources) {
+        const resolved = resolveAuth(source);
+        if (resolved?.token) {
+          cb({ token: resolved.token, dev: resolved.dev });
+          return;
+        }
+      }
+      cb({ token: "" });
     },
     reconnection: true,
     reconnectionAttempts: Infinity,
@@ -211,7 +233,10 @@ export function leaveCollabRoom(s: CollabSocket, room: string): void {
  * holder releases (ref count reaches zero). A single consumer unmount must never
  * disconnect the socket out from under other mounted consumers. — card H1.
  */
-export function releaseCollabSocket(): void {
+export function releaseCollabSocket(source?: CollabAuthSource | null): void {
+  // Drop this consumer's auth source from the ACTIVE registry so a later reconnect
+  // never resolves a released consumer's (stale/null) token. — multi-consumer fix.
+  if (source) activeAuthSources.delete(source);
   if (!socket) return;
   refCount -= 1;
   if (refCount <= 0) {
@@ -220,6 +245,7 @@ export function releaseCollabSocket(): void {
     socket.disconnect();
     socket = null;
     refCount = 0;
+    activeAuthSources.clear();
   }
 }
 
@@ -235,4 +261,5 @@ export function closeCollabSocket(): void {
     socket = null;
   }
   refCount = 0;
+  activeAuthSources.clear();
 }

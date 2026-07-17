@@ -161,7 +161,17 @@ export function useCollabRoom({
       setIsConnected(true);
       doJoin();
     };
-    const handleDisconnect = () => setIsConnected(false);
+    const handleDisconnect = () => {
+      // socket.io rooms are per-connection: a disconnect drops all room membership,
+      // so the joined roster is stale until the reconnect re-join (handleConnect →
+      // doJoin) repopulates it. Clear joined state now so the surface never shows a
+      // stale "joined"/roster between the blip and the re-join. — card (b).
+      setIsConnected(false);
+      setIsJoined(false);
+      joinedRoomRef.current = null;
+      setJoinedRoom(null);
+      setPresentMembers([]);
+    };
 
     const handlePresence = (payload: { room: string; members: CollabRoomMember[] }) => {
       // Drop presence for any room that is not THIS hook's joined room — on the
@@ -211,18 +221,26 @@ export function useCollabRoom({
       }
     };
 
+    // Mint a fresh token, storing it on success and degrading (keep the last token,
+    // or null) on failure. try/catch keeps a token-fetch rejection from leaking as an
+    // UNHANDLED promise rejection and never throws — graceful degradation. — card (c).
+    const refreshToken = async (): Promise<void> => {
+      try {
+        const token = await resolveBearerToken();
+        if (!cancelled) tokenRef.current = token;
+      } catch {
+        // Keep the last token (or null → degrade). A later refresh/reconnect retries.
+      }
+    };
+
     // Mint a FRESH token before the first connect (fixes the "opened past the token
     // TTL → expired handshake" bug), then re-mint on a cadence so the shared
     // socket's infinite reconnects always read a valid token.
-    void resolveBearerToken().then((token) => {
-      if (cancelled) return;
-      tokenRef.current = token;
-      connect();
+    void refreshToken().then(() => {
+      if (!cancelled) connect();
     });
     refreshTimer = setInterval(() => {
-      void resolveBearerToken().then((token) => {
-        if (!cancelled) tokenRef.current = token;
-      });
+      void refreshToken();
     }, TOKEN_REFRESH_MS);
 
     return () => {
@@ -236,7 +254,9 @@ export function useCollabRoom({
         if (joinedRoomRef.current) leaveCollabRoom(acquired, joinedRoomRef.current);
         // Only release when a socket was actually acquired — a null (degraded)
         // getCollabSocket must NOT be paired with a release. — collab-socket contract.
-        releaseCollabSocket();
+        // Pass THIS hook's authSource so it is dropped from the shared socket's active
+        // auth registry — a released consumer's token must not be replayed. — card (a).
+        releaseCollabSocket(authSource);
       }
       joinedRoomRef.current = null;
       socketRef.current = null;

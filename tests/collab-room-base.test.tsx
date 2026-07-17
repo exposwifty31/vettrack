@@ -237,6 +237,50 @@ describe("useCollabRoom — shared base-hook lifecycle (R-RTC-1 panel #5)", () =
     expect(() => unmount()).not.toThrow();
   });
 
+  it("clears isJoined + joinedRoom + presentMembers on disconnect (no stale roster before re-join)", async () => {
+    seedToken(JWT);
+    const { result } = renderHook(() =>
+      useCollabRoom({ enabled: true, joinRequest: { kind: "chat" } }),
+    );
+    const socket = await connectedSocket();
+    await act(async () => acceptJoin(socket, "clinic:c1:chat", [{ userId: "p1", displayName: "Dana" }]));
+    expect(result.current.isJoined).toBe(true);
+    expect(result.current.joinedRoom).toBe("clinic:c1:chat");
+    expect(result.current.presentMembers).toHaveLength(1);
+
+    // A WS blip must not leave a stale joined roster showing between the disconnect
+    // and the reconnect re-join — the re-join (handleConnect → doJoin) repopulates.
+    act(() => socket.trigger("disconnect"));
+    expect(result.current.isConnected).toBe(false);
+    expect(result.current.isJoined).toBe(false);
+    expect(result.current.joinedRoom).toBeNull();
+    expect(result.current.presentMembers).toEqual([]);
+  });
+
+  it("degrades with NO unhandled rejection when the token fetch REJECTS", async () => {
+    const rejections: unknown[] = [];
+    const onUnhandled = (reason: unknown) => rejections.push(reason);
+    process.on("unhandledRejection", onUnhandled);
+    try {
+      // resolveBearerToken() routes through the Clerk token getter; a rejecting getter
+      // simulates a failed token mint. Without a .catch this leaks an unhandled rejection.
+      setClerkTokenGetter(() => Promise.reject(new Error("token fetch failed")));
+      const { result } = renderHook(() =>
+        useCollabRoom({ enabled: true, joinRequest: { kind: "chat" } }),
+      );
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      });
+      // Graceful degradation: no token → no socket, hook inert, and (critically) the
+      // token-fetch rejection was swallowed — no unhandled promise rejection.
+      expect(ioMock).not.toHaveBeenCalled();
+      expect(result.current.isConnected).toBe(false);
+      expect(rejections).toEqual([]);
+    } finally {
+      process.off("unhandledRejection", onUnhandled);
+    }
+  });
+
   it("does NOT reconnect when a fresh joinRequest object with the same kind is passed each render", async () => {
     seedToken(JWT);
     const { rerender } = renderHook(

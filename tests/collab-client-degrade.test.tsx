@@ -155,4 +155,49 @@ describe("collab-socket client primitive — graceful degradation (R-RTC-1.6)", 
     getCollabSocket({ token: "t" });
     expect(ioMock.mock.calls[0][0]).toBe(window.location.origin);
   });
+
+  it("resolves a LATER consumer's fresh token after the FIRST acquirer releases (multi-consumer auth registry)", () => {
+    let t1: string | null = "token-1";
+    const t2 = "token-2";
+    const src1 = () => (t1 ? { token: t1 } : null);
+    const src2 = () => ({ token: t2 });
+
+    getCollabSocket(src1); // first acquirer builds the io() socket
+    getCollabSocket(src2); // second consumer shares the singleton
+
+    // The first consumer unmounts: it releases AND its session token goes stale/null.
+    // A naive io() auth callback that closed over the FIRST source would now replay a
+    // null token on reconnect even though a live consumer still holds a fresh one.
+    releaseCollabSocket(src1);
+    t1 = null;
+
+    const opts = ioMock.mock.calls[0][1] as {
+      auth: (cb: (d: { token?: string }) => void) => void;
+    };
+    let captured: { token?: string } = {};
+    opts.auth((d) => {
+      captured = d;
+    });
+    // Reconnect resolves the FIRST still-ACTIVE source that yields a non-empty token —
+    // the released first consumer is skipped, the second consumer's fresh token wins.
+    expect(captured.token).toBe("token-2");
+  });
+
+  it("clears all registered auth sources on closeCollabSocket (no leak into a later socket)", () => {
+    const stale = () => ({ token: "stale" });
+    getCollabSocket(stale);
+    closeCollabSocket();
+
+    // A brand-new socket after a hard sign-out must NOT resolve a pre-signout source.
+    const fresh = () => ({ token: "fresh" });
+    getCollabSocket(fresh);
+    const opts = ioMock.mock.calls[1][1] as {
+      auth: (cb: (d: { token?: string }) => void) => void;
+    };
+    let captured: { token?: string } = {};
+    opts.auth((d) => {
+      captured = d;
+    });
+    expect(captured.token).toBe("fresh");
+  });
 });

@@ -20,6 +20,9 @@ interface RecordPresenceIndicatorProps {
 export function RecordPresenceIndicator({ editors }: RecordPresenceIndicatorProps) {
   if (editors.length === 0) return null;
 
+  // The `length === 0` guard above returns, so `editors` is non-empty here; TS
+  // cannot narrow the element type from a length check, so the non-null assertion
+  // on the guaranteed-present first element is safe.
   const first = editors[0]!;
   const name = first.displayName.trim();
   const label = name ? t.recordCollab.editingThis(name) : t.recordCollab.someoneEditing;
