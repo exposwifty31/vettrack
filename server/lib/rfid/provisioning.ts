@@ -287,30 +287,54 @@ export async function ackRotationReader(
   readerId: string,
   now: number = Date.now(),
 ): Promise<{ status: RotationStatus; rollbackAvailable: boolean }> {
-  const rot = await getRotationRow(clinicId, { id: rotationId });
-  if (!rot) throw new RfidRotationError("ROTATION_NOT_FOUND", "RFID secret rotation not found", 404);
+  // The ack is a read-modify-write of the `ackedReaderIds` set. Concurrent acks from two readers
+  // must NOT clobber each other (a lost append can leave `allAcked` permanently false). Serialize
+  // per-rotation with a row lock so the merge + completion test see a consistent, committed set.
+  type AckOutcome =
+    | { kind: "not_found" }
+    | { kind: "settled"; status: RotationStatus }
+    | { kind: "finalize"; rot: RfidSecretRotation }
+    | { kind: "grace" };
 
-  if (rot.status !== "grace" || !rot.previousRetained) {
-    return { status: rot.status as RotationStatus, rollbackAvailable: false };
+  const outcome = await db.transaction<AckOutcome>(async (tx) => {
+    const [rot] = await tx
+      .select()
+      .from(rfidSecretRotations)
+      .where(and(eq(rfidSecretRotations.clinicId, clinicId), eq(rfidSecretRotations.id, rotationId)))
+      .limit(1)
+      .for("update");
+    if (!rot) return { kind: "not_found" };
+
+    if (rot.status !== "grace" || !rot.previousRetained) {
+      return { kind: "settled", status: rot.status as RotationStatus };
+    }
+    if (now > new Date(rot.graceExpiresAt).getTime()) {
+      return { kind: "finalize", rot };
+    }
+
+    const snapshot = rot.snapshotReaderIds ?? [];
+    const acked = new Set(rot.ackedReaderIds ?? []);
+    acked.add(readerId);
+
+    await tx
+      .update(rfidSecretRotations)
+      .set({ ackedReaderIds: [...acked], updatedAt: new Date(now) })
+      .where(and(eq(rfidSecretRotations.clinicId, clinicId), eq(rfidSecretRotations.id, rotationId)));
+
+    const allAcked = snapshot.length > 0 && snapshot.every((id) => acked.has(id));
+    return allAcked ? { kind: "finalize", rot } : { kind: "grace" };
+  });
+
+  if (outcome.kind === "not_found") {
+    throw new RfidRotationError("ROTATION_NOT_FOUND", "RFID secret rotation not found", 404);
   }
-  if (now > new Date(rot.graceExpiresAt).getTime()) {
-    await finalizeRotation(clinicId, rot, now);
-    return { status: "completed", rollbackAvailable: false };
+  if (outcome.kind === "settled") {
+    return { status: outcome.status, rollbackAvailable: false };
   }
-
-  const snapshot = rot.snapshotReaderIds ?? [];
-  const acked = new Set(rot.ackedReaderIds ?? []);
-  acked.add(readerId);
-  const ackedArr = [...acked];
-
-  await db
-    .update(rfidSecretRotations)
-    .set({ ackedReaderIds: ackedArr, updatedAt: new Date(now) })
-    .where(and(eq(rfidSecretRotations.clinicId, clinicId), eq(rfidSecretRotations.id, rotationId)));
-
-  const allAcked = snapshot.length > 0 && snapshot.every((id) => acked.has(id));
-  if (allAcked) {
-    await finalizeRotation(clinicId, rot, now);
+  if (outcome.kind === "finalize") {
+    // finalize runs its own CAS + credential mutation AFTER the ack transaction commits (never
+    // nested inside it), so the two never contend for the same locked row.
+    await finalizeRotation(clinicId, outcome.rot, now);
     return { status: "completed", rollbackAvailable: false };
   }
   return { status: "grace", rollbackAvailable: true };
