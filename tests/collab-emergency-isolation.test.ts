@@ -11,8 +11,9 @@
  * Plus the closed-enum telemetry rejection.
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { readFileSync, readdirSync } from "node:fs";
+import { readFileSync, readdirSync, mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
+import { tmpdir } from "node:os";
 import { createServer, type Server as HttpServer } from "node:http";
 import { type AddressInfo } from "node:net";
 import { initCollabServer } from "../server/lib/realtime-collab/server.js";
@@ -46,6 +47,25 @@ function importsForbiddenModule(src: string, forbidden: string): boolean {
   const staticRe = new RegExp(`(import|from)\\s+["'][^"']*${mod}`);
   const dynamicRe = new RegExp(`import\\s*\\(\\s*["'\`][^"'\`]*${mod}`);
   return staticRe.test(src) || dynamicRe.test(src);
+}
+
+/**
+ * Walk a directory tree, flagging every `.ts` file (at ANY depth) that imports a
+ * FORBIDDEN emergency/SSE/outbox module. `readdirSync(dir, { recursive: true })`
+ * descends into subdirectories — a NON-recursive scan (direct children only) would let
+ * a future NESTED collab module (e.g. `realtime-collab/adapters/x.ts`) couple to the
+ * frozen surface and silently pass THE only merge gate. — PR#112 (b).
+ */
+function collectImportOffenders(dir: string): string[] {
+  const offenders: string[] = [];
+  const entries = readdirSync(dir, { recursive: true }) as string[];
+  for (const rel of entries.filter((f) => f.endsWith(".ts"))) {
+    const src = readFileSync(join(dir, rel), "utf8");
+    for (const forbidden of FORBIDDEN) {
+      if (importsForbiddenModule(src, forbidden)) offenders.push(`${rel} → ${forbidden}`);
+    }
+  }
+  return offenders;
 }
 
 describe("R-RTC-1.7 — emergency isolation merge gate", () => {
@@ -127,17 +147,32 @@ describe("R-RTC-1.7 — emergency isolation merge gate", () => {
     expect(httpServer.listening).toBe(true);
   });
 
-  it("STRUCTURAL: no collab source file imports an emergency / SSE / outbox module", () => {
+  it("STRUCTURAL: no collab source file imports an emergency / SSE / outbox module (recursive)", () => {
     const dir = join(process.cwd(), "server", "lib", "realtime-collab");
-    const offenders: string[] = [];
-    for (const file of readdirSync(dir).filter((f) => f.endsWith(".ts"))) {
-      const src = readFileSync(join(dir, file), "utf8");
-      for (const forbidden of FORBIDDEN) {
-        // Only flag actual import statements, not comment prose.
-        if (importsForbiddenModule(src, forbidden)) offenders.push(`${file} → ${forbidden}`);
-      }
+    // Recursive walk: catches a forbidden import in a NESTED module, not just direct children.
+    expect(collectImportOffenders(dir)).toEqual([]);
+  });
+
+  it("STRUCTURAL scan is RECURSIVE: a forbidden import in a NESTED collab module IS caught", () => {
+    // A non-recursive `readdirSync(dir)` scan sees only direct children, so a future
+    // `realtime-collab/<subdir>/x.ts` that couples to the frozen emergency surface would
+    // evade THE only merge gate. Prove the walk descends: a nested file that imports a
+    // forbidden module MUST be flagged, while a sibling clean file is not. — PR#112 (b).
+    const fixture = mkdtempSync(join(tmpdir(), "collab-nested-scan-"));
+    try {
+      mkdirSync(join(fixture, "adapters"));
+      writeFileSync(join(fixture, "clean.ts"), "export const ok = 1;\n");
+      writeFileSync(
+        join(fixture, "adapters", "sneaky.ts"),
+        'import { publish } from "../../event-publisher.js";\n',
+      );
+      const offenders = collectImportOffenders(fixture);
+      expect(offenders).toContain(`${join("adapters", "sneaky.ts")} → event-publisher`);
+      // The clean sibling is never flagged (no false positive from the recursion).
+      expect(offenders.some((o) => o.startsWith("clean.ts"))).toBe(false);
+    } finally {
+      rmSync(fixture, { recursive: true, force: true });
     }
-    expect(offenders).toEqual([]);
   });
 
   it("STRUCTURAL scanner catches a DYNAMIC import() of a forbidden emergency module", () => {

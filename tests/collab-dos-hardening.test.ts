@@ -132,15 +132,23 @@ describe("R-RTC-1 collaboration channel — H2 DoS hardening (live server)", () 
     a.close();
   });
 
-  it("rejects join floods beyond JOIN_MAX_PER_SEC with RATE_LIMITED", async () => {
+  it("rejects join floods beyond JOIN_MAX_PER_SEC with RATE_LIMITED (accepted count stays within budget)", async () => {
     const a = connect({ token: tokenFor("alice", "clinic-A") });
     await waitConnect(a);
     // Flood the SAME room so the rooms cap never trips — only the rate limit can.
+    const flood = JOIN_MAX_PER_SEC + 15;
     const acks = await Promise.all(
-      Array.from({ length: JOIN_MAX_PER_SEC + 15 }, () => joinAck(a, { kind: "chat" })),
+      Array.from({ length: flood }, () => joinAck(a, { kind: "chat" })),
     );
-    const limited = acks.filter((r) => r.ok === false && r.reason === "RATE_LIMITED");
+    const accepted = acks.filter((r) => r.ok === true);
+    const limited = acks.filter((r) => r.ok === false);
+    // Some joins WERE throttled — `limited.length > 0` alone would pass even if nearly
+    // the whole flood was accepted, so also pin the ACCEPTED count within the budget and
+    // prove every rejection is a RATE_LIMITED (not some other reason). — PR#112 (a).
     expect(limited.length).toBeGreaterThan(0);
+    expect(accepted.length).toBeLessThanOrEqual(JOIN_MAX_PER_SEC);
+    expect(accepted.length + limited.length).toBe(flood);
+    expect(limited.every((r) => r.reason === "RATE_LIMITED")).toBe(true);
     a.close();
   });
 

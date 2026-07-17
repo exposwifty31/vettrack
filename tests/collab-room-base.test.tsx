@@ -21,6 +21,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 
+type FakeHandler = (payload?: unknown) => void;
+
 interface FakeSocket {
   connected: boolean;
   emit: ReturnType<typeof vi.fn>;
@@ -28,31 +30,46 @@ interface FakeSocket {
   off: ReturnType<typeof vi.fn>;
   disconnect: ReturnType<typeof vi.fn>;
   removeAllListeners: ReturnType<typeof vi.fn>;
-  handlers: Map<string, (payload?: unknown) => void>;
+  // A Set of handlers PER event — socket.io allows many listeners for one event and
+  // off(event, handler) removes exactly one. A single-handler Map cannot model that. — PR#112 (e).
+  handlers: Map<string, Set<FakeHandler>>;
   trigger: (event: string, payload?: unknown) => void;
 }
 
 const fakeSockets: FakeSocket[] = [];
 
 function makeFakeSocket(): FakeSocket {
-  const handlers = new Map<string, (payload?: unknown) => void>();
+  const handlers = new Map<string, Set<FakeHandler>>();
   const s: FakeSocket = {
     connected: true,
     emit: vi.fn(),
-    on: vi.fn((event: string, handler: (payload?: unknown) => void) => {
-      handlers.set(event, handler);
+    on: vi.fn((event: string, handler: FakeHandler) => {
+      let set = handlers.get(event);
+      if (!set) {
+        set = new Set();
+        handlers.set(event, set);
+      }
+      set.add(handler);
       return s;
     }),
-    off: vi.fn((event: string) => {
-      handlers.delete(event);
+    off: vi.fn((event: string, handler?: FakeHandler) => {
+      const set = handlers.get(event);
+      if (!set) return s;
+      // off(event) with no handler clears every listener; off(event, handler) removes one.
+      if (handler === undefined) handlers.delete(event);
+      else {
+        set.delete(handler);
+        if (set.size === 0) handlers.delete(event);
+      }
       return s;
     }),
     disconnect: vi.fn(),
     removeAllListeners: vi.fn(() => handlers.clear()),
     handlers,
     trigger: (event, payload) => {
-      const h = handlers.get(event);
-      if (h) h(payload);
+      const set = handlers.get(event);
+      if (!set) return;
+      for (const h of [...set]) h(payload);
     },
   };
   return s;
@@ -279,6 +296,33 @@ describe("useCollabRoom — shared base-hook lifecycle (R-RTC-1 panel #5)", () =
     } finally {
       process.off("unhandledRejection", onUnhandled);
     }
+  });
+
+  it("fake-socket harness models MULTIPLE handlers per event with selective off (fidelity)", () => {
+    // The shared fake must faithfully mirror socket.io's EventEmitter: on() ADDS a
+    // listener (many per event), off(event, handler) removes ONLY that handler, and
+    // trigger() invokes them ALL. A Map<string,handler> harness (one per event, off
+    // deletes all) silently drops a second listener and over-removes on off — hiding
+    // real cleanup regressions in the hook it stands in for. — PR#112 (e).
+    const s = makeFakeSocket();
+    const h1 = vi.fn();
+    const h2 = vi.fn();
+    s.on("evt", h1);
+    s.on("evt", h2);
+    s.trigger("evt", "x");
+    expect(h1).toHaveBeenCalledWith("x");
+    expect(h2).toHaveBeenCalledWith("x");
+
+    // Selective off: only h1 is removed; h2 stays registered.
+    s.off("evt", h1);
+    s.trigger("evt", "y");
+    expect(h1).toHaveBeenCalledTimes(1); // not invoked again
+    expect(h2).toHaveBeenCalledTimes(2); // still invoked
+
+    // off with no handler clears every listener for the event.
+    s.off("evt");
+    s.trigger("evt", "z");
+    expect(h2).toHaveBeenCalledTimes(2); // no further invocation
   });
 
   it("does NOT reconnect when a fresh joinRequest object with the same kind is passed each render", async () => {

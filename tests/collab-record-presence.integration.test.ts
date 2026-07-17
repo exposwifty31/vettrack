@@ -101,7 +101,16 @@ function joinRecord(s: ClientSocket, recordType: string, recordId: string): Prom
 }
 
 function joinKind(s: ClientSocket, kind: "chat" | "board"): Promise<void> {
-  return new Promise((resolve) => s.emit("join", { kind }, () => resolve()));
+  // Mirror joinRecord: REJECT on a non-ok ack. Resolving on EVERY ack regardless of
+  // `ack.ok` would let a rejected chat/board join yield a false "chat-only peer" pass
+  // (the socket never actually entered the room). — PR#112 (d).
+  return new Promise((resolve, reject) => {
+    s.emit("join", { kind }, (ack: unknown) => {
+      const a = ack as { ok?: boolean; reason?: string };
+      if (a?.ok) resolve();
+      else reject(new Error(`join failed: ${a?.reason ?? "unknown"}`));
+    });
+  });
 }
 
 beforeAll(async () => {

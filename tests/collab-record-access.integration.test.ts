@@ -20,19 +20,28 @@ import { RECORD_TYPES, type CollabIdentity, type RecordType } from "../server/li
 
 // ── DB probe (same URL the db.js singleton reads) ───────────────────────────
 const DATABASE_URL = process.env.DATABASE_URL ?? "";
+const REQUIRED_TABLES = ["vt_clinics", "vt_equipment", "vt_rooms", "vt_appointments"] as const;
 let probePool: Pool | null = null;
+// Reachability is derived from `SELECT 1` ALONE. A MISSING required table must NOT
+// collapse into "unreachable" — that would silently SKIP the whole tenancy-SECURITY
+// suite when the DB is present but under-migrated. Reachability gates the skip; table
+// presence is captured separately and surfaced as a FAILURE in beforeAll. — PR#112 (c).
 let dbReachable = false;
+let requiredTablesPresent = false;
 
 if (DATABASE_URL) {
   probePool = new Pool({ connectionString: DATABASE_URL, connectionTimeoutMillis: 2000, max: 2 });
   try {
     await probePool.query("SELECT 1");
+    dbReachable = true;
     const { rows } = await probePool.query<{ table_name: string }>(
       `SELECT table_name FROM information_schema.tables
-       WHERE table_name IN ('vt_clinics','vt_equipment','vt_rooms','vt_appointments')`,
+       WHERE table_name = ANY($1)`,
+      [REQUIRED_TABLES as unknown as string[]],
     );
-    dbReachable = rows.length === 4;
+    requiredTablesPresent = rows.length === REQUIRED_TABLES.length;
   } catch {
+    // Only a genuine connection/query failure means unreachable → clean skip.
     dbReachable = false;
   }
 }
@@ -87,6 +96,13 @@ async function purge() {
 describe.skipIf(!dbReachable)("defaultRecordAccessCheck — real clinic-scoped ACL (R-RTC-1.1/1.4)", () => {
   beforeAll(async () => {
     if (!dbReachable) throw new Error("DATABASE_URL required");
+    // The DB is reachable but under-migrated: SURFACE it as a failure — never let a
+    // missing required table silently skip this tenancy-security suite. — PR#112 (c).
+    if (!requiredTablesPresent) {
+      throw new Error(
+        `required tables missing (${REQUIRED_TABLES.join(", ")}) — run migrations before this suite`,
+      );
+    }
     await purge(); // clean any leftovers
     await seed();
   });
