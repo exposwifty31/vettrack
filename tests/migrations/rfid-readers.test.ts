@@ -25,13 +25,24 @@ async function expectReject(
   fn: () => Promise<unknown>,
   message: string,
 ): Promise<void> {
-  let threw = false;
+  let caught: unknown;
   try {
     await fn();
-  } catch {
-    threw = true;
+  } catch (error) {
+    caught = error;
   }
-  assert.ok(threw, message);
+  assert.ok(caught !== undefined, `${message} (expected a rejection, but the statement succeeded)`);
+  // Every negative case in this suite is an in-DB tenant/integrity guard, so the
+  // rejection MUST carry a Postgres SQLSTATE in the integrity-constraint class
+  // (23xxx: not-null 23502, foreign_key 23503, unique 23505, check 23514).
+  // Asserting the class rejects false positives — a connection failure, a missing
+  // relation/column (08xxx / 42xxx), or a plain JS error would otherwise satisfy a
+  // bare "did it throw?" check and mask a broken migration.
+  const code = (caught as { code?: unknown }).code;
+  assert.ok(
+    typeof code === "string" && code.startsWith("23"),
+    `${message} (expected a 23xxx integrity-constraint SQLSTATE, got ${String(code)})`,
+  );
 }
 
 async function main() {

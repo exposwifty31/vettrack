@@ -59,6 +59,13 @@ if (DATABASE_URL) {
   }
 }
 
+// The suite's afterAll (which ends probePool) only runs when the suite runs.
+// If a URL was configured but the DB/schema is unusable, the suite is skipped —
+// so close the probe pool here to avoid leaking an open connection.
+if (probePool && !dbReachable) {
+  await probePool.end();
+}
+
 const describeDb = dbReachable ? describe.sequential : describe.skip;
 
 const SECRET = `golden-secret-${randomUUID().slice(0, 8)}`;

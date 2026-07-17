@@ -39,6 +39,13 @@ if (DATABASE_URL) {
   }
 }
 
+// The suite's afterAll (which ends probePool) only runs when the suite runs.
+// If a URL was configured but the DB/schema is unusable, the suite is skipped —
+// so close the probe pool here to avoid leaking an open connection.
+if (probePool && !dbReachable) {
+  await probePool.end();
+}
+
 const describeDb = dbReachable ? describe.sequential : describe.skip;
 
 describeDb("R-M1.2a directional ingest", () => {
@@ -162,6 +169,29 @@ describeDb("R-M1.2a directional ingest", () => {
     return row!;
   }
 
+  // A HARD REJECT must be atomic: no directional read, no egress signal, and no
+  // realtime outbox row may leak. `beforeEach` clears all three, so any row here
+  // is a partial write from the rejected batch.
+  async function expectNoPersistedSideEffects() {
+    const reads = await db
+      .select()
+      .from(equipmentRfidReads)
+      .where(eq(equipmentRfidReads.equipmentId, equipmentId));
+    expect(reads).toHaveLength(0);
+
+    const egress = await db
+      .select()
+      .from(rfidEgressSignals)
+      .where(eq(rfidEgressSignals.equipmentId, equipmentId));
+    expect(egress).toHaveLength(0);
+
+    const outbox = await db
+      .select()
+      .from(eventOutbox)
+      .where(and(eq(eventOutbox.clinicId, clinicA), eq(eventOutbox.type, "EQUIPMENT_RFID_OBSERVED")));
+    expect(outbox).toHaveLength(0);
+  }
+
   it("valid directional payload (exited internal gate) resolves to the destination room", async () => {
     const before = await loadEquipment();
     const result = await ingestRfidBatch(clinicA, {
@@ -204,6 +234,7 @@ describeDb("R-M1.2a directional ingest", () => {
       }),
     ).rejects.toMatchObject({ code: "PARTIAL_GATEWAY_PAIR" });
     expect(await loadEquipment()).toMatchObject({ lastRfidRoomId: null });
+    await expectNoPersistedSideEffects();
   });
 
   it("rejects a direction/gateway disagreement", async () => {
@@ -223,6 +254,7 @@ describeDb("R-M1.2a directional ingest", () => {
       }),
     ).rejects.toBeInstanceOf(RfidDirectionalRejection);
     expect(await loadEquipment()).toMatchObject({ lastRfidRoomId: null });
+    await expectNoPersistedSideEffects();
   });
 
   it("rejects an unknown / cross-clinic gateway on a directional payload", async () => {
@@ -233,5 +265,6 @@ describeDb("R-M1.2a directional ingest", () => {
       }),
     ).rejects.toMatchObject({ code: "UNKNOWN_GATEWAY" });
     expect(await loadEquipment()).toMatchObject({ lastRfidRoomId: null });
+    await expectNoPersistedSideEffects();
   });
 });

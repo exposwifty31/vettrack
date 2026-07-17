@@ -39,6 +39,13 @@ if (DATABASE_URL) {
   }
 }
 
+// The suite's afterAll (which ends probePool) only runs when the suite runs.
+// If a URL was configured but the DB/schema is unusable, the suite is skipped —
+// so close the probe pool here to avoid leaking an open connection.
+if (probePool && !dbReachable) {
+  await probePool.end();
+}
+
 const describeDb = dbReachable ? describe.sequential : describe.skip;
 
 describeDb("R-M1.2c directional resolve + possible_egress", () => {
@@ -188,6 +195,9 @@ describeDb("R-M1.2c directional resolve + possible_egress", () => {
     expect(reordered.possibleEgress).toBe(0);
     // exactly one row per distinct readAt (08:30 and 08:31), never a duplicate of either.
     const rows = await egressRows();
+    // Both distinct reads must have persisted (the size-vs-length check below
+    // is vacuously true for 0 or 1 rows, so pin the exact expected count first).
+    expect(rows).toHaveLength(2);
     const distinctReadAts = new Set(rows.map((r) => r.detectedAt.toISOString()));
     expect(distinctReadAts.size).toBe(rows.length);
   });

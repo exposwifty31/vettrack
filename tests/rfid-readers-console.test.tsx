@@ -232,6 +232,9 @@ describe("RfidReadersConsolePage — provision secret + ingest toggle", () => {
     // The plaintext secret is surfaced once in the reveal dialog.
     const reveal = await screen.findByTestId("provisioned-secret");
     expect(reveal.textContent).toBe("s3cr3t-abcdef0123456789");
+    // ...and NOWHERE else — the one-time disclosure guarantee means the plaintext
+    // must appear exactly once across the whole rendered page.
+    expect(screen.getAllByText("s3cr3t-abcdef0123456789")).toHaveLength(1);
   });
 
   it("toggles ingest on and off through the provisioning endpoint", async () => {

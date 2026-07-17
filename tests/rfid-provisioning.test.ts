@@ -32,6 +32,9 @@ import { createHmac, randomUUID } from "crypto";
 const DATABASE_URL = process.env.DATABASE_URL ?? "";
 let probePool: Pool | null = null;
 let dbReachable = false;
+// Every clinic this suite seeds, so teardown can delete them (and their child
+// rows) instead of leaving them behind to pollute a persistent integration DB.
+const seededClinics = new Set<string>();
 
 if (DATABASE_URL) {
   probePool = new Pool({ connectionString: DATABASE_URL, connectionTimeoutMillis: 2500, max: 4 });
@@ -89,6 +92,7 @@ const {
 
 async function seedClinic(pool: Pool, clinicId: string) {
   await pool.query("INSERT INTO vt_clinics (id) VALUES ($1) ON CONFLICT DO NOTHING", [clinicId]);
+  seededClinics.add(clinicId);
 }
 async function seedReader(pool: Pool, clinicId: string, status = "active"): Promise<string> {
   const id = uid();
@@ -100,7 +104,20 @@ async function seedReader(pool: Pool, clinicId: string, status = "active"): Prom
 }
 
 afterAll(async () => {
-  await probePool?.end().catch(() => {});
+  try {
+    if (probePool && seededClinics.size > 0) {
+      const ids = [...seededClinics];
+      // Child rows first: vt_rfid_readers and vt_equipment both carry
+      // clinic_id ON DELETE RESTRICT (deleting equipment cascades its rfid
+      // reads/egress). vt_rfid_secret_rotations is clinic_id ON DELETE CASCADE,
+      // so it clears when the clinic row goes.
+      await probePool.query(`DELETE FROM vt_rfid_readers WHERE clinic_id = ANY($1)`, [ids]);
+      await probePool.query(`DELETE FROM vt_equipment WHERE clinic_id = ANY($1)`, [ids]);
+      await probePool.query(`DELETE FROM vt_clinics WHERE id = ANY($1)`, [ids]);
+    }
+  } finally {
+    await probePool?.end().catch(() => {});
+  }
 });
 
 describe("R-M1.1c · HMAC rotation contract (DB-integration)", () => {
