@@ -155,4 +155,29 @@ describe("CommandBoard — RFID chip discriminator render", () => {
     const { queryByTestId } = renderBoard(board([unit({})]));
     expect(queryByTestId("board-unit-rfid-eq-1")).toBeNull();
   });
+
+  // WCAG AA: the category-prefix span must not composite its foreground token below
+  // 4.5:1 via opacity. vt-text-2xs is small text, so the 4.5:1 threshold applies and
+  // the prefix must render at full token opacity.
+  it("renders the RFID category prefix without an opacity modifier (AA contrast)", () => {
+    const { getByTestId } = renderBoard(
+      board([
+        unit({
+          rfid: {
+            lastSeenAt: "2026-07-17T00:00:00.000Z",
+            readerId: "reader-1",
+            locationKind: "room",
+            locationName: "Ward B",
+            confidence: "high",
+          },
+        }),
+      ]),
+    );
+    const chip = getByTestId("board-unit-rfid-eq-1");
+    const prefix = Array.from(chip.querySelectorAll("span")).find(
+      (el) => el.textContent === t.board.rfidTag,
+    );
+    expect(prefix).toBeDefined();
+    expect(prefix?.className).not.toMatch(/opacity-70/);
+  });
 });

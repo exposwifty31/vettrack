@@ -247,7 +247,7 @@ function RfidChip({ unit }: { unit: EquipmentBoardUnitRow }) {
       data-testid={`board-unit-rfid-${unit.equipmentId}`}
       data-rfid-kind={rfid.locationKind}
     >
-      <span className="opacity-70">{t.board.rfidTag}</span>
+      <span>{t.board.rfidTag}</span>
       <span>{label}</span>
     </span>
   );

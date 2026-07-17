@@ -3914,3 +3914,15 @@ Reviewer returned 1 HIGH + 1 MEDIUM + 2 LOW on the committed sub-card; all four 
 - **Frozen guardrails held:** ingest surface (`server/routes/rfid.ts`, middleware) untouched — only the controller package changed. Serialization is additive movement EVIDENCE, never custody/authority (ADR-006); the both-or-neither gateway-pair rule is honored (a first sighting emits neither); `direction` (entered|exited) is never fabricated by the controller (ADR-004/006 hardware-track), only carried through when supplied. No new transport; zero runtime deps; single-source `RfidBatchSchema` via the parity oracle. Server-side rotation grace is a SERVER property, asserted in the DB-integration e2e — not a controller-side dual-sign.
 
 **Verdict:** VERIFIED
+
+## 2026-07-18 — Remove opacity-70 from RFID chip category prefix (WCAG AA) (pending-commit)
+
+**Claim:** Removed `opacity-70` from the RFID chip category-prefix span in CommandBoard so the prefix renders at full token opacity and no longer composites its foreground below 4.5:1 at vt-text-2xs (small text) in either theme; chip layout + advisory-only semantics unchanged.
+
+**Evidence:**
+- `src/features/command-board/components/CommandBoard.tsx:250` — prefix span is now `<span>{t.board.rfidTag}</span>` (no `opacity-70`); the value span at :251 and the chip container/testids/data-rfid-kind are unchanged.
+- Test (RED): stashed the source fix, ran `pnpm test -- tests/board-rfid-render.test.tsx -t "without an opacity modifier"` → `1 failed | 5 skipped` (× renders the RFID category prefix without an opacity modifier).
+- Test (GREEN): `pnpm test -- tests/board-rfid-render.test.tsx --reporter=verbose` → `Test Files 1 passed (1) / Tests 6 passed (6)`.
+- Command: `pnpm typecheck` → exit 0 (tsc frontend + server, no errors).
+
+**Verdict:** VERIFIED
