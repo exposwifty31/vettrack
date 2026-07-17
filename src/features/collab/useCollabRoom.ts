@@ -224,21 +224,25 @@ export function useCollabRoom({
     // Mint a fresh token, storing it on success and degrading (keep the last token,
     // or null) on failure. try/catch keeps a token-fetch rejection from leaking as an
     // UNHANDLED promise rejection and never throws — graceful degradation. — card (c).
+    // If the FIRST mint returned null (signed-out at mount) connect() degrades and
+    // never acquires; a later successful refresh then retries the acquire so a
+    // post-mount sign-in connects instead of staying dark forever. Failures are
+    // logged (never silently swallowed). — PR#112 CodeRabbit.
     const refreshToken = async (): Promise<void> => {
       try {
         const token = await resolveBearerToken();
-        if (!cancelled) tokenRef.current = token;
-      } catch {
-        // Keep the last token (or null → degrade). A later refresh/reconnect retries.
+        if (cancelled) return;
+        tokenRef.current = token;
+        if (!acquired && token) connect();
+      } catch (error) {
+        if (!cancelled) console.error("[collab] bearer token refresh failed", error);
       }
     };
 
     // Mint a FRESH token before the first connect (fixes the "opened past the token
     // TTL → expired handshake" bug), then re-mint on a cadence so the shared
     // socket's infinite reconnects always read a valid token.
-    void refreshToken().then(() => {
-      if (!cancelled) connect();
-    });
+    void refreshToken();
     refreshTimer = setInterval(() => {
       void refreshToken();
     }, TOKEN_REFRESH_MS);

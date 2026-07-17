@@ -37,7 +37,7 @@ if (DATABASE_URL) {
     const { rows } = await probePool.query<{ table_name: string }>(
       `SELECT table_name FROM information_schema.tables
        WHERE table_name = ANY($1)`,
-      [REQUIRED_TABLES as unknown as string[]],
+      [[...REQUIRED_TABLES]],
     );
     requiredTablesPresent = rows.length === REQUIRED_TABLES.length;
   } catch {

@@ -106,9 +106,9 @@ function joinKind(s: ClientSocket, kind: "chat" | "board"): Promise<void> {
   // (the socket never actually entered the room). — PR#112 (d).
   return new Promise((resolve, reject) => {
     s.emit("join", { kind }, (ack: unknown) => {
-      const a = ack as { ok?: boolean; reason?: string };
-      if (a?.ok) resolve();
-      else reject(new Error(`join failed: ${a?.reason ?? "unknown"}`));
+      const a = typeof ack === "object" && ack !== null ? (ack as { ok?: boolean; reason?: string }) : {};
+      if (a.ok) resolve();
+      else reject(new Error(`join failed: ${a.reason ?? "unknown"}`));
     });
   });
 }
