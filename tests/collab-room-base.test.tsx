@@ -159,6 +159,36 @@ describe("useCollabRoom — shared base-hook lifecycle (R-RTC-1 panel #5)", () =
     expect(result.current.presentMembers).toHaveLength(2);
   });
 
+  it("drops a DIFFERENT-room presence that arrives BEFORE this hook's join ack (pre-ack window)", async () => {
+    seedToken(JWT);
+    const { result } = renderHook(() =>
+      useCollabRoom({
+        enabled: true,
+        joinRequest: { kind: "record", recordType: "equipment", recordId: "eq1" },
+      }),
+    );
+    const socket = await connectedSocket();
+    // Join not yet ack'd → joinedRoom unknown.
+    expect(result.current.joinedRoom).toBeFalsy();
+
+    // On the SHARED socket a foreign room's presence (e.g. a board surface already
+    // joined) can arrive before THIS hook's record join acks — it must NOT populate
+    // this hook's roster while the room is still unknown (panel #3 pre-ack window).
+    act(() =>
+      socket.trigger("presence", {
+        room: "clinic:c1:board",
+        members: [{ userId: "board", displayName: "Board" }],
+      }),
+    );
+    expect(result.current.presentMembers).toEqual([]);
+
+    // Once our own join acks, the correct roster arrives via ack.members.
+    await act(async () =>
+      acceptJoin(socket, "clinic:c1:record:equipment:eq1", [{ userId: "me", displayName: "Me" }]),
+    );
+    expect(result.current.presentMembers).toEqual([{ userId: "me", displayName: "Me" }]);
+  });
+
   it("invokes the feature binder with a working `on`, and runs its cleanup on unmount", async () => {
     seedToken(JWT);
     const featureHandler = vi.fn();

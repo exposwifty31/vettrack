@@ -134,6 +134,9 @@ describe("useShiftChatCollab — Feature 1 wiring (R-RTC-1.2)", () => {
       useShiftChatCollab({ enabled: true, onNewMessage: vi.fn() }),
     );
     const socket = await connectedSocket();
+    // Real order: join must be ack'd (room known) before room presence is trusted;
+    // the ack carries no peers yet — the peer arrives via the presence event below.
+    await act(async () => acceptJoin(socket, []));
 
     act(() =>
       socket.trigger("presence", {

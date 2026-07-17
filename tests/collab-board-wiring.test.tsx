@@ -124,6 +124,15 @@ describe("useBoardCoPresence — Feature 2 wiring (R-RTC-1.3)", () => {
     seedToken(JWT);
     const { result } = renderHook(() => useBoardCoPresence());
     const socket = await connectedSocket();
+    // Real order: join must be ack'd (room known) before room presence is trusted.
+    await act(async () => {
+      const joinCall = socket.emit.mock.calls.find((c) => c[0] === "join");
+      (joinCall?.[2] as ((r: unknown) => void) | undefined)?.({
+        ok: true,
+        room: "clinic:c1:board",
+        members: [],
+      });
+    });
 
     act(() =>
       socket.trigger("presence", {

@@ -164,10 +164,13 @@ export function useCollabRoom({
     const handleDisconnect = () => setIsConnected(false);
 
     const handlePresence = (payload: { room: string; members: CollabRoomMember[] }) => {
-      // Drop presence for any OTHER room — on the SHARED ref-counted socket a
-      // room-A event must not overwrite this hook's room-B roster. The hook's own
-      // initial roster still arrives via the join ack.members. — panel #3 (MEDIUM).
-      if (joinedRoomRef.current && payload?.room !== joinedRoomRef.current) return;
+      // Drop presence for any room that is not THIS hook's joined room — on the
+      // SHARED ref-counted socket a room-A event must not overwrite this hook's
+      // room-B roster. This also drops presence during the pre-ack window (joined
+      // room still null): the hook's own initial roster arrives via the join
+      // ack.members, so nothing is lost by ignoring presence until the room is
+      // known. — panel #3 (MEDIUM) + fix-delta re-review (pre-ack/failed-join window).
+      if (payload?.room !== joinedRoomRef.current) return;
       setPresentMembers(Array.isArray(payload?.members) ? payload.members : []);
     };
 
