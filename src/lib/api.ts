@@ -848,6 +848,32 @@ export const api = {
         readers: import("@/types").RfidReaderRow[];
         requestId: string;
       }>("/api/admin/rfid-readers"),
+    listManaged: () =>
+      request<{
+        clinicId: string;
+        readers: import("@/types").ManagedRfidReaderRow[];
+        requestId: string;
+      }>("/api/admin/rfid-readers/managed"),
+    create: (body: {
+      name: string;
+      gatewayCode: string;
+      roomId?: string | null;
+      physicalLocation?: string | null;
+    }) =>
+      request<{ clinicId: string; reader: import("@/types").ManagedRfidReaderRow; requestId: string }>(
+        "/api/admin/rfid-readers",
+        { method: "POST", body: JSON.stringify(body) },
+      ),
+    rename: (id: string, name: string) =>
+      request<{ clinicId: string; reader: import("@/types").ManagedRfidReaderRow; requestId: string }>(
+        `/api/admin/rfid-readers/${encodeURIComponent(id)}`,
+        { method: "PATCH", body: JSON.stringify({ name }) },
+      ),
+    deactivate: (id: string) =>
+      request<{ clinicId: string; reader: import("@/types").ManagedRfidReaderRow; requestId: string }>(
+        `/api/admin/rfid-readers/${encodeURIComponent(id)}/deactivate`,
+        { method: "POST" },
+      ),
   },
   webhooks: {
     list: () =>
