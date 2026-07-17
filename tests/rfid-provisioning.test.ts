@@ -240,8 +240,11 @@ describe("R-M1.1c · HMAC rotation contract (DB-integration)", () => {
 
   it.runIf(dbReachable)("contended finalize vs rollback: ack never reports 'completed' when rollback wins the race", async () => {
     const clinic = `test-rfidp-${uid()}`;
-    await seedClinic(probePool!, clinic);
-    const readerId = await seedReader(probePool!, clinic);
+    // The it.runIf(dbReachable) guard implies probePool is initialised here.
+    const pool = probePool;
+    if (!pool) throw new Error("probePool must be initialised when dbReachable");
+    await seedClinic(pool, clinic);
+    const readerId = await seedReader(pool, clinic);
     await rotateRfidSecret(clinic, `key-${uid()}`);
     const second = await rotateRfidSecret(clinic, `key-${uid()}`, { graceTtlMs: 600_000 });
 
@@ -255,19 +258,20 @@ describe("R-M1.1c · HMAC rotation contract (DB-integration)", () => {
     ]);
 
     const persisted = await getRotation(clinic, second.rotationId);
-    expect(persisted).not.toBeNull();
-    expect(["completed", "rolled_back"]).toContain(persisted!.status);
+    // Narrow explicitly: the ack/rollback race always commits a terminal row for this rotation.
+    if (!persisted) throw new Error("rotation row must exist after ack/rollback");
+    expect(["completed", "rolled_back"]).toContain(persisted.status);
 
     // The ack must AGREE with the committed row — never claim "completed" while the row
     // committed as "rolled_back".
     expect(ackRes.status).toBe("fulfilled");
     if (ackRes.status === "fulfilled") {
-      expect(ackRes.value.status).toBe(persisted!.status);
+      expect(ackRes.value.status).toBe(persisted.status);
       expect(ackRes.value.rollbackAvailable).toBe(false);
     }
     // The rollback either won (fulfilled → rolled_back) or lost (rejected UNAVAILABLE),
     // consistent with the committed terminal state.
-    if (persisted!.status === "rolled_back") {
+    if (persisted.status === "rolled_back") {
       expect(rollbackRes.status).toBe("fulfilled");
     } else {
       expect(rollbackRes.status).toBe("rejected");

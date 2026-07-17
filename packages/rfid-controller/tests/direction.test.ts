@@ -70,6 +70,8 @@ describe("DirectionTracker — time/sequence-based movement inference (internal 
   it("holds the cap as a HARD ceiling — size never exceeds it across many distinct tags", () => {
     const cap = 3;
     const t = new DirectionTracker(cap);
+    // Test-only private-state cast: the transient capacity invariant (map size ≤ cap) is not
+    // observable through the public API — lastGateway() reveals a tag's presence, not the map size.
     const size = () => (t as unknown as { lastGatewayByTag: Map<string, string> }).lastGatewayByTag.size;
 
     for (let i = 0; i < 50; i += 1) {
