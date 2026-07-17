@@ -310,6 +310,10 @@ type MetricName =
   | "rfid_batch_verified_grace_previous"
   | "rfid_reader_offline_detected"
   | "rfid_reader_recovered"
+  | "rfid_event_directional_resolved"
+  | "rfid_event_directional_rejected"
+  | "rfid_possible_egress"
+  | "rfid_possible_egress_deduped"
   | "semi_dock_notified"
   | "semi_dock_skipped_deduped"
   | "stale_checkout_nudged"
@@ -982,6 +986,10 @@ const DEFAULT_COUNTERS: MetricBuckets = {
   rfid_batch_verified_grace_previous: 0,
   rfid_reader_offline_detected: 0,
   rfid_reader_recovered: 0,
+  rfid_event_directional_resolved: 0,
+  rfid_event_directional_rejected: 0,
+  rfid_possible_egress: 0,
+  rfid_possible_egress_deduped: 0,
   semi_dock_notified: 0,
   semi_dock_skipped_deduped: 0,
   stale_checkout_nudged: 0,

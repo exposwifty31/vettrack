@@ -7,7 +7,7 @@ import { Router } from "express";
 import type { Request, Response } from "express";
 import { z } from "zod";
 import { verifyVetTrackWebhookSignature } from "../integrations/webhooks/verify-signature.js";
-import { ingestRfidBatch } from "../lib/rfid-ingest.js";
+import { ingestRfidBatch, RfidDirectionalRejection } from "../lib/rfid-ingest.js";
 import { isRfidIngestEnabled } from "../lib/rfid/config.js";
 import { getRfidVerificationSecrets } from "../lib/rfid/provisioning.js";
 import { incrementMetric } from "../lib/metrics.js";
@@ -15,16 +15,27 @@ import { rfidEventLimiter } from "../middleware/rate-limiters.js";
 
 const router = Router();
 
-const RfidBatchSchema = z.object({
+// R-M1.2a — optional directional fields. A payload MAY carry direction, the gateway pair, both,
+// or neither; the ingest resolver makes every combination deterministic. Schema-level guard: a
+// gateway pair is BOTH-or-NEITHER (a partial pair is INVALID_SCHEMA, never a silent downgrade).
+export const RfidBatchSchema = z.object({
   batchId: z.string().min(1).max(64),
   controllerVersion: z.string().max(32).optional(),
   events: z
     .array(
-      z.object({
-        tagEpc: z.string().min(1).max(128),
-        gatewayCode: z.string().min(1).max(64),
-        readAt: z.string().datetime(),
-      }),
+      z
+        .object({
+          tagEpc: z.string().min(1).max(128),
+          gatewayCode: z.string().min(1).max(64),
+          readAt: z.string().datetime(),
+          direction: z.enum(["entered", "exited"]).optional(),
+          fromGateway: z.string().min(1).max(64).optional(),
+          toGateway: z.string().min(1).max(64).optional(),
+        })
+        .refine((e) => (e.fromGateway == null) === (e.toGateway == null), {
+          message: "fromGateway and toGateway must be supplied together",
+          path: ["fromGateway"],
+        }),
     )
     .min(1)
     .max(200),
@@ -94,8 +105,18 @@ router.post("/events", rfidEventLimiter, async (req: Request, res: Response) => 
 
   incrementMetric("rfid_batch_received");
 
-  const ingestResult = await ingestRfidBatch(clinicId, parsed);
-  return res.status(202).json({ ok: true, ...ingestResult });
+  try {
+    const ingestResult = await ingestRfidBatch(clinicId, parsed);
+    return res.status(202).json({ ok: true, ...ingestResult });
+  } catch (err) {
+    // R-M1.2a — a directional payload that cannot be resolved deterministically is a HARD
+    // 4xx reject (never a silent downgrade). Any other failure is a genuine 500.
+    if (err instanceof RfidDirectionalRejection) {
+      incrementMetric("rfid_event_directional_rejected");
+      return jsonErr(res, 422, err.code, err.message);
+    }
+    throw err;
+  }
 });
 
 export default router;

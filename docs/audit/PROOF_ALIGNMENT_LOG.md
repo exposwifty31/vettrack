@@ -3698,3 +3698,18 @@ Reviewer returned 1 HIGH + 1 MEDIUM + 2 LOW on the committed sub-card; all four 
 - **DB-integration RFID tests (crud/provisioning/offline) — noted skip:** this card is strictly client-side (page + `api.ts` client methods + `src/types` + locales) with ZERO server/schema/service changes, so those DB-integration suites are outside the delta's blast radius; running them applies migrations to the shared seeded dev DB that a concurrent agent depends on (per the docking/infra coordination memory), so they were intentionally not run here — their behavior is unchanged by this card.
 
 **Verdict:** VERIFIED
+
+## 2026-07-17 — R-M1.2 True directional gates (entry/exit + adjacency + idempotent possible_egress)
+
+**Claim:** Implemented R-M1.2 a/b/c: extended `RfidBatchSchema` with optional `direction` + a both-or-neither `fromGateway`/`toGateway` pair; directional reads resolve last-seen to the destination room via the managed reader registry and populate `vt_equipment_rfid_reads.from_room_id`/`to_room_id`; a boundary/dock exit toward the external (NULL) endpoint emits exactly one idempotent `possible_egress` signal (new table `vt_rfid_egress_signals`, migration 175). Partial pair / direction-gateway disagreement / unknown-or-cross-clinic gateway are hard 4xx rejects (never silent downgrade). Legacy non-directional ingest unchanged. No custody mutation.
+
+**Evidence:**
+- `server/routes/rfid.ts:18-40` — `RfidBatchSchema` gains optional `direction`/`fromGateway`/`toGateway` + `.refine` both-or-neither; `:95-108` maps `RfidDirectionalRejection` → 422 with stable code.
+- `server/lib/rfid-ingest.ts:79-205` — `resolveDirectionalEvent` (deterministic precedence: `entered`→home, `exited`→away; away NULL for boundary/dock ⇒ external) + `egressSourceEventId` fingerprint (equipmentId|gateway|readAt|exited, NOT batchId → retry/out-of-order dedupe).
+- `server/lib/rfid-ingest.ts` directional loop — external exit path inserts `rfidEgressSignals` with `.onConflictDoNothing` on the composite correlation key; internal move advances `lastRfidRoomId` + inserts a read with `fromRoomId=src,toRoomId=dest`; legacy loop iterates `coalesced` (legacy events only) unchanged.
+- `migrations/175_vt_rfid_egress_signals.sql` + `server/schema/equipment.ts:304-360` (`rfidEgressSignals`) — composite UNIQUE `(clinic_id,equipment_id,gate_id,source_event_id)` + composite FKs to `vt_equipment`/`vt_rfid_readers` (tenant safety in the DB). Applied: `pnpm db:migrate` → "✅ Applied migration: 175_vt_rfid_egress_signals.sql".
+- RED→GREEN: wrote 3 tests first, ran → `Tests 9 failed | 3 passed` (directionalResolved 0, no rejects thrown, possibleEgress 0 — right reason); after GREEN → `pnpm test -- tests/rfid-ingest-direction.test.ts tests/rfid-adjacency.test.ts tests/rfid-direction-resolve.test.ts` → `Test Files 3 passed (3) / Tests 12 passed (12)`.
+- Regression: `pnpm test -- tests/rfid-ingest.test.ts tests/rfid-boundary.test.ts tests/rfid-webhook-signature.test.ts tests/rfid-readers-crud.test.ts tests/rfid-reader-offline.test.ts` → `27 passed`; full `pnpm test` → `622 files / 5585 passed | 11 skipped | 0 failed`.
+- `pnpm typecheck` → exit 0 (0 errors). `pnpm architecture:gates` → "All G1 checks passed."
+
+**Verdict:** VERIFIED

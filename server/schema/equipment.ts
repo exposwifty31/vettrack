@@ -302,6 +302,60 @@ export type RfidReader = typeof rfidReaders.$inferSelect;
 export type NewRfidReader = typeof rfidReaders.$inferInsert;
 
 /**
+ * R-M1.2c — idempotent `possible_egress` signal store.
+ *
+ * A directional boundary/dock exit toward the external (NULL) endpoint with no matching prior
+ * entry emits EXACTLY ONE bounded-enum signal. Idempotency is enforced IN THE DB via the
+ * composite UNIQUE correlation key (clinic_id, equipment_id, gate_id, source_event_id) —
+ * source_event_id is a deterministic fingerprint of the intrinsic read (equipment + gateway +
+ * readAt + direction), so retries and out-of-order batches dedupe. Composite FKs pin equipment
+ * + gate same-clinic. Advisory-only (ADR-006): never mutates custody. Migration 175 is the
+ * source of truth (composite FKs drizzle-kit can't express); this def is for query typing only.
+ */
+export const rfidEgressSignals = vtTable(
+  "vt_rfid_egress_signals",
+  {
+    id: text("id").primaryKey(),
+    clinicId: text("clinic_id").notNull().references(() => clinics.id, { onDelete: "restrict" }),
+    equipmentId: text("equipment_id").notNull(),
+    /** the gate (reader) the exit was detected through */
+    gateId: text("gate_id").notNull(),
+    gatewayCode: text("gateway_code").notNull(),
+    /** deterministic fingerprint of the intrinsic read (dedup key component) */
+    sourceEventId: text("source_event_id").notNull(),
+    /** internal room the asset exited FROM (the boundary/dock gate's non-null endpoint) */
+    fromRoomId: text("from_room_id"),
+    /** batch that produced this signal (diagnostic only; NOT part of the correlation key) */
+    batchId: text("batch_id").notNull(),
+    detectedAt: timestamp("detected_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    correlationUnique: unique("vt_rfid_egress_signals_correlation_uq").on(
+      t.clinicId,
+      t.equipmentId,
+      t.gateId,
+      t.sourceEventId,
+    ),
+    clinicEquipmentDetectedIdx: index(
+      "vt_rfid_egress_signals_clinic_equipment_detected_idx",
+    ).on(t.clinicId, t.equipmentId, t.detectedAt),
+    equipmentFk: foreignKey({
+      columns: [t.clinicId, t.equipmentId],
+      foreignColumns: [equipment.clinicId, equipment.id],
+      name: "vt_rfid_egress_signals_equipment_fk",
+    }).onDelete("cascade"),
+    gateFk: foreignKey({
+      columns: [t.clinicId, t.gateId],
+      foreignColumns: [rfidReaders.clinicId, rfidReaders.id],
+      name: "vt_rfid_egress_signals_gate_fk",
+    }).onDelete("cascade"),
+  }),
+);
+export type RfidEgressSignal = typeof rfidEgressSignals.$inferSelect;
+export type NewRfidEgressSignal = typeof rfidEgressSignals.$inferInsert;
+
+/**
  * R-M1.1c — durable state for the per-clinic RFID HMAC secret-rotation contract.
  *
  * The plaintext secrets live ONLY in the encrypted credential blob (credential-manager,
