@@ -121,6 +121,7 @@ describe.skipIf(!HAS_DB)("rfid-controller e2e — real ingest (DB-integration-cl
     baseUrl = `http://127.0.0.1:${typeof addr === "object" && addr ? addr.port : 0}`;
 
     teardown = async () => {
+      let cleanupError: unknown;
       try {
         await db.delete(equipment).where(eq(equipment.clinicId, clinicEnabled));
         await db.delete(rooms).where(eq(rooms.clinicId, clinicEnabled));
@@ -130,11 +131,16 @@ describe.skipIf(!HAS_DB)("rfid-controller e2e — real ingest (DB-integration-cl
         await db.delete(rfidSecretRotations).where(eq(rfidSecretRotations.clinicId, clinicGrace));
         await db.delete(serverConfig).where(eq(serverConfig.key, graceFlagKey));
         await db.delete(serverConfig).where(eq(serverConfig.key, `${clinicGrace}:integration:rfid:credentials`));
-      } catch {
-        /* best-effort — clinic + append-only audit rows persist by design */
+      } catch (error) {
+        // Clinic + append-only audit rows persist by design, but an unexpected
+        // cleanup failure must surface (and leave the suite red) — not be swallowed.
+        cleanupError = error;
+        console.error("RFID E2E database cleanup failed", error);
+      } finally {
+        await new Promise<void>((resolve) => server.close(() => resolve()));
+        await pool.end();
       }
-      await new Promise<void>((resolve) => server.close(() => resolve()));
-      await pool.end();
+      if (cleanupError) throw cleanupError;
     };
   }, 30_000);
 
