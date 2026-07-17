@@ -1,4 +1,4 @@
-import { getServerConfigValue } from "../server-config.js";
+import { getServerConfigValue, setServerConfigValue } from "../server-config.js";
 
 const PER_CLINIC_TTL_MS = 10_000;
 
@@ -39,6 +39,18 @@ export async function isRfidIngestEnabled(clinicId: string): Promise<boolean> {
   const enabled = raw?.trim().toLowerCase() === "true";
   writeCache(id, enabled);
   return enabled;
+}
+
+/**
+ * Enable/disable RFID doorway ingest for a clinic from the admin UI (R-M1.1c) — replaces the
+ * manual hand-flip of the `rfid.ingest_enabled.<clinicId>` config key. Busts the per-clinic TTL
+ * cache so the change takes effect immediately rather than after the 10s window.
+ */
+export async function setRfidIngestEnabled(clinicId: string, enabled: boolean): Promise<void> {
+  const id = clinicId.trim();
+  if (!id) return;
+  await setServerConfigValue(id, configKey(id), enabled ? "true" : "false");
+  writeCache(id, enabled);
 }
 
 /** Test-only: flush in-process TTL cache. */

@@ -303,6 +303,11 @@ type MetricName =
   | "rfid_event_stale"
   | "rfid_event_unchanged"
   | "rfid_event_room_changed"
+  | "rfid_secret_rotated"
+  | "rfid_secret_rotation_conflict"
+  | "rfid_secret_rolled_back"
+  | "rfid_secret_grace_expired"
+  | "rfid_batch_verified_grace_previous"
   | "semi_dock_notified"
   | "semi_dock_skipped_deduped"
   | "stale_checkout_nudged"
@@ -968,6 +973,11 @@ const DEFAULT_COUNTERS: MetricBuckets = {
   rfid_event_stale: 0,
   rfid_event_unchanged: 0,
   rfid_event_room_changed: 0,
+  rfid_secret_rotated: 0,
+  rfid_secret_rotation_conflict: 0,
+  rfid_secret_rolled_back: 0,
+  rfid_secret_grace_expired: 0,
+  rfid_batch_verified_grace_previous: 0,
   semi_dock_notified: 0,
   semi_dock_skipped_deduped: 0,
   stale_checkout_nudged: 0,

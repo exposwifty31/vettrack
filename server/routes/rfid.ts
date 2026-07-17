@@ -6,10 +6,10 @@
 import { Router } from "express";
 import type { Request, Response } from "express";
 import { z } from "zod";
-import { getCredentials } from "../integrations/credential-manager.js";
 import { verifyVetTrackWebhookSignature } from "../integrations/webhooks/verify-signature.js";
 import { ingestRfidBatch } from "../lib/rfid-ingest.js";
 import { isRfidIngestEnabled } from "../lib/rfid/config.js";
+import { getRfidVerificationSecrets } from "../lib/rfid/provisioning.js";
 import { incrementMetric } from "../lib/metrics.js";
 import { rfidEventLimiter } from "../middleware/rate-limiters.js";
 
@@ -52,19 +52,29 @@ router.post("/events", rfidEventLimiter, async (req: Request, res: Response) => 
     return jsonErr(res, 400, "INVALID_BODY", "Expected raw request body");
   }
 
-  const credentials = await getCredentials(clinicId, "rfid");
-  if (!credentials?.webhook_secret?.trim()) {
+  // During a secret rotation's grace window this returns [current, previous]; otherwise just
+  // [current] (byte-for-byte the pre-rotation path — no extra query). The HMAC mechanism is
+  // unchanged; rotation only widens the accepted-secret set (R-M1.1c).
+  const secrets = await getRfidVerificationSecrets(clinicId);
+  if (secrets.length === 0) {
     return jsonErr(res, 401, "RFID_NOT_CONFIGURED", "RFID credentials not configured for clinic");
   }
 
-  const signatureOk = verifyVetTrackWebhookSignature(
-    rawBody,
-    credentials.webhook_secret,
-    req.headers["x-vetrack-signature"],
-  );
-  if (!signatureOk) {
+  const signatureHeader = req.headers["x-vetrack-signature"];
+  let matchedIndex = -1;
+  for (let i = 0; i < secrets.length; i++) {
+    if (verifyVetTrackWebhookSignature(rawBody, secrets[i], signatureHeader)) {
+      matchedIndex = i;
+      break;
+    }
+  }
+  if (matchedIndex === -1) {
     incrementMetric("rfid_batch_rejected_signature");
     return jsonErr(res, 401, "INVALID_SIGNATURE", "Signature verification failed");
+  }
+  if (matchedIndex > 0) {
+    // Verified against the retained PREVIOUS secret during the grace window.
+    incrementMetric("rfid_batch_verified_grace_previous");
   }
 
   const enabled = await isRfidIngestEnabled(clinicId);

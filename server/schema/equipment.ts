@@ -294,6 +294,43 @@ export const rfidReaders = vtTable(
 export type RfidReader = typeof rfidReaders.$inferSelect;
 export type NewRfidReader = typeof rfidReaders.$inferInsert;
 
+/**
+ * R-M1.1c — durable state for the per-clinic RFID HMAC secret-rotation contract.
+ *
+ * The plaintext secrets live ONLY in the encrypted credential blob (credential-manager,
+ * adapter "rfid"). This table stores rotation STATE — never the plaintext — so a same-key
+ * retry replays the original envelope without re-issuing/re-delivering a secret. The partial
+ * unique index (clinic_id) WHERE previous_retained enforces at-most-one in-flight rotation per
+ * clinic (concurrency winner). NOTE: migration 173 is the source of truth (partial index +
+ * JSONB defaults drizzle-kit can't express); this def is for query typing only.
+ */
+export const rfidSecretRotations = vtTable(
+  "vt_rfid_secret_rotations",
+  {
+    clinicId: text("clinic_id").notNull().references(() => clinics.id, { onDelete: "cascade" }),
+    id: text("id").notNull(),
+    idempotencyKey: text("idempotency_key").notNull(),
+    /** grace | completed | rolled_back */
+    status: text("status").notNull().default("grace"),
+    rotationStartedAt: timestamp("rotation_started_at", { withTimezone: true }).notNull().defaultNow(),
+    graceExpiresAt: timestamp("grace_expires_at", { withTimezone: true }).notNull(),
+    /** vt_rfid_readers.id[] eligible + active at rotation start. */
+    snapshotReaderIds: jsonb("snapshot_reader_ids").$type<string[]>().notNull().default([]),
+    ackedReaderIds: jsonb("acked_reader_ids").$type<string[]>().notNull().default([]),
+    previousRetained: boolean("previous_retained").notNull().default(true),
+    secretDelivered: boolean("secret_delivered").notNull().default(true),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    pk: primaryKey({ columns: [t.clinicId, t.idempotencyKey] }),
+    clinicIdUnique: unique("vt_rfid_secret_rotations_clinic_id_uq").on(t.clinicId, t.id),
+  }),
+);
+export type RfidSecretRotation = typeof rfidSecretRotations.$inferSelect;
+export type NewRfidSecretRotation = typeof rfidSecretRotations.$inferInsert;
+
 export const unitConditionStates = vtTable(
   "vt_unit_condition_states",
   {

@@ -13,3 +13,15 @@ export async function getServerConfigValue(
     .limit(1);
   return row?.value ?? null;
 }
+
+/** Upserts a global config row by key (`vt_server_config` has no clinic scope today). */
+export async function setServerConfigValue(
+  _clinicId: string,
+  key: string,
+  value: string,
+): Promise<void> {
+  await db
+    .insert(serverConfig)
+    .values({ key, value })
+    .onConflictDoUpdate({ target: serverConfig.key, set: { value, updatedAt: new Date() } });
+}
