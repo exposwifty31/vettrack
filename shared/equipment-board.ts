@@ -100,6 +100,25 @@ export type EquipmentBoardAlert = {
   citationIds?: string[];
 };
 
+/**
+ * R-BDF-1.1 — Ambient board anomaly (glance-only). Closed v1 type enum; the derivation
+ * lives in the board producer (`deriveBoardAnomalies`) and the telemetry union (R-BDF-1.3)
+ * mirrors this enum. `since` is the condition's first-observed ISO instant; `sourceRef` is
+ * the {table,id} of the row that tripped the rule.
+ */
+export type BoardAnomalyType = "battery_critical" | "cart_unverified" | "rfid_reader_offline";
+
+/** Two-level glance severity: `calm` stays quiet, `pressure` escalates (color+size). */
+export type BoardAnomalySeverity = "calm" | "pressure";
+
+export type BoardAnomaly = {
+  type: BoardAnomalyType;
+  unitId: string;
+  severity: BoardAnomalySeverity;
+  since: string;
+  sourceRef: { table: string; id: string };
+};
+
 export type EquipmentBoardRoiSignals = {
   overusedUnits: unknown[];
   underusedUnits: unknown[];
@@ -169,5 +188,10 @@ export type EquipmentCommandBoardSnapshot = {
   docks?: EquipmentBoardDocksBlock;
   waitlist?: EquipmentBoardWaitlistBlock;
   staging?: EquipmentBoardStagingBlock;
+  /**
+   * R-BDF-1.1 — additive ambient anomaly pass (glance-only). Absent/empty when nothing
+   * trips; every client reader must be tolerant (render nothing when the block is absent).
+   */
+  anomalies?: BoardAnomaly[];
   roiSignals: EquipmentBoardRoiSignals;
 };

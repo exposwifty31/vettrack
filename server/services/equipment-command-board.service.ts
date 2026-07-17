@@ -24,7 +24,15 @@ import type {
   EquipmentReadinessStatus,
 } from "../../shared/equipment-board.js";
 import { isEquipmentFullyDeployable } from "./equipment-operational-state.service.js";
-import { getReadinessRules } from "./equipment-readiness-rules.service.js";
+import {
+  BATTERY_CRITICAL_PERCENT,
+  getReadinessRules,
+} from "./equipment-readiness-rules.service.js";
+import {
+  deriveBoardAnomalies,
+  type ReaderAnomalySource,
+} from "./board-anomaly-rules.js";
+import { resolveReaderStalenessThresholdMs } from "../lib/rfid/reader-offline-sweep.js";
 import { withTimeout } from "../lib/with-timeout.js";
 
 export type BuildCommandBoardSnapshotFn = (params: {
@@ -101,6 +109,8 @@ export type BoardRfidReaderInfo = {
   /** "healthy" | "offline" | "unknown" — only an ACTIVE + offline reader raises the alert. */
   readerHealthStatus: string;
   name: string | null;
+  /** R-BDF-1.1 — the reader's OWN heartbeat, sole input to the rfid_reader_offline anomaly since/age. */
+  lastReaderHeartbeatAt?: Date | null;
 };
 
 export type BoardRfidUnitInput = {
@@ -363,6 +373,24 @@ export const defaultBoardAggregates: BoardAggregateFns = {
 // R-M1.3 — reads within this window feed the ambiguity check (≥2 simultaneous candidate rooms).
 const RFID_AMBIGUITY_WINDOW_MS = 5 * 60 * 1000;
 
+/**
+ * R-BDF-1.1 — process-local VOLATILE onset store for `battery_critical`, partitioned per clinic
+ * (battery has no snapshot onset, so its `since` is the absent→active transition time). Volatile
+ * by design: a fresh process / scale-out instance re-anchors `since` to the current observation —
+ * an advisory glance hint, not an SLA clock. Per-clinic so one clinic's pass never evicts another's
+ * onset keys. R-BDF-1.2 builds the fuller single-shot state machine on this seam.
+ */
+const batteryCriticalOnsetByClinic = new Map<string, Map<string, string>>();
+
+function getBatteryOnsetStore(clinicId: string): Map<string, string> {
+  let store = batteryCriticalOnsetByClinic.get(clinicId);
+  if (!store) {
+    store = new Map<string, string>();
+    batteryCriticalOnsetByClinic.set(clinicId, store);
+  }
+  return store;
+}
+
 /** Managed readers for the clinic, keyed by gatewayCode (includes inactive/deactivated). */
 async function queryRfidReaders(clinicId: string): Promise<Map<string, BoardRfidReaderInfo>> {
   const rows = await db
@@ -372,6 +400,7 @@ async function queryRfidReaders(clinicId: string): Promise<Map<string, BoardRfid
       status: rfidReaders.status,
       readerHealthStatus: rfidReaders.readerHealthStatus,
       name: rfidReaders.name,
+      lastReaderHeartbeatAt: rfidReaders.lastReaderHeartbeatAt,
     })
     .from(rfidReaders)
     .where(eq(rfidReaders.clinicId, clinicId));
@@ -382,6 +411,7 @@ async function queryRfidReaders(clinicId: string): Promise<Map<string, BoardRfid
       status: r.status,
       readerHealthStatus: r.readerHealthStatus,
       name: r.name,
+      lastReaderHeartbeatAt: r.lastReaderHeartbeatAt,
     });
   }
   return map;
@@ -632,6 +662,30 @@ export const buildCommandBoardSnapshot: BuildCommandBoardSnapshotFn = async (
     (a, b) => utilizationScore(b) - utilizationScore(a),
   );
 
+  // R-BDF-1.1 — additive ambient anomaly pass over data ALREADY fetched (no new query/poll).
+  // Fail-safe: deriveBoardAnomalies never throws, and each source is clinicId-filtered inside it.
+  // rfid_reader_offline is fed from the reader rows already loaded above (reusing the R-M1.1d
+  // single-source health computation). battery_critical / cart_unverified carry no clean per-unit
+  // source in the current snapshot (no battery column; no crash-cart identity in the critical-only
+  // rows) — they degrade to no anomaly (fail-safe) until their data sources are plumbed; the pass
+  // supports them now so that wiring is additive-only.
+  const readerAnomalySources: ReaderAnomalySource[] = [...readerLookup.values()].map((r) => ({
+    clinicId,
+    readerId: r.id,
+    status: r.status,
+    lastReaderHeartbeatAt: r.lastReaderHeartbeatAt ?? null,
+  }));
+  const anomalies = deriveBoardAnomalies({
+    clinicId,
+    now,
+    batteryCriticalPercent: BATTERY_CRITICAL_PERCENT,
+    readerStalenessThresholdMs: resolveReaderStalenessThresholdMs(clinicId),
+    batteries: [],
+    carts: [],
+    readers: readerAnomalySources,
+    batteryOnset: getBatteryOnsetStore(clinicId),
+  });
+
   return {
     generatedAt: now.toISOString(),
     clinicId,
@@ -640,6 +694,7 @@ export const buildCommandBoardSnapshot: BuildCommandBoardSnapshotFn = async (
     byLocation: aggregateByLocation(rows, criticalUnits),
     criticalUnits,
     alerts,
+    anomalies,
     power,
     docks,
     waitlist,

@@ -8,6 +8,14 @@ import {
 /** Logical config key; clinic scope is enforced by `clinic_id` column, not key suffix. */
 export const READINESS_RULES_CONFIG_KEY = "equipment.readinessRules.v1" as const;
 
+/**
+ * R-BDF-1.1 — fixed battery-critical threshold (percent) for the board anomaly pass.
+ * A device battery reading AT or BELOW this value trips `battery_critical` (equality
+ * FIRES). Not owner-configurable in v1 (the v1 rule set + thresholds are fixed); this
+ * is the single named source the board producer and its RED fixtures read.
+ */
+export const BATTERY_CRITICAL_PERCENT = 20;
+
 const rulesCache = new Map<string, { rules: EquipmentReadinessRulesV1; loadedAt: number }>();
 const CACHE_TTL_MS = 60_000;
 
