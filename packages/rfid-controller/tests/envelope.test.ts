@@ -1,11 +1,31 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import type { MovementEvent } from "../src/aggregate";
-import { validateRfidBatch } from "../src/contract";
+import { validateRfidBatch, type RfidDirection } from "../src/contract";
 import { buildEnvelope } from "../src/envelope";
 
-function mv(tagEpc: string, gatewayCode: string, iso: string, from: string | null = null): MovementEvent {
-  return { tagEpc, gatewayCode, readAt: new Date(iso), fromGateway: from };
+// The real route schema pulls in `server/db.ts` transitively (via the
+// provisioning import chain), which throws at module load without a
+// DATABASE_URL. We only need the exported zod schema as a drift oracle — never
+// a DB — so stub the db module exactly like tests/contract-parity.test.ts does.
+vi.mock("../../../server/db.js", () => ({ db: {} }));
+// eslint-disable-next-line import/first
+import { RfidBatchSchema } from "../../../server/routes/rfid";
+
+function mv(
+  tagEpc: string,
+  gatewayCode: string,
+  iso: string,
+  from: string | null = null,
+  direction?: RfidDirection,
+): MovementEvent {
+  return {
+    tagEpc,
+    gatewayCode,
+    readAt: new Date(iso),
+    fromGateway: from,
+    ...(direction !== undefined ? { direction } : {}),
+  };
 }
 
 describe("buildEnvelope", () => {
@@ -23,17 +43,38 @@ describe("buildEnvelope", () => {
     expect(batch.events[0].readAt).not.toContain("GMT");
   });
 
-  it("emits ONLY {tagEpc, gatewayCode, readAt} on the wire — directional emission deferred", () => {
-    const { batch } = buildEnvelope([mv("E1", "GW-2", "2026-07-17T18:00:00.000Z", "GW-1")]);
+  it("a first sighting (no origin) emits ONLY the minimal triple — the gateway pair is both-or-neither", () => {
+    // fromGateway === null → no resolved origin, so the schema's both-or-neither
+    // pair rule means NEITHER fromGateway nor toGateway is serialized.
+    const { batch } = buildEnvelope([mv("E1", "GW-2", "2026-07-17T18:00:00.000Z", null)]);
     expect(Object.keys(batch.events[0]).sort()).toEqual(["gatewayCode", "readAt", "tagEpc"]);
-    // Deliberate deferral (see envelope.ts header): post-R-M1 the route schema
-    // and Module 0 contract DO accept directional fields, but the controller has
-    // no gateway-role geometry to classify entered/exited, so it emits the
-    // minimal safe subset. fromGateway stays internal-only until the hardware
-    // direction track wires emission additively.
     expect(batch.events[0]).not.toHaveProperty("fromGateway");
     expect(batch.events[0]).not.toHaveProperty("toGateway");
     expect(batch.events[0]).not.toHaveProperty("direction");
+  });
+
+  it("a resolved crossing serializes the fromGateway/toGateway pair (toGateway = destination gatewayCode)", () => {
+    const { batch } = buildEnvelope([mv("E1", "GW-2", "2026-07-17T18:00:00.000Z", "GW-1")]);
+    const ev = batch.events[0];
+    expect(ev.fromGateway).toBe("GW-1");
+    expect(ev.toGateway).toBe("GW-2"); // destination = where the tag now is
+    expect(ev.gatewayCode).toBe("GW-2");
+  });
+
+  it("a crossing carrying a classified direction serializes direction alongside the pair", () => {
+    const { batch } = buildEnvelope([mv("E1", "GW-2", "2026-07-17T18:00:00.000Z", "GW-1", "entered")]);
+    const ev = batch.events[0];
+    expect(ev.direction).toBe("entered");
+    expect(ev.fromGateway).toBe("GW-1");
+    expect(ev.toGateway).toBe("GW-2");
+  });
+
+  it("a directional envelope validates against the REAL exported RfidBatchSchema (and the signed bytes match)", () => {
+    const { batch, body } = buildEnvelope([mv("E1", "GW-2", "2026-07-17T18:00:00.123Z", "GW-1", "entered")]);
+    const parsed = RfidBatchSchema.safeParse(batch);
+    expect(parsed.success).toBe(true);
+    // The exact bytes signed & sent must be the serialization of the validated batch.
+    expect(JSON.parse(body.toString("utf8"))).toEqual(batch);
   });
 
   it("derives a deterministic batchId from content (same events → same id)", () => {

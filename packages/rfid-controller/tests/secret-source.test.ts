@@ -33,8 +33,13 @@ describe("RotatableSecretSource — hot-swap on rotation", () => {
     const afterHeader = signBody(body, src.current());
     expect(afterHeader).not.toBe(beforeHeader);
     expect(verifyVetTrackWebhookSignature(body, "new", afterHeader)).toBe(true);
-    // No server-side current-OR-previous grace verifier exists on this branch,
-    // so the controller signs with the CURRENT secret only — it never dual-signs.
+    // The controller signs with its ONE current secret and hot-swaps on rotation
+    // — it never dual-signs. As a raw HMAC, a body signed under "new" does not
+    // verify against "old". Rotation overlap is covered SERVER-SIDE: during the
+    // grace window getRfidVerificationSecrets returns [current, previous] and the
+    // ingest tries each, so a batch signed with the previous secret is still
+    // accepted. That is a server property, asserted in the DB-integration e2e —
+    // not a controller-side dual-sign.
     expect(verifyVetTrackWebhookSignature(body, "old", afterHeader)).toBe(false);
   });
 });

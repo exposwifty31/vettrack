@@ -17,7 +17,7 @@ import { HttpSender, type SendOutcome } from "../src/sender";
  * DATABASE_URL is unset (all server db imports are dynamic, inside beforeAll,
  * so nothing connects on skip). It does NOT run migrations and never deletes a
  * clinic or its append-only audit rows — it seeds unique per-run clinic ids and
- * best-effort cleans only the rows it can (equipment/rooms/config).
+ * best-effort cleans only the rows it can (equipment/rooms/config/rotation).
  */
 const HAS_DB = Boolean(process.env.DATABASE_URL);
 const SECRET = "e2e-webhook-secret";
@@ -26,6 +26,11 @@ const GW = "E2E-GW-1";
 
 const clinicEnabled = `e2e-rfid-${randomUUID()}`;
 const clinicDisabled = `e2e-rfid-off-${randomUUID()}`;
+// Module 7 — server-side rotation grace. Dedicated clinic so the [current,
+// previous] accepted-secret set never leaks into the single-secret clinics above.
+const clinicGrace = `e2e-rfid-grace-${randomUUID()}`;
+const GRACE_CURRENT = "e2e-grace-current-secret";
+const GRACE_PREVIOUS = "e2e-grace-previous-secret";
 
 let server: Server;
 let baseUrl: string;
@@ -54,7 +59,9 @@ function controllerFor(clinicId: string, secret = SECRET): RfidController {
 
 describe.skipIf(!HAS_DB)("rfid-controller e2e — real ingest (DB-integration-class)", () => {
   beforeAll(async () => {
-    const { db, pool, clinics, equipment, rooms, serverConfig } = await import("../../../server/db.js");
+    const { db, pool, clinics, equipment, rooms, serverConfig, rfidSecretRotations } = await import(
+      "../../../server/db.js"
+    );
     const { storeCredentials } = await import("../../../server/integrations/credential-manager.js");
     const { eq } = await import("drizzle-orm");
     const rfidRoutes = (await import("../../../server/routes/rfid.js")).default;
@@ -82,6 +89,30 @@ describe.skipIf(!HAS_DB)("rfid-controller e2e — real ingest (DB-integration-cl
     await storeCredentials(clinicEnabled, "rfid", { webhook_secret: SECRET });
     await storeCredentials(clinicDisabled, "rfid", { webhook_secret: SECRET });
 
+    // clinicGrace: enabled, with a CURRENT + PREVIOUS secret and an OPEN rotation
+    // grace window so ingest verifies against [current, previous] (M1.1c).
+    const graceFlagKey = `rfid.ingest_enabled.${clinicGrace}`;
+    await db.insert(clinics).values({ id: clinicGrace }).onConflictDoNothing();
+    await db
+      .insert(serverConfig)
+      .values({ key: graceFlagKey, value: "true" })
+      .onConflictDoUpdate({ target: serverConfig.key, set: { value: "true" } });
+    await storeCredentials(clinicGrace, "rfid", {
+      webhook_secret: GRACE_CURRENT,
+      previous_webhook_secret: GRACE_PREVIOUS,
+    });
+    await db
+      .insert(rfidSecretRotations)
+      .values({
+        clinicId: clinicGrace,
+        id: randomUUID(),
+        idempotencyKey: `e2e-grace-${randomUUID()}`,
+        status: "grace",
+        graceExpiresAt: new Date(Date.now() + 60 * 60 * 1000),
+        previousRetained: true,
+      })
+      .onConflictDoNothing();
+
     const app = express();
     app.use("/api/rfid", express.raw({ type: () => true, limit: "512kb" }), rfidRoutes);
     server = createServer(app);
@@ -96,6 +127,9 @@ describe.skipIf(!HAS_DB)("rfid-controller e2e — real ingest (DB-integration-cl
         await db.delete(serverConfig).where(eq(serverConfig.key, flagKey));
         await db.delete(serverConfig).where(eq(serverConfig.key, `${clinicEnabled}:integration:rfid:credentials`));
         await db.delete(serverConfig).where(eq(serverConfig.key, `${clinicDisabled}:integration:rfid:credentials`));
+        await db.delete(rfidSecretRotations).where(eq(rfidSecretRotations.clinicId, clinicGrace));
+        await db.delete(serverConfig).where(eq(serverConfig.key, graceFlagKey));
+        await db.delete(serverConfig).where(eq(serverConfig.key, `${clinicGrace}:integration:rfid:credentials`));
       } catch {
         /* best-effort — clinic + append-only audit rows persist by design */
       }
@@ -149,6 +183,32 @@ describe.skipIf(!HAS_DB)("rfid-controller e2e — real ingest (DB-integration-cl
     expect(summary.dropped).toBe(1);
     expect(summary.accepted).toBe(0);
     expect(summary.buffered).toBe(0);
+  });
+
+  it("server-side grace: a batch signed with the PREVIOUS secret is accepted during the rotation window", async () => {
+    // The controller signs with its ONE current secret and never dual-signs.
+    // Here it signs with the PREVIOUS secret; the SERVER accepts it because
+    // getRfidVerificationSecrets returns [current, previous] during grace (M1.1c)
+    // and the ingest tries each. This is the server-side grace property.
+    const prev = await controllerFor(clinicGrace, GRACE_PREVIOUS).run(
+      new SyntheticAdapter([{ tagEpc: TAG, gatewayCode: GW, readAt: new Date() }]),
+    );
+    expect(prev.accepted).toBe(1);
+    expect(prev.dropped).toBe(0);
+
+    // The CURRENT secret is accepted as well.
+    const cur = await controllerFor(clinicGrace, GRACE_CURRENT).run(
+      new SyntheticAdapter([{ tagEpc: TAG, gatewayCode: GW, readAt: new Date(Date.now() + 60_000) }]),
+    );
+    expect(cur.accepted).toBe(1);
+    expect(cur.dropped).toBe(0);
+
+    // A secret that is neither current nor previous → dropped (401), never retried.
+    const bogus = await controllerFor(clinicGrace, "e2e-grace-bogus-secret").run(
+      new SyntheticAdapter([{ tagEpc: TAG, gatewayCode: GW, readAt: new Date(Date.now() + 120_000) }]),
+    );
+    expect(bogus.dropped).toBe(1);
+    expect(bogus.accepted).toBe(0);
   });
 
   it("ingest disabled (flag off) → stopped", async () => {

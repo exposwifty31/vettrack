@@ -1,7 +1,7 @@
 import type { RfidRead } from "./adapter";
 import { DirectionTracker } from "./direction";
 import { noopLogger, type Logger } from "./logger";
-import { RFID_LIMITS } from "./contract";
+import { RFID_LIMITS, type RfidDirection } from "./contract";
 
 /**
  * Module 4 — movement aggregation.
@@ -20,8 +20,20 @@ export interface MovementEvent {
   /** Destination gateway (where the tag now is) — the wire-facing gatewayCode. */
   gatewayCode: string;
   readAt: Date;
-  /** Internal evidence only (see direction.ts) — NOT serialized to the wire. */
+  /**
+   * Origin gateway of a resolved crossing, or null on a first sighting (no
+   * known origin). When non-null it is SERIALIZED as the `fromGateway`/`toGateway`
+   * pair (R-M1.2a movement evidence, both-or-neither) — see envelope.ts.
+   */
   fromGateway: string | null;
+  /**
+   * Optional classified crossing direction (entered|exited). The time/sequence
+   * tracker CANNOT derive this (no gateway-role geometry — ADR-004/006), so the
+   * synthetic/file/stdin pipeline leaves it undefined; a hardware direction
+   * source may supply it, and the envelope serializes it when present. Advisory
+   * evidence only — never custody/authority.
+   */
+  direction?: RfidDirection;
 }
 
 export interface AggregatorOptions {

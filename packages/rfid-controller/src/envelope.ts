@@ -16,19 +16,19 @@ import {
  *   1. `readAt` is serialized via `Date.toISOString()` (RFC-3339 `Z`), never
  *      `Date.toString()` — the route's strict `z.string().datetime()` 400s
  *      otherwise.
- *   2. Only `{tagEpc, gatewayCode, readAt}` reach the wire. Directional emission
- *      is DELIBERATELY DEFERRED. Post-R-M1 the route schema DOES accept optional
- *      directional fields (`direction` enum + a both-or-neither `fromGateway`/
- *      `toGateway` pair; a partial pair is a HARD reject, not a silent strip) —
- *      and the Module 0 contract validates that same shape for parity. But the
- *      controller has no gateway-role geometry to classify entered vs exited
- *      (hardware-track, ADR-004/006), so emitting a partial directional payload
- *      would be incomplete evidence. It therefore emits the minimal safe subset
- *      and leaves directional emission to the hardware direction track; the
- *      internal `MovementEvent.fromGateway` is retained for logging only. This
- *      is a documented deferral, not an accidental gap: the schema/contract are
- *      already ready, so `toWireEvent` can additively surface the gateway pair
- *      later without touching validation.
+ *   2. R-M1.2a movement EVIDENCE is surfaced additively. The route schema and
+ *      Module 0 contract accept optional directional fields (`direction` enum +
+ *      a both-or-neither `fromGateway`/`toGateway` pair; a partial pair is a HARD
+ *      reject, not a silent strip), so `toWireEvent` serializes them WHEN the
+ *      resolved crossing has them: the gateway pair whenever the crossing has a
+ *      known origin (`fromGateway !== null`; the destination is `gatewayCode`),
+ *      and `direction` whenever a source classified it. A first sighting (no
+ *      origin) still emits the minimal `{tagEpc, gatewayCode, readAt}` triple —
+ *      the both-or-neither rule forbids a half pair. This stays ADVISORY-ONLY
+ *      (ADR-006): movement evidence, never custody/authority. The controller's
+ *      own time/sequence tracker never fabricates `direction` (no gateway-role
+ *      geometry — ADR-004/006); it is carried through only when an upstream
+ *      hardware source supplies it.
  *
  * The body is serialized ONCE and returned as the exact bytes to sign and send
  * (Module 6 must sign THIS buffer and Module 8 must POST THIS buffer — any
@@ -47,11 +47,22 @@ export interface Envelope {
 }
 
 function toWireEvent(m: MovementEvent): RfidBatchEvent {
-  return {
+  const event: RfidBatchEvent = {
     tagEpc: m.tagEpc,
     gatewayCode: m.gatewayCode,
     readAt: m.readAt.toISOString(),
   };
+  // R-M1.2a — surface the resolved gateway pair (both-or-neither). A first
+  // sighting has no origin (fromGateway === null) → emit neither.
+  if (m.fromGateway !== null) {
+    event.fromGateway = m.fromGateway;
+    event.toGateway = m.gatewayCode; // destination = where the tag now is
+  }
+  // Carry a classified direction ONLY when a source supplied one.
+  if (m.direction !== undefined) {
+    event.direction = m.direction;
+  }
+  return event;
 }
 
 /** Deterministic 64-char batchId from event content (idempotent retries). */

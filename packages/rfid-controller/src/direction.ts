@@ -9,26 +9,26 @@ import type { RfidRead } from "./adapter";
  * contract validates that same shape (pinned by `tests/contract-parity.test.ts`).
  *
  * This tracker computes movement from time/sequence ONLY (last gateway a tag was
- * seen at → new gateway). That movement is INTERNAL evidence: it drives Module
- * 4's "is this a crossing?" decision and is available for logging. `fromGateway`
- * is carried on the internal Movement/MovementEvent but is NOT serialized onto
- * the wire — directional emission is a DELIBERATE DEFERRAL documented on the
- * envelope (Module 5). The controller has no gateway-role geometry to classify a
- * crossing as entered vs exited (antenna-geometry / RSSI / loiter/tailgate
- * inference is hardware-track, ADR-004/006, out of this core), so it emits the
- * minimal safe `{tagEpc, gatewayCode, readAt}` where `gatewayCode` is the
- * destination gateway, and leaves directional emission to the hardware track.
+ * seen at → new gateway). That movement is EVIDENCE: it drives Module 4's "is
+ * this a crossing?" decision, and its `fromGateway`/`toGateway` pair is now
+ * SERIALIZED by Module 5 whenever the crossing has a known origin (R-M1.2a
+ * movement evidence, both-or-neither). What this tracker does NOT produce is a
+ * classified `entered`/`exited` direction: that needs gateway-role geometry
+ * (antenna-geometry / RSSI / loiter/tailgate inference is hardware-track,
+ * ADR-004/006, out of this core). So a first sighting (`fromGateway === null`)
+ * still emits the minimal `{tagEpc, gatewayCode, readAt}` triple, and the
+ * `direction` enum is emitted only when an upstream hardware source supplies it.
  *
- * When that hardware track lands, Module 5 can additively surface
- * `fromGateway`/`toGateway` from this tracker without changing its logic — the
- * schema and contract already accept them.
+ * All of this stays ADVISORY-ONLY (ADR-006): the controller emits movement
+ * evidence, never custody or authority — the server resolver owns precedence.
  */
 export type Movement =
   | { kind: "same"; tagEpc: string; gatewayCode: string; readAt: Date }
   | {
       kind: "moved";
       tagEpc: string;
-      /** Internal evidence only — NOT serialized (see file header). */
+      /** Origin gateway (null on a first sighting). Serialized as the
+       *  fromGateway/toGateway pair when non-null — see envelope.ts. */
       fromGateway: string | null;
       toGateway: string;
       /** Wire-facing gateway = destination (where the tag now is). */
