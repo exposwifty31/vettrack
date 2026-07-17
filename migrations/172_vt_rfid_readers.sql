@@ -77,8 +77,8 @@ CREATE TABLE IF NOT EXISTS vt_rfid_readers (
     OR (
       gate_type IN ('boundary', 'dock')
       AND (
-        (from_room_id IS NOT NULL AND to_room_id IS NULL AND room_id = from_room_id)
-        OR (from_room_id IS NULL AND to_room_id IS NOT NULL AND room_id = to_room_id)
+        (room_id IS NOT NULL AND from_room_id IS NOT NULL AND to_room_id IS NULL AND room_id = from_room_id)
+        OR (room_id IS NOT NULL AND from_room_id IS NULL AND to_room_id IS NOT NULL AND room_id = to_room_id)
       )
     )
   ),

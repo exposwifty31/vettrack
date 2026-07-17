@@ -284,8 +284,8 @@ export const rfidReaders = vtTable(
         OR (
           ${t.gateType} IN ('boundary', 'dock')
           AND (
-            (${t.fromRoomId} IS NOT NULL AND ${t.toRoomId} IS NULL AND ${t.roomId} = ${t.fromRoomId})
-            OR (${t.fromRoomId} IS NULL AND ${t.toRoomId} IS NOT NULL AND ${t.roomId} = ${t.toRoomId})
+            (${t.roomId} IS NOT NULL AND ${t.fromRoomId} IS NOT NULL AND ${t.toRoomId} IS NULL AND ${t.roomId} = ${t.fromRoomId})
+            OR (${t.roomId} IS NOT NULL AND ${t.fromRoomId} IS NULL AND ${t.toRoomId} IS NOT NULL AND ${t.roomId} = ${t.toRoomId})
           )
         )`,
     ),

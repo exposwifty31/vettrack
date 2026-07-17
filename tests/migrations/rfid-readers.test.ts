@@ -284,6 +284,55 @@ async function main() {
         "boundary gate room_id must equal the single internal endpoint",
       );
 
+      // NULL room_id on a CONFIGURED boundary/dock gate rejected (three-valued-logic guard):
+      // room_id = from_room_id yields SQL NULL when room_id IS NULL, so without an explicit
+      // room_id IS NOT NULL the CHECK evaluates to NULL and PASSES. A configured gate must
+      // carry its mounting room (subspec §R-M1.1a: room_id = the single internal endpoint).
+      await expectReject(
+        () =>
+          insertReader({
+            clinic_id: clinicId,
+            gate_type: "boundary",
+            room_id: null,
+            from_room_id: roomA,
+            to_room_id: null,
+          }),
+        "boundary gate with NULL room_id (from_room_id set) must be rejected",
+      );
+      await expectReject(
+        () =>
+          insertReader({
+            clinic_id: clinicId,
+            gate_type: "boundary",
+            room_id: null,
+            from_room_id: null,
+            to_room_id: roomB,
+          }),
+        "boundary gate with NULL room_id (to_room_id set) must be rejected",
+      );
+      await expectReject(
+        () =>
+          insertReader({
+            clinic_id: clinicId,
+            gate_type: "dock",
+            room_id: null,
+            from_room_id: roomA,
+            to_room_id: null,
+          }),
+        "dock gate with NULL room_id (from_room_id set) must be rejected",
+      );
+      await expectReject(
+        () =>
+          insertReader({
+            clinic_id: clinicId,
+            gate_type: "dock",
+            room_id: null,
+            from_room_id: null,
+            to_room_id: roomB,
+          }),
+        "dock gate with NULL room_id (to_room_id set) must be rejected",
+      );
+
       // invalid gate_type value rejected
       await expectReject(
         () =>
