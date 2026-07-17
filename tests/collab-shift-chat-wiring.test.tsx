@@ -151,6 +151,46 @@ describe("useShiftChatCollab — Feature 1 wiring (R-RTC-1.2)", () => {
     expect(result.current.peerTypingUserIds).not.toContain("peer-1");
   });
 
+  it("re-joins the chat room on every (re)connect (rooms are per-connection)", async () => {
+    // socket.io rooms are per-connection; reconnection is ON (Infinity). After any
+    // WS blip the reconnected socket has NO room membership — the bound `connect`
+    // handler must RE-emit join, not just flip isConnected. Panel #1 (HIGH).
+    seedToken(JWT);
+    const { result } = renderHook(() =>
+      useShiftChatCollab({ enabled: true, onNewMessage: vi.fn() }),
+    );
+    const socket = await connectedSocket();
+    expect(socket.emit.mock.calls.filter((c) => c[0] === "join")).toHaveLength(1);
+
+    // Reconnect: the socket fires `connect` again. The hook must re-join.
+    act(() => socket.trigger("connect"));
+    expect(socket.emit.mock.calls.filter((c) => c[0] === "join")).toHaveLength(2);
+    // isConnected stays true throughout — the bug was silent (typing/presence die
+    // while isConnected reads true).
+    expect(result.current.isConnected).toBe(true);
+  });
+
+  it("ignores a `presence` event for a DIFFERENT room (shared-socket isolation)", async () => {
+    // On the SHARED ref-counted socket, a room-A presence event must NOT overwrite
+    // this hook's room-B roster. Panel #3 (MEDIUM).
+    seedToken(JWT);
+    const { result } = renderHook(() =>
+      useShiftChatCollab({ enabled: true, onNewMessage: vi.fn() }),
+    );
+    const socket = await connectedSocket();
+    await act(async () => acceptJoin(socket, [{ userId: "chat-peer", displayName: "ChatPeer" }]));
+    expect(result.current.presentMembers).toEqual([{ userId: "chat-peer", displayName: "ChatPeer" }]);
+
+    // A presence for a different room (e.g. a co-mounted record surface) is dropped.
+    act(() =>
+      socket.trigger("presence", {
+        room: "clinic:c1:record:equipment:eq-1",
+        members: [{ userId: "record-peer", displayName: "RecordPeer" }],
+      }),
+    );
+    expect(result.current.presentMembers).toEqual([{ userId: "chat-peer", displayName: "ChatPeer" }]);
+  });
+
   it("coalesces duplicate nudges + reconnect replays into ONE refetch per messageId", async () => {
     seedToken(JWT);
     const onNewMessage = vi.fn();

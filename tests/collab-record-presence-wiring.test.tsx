@@ -125,6 +125,41 @@ describe("useRecordPresence — Feature 3 wiring (R-RTC-1.4)", () => {
     expect(joinCall![1]).toEqual({ kind: "record", recordType: "equipment", recordId: "eq-1" });
   });
 
+  it("re-joins the record room on every (re)connect (rooms are per-connection)", async () => {
+    // After a WS blip the reconnected socket has NO room membership — the bound
+    // `connect` handler must RE-emit join. Panel #1 (HIGH).
+    seedToken(JWT);
+    const { result } = renderHook(() =>
+      useRecordPresence({ recordType: "equipment", recordId: "eq-1" }),
+    );
+    const socket = await connectedSocket();
+    expect(socket.emit.mock.calls.filter((c) => c[0] === "join")).toHaveLength(1);
+
+    act(() => socket.trigger("connect"));
+    expect(socket.emit.mock.calls.filter((c) => c[0] === "join")).toHaveLength(2);
+    expect(result.current.isConnected).toBe(true);
+  });
+
+  it("ignores a `presence` event for a DIFFERENT room (shared-socket isolation)", async () => {
+    // A room-A presence must NOT overwrite this record's room-B roster on the shared
+    // socket (chat + record co-mounted on desktop equipment-detail). Panel #3 (MEDIUM).
+    seedToken(JWT);
+    const { result } = renderHook(() =>
+      useRecordPresence({ recordType: "equipment", recordId: "eq-1" }),
+    );
+    const socket = await connectedSocket();
+    await act(async () => acceptJoin(socket, [{ userId: "record-peer", displayName: "RecordPeer" }]));
+    expect(result.current.presentMembers).toEqual([{ userId: "record-peer", displayName: "RecordPeer" }]);
+
+    act(() =>
+      socket.trigger("presence", {
+        room: "clinic:c1:chat",
+        members: [{ userId: "chat-peer", displayName: "ChatPeer" }],
+      }),
+    );
+    expect(result.current.presentMembers).toEqual([{ userId: "record-peer", displayName: "RecordPeer" }]);
+  });
+
   it("surfaces a peer editing the record (name resolved from server-attached presence)", async () => {
     seedToken(JWT);
     const { result } = renderHook(() =>

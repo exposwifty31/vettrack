@@ -101,10 +101,33 @@ export function useShiftChatCollab({
     const authSource: CollabAuthSource = () =>
       tokenRef.current ? { token: tokenRef.current } : null;
 
-    const handleConnect = () => setIsConnected(true);
+    // Re-emit join on EVERY (re)connect. socket.io rooms are per-connection and
+    // reconnection is ON (Infinity), so after any WS blip the reconnected socket
+    // has NO room membership — without re-joining, typing/presence/nudge silently
+    // die while isConnected stays true. Idempotent server-side. — panel #1 (HIGH).
+    const doJoin = () => {
+      const socket = socketRef.current;
+      if (!socket) return;
+      void joinCollabRoom(socket, { kind: "chat" }).then((ack) => {
+        if (cancelled) return;
+        if (ack?.ok) {
+          if (ack.room) joinedRoomRef.current = ack.room;
+          if (ack.members) setPresentMembers(ack.members);
+        }
+      });
+    };
+
+    const handleConnect = () => {
+      setIsConnected(true);
+      doJoin();
+    };
     const handleDisconnect = () => setIsConnected(false);
 
     const handlePresence = (payload: { room: string; members: CollabMember[] }) => {
+      // Drop presence for any OTHER room — on the SHARED ref-counted socket a
+      // room-A event must not overwrite this hook's room-B roster. The hook's own
+      // initial roster still arrives via the join ack.members. — panel #3 (MEDIUM).
+      if (joinedRoomRef.current && payload?.room !== joinedRoomRef.current) return;
       setPresentMembers(Array.isArray(payload?.members) ? payload.members : []);
     };
 
@@ -158,15 +181,13 @@ export function useShiftChatCollab({
       socket.on("presence", handlePresence);
       socket.on("peer-typing", handlePeerTyping);
       socket.on("chat-nudge", handleNudge);
-      if (isCollabConnected()) setIsConnected(true);
-
-      void joinCollabRoom(socket, { kind: "chat" }).then((ack) => {
-        if (cancelled) return;
-        if (ack?.ok) {
-          if (ack.room) joinedRoomRef.current = ack.room;
-          if (ack.members) setPresentMembers(ack.members);
-        }
-      });
+      // If the socket is ALREADY connected when listeners are bound, the `connect`
+      // event has already fired and handleConnect won't run — join once explicitly
+      // now. Every later (re)connect re-runs doJoin via handleConnect. — panel #1.
+      if (isCollabConnected()) {
+        setIsConnected(true);
+        doJoin();
+      }
     };
 
     // Mint a FRESH token before the first connect (fixes the "panel opened past

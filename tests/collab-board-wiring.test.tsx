@@ -138,6 +138,44 @@ describe("useBoardCoPresence — Feature 2 wiring (R-RTC-1.3)", () => {
     expect(cursor).toEqual({ userId: "peer-1", x: 0.5, y: 0.25 });
   });
 
+  it("re-joins the board room on every (re)connect (rooms are per-connection)", async () => {
+    // On the long-lived /board kiosk a WS blip is PERMANENT death for the overlay
+    // unless the `connect` handler re-emits join. Panel #1 (HIGH).
+    seedToken(JWT);
+    const { result } = renderHook(() => useBoardCoPresence());
+    const socket = await connectedSocket();
+    expect(socket.emit.mock.calls.filter((c) => c[0] === "join")).toHaveLength(1);
+
+    act(() => socket.trigger("connect"));
+    expect(socket.emit.mock.calls.filter((c) => c[0] === "join")).toHaveLength(2);
+    expect(result.current.isConnected).toBe(true);
+  });
+
+  it("ignores a `presence` event for a DIFFERENT room (shared-socket isolation)", async () => {
+    // A room-A presence must NOT overwrite the board's room-B roster on the shared
+    // socket. Panel #3 (MEDIUM).
+    seedToken(JWT);
+    const { result } = renderHook(() => useBoardCoPresence());
+    const socket = await connectedSocket();
+    await act(async () => {
+      const joinCall = socket.emit.mock.calls.find((c) => c[0] === "join");
+      (joinCall?.[2] as ((r: unknown) => void) | undefined)?.({
+        ok: true,
+        room: "clinic:c1:board",
+        members: [{ userId: "board-peer", displayName: "BoardPeer" }],
+      });
+    });
+    expect(result.current.presentMembers).toEqual([{ userId: "board-peer", displayName: "BoardPeer" }]);
+
+    act(() =>
+      socket.trigger("presence", {
+        room: "clinic:c1:chat",
+        members: [{ userId: "chat-peer", displayName: "ChatPeer" }],
+      }),
+    );
+    expect(result.current.presentMembers).toEqual([{ userId: "board-peer", displayName: "BoardPeer" }]);
+  });
+
   it("surfaces a peer selection (highlighted entity id)", async () => {
     seedToken(JWT);
     const { result } = renderHook(() => useBoardCoPresence());
