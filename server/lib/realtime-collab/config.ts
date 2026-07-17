@@ -48,6 +48,13 @@ export const TYPING_MAX_PER_SEC = 10;
 export const NUDGE_MAX_PER_SEC = 5;
 export const RECORD_PRESENCE_MAX_PER_SEC = 10;
 export const LEAVE_MAX_PER_SEC = 20;
+/**
+ * Per-socket cap on `presence-heartbeat`. Kept small: a single heartbeat fans
+ * `presence.refresh` (Redis ZADD + PEXPIRE) across EVERY room the socket holds, so
+ * an unthrottled flood amplifies into the shared Redis. The legitimate client cadence
+ * is one heartbeat per PRESENCE_HEARTBEAT_MS (30 s), so 4/s is far above real use.
+ */
+export const HEARTBEAT_MAX_PER_SEC = 4;
 
 /**
  * Hard cap on how many rooms a single socket may hold at once (R-RTC-1 card H2).

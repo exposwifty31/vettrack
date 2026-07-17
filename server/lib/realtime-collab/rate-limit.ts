@@ -62,6 +62,7 @@ export const COLLAB_RATE_VERBS = {
   selection: "sel",
   recordPresence: "recpres",
   leave: "leave",
+  heartbeat: "hb",
 } as const;
 export type CollabRateVerb = (typeof COLLAB_RATE_VERBS)[keyof typeof COLLAB_RATE_VERBS];
 

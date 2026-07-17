@@ -25,8 +25,11 @@ import {
   JOIN_MAX_PER_SEC,
   MAX_ROOMS_PER_SOCKET,
   NUDGE_MAX_PER_SEC,
+  HEARTBEAT_MAX_PER_SEC,
+  CURSOR_MAX_PER_SEC,
 } from "../server/lib/realtime-collab/config.js";
 import { createRateLimiter, type RateLimiter } from "../server/lib/realtime-collab/rate-limit.js";
+import { createPresenceStore, type PresenceStore } from "../server/lib/realtime-collab/presence-store.js";
 import type { ResolveHandshakeIdentity } from "../server/lib/realtime-collab/handshake.js";
 
 // ── H3: pure guard on authorizeRoomJoin ──────────────────────────────────────
@@ -243,5 +246,182 @@ describe("R-RTC-1 collaboration channel — #7 per-socket rate-key namespacing (
     // for EVERY verb — while the per-room board aggregate is untouched.
     expect(limiter.keys().filter((k) => k.includes(sid))).toEqual([]);
     expect(limiter.keys().some((k) => k.startsWith("curroom:"))).toBe(true);
+  });
+});
+
+// ── PR#112 (a): join handler never leaks an unhandled rejection ────────────────
+// authorizeRoomJoin → defaultRecordAccessCheck is a REAL db.select. A transient DB
+// rejection must NOT escape the async listener (which never acks → client hangs and
+// an unhandled promise rejection fires). The handler must catch and ack JOIN_FAILED.
+describe("R-RTC-1 collaboration channel — PR#112 (a) join DB rejection acks JOIN_FAILED", () => {
+  let http3: HttpServer;
+  let collab3: CollabServer;
+  let url3: string;
+  let sawUnhandled = false;
+  const onUnhandled = () => { sawUnhandled = true; };
+
+  beforeAll(async () => {
+    process.on("unhandledRejection", onUnhandled);
+    http3 = createServer();
+    await new Promise<void>((r) => http3.listen(0, "127.0.0.1", r));
+    const port = (http3.address() as AddressInfo).port;
+    url3 = `http://127.0.0.1:${port}`;
+    collab3 = await initCollabServer(http3, {
+      resolveIdentity,
+      // A record-access check that rejects (simulates a transient db.select failure).
+      recordAccess: async () => {
+        throw new Error("simulated DB failure during record ACL");
+      },
+      skipRedisAdapter: true,
+    });
+    expect(collab3.enabled).toBe(true);
+  });
+
+  afterAll(async () => {
+    process.off("unhandledRejection", onUnhandled);
+    await collab3?.close();
+    await new Promise<void>((r) => http3.close(() => r()));
+  });
+
+  it("acks {ok:false, reason:'JOIN_FAILED'} when the record ACL rejects (no unhandled rejection, no hang)", async () => {
+    const a = ioClient(url3, {
+      path: "/collab-ws",
+      transports: ["websocket"],
+      auth: { token: tokenFor("alice", "clinic-A") },
+      reconnection: false,
+      forceNew: true,
+    });
+    await waitConnect(a);
+    const ack = await joinAck(a, { kind: "record", recordType: "task", recordId: "r1" });
+    expect(ack).toEqual({ ok: false, reason: "JOIN_FAILED" });
+    // Server still healthy: a well-formed chat join (no record ACL) succeeds right after.
+    const good = await joinAck(a, { kind: "chat" });
+    expect(good.ok).toBe(true);
+    a.close();
+    await new Promise((r) => setTimeout(r, 100));
+    expect(sawUnhandled).toBe(false);
+  });
+});
+
+// ── PR#112 (b): presence-heartbeat is rate-limited (amplification guard) ───────
+// A heartbeat fans presence.refresh across EVERY joined room — the ONLY control
+// handler that previously had no rate limit. A flood past HEARTBEAT_MAX_PER_SEC must
+// be throttled BEFORE the room iteration, so refresh is not amplified.
+describe("R-RTC-1 collaboration channel — PR#112 (b) heartbeat flood is throttled", () => {
+  let http4: HttpServer;
+  let collab4: CollabServer;
+  let url4: string;
+  let refreshCount = 0;
+
+  beforeAll(async () => {
+    http4 = createServer();
+    await new Promise<void>((r) => http4.listen(0, "127.0.0.1", r));
+    const port = (http4.address() as AddressInfo).port;
+    url4 = `http://127.0.0.1:${port}`;
+    const base = createPresenceStore();
+    const presence: PresenceStore = {
+      ...base,
+      refresh: async (room, socketId) => {
+        refreshCount += 1;
+        return base.refresh(room, socketId);
+      },
+    };
+    collab4 = await initCollabServer(http4, {
+      resolveIdentity,
+      recordAccess: async () => true,
+      skipRedisAdapter: true,
+      presence,
+    });
+    expect(collab4.enabled).toBe(true);
+  });
+
+  afterAll(async () => {
+    await collab4?.close();
+    await new Promise<void>((r) => http4.close(() => r()));
+  });
+
+  it("caps presence.refresh fan-out at HEARTBEAT_MAX_PER_SEC per second (one joined room)", async () => {
+    const a = ioClient(url4, {
+      path: "/collab-ws",
+      transports: ["websocket"],
+      auth: { token: tokenFor("alice", "clinic-A") },
+      reconnection: false,
+      forceNew: true,
+    });
+    await waitConnect(a);
+    await joinAck(a, { kind: "chat" }); // exactly one joined room
+    refreshCount = 0;
+    for (let i = 0; i < HEARTBEAT_MAX_PER_SEC + 20; i++) a.emit("presence-heartbeat");
+    // Ordered per-socket delivery: this ack resolves only after every heartbeat's
+    // synchronous rate-limit prologue has run.
+    await joinAck(a, { kind: "chat" });
+    await new Promise((r) => setTimeout(r, 100));
+    expect(refreshCount).toBeGreaterThan(0);
+    expect(refreshCount).toBeLessThanOrEqual(HEARTBEAT_MAX_PER_SEC);
+    a.close();
+  });
+});
+
+// ── PR#112 (c): a cursor over its per-socket budget does NOT charge the room ────
+// The shared `curroom:<room>` limiter is a single INCREMENTING counter across all
+// sockets in a room. If it is checked BEFORE the per-socket drop verdict, one abuser
+// who is already over its own budget still charges the room allowance → starves peers'
+// cursors. The per-room check must run ONLY for a cursor that passed its per-socket budget.
+describe("R-RTC-1 collaboration channel — PR#112 (c) over-budget cursor spares the room aggregate", () => {
+  let http5: HttpServer;
+  let collab5: CollabServer;
+  let url5: string;
+  const curroomChecks: string[] = [];
+  let base: RateLimiter;
+
+  beforeAll(async () => {
+    http5 = createServer();
+    await new Promise<void>((r) => http5.listen(0, "127.0.0.1", r));
+    const port = (http5.address() as AddressInfo).port;
+    url5 = `http://127.0.0.1:${port}`;
+    base = createRateLimiter();
+    const spy: RateLimiter = {
+      check(key, perSec) {
+        if (key.startsWith("curroom:")) curroomChecks.push(key);
+        return base.check(key, perSec);
+      },
+      reset: (prefix) => base.reset(prefix),
+      keys: () => base.keys(),
+    };
+    collab5 = await initCollabServer(http5, {
+      resolveIdentity,
+      recordAccess: async () => true,
+      skipRedisAdapter: true,
+      rateLimiter: spy,
+    });
+    expect(collab5.enabled).toBe(true);
+  });
+
+  afterAll(async () => {
+    await collab5?.close();
+    await new Promise<void>((r) => http5.close(() => r()));
+  });
+
+  it("checks curroom:<room> at most CURSOR_MAX_PER_SEC times when one socket floods past its per-socket budget", async () => {
+    const a = ioClient(url5, {
+      path: "/collab-ws",
+      transports: ["websocket"],
+      auth: { token: tokenFor("alice", "clinic-A") },
+      reconnection: false,
+      forceNew: true,
+    });
+    await waitConnect(a);
+    await joinAck(a, { kind: "board" });
+    const flood = CURSOR_MAX_PER_SEC + 10; // stays under the disconnect multiplier
+    for (let i = 0; i < flood; i++) a.emit("board-cursor", { x: 0.5, y: 0.5 });
+    // Flush ordered per-socket delivery so every cursor's synchronous prologue has run.
+    await joinAck(a, { kind: "board" });
+    await new Promise((r) => setTimeout(r, 100));
+    // RED before the fix: the room aggregate is checked once PER emit (flood times).
+    // After the fix: only cursors that passed the per-socket budget charge the room.
+    expect(curroomChecks.length).toBeGreaterThan(0);
+    expect(curroomChecks.length).toBeLessThanOrEqual(CURSOR_MAX_PER_SEC);
+    expect(flood).toBeGreaterThan(CURSOR_MAX_PER_SEC);
+    a.close();
   });
 });

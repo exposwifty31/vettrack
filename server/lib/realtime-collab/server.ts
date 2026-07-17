@@ -25,6 +25,7 @@ import {
   NUDGE_MAX_PER_SEC,
   RECORD_PRESENCE_MAX_PER_SEC,
   LEAVE_MAX_PER_SEC,
+  HEARTBEAT_MAX_PER_SEC,
   MAX_ROOMS_PER_SOCKET,
 } from "./config.js";
 import { validateHandshake } from "./handshake.js";
@@ -122,8 +123,10 @@ export async function initCollabServer(
     if (adapterSub) {
       try {
         await adapterSub.quit();
-      } catch {
-        // best-effort — a sub that never fully connected may reject on quit.
+      } catch (err) {
+        // best-effort — a sub that never fully connected may reject on quit. Surface it
+        // (a swallowed quit leaks the subscriber) without failing teardown. — PR#112 (d).
+        console.warn("[collab-ws] adapterSub quit failed during teardown (non-fatal)", err);
       }
       adapterSub = undefined;
     }
@@ -201,30 +204,39 @@ export async function initCollabServer(
     };
 
     socket.on("join", async (req: unknown, ack?: (r: unknown) => void) => {
-      // Rate-limit BEFORE authorization — a join is a DB round-trip (record ACL),
-      // so throttling here caps the DB work a misbehaving socket can force. — H2.
-      if (rateLimiter.check(socketRateKey(socket.id, COLLAB_RATE_VERBS.join), JOIN_MAX_PER_SEC) !== "allow") {
-        ack?.({ ok: false, reason: "RATE_LIMITED" });
-        return;
+      // The whole body is wrapped: authorizeRoomJoin awaits the record ACL, which is a
+      // REAL db.select. A transient DB rejection would otherwise escape this async
+      // listener as an unhandled rejection AND never ack (the client hangs forever).
+      // Catch → log → ack a stable JOIN_FAILED so the client fails fast. — PR#112 (a).
+      try {
+        // Rate-limit BEFORE authorization — a join is a DB round-trip (record ACL),
+        // so throttling here caps the DB work a misbehaving socket can force. — H2.
+        if (rateLimiter.check(socketRateKey(socket.id, COLLAB_RATE_VERBS.join), JOIN_MAX_PER_SEC) !== "allow") {
+          ack?.({ ok: false, reason: "RATE_LIMITED" });
+          return;
+        }
+        const decision = await authorizeRoomJoin(identity, req, recordAccess);
+        if (!decision.ok) {
+          ack?.({ ok: false, reason: decision.reason });
+          return;
+        }
+        // Bound socket.data.rooms so it can't grow without limit (a distinct room per
+        // join otherwise accumulates forever). Re-joining a held room is always ok. — H2.
+        if (!socket.data.rooms.has(decision.room) && socket.data.rooms.size >= MAX_ROOMS_PER_SOCKET) {
+          ack?.({ ok: false, reason: "ROOM_LIMIT_EXCEEDED" });
+          return;
+        }
+        await socket.join(decision.room);
+        socket.data.rooms.add(decision.room);
+        if (await presence.register(decision.room, { userId: identity.userId, displayName: identity.displayName }, socket.id)) {
+          recordCollabMetric("collab_presence");
+        }
+        await emitPresence(decision.room);
+        ack?.({ ok: true, room: decision.room, members: await presence.getConvergedPresent(decision.room) });
+      } catch (err) {
+        console.error("[collab-ws] room join failed", { socketId: socket.id, err });
+        ack?.({ ok: false, reason: "JOIN_FAILED" });
       }
-      const decision = await authorizeRoomJoin(identity, req, recordAccess);
-      if (!decision.ok) {
-        ack?.({ ok: false, reason: decision.reason });
-        return;
-      }
-      // Bound socket.data.rooms so it can't grow without limit (a distinct room per
-      // join otherwise accumulates forever). Re-joining a held room is always ok. — H2.
-      if (!socket.data.rooms.has(decision.room) && socket.data.rooms.size >= MAX_ROOMS_PER_SOCKET) {
-        ack?.({ ok: false, reason: "ROOM_LIMIT_EXCEEDED" });
-        return;
-      }
-      await socket.join(decision.room);
-      socket.data.rooms.add(decision.room);
-      if (await presence.register(decision.room, { userId: identity.userId, displayName: identity.displayName }, socket.id)) {
-        recordCollabMetric("collab_presence");
-      }
-      await emitPresence(decision.room);
-      ack?.({ ok: true, room: decision.room, members: await presence.getConvergedPresent(decision.room) });
     });
 
     // ── Feature 1: shift-chat typing + presence + nudge (R-RTC-1.2) ────────────
@@ -238,6 +250,10 @@ export async function initCollabServer(
     });
 
     socket.on("presence-heartbeat", () => {
+      // Rate-limit BEFORE the room iteration: a single heartbeat fans presence.refresh
+      // (Redis ZADD + PEXPIRE) across EVERY joined room, so an unthrottled flood
+      // amplifies into the shared Redis. Gate it like every other control verb. — PR#112 (b).
+      if (rateLimiter.check(socketRateKey(socket.id, COLLAB_RATE_VERBS.heartbeat), HEARTBEAT_MAX_PER_SEC) !== "allow") return;
       // Refresh both the local lease and its Redis mirror TTL (best-effort, never throws).
       for (const room of socket.data.rooms) void presence.refresh(room, socket.id);
     });
@@ -259,16 +275,25 @@ export async function initCollabServer(
       if (!socket.data.rooms.has(room)) return;
       if (!isNormalizedCoord(payload?.x) || !isNormalizedCoord(payload?.y)) return;
       if (!isWithinByteLimit(payload, MAX_EVENT_BYTES)) return;
+      // Resolve the per-socket verdict FIRST and early-return on disconnect/drop. Only
+      // AFTER a cursor passes its own budget do we charge the shared per-ROOM aggregate.
+      // rateLimiter.check INCREMENTS on every call, so checking the room aggregate before
+      // the per-socket drop verdict would let one abuser (already over its own budget)
+      // still consume the room allowance and starve peers' cursors. — PR#112 (c).
       const perSocket = rateLimiter.check(socketRateKey(socket.id, COLLAB_RATE_VERBS.cursor), CURSOR_MAX_PER_SEC);
-      // Per-ROOM aggregate — shared across sockets, so it is NOT socket-namespaced and
-      // must survive any single socket's disconnect cleanup.
-      const perRoom = rateLimiter.check(`curroom:${room}`, BOARD_ROOM_AGGREGATE_MAX_PER_SEC);
       if (perSocket === "disconnect") {
         recordCollabMetric("collab_board_rate_limited");
         socket.disconnect(true);
         return;
       }
-      if (perSocket === "drop" || perRoom !== "allow") {
+      if (perSocket === "drop") {
+        recordCollabMetric("collab_cursor_dropped");
+        return;
+      }
+      // Per-ROOM aggregate — shared across sockets, so it is NOT socket-namespaced and
+      // must survive any single socket's disconnect cleanup. Charged only for a cursor
+      // that already cleared its per-socket budget.
+      if (rateLimiter.check(`curroom:${room}`, BOARD_ROOM_AGGREGATE_MAX_PER_SEC) !== "allow") {
         recordCollabMetric("collab_cursor_dropped");
         return;
       }
