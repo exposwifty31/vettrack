@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import {
   text, timestamp, boolean, varchar, integer, date,
   index, uniqueIndex, primaryKey, pgEnum, bigint, jsonb,
+  unique, foreignKey, check,
 } from "drizzle-orm/pg-core";
 import { vtTable } from "./helpers.js";
 import { clinics, users } from "./core.js";
@@ -42,6 +43,9 @@ export const rooms = vtTable(
     clinicGatewayUnique: uniqueIndex("vt_rooms_clinic_gateway_code_uq")
       .on(table.clinicId, table.gatewayCode)
       .where(sql`${table.gatewayCode} IS NOT NULL`),
+    // Composite-FK target for vt_rfid_readers(clinic_id, room_id|from_room_id|to_room_id)
+    // → enforces same-clinic room references at the DB boundary (R-M1.1a).
+    clinicIdUnique: unique("vt_rooms_clinic_id_uq").on(table.clinicId, table.id),
   }),
 );
 
@@ -206,6 +210,89 @@ export const equipmentRfidReads = vtTable(
 );
 export type EquipmentRfidRead = typeof equipmentRfidReads.$inferSelect;
 export type NewEquipmentRfidRead = typeof equipmentRfidReads.$inferInsert;
+
+/**
+ * R-M1.1a — Managed RFID reader entity. Promotes "reader" from an inferred derived-list
+ * (rooms.gateway_code) to a first-class, directional, tenant-safe managed entity.
+ *
+ * Tenant safety is enforced IN THE DB (not merely in service queries): composite
+ * UNIQUE (clinic_id, gateway_code) is the authoritative gateway↔reader registry, and the three
+ * composite FKs (clinic_id, room_id|from_room_id|to_room_id) → vt_rooms(clinic_id, id) guarantee
+ * every non-null room endpoint is same-clinic. Directional-pair validity + roomId membership fire
+ * ONLY when gate_type is SET; a legacy_unconfigured reader (gate_type UNSET) is exempt. RFID is
+ * advisory-only and vendor-neutral (ADR-006) — this entity never mutates custody.
+ *
+ * NOTE: the migration (172_vt_rfid_readers.sql) is the source of truth. The room FKs use PG15+
+ * column-list `ON DELETE SET NULL (<room column>)` which drizzle-kit cannot express; drizzle-kit
+ * generate is non-functional in this repo, so the `.onDelete("set null")` below is a best-effort
+ * approximation for query typing only — never round-tripped to SQL.
+ */
+export const rfidReaders = vtTable(
+  "vt_rfid_readers",
+  {
+    id: text("id").primaryKey(),
+    clinicId: text("clinic_id").notNull().references(() => clinics.id, { onDelete: "restrict" }),
+    name: text("name").notNull(),
+    gatewayCode: text("gateway_code").notNull(),
+    /** Canonical physical mounting room (where the device sits). */
+    roomId: text("room_id"),
+    /** Directional adjacency endpoints (external zone = NULL); routing keys off gateType. */
+    fromRoomId: text("from_room_id"),
+    toRoomId: text("to_room_id"),
+    /** Typed boundary classification the egress rule keys on. UNSET => legacy_unconfigured. */
+    gateType: text("gate_type"),
+    physicalLocation: text("physical_location"),
+    status: text("status").notNull().default("active"),
+    lastSeenAt: timestamp("last_seen_at", { withTimezone: true }),
+    lastReaderHeartbeatAt: timestamp("last_reader_heartbeat_at", { withTimezone: true }),
+    provisioningState: text("provisioning_state").notNull().default("legacy_unconfigured"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    clinicGatewayUnique: unique("vt_rfid_readers_clinic_gateway_uq").on(t.clinicId, t.gatewayCode),
+    clinicRoomIdx: index("vt_rfid_readers_clinic_room_idx").on(t.clinicId, t.roomId),
+    roomFk: foreignKey({
+      columns: [t.clinicId, t.roomId],
+      foreignColumns: [rooms.clinicId, rooms.id],
+      name: "vt_rfid_readers_room_fk",
+    }).onDelete("set null"),
+    fromRoomFk: foreignKey({
+      columns: [t.clinicId, t.fromRoomId],
+      foreignColumns: [rooms.clinicId, rooms.id],
+      name: "vt_rfid_readers_from_room_fk",
+    }).onDelete("set null"),
+    toRoomFk: foreignKey({
+      columns: [t.clinicId, t.toRoomId],
+      foreignColumns: [rooms.clinicId, rooms.id],
+      name: "vt_rfid_readers_to_room_fk",
+    }).onDelete("set null"),
+    gateTypeCheck: check(
+      "vt_rfid_readers_gate_type_ck",
+      sql`${t.gateType} IS NULL OR ${t.gateType} IN ('internal', 'boundary', 'dock')`,
+    ),
+    directionalCheck: check(
+      "vt_rfid_readers_directional_ck",
+      sql`${t.gateType} IS NULL
+        OR (
+          ${t.gateType} = 'internal'
+          AND ${t.fromRoomId} IS NOT NULL
+          AND ${t.toRoomId} IS NOT NULL
+          AND ${t.fromRoomId} <> ${t.toRoomId}
+          AND ${t.roomId} IS NOT NULL
+          AND (${t.roomId} = ${t.fromRoomId} OR ${t.roomId} = ${t.toRoomId})
+        )
+        OR (
+          ${t.gateType} IN ('boundary', 'dock')
+          AND (
+            (${t.fromRoomId} IS NOT NULL AND ${t.toRoomId} IS NULL AND ${t.roomId} = ${t.fromRoomId})
+            OR (${t.fromRoomId} IS NULL AND ${t.toRoomId} IS NOT NULL AND ${t.roomId} = ${t.toRoomId})
+          )
+        )`,
+    ),
+  }),
+);
+export type RfidReader = typeof rfidReaders.$inferSelect;
+export type NewRfidReader = typeof rfidReaders.$inferInsert;
 
 export const unitConditionStates = vtTable(
   "vt_unit_condition_states",
