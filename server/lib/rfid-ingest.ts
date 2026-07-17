@@ -1,6 +1,6 @@
 import { randomUUID } from "crypto";
 import { and, eq, inArray, isNull, lt, or } from "drizzle-orm";
-import { db, docks, equipment, equipmentRfidReads, rooms } from "../db.js";
+import { db, docks, equipment, equipmentRfidReads, rfidReaders, rooms } from "../db.js";
 import { logAudit } from "./audit.js";
 import { incrementMetric } from "./metrics.js";
 import { insertRealtimeDomainEvent } from "./realtime-outbox.js";
@@ -128,6 +128,7 @@ export async function ingestRfidBatch(
     stale: 0,
   };
 
+  const serverNow = new Date();
   const coalesced = coalesceLatestPerTag(batch.events);
   if (coalesced.length === 0) return result;
 
@@ -180,6 +181,17 @@ export async function ingestRfidBatch(
     for (const row of roomRows) {
       if (row.gatewayCode) roomByGateway.set(row.gatewayCode, row.id);
     }
+
+    // R-M1.1d — reader-level liveness: an accepted ingest batch IS a heartbeat for every managed
+    // reader whose gateway appears in it (independent of per-event tag matches — the reader is
+    // transmitting). Server-set timestamp, NEVER the client-supplied readAt. Feeds the
+    // reader-offline sweep's staleness check (server/lib/rfid/reader-offline-sweep.ts). Matches 0
+    // rows for a legacy clinic with no managed readers, so legacy ingest stays byte-for-byte
+    // unchanged. Never touches custody (R-M1 guardrail 1).
+    await tx
+      .update(rfidReaders)
+      .set({ lastReaderHeartbeatAt: serverNow })
+      .where(and(eq(rfidReaders.clinicId, clinicId), inArray(rfidReaders.gatewayCode, gatewayCodes)));
 
     for (const ev of coalesced) {
       const eqRow = equipmentByEpc.get(ev.tagEpc);

@@ -26,6 +26,7 @@ import { startEquipmentWaitlistReservationWorker } from "../workers/equipment-wa
 import { startStaleCheckoutSweepWorker } from "../workers/staleCheckoutSweepWorker.js";
 import { startStaleReturnedSweepWorker } from "../workers/stale-returned-sweep.worker.js";
 import { startSweepEscalationWorker } from "../workers/sweep-escalation.worker.js";
+import { startRfidReaderOfflineSweep } from "../lib/rfid/reader-offline-sweep.js";
 
 export async function startBackgroundSchedulers() {
   if (process.env.NODE_ENV === "test") {
@@ -74,4 +75,7 @@ export async function startBackgroundSchedulers() {
   startStaleCheckoutSweepWorker();
   startStaleReturnedSweepWorker();
   startSweepEscalationWorker();
+
+  // R-M1.1d — RFID reader-offline detection (heartbeat staleness → rfid_reader_offline signal).
+  startRfidReaderOfflineSweep();
 }

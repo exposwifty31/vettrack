@@ -245,6 +245,13 @@ export const rfidReaders = vtTable(
     status: text("status").notNull().default("active"),
     lastSeenAt: timestamp("last_seen_at", { withTimezone: true }),
     lastReaderHeartbeatAt: timestamp("last_reader_heartbeat_at", { withTimezone: true }),
+    /**
+     * R-M1.1d — persisted health state for the reader-offline sweep's dedup. Derived from
+     * lastReaderHeartbeatAt (never asset traffic); 'healthy' | 'offline' | 'unknown'. Only
+     * healthy<->offline transitions emit a signal. Migration 174 is the source of truth.
+     */
+    readerHealthStatus: text("reader_health_status").notNull().default("unknown"),
+    readerHealthChangedAt: timestamp("reader_health_changed_at", { withTimezone: true }),
     provisioningState: text("provisioning_state").notNull().default("legacy_unconfigured"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },

@@ -43,10 +43,37 @@ export const READER_HEARTBEAT_ONLINE_WINDOW_MS = 5 * 60 * 1000;
  * reading online).
  */
 export function managedReaderHealth(lastReaderHeartbeatAt: string | null, nowMs: number): ManagedReaderHealth {
+  return managedReaderHealthWithThreshold(lastReaderHeartbeatAt, nowMs, READER_HEARTBEAT_ONLINE_WINDOW_MS);
+}
+
+/**
+ * Same health computation as {@link managedReaderHealth} but with an explicit staleness
+ * threshold — the R-M1.1d reader-offline sweep resolves a per-clinic threshold and passes it
+ * here, so the window is a single source of truth and the per-clinic seam never forks the logic.
+ */
+export function managedReaderHealthWithThreshold(
+  lastReaderHeartbeatAt: string | null,
+  nowMs: number,
+  thresholdMs: number,
+): ManagedReaderHealth {
   if (!lastReaderHeartbeatAt) return "no_signal";
   const beatMs = new Date(lastReaderHeartbeatAt).getTime();
   if (Number.isNaN(beatMs)) return "no_signal";
-  return nowMs - beatMs <= READER_HEARTBEAT_ONLINE_WINDOW_MS ? "online" : "offline";
+  return nowMs - beatMs <= thresholdMs ? "online" : "offline";
+}
+
+/**
+ * R-M1.1d persisted health vocabulary (vt_rfid_readers.reader_health_status). Distinct from the
+ * derived {@link ManagedReaderHealth} display value: 'unknown' is the never-observed-healthy
+ * state (no signal, never a degradation) so it emits no offline transition.
+ */
+export type PersistedReaderHealth = "healthy" | "offline" | "unknown";
+
+/** Maps the derived health to the persisted-state vocabulary used for transition dedup. */
+export function toPersistedReaderHealth(health: ManagedReaderHealth): PersistedReaderHealth {
+  if (health === "online") return "healthy";
+  if (health === "offline") return "offline";
+  return "unknown";
 }
 
 export type ManagedRfidReaderRow = {

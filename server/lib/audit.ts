@@ -237,6 +237,8 @@ export type AuditActionType =
   | "equipment_waitlist_expired"
   | "equipment_waitlist_fulfilled"
   | "equipment_rfid_observed_room_changed"
+  | "rfid_reader_offline"
+  | "rfid_reader_recovered"
   | "equipment_semi_dock_notified"
   | "equipment_stale_checkout_nudged"
   // T3.5 — staleReturnedSweep nudge worker (returned-unverified → nudge managers).
