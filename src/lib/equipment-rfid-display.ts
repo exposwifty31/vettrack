@@ -11,23 +11,26 @@ export function isRfidSubtitleFresh(lastRfidSeenAt: string | null | undefined, n
 }
 
 /**
- * A resolvable directional RFID movement — the origin (`fromRoomName`) and the
- * destination (`toRoomName`) of the most recent gate crossing. DISPLAY ONLY:
- * this never overrides an authoritative room (R-M1.0 precedence) and never
- * mutates custody (R-M1 non-goal).
+ * A resolvable directional RFID movement derived from ONE gate crossing (the
+ * latest read). `exited` carries both the origin (`fromRoomName`) and the
+ * destination (`toRoomName`); `entered` carries only the destination — the
+ * crossing had no resolvable origin room (M1.2c "entered from external" or a
+ * first-ever read). DISPLAY ONLY: this never overrides an authoritative room
+ * (R-M1.0 precedence) and never mutates custody (R-M1 non-goal).
  */
-export interface RfidDirection {
-  fromRoomName: string;
-  toRoomName: string;
-}
+export type RfidDirection =
+  | { kind: "exited"; fromRoomName: string; toRoomName: string }
+  | { kind: "entered"; toRoomName: string };
 
 /**
  * Resolve the directional last-seen for the equipment-list subtitle / detail
- * card. Returns a from→to pair ONLY when the read is fresh (the same
- * `RFID_SUBTITLE_MAX_AGE_MS` gate as the plain last-seen line) AND both an
- * origin and a destination room resolved. A non-directional / legacy read (no
- * origin room) returns `null`, so callers fall back to the plain "last seen
- * near {room}" line — the legacy display is preserved byte-for-byte.
+ * card. Both endpoints come from the SAME latest read (the server projection
+ * pairs `lastRfidFromRoomName` with `lastRfidRoomName` off one crossing), so a
+ * fresh read with a resolved origin is an `exited` from→to pair and a fresh read
+ * whose origin was NULL is an `entered {to}` line. Returns `null` only when the
+ * read is stale (the same `RFID_SUBTITLE_MAX_AGE_MS` gate as the plain last-seen
+ * line) or no destination resolved, so callers fall back to the plain "last seen
+ * near {room}" line.
  */
 export function getRfidDirection(
   eq: Pick<Equipment, "lastRfidSeenAt" | "lastRfidRoomName" | "lastRfidFromRoomName">,
@@ -37,8 +40,8 @@ export function getRfidDirection(
   const toRoomName = eq.lastRfidRoomName?.trim();
   if (!toRoomName) return null;
   const fromRoomName = eq.lastRfidFromRoomName?.trim();
-  if (!fromRoomName) return null;
-  return { fromRoomName, toRoomName };
+  if (fromRoomName) return { kind: "exited", fromRoomName, toRoomName };
+  return { kind: "entered", toRoomName };
 }
 
 /** Pure UI hint: checked out + fresh RFID at a dock/equipment-storage room. */

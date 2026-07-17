@@ -1038,6 +1038,10 @@ export function EquipmentItem({
   const checkedOutByMe = eq.checkedOutById === userId;
   const expiryState = getExpiryBadgeState(eq.expiryDate);
   const displayName = getEquipmentDisplayName(eq);
+  // Evaluate the RFID direction once per row: two calls (one with a fresh
+  // default `Date.now()` each) could straddle the freshness boundary and
+  // disagree (truthy guard, then a null deref).
+  const rfidDirection = getRfidDirection(eq);
   const recoveryBadgeKey = isEquipmentRecoveryUiEnabled
     ? resolveEquipmentListRecoveryBadgeKey(
         deriveEquipmentRecoverySnapshotFromSource(eq),
@@ -1252,9 +1256,9 @@ export function EquipmentItem({
                     {t.equipmentList.linkedInUse(eq.linkedAnimalName)}
                   </p>
                 )}
-                {getRfidDirection(eq) ? (
+                {rfidDirection ? (
                   <RfidDirectionLine
-                    direction={getRfidDirection(eq)!}
+                    direction={rfidDirection}
                     relative={formatRelativeTime(eq.lastRfidSeenAt!)}
                     className="text-xs text-muted-foreground mt-0.5"
                     testId={`equipment-rfid-direction-${eq.id}`}
