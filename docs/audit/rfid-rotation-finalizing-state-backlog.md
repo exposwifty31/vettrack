@@ -1,5 +1,14 @@
 # RFID rotation: transient `completed` during finalize-vs-rollback — deferred hardening
 
+> **STATUS: RESOLVED (FS-1, 2026-07-18).** Implemented on branch
+> `claude/rfid-gates-board-alerts` (extends PR #113). The `finalizing` intermediate state
+> now sits between `grace` and `completed`, so `completed` is committed ONLY after the durable
+> credential delete. Delivered by: migration `176_vt_rfid_secret_rotations_finalizing_status.sql`
+> (widens the status CHECK), the two-phase `finalizeRotation` + `finalizing`-aware
+> `ackRotationReader` / `getRfidVerificationSecrets` / `rollbackRfidSecret` in
+> `server/lib/rfid/provisioning.ts`, the `RotationStatus` / `RfidRotationStatus` unions, and the
+> FS-1 tests in `tests/rfid-provisioning.test.ts`. Kept for provenance — do not delete.
+
 Tracked deferral of a CodeRabbit finding on `server/lib/rfid/provisioning.ts`
 (finalize-vs-rollback), review comment id `3606912682`. Deliberately deferred at
 the tail of an asymptotic review — logged here so it is not lost.

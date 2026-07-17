@@ -4006,3 +4006,26 @@ Reviewer returned 1 HIGH + 1 MEDIUM + 2 LOW on the committed sub-card; all four 
 **Guardrails held:** direction eviction is internal advisory state (no custody); provisioning still reverts to grace on post-CAS credential failure (recoverability intact) and the reload is clinic-scoped; no transport/schema/authority change; scan-only golden path untouched.
 
 **Verdict:** VERIFIED
+
+## 2026-07-18 — FS-1: `finalizing` intermediate rotation state (closes deferred finalize-vs-rollback edge)
+
+**Claim:** Closed the ONE deferred CodeRabbit finding (`docs/audit/rfid-rotation-finalizing-state-backlog.md`, comment `3606912682`): `finalizeRotation` CAS-committed `completed` BEFORE the external credential delete, exposing a transient-`completed` window in which a concurrent acker/reader could observe `completed` for a rotation that then reverts to `grace` on a delete failure. Introduced a `finalizing` intermediate state so `completed` is committed ONLY after the durable delete. Recoverability (revert-on-credential-failure) is preserved — `finalizing` REPLACES the transient-`completed` window, it does not remove the revert. FROZEN surfaces held: every rotation query clinic-scoped; RFID advisory-only; scan-only golden path + the no-rotation ingest fast-path (`getRfidVerificationSecrets` → `[current]` with no extra query when no previous) byte-for-byte unchanged.
+
+**Evidence (verified against real code + DB + tests):**
+- `migrations/176_vt_rfid_secret_rotations_finalizing_status.sql` — additive + idempotent: `DROP CONSTRAINT IF EXISTS vt_rfid_secret_rotations_status_check` then guarded `ADD CONSTRAINT ... CHECK (status IN ('grace','finalizing','completed','rolled_back'))`. Applied via `pnpm db:migrate` (`✅ Applied migration: 176_...`); verified live: `pg_get_constraintdef` → `CHECK ((status = ANY (ARRAY['grace'::text, 'finalizing'::text, 'completed'::text, 'rolled_back'::text])))`.
+- `server/lib/rfid/provisioning.ts` `finalizeRotation` — now TWO-PHASE: (1) CAS `grace`→`finalizing` keyed on `status='grace' AND previous_retained=true` (0 rows → lost claim → return `false`); (2) durable credential delete; on FAILURE `revertRotationToGrace` (`finalizing`→`grace`, previous still retained) + rethrow; (3) on SUCCESS CAS `finalizing`→`completed` + `previous_retained=false`. Returns whether it reached durable `completed`.
+- `server/lib/rfid/provisioning.ts` `ackRotationReader` — the FOR-UPDATE settled branch and the post-finalize re-read branch both return the honest committed status; a `finalizing` row is never coerced to `completed` (re-read fallback changed from `?? "completed"` to `?? outcome.rot.status`, i.e. never `completed`). `RotationStatus` union gains `finalizing`.
+- `server/lib/rfid/provisioning.ts` `getRfidVerificationSecrets` — treats `finalizing` like `grace`: accepts `[current, previous]` while previous is present in the blob; grace-expiry lazy-finalize routes through the two-phase path.
+- `server/lib/rfid/provisioning.ts` `rollbackRfidSecret` — explicit early reject when `status === 'finalizing'` → `RfidRotationError("ROLLBACK_UNAVAILABLE", ..., 409)` (rollback valid only during `grace`).
+- `server/schema/equipment.ts` status comment + `src/types/rfid-readers.ts` `RfidRotationStatus` union updated to include `finalizing`.
+- Tests (RED first): `tests/rfid-provisioning.test.ts` — added a one-shot credential-store injection (`credHooks.beforeFinalizeDelete` via `vi.mock` + `vi.hoisted`) to block/fail the finalize-delete and observe `finalizing`. New cases: (b) delete-failure reverts `finalizing`→`grace`, concurrent `getRotation`/`getRfidVerificationSecrets` observe `finalizing`/2-secrets but NEVER `completed`; (c) happy path `grace`→`finalizing`→`completed` with previous invalidated (mid-delete row observed as `finalizing`); (d) rollback during `finalizing` REJECTED `ROLLBACK_UNAVAILABLE`; (e) `getRfidVerificationSecrets` = `[current, previous]` while finalizing, `[current]` once delete commits. The existing contended finalize-vs-rollback test (a) still passes.
+- RED proof: before migration 176, the 4 FS-1 tests failed with `new row ... violates check constraint "vt_rfid_secret_rotations_status_check"` (code `23514`) on the `grace`→`finalizing` CAS. After migration: GREEN.
+
+**Evidence — commands:**
+- `pnpm typecheck` (frontend `tsc --noEmit` + server `tsconfig.server.json --noEmit`) → exit 0, zero errors.
+- `DATABASE_URL=... pnpm exec vitest run tests/rfid-provisioning.test.ts` → `Test Files 1 passed (1)`, `Tests 18 passed (18)` (14 prior + 4 FS-1; DB-integration cases run, not skipped).
+- `pnpm test` (broad, normal env) → `Test Files 635 passed (635)`, `Tests 5701 passed | 11 skipped (5712)`. (An earlier run with `.env` sourced showed 4 failures in `env-validation-runtime` / `display-token-header` / `dev-role-override` — env/auth-mode pollution from the sourced `DATABASE_URL`/`NODE_ENV`, NOT this change; re-running those 3 files with the vars unset → `14 passed`.)
+
+**Guardrails held:** advisory-only (no custody writes); all rotation queries clinic-scoped; recoverability intact (`finalizing` reverts to `grace` on delete failure, blob unchanged, previous still verifies); scan-only golden path + no-rotation ingest fast-path untouched; no transport/authority change; migration additive + idempotent, safe on a populated table.
+
+**Verdict:** VERIFIED

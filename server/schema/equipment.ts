@@ -371,7 +371,7 @@ export const rfidSecretRotations = vtTable(
     clinicId: text("clinic_id").notNull().references(() => clinics.id, { onDelete: "cascade" }),
     id: text("id").notNull(),
     idempotencyKey: text("idempotency_key").notNull(),
-    /** grace | completed | rolled_back */
+    /** grace | finalizing | completed | rolled_back */
     status: text("status").notNull().default("grace"),
     rotationStartedAt: timestamp("rotation_started_at", { withTimezone: true }).notNull().defaultNow(),
     graceExpiresAt: timestamp("grace_expires_at", { withTimezone: true }).notNull(),

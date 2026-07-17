@@ -34,7 +34,7 @@ const DEFAULT_GRACE_TTL_MS = 24 * 60 * 60 * 1000; // 24h
 const SECRET_BYTES = 32;
 const ONE_INFLIGHT_INDEX = "vt_rfid_secret_rotations_one_inflight_uq";
 
-export type RotationStatus = "grace" | "completed" | "rolled_back";
+export type RotationStatus = "grace" | "finalizing" | "completed" | "rolled_back";
 
 export interface RotationEnvelope {
   rotationId: string;
@@ -110,10 +110,11 @@ async function getActiveReaderIds(clinicId: string): Promise<string[]> {
 
 /**
  * Compensating transition: return a rotation row to its retained-grace state after a
- * post-CAS credential mutation fails. This keeps the durable rotation STATE consistent with
- * the (unchanged) credential blob — `previous` is still retained and accepted — so a later
- * verify/ack/rollback retries the transition cleanly instead of being stranded on a terminal
- * `completed`/`rolled_back` row that no longer matches the stored secrets.
+ * post-CAS credential mutation fails (a `finalizing` delete failure or a `rolled_back` restore
+ * failure). This keeps the durable rotation STATE consistent with the (unchanged) credential
+ * blob — `previous` is still retained and accepted — so a later verify/ack/rollback retries the
+ * transition cleanly instead of being stranded on a `finalizing`/terminal row that no longer
+ * matches the stored secrets.
  */
 async function revertRotationToGrace(clinicId: string, rotationId: string, now: number): Promise<void> {
   await db
@@ -123,30 +124,42 @@ async function revertRotationToGrace(clinicId: string, rotationId: string, now: 
 }
 
 /**
- * Invalidate the retained previous secret for a rotation (grace expiry OR all-acked).
- * CAS on `previous_retained = true` so exactly one caller drops the blob key; concurrent
- * callers no-op. Idempotent. If the credential drop fails AFTER the state flip, the row is
- * rolled back to grace so the flow is recoverable (never a terminal `completed` row that still
- * carries `previous_webhook_secret`).
+ * Invalidate the retained previous secret for a rotation (grace expiry OR all-acked). TWO-PHASE
+ * (FS-1) so the row is never observably `completed` until the external credential delete durably
+ * commits:
  *
- * Returns whether THIS call won the CAS and finalized the row. `false` means a concurrent
- * caller already claimed it (another finalize → `completed`, or a rollback → `rolled_back`);
- * the caller must NOT assume `completed` and should re-read the committed status instead.
+ *   1. CAS `grace` → `finalizing` (claim). `previous_retained` stays `true`, so the one-in-flight
+ *      partial unique index still holds and ingest keeps accepting `previous` while the blob
+ *      carries it. If the CAS matches 0 rows the grace row was already claimed (a concurrent
+ *      finalize → `finalizing`/`completed`, or a rollback → `rolled_back`): return `false`.
+ *   2. Delete the retained `previous_webhook_secret` from the credential blob. On FAILURE, revert
+ *      `finalizing` → `grace` (previous still retained, blob unchanged) and surface the error, so
+ *      the flow stays recoverable and no terminal `completed` row ever carries `previous_webhook_secret`.
+ *   3. On delete SUCCESS, CAS `finalizing` → `completed` (`previous_retained = false`).
+ *
+ * Returns whether THIS call drove the row to a durable `completed`. `false` means it did not win
+ * the claim; the caller must NOT assume `completed` and should re-read the committed status. The
+ * transient `completed`-before-delete window the pre-FS-1 code exposed is gone: a concurrent
+ * ack/reader can now only ever observe `grace`, `finalizing`, `completed`, or `rolled_back` — and
+ * `completed` is reached ONLY after the durable delete.
  */
 async function finalizeRotation(clinicId: string, rot: RfidSecretRotation, now: number): Promise<boolean> {
+  // Phase 1 — claim the grace row into the transient `finalizing` state.
   const claimed = await db
     .update(rfidSecretRotations)
-    .set({ status: "completed", previousRetained: false, completedAt: new Date(now), updatedAt: new Date(now) })
+    .set({ status: "finalizing", updatedAt: new Date(now) })
     .where(
       and(
         eq(rfidSecretRotations.clinicId, clinicId),
         eq(rfidSecretRotations.id, rot.id),
+        eq(rfidSecretRotations.status, "grace"),
         eq(rfidSecretRotations.previousRetained, true),
       ),
     )
     .returning();
-  if (claimed.length === 0) return false; // already finalized/rolled_back by a concurrent caller
+  if (claimed.length === 0) return false; // already finalizing/completed/rolled_back by a concurrent caller
 
+  // Phase 2 — durable credential delete of the retained previous secret.
   try {
     const creds = await getCredentials(clinicId, "rfid");
     if (creds?.previous_webhook_secret) {
@@ -158,6 +171,18 @@ async function finalizeRotation(clinicId: string, rot: RfidSecretRotation, now: 
     await revertRotationToGrace(clinicId, rot.id, now);
     throw err;
   }
+
+  // Phase 3 — the delete durably committed; only now advance to the terminal `completed`.
+  await db
+    .update(rfidSecretRotations)
+    .set({ status: "completed", previousRetained: false, completedAt: new Date(now), updatedAt: new Date(now) })
+    .where(
+      and(
+        eq(rfidSecretRotations.clinicId, clinicId),
+        eq(rfidSecretRotations.id, rot.id),
+        eq(rfidSecretRotations.status, "finalizing"),
+      ),
+    );
   return true;
 }
 
@@ -271,14 +296,18 @@ export async function getRfidVerificationSecrets(
   if (!previous) return [current];
 
   // A previous secret exists → there is (or was) an in-flight rotation. At most one exists
-  // (partial unique index).
+  // (partial unique index). A `finalizing` row (FS-1) is treated like `grace`: the delete has not
+  // durably committed yet — the blob still carries `previous` (else the early `!previous` return
+  // above would have fired) — so `previous` is still accepted while retained.
   const [rot] = await db
     .select()
     .from(rfidSecretRotations)
     .where(and(eq(rfidSecretRotations.clinicId, clinicId), eq(rfidSecretRotations.previousRetained, true)))
     .limit(1);
-  if (!rot || rot.status !== "grace") return [current];
+  if (!rot || (rot.status !== "grace" && rot.status !== "finalizing")) return [current];
   if (now > new Date(rot.graceExpiresAt).getTime()) {
+    // Lazy-finalize through the same two-phase path. A no-op `false` (row already `finalizing`
+    // under a concurrent caller) is fine: grace has expired, so `previous` is on its way out.
     await finalizeRotation(clinicId, rot, now);
     incrementMetric("rfid_secret_grace_expired");
     return [current];
@@ -315,6 +344,9 @@ export async function ackRotationReader(
     if (!rot) return { kind: "not_found" };
 
     if (rot.status !== "grace" || !rot.previousRetained) {
+      // Non-grace terminal (`completed`/`rolled_back`) OR the NON-TERMINAL `finalizing` transient
+      // (FS-1): a concurrent finalize claimed the row but its durable delete is still in flight.
+      // Return the honest committed status — NEVER coerce `finalizing` to `completed`.
       return { kind: "settled", status: rot.status as RotationStatus };
     }
     if (now > new Date(rot.graceExpiresAt).getTime()) {
@@ -347,11 +379,13 @@ export async function ackRotationReader(
     if (finalized) {
       return { status: "completed", rollbackAvailable: false };
     }
-    // A concurrent rollback claimed the row between the ack commit and the finalize CAS: the
-    // rotation is NOT completed. Report the actually-committed outcome (re-read the post-CAS
-    // state) so a rolled-back rotation never surfaces as `completed`.
+    // A concurrent finalize/rollback claimed the row between the ack commit and this finalize CAS:
+    // the rotation is NOT durably completed here. Report the actually-committed outcome (re-read the
+    // post-CAS state) so a `rolled_back` — or a still-in-flight `finalizing` — never surfaces as
+    // `completed`. The invariant: ack returns `completed` ONLY when THIS call drove the durable
+    // delete. Fall back to the pre-finalize snapshot status (`grace`), never to `completed`.
     const current = await getRotationRow(clinicId, { id: rotationId });
-    const status = (current?.status ?? "completed") as RotationStatus;
+    const status = (current?.status ?? outcome.rot.status) as RotationStatus;
     return {
       status,
       rollbackAvailable: status === "grace" && (current?.previousRetained ?? false),
@@ -363,7 +397,8 @@ export async function ackRotationReader(
 /**
  * Roll back a rotation while its previous secret is still retained: restores the previous as
  * current and invalidates the newly issued secret. Rejected once previous is invalidated
- * (grace expiry / all-acked) — recovery is then a fresh rotation.
+ * (grace expiry / all-acked) — recovery is then a fresh rotation. Also rejected while a
+ * finalization is already in progress (`finalizing`, FS-1): rollback is valid ONLY during `grace`.
  */
 export async function rollbackRfidSecret(
   clinicId: string,
@@ -372,6 +407,12 @@ export async function rollbackRfidSecret(
 ): Promise<RotationEnvelope> {
   const rot = await getRotationRow(clinicId, { id: rotationId });
   if (!rot) throw new RfidRotationError("ROTATION_NOT_FOUND", "RFID secret rotation not found", 404);
+
+  // A finalize has already claimed this row and its durable delete is in flight — rollback is no
+  // longer eligible (it is valid only during `grace`, before finalize commits to dropping previous).
+  if (rot.status === "finalizing") {
+    throw new RfidRotationError("ROLLBACK_UNAVAILABLE", "A rotation finalization is in progress; rollback is unavailable", 409);
+  }
 
   const isGrace = rot.status === "grace" && rot.previousRetained;
   if (isGrace && now > new Date(rot.graceExpiresAt).getTime()) {

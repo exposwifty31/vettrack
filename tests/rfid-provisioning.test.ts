@@ -74,6 +74,37 @@ vi.mock("../server/middleware/auth.js", () => ({
   },
 }));
 
+// ── Credential-store injection (FS-1 finalize hardening) ──────────────────────
+// A one-shot hook fired on the finalize-delete store (the `rfid` store that drops
+// `previous_webhook_secret`). The service is otherwise REAL: the hook lets a test block or fail
+// the durable delete to observe the intermediate `finalizing` state. Reset per-test.
+const credHooks = vi.hoisted(() => ({
+  beforeFinalizeDelete: null as null | (() => Promise<void>),
+}));
+vi.mock("../server/integrations/credential-manager.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../server/integrations/credential-manager.js")>();
+  return {
+    ...actual,
+    storeCredentials: async (clinicId: string, adapterId: string, creds: Record<string, string>) => {
+      const isFinalizeDelete = adapterId === "rfid" && !creds.previous_webhook_secret && !!creds.webhook_secret;
+      if (isFinalizeDelete && credHooks.beforeFinalizeDelete) {
+        const hook = credHooks.beforeFinalizeDelete;
+        credHooks.beforeFinalizeDelete = null; // one-shot
+        await hook();
+      }
+      return actual.storeCredentials(clinicId, adapterId, creds);
+    },
+  };
+});
+
+async function waitFor(cond: () => boolean, timeoutMs = 4000): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (!cond()) {
+    if (Date.now() > deadline) throw new Error("waitFor: condition not met before timeout");
+    await new Promise((r) => setTimeout(r, 5));
+  }
+}
+
 const uid = () => randomUUID();
 const sign = (body: string, secret: string): string =>
   `sha256=${createHmac("sha256", secret).update(Buffer.from(body, "utf8")).digest("hex")}`;
@@ -123,6 +154,10 @@ afterAll(async () => {
 });
 
 describe("R-M1.1c · HMAC rotation contract (DB-integration)", () => {
+  beforeEach(() => {
+    credHooks.beforeFinalizeDelete = null;
+  });
+
   it.runIf(dbReachable)("first provision returns a secret ONCE; no previous to roll back", async () => {
     const clinic = `test-rfidp-${uid()}`;
     await seedClinic(probePool!, clinic);
@@ -276,6 +311,131 @@ describe("R-M1.1c · HMAC rotation contract (DB-integration)", () => {
     } else {
       expect(rollbackRes.status).toBe("rejected");
     }
+  });
+
+  // ── FS-1: `finalizing` intermediate state (transient-`completed` window closed) ──────────────
+  it.runIf(dbReachable)("FS-1 happy path: grace → finalizing → completed, previous invalidated", async () => {
+    const clinic = `test-rfidp-${uid()}`;
+    await seedClinic(probePool!, clinic);
+    const readerId = await seedReader(probePool!, clinic);
+    await rotateRfidSecret(clinic, `key-${uid()}`);
+    const second = await rotateRfidSecret(clinic, `key-${uid()}`, { graceTtlMs: 600_000 });
+    expect(second.status).toBe("grace");
+
+    // Observe the row is durably `finalizing` mid-delete (phase-1 CAS committed, delete not yet).
+    let observedMid: string | undefined;
+    credHooks.beforeFinalizeDelete = async () => {
+      observedMid = (await getRotation(clinic, second.rotationId))?.status;
+    };
+
+    const acked = await ackRotationReader(clinic, second.rotationId, readerId);
+    expect(observedMid).toBe("finalizing"); // grace → finalizing observed BEFORE completed
+    expect(acked.status).toBe("completed"); // → completed ONLY after the durable delete
+    expect(acked.rollbackAvailable).toBe(false);
+
+    // Previous invalidated; only the new secret verifies.
+    expect(await getRfidVerificationSecrets(clinic)).toEqual([second.secret]);
+    expect((await getRotation(clinic, second.rotationId))?.previousRetained).toBe(false);
+  });
+
+  it.runIf(dbReachable)("FS-1: a credential-delete FAILURE during finalize reverts finalizing → grace; a concurrent read NEVER sees completed", async () => {
+    const clinic = `test-rfidp-${uid()}`;
+    await seedClinic(probePool!, clinic);
+    const readerId = await seedReader(probePool!, clinic);
+    const first = await rotateRfidSecret(clinic, `key-${uid()}`);
+    const second = await rotateRfidSecret(clinic, `key-${uid()}`, { graceTtlMs: 600_000 });
+
+    // Block the durable delete in the `finalizing` state, then FAIL it.
+    let reachedFinalize = false;
+    let release!: (fail: boolean) => void;
+    const gate = new Promise<void>((resolve, reject) => {
+      release = (fail) => (fail ? reject(new Error("injected credential-store delete failure")) : resolve());
+    });
+    credHooks.beforeFinalizeDelete = async () => {
+      reachedFinalize = true;
+      await gate;
+    };
+
+    // Kick off finalize (all readers acked) without awaiting — it parks in the blocked delete.
+    const ackPromise = ackRotationReader(clinic, second.rotationId, readerId);
+    await waitFor(() => reachedFinalize);
+
+    // CONCURRENT observation while the row is `finalizing`: never `completed`.
+    const midStatus = (await getRotation(clinic, second.rotationId))?.status;
+    expect(midStatus).toBe("finalizing");
+    expect(midStatus).not.toBe("completed");
+    // Ingest still accepts previous — the blob delete has not committed.
+    const midSecrets = await getRfidVerificationSecrets(clinic);
+    expect(midSecrets).toHaveLength(2);
+    expect(midSecrets).toContain(first.secret);
+    expect(midSecrets).toContain(second.secret);
+
+    // Fail the delete → revert to grace, surface the error, NEVER a terminal `completed`.
+    release(true);
+    await expect(ackPromise).rejects.toThrow(/injected credential-store delete failure/);
+
+    const persisted = await getRotation(clinic, second.rotationId);
+    expect(persisted?.status).toBe("grace");
+    expect(persisted?.status).not.toBe("completed");
+    expect(persisted?.previousRetained).toBe(true);
+    // Recoverable: previous still verifies after the revert.
+    expect(await getRfidVerificationSecrets(clinic)).toHaveLength(2);
+  });
+
+  it.runIf(dbReachable)("FS-1: rollback is REJECTED while the rotation is finalizing", async () => {
+    const clinic = `test-rfidp-${uid()}`;
+    await seedClinic(probePool!, clinic);
+    const readerId = await seedReader(probePool!, clinic);
+    await rotateRfidSecret(clinic, `key-${uid()}`);
+    const second = await rotateRfidSecret(clinic, `key-${uid()}`, { graceTtlMs: 600_000 });
+
+    let reachedFinalize = false;
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    credHooks.beforeFinalizeDelete = async () => {
+      reachedFinalize = true;
+      await gate;
+    };
+
+    const ackPromise = ackRotationReader(clinic, second.rotationId, readerId);
+    await waitFor(() => reachedFinalize);
+
+    // The row is `finalizing` — rollback must be refused (valid only during `grace`).
+    await expect(rollbackRfidSecret(clinic, second.rotationId)).rejects.toMatchObject({
+      code: "ROLLBACK_UNAVAILABLE",
+    });
+
+    release();
+    const acked = await ackPromise;
+    expect(acked.status).toBe("completed");
+  });
+
+  it.runIf(dbReachable)("FS-1: getRfidVerificationSecrets returns [current, previous] while finalizing, [current] once the delete commits", async () => {
+    const clinic = `test-rfidp-${uid()}`;
+    await seedClinic(probePool!, clinic);
+    const readerId = await seedReader(probePool!, clinic);
+    const first = await rotateRfidSecret(clinic, `key-${uid()}`);
+    const second = await rotateRfidSecret(clinic, `key-${uid()}`, { graceTtlMs: 600_000 });
+
+    let reachedFinalize = false;
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    credHooks.beforeFinalizeDelete = async () => {
+      reachedFinalize = true;
+      await gate;
+    };
+
+    const ackPromise = ackRotationReader(clinic, second.rotationId, readerId);
+    await waitFor(() => reachedFinalize);
+
+    // During `finalizing`, before the delete commits: both secrets verify.
+    const during = await getRfidVerificationSecrets(clinic);
+    expect(during).toEqual([second.secret, first.secret]);
+
+    // Let the delete commit → [current] only.
+    release();
+    await ackPromise;
+    expect(await getRfidVerificationSecrets(clinic)).toEqual([second.secret]);
   });
 
   it.runIf(dbReachable)("rollback within grace restores previous as current + invalidates the new secret", async () => {

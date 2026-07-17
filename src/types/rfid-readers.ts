@@ -4,8 +4,12 @@ export type { RfidReaderRow, RfidReaderStatus } from "../../shared/rfid-readers.
 // Managed reader entity (R-M1.1b): CRUD view with heartbeat-derived health.
 export type { ManagedRfidReaderRow, ManagedReaderHealth } from "../../shared/rfid-readers.js";
 
-/** Rotation lifecycle status returned by the provisioning endpoint (R-M1.1c). */
-export type RfidRotationStatus = "grace" | "completed" | "rolled_back";
+/**
+ * Rotation lifecycle status returned by the provisioning endpoint (R-M1.1c).
+ * `finalizing` (FS-1) is a NON-TERMINAL transient: finalize claimed the row and the external
+ * credential delete is in flight; previous is still retained and rollback is unavailable.
+ */
+export type RfidRotationStatus = "grace" | "finalizing" | "completed" | "rolled_back";
 
 /**
  * Client view of a secret-rotation envelope (R-M1.1e admin console). `secret` is present
