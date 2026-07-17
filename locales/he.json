@@ -930,6 +930,10 @@
     "rfidLastSeen": {
       "line": "זוהה לאחרונה ב־RFID ליד {room} · {relative}"
     },
+    "rfidDirection": {
+      "exited": "יצא מ־{from} → {to}",
+      "entered": "נכנס ל־{to}"
+    },
     "rfidAttention": {
       "checkedOutMismatch": "זוהה ליד {room} בעוד שאול ל־{holder}"
     }

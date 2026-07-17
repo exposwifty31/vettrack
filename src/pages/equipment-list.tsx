@@ -40,7 +40,9 @@ import { ReadinessBadge } from "@/components/ui/readiness-badge";
 import {
   isRfidSubtitleFresh,
   shouldShowRfidAttentionBadge,
+  getRfidDirection,
 } from "@/lib/equipment-rfid-display";
+import { RfidDirectionLine } from "@/features/equipment/RfidDirectionLine";
 import { DockReturnFlow } from "@/components/equipment/DockReturnFlow";
 import {
   Plus,
@@ -1250,16 +1252,26 @@ export function EquipmentItem({
                     {t.equipmentList.linkedInUse(eq.linkedAnimalName)}
                   </p>
                 )}
-                {isRfidSubtitleFresh(eq.lastRfidSeenAt) && eq.lastRfidRoomName && (
-                  <p
+                {getRfidDirection(eq) ? (
+                  <RfidDirectionLine
+                    direction={getRfidDirection(eq)!}
+                    relative={formatRelativeTime(eq.lastRfidSeenAt!)}
                     className="text-xs text-muted-foreground mt-0.5"
-                    data-testid={`equipment-rfid-last-seen-${eq.id}`}
-                  >
-                    {t.equipment.rfidLastSeen.line(
-                      eq.lastRfidRoomName,
-                      formatRelativeTime(eq.lastRfidSeenAt!),
-                    )}
-                  </p>
+                    testId={`equipment-rfid-direction-${eq.id}`}
+                  />
+                ) : (
+                  isRfidSubtitleFresh(eq.lastRfidSeenAt) &&
+                  eq.lastRfidRoomName && (
+                    <p
+                      className="text-xs text-muted-foreground mt-0.5"
+                      data-testid={`equipment-rfid-last-seen-${eq.id}`}
+                    >
+                      {t.equipment.rfidLastSeen.line(
+                        eq.lastRfidRoomName,
+                        formatRelativeTime(eq.lastRfidSeenAt!),
+                      )}
+                    </p>
+                  )
                 )}
                 {shouldShowRfidAttentionBadge(eq) && (
                   <button

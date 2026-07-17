@@ -930,6 +930,10 @@
     "rfidLastSeen": {
       "line": "Last seen via RFID near {room} · {relative}"
     },
+    "rfidDirection": {
+      "exited": "Exited {from} → {to}",
+      "entered": "Entered {to}"
+    },
     "rfidAttention": {
       "checkedOutMismatch": "Detected near {room} while checked out to {holder}"
     }

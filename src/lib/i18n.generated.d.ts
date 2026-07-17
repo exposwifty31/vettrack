@@ -933,6 +933,10 @@ export interface TStructure {
     rfidLastSeen: {
       line: string;
     };
+    rfidDirection: {
+      exited: string;
+      entered: string;
+    };
     rfidAttention: {
       checkedOutMismatch: string;
     };
