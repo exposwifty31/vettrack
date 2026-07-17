@@ -363,6 +363,17 @@ function isAllowedNudgeShown(value: unknown): value is NudgeShown {
   return typeof value === "string" && (ALLOWED_NUDGE_SHOWN as readonly string[]).includes(value);
 }
 
+// R-BDF-1.3 — board anomaly activation telemetry accepted via the existing
+// endpoint. The set of allowed types is a CLOSED enum (mirrors the shared
+// BoardAnomalyType); each in-enum type maps 1:1 to a fixed metric id. Anything
+// else is rejected via the shared enum-mismatch counter — no new metric series.
+const ALLOWED_BOARD_ANOMALY_TYPES = ["battery_critical", "cart_unverified", "rfid_reader_offline"] as const;
+type BoardAnomalyTelemetryType = (typeof ALLOWED_BOARD_ANOMALY_TYPES)[number];
+
+function isAllowedBoardAnomalyType(value: unknown): value is BoardAnomalyTelemetryType {
+  return typeof value === "string" && (ALLOWED_BOARD_ANOMALY_TYPES as readonly string[]).includes(value);
+}
+
 // Phase 9 PR 9.5 — offline emergency mutation blocking. Bounded enum; the
 // sessionStorage buffer itself is never posted, only the endpoint class.
 const ALLOWED_EMERGENCY_BLOCKED_CLASSES = ["start", "log", "end", "presence"] as const;
@@ -492,6 +503,7 @@ router.post("/telemetry", requireAuth, (req, res) => {
       offlineSyncSessionDeadBucket?: unknown;
       syncPermanentFailure?: unknown;
       syncCircuitOpen?: unknown;
+      boardAnomalyActivated?: unknown;
     };
     if (body?.duplicateDrop === true) {
       incrementMetric("realtime_duplicate_drops");
@@ -670,6 +682,21 @@ router.post("/telemetry", requireAuth, (req, res) => {
     if (body?.syncCircuitOpen !== undefined) {
       if (body.syncCircuitOpen === true) {
         incrementMetric("offline_sync_circuit_open");
+      } else {
+        incrementMetric("telemetry_payload_rejected_enum_mismatch");
+      }
+    }
+
+    // R-BDF-1.3 — board anomaly activation (closed enum → 1:1 metric id). The
+    // client fires this once per (type,unitId) activation via the R-BDF-1.2
+    // state-machine seam. Out-of-enum types bump the shared enum-mismatch
+    // counter without creating a new metric series.
+    if (body?.boardAnomalyActivated !== undefined) {
+      if (isAllowedBoardAnomalyType(body.boardAnomalyActivated)) {
+        const anomalyType = body.boardAnomalyActivated;
+        if (anomalyType === "battery_critical") incrementMetric("board_anomaly_battery_critical");
+        else if (anomalyType === "rfid_reader_offline") incrementMetric("board_anomaly_reader_offline");
+        else if (anomalyType === "cart_unverified") incrementMetric("board_anomaly_cart_unverified");
       } else {
         incrementMetric("telemetry_payload_rejected_enum_mismatch");
       }

@@ -1238,6 +1238,9 @@ export const api = {
       // T-30a2-ii — bounded enum: which nudge-feed kind was shown. Mirrors
       // the server's closed ALLOWED_NUDGE_SHOWN enum (T-30a2-i).
       nudgeShown?: NudgeKind;
+      // R-BDF-1.3 — bounded enum: which board anomaly type just activated
+      // (absent→active). Mirrors the server's closed ALLOWED_BOARD_ANOMALY_TYPES.
+      boardAnomalyActivated?: "battery_critical" | "cart_unverified" | "rfid_reader_offline";
     }) =>
       request<{ ok: boolean }>("/api/realtime/telemetry", {
         method: "POST",

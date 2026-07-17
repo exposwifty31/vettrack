@@ -344,7 +344,13 @@ type MetricName =
   | "collab_presence"
   | "collab_cursor_dropped"
   | "collab_board_rate_limited"
-  | "collab_record_presence";
+  | "collab_record_presence"
+  // R-BDF-1.3 — ambient board anomaly activation telemetry (bounded enum, no
+  // PII, no unitId label). One counter per closed BoardAnomalyType; the client
+  // emits once per (type,unitId) activation via the R-BDF-1.2 state machine.
+  | "board_anomaly_battery_critical"
+  | "board_anomaly_reader_offline"
+  | "board_anomaly_cart_unverified";
 
 type MetricBuckets = Record<MetricName, number>;
 
@@ -1012,6 +1018,10 @@ const DEFAULT_COUNTERS: MetricBuckets = {
   collab_cursor_dropped: 0,
   collab_board_rate_limited: 0,
   collab_record_presence: 0,
+  // R-BDF-1.3 — ambient board anomaly activation counters.
+  board_anomaly_battery_critical: 0,
+  board_anomaly_reader_offline: 0,
+  board_anomaly_cart_unverified: 0,
 };
 
 const metrics: MetricBuckets = { ...DEFAULT_COUNTERS };

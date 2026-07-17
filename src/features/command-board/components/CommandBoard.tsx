@@ -7,6 +7,7 @@ import { useLocation } from "wouter";
 import { Settings2, X } from "lucide-react";
 import { t } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
+import { reportBoardAnomalyActivated } from "@/lib/realtime";
 import { useBoardEntityCoPresence } from "@/board/board-copresence-context";
 import { usePrefersReducedMotion } from "@/hooks/use-prefers-reduced-motion";
 import type { EquipmentCommandBoardSnapshot } from "@/types/safety-surfaces";
@@ -482,7 +483,12 @@ export function CommandBoard({
 
       {/* Ambient anomaly attention (R-BDF-1.2) — glance-only, present in both modes */}
       {anomalies.length > 0 && (
-        <BoardAttentionSection anomalies={anomalies} mode={mode} reducedMotion={reducedMotion} />
+        <BoardAttentionSection
+          anomalies={anomalies}
+          mode={mode}
+          reducedMotion={reducedMotion}
+          onAnomalyActivated={reportBoardAnomalyActivated}
+        />
       )}
 
       {/* Body */}
