@@ -86,15 +86,20 @@ function resolveLocationFromGraph(ctx: ResolverContext, graph: EvidenceGraph): L
     evidence: { observedAt: iso(eq.lastSeen ?? eq.custodyStateSince ?? ctx.now) },
   });
 
+  // Summary precedence (R-M1.0, PINNED — aligned to the inference-service
+  // ladder): active checkout > dock station > human-confirmed roomId > RFID
+  // last-seen > free-text > unknown. RFID is advisory-only (ADR-006): it
+  // corroborates (see citations above) but must NEVER override a
+  // human-confirmed room.
   let summary: string;
   if (eq.custodyState === "checked_out" && eq.checkedOutLocation) {
     summary = `checked_out:${eq.checkedOutLocation}`;
-  } else if (latestRfid && roomLabel(graph, latestRfid.toRoomId)) {
-    summary = `rfid_room:${roomLabel(graph, latestRfid.toRoomId)}`;
   } else if (graph.currentAnchor && graph.currentAnchor.dockName) {
     summary = `dock_station:${graph.currentAnchor.dockName}`;
   } else if (eq.roomId && roomLabel(graph, eq.roomId)) {
     summary = `room:${roomLabel(graph, eq.roomId)}`;
+  } else if (latestRfid && roomLabel(graph, latestRfid.toRoomId)) {
+    summary = `rfid_room:${roomLabel(graph, latestRfid.toRoomId)}`;
   } else if (eq.location) {
     summary = `location:${eq.location}`;
   } else {
