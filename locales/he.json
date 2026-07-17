@@ -3875,7 +3875,14 @@
     "waitlist": "רשימת המתנה",
     "staging": "היערכות",
     "inQueue": "בתור",
-    "highLoad": "עומס גבוה"
+    "highLoad": "עומס גבוה",
+    "collab": {
+      "present": "נוכחים בלוח"
+    }
+  },
+  "recordCollab": {
+    "editingThis": "{name} עורך/ת פריט זה",
+    "someoneEditing": "מישהו עורך פריט זה"
   },
   "webOnlyGuard": {
     "title": "מיטבי לצפייה במסך גדול יותר",

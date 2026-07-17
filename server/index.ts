@@ -421,11 +421,25 @@ function startResilientInterval(params: {
 
 const isTestMode = process.env.NODE_ENV === "test";
 const PORT = resolvePort(process.env.PORT);
-app.listen(PORT, "0.0.0.0", () => {
+const httpServer = app.listen(PORT, "0.0.0.0", () => {
   if (process.env.NODE_ENV !== "production") {
     console.log("ENV PORT =", process.env.PORT);
   }
   console.log(`Server listening on ${PORT}`);
+
+  // R-RTC-1 — additive, ephemeral collaboration WS channel. Its entire startup is
+  // NON-FATAL (R-RTC-1.7): a failure here never blocks SSE, vt_event_outbox, or
+  // Code Blue, which have already started. Distinct path from /api/realtime/* (SSE).
+  if (!isTestMode) {
+    import("./lib/realtime-collab/server.js")
+      .then(({ initCollabServer }) => initCollabServer(httpServer))
+      .then((collab) => {
+        if (!collab.enabled) {
+          console.log(`[collab-ws] collaboration channel not started: ${collab.reason ?? "disabled"}`);
+        }
+      })
+      .catch((err) => console.error("[collab-ws] init failed (non-fatal)", err));
+  }
 });
 
 runMigrations()

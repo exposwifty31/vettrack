@@ -3879,6 +3879,13 @@ export interface TStructure {
     staging: string;
     inQueue: string;
     highLoad: string;
+    collab: {
+      present: string;
+    };
+  };
+  recordCollab: {
+    editingThis: string;
+    someoneEditing: string;
   };
   webOnlyGuard: {
     title: string;

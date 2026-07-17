@@ -4,6 +4,8 @@ import { EquipmentDetailScreen } from "@/features/equipment";
 import { formatBundleGateReason } from "@/lib/equipment-truth-display";
 import { getEquipmentDisplayName } from "@/lib/equipment-display";
 import { Bdi } from "@/components/ui/bdi";
+import { useRecordPresence } from "@/features/collab/useRecordPresence";
+import { RecordPresenceIndicator } from "@/features/collab/RecordPresenceIndicator";
 import { useConfirm } from "@/hooks/use-confirm";
 // TODO(arch): God-file split — see docs/architecture/equipment-god-files-split-plan.md (item 9 handoff; no implementation here).
 import { Breadcrumb } from "@/components/layout/Breadcrumb";
@@ -202,6 +204,15 @@ function EquipmentDetailPageDesktop() {
   const [reportIssueNote, setReportIssueNote] = useState("");
   const [reportIssuePhoto, setReportIssuePhoto] = useState<string | null>(null);
   const [reportIssueNoteError, setReportIssueNoteError] = useState("");
+
+  // R-RTC-1.4 · Feature 3 — EPHEMERAL + STRICTLY ADVISORY record co-presence.
+  // Emits viewing on mount and editing while a record-editing surface is open.
+  // Never gates any action; the server OCC guard remains the sole conflict authority.
+  const recordPresence = useRecordPresence({
+    recordType: "equipment",
+    recordId: id ?? "",
+    editing: editingFloorNote || reportIssueOpen || moveRoomOpen,
+  });
 
   useEffect(() => {
     const params = new URLSearchParams(searchStr);
@@ -1030,6 +1041,9 @@ function EquipmentDetailPageDesktop() {
             <div>
               <h1 className="vt-page-title leading-tight"><Bdi>{equipmentDisplayName}</Bdi></h1>
               <ReadinessBadge status={equipment.status} className="mt-0.5" />
+              {recordPresence.peerEditors.length > 0 && (
+                <RecordPresenceIndicator editors={recordPresence.peerEditors} />
+              )}
               {equipment.folderName && (
                 <span className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5">
                   <FolderOpen className="w-3 h-3" />

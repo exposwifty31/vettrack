@@ -147,6 +147,12 @@ export function useShiftChat(isOpen: boolean) {
     },
   });
 
+  // Advisory refetch trigger for the collab "new message" nudge (R-RTC-1.2).
+  // Re-runs the existing gt-poll query; WS is never the message store.
+  const refetch = useCallback(() => {
+    void queryClient.invalidateQueries({ queryKey: QUERY_KEY });
+  }, [queryClient]);
+
   // ── Typing indicator (debounced) ───────────────────────────────────────────
   const notifyTyping = useCallback(() => {
     if (typingTimer.current) return; // Already sent recently
@@ -205,6 +211,7 @@ export function useShiftChat(isOpen: boolean) {
     reactToMessage: reactMutation.mutate,
     pinMessage:    pinMutation.mutate,
     notifyTyping,
+    refetch,
     currentUserId: userId,
   };
 }

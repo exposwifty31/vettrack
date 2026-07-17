@@ -1139,6 +1139,11 @@ const translations = {
 
   boardPair: d.boardPair,
 
+  recordCollab: {
+    editingThis: (name: string) => tr(d.recordCollab.editingThis, { name }),
+    someoneEditing: d.recordCollab.someoneEditing,
+  },
+
   webOnlyGuard: d.webOnlyGuard,
 
   managementWebGate: d.managementWebGate,

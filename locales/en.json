@@ -3875,7 +3875,14 @@
     "waitlist": "Waitlist",
     "staging": "Staging",
     "inQueue": "in queue",
-    "highLoad": "High load"
+    "highLoad": "High load",
+    "collab": {
+      "present": "On the board"
+    }
+  },
+  "recordCollab": {
+    "editingThis": "{name} is editing this",
+    "someoneEditing": "Someone is editing this"
   },
   "webOnlyGuard": {
     "title": "Best viewed on a larger screen",

@@ -7,6 +7,7 @@ import { useLocation } from "wouter";
 import { Settings2, X } from "lucide-react";
 import { t } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
+import { useBoardEntityCoPresence } from "@/board/board-copresence-context";
 import type { EquipmentCommandBoardSnapshot } from "@/types/safety-surfaces";
 import type { EquipmentBoardUnitRow, EquipmentReadinessStatus } from "../../../../shared/equipment-board";
 import { STATUS_BG, STATUS_BAR_COLOR, statusLabel } from "../status-tokens";
@@ -214,16 +215,39 @@ function LocationCard({ row }: { row: EquipmentCommandBoardSnapshot["byLocation"
 
 function UnitRow({ unit }: { unit: EquipmentBoardUnitRow }) {
   const blocking = unit.blockingReasons[0] ?? unit.nextAction ?? null;
+  // R-RTC-1.3 · Feature 2 — advisory co-presence. Hovering/focusing a unit reports
+  // it as the locally-highlighted entity (producer); when a remote peer has it
+  // highlighted we draw a visible ring + name their presence. Inert without a
+  // provider (socket down / other routes), so the row is unchanged when degraded.
+  const { isPeerSelected, peerNames, onSelect, onClear } = useBoardEntityCoPresence(unit.equipmentId);
   return (
     <div
-      className="flex items-start gap-3 py-2.5 border-b border-ivory-border last:border-0"
+      className={cn(
+        "flex items-start gap-3 py-2.5 border-b border-ivory-border last:border-0",
+        isPeerSelected &&
+          "rounded-lg border-b-transparent ring-2 ring-[hsl(var(--status-ok))] ring-offset-1 ring-offset-[rgb(var(--ivory-surface))]",
+      )}
       data-testid={`board-unit-row-${unit.equipmentId}`}
+      data-board-entity-id={unit.equipmentId}
+      data-board-peer-selected={isPeerSelected ? "true" : undefined}
+      onPointerEnter={onSelect}
+      onPointerLeave={onClear}
+      onFocus={onSelect}
+      onBlur={onClear}
     >
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
           <span className="vt-text-sm font-semibold text-ivory-text truncate">{unit.displayName}</span>
           {unit.typeName && (
             <span className="vt-text-2xs text-ivory-text3 truncate shrink-0">{unit.typeName}</span>
+          )}
+          {isPeerSelected && peerNames.length > 0 && (
+            <span
+              className="vt-text-2xs font-semibold text-white bg-[hsl(var(--status-ok))] rounded-full px-2 py-0.5 shrink-0"
+              data-board-peer-selection-label
+            >
+              {peerNames.join(", ")}
+            </span>
           )}
         </div>
         <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-0.5">

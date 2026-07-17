@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from "react";
 import { useLocation } from "wouter";
 import { useShiftChat } from "../hooks/useShiftChat";
+import { useShiftChatCollab } from "../hooks/useShiftChatCollab";
 import { ShiftChatPanel } from "./ShiftChatPanel";
 import { useAuth } from "@/hooks/use-auth";
 import { isKioskSuppressedPathname } from "@/app/platform";
@@ -29,6 +30,9 @@ export function ShiftChatLauncher({ renderTrigger }: Props) {
   const [location] = useLocation();
   const [isOpen, setIsOpen] = useState(false);
   const chat = useShiftChat(isOpen);
+  // Lazy: the collab socket is acquired only while the panel is open, and the
+  // nudge only triggers the existing REST refetch (WS is never the message store).
+  const collab = useShiftChatCollab({ enabled: isOpen, onNewMessage: chat.refetch });
 
   // Only render for shift-eligible roles
   const eligibleRoles = ["vet", "technician", "senior_technician", "admin"];
@@ -60,6 +64,7 @@ export function ShiftChatLauncher({ renderTrigger }: Props) {
         isOpen={isOpen}
         onClose={() => setIsOpen(false)}
         chat={chat}
+        collab={collab}
       />
     </>
   );
