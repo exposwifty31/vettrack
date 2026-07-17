@@ -121,6 +121,19 @@ export function createPresenceStore(opts: PresenceStoreOptions = {}): PresenceSt
     }
   }
 
+  // Reclaim GHOST rooms: rooms whose leases all lapsed by TTL without an explicit
+  // disconnect (network stall / reconnect churn / a sole-lease record room expiring).
+  // removeLeaseLocal deletes an empty room only on an explicit disconnect, so without
+  // this sweep those rooms linger in `rooms` forever; once FALLBACK_MAP_MAX_ROOMS of
+  // them accumulate, addLeaseLocal would reject EVERY new room. O(rooms) — invoked
+  // only at the cap boundary, never on the hot path.
+  function sweepEmptyRooms(): void {
+    for (const [room, leases] of rooms) {
+      pruneRoom(leases);
+      if (leases.size === 0) rooms.delete(room);
+    }
+  }
+
   function userPresent(leases: Map<string, Lease>, userId: string): boolean {
     for (const lease of leases.values()) {
       if (lease.userId === userId) return true;
@@ -132,7 +145,12 @@ export function createPresenceStore(opts: PresenceStoreOptions = {}): PresenceSt
   function addLeaseLocal(room: string, member: PresenceMember, socketId: string): boolean {
     let leases = rooms.get(room);
     if (!leases) {
-      if (rooms.size >= FALLBACK_MAP_MAX_ROOMS) return false; // bounded: drop
+      if (rooms.size >= FALLBACK_MAP_MAX_ROOMS) {
+        // At the cap: first reclaim ghost rooms (leases lapsed by TTL, never
+        // disconnected). Only if genuinely full afterwards do we drop the join.
+        sweepEmptyRooms();
+        if (rooms.size >= FALLBACK_MAP_MAX_ROOMS) return false; // bounded: drop
+      }
       leases = new Map();
       rooms.set(room, leases);
     }
@@ -173,6 +191,12 @@ export function createPresenceStore(opts: PresenceStoreOptions = {}): PresenceSt
     const leases = rooms.get(room);
     if (!leases) return [];
     pruneRoom(leases);
+    // Reclaim on read: a room whose sole lease just lapsed by TTL is now empty and
+    // must not linger as a ghost occupying a slot against FALLBACK_MAP_MAX_ROOMS.
+    if (leases.size === 0) {
+      rooms.delete(room);
+      return [];
+    }
     const byUser = new Map<string, PresenceMember>();
     for (const lease of leases.values()) {
       if (!byUser.has(lease.userId)) {

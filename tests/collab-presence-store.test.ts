@@ -9,6 +9,7 @@ import { createPresenceStore } from "../server/lib/realtime-collab/presence-stor
 import {
   COLLAB_REDIS_PREFIX,
   PRESENCE_KEY_EXPIRE_MARGIN_MS,
+  FALLBACK_MAP_MAX_ROOMS,
 } from "../server/lib/realtime-collab/config.js";
 
 const presenceKeyFor = (room: string): string => `${COLLAB_REDIS_PREFIX}presence:${room}`;
@@ -173,6 +174,41 @@ describe("presence store — R-RTC-1.5", () => {
     store.addLease("room", { userId: "u2", displayName: "U2" }, "s3");
     const present = store.getPresent("room").map((m) => m.userId).sort();
     expect(present).toEqual(["u1", "u2"]);
+  });
+});
+
+describe("presence store — ghost-room reclaim (TTL-lapsed rooms must not wedge the cap)", () => {
+  it("reclaims a room whose leases all expire by TTL (no disconnect) so new rooms are still admitted at the cap", () => {
+    let t = 1_000;
+    const store = createPresenceStore({ now: () => t, ttlMs: 5_000 });
+    // Fill EXACTLY to the room cap, one per-record room with a single lease each —
+    // the per-equipment record rooms the card calls out.
+    for (let i = 0; i < FALLBACK_MAP_MAX_ROOMS; i++) {
+      const admitted = store.addLease(`clinic:R:eq-${i}`, { userId: `u${i}`, displayName: `U${i}` }, `s${i}`);
+      expect(admitted).toBe(true);
+    }
+    // Every lease lapses purely by TTL — NO explicit disconnect ever fires
+    // (network stall / reconnect churn / a sole-lease record room expiring).
+    t += 5_001;
+    // Without reclaim, the 2000 now-empty rooms are ghosts that stay in the Map and
+    // make addLease reject EVERY new room forever. A fresh room MUST still be admitted.
+    const admittedFresh = store.addLease("clinic:R:eq-fresh", { userId: "fresh", displayName: "Fresh" }, "sf");
+    expect(admittedFresh).toBe(true);
+    expect(store.getPresent("clinic:R:eq-fresh")).toEqual([{ userId: "fresh", displayName: "Fresh" }]);
+  });
+
+  it("removes an empty room from the Map on a read once its sole lease expires (no ghost lingers)", () => {
+    let t = 0;
+    const store = createPresenceStore({ now: () => t, ttlMs: 5_000 });
+    store.addLease("room", { userId: "u1", displayName: "U1" }, "s1");
+    t += 5_001; // sole lease lapses by TTL, no disconnect
+    expect(store.getPresent("room")).toEqual([]);
+    // The now-empty room entry must be gone: adding cap-1 OTHER rooms plus this one
+    // must still leave headroom for one more (proves "room" no longer occupies a slot).
+    for (let i = 0; i < FALLBACK_MAP_MAX_ROOMS - 1; i++) {
+      expect(store.addLease(`other-${i}`, { userId: `o${i}`, displayName: `O${i}` }, `os${i}`)).toBe(true);
+    }
+    expect(store.addLease("last", { userId: "last", displayName: "Last" }, "sl")).toBe(true);
   });
 });
 

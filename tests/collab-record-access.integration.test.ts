@@ -40,6 +40,7 @@ if (DATABASE_URL) {
 const clinicA = `clinic-A-${randomUUID()}`;
 const clinicB = `clinic-B-${randomUUID()}`;
 const eqId = randomUUID();
+const softDeletedEqId = randomUUID();
 const roomId = randomUUID();
 const taskId = randomUUID();
 
@@ -61,6 +62,12 @@ async function seed() {
   const P = probePool!;
   await P.query(`INSERT INTO vt_clinics (id) VALUES ($1), ($2) ON CONFLICT DO NOTHING`, [clinicA, clinicB]);
   await P.query(`INSERT INTO vt_equipment (id, clinic_id, name) VALUES ($1, $2, $3)`, [eqId, clinicA, "ACL Test Pump"]);
+  // A SOFT-DELETED equipment record in the SAME clinic: must NOT authorize a room join
+  // (the REST record path filters isNull(deleted_at); the collab ACL must match).
+  await P.query(
+    `INSERT INTO vt_equipment (id, clinic_id, name, deleted_at) VALUES ($1, $2, $3, now())`,
+    [softDeletedEqId, clinicA, "ACL Test Deleted Pump"],
+  );
   await P.query(`INSERT INTO vt_rooms (id, clinic_id, name) VALUES ($1, $2, $3)`, [roomId, clinicA, "ACL Test Room"]);
   await P.query(
     `INSERT INTO vt_appointments (id, clinic_id, start_time, end_time)
@@ -113,4 +120,9 @@ describe.skipIf(!dbReachable)("defaultRecordAccessCheck — real clinic-scoped A
       expect(allowed).toBe(false);
     });
   }
+
+  it("DENIES a SOFT-DELETED equipment record to its OWN clinic (soft-delete parity with the REST path)", async () => {
+    const allowed = await defaultRecordAccessCheck(identityFor(clinicA), "equipment", softDeletedEqId);
+    expect(allowed).toBe(false);
+  });
 });
