@@ -33,6 +33,18 @@ export type ControllerConfigInput = Partial<ControllerConfig> &
   Pick<ControllerConfig, "apiOrigin" | "clinicId">;
 
 export function loadConfig(input: ControllerConfigInput): ControllerConfig {
+  // loadConfigFromFile feeds untyped JSON through the ControllerConfigInput cast,
+  // so a string field may arrive as a number, array, or object. Reject non-string
+  // values here with a contextual error — a numeric/array apiOrigin/clinicId would
+  // otherwise throw a bare `.trim()` TypeError, and a non-string controllerVersion
+  // would reach the wire contract unchecked.
+  for (const name of ["apiOrigin", "clinicId", "controllerVersion"] as const) {
+    const value = input[name];
+    if (value !== undefined && typeof value !== "string") {
+      throw new Error(`config: ${name} must be a string`);
+    }
+  }
+
   const apiOrigin = (input.apiOrigin ?? "").trim();
   const clinicId = (input.clinicId ?? "").trim();
   if (!apiOrigin) throw new Error("config: apiOrigin is required");

@@ -116,7 +116,9 @@ afterAll(async () => {
       await probePool.query(`DELETE FROM vt_clinics WHERE id = ANY($1)`, [ids]);
     }
   } finally {
-    await probePool?.end().catch(() => {});
+    // Do not swallow a rejected Pool.end(): a teardown/resource failure must
+    // surface from afterAll rather than pass silently.
+    await probePool?.end();
   }
 });
 
@@ -234,6 +236,42 @@ describe("R-M1.1c · HMAC rotation contract (DB-integration)", () => {
     await expect(rollbackRfidSecret(clinic, second.rotationId)).rejects.toMatchObject({
       code: "ROLLBACK_UNAVAILABLE",
     });
+  });
+
+  it.runIf(dbReachable)("contended finalize vs rollback: ack never reports 'completed' when rollback wins the race", async () => {
+    const clinic = `test-rfidp-${uid()}`;
+    await seedClinic(probePool!, clinic);
+    const readerId = await seedReader(probePool!, clinic);
+    await rotateRfidSecret(clinic, `key-${uid()}`);
+    const second = await rotateRfidSecret(clinic, `key-${uid()}`, { graceTtlMs: 600_000 });
+
+    // Race the all-readers-acked finalize against a rollback on the SAME grace rotation.
+    // The ack transaction commits its "should finalize" decision, then finalizeRotation's
+    // CAS races the rollback CAS — the exact window where the ack could otherwise report a
+    // stale "completed" for a row that actually committed as "rolled_back".
+    const [ackRes, rollbackRes] = await Promise.allSettled([
+      ackRotationReader(clinic, second.rotationId, readerId),
+      rollbackRfidSecret(clinic, second.rotationId),
+    ]);
+
+    const persisted = await getRotation(clinic, second.rotationId);
+    expect(persisted).not.toBeNull();
+    expect(["completed", "rolled_back"]).toContain(persisted!.status);
+
+    // The ack must AGREE with the committed row — never claim "completed" while the row
+    // committed as "rolled_back".
+    expect(ackRes.status).toBe("fulfilled");
+    if (ackRes.status === "fulfilled") {
+      expect(ackRes.value.status).toBe(persisted!.status);
+      expect(ackRes.value.rollbackAvailable).toBe(false);
+    }
+    // The rollback either won (fulfilled → rolled_back) or lost (rejected UNAVAILABLE),
+    // consistent with the committed terminal state.
+    if (persisted!.status === "rolled_back") {
+      expect(rollbackRes.status).toBe("fulfilled");
+    } else {
+      expect(rollbackRes.status).toBe("rejected");
+    }
   });
 
   it.runIf(dbReachable)("rollback within grace restores previous as current + invalidates the new secret", async () => {

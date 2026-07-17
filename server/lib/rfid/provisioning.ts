@@ -128,8 +128,12 @@ async function revertRotationToGrace(clinicId: string, rotationId: string, now: 
  * callers no-op. Idempotent. If the credential drop fails AFTER the state flip, the row is
  * rolled back to grace so the flow is recoverable (never a terminal `completed` row that still
  * carries `previous_webhook_secret`).
+ *
+ * Returns whether THIS call won the CAS and finalized the row. `false` means a concurrent
+ * caller already claimed it (another finalize → `completed`, or a rollback → `rolled_back`);
+ * the caller must NOT assume `completed` and should re-read the committed status instead.
  */
-async function finalizeRotation(clinicId: string, rot: RfidSecretRotation, now: number): Promise<void> {
+async function finalizeRotation(clinicId: string, rot: RfidSecretRotation, now: number): Promise<boolean> {
   const claimed = await db
     .update(rfidSecretRotations)
     .set({ status: "completed", previousRetained: false, completedAt: new Date(now), updatedAt: new Date(now) })
@@ -141,7 +145,7 @@ async function finalizeRotation(clinicId: string, rot: RfidSecretRotation, now: 
       ),
     )
     .returning();
-  if (claimed.length === 0) return; // already finalized by a concurrent caller
+  if (claimed.length === 0) return false; // already finalized/rolled_back by a concurrent caller
 
   try {
     const creds = await getCredentials(clinicId, "rfid");
@@ -154,6 +158,7 @@ async function finalizeRotation(clinicId: string, rot: RfidSecretRotation, now: 
     await revertRotationToGrace(clinicId, rot.id, now);
     throw err;
   }
+  return true;
 }
 
 /**
@@ -229,9 +234,13 @@ export async function rotateRfidSecret(
   //    durable store fails, the row is a bricked "delivered" record (secret never returned to
   //    the caller, gate still held) — compensate by deleting it so the same key re-runs cleanly
   //    and a fresh rotation is not blocked by the one-in-flight gate.
-  const nextBlob = retainPrevious
-    ? { ...(creds ?? {}), webhook_secret: newSecret, previous_webhook_secret: currentSecret! }
-    : { webhook_secret: newSecret };
+  // `retainPrevious` already implies `currentSecret` is a non-empty string
+  // (`Boolean(currentSecret) && snapshot.length > 0`). Re-testing `currentSecret`
+  // in the condition narrows it to `string` for TypeScript — no non-null assertion.
+  const nextBlob =
+    retainPrevious && currentSecret
+      ? { ...(creds ?? {}), webhook_secret: newSecret, previous_webhook_secret: currentSecret }
+      : { webhook_secret: newSecret };
   try {
     await storeCredentials(clinicId, "rfid", nextBlob);
   } catch (err) {
@@ -334,8 +343,19 @@ export async function ackRotationReader(
   if (outcome.kind === "finalize") {
     // finalize runs its own CAS + credential mutation AFTER the ack transaction commits (never
     // nested inside it), so the two never contend for the same locked row.
-    await finalizeRotation(clinicId, outcome.rot, now);
-    return { status: "completed", rollbackAvailable: false };
+    const finalized = await finalizeRotation(clinicId, outcome.rot, now);
+    if (finalized) {
+      return { status: "completed", rollbackAvailable: false };
+    }
+    // A concurrent rollback claimed the row between the ack commit and the finalize CAS: the
+    // rotation is NOT completed. Report the actually-committed outcome (re-read the post-CAS
+    // state) so a rolled-back rotation never surfaces as `completed`.
+    const current = await getRotationRow(clinicId, { id: rotationId });
+    const status = (current?.status ?? "completed") as RotationStatus;
+    return {
+      status,
+      rollbackAvailable: status === "grace" && (current?.previousRetained ?? false),
+    };
   }
   return { status: "grace", rollbackAvailable: true };
 }

@@ -37,6 +37,20 @@ describe("loadConfig", () => {
     expect(() => loadConfig({ apiOrigin: "x", clinicId: "c", debounceMs: [1] })).toThrow();
   });
 
+  it("rejects non-string apiOrigin / clinicId / controllerVersion from untyped file config", () => {
+    // A numeric / array apiOrigin or clinicId would otherwise throw a bare
+    // `.trim()` TypeError with no context about which field was malformed.
+    // @ts-expect-error — runtime guard for the untyped file-config path
+    expect(() => loadConfig({ apiOrigin: 123, clinicId: "c" })).toThrow("config: apiOrigin must be a string");
+    // @ts-expect-error — runtime guard for the untyped file-config path
+    expect(() => loadConfig({ apiOrigin: "x", clinicId: ["c"] })).toThrow("config: clinicId must be a string");
+    // A non-string controllerVersion would otherwise reach the wire contract.
+    // @ts-expect-error — runtime guard for the untyped file-config path
+    expect(() => loadConfig({ apiOrigin: "x", clinicId: "c", controllerVersion: 7 })).toThrow(
+      "config: controllerVersion must be a string",
+    );
+  });
+
   it("does NOT carry a secret (secrets come from env/secret-source only)", () => {
     const cfg = loadConfig({
       apiOrigin: "https://api.test",

@@ -54,15 +54,20 @@ describe("RfidController — end-to-end pipeline (no DB, injected fetch)", () =>
   });
 
   it("honors the server backoff and governs the retry pass (does not re-send immediately)", async () => {
+    // Record fetch + sleep on ONE ordered timeline so we can assert the retry POST
+    // happens AFTER the backoff sleep (not merely that a 5s sleep occurred somewhere).
+    const events: string[] = [];
     const sleeps: number[] = [];
     let now = 0;
     const sleep = async (ms: number): Promise<void> => {
+      events.push(`sleep:${ms}`);
       sleeps.push(ms);
       now += ms;
     };
     let calls = 0;
     const fetchFn = vi.fn(async () => {
       calls += 1;
+      events.push(`fetch:${calls}`);
       // First attempt: 429 (Retry-After 5s) → buffered. Retry: 202.
       return calls === 1
         ? new Response(JSON.stringify({ error: "slow" }), { status: 429, headers: { "retry-after": "5" } })
@@ -83,7 +88,10 @@ describe("RfidController — end-to-end pipeline (no DB, injected fetch)", () =>
       new SyntheticAdapter([{ tagEpc: "E1", gatewayCode: "GW-1", readAt: new Date(1_800_000_000_000) }]),
     );
 
-    // The retry pass slept for the server's Retry-After before re-sending.
+    // The retry pass slept for the server's Retry-After BEFORE re-sending — the
+    // ordering (first POST → 5s backoff → retry POST) is what makes the backoff
+    // real; a `toContain(5_000)` alone would pass even if the retry fired first.
+    expect(events).toEqual(["fetch:1", "sleep:5000", "fetch:2"]);
     expect(sleeps).toContain(5_000);
     expect(summary.backoff).toBe(1);
     expect(summary.accepted).toBe(1);

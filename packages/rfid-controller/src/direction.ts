@@ -51,7 +51,19 @@ export class DirectionTracker {
   private readonly maxTrackedTags: number;
 
   constructor(maxTrackedTags: number = MAX_TRACKED_TAGS) {
-    this.maxTrackedTags = Math.max(1, Math.floor(maxTrackedTags));
+    // Hard ceiling: a NaN cap would disable eviction (`size > NaN` is always
+    // false → unbounded growth), and Infinity / an over-MAX value would defeat
+    // the claimed bound. Reject anything outside the integer range 1..MAX.
+    if (
+      !Number.isInteger(maxTrackedTags) ||
+      maxTrackedTags < 1 ||
+      maxTrackedTags > MAX_TRACKED_TAGS
+    ) {
+      throw new RangeError(
+        `DirectionTracker: maxTrackedTags must be an integer in 1..${MAX_TRACKED_TAGS}`,
+      );
+    }
+    this.maxTrackedTags = maxTrackedTags;
   }
 
   /** Last gateway a tag was seen at, or null if never seen. */
@@ -62,14 +74,19 @@ export class DirectionTracker {
   /** Classify a read as a same-gateway presence or a crossing to a new gateway. */
   observe(read: RfidRead): Movement {
     const prev = this.lastGatewayByTag.get(read.tagEpc) ?? null;
-    // Delete-then-set moves this tag to the most-recent (insertion-order) slot so
-    // eviction targets the least-recently-observed EPC.
+    // Delete first so re-inserting below moves this tag to the most-recent
+    // (insertion-order) slot — eviction then targets the least-recently-observed EPC.
     this.lastGatewayByTag.delete(read.tagEpc);
-    this.lastGatewayByTag.set(read.tagEpc, read.gatewayCode);
-    if (this.lastGatewayByTag.size > this.maxTrackedTags) {
+    // Hard ceiling: evict oldest entries until there is room for exactly one more,
+    // BEFORE inserting. The map never exceeds maxTrackedTags — not even transiently
+    // across the set below. (A stable-cap map only ever needs one eviction here, but
+    // the loop keeps the ceiling invariant robust regardless of prior state.)
+    while (this.lastGatewayByTag.size >= this.maxTrackedTags) {
       const oldest = this.lastGatewayByTag.keys().next().value;
-      if (oldest !== undefined) this.lastGatewayByTag.delete(oldest);
+      if (oldest === undefined) break;
+      this.lastGatewayByTag.delete(oldest);
     }
+    this.lastGatewayByTag.set(read.tagEpc, read.gatewayCode);
 
     if (prev === read.gatewayCode) {
       return { kind: "same", tagEpc: read.tagEpc, gatewayCode: read.gatewayCode, readAt: read.readAt };

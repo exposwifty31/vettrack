@@ -83,6 +83,31 @@ describe("HttpSender — response classifier", () => {
     expect(seenSignal).toBeInstanceOf(AbortSignal);
   });
 
+  it("actually aborts a hung request at requestTimeoutMs and buffers the outcome", async () => {
+    // A `toBeInstanceOf(AbortSignal)` check alone passes even for a signal that
+    // never fires. Prove the timeout genuinely aborts: fetch resolves ONLY when
+    // the sender's own AbortSignal fires, so the buffered-network outcome is
+    // reachable only if the request was aborted at the configured deadline.
+    let seenSignal: AbortSignal | undefined;
+    const fetchFn = vi.fn((_url: string, init: RequestInit) => {
+      seenSignal = init.signal as AbortSignal;
+      return new Promise<Response>((_resolve, reject) => {
+        init.signal?.addEventListener("abort", () => {
+          reject(new DOMException("The operation was aborted.", "AbortError"));
+        });
+      });
+    }) as unknown as typeof fetch;
+
+    const sender = senderWith(fetchFn, { requestTimeoutMs: 20 });
+    const out = await sender.send(req());
+
+    expect(seenSignal).toBeInstanceOf(AbortSignal);
+    expect(seenSignal?.aborted).toBe(true);
+    expect(out.kind).toBe("buffered");
+    if (out.kind === "buffered") expect(out.reason).toBe("network");
+    expect(sender.bufferedCount()).toBe(1);
+  });
+
   it("429 → backoff, honoring Retry-After seconds", async () => {
     const fetchFn = vi.fn(async () => jsonResponse(429, { error: "slow down" }, { "retry-after": "5" })) as unknown as typeof fetch;
     const out = await senderWith(fetchFn).send(req());

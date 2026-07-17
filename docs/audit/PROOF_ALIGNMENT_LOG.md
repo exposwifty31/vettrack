@@ -3980,3 +3980,29 @@ Reviewer returned 1 HIGH + 1 MEDIUM + 2 LOW on the committed sub-card; all four 
 - Command: `tsc --noEmit -p tsconfig.json` (package) → exit 0; `pnpm typecheck` (repo, frontend + server) → exit 0.
 
 **Verdict:** VERIFIED
+
+## 2026-07-18 — PR #113 CodeRabbit round-2 fix delta (rfid-controller + server-rfid), uncommitted at log time
+
+**Claim:** Addressed CodeRabbit's 9 round-2 incremental comments on the fix delta (d6facafec..66458a908). 3 majors + 4 minors fixed with tests; 2 truncated style nits reason-declined. FROZEN surfaces (RFID advisory-only, clinic-scoped queries, rotation recoverability, scan-only golden path) preserved.
+
+**Evidence (fixes verified against real code + tests):**
+- MAJOR `packages/rfid-controller/src/direction.ts:53` — constructor now rejects a non-integer / out-of-range cap (`!Number.isInteger || <1 || >MAX_TRACKED_TAGS` → `RangeError`); `observe()` evicts oldest with a `while` loop BEFORE the `set`, so the map never exceeds the cap even transiently (was: `Math.max(1,Math.floor())` — a NaN cap disabled eviction via `size > NaN`). New tests: `direction.test.ts` "holds the cap as a HARD ceiling — size never exceeds it across many distinct tags" (asserts private-map `.size <= cap` after every insert across 50 distinct tags) + "rejects a non-integer / out-of-range capacity".
+- MAJOR `server/lib/rfid/provisioning.ts:233` — removed the `currentSecret!` non-null assertion by re-testing `retainPrevious && currentSecret` in the ternary condition (narrows to `string`; `retainPrevious` already implies a non-empty current secret). No behavior change.
+- MAJOR `server/lib/rfid/provisioning.ts` finalize/rollback race — `finalizeRotation()` now returns `boolean` (whether its CAS won); `ackRotationReader()` re-reads the clinic-scoped committed row when finalize loses the race and returns that actual status instead of a stale `completed`. New DB-integration test `tests/rfid-provisioning.test.ts` "contended finalize vs rollback: ack never reports 'completed' when rollback wins the race" (Promise.allSettled(ack, rollback); asserts ack.status === persisted terminal status).
+- MINOR `packages/rfid-controller/src/config.ts:35` — validates `apiOrigin`/`clinicId`/`controllerVersion` are strings (or absent) before `.trim()`/return, with contextual errors (was: numeric/array field → bare `.trim()` TypeError; non-string `controllerVersion` reached the wire). New `config.test.ts` case "rejects non-string apiOrigin / clinicId / controllerVersion".
+- MINOR `packages/rfid-controller/tests/controller.test.ts:56` — backoff test now records fetch+sleep on one ordered timeline and asserts `["fetch:1","sleep:5000","fetch:2"]` (locks backoff-BEFORE-retry ordering; a `toContain(5000)` alone passed even if retry fired first).
+- MINOR `packages/rfid-controller/tests/sender.test.ts` — added "actually aborts a hung request at requestTimeoutMs and buffers the outcome": fetch resolves only on the sender's own `AbortSignal` abort → buffered-network is reachable only if the timeout truly fired (asserts `signal.aborted === true`, ran 22ms with `requestTimeoutMs:20`).
+- MINOR `tests/rfid-provisioning.test.ts:119` — `afterAll` teardown no longer swallows `probePool.end()` rejections (`await probePool?.end()`, was `.catch(()=>{})`).
+
+**Reason-declined (truncated style nits, no actionable recommendation):**
+- `controller.test.ts:70` (🔵 Trivial) — the `vi.fn(...) as unknown as typeof fetch` double-cast is a deliberate, repo-wide test pattern used across all rfid-controller tests; comment body was an analysis chain with no concrete ask. No behavioral impact.
+- `secret-source.test.ts:21` (Minor) — the `(src as unknown as {previous?}).previous` assertion is intentional (guards against a future `previous` accessor leaking the rotated-out secret) and is backed by the stronger `JSON.stringify(src)` no-"old" check. Comment body was an analysis chain with no concrete ask.
+
+**Evidence — commands:**
+- `pnpm typecheck` (frontend `tsc --noEmit` + server `tsconfig.server.json --noEmit`) → exit 0, zero errors.
+- `pnpm test:rfid-controller` → `Test Files 15 passed | 1 skipped (16)`, `Tests 145 passed | 6 skipped (151)`.
+- `DATABASE_URL=... npx vitest run tests/rfid-provisioning.test.ts` → `Test Files 1 passed`, `Tests 14 passed` (incl. new race test); ran the race test 5× standalone → 1 passed each run (not flaky). Teardown clean with un-swallowed `Pool.end()`.
+
+**Guardrails held:** direction eviction is internal advisory state (no custody); provisioning still reverts to grace on post-CAS credential failure (recoverability intact) and the reload is clinic-scoped; no transport/schema/authority change; scan-only golden path untouched.
+
+**Verdict:** VERIFIED

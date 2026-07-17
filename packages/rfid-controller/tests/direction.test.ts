@@ -66,4 +66,33 @@ describe("DirectionTracker — time/sequence-based movement inference (internal 
     expect(t.lastGateway("E1")).toBe("GW-1");
     expect(t.lastGateway("E3")).toBe("GW-3");
   });
+
+  it("holds the cap as a HARD ceiling — size never exceeds it across many distinct tags", () => {
+    const cap = 3;
+    const t = new DirectionTracker(cap);
+    const size = () => (t as unknown as { lastGatewayByTag: Map<string, string> }).lastGatewayByTag.size;
+
+    for (let i = 0; i < 50; i += 1) {
+      t.observe(read(`E${i}`, `GW-${i}`, i));
+      // Invariant checked after EVERY insert, not just at the end.
+      expect(size()).toBeLessThanOrEqual(cap);
+    }
+
+    // Only the last `cap` distinct tags survive; everything older was evicted.
+    expect(size()).toBe(cap);
+    expect(t.lastGateway("E49")).toBe("GW-49");
+    expect(t.lastGateway("E48")).toBe("GW-48");
+    expect(t.lastGateway("E47")).toBe("GW-47");
+    expect(t.lastGateway("E46")).toBeNull();
+    expect(t.lastGateway("E0")).toBeNull();
+  });
+
+  it("rejects a non-integer / out-of-range capacity (NaN or Infinity would disable eviction)", () => {
+    expect(() => new DirectionTracker(Number.NaN)).toThrow(RangeError);
+    expect(() => new DirectionTracker(Number.POSITIVE_INFINITY)).toThrow(RangeError);
+    expect(() => new DirectionTracker(0)).toThrow(RangeError);
+    expect(() => new DirectionTracker(-5)).toThrow(RangeError);
+    expect(() => new DirectionTracker(2.5)).toThrow(RangeError);
+    expect(() => new DirectionTracker(100_001)).toThrow(RangeError); // above MAX_TRACKED_TAGS
+  });
 });
