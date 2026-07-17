@@ -12,14 +12,21 @@
  * the Socket.io Redis adapter fans BROADCASTS across instances, but it does NOT
  * share this store's per-socket presence bookkeeping — so a converged member list
  * cannot be computed from the local Map alone. Convergence is achieved HERE: the
- * async `register`/`refresh`/`unregister` methods best-effort mirror each lease to
- * a CLINIC-SCOPED Redis key (`vettrack:collab:lease:<room>:<socketId>`, PX-TTL) and
- * `getConvergedPresent` aggregates the room's whole lease keyspace by SCAN + MGET,
- * merged with the local view and deduped by userId. The mirror follows the
- * `display-heartbeat-store` convention (`recordRedisFallback` / `timedRedisOp`,
- * best-effort, never throws) so a crashed instance's leases self-expire via TTL and
- * Redis absence degrades cleanly to the per-instance local view. The room name
- * embeds the clinicId, so the SCAN keyspace is clinic-scoped — no cross-tenant leak.
+ * async `register`/`refresh`/`unregister` methods best-effort mirror each lease as
+ * a MEMBER of a single CLINIC-SCOPED Redis SORTED SET per room
+ * (`vettrack:collab:presence:<room>`). Each member encodes `{userId, socketId,
+ * displayName}` (so a user stays present while ANY of their sockets' leases live —
+ * ref-count preserved) and its SCORE is the lease-expiry timestamp. `register`/
+ * `refresh` ZADD (score = now + TTL); `unregister`/disconnect ZREM the member;
+ * `getConvergedPresent` ZREMRANGEBYSCORE(-inf, now) to prune expired leases then
+ * ZRANGE the live members, merged with the local view and deduped by userId. This
+ * is O(members-in-the-room) — it NEVER scans the shared Redis keyspace, so its cost
+ * no longer scales with BullMQ/outbox/session keys on a busy clinic (card #4). The
+ * mirror follows the `display-heartbeat-store` convention (`recordRedisFallback` /
+ * `timedRedisOp`, best-effort, never throws) so a crashed instance's leases
+ * self-expire via TTL (they linger in the ZSET only until the next read prunes them)
+ * and Redis absence degrades cleanly to the per-instance local view. The room name
+ * embeds the clinicId, so the ZSET key is clinic-scoped — no cross-tenant leak.
  */
 import type { Redis } from "ioredis";
 import { getRedis, recordRedisFallback, timedRedisOp } from "../redis.js";
@@ -64,10 +71,11 @@ export interface PresenceStore {
   /** Remove a lease locally AND from the Redis mirror. Returns true if now fully absent locally. Never throws. */
   unregister(room: string, socketId: string): Promise<boolean>;
   /**
-   * Cross-instance present members: the local view merged with every lease in the
-   * room's Redis keyspace (SCAN + MGET), deduped by userId. Falls back to the local
-   * view when Redis is unavailable. Clinic-scoped by the room name — never leaks
-   * across tenants. Never throws.
+   * Cross-instance present members: the local view merged with the room's shared
+   * Redis sorted set (ZREMRANGEBYSCORE prune + ZRANGE live members), deduped by
+   * userId. O(members-in-room) — never scans the shared keyspace. Falls back to the
+   * local view when Redis is unavailable. Clinic-scoped by the room name — never
+   * leaks across tenants. Never throws.
    */
   getConvergedPresent(room: string): Promise<PresenceMember[]>;
 }
@@ -81,8 +89,9 @@ export interface PresenceStoreOptions {
   getRedisClient?: () => Promise<Redis | null>;
 }
 
-interface RedisLeaseValue {
+interface RedisMemberValue {
   userId: string;
+  socketId: string;
   displayName: string;
 }
 
@@ -173,8 +182,17 @@ export function createPresenceStore(opts: PresenceStoreOptions = {}): PresenceSt
   }
 
   // ── REDIS mirror (best-effort, never throws; converges across instances) ─────
-  const leaseKey = (room: string, socketId: string): string => `${redisPrefix}lease:${room}:${socketId}`;
-  const leasePattern = (room: string): string => `${redisPrefix}lease:${room}:*`;
+  // One clinic-scoped SORTED SET per room. Members are per-socket leases (so a user
+  // stays present while ANY of their sockets' leases live); the score is the lease
+  // expiry timestamp, so pruning is a single ranged ZSET op — never a keyspace scan.
+  const presenceKey = (room: string): string => `${redisPrefix}presence:${room}`;
+
+  // Deterministic member serialization (fixed key order → ZADD and ZREM produce the
+  // byte-identical member string for the same socket lease).
+  function leaseMember(userId: string, socketId: string, displayName: string): string {
+    const value: RedisMemberValue = { userId, socketId, displayName };
+    return JSON.stringify(value);
+  }
 
   async function writeLease(room: string, member: PresenceMember, socketId: string): Promise<void> {
     try {
@@ -183,41 +201,31 @@ export function createPresenceStore(opts: PresenceStoreOptions = {}): PresenceSt
         recordRedisFallback("collabPresence:write");
         return;
       }
-      const value: RedisLeaseValue = { userId: member.userId, displayName: member.displayName };
-      await timedRedisOp("collabPresence:write", () =>
-        redis.set(leaseKey(room, socketId), JSON.stringify(value), "PX", ttlMs),
-      );
+      const score = now() + ttlMs;
+      const m = leaseMember(member.userId, socketId, member.displayName);
+      await timedRedisOp("collabPresence:write", () => redis.zadd(presenceKey(room), score, m));
     } catch {
       /* ephemeral — presence loss under a Redis hiccup is acceptable, never an error */
     }
   }
 
-  async function deleteLease(room: string, socketId: string): Promise<void> {
+  async function deleteLease(
+    room: string,
+    socketId: string,
+    userId: string,
+    displayName: string,
+  ): Promise<void> {
     try {
       const redis = await getRedisClient();
       if (!redis) {
         recordRedisFallback("collabPresence:del");
         return;
       }
-      await timedRedisOp("collabPresence:del", () => redis.del(leaseKey(room, socketId)));
+      const m = leaseMember(userId, socketId, displayName);
+      await timedRedisOp("collabPresence:del", () => redis.zrem(presenceKey(room), m));
     } catch {
       /* ephemeral — ignore */
     }
-  }
-
-  async function scanLeaseKeys(redis: Redis, pattern: string): Promise<string[]> {
-    const out: string[] = [];
-    let cursor = "0";
-    do {
-      const [next, keys] = await timedRedisOp("collabPresence:scan", () =>
-        redis.scan(cursor, "MATCH", pattern, "COUNT", 100),
-      );
-      cursor = next;
-      out.push(...keys);
-      // Bound the read the same way the in-process fallback is bounded.
-      if (out.length >= FALLBACK_MAP_MAX_LEASES_PER_ROOM) return out.slice(0, FALLBACK_MAP_MAX_LEASES_PER_ROOM);
-    } while (cursor !== "0");
-    return out;
   }
 
   async function getConvergedPresent(room: string): Promise<PresenceMember[]> {
@@ -236,21 +244,23 @@ export function createPresenceStore(opts: PresenceStoreOptions = {}): PresenceSt
     }
 
     try {
-      const keys = await scanLeaseKeys(redis, leasePattern(room));
-      if (keys.length > 0) {
-        const values = await timedRedisOp("collabPresence:mget", () => redis!.mget(...keys));
-        for (const raw of values) {
-          if (!raw) continue;
-          try {
-            const parsed = JSON.parse(raw) as Partial<RedisLeaseValue>;
-            if (typeof parsed.userId === "string" && typeof parsed.displayName === "string") {
-              if (!byUser.has(parsed.userId)) {
-                byUser.set(parsed.userId, { userId: parsed.userId, displayName: parsed.displayName });
-              }
+      const key = presenceKey(room);
+      // Prune expired leases (score = expiry <= now) with a single ranged ZSET op…
+      await timedRedisOp("collabPresence:prune", () => redis!.zremrangebyscore(key, "-inf", now()));
+      // …then read the live members. Bounded the same way the in-process fallback is.
+      const members = await timedRedisOp("collabPresence:range", () =>
+        redis!.zrange(key, 0, FALLBACK_MAP_MAX_LEASES_PER_ROOM - 1),
+      );
+      for (const raw of members) {
+        try {
+          const parsed = JSON.parse(raw) as Partial<RedisMemberValue>;
+          if (typeof parsed.userId === "string" && typeof parsed.displayName === "string") {
+            if (!byUser.has(parsed.userId)) {
+              byUser.set(parsed.userId, { userId: parsed.userId, displayName: parsed.displayName });
             }
-          } catch {
-            /* skip a malformed lease value */
           }
+        } catch {
+          /* skip a malformed member */
         }
       }
       return [...byUser.values()];
@@ -286,8 +296,13 @@ export function createPresenceStore(opts: PresenceStoreOptions = {}): PresenceSt
     },
 
     async unregister(room, socketId) {
+      // Capture the lease's identity BEFORE local removal — the ZSET member string is
+      // derived from (userId, socketId, displayName), so ZREM needs it. If the lease
+      // was never accepted locally (cap), there is nothing mirrored to remove; a
+      // lease whose local copy already expired self-heals via the read-time prune.
+      const lease = rooms.get(room)?.get(socketId);
       const nowAbsent = removeLeaseLocal(room, socketId);
-      await deleteLease(room, socketId);
+      if (lease) await deleteLease(room, socketId, lease.userId, lease.displayName);
       return nowAbsent;
     },
 

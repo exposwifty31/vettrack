@@ -8,52 +8,64 @@ import type { Redis } from "ioredis";
 import { createPresenceStore } from "../server/lib/realtime-collab/presence-store.js";
 
 /**
- * Minimal in-memory Redis double supporting only the presence-store surface
- * (set/PX, del, scan/MATCH, mget) — shared between two stores to simulate the
- * 2-instance topology the collab channel REQUIRES Redis for. Honors PX TTL so
- * expiry semantics stay observable.
+ * Minimal in-memory Redis double supporting ONLY the ZSET surface the presence
+ * store now uses (zadd / zrem / zremrangebyscore / zrange) — shared between two
+ * stores to simulate the 2-instance topology the collab channel REQUIRES Redis
+ * for. Scores are per-member lease-expiry timestamps, so TTL prune is observable
+ * via ZREMRANGEBYSCORE. A `scan` stub records any call so tests can PROVE the
+ * converged read never falls back to a whole-keyspace SCAN (card #4).
  */
 function makeFakeRedis() {
-  const store = new Map<string, { value: string; expiresAt: number }>();
-  const alive = (k: string, now: number): boolean => {
-    const e = store.get(k);
-    if (!e) return false;
-    if (e.expiresAt <= now) {
-      store.delete(k);
-      return false;
-    }
-    return true;
-  };
-  return {
-    async set(key: string, value: string, _mode: "PX", ttlMs: number): Promise<"OK"> {
-      store.set(key, { value, expiresAt: Date.now() + ttlMs });
-      return "OK";
+  // key -> Map<member, score>  (score = lease expiry timestamp)
+  const z = new Map<string, Map<string, number>>();
+  const api = {
+    scanCalls: 0,
+    async zadd(key: string, score: number | string, member: string): Promise<number> {
+      let s = z.get(key);
+      if (!s) {
+        s = new Map();
+        z.set(key, s);
+      }
+      const existed = s.has(member);
+      s.set(member, Number(score));
+      return existed ? 0 : 1;
     },
-    async del(...keys: string[]): Promise<number> {
+    async zrem(key: string, ...members: string[]): Promise<number> {
+      const s = z.get(key);
+      if (!s) return 0;
       let n = 0;
-      for (const k of keys) if (store.delete(k)) n += 1;
+      for (const m of members) if (s.delete(m)) n += 1;
+      if (s.size === 0) z.delete(key);
       return n;
     },
-    async scan(
-      _cursor: string,
-      _match: "MATCH",
-      pattern: string,
-      _count: "COUNT",
-      _n: number,
-    ): Promise<[string, string[]]> {
-      const now = Date.now();
-      const re = new RegExp(
-        "^" + pattern.replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*") + "$",
-      );
-      const keys: string[] = [];
-      for (const k of [...store.keys()]) if (alive(k, now) && re.test(k)) keys.push(k);
-      return ["0", keys];
+    async zremrangebyscore(key: string, min: string | number, max: string | number): Promise<number> {
+      const s = z.get(key);
+      if (!s) return 0;
+      const lo = min === "-inf" ? -Infinity : Number(min);
+      const hi = max === "+inf" ? Infinity : Number(max);
+      let n = 0;
+      for (const [m, score] of [...s]) {
+        if (score >= lo && score <= hi) {
+          s.delete(m);
+          n += 1;
+        }
+      }
+      if (s.size === 0) z.delete(key);
+      return n;
     },
-    async mget(...keys: string[]): Promise<(string | null)[]> {
-      const now = Date.now();
-      return keys.map((k) => (alive(k, now) ? store.get(k)!.value : null));
+    async zrange(key: string, start: number, stop: number): Promise<string[]> {
+      const s = z.get(key);
+      if (!s) return [];
+      const sorted = [...s.entries()].sort((a, b) => a[1] - b[1]).map(([m]) => m);
+      const end = stop < 0 ? sorted.length + stop + 1 : stop + 1;
+      return sorted.slice(start, end);
+    },
+    async scan(): Promise<[string, string[]]> {
+      api.scanCalls += 1;
+      return ["0", []];
     },
   };
+  return api;
 }
 
 const asRedisFactory = (r: ReturnType<typeof makeFakeRedis> | null) => async (): Promise<Redis | null> =>
@@ -132,6 +144,38 @@ describe("presence store — cross-instance convergence (R-RTC-1.5 / card H5)", 
     expect(inst2.getPresent(room)).toEqual([]);
     // …but the converged read sees u1 via the shared Redis lease keyspace.
     expect(await inst2.getConvergedPresent(room)).toEqual([{ userId: "u1", displayName: "U1" }]);
+  });
+
+  it("reads are room-scoped via a ZSET — never SCANs the shared keyspace (card #4)", async () => {
+    const redis = makeFakeRedis();
+    const factory = asRedisFactory(redis);
+    const inst1 = createPresenceStore({ getRedisClient: factory });
+    const inst2 = createPresenceStore({ getRedisClient: factory });
+    await inst1.register("clinic:A:chat", { userId: "u1", displayName: "U1" }, "s1");
+    // Unrelated presence rooms must not affect the read's cost or its result — the
+    // converged read touches ONLY the room's ZSET key, not the whole keyspace.
+    await inst1.register("clinic:Z:board", { userId: "u9", displayName: "U9" }, "s9");
+    expect(await inst2.getConvergedPresent("clinic:A:chat")).toEqual([
+      { userId: "u1", displayName: "U1" },
+    ]);
+    // The old implementation did SCAN + MGET over the shared keyspace on EVERY read;
+    // the ZSET path must never scan (cost is O(room members), not O(keyspace)).
+    expect(redis.scanCalls).toBe(0);
+  });
+
+  it("prunes expired ZSET leases on the converged read (TTL via ZREMRANGEBYSCORE)", async () => {
+    const redis = makeFakeRedis();
+    let t = 1_000;
+    const store = createPresenceStore({
+      getRedisClient: asRedisFactory(redis),
+      now: () => t,
+      ttlMs: 5_000,
+    });
+    const room = "clinic:A:chat";
+    await store.register(room, { userId: "u1", displayName: "U1" }, "s1");
+    expect(await store.getConvergedPresent(room)).toEqual([{ userId: "u1", displayName: "U1" }]);
+    t += 5_001; // past TTL — the lease's ZSET score is now in the prune range
+    expect(await store.getConvergedPresent(room)).toEqual([]);
   });
 
   it("does NOT leak presence across clinics (converged read is scoped to the room's clinic)", async () => {
