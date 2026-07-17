@@ -874,6 +874,18 @@ export const api = {
         `/api/admin/rfid-readers/${encodeURIComponent(id)}/deactivate`,
         { method: "POST" },
       ),
+    /** Provision (first time) or rotate the per-clinic HMAC ingest secret (R-M1.1c). Secret is returned once. */
+    provision: (idempotencyKey: string) =>
+      request<{ clinicId: string; rotation: import("@/types").RfidRotationEnvelope; requestId: string }>(
+        "/api/admin/rfid-provisioning/rotate",
+        { method: "POST", body: JSON.stringify({ idempotencyKey }) },
+      ),
+    /** Toggle rfid.ingest_enabled.<clinicId> (R-M1.1c). */
+    setIngest: (enabled: boolean) =>
+      request<{ clinicId: string; enabled: boolean; requestId: string }>(
+        "/api/admin/rfid-provisioning/ingest",
+        { method: "PUT", body: JSON.stringify({ enabled }) },
+      ),
   },
   webhooks: {
     list: () =>

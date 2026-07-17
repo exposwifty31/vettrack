@@ -3593,6 +3593,40 @@ export interface TStructure {
     rfidReaders: {
       title: string;
       subtitle: string;
+      addReader: string;
+      createTitle: string;
+      createDescription: string;
+      nameLabel: string;
+      gatewayLabel: string;
+      physicalLocationLabel: string;
+      create: string;
+      created: string;
+      createFailed: string;
+      duplicateGateway: string;
+      manageTitle: string;
+      save: string;
+      renamed: string;
+      renameFailed: string;
+      deactivate: string;
+      deactivateConfirm: string;
+      deactivated: string;
+      deactivateFailed: string;
+      colHealth: string;
+      lifecycleActive: string;
+      lifecycleInactive: string;
+      provisionSecret: string;
+      provisioning: string;
+      provisionTitle: string;
+      provisionDescription: string;
+      provisionFailed: string;
+      provisionInProgress: string;
+      ingestSection: string;
+      ingestSectionHelp: string;
+      ingestEnable: string;
+      ingestDisable: string;
+      ingestEnabled: string;
+      ingestDisabled: string;
+      ingestFailed: string;
     };
     opsHealth: {
       title: string;
@@ -3651,6 +3685,7 @@ export interface TStructure {
     colLastSeen: string;
     colObserved: string;
     readerOnline: string;
+    readerOffline: string;
     readerStale: string;
     readerNoSignal: string;
     readerUnassigned: string;
