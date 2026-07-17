@@ -149,6 +149,18 @@ export async function runCli(deps: CliDeps): Promise<RunSummary> {
   return summary;
 }
 
+/**
+ * Exit code from a run summary: NON-ZERO when any batch failed to land —
+ * validation drops, a disabled clinic, OR undelivered/overflow-evicted batches
+ * still in (or lost from) the retry buffer. A 429/5xx that never delivered is a
+ * failure, not a success.
+ */
+export function exitCodeFor(summary: RunSummary): number {
+  const failed =
+    summary.dropped + summary.stopped + summary.undelivered + summary.bufferDropped;
+  return failed > 0 ? 1 : 0;
+}
+
 function isDirectRun(): boolean {
   const entry = process.argv[1];
   return typeof entry === "string" && import.meta.url === pathToFileURL(entry).href;
@@ -157,7 +169,7 @@ function isDirectRun(): boolean {
 if (isDirectRun()) {
   runCli({ argv: process.argv.slice(2) })
     .then((summary) => {
-      process.exitCode = summary.dropped + summary.stopped > 0 ? 1 : 0;
+      process.exitCode = exitCodeFor(summary);
     })
     .catch((err: unknown) => {
       process.stderr.write(

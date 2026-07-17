@@ -60,10 +60,15 @@ export class HttpSender {
     this.logger = opts.logger ?? noopLogger;
   }
 
-  /** POST one prepared batch, classify, and buffer on transient failure. */
+  /**
+   * POST one prepared batch, classify, and buffer on transient failure.
+   * A 429 `backoff` is re-buffered here — mirroring `flush()` — so the caller's
+   * retry pass re-sends the batch instead of silently dropping it (the per-
+   * crossing directional/possible_egress evidence is NOT re-derivable later).
+   */
   async send(request: PreparedRequest): Promise<SendOutcome> {
     const outcome = await this.attempt(request);
-    if (outcome.kind === "buffered") this.enqueue(request);
+    if (outcome.kind === "buffered" || outcome.kind === "backoff") this.enqueue(request);
     return outcome;
   }
 

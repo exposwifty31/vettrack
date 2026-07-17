@@ -3964,3 +3964,19 @@ Reviewer returned 1 HIGH + 1 MEDIUM + 2 LOW on the committed sub-card; all four 
 - **Guardrails held:** no product/migration/schema change — test file only; new DB-integration cases self-skip when `DATABASE_URL` is unset; per-run random-UUID test clinics, best-effort purge of only rows the test created (never the dev clinic, never append-only audit rows).
 
 **Verdict:** VERIFIED
+
+## 2026-07-18 — RFID controller: retry 429'd batches, report undelivered as failure, wire the client rate governor (uncommitted at log time)
+
+**Claim:** Fixed a real data-loss finding in `packages/rfid-controller`: a batch that got a 429 `backoff` on the primary send was tallied but never retried (silent drop of non-re-derivable per-crossing directional evidence), the CLI exit code reported success even when batches remained undelivered, and the exported `TokenBucket` governor was never wired into `run()`. Now (1) `HttpSender.send()` re-buffers `backoff` (mirroring `flush()`), so the flush pass retries it; (2) `RunSummary` gains `undelivered` (residual `bufferedCount()`) + `bufferDropped` (overflow evictions) and `exitCodeFor()` makes the CLI exit non-zero when either is >0; (3) `run()` constructs a `TokenBucket` from `config.rateLimitPerMinute` and waits (never drops) for a token before each POST via a new `TokenBucket.msUntilAvailable()`. Advisory-only preserved.
+
+**Evidence:**
+- `packages/rfid-controller/src/sender.ts:70` — `send()` now enqueues on `outcome.kind === "buffered" || outcome.kind === "backoff"` (was `buffered` only).
+- `packages/rfid-controller/src/controller.ts:105` — `run()` builds `new TokenBucket({ capacity: rateLimitPerMinute, refillPerSec: rateLimitPerMinute/60 })` and calls `await this.acquireToken(governor)` before each `sender.send`; `acquireToken` loops on `msUntilAvailable(1)` + injectable `sleep`.
+- `packages/rfid-controller/src/controller.ts` — `summary.undelivered = this.sender.bufferedCount()` and `summary.bufferDropped = this.sender.droppedFromBuffer()` set after the flush pass; logs `run_undelivered_batches` when >0.
+- `packages/rfid-controller/src/aggregate.ts` — new `TokenBucket.msUntilAvailable(n)` returns ms until n tokens (0 if available).
+- `packages/rfid-controller/src/cli.ts` — new `exitCodeFor(summary)` = `dropped+stopped+undelivered+bufferDropped > 0 ? 1 : 0`; direct-run block uses it.
+- Test (RED first): `packages/rfid-controller/tests/backpressure.test.ts` failed 6/7 before impl (undelivered undefined, sleep never called), then GREEN.
+- Test: `pnpm exec vitest run --config vitest.config.ts` (in packages/rfid-controller) → `Test Files 15 passed | 1 skipped (16)`, `Tests 133 passed | 6 skipped (139)` (6 skipped = DB e2e, DATABASE_URL unset).
+- Command: `tsc --noEmit -p tsconfig.json` (package) → exit 0; `pnpm typecheck` (repo, frontend + server) → exit 0.
+
+**Verdict:** VERIFIED

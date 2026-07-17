@@ -145,4 +145,16 @@ export class TokenBucket {
     this.refill();
     return this.tokens;
   }
+
+  /**
+   * Milliseconds until `n` tokens are available (0 if available now). Lets a
+   * caller WAIT for the client rate budget rather than dropping a batch.
+   */
+  msUntilAvailable(n = 1): number {
+    this.refill();
+    if (this.tokens >= n) return 0;
+    const deficit = n - this.tokens;
+    if (this.refillPerSec <= 0) return Number.POSITIVE_INFINITY;
+    return Math.ceil((deficit / this.refillPerSec) * 1000);
+  }
 }

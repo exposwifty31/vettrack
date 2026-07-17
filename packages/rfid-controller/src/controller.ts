@@ -1,5 +1,5 @@
 import type { ReaderAdapter } from "./adapter";
-import { MovementAggregator } from "./aggregate";
+import { MovementAggregator, TokenBucket } from "./aggregate";
 import type { ControllerConfig } from "./config";
 import { ReadDebouncer } from "./debounce";
 import { buildEnvelope } from "./envelope";
@@ -18,6 +18,10 @@ export interface RfidControllerDeps {
   secretSource: SecretSource;
   sender: HttpSender;
   logger?: Logger;
+  /** Injectable clock for the client rate governor (deterministic tests). */
+  now?: () => number;
+  /** Injectable sleep for rate-governor waits (deterministic tests). */
+  sleep?: (ms: number) => Promise<void>;
 }
 
 export interface RunSummary {
@@ -28,20 +32,38 @@ export interface RunSummary {
   stopped: number;
   backoff: number;
   buffered: number;
+  /**
+   * Batches STILL in the retry buffer after the flush pass (bufferedCount()>0)
+   * — a 429/5xx that never landed. Undelivered evidence, not "success".
+   */
+  undelivered: number;
+  /** Batches evicted from the bounded retry buffer on overflow — lost. */
+  bufferDropped: number;
   outcomes: SendOutcome[];
 }
+
+const DEFAULT_SLEEP = (ms: number): Promise<void> =>
+  new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+
+const SECONDS_PER_MINUTE = 60;
 
 export class RfidController {
   private readonly config: ControllerConfig;
   private readonly secretSource: SecretSource;
   private readonly sender: HttpSender;
   private readonly logger: Logger;
+  private readonly now?: () => number;
+  private readonly sleep: (ms: number) => Promise<void>;
 
   constructor(deps: RfidControllerDeps) {
     this.config = deps.config;
     this.secretSource = deps.secretSource;
     this.sender = deps.sender;
     this.logger = deps.logger ?? noopLogger;
+    this.now = deps.now;
+    this.sleep = deps.sleep ?? DEFAULT_SLEEP;
   }
 
   /**
@@ -64,8 +86,19 @@ export class RfidController {
       stopped: 0,
       backoff: 0,
       buffered: 0,
+      undelivered: 0,
+      bufferDropped: 0,
       outcomes: [],
     };
+
+    // Client-side rate governor: stay <= rateLimitPerMinute POSTs/min (ADR-005)
+    // so the server 120/min limiter rarely fires a 429. Empty bucket → WAIT for
+    // refill, never drop.
+    const governor = new TokenBucket({
+      capacity: this.config.rateLimitPerMinute,
+      refillPerSec: this.config.rateLimitPerMinute / SECONDS_PER_MINUTE,
+      ...(this.now ? { now: this.now } : {}),
+    });
 
     for await (const read of adapter.reads()) {
       summary.readsProcessed += 1;
@@ -75,6 +108,7 @@ export class RfidController {
 
     const batches = aggregator.drainBatches();
     for (const events of batches) {
+      await this.acquireToken(governor);
       const { body } = buildEnvelope(events, {
         ...(this.config.controllerVersion !== undefined
           ? { controllerVersion: this.config.controllerVersion }
@@ -91,12 +125,34 @@ export class RfidController {
       }
     }
 
-    // One retry pass for anything buffered by transient 5xx/network failures.
+    // One retry pass for anything buffered by transient 5xx/network/429 failures.
     if (this.sender.bufferedCount() > 0) {
       for (const outcome of await this.sender.flush()) this.tally(summary, outcome);
     }
 
+    // Anything still buffered (or evicted on overflow) never landed — surface it
+    // so the CLI exit code reports undelivered evidence as a failure.
+    summary.undelivered = this.sender.bufferedCount();
+    summary.bufferDropped = this.sender.droppedFromBuffer();
+    if (summary.undelivered > 0 || summary.bufferDropped > 0) {
+      this.logger.error("run_undelivered_batches", {
+        clinicId: this.config.clinicId,
+        undelivered: summary.undelivered,
+        bufferDropped: summary.bufferDropped,
+      });
+    }
+
     return summary;
+  }
+
+  /** Block until the governor grants a token; waits (never drops) when empty. */
+  private async acquireToken(governor: TokenBucket): Promise<void> {
+    let waitMs = governor.msUntilAvailable(1);
+    while (waitMs > 0 && Number.isFinite(waitMs)) {
+      await this.sleep(waitMs);
+      waitMs = governor.msUntilAvailable(1);
+    }
+    governor.tryRemove(1);
   }
 
   private tally(summary: RunSummary, outcome: SendOutcome): void {
