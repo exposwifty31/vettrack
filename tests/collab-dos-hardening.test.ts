@@ -26,6 +26,7 @@ import {
   MAX_ROOMS_PER_SOCKET,
   NUDGE_MAX_PER_SEC,
 } from "../server/lib/realtime-collab/config.js";
+import { createRateLimiter, type RateLimiter } from "../server/lib/realtime-collab/rate-limit.js";
 import type { ResolveHandshakeIdentity } from "../server/lib/realtime-collab/handshake.js";
 
 // ── H3: pure guard on authorizeRoomJoin ──────────────────────────────────────
@@ -167,5 +168,80 @@ describe("R-RTC-1 collaboration channel — H2 DoS hardening (live server)", () 
     expect(received).toBeLessThanOrEqual(NUDGE_MAX_PER_SEC);
     a.close();
     b.close();
+  });
+});
+
+// ── #7: per-socket rate-key namespacing → leak-proof disconnect cleanup ────────
+// Every per-socket rate-limit key is namespaced `${socketId}:${verb}` so the ENTIRE
+// disconnect cleanup is ONE prefix-clear — a future verb whose reset is forgotten can
+// never leak a windows-Map key. The per-room board aggregate ("curroom:<room>") is
+// deliberately NOT socket-scoped and must survive a single socket's disconnect.
+describe("R-RTC-1 collaboration channel — #7 per-socket rate-key namespacing (leak-proof cleanup)", () => {
+  let http2: HttpServer;
+  let collab2: CollabServer;
+  let url2: string;
+  let limiter: RateLimiter;
+
+  beforeAll(async () => {
+    http2 = createServer();
+    await new Promise<void>((r) => http2.listen(0, "127.0.0.1", r));
+    const port = (http2.address() as AddressInfo).port;
+    url2 = `http://127.0.0.1:${port}`;
+    limiter = createRateLimiter();
+    collab2 = await initCollabServer(http2, {
+      resolveIdentity,
+      recordAccess: async () => true,
+      skipRedisAdapter: true,
+      rateLimiter: limiter,
+    });
+    expect(collab2.enabled).toBe(true);
+  });
+
+  afterAll(async () => {
+    await collab2?.close();
+    await new Promise<void>((r) => http2.close(() => r()));
+  });
+
+  it("namespaces EVERY per-socket verb under `${socketId}:` and clears them ALL on disconnect", async () => {
+    const a = ioClient(url2, {
+      path: "/collab-ws",
+      transports: ["websocket"],
+      auth: { token: tokenFor("alice", "clinic-A") },
+      reconnection: false,
+      forceNew: true,
+    });
+    await waitConnect(a);
+    const sid = a.id as string; // socket.io: client id === server socket id post-connect
+
+    // Exercise every per-socket verb so each mints its own rate-limit window key.
+    await joinAck(a, { kind: "chat" }); // join (+ enters chat room)
+    await joinAck(a, { kind: "board" }); // join again (+ enters board room)
+    a.emit("typing", { on: true }); // typing (needs chat room)
+    a.emit("chat-nudge", { messageId: "m1" }); // nudge (needs chat room)
+    a.emit("board-cursor", { x: 0.5, y: 0.5 }); // cur (needs board room; also mints curroom:<room>)
+    a.emit("board-selection", { entityId: "e1" }); // sel (needs board room)
+    a.emit("record-presence", { editing: true }); // recpres (rate-checked first)
+    a.emit("leave", { room: "clinic:clinic-A:board" }); // leave (rate-checked first)
+    // Ordered per-socket delivery: this ack resolves only after every prior event was
+    // dispatched, so all their (synchronous) rate-limit prologues have already run.
+    await joinAck(a, { kind: "chat" });
+
+    const suffixes = limiter
+      .keys()
+      .filter((k) => k.startsWith(`${sid}:`))
+      .map((k) => k.slice(sid.length + 1))
+      .sort();
+    // RED before the fix: keys were `${verb}:${socketId}`, so NONE start with `${socketId}:`.
+    expect(suffixes).toEqual(["cur", "join", "leave", "nudge", "recpres", "sel", "typing"]);
+    // No per-socket key escapes the `${socketId}:` namespace.
+    expect(limiter.keys().filter((k) => k.includes(sid) && !k.startsWith(`${sid}:`))).toEqual([]);
+
+    a.close();
+    await new Promise((r) => setTimeout(r, 300));
+
+    // The ENTIRE cleanup is one prefix-clear: NO key referencing this socket survives —
+    // for EVERY verb — while the per-room board aggregate is untouched.
+    expect(limiter.keys().filter((k) => k.includes(sid))).toEqual([]);
+    expect(limiter.keys().some((k) => k.startsWith("curroom:"))).toBe(true);
   });
 });

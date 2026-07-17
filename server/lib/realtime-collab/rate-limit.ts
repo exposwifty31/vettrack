@@ -11,8 +11,10 @@ import { RATE_DISCONNECT_MULTIPLIER } from "./config.js";
 export interface RateLimiter {
   /** Returns "allow" | "drop" | "disconnect" for one event on `key` at limit `perSec`. */
   check(key: string, perSec: number): "allow" | "drop" | "disconnect";
-  /** Drop all counters for a socket on disconnect (prevents unbounded growth). */
+  /** Drop every counter whose key starts with `prefix` (disconnect cleanup — no unbounded growth). */
   reset(prefix: string): void;
+  /** Inspection seam (tests/diagnostics): a snapshot of the live window keys. Never used in hot paths. */
+  keys(): string[];
 }
 
 export function createRateLimiter(now: () => number = () => Date.now()): RateLimiter {
@@ -37,7 +39,40 @@ export function createRateLimiter(now: () => number = () => Date.now()): RateLim
         if (key.startsWith(prefix)) windows.delete(key);
       }
     },
+    keys() {
+      return [...windows.keys()];
+    },
   };
+}
+
+/**
+ * The per-socket rate-limit verbs — the single source of truth for the control-event
+ * keys. Every per-socket key is namespaced `${socketId}:${verb}` (see `socketRateKey`),
+ * so the ENTIRE disconnect cleanup collapses to one `reset(socketRateKeyPrefix(id))` and
+ * a newly added verb can never leak a windows-Map key through a forgotten per-verb reset.
+ *
+ * NOTE: the board per-ROOM aggregate ("curroom:<room>") is intentionally NOT here — it is
+ * shared across every socket in a room and must survive any single socket's disconnect.
+ */
+export const COLLAB_RATE_VERBS = {
+  join: "join",
+  typing: "typing",
+  nudge: "nudge",
+  cursor: "cur",
+  selection: "sel",
+  recordPresence: "recpres",
+  leave: "leave",
+} as const;
+export type CollabRateVerb = (typeof COLLAB_RATE_VERBS)[keyof typeof COLLAB_RATE_VERBS];
+
+/** Build a per-socket rate-limit key: a per-socket sub-scope so one prefix-clear covers all verbs. */
+export function socketRateKey(socketId: string, verb: CollabRateVerb): string {
+  return `${socketId}:${verb}`;
+}
+
+/** The prefix matching EVERY per-socket rate-limit key for one socket (disconnect cleanup). */
+export function socketRateKeyPrefix(socketId: string): string {
+  return `${socketId}:`;
 }
 
 /** Validate a normalized cursor coordinate: finite number in [0,1]. */

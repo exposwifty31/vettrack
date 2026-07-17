@@ -38,7 +38,15 @@ import {
 } from "./rooms.js";
 import { defaultRecordAccessCheck } from "./record-access.js";
 import { createPresenceStore, type PresenceStore } from "./presence-store.js";
-import { createRateLimiter, isNormalizedCoord, isWithinByteLimit } from "./rate-limit.js";
+import {
+  createRateLimiter,
+  isNormalizedCoord,
+  isWithinByteLimit,
+  socketRateKey,
+  socketRateKeyPrefix,
+  COLLAB_RATE_VERBS,
+  type RateLimiter,
+} from "./rate-limit.js";
 import { recordCollabMetric } from "./telemetry.js";
 
 export interface CollabServer {
@@ -63,6 +71,8 @@ export interface InitCollabOptions {
   resolveIdentity?: typeof resolveHandshakeIdentity;
   /** Test seam: inject the Redis client factory (defaults to the shared getRedis). */
   getRedisClient?: () => Promise<Redis | null>;
+  /** Test seam: inject the rate limiter (defaults to a fresh in-process one). */
+  rateLimiter?: RateLimiter;
 }
 
 /**
@@ -79,7 +89,7 @@ export async function initCollabServer(
 
   const presence = opts.presence ?? createPresenceStore();
   const recordAccess = opts.recordAccess ?? defaultRecordAccessCheck;
-  const rateLimiter = createRateLimiter();
+  const rateLimiter = opts.rateLimiter ?? createRateLimiter();
   const getRedisClient = opts.getRedisClient ?? getRedis;
 
   let io: Server;
@@ -193,7 +203,7 @@ export async function initCollabServer(
     socket.on("join", async (req: unknown, ack?: (r: unknown) => void) => {
       // Rate-limit BEFORE authorization — a join is a DB round-trip (record ACL),
       // so throttling here caps the DB work a misbehaving socket can force. — H2.
-      if (rateLimiter.check(`join:${socket.id}`, JOIN_MAX_PER_SEC) !== "allow") {
+      if (rateLimiter.check(socketRateKey(socket.id, COLLAB_RATE_VERBS.join), JOIN_MAX_PER_SEC) !== "allow") {
         ack?.({ ok: false, reason: "RATE_LIMITED" });
         return;
       }
@@ -221,7 +231,7 @@ export async function initCollabServer(
     socket.on("typing", (payload: { on?: boolean }) => {
       const room = chatRoom(identity.clinicId);
       if (!socket.data.rooms.has(room)) return;
-      if (rateLimiter.check(`typing:${socket.id}`, TYPING_MAX_PER_SEC) !== "allow") return;
+      if (rateLimiter.check(socketRateKey(socket.id, COLLAB_RATE_VERBS.typing), TYPING_MAX_PER_SEC) !== "allow") return;
       recordCollabMetric("collab_typing");
       // Identity is server-attached; a client-supplied userId is never read.
       socket.to(room).emit("peer-typing", { userId: identity.userId, on: payload?.on === true });
@@ -237,7 +247,7 @@ export async function initCollabServer(
       if (!socket.data.rooms.has(room)) return;
       // Each accepted nudge fans out to every clinic member (each then refetches) —
       // throttle hard to bound that amplification. — H2.
-      if (rateLimiter.check(`nudge:${socket.id}`, NUDGE_MAX_PER_SEC) !== "allow") return;
+      if (rateLimiter.check(socketRateKey(socket.id, COLLAB_RATE_VERBS.nudge), NUDGE_MAX_PER_SEC) !== "allow") return;
       // Advisory refetch nudge only — WS never stores messages. The messageId lets
       // the client coalesce repeated emissions into one refetch.
       socket.to(room).emit("chat-nudge", { messageId: String(payload?.messageId ?? "") });
@@ -249,7 +259,9 @@ export async function initCollabServer(
       if (!socket.data.rooms.has(room)) return;
       if (!isNormalizedCoord(payload?.x) || !isNormalizedCoord(payload?.y)) return;
       if (!isWithinByteLimit(payload, MAX_EVENT_BYTES)) return;
-      const perSocket = rateLimiter.check(`cur:${socket.id}`, CURSOR_MAX_PER_SEC);
+      const perSocket = rateLimiter.check(socketRateKey(socket.id, COLLAB_RATE_VERBS.cursor), CURSOR_MAX_PER_SEC);
+      // Per-ROOM aggregate — shared across sockets, so it is NOT socket-namespaced and
+      // must survive any single socket's disconnect cleanup.
       const perRoom = rateLimiter.check(`curroom:${room}`, BOARD_ROOM_AGGREGATE_MAX_PER_SEC);
       if (perSocket === "disconnect") {
         recordCollabMetric("collab_board_rate_limited");
@@ -267,7 +279,7 @@ export async function initCollabServer(
       const room = boardRoom(identity.clinicId);
       if (!socket.data.rooms.has(room)) return;
       if (typeof payload?.entityId !== "string" || payload.entityId.length > 128) return;
-      if (rateLimiter.check(`sel:${socket.id}`, SELECTION_MAX_PER_SEC) !== "allow") {
+      if (rateLimiter.check(socketRateKey(socket.id, COLLAB_RATE_VERBS.selection), SELECTION_MAX_PER_SEC) !== "allow") {
         recordCollabMetric("collab_board_rate_limited");
         return;
       }
@@ -276,7 +288,7 @@ export async function initCollabServer(
 
     // ── Feature 3: record co-presence (advisory) (R-RTC-1.4) ───────────────────
     socket.on("record-presence", (payload: { editing?: boolean }) => {
-      if (rateLimiter.check(`recpres:${socket.id}`, RECORD_PRESENCE_MAX_PER_SEC) !== "allow") return;
+      if (rateLimiter.check(socketRateKey(socket.id, COLLAB_RATE_VERBS.recordPresence), RECORD_PRESENCE_MAX_PER_SEC) !== "allow") return;
       // recordType/recordId are DERIVED from the socket's authorized record rooms —
       // never from the client payload. Advisory only; never gates the OCC guard.
       for (const room of socket.data.rooms) {
@@ -290,7 +302,7 @@ export async function initCollabServer(
     });
 
     socket.on("leave", async (payload: { room?: string }) => {
-      if (rateLimiter.check(`leave:${socket.id}`, LEAVE_MAX_PER_SEC) !== "allow") return;
+      if (rateLimiter.check(socketRateKey(socket.id, COLLAB_RATE_VERBS.leave), LEAVE_MAX_PER_SEC) !== "allow") return;
       const room = typeof payload?.room === "string" ? payload.room : "";
       if (!socket.data.rooms.has(room)) return;
       socket.leave(room);
@@ -305,13 +317,11 @@ export async function initCollabServer(
         await presence.unregister(room, socket.id);
         await emitPresence(room);
       }
-      rateLimiter.reset(`cur:${socket.id}`);
-      rateLimiter.reset(`sel:${socket.id}`);
-      rateLimiter.reset(`join:${socket.id}`);
-      rateLimiter.reset(`typing:${socket.id}`);
-      rateLimiter.reset(`nudge:${socket.id}`);
-      rateLimiter.reset(`recpres:${socket.id}`);
-      rateLimiter.reset(`leave:${socket.id}`);
+      // Every per-socket rate-limit key is namespaced `${socket.id}:${verb}`, so this ONE
+      // prefix-clear drops them all — a future verb can never leak a windows-Map key
+      // through a forgotten per-verb reset. (The per-room `curroom:<room>` aggregate is
+      // deliberately not socket-scoped and is untouched here.)
+      rateLimiter.reset(socketRateKeyPrefix(socket.id));
     });
   });
 
