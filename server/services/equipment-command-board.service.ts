@@ -1,5 +1,16 @@
-import { and, count, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
-import { db, docks, equipment, equipmentWaitlist, rooms, stagingQueue } from "../db.js";
+import { and, count, eq, gte, inArray, isNotNull, isNull, sql } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
+import {
+  db,
+  docks,
+  equipment,
+  equipmentRfidReads,
+  equipmentWaitlist,
+  rfidEgressSignals,
+  rfidReaders,
+  rooms,
+  stagingQueue,
+} from "../db.js";
 import type {
   EquipmentBoardAlert,
   EquipmentBoardDocksBlock,
@@ -75,6 +86,166 @@ export function aggregateByLocation(
     byLocationMap.set(locKey, loc);
   }
   return [...byLocationMap.values()];
+}
+
+// ── R-M1.3 · RFID board surfacing (advisory-only; ADR-006) ────────────────────
+// RFID NEVER becomes the resolved location and NEVER mutates custody — the human-confirmed
+// room (equipment.roomId) stays authoritative (M1.0). This transform derives the additive
+// unit.rfid block + conflict/offline/egress signals. Pure (no DB) so every pinned branch is
+// exercisable without a database, mirroring aggregateByLocation.
+
+export type BoardRfidReaderInfo = {
+  id: string;
+  /** "active" | "inactive" — an inactive (deactivated) reader is excluded from live status. */
+  status: string;
+  /** "healthy" | "offline" | "unknown" — only an ACTIVE + offline reader raises the alert. */
+  readerHealthStatus: string;
+  name: string | null;
+};
+
+export type BoardRfidUnitInput = {
+  equipmentId: string;
+  displayName: string;
+  /** The human-confirmed room (authoritative). RFID may corroborate but never overrides it. */
+  humanRoomId: string | null;
+  lastRfidSeenAt: Date | null;
+  lastRfidRoomId: string | null;
+  lastRfidRoomName: string | null;
+  lastRfidGatewayCode: string | null;
+  /** Recent reads within the ambiguity window (for the >=2-simultaneous-rooms check). */
+  recentReads: Array<{ toRoomId: string; readAt: Date }>;
+  /** detectedAt of the most recent possible_egress signal, if any. */
+  latestEgressAt: Date | null;
+};
+
+export type UnitRfidDerivation = {
+  rfid?: NonNullable<EquipmentBoardUnitRow["rfid"]>;
+  evidenceConflict?: EquipmentBoardUnitRow["evidenceConflict"];
+  alerts: EquipmentBoardAlert[];
+};
+
+/** ≥2 DISTINCT candidate rooms sharing the latest read instant = no single winner = ambiguous. */
+function hasAmbiguousCandidateRooms(reads: Array<{ toRoomId: string; readAt: Date }>): boolean {
+  if (reads.length < 2) return false;
+  let maxAt = -Infinity;
+  for (const r of reads) maxAt = Math.max(maxAt, r.readAt.getTime());
+  const roomsAtMax = new Set(reads.filter((r) => r.readAt.getTime() === maxAt).map((r) => r.toRoomId));
+  return roomsAtMax.size >= 2;
+}
+
+/**
+ * Derive the additive RFID surfacing for one board unit. Fires each bounded enum DISTINCTLY:
+ *  - locationKind: 'room' | 'external_zone' (post-egress) | 'unresolved' (no resolvable room).
+ *  - rfid_location_conflict: a SINGLE recent read disagrees with the human room.
+ *  - ambiguous_rfid_location: ≥2 simultaneous candidate rooms (takes precedence over conflict).
+ *  - rfid_reader_offline: the last reader is ACTIVE + stale (deactivated readers are excluded).
+ *  - possible_egress: a recent boundary/dock exit toward the external (NULL) endpoint.
+ */
+export function deriveUnitRfid(
+  input: BoardRfidUnitInput,
+  readerByGateway: Map<string, BoardRfidReaderInfo>,
+): UnitRfidDerivation {
+  const alerts: EquipmentBoardAlert[] = [];
+  if (input.lastRfidSeenAt == null) {
+    return { alerts };
+  }
+
+  const reader = input.lastRfidGatewayCode
+    ? readerByGateway.get(input.lastRfidGatewayCode)
+    : undefined;
+  // Reader removed AFTER a valid read => readerId=null (last-seen room still shown, no link).
+  const readerId = reader ? reader.id : null;
+
+  const isExternal =
+    input.latestEgressAt != null &&
+    input.latestEgressAt.getTime() >= input.lastRfidSeenAt.getTime();
+  const locationKind: "room" | "external_zone" | "unresolved" = isExternal
+    ? "external_zone"
+    : input.lastRfidRoomId == null
+      ? "unresolved"
+      : "room";
+
+  const isAmbiguous = hasAmbiguousCandidateRooms(input.recentReads);
+  const isSingleConflict =
+    !isAmbiguous &&
+    input.humanRoomId != null &&
+    input.lastRfidRoomId != null &&
+    input.lastRfidRoomId !== input.humanRoomId;
+
+  const confidence: "low" | "medium" | "high" = isAmbiguous
+    ? "low"
+    : locationKind === "room"
+      ? "high"
+      : locationKind === "external_zone"
+        ? "medium"
+        : "low";
+
+  const rfid: NonNullable<EquipmentBoardUnitRow["rfid"]> = {
+    lastSeenAt: input.lastRfidSeenAt.toISOString(),
+    readerId,
+    readerName: reader?.name ?? undefined,
+    locationId: input.lastRfidRoomId ?? undefined,
+    locationName: input.lastRfidRoomName ?? undefined,
+    locationKind,
+    confidence,
+    readsInWindow: input.recentReads.length > 0 ? input.recentReads.length : undefined,
+  };
+
+  let evidenceConflict: EquipmentBoardUnitRow["evidenceConflict"];
+  if (isAmbiguous) {
+    evidenceConflict = {
+      type: "ambiguous_rfid_location",
+      action: "confirm_location",
+      message: `${input.displayName} has conflicting RFID locations`,
+    };
+    alerts.push({
+      id: `ambiguous_rfid_location:${input.equipmentId}`,
+      type: "ambiguous_rfid_location",
+      severity: "warning",
+      equipmentId: input.equipmentId,
+      message: `${input.displayName} has conflicting RFID locations`,
+      recommendedAction: "confirm_location",
+    });
+  } else if (isSingleConflict) {
+    evidenceConflict = {
+      type: "rfid_location_conflict",
+      action: "confirm_location",
+      message: `${input.displayName} RFID last-seen disagrees with its confirmed room`,
+    };
+    alerts.push({
+      id: `rfid_location_conflict:${input.equipmentId}`,
+      type: "rfid_location_conflict",
+      severity: "warning",
+      equipmentId: input.equipmentId,
+      message: `${input.displayName} RFID last-seen disagrees with its confirmed room`,
+      recommendedAction: "confirm_location",
+    });
+  }
+
+  // Deactivated readers are excluded from live status; only an ACTIVE + offline reader alerts.
+  if (reader && reader.status === "active" && reader.readerHealthStatus === "offline") {
+    alerts.push({
+      id: `rfid_reader_offline:${input.equipmentId}`,
+      type: "rfid_reader_offline",
+      severity: "warning",
+      equipmentId: input.equipmentId,
+      message: `RFID reader for ${input.displayName} is offline`,
+      recommendedAction: "open_detail",
+    });
+  }
+
+  if (isExternal) {
+    alerts.push({
+      id: `possible_egress:${input.equipmentId}`,
+      type: "possible_egress",
+      severity: "warning",
+      equipmentId: input.equipmentId,
+      message: `${input.displayName} may have left the clinic`,
+      recommendedAction: "open_detail",
+    });
+  }
+
+  return { rfid, evidenceConflict, alerts };
 }
 
 /**
@@ -189,6 +360,90 @@ export const defaultBoardAggregates: BoardAggregateFns = {
   staging: (clinicId) => safeBlock(() => withTimeout(queryStaging(clinicId), AGGREGATE_TIMEOUT_MS)),
 };
 
+// R-M1.3 — reads within this window feed the ambiguity check (≥2 simultaneous candidate rooms).
+const RFID_AMBIGUITY_WINDOW_MS = 5 * 60 * 1000;
+
+/** Managed readers for the clinic, keyed by gatewayCode (includes inactive/deactivated). */
+async function queryRfidReaders(clinicId: string): Promise<Map<string, BoardRfidReaderInfo>> {
+  const rows = await db
+    .select({
+      id: rfidReaders.id,
+      gatewayCode: rfidReaders.gatewayCode,
+      status: rfidReaders.status,
+      readerHealthStatus: rfidReaders.readerHealthStatus,
+      name: rfidReaders.name,
+    })
+    .from(rfidReaders)
+    .where(eq(rfidReaders.clinicId, clinicId));
+  const map = new Map<string, BoardRfidReaderInfo>();
+  for (const r of rows) {
+    map.set(r.gatewayCode, {
+      id: r.id,
+      status: r.status,
+      readerHealthStatus: r.readerHealthStatus,
+      name: r.name,
+    });
+  }
+  return map;
+}
+
+/** Latest possible_egress detectedAt per equipment (the exit-toward-external signal, R-M1.2c). */
+async function queryLatestEgress(
+  clinicId: string,
+  equipmentIds: string[],
+): Promise<Map<string, Date>> {
+  const map = new Map<string, Date>();
+  if (equipmentIds.length === 0) return map;
+  const rows = await db
+    .select({
+      equipmentId: rfidEgressSignals.equipmentId,
+      detectedAt: sql<Date>`max(${rfidEgressSignals.detectedAt})`,
+    })
+    .from(rfidEgressSignals)
+    .where(
+      and(
+        eq(rfidEgressSignals.clinicId, clinicId),
+        inArray(rfidEgressSignals.equipmentId, equipmentIds),
+      ),
+    )
+    .groupBy(rfidEgressSignals.equipmentId);
+  for (const r of rows) {
+    if (r.detectedAt) map.set(r.equipmentId, new Date(r.detectedAt));
+  }
+  return map;
+}
+
+/** Recent reads per equipment within the ambiguity window, for the ≥2-simultaneous-rooms check. */
+async function queryRecentReads(
+  clinicId: string,
+  equipmentIds: string[],
+  now: Date,
+): Promise<Map<string, Array<{ toRoomId: string; readAt: Date }>>> {
+  const map = new Map<string, Array<{ toRoomId: string; readAt: Date }>>();
+  if (equipmentIds.length === 0) return map;
+  const windowStart = new Date(now.getTime() - RFID_AMBIGUITY_WINDOW_MS);
+  const rows = await db
+    .select({
+      equipmentId: equipmentRfidReads.equipmentId,
+      toRoomId: equipmentRfidReads.toRoomId,
+      readAt: equipmentRfidReads.readAt,
+    })
+    .from(equipmentRfidReads)
+    .where(
+      and(
+        eq(equipmentRfidReads.clinicId, clinicId),
+        inArray(equipmentRfidReads.equipmentId, equipmentIds),
+        gte(equipmentRfidReads.readAt, windowStart),
+      ),
+    );
+  for (const r of rows) {
+    const list = map.get(r.equipmentId) ?? [];
+    list.push({ toRoomId: r.toRoomId, readAt: new Date(r.readAt) });
+    map.set(r.equipmentId, list);
+  }
+  return map;
+}
+
 /** Builds equipment command board snapshot (critical rows, overview, alerts, utilization signals). */
 export const buildCommandBoardSnapshot: BuildCommandBoardSnapshotFn = async (
   params,
@@ -196,6 +451,10 @@ export const buildCommandBoardSnapshot: BuildCommandBoardSnapshotFn = async (
 ) => {
   const { clinicId } = params;
   const now = new Date();
+
+  // R-M1.3 — resolve the RFID last-seen room NAME via a second (clinic-scoped) rooms join so a
+  // since-deleted room surfaces as NULL (=> locationKind 'unresolved') without failing the join.
+  const rfidRooms = alias(rooms, "rfid_rooms");
 
   const rowsQuery = db
     .select({
@@ -210,9 +469,17 @@ export const buildCommandBoardSnapshot: BuildCommandBoardSnapshotFn = async (
       lastSeen: equipment.lastSeen,
       roomName: rooms.name,
       roomId: equipment.roomId,
+      lastRfidSeenAt: equipment.lastRfidSeenAt,
+      lastRfidRoomId: equipment.lastRfidRoomId,
+      lastRfidGatewayCode: equipment.lastRfidGatewayCode,
+      rfidRoomName: rfidRooms.name,
     })
     .from(equipment)
     .leftJoin(rooms, and(eq(equipment.roomId, rooms.id), eq(rooms.clinicId, clinicId)))
+    .leftJoin(
+      rfidRooms,
+      and(eq(equipment.lastRfidRoomId, rfidRooms.id), eq(rfidRooms.clinicId, clinicId)),
+    )
     .where(
       and(
         eq(equipment.clinicId, clinicId),
@@ -236,6 +503,19 @@ export const buildCommandBoardSnapshot: BuildCommandBoardSnapshotFn = async (
 
   const staleCutoff = new Date(now.getTime() - rules.staleEvidenceMs);
 
+  // R-M1.3 — RFID surfacing lookups. Bounded to the critical units on the board and wrapped in
+  // safeBlock so a failure degrades RFID surfacing to empty (the board still renders — kiosk-safe,
+  // matching the enrichment-block tolerant-reader doctrine). RFID is advisory-only: these NEVER
+  // change custody and NEVER become the resolved location.
+  const equipmentIds = rows.map((r) => r.id);
+  const [readerByGateway, latestEgressByEquipment, recentReadsByEquipment] = await Promise.all([
+    safeBlock(() => queryRfidReaders(clinicId)),
+    safeBlock(() => queryLatestEgress(clinicId, equipmentIds)),
+    safeBlock(() => queryRecentReads(clinicId, equipmentIds, now)),
+  ]);
+  const readerLookup = readerByGateway ?? new Map<string, BoardRfidReaderInfo>();
+  const rfidAlerts: EquipmentBoardAlert[] = [];
+
   const criticalUnits: EquipmentBoardUnitRow[] = rows.map((row) => {
     const status = deriveReadinessStatus(row);
     const stale =
@@ -243,12 +523,31 @@ export const buildCommandBoardSnapshot: BuildCommandBoardSnapshotFn = async (
         ? row.lastSeen < staleCutoff
         : true;
     const resolvedStatus: EquipmentReadinessStatus = stale && status === "ready" ? "stale" : status;
+    const rfidDerivation = deriveUnitRfid(
+      {
+        equipmentId: row.id,
+        displayName: row.name,
+        humanRoomId: row.roomId,
+        lastRfidSeenAt: row.lastRfidSeenAt,
+        lastRfidRoomId: row.lastRfidRoomId,
+        lastRfidRoomName: row.rfidRoomName,
+        lastRfidGatewayCode: row.lastRfidGatewayCode,
+        recentReads: recentReadsByEquipment?.get(row.id) ?? [],
+        latestEgressAt: latestEgressByEquipment?.get(row.id) ?? null,
+      },
+      readerLookup,
+    );
+    rfidAlerts.push(...rfidDerivation.alerts);
     return {
       equipmentId: row.id,
       displayName: row.name,
       status: resolvedStatus,
+      // Human-confirmed room stays the RESOLVED location (M1.0) — RFID evidence lives only in
+      // the additive rfid block, never overriding locationName.
       locationName: row.roomName ?? undefined,
       lastEvidenceAt: row.lastSeen?.toISOString(),
+      rfid: rfidDerivation.rfid,
+      evidenceConflict: rfidDerivation.evidenceConflict,
       blockingReasons:
         resolvedStatus === "blocked" ? [`readiness:${row.readinessState}`] : [],
       citationsCount: 0,
@@ -320,6 +619,9 @@ export const buildCommandBoardSnapshot: BuildCommandBoardSnapshotFn = async (
       });
     }
   }
+
+  // R-M1.3 — RFID conflict / offline / egress signals (advisory; never a custody move).
+  alerts.push(...rfidAlerts);
 
   overview.belowThresholdTypes = [...byTypeMap.values()].filter((t) => t.belowMinimumReady).length;
 

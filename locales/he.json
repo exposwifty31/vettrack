@@ -3911,6 +3911,13 @@
     "staging": "היערכות",
     "inQueue": "בתור",
     "highLoad": "עומס גבוה",
+    "rfidTag": "RFID",
+    "rfidExternalZone": "יצא מהמרפאה",
+    "rfidUnresolved": "מיקום לא ברור",
+    "rfidReaderOffline": "קורא לא מקוון",
+    "rfidPossibleEgress": "יציאה אפשרית",
+    "rfidConflict": "אי-התאמת RFID",
+    "rfidAmbiguous": "RFID סותר",
     "collab": {
       "present": "נוכחים בלוח"
     }

@@ -211,6 +211,45 @@ function LocationCard({ row }: { row: EquipmentCommandBoardSnapshot["byLocation"
   );
 }
 
+// ── RFID chip ─────────────────────────────────────────────────────────────────
+
+/**
+ * R-M1.3 — advisory RFID last-seen chip. The pinned `locationKind` discriminator
+ * renders three DISTINCT, non-blank surfaces — 'external_zone' (left clinic) and
+ * 'unresolved' (no resolvable room) never collapse to the same/blank surface, and
+ * a resolved room shows its name. Advisory only: the human-confirmed room stays the
+ * unit's resolved location (never overridden here).
+ */
+function RfidChip({ unit }: { unit: EquipmentBoardUnitRow }) {
+  const rfid = unit.rfid;
+  if (!rfid) return null;
+  const kindStyle =
+    rfid.locationKind === "external_zone"
+      ? "border-[var(--status-issue-border)] bg-[var(--status-issue-bg)] text-[var(--status-issue-fg)]"
+      : rfid.locationKind === "unresolved"
+        ? "border-[var(--status-stale-border)] bg-[var(--status-stale-bg)] text-[var(--status-stale-fg)]"
+        : "border-ivory-border bg-[rgb(var(--ivory-surface))] text-ivory-text2";
+  const label =
+    rfid.locationKind === "external_zone"
+      ? t.board.rfidExternalZone
+      : rfid.locationKind === "unresolved"
+        ? t.board.rfidUnresolved
+        : (rfid.locationName ?? t.board.rfidTag);
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center gap-1 vt-text-2xs font-semibold px-1.5 py-0.5 rounded border",
+        kindStyle,
+      )}
+      data-testid={`board-unit-rfid-${unit.equipmentId}`}
+      data-rfid-kind={rfid.locationKind}
+    >
+      <span className="opacity-70">{t.board.rfidTag}</span>
+      <span>{label}</span>
+    </span>
+  );
+}
+
 // ── UnitRow ───────────────────────────────────────────────────────────────────
 
 function UnitRow({ unit }: { unit: EquipmentBoardUnitRow }) {
@@ -261,6 +300,11 @@ function UnitRow({ unit }: { unit: EquipmentBoardUnitRow }) {
             <span className="vt-text-xs text-[hsl(var(--status-issue))]">{blocking}</span>
           )}
         </div>
+        {unit.rfid && (
+          <div className="mt-1">
+            <RfidChip unit={unit} />
+          </div>
+        )}
       </div>
       <span
         className={cn(

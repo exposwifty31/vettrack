@@ -3911,6 +3911,13 @@
     "staging": "Staging",
     "inQueue": "in queue",
     "highLoad": "High load",
+    "rfidTag": "RFID",
+    "rfidExternalZone": "Left clinic",
+    "rfidUnresolved": "Location unresolved",
+    "rfidReaderOffline": "Reader offline",
+    "rfidPossibleEgress": "Possible exit",
+    "rfidConflict": "RFID mismatch",
+    "rfidAmbiguous": "Conflicting RFID",
     "collab": {
       "present": "On the board"
     }

@@ -3914,6 +3914,13 @@ export interface TStructure {
     staging: string;
     inQueue: string;
     highLoad: string;
+    rfidTag: string;
+    rfidExternalZone: string;
+    rfidUnresolved: string;
+    rfidReaderOffline: string;
+    rfidPossibleEgress: string;
+    rfidConflict: string;
+    rfidAmbiguous: string;
     collab: {
       present: string;
     };

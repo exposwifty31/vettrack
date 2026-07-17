@@ -17,16 +17,23 @@ export type EquipmentBoardUnitRow = {
   lastHumanConfirmationAt?: string;
   rfid?: {
     lastSeenAt?: string;
-    readerId?: string;
+    /** (clinicId, gatewayCode) → vt_rfid_readers.id. `null` = reader removed AFTER a valid
+     * read (last-seen room still shown, no reader link) vs a resolved reader row. */
+    readerId: string | null;
     readerName?: string;
     locationId?: string;
     locationName?: string;
+    /** R-M1.3 — bounded location discriminator. 'external_zone' (boundary/dock NULL side) and
+     * 'unresolved' (no resolvable room) are DISTINCT states — neither collapses to blank/null. */
+    locationKind: "room" | "external_zone" | "unresolved";
     confidence: "low" | "medium" | "high";
     readsInWindow?: number;
   };
   evidenceConflict?: {
     type:
-      | "rfid_overrides_human_location"
+      // R-M1.3 — renamed from the inert `rfid_overrides_human_location` (which encoded the wrong
+      // precedence). RFID is advisory: a conflict is a badge only, never an override (M1.0).
+      | "rfid_location_conflict"
       | "ambiguous_rfid_location"
       | "custody_location_mismatch";
     action: "confirm_location" | "return" | "open_detail";
@@ -81,7 +88,11 @@ export type EquipmentBoardAlert = {
     | "truth_resolution_failed"
     | "ambiguous_rfid_location"
     | "custody_location_mismatch"
-    | "rfid_reader_offline";
+    | "rfid_reader_offline"
+    // R-M1.3 — RFID location evidence disagrees with the human-confirmed room (single read);
+    // and a boundary/dock exit toward the external (NULL) endpoint (advisory, never a custody move).
+    | "rfid_location_conflict"
+    | "possible_egress";
   severity: "info" | "warning" | "critical";
   equipmentId?: string;
   message: string;
