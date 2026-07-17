@@ -3885,6 +3885,9 @@ export interface TStructure {
     ready: string;
     noUnitsHere: string;
     attention: string;
+    anomalyBatteryCritical: string;
+    anomalyCartUnverified: string;
+    anomalySince: string;
     live: string;
     updated: string;
     ward: string;

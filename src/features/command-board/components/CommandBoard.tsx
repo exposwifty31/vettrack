@@ -8,11 +8,13 @@ import { Settings2, X } from "lucide-react";
 import { t } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { useBoardEntityCoPresence } from "@/board/board-copresence-context";
+import { usePrefersReducedMotion } from "@/hooks/use-prefers-reduced-motion";
 import type { EquipmentCommandBoardSnapshot } from "@/types/safety-surfaces";
 import type { EquipmentBoardUnitRow, EquipmentReadinessStatus } from "../../../../shared/equipment-board";
 import { STATUS_BG, STATUS_BAR_COLOR, statusLabel } from "../status-tokens";
 import { useKioskModeFromUrl } from "../use-kiosk-mode-from-url";
 import { countCriticalAlerts, useBoardMode } from "../use-board-mode";
+import { BoardAttentionSection } from "./BoardAttentionSection";
 import { DocksPanel, PowerPanel, StagingPanel, WaitlistPanel } from "./board-panels";
 
 /** The six readiness buckets that make up a stacked readiness bar. */
@@ -410,6 +412,8 @@ export function CommandBoard({
   const kioskModeFromUrl = useKioskModeFromUrl();
   const kioskMode = kioskModeProp ?? kioskModeFromUrl;
   const mode = useBoardMode(board);
+  const reducedMotion = usePrefersReducedMotion();
+  const anomalies = board.anomalies ?? [];
   const now = new Date(currentTime);
   const timeStr = now.toLocaleTimeString("he-IL", {
     hour: "2-digit",
@@ -475,6 +479,11 @@ export function CommandBoard({
           </button>
         )}
       </header>
+
+      {/* Ambient anomaly attention (R-BDF-1.2) — glance-only, present in both modes */}
+      {anomalies.length > 0 && (
+        <BoardAttentionSection anomalies={anomalies} mode={mode} reducedMotion={reducedMotion} />
+      )}
 
       {/* Body */}
       {mode === "pressure" && <PressureMain board={board} needAttention={needAttention} />}
