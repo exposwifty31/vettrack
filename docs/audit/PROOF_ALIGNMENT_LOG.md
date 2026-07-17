@@ -3943,3 +3943,24 @@ Reviewer returned 1 HIGH + 1 MEDIUM + 2 LOW on the committed sub-card; all four 
 - **Guardrails held:** ingest surface behavior byte-identical (MISSING_CLINIC 400 gate + per-clinic limiter key preserved); no transport/schema/authority change; helper is pure header parsing.
 
 **Verdict:** VERIFIED
+
+## 2026-07-18 — Cover migration 173 + 175 ON-DELETE / cross-clinic FK behavior (pending-commit)
+
+**Claim:** `tests/migrations/rfid-readers.test.ts` previously exercised ON-DELETE only for migration 172 (:376-435). Added DB-integration cases (self-skip without `DATABASE_URL`) covering migration 173 (`vt_rfid_secret_rotations` clinic_id ON DELETE CASCADE) and migration 175 (`vt_rfid_egress_signals`: clinic_id ON DELETE RESTRICT :39; composite (clinic_id,equipment_id) FK CASCADE :59; composite (clinic_id,gate_id) FK CASCADE :61). Test-only change; migrations untouched.
+
+**Evidence:**
+- New helpers in-test: `insertEquipment(clinicId)` (id+clinic_id+name into `vt_equipment`) and `insertEgress(fields)` (defaulted row into `vt_rfid_egress_signals`).
+- Migration 173 section: seeds a clinic + one rotation row, asserts the row exists, deletes the clinic, asserts the rotation row is gone (clinic_id ON DELETE CASCADE).
+- Migration 175 section (two isolated clinics a/b, equipment + boundary/dock gates):
+  - cross-clinic `equipment_id` (eqB under clinic a) → rejected by `(clinic_id, equipment_id)` composite FK.
+  - cross-clinic `gate_id` (gateB under clinic a) → rejected by `(clinic_id, gate_id)` composite FK.
+  - deleting the gate reader cascades its egress row (asserts 0 rows after).
+  - deleting the equipment cascades its egress row (asserts 0 rows after).
+  - clinic delete BLOCKED while an egress row exists (`expectReject`), and the egress row survives (asserts 1 row) — confirms clinic_id ON DELETE RESTRICT + that the valid egress insert genuinely persisted.
+- `finally` cleanup extended: purges `vt_rfid_egress_signals` (its clinic_id RESTRICT would otherwise block clinic delete), `vt_rfid_secret_rotations`, and `vt_equipment` per test clinic before deleting rooms/clinic.
+- Commands:
+  - `pnpm exec tsx tests/migrations/rfid-readers.test.ts` → `✅ rfid-readers.test.ts passed` (against live local Postgres, DATABASE_URL set, migrations applied).
+  - `pnpm typecheck` (frontend `tsc --noEmit` + server `tsconfig.server.json --noEmit`) → exit 0, zero errors.
+- **Guardrails held:** no product/migration/schema change — test file only; new DB-integration cases self-skip when `DATABASE_URL` is unset; per-run random-UUID test clinics, best-effort purge of only rows the test created (never the dev clinic, never append-only audit rows).
+
+**Verdict:** VERIFIED

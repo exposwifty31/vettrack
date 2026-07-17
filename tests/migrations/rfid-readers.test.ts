@@ -128,6 +128,36 @@ async function main() {
       );
     }
 
+    async function insertEquipment(clinicId: string): Promise<string> {
+      const id = uid();
+      await pool.query(
+        `insert into vt_equipment (id, clinic_id, name) values ($1, $2, $3)`,
+        [id, clinicId, `Eq-${id.slice(0, 6)}`],
+      );
+      return id;
+    }
+
+    async function insertEgress(fields: Record<string, unknown>): Promise<void> {
+      const base: Record<string, unknown> = {
+        id: uid(),
+        clinic_id: null,
+        equipment_id: null,
+        gate_id: null,
+        gateway_code: `gw-${uid().slice(0, 8)}`,
+        source_event_id: `src-${uid().slice(0, 8)}`,
+        from_room_id: null,
+        batch_id: `batch-${uid().slice(0, 8)}`,
+        detected_at: new Date().toISOString(),
+        ...fields,
+      };
+      const keys = Object.keys(base);
+      const params = keys.map((_, i) => `$${i + 1}`);
+      await pool.query(
+        `insert into vt_rfid_egress_signals (${keys.join(", ")}) values (${params.join(", ")})`,
+        keys.map((k) => base[k]),
+      );
+    }
+
     // ================= tenant safety: composite unique (clinic_id, gateway_code) =================
     {
       const { clinicId } = await seedClinic();
@@ -434,6 +464,139 @@ async function main() {
       );
     }
 
+    // ================= migration 173: vt_rfid_secret_rotations clinic_id ON DELETE CASCADE =================
+    {
+      const clinicId = uid();
+      clinicIds.push(clinicId);
+      await pool.query(`insert into vt_clinics (id) values ($1)`, [clinicId]);
+      const rotationId = uid();
+      await pool.query(
+        `insert into vt_rfid_secret_rotations (clinic_id, id, idempotency_key, grace_expires_at)
+         values ($1, $2, $3, now() + interval '1 hour')`,
+        [clinicId, rotationId, `idem-${uid().slice(0, 8)}`],
+      );
+      const before = await pool.query(
+        `select 1 from vt_rfid_secret_rotations where clinic_id = $1`,
+        [clinicId],
+      );
+      assert.strictEqual(before.rows.length, 1, "rotation row must exist before clinic delete");
+      // A clinic delete cascades its 173 rotation rows (clinic_id ON DELETE CASCADE).
+      await pool.query(`delete from vt_clinics where id = $1`, [clinicId]);
+      const after = await pool.query(
+        `select 1 from vt_rfid_secret_rotations where clinic_id = $1`,
+        [clinicId],
+      );
+      assert.strictEqual(
+        after.rows.length,
+        0,
+        "clinic delete must cascade-delete its 173 rotation rows",
+      );
+    }
+
+    // ================= migration 175: vt_rfid_egress_signals tenant guards + ON DELETE =================
+    // clinic_id ON DELETE RESTRICT (:39); composite FKs (clinic_id,equipment_id) (:59) and
+    // (clinic_id,gate_id) (:61) are the in-DB cross-clinic tenant guard, both ON DELETE CASCADE.
+    {
+      const a = await seedClinic();
+      const b = await seedClinic();
+
+      const eqA1 = await insertEquipment(a.clinicId);
+      const eqA2 = await insertEquipment(a.clinicId);
+      const eqB = await insertEquipment(b.clinicId);
+
+      const gateA1 = uid();
+      const gateA2 = uid();
+      const gateB = uid();
+      // Configured boundary/dock gates in clinic a (the egress-producing gate kinds).
+      await insertReader({
+        id: gateA1,
+        clinic_id: a.clinicId,
+        gate_type: "boundary",
+        provisioning_state: "active",
+        room_id: a.roomA,
+        from_room_id: a.roomA,
+        to_room_id: null,
+      });
+      await insertReader({
+        id: gateA2,
+        clinic_id: a.clinicId,
+        gate_type: "dock",
+        provisioning_state: "active",
+        room_id: a.roomB,
+        from_room_id: null,
+        to_room_id: a.roomB,
+      });
+      // A reader in clinic b (any reader satisfies the composite FK target).
+      await insertReader({
+        id: gateB,
+        clinic_id: b.clinicId,
+        provisioning_state: "legacy_unconfigured",
+        room_id: b.roomA,
+      });
+
+      // Cross-clinic equipment_id → composite FK (clinic_id, equipment_id) rejects.
+      await expectReject(
+        () => insertEgress({ clinic_id: a.clinicId, equipment_id: eqB, gate_id: gateA1 }),
+        "cross-clinic equipment_id must be rejected by the composite FK",
+      );
+      // Cross-clinic gate_id → composite FK (clinic_id, gate_id) rejects.
+      await expectReject(
+        () => insertEgress({ clinic_id: a.clinicId, equipment_id: eqA1, gate_id: gateB }),
+        "cross-clinic gate_id must be rejected by the composite FK",
+      );
+
+      // Deleting a gate cascades its egress rows ((clinic_id, gate_id) FK ON DELETE CASCADE).
+      const egGate = uid();
+      await insertEgress({ id: egGate, clinic_id: a.clinicId, equipment_id: eqA1, gate_id: gateA1 });
+      await pool.query(`delete from vt_rfid_readers where id = $1 and clinic_id = $2`, [
+        gateA1,
+        a.clinicId,
+      ]);
+      const afterGate = await pool.query(
+        `select 1 from vt_rfid_egress_signals where id = $1`,
+        [egGate],
+      );
+      assert.strictEqual(
+        afterGate.rows.length,
+        0,
+        "deleting a gate must cascade-delete its egress rows",
+      );
+
+      // Deleting an equipment cascades its egress rows ((clinic_id, equipment_id) FK ON DELETE CASCADE).
+      const egEq = uid();
+      await insertEgress({ id: egEq, clinic_id: a.clinicId, equipment_id: eqA2, gate_id: gateA2 });
+      await pool.query(`delete from vt_equipment where id = $1 and clinic_id = $2`, [
+        eqA2,
+        a.clinicId,
+      ]);
+      const afterEq = await pool.query(
+        `select 1 from vt_rfid_egress_signals where id = $1`,
+        [egEq],
+      );
+      assert.strictEqual(
+        afterEq.rows.length,
+        0,
+        "deleting an equipment must cascade-delete its egress rows",
+      );
+
+      // A clinic delete is BLOCKED by ON DELETE RESTRICT while an egress row exists.
+      const egRestrict = uid();
+      await insertEgress({ id: egRestrict, clinic_id: b.clinicId, equipment_id: eqB, gate_id: gateB });
+      await expectReject(
+        () => pool.query(`delete from vt_clinics where id = $1`, [b.clinicId]),
+        "clinic delete must be blocked by egress ON DELETE RESTRICT while an egress row exists",
+      );
+      const survive = await pool.query(
+        `select 1 from vt_rfid_egress_signals where id = $1`,
+        [egRestrict],
+      );
+      assert.strictEqual(
+        survive.rows.length,
+        1,
+        "egress row survives the RESTRICT-blocked clinic delete",
+      );
+    }
+
     // ================= backfill: rooms.gateway_code → managed reader (registry authoritative) =================
     {
       const clinicId = uid();
@@ -493,7 +656,11 @@ async function main() {
     console.log("✅ rfid-readers.test.ts passed");
   } finally {
     for (const clinicId of clinicIds) {
+      // Egress first: its clinic_id ON DELETE RESTRICT would otherwise block the clinic delete.
+      await pool.query(`delete from vt_rfid_egress_signals where clinic_id = $1`, [clinicId]);
+      await pool.query(`delete from vt_rfid_secret_rotations where clinic_id = $1`, [clinicId]);
       await pool.query(`delete from vt_rfid_readers where clinic_id = $1`, [clinicId]);
+      await pool.query(`delete from vt_equipment where clinic_id = $1`, [clinicId]);
       await pool.query(`delete from vt_rooms where clinic_id = $1`, [clinicId]);
       await pool.query(`delete from vt_clinics where id = $1`, [clinicId]);
     }
