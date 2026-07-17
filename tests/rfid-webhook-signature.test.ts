@@ -18,6 +18,9 @@ vi.mock("../server/lib/rfid/config.js", () => ({
 const mockIngest = vi.fn();
 vi.mock("../server/lib/rfid-ingest.js", () => ({
   ingestRfidBatch: (...args: unknown[]) => mockIngest(...args),
+  RfidDirectionalRejection: class RfidDirectionalRejection extends Error {
+    code = "RFID_DIRECTIONAL_UNRESOLVABLE";
+  },
 }));
 
 import rfidRoutes from "../server/routes/rfid.js";
@@ -111,7 +114,7 @@ describe("POST /api/rfid/events", () => {
     });
   });
 
-  it("valid signature returns 202", async () => {
+  it("valid signature returns 202 (canonical two-`t` x-vettrack-* headers)", async () => {
     const body = Buffer.from(
       JSON.stringify({
         batchId: "b1",
@@ -119,14 +122,55 @@ describe("POST /api/rfid/events", () => {
       }),
     );
     const res = await postRfid(body, {
-      "x-vetrack-clinic": CLINIC,
-      "x-vetrack-signature": sign(body, SECRET),
+      "x-vettrack-clinic": CLINIC,
+      "x-vettrack-signature": sign(body, SECRET),
       "content-type": "application/json",
     });
 
     expect(res.status).toBe(202);
     expect(res.json.ok).toBe(true);
     expect(mockIngest).toHaveBeenCalledOnce();
+  });
+
+  it("canonical brand-cased X-VetTrack-* (two-`t`) headers authenticate → 202", async () => {
+    // The signer/brand emit `X-VetTrack-Clinic` / `X-VetTrack-Signature` (two `t`s;
+    // Node lowercases them to `x-vettrack-*` on the wire). Before the header fix the
+    // route read the one-`t` `x-vetrack-*` spelling, so a spec-following client hit
+    // 400 MISSING_CLINIC. This locks the route onto the canonical two-`t` spelling.
+    const body = Buffer.from(
+      JSON.stringify({
+        batchId: "b-canonical",
+        events: [{ tagEpc: "E280", gatewayCode: "GW-1", readAt: new Date().toISOString() }],
+      }),
+    );
+    const res = await postRfid(body, {
+      "X-VetTrack-Clinic": CLINIC,
+      "X-VetTrack-Signature": sign(body, SECRET),
+      "content-type": "application/json",
+    });
+
+    expect(res.status).toBe(202);
+    expect(res.json.ok).toBe(true);
+    expect(mockIngest).toHaveBeenCalledOnce();
+  });
+
+  it("the buggy one-`t` x-vetrack-clinic spelling is NOT accepted → 400", async () => {
+    // Proves the route no longer silently authenticates the old one-`t` spelling:
+    // a request carrying ONLY `x-vetrack-*` is treated as missing the clinic header.
+    const body = Buffer.from(
+      JSON.stringify({
+        batchId: "b-legacy",
+        events: [{ tagEpc: "E280", gatewayCode: "GW-1", readAt: new Date().toISOString() }],
+      }),
+    );
+    const res = await postRfid(body, {
+      "x-vetrack-clinic": CLINIC,
+      "x-vetrack-signature": sign(body, SECRET),
+    });
+
+    expect(res.status).toBe(400);
+    expect(res.json.code).toBe("MISSING_CLINIC");
+    expect(mockIngest).not.toHaveBeenCalled();
   });
 
   it("wrong secret returns 401", async () => {
@@ -137,8 +181,8 @@ describe("POST /api/rfid/events", () => {
       }),
     );
     const res = await postRfid(body, {
-      "x-vetrack-clinic": CLINIC,
-      "x-vetrack-signature": sign(body, "wrong-secret"),
+      "x-vettrack-clinic": CLINIC,
+      "x-vettrack-signature": sign(body, "wrong-secret"),
     });
 
     expect(res.status).toBe(401);
@@ -153,7 +197,7 @@ describe("POST /api/rfid/events", () => {
       }),
     );
     const res = await postRfid(body, {
-      "x-vetrack-signature": sign(body, SECRET),
+      "x-vettrack-signature": sign(body, SECRET),
     });
 
     expect(res.status).toBe(400);
@@ -168,8 +212,8 @@ describe("POST /api/rfid/events", () => {
       }),
     );
     const res = await postRfid(body, {
-      "x-vetrack-clinic": CLINIC,
-      "x-vetrack-signature": sign(body, SECRET),
+      "x-vettrack-clinic": CLINIC,
+      "x-vettrack-signature": sign(body, SECRET),
     });
 
     expect(res.status).toBe(403);
@@ -179,8 +223,8 @@ describe("POST /api/rfid/events", () => {
   it("rejects body larger than 512kb", async () => {
     const huge = Buffer.alloc(512 * 1024 + 1, 0x61);
     const res = await postRfid(huge, {
-      "x-vetrack-clinic": CLINIC,
-      "x-vetrack-signature": sign(huge, SECRET),
+      "x-vettrack-clinic": CLINIC,
+      "x-vettrack-signature": sign(huge, SECRET),
     });
 
     expect(res.status).toBe(413);

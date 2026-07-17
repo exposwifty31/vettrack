@@ -225,8 +225,8 @@ describeDb("R-M1.5 scan-only golden (ingest disabled, no reads)", () => {
     );
     const status = await postRfid(body, {
       "content-type": "application/json",
-      "x-vetrack-clinic": clinic,
-      "x-vetrack-signature": sign(body, SECRET),
+      "x-vettrack-clinic": clinic,
+      "x-vettrack-signature": sign(body, SECRET),
     });
     expect(status).toBe(403);
 

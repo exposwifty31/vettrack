@@ -46,7 +46,7 @@ function jsonErr(res: Response, status: number, code: string, message: string) {
 }
 
 router.post("/events", rfidEventLimiter, async (req: Request, res: Response) => {
-  const clinicHeader = req.headers["x-vetrack-clinic"];
+  const clinicHeader = req.headers["x-vettrack-clinic"];
   const clinicId =
     typeof clinicHeader === "string"
       ? clinicHeader.trim()
@@ -71,7 +71,7 @@ router.post("/events", rfidEventLimiter, async (req: Request, res: Response) => 
     return jsonErr(res, 401, "RFID_NOT_CONFIGURED", "RFID credentials not configured for clinic");
   }
 
-  const signatureHeader = req.headers["x-vetrack-signature"];
+  const signatureHeader = req.headers["x-vettrack-signature"];
   let matchedIndex = -1;
   for (let i = 0; i < secrets.length; i++) {
     if (verifyVetTrackWebhookSignature(rawBody, secrets[i], signatureHeader)) {

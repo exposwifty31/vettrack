@@ -79,24 +79,31 @@ export const pushTestLimiter = rateLimit({
   message: { error: "Too many test notifications. Please wait a minute." },
 });
 // Write operations: 30/min — POST/PATCH/DELETE on equipment
-// RFID doorway ingest: 120/min per clinic+IP
+// RFID doorway ingest: 120/min per clinic+IP.
+//
+// Per-clinic keying reads the canonical two-`t` `x-vettrack-clinic` header (the
+// spelling the signer/brand emit — Node lowercases `X-VetTrack-*` on the wire).
+// Two clinics behind one IP get independent 120/min buckets; the per-IP tail
+// only applies when the clinic header is truly absent.
+export function rfidEventLimiterKey(req: Request): string {
+  const clinicHeader = req.headers["x-vettrack-clinic"];
+  const clinicId =
+    typeof clinicHeader === "string"
+      ? clinicHeader.trim()
+      : Array.isArray(clinicHeader)
+        ? clinicHeader[0]?.trim() ?? ""
+        : "";
+  const ip = ipKeyGenerator(req.ip ?? "127.0.0.1");
+  return `${clinicId}:${ip}`;
+}
+
 export const rfidEventLimiter = rateLimit({
   windowMs: 60_000,
   max: 120,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: "Too many RFID events. Please wait a moment." },
-  keyGenerator: (req) => {
-    const clinicHeader = req.headers["x-vetrack-clinic"];
-    const clinicId =
-      typeof clinicHeader === "string"
-        ? clinicHeader.trim()
-        : Array.isArray(clinicHeader)
-          ? clinicHeader[0]?.trim() ?? ""
-          : "";
-    const ip = ipKeyGenerator(req.ip ?? "127.0.0.1");
-    return `${clinicId}:${ip}`;
-  },
+  keyGenerator: rfidEventLimiterKey,
   skip: shouldSkipPerIpApiThrottles,
 });
 

@@ -130,8 +130,8 @@ async function postBatch(clinic: string, batch: unknown, secret = SECRET) {
   const body = Buffer.from(JSON.stringify(batch));
   return postRfid(body, {
     "content-type": "application/json",
-    "x-vetrack-clinic": clinic,
-    "x-vetrack-signature": sign(body, secret),
+    "x-vettrack-clinic": clinic,
+    "x-vettrack-signature": sign(body, secret),
   });
 }
 
