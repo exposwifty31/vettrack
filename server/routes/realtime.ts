@@ -9,6 +9,7 @@ import { incrementMetric } from "../lib/metrics.js";
 import { subscribe, unsubscribe } from "../lib/realtime.js";
 import { recordStreamConnect, startKeepalive } from "../lib/code-blue-keepalive.js";
 import { resolveRequestId, apiError } from "../lib/route-utils.js";
+import { BOARD_ANOMALY_TYPES } from "../../shared/equipment-board.js";
 
 const MAX_OUTBOX_REPLAY = 1000;
 
@@ -364,14 +365,14 @@ function isAllowedNudgeShown(value: unknown): value is NudgeShown {
 }
 
 // R-BDF-1.3 — board anomaly activation telemetry accepted via the existing
-// endpoint. The set of allowed types is a CLOSED enum (mirrors the shared
-// BoardAnomalyType); each in-enum type maps 1:1 to a fixed metric id. Anything
-// else is rejected via the shared enum-mismatch counter — no new metric series.
-const ALLOWED_BOARD_ANOMALY_TYPES = ["battery_critical", "cart_unverified", "rfid_reader_offline"] as const;
-type BoardAnomalyTelemetryType = (typeof ALLOWED_BOARD_ANOMALY_TYPES)[number];
+// endpoint. The set of allowed types is derived DIRECTLY from the shared runtime
+// tuple (BOARD_ANOMALY_TYPES), so it can never drift from BoardAnomalyType: each
+// in-enum type maps 1:1 to a fixed metric id; anything else is rejected via the
+// shared enum-mismatch counter — no new metric series.
+type BoardAnomalyTelemetryType = (typeof BOARD_ANOMALY_TYPES)[number];
 
 function isAllowedBoardAnomalyType(value: unknown): value is BoardAnomalyTelemetryType {
-  return typeof value === "string" && (ALLOWED_BOARD_ANOMALY_TYPES as readonly string[]).includes(value);
+  return typeof value === "string" && (BOARD_ANOMALY_TYPES as readonly string[]).includes(value);
 }
 
 // Phase 9 PR 9.5 — offline emergency mutation blocking. Bounded enum; the

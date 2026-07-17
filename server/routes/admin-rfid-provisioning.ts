@@ -10,8 +10,10 @@
 import { Router, type Request, type Response } from "express";
 import { z } from "zod";
 import { requireAdmin, requireAuth } from "../middleware/auth.js";
+import { writeLimiter } from "../middleware/rate-limiters.js";
 import { resolveRequestId } from "../lib/route-utils.js";
-import { setRfidIngestEnabled } from "../lib/rfid/config.js";
+import { logAudit } from "../lib/audit.js";
+import { isRfidIngestEnabled, setRfidIngestEnabled } from "../lib/rfid/config.js";
 import {
   ackRotationReader,
   rollbackRfidSecret,
@@ -53,7 +55,7 @@ function handleRotationError(err: unknown, res: Response, requestId: string, fal
  * Provision (first time) or rotate the per-clinic HMAC secret. The secret is returned ONCE.
  * A same-key retry replays the original envelope WITHOUT the secret.
  */
-router.post("/rfid-provisioning/rotate", requireAuth, requireAdmin, async (req, res: Response) => {
+router.post("/rfid-provisioning/rotate", requireAuth, requireAdmin, writeLimiter, async (req, res: Response) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
   try {
     const clinicId = requireClinicId(req, res, requestId);
@@ -73,7 +75,7 @@ router.post("/rfid-provisioning/rotate", requireAuth, requireAdmin, async (req, 
 });
 
 /** POST /api/admin/rfid-provisioning/rollback — restore previous as current (grace only). */
-router.post("/rfid-provisioning/rollback", requireAuth, requireAdmin, async (req, res: Response) => {
+router.post("/rfid-provisioning/rollback", requireAuth, requireAdmin, writeLimiter, async (req, res: Response) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
   try {
     const clinicId = requireClinicId(req, res, requestId);
@@ -92,7 +94,7 @@ router.post("/rfid-provisioning/rollback", requireAuth, requireAdmin, async (req
 });
 
 /** POST /api/admin/rfid-provisioning/ack — record a snapshot reader adopting the new secret. */
-router.post("/rfid-provisioning/ack", requireAuth, requireAdmin, async (req, res: Response) => {
+router.post("/rfid-provisioning/ack", requireAuth, requireAdmin, writeLimiter, async (req, res: Response) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
   try {
     const clinicId = requireClinicId(req, res, requestId);
@@ -110,7 +112,7 @@ router.post("/rfid-provisioning/ack", requireAuth, requireAdmin, async (req, res
 });
 
 /** PUT /api/admin/rfid-provisioning/ingest — toggle rfid.ingest_enabled.<clinicId>. */
-router.put("/rfid-provisioning/ingest", requireAuth, requireAdmin, async (req, res: Response) => {
+router.put("/rfid-provisioning/ingest", requireAuth, requireAdmin, writeLimiter, async (req, res: Response) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
   try {
     const clinicId = requireClinicId(req, res, requestId);
@@ -120,7 +122,17 @@ router.put("/rfid-provisioning/ingest", requireAuth, requireAdmin, async (req, r
       res.status(400).json({ code: "INVALID_INPUT", error: "INVALID_INPUT", message: "enabled (boolean) is required", requestId });
       return;
     }
+    const previousEnabled = await isRfidIngestEnabled(clinicId);
     await setRfidIngestEnabled(clinicId, parsed.data.enabled);
+    logAudit({
+      clinicId,
+      actionType: "rfid_ingest_enabled_changed",
+      performedBy: req.authUser?.id ?? "unknown",
+      performedByEmail: req.authUser?.email ?? "unknown",
+      targetId: clinicId,
+      targetType: "clinic",
+      metadata: { previousEnabled, enabled: parsed.data.enabled, requestId },
+    });
     res.status(200).json({ clinicId, enabled: parsed.data.enabled, requestId });
   } catch (err) {
     console.error("[admin-rfid-provisioning] ingest toggle failed", err);

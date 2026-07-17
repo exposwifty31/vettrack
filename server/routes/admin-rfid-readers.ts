@@ -1,7 +1,9 @@
 import { Router, type Request, type Response } from "express";
 import { z } from "zod";
 import { requireAdmin, requireAuth } from "../middleware/auth.js";
+import { writeLimiter } from "../middleware/rate-limiters.js";
 import { resolveRequestId } from "../lib/route-utils.js";
+import { logAudit } from "../lib/audit.js";
 import {
   createRfidReader,
   deactivateRfidReader,
@@ -98,7 +100,7 @@ router.get("/rfid-readers/managed", requireAuth, requireAdmin, async (req, res: 
 });
 
 /** POST /api/admin/rfid-readers — create a managed reader (unconfigured; no gate_type yet). */
-router.post("/rfid-readers", requireAuth, requireAdmin, async (req, res: Response) => {
+router.post("/rfid-readers", requireAuth, requireAdmin, writeLimiter, async (req, res: Response) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
   try {
     const clinicId = requireClinicId(req, res, requestId);
@@ -109,6 +111,15 @@ router.post("/rfid-readers", requireAuth, requireAdmin, async (req, res: Respons
       return;
     }
     const reader = await createRfidReader(clinicId, parsed.data);
+    logAudit({
+      clinicId,
+      actionType: "rfid_reader_created",
+      performedBy: req.authUser?.id ?? "unknown",
+      performedByEmail: req.authUser?.email ?? "unknown",
+      targetId: reader.id,
+      targetType: "rfid_reader",
+      metadata: { name: reader.name, gatewayCode: reader.gatewayCode, requestId },
+    });
     res.status(201).json({ clinicId, reader, requestId });
   } catch (err) {
     // Duplicate (clinicId, gatewayCode) trips the DB composite unique.
@@ -122,7 +133,7 @@ router.post("/rfid-readers", requireAuth, requireAdmin, async (req, res: Respons
 });
 
 /** PATCH /api/admin/rfid-readers/:id — rename. Clinic-scoped; cross-clinic id → 404. */
-router.patch("/rfid-readers/:id", requireAuth, requireAdmin, async (req, res: Response) => {
+router.patch("/rfid-readers/:id", requireAuth, requireAdmin, writeLimiter, async (req, res: Response) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
   try {
     const clinicId = requireClinicId(req, res, requestId);
@@ -137,6 +148,15 @@ router.patch("/rfid-readers/:id", requireAuth, requireAdmin, async (req, res: Re
       res.status(404).json({ code: "READER_NOT_FOUND", error: "READER_NOT_FOUND", message: "RFID reader not found", requestId });
       return;
     }
+    logAudit({
+      clinicId,
+      actionType: "rfid_reader_renamed",
+      performedBy: req.authUser?.id ?? "unknown",
+      performedByEmail: req.authUser?.email ?? "unknown",
+      targetId: reader.id,
+      targetType: "rfid_reader",
+      metadata: { name: reader.name, requestId },
+    });
     res.status(200).json({ clinicId, reader, requestId });
   } catch (err) {
     console.error("[admin-rfid-readers] rename failed", err);
@@ -145,7 +165,7 @@ router.patch("/rfid-readers/:id", requireAuth, requireAdmin, async (req, res: Re
 });
 
 /** POST /api/admin/rfid-readers/:id/deactivate — soft-deactivate. Clinic-scoped; cross-clinic id → 404. */
-router.post("/rfid-readers/:id/deactivate", requireAuth, requireAdmin, async (req, res: Response) => {
+router.post("/rfid-readers/:id/deactivate", requireAuth, requireAdmin, writeLimiter, async (req, res: Response) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
   try {
     const clinicId = requireClinicId(req, res, requestId);
@@ -155,6 +175,15 @@ router.post("/rfid-readers/:id/deactivate", requireAuth, requireAdmin, async (re
       res.status(404).json({ code: "READER_NOT_FOUND", error: "READER_NOT_FOUND", message: "RFID reader not found", requestId });
       return;
     }
+    logAudit({
+      clinicId,
+      actionType: "rfid_reader_deactivated",
+      performedBy: req.authUser?.id ?? "unknown",
+      performedByEmail: req.authUser?.email ?? "unknown",
+      targetId: reader.id,
+      targetType: "rfid_reader",
+      metadata: { gatewayCode: reader.gatewayCode, requestId },
+    });
     res.status(200).json({ clinicId, reader, requestId });
   } catch (err) {
     console.error("[admin-rfid-readers] deactivate failed", err);

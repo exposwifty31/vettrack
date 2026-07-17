@@ -3,13 +3,14 @@ import { and, eq, isNotNull, sql } from "drizzle-orm";
 import { db, rooms, equipment, rfidReaders } from "../db.js";
 import type { RfidReader } from "../schema/equipment.js";
 import {
-  managedReaderHealth,
+  managedReaderHealthWithThreshold,
   mergeReaderRows,
   type ManagedRfidReaderRow,
   type RfidReaderRow,
   type ReaderRoomAssignment,
   type ReaderObservation,
 } from "../../shared/rfid-readers.js";
+import { resolveReaderStalenessThresholdMs } from "../lib/rfid/reader-offline-sweep.js";
 
 /**
  * Derives the RFID reader registry for a clinic from live signals (rooms.gatewayCode
@@ -83,7 +84,13 @@ function toManagedRow(r: RfidReader, nowMs: number): ManagedRfidReaderRow {
     provisioningState: r.provisioningState,
     lastSeenAt,
     lastReaderHeartbeatAt,
-    health: managedReaderHealth(lastReaderHeartbeatAt, nowMs),
+    // Same per-clinic staleness threshold the offline sweep + board anomalies resolve, so the
+    // reader API, persisted alerts, and board anomalies never disagree under an env override.
+    health: managedReaderHealthWithThreshold(
+      lastReaderHeartbeatAt,
+      nowMs,
+      resolveReaderStalenessThresholdMs(r.clinicId),
+    ),
     createdAt: r.createdAt ? new Date(r.createdAt).toISOString() : null,
   };
 }

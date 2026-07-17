@@ -109,9 +109,25 @@ async function getActiveReaderIds(clinicId: string): Promise<string[]> {
 }
 
 /**
+ * Compensating transition: return a rotation row to its retained-grace state after a
+ * post-CAS credential mutation fails. This keeps the durable rotation STATE consistent with
+ * the (unchanged) credential blob — `previous` is still retained and accepted — so a later
+ * verify/ack/rollback retries the transition cleanly instead of being stranded on a terminal
+ * `completed`/`rolled_back` row that no longer matches the stored secrets.
+ */
+async function revertRotationToGrace(clinicId: string, rotationId: string, now: number): Promise<void> {
+  await db
+    .update(rfidSecretRotations)
+    .set({ status: "grace", previousRetained: true, completedAt: null, updatedAt: new Date(now) })
+    .where(and(eq(rfidSecretRotations.clinicId, clinicId), eq(rfidSecretRotations.id, rotationId)));
+}
+
+/**
  * Invalidate the retained previous secret for a rotation (grace expiry OR all-acked).
  * CAS on `previous_retained = true` so exactly one caller drops the blob key; concurrent
- * callers no-op. Idempotent.
+ * callers no-op. Idempotent. If the credential drop fails AFTER the state flip, the row is
+ * rolled back to grace so the flow is recoverable (never a terminal `completed` row that still
+ * carries `previous_webhook_secret`).
  */
 async function finalizeRotation(clinicId: string, rot: RfidSecretRotation, now: number): Promise<void> {
   const claimed = await db
@@ -127,11 +143,16 @@ async function finalizeRotation(clinicId: string, rot: RfidSecretRotation, now: 
     .returning();
   if (claimed.length === 0) return; // already finalized by a concurrent caller
 
-  const creds = await getCredentials(clinicId, "rfid");
-  if (creds?.previous_webhook_secret) {
-    const next = { ...creds };
-    delete next.previous_webhook_secret;
-    await storeCredentials(clinicId, "rfid", next);
+  try {
+    const creds = await getCredentials(clinicId, "rfid");
+    if (creds?.previous_webhook_secret) {
+      const next = { ...creds };
+      delete next.previous_webhook_secret;
+      await storeCredentials(clinicId, "rfid", next);
+    }
+  } catch (err) {
+    await revertRotationToGrace(clinicId, rot.id, now);
+    throw err;
   }
 }
 
@@ -204,11 +225,21 @@ export async function rotateRfidSecret(
     throw new RfidRotationError("ROTATION_CONFLICT", "Rotation record could not be persisted", 409);
   }
 
-  // 4. Mutate the credential blob (secret change is now gated by the persisted row).
+  // 4. Mutate the credential blob (secret change is now gated by the persisted row). If the
+  //    durable store fails, the row is a bricked "delivered" record (secret never returned to
+  //    the caller, gate still held) — compensate by deleting it so the same key re-runs cleanly
+  //    and a fresh rotation is not blocked by the one-in-flight gate.
   const nextBlob = retainPrevious
     ? { ...(creds ?? {}), webhook_secret: newSecret, previous_webhook_secret: currentSecret! }
     : { webhook_secret: newSecret };
-  await storeCredentials(clinicId, "rfid", nextBlob);
+  try {
+    await storeCredentials(clinicId, "rfid", nextBlob);
+  } catch (err) {
+    await db
+      .delete(rfidSecretRotations)
+      .where(and(eq(rfidSecretRotations.clinicId, clinicId), eq(rfidSecretRotations.id, insertedRow.id)));
+    throw err;
+  }
 
   incrementMetric("rfid_secret_rotated");
   return toEnvelope(insertedRow, newSecret);
@@ -324,10 +355,19 @@ export async function rollbackRfidSecret(
     throw new RfidRotationError("ROLLBACK_UNAVAILABLE", "Rotation is no longer rollback-eligible", 409);
   }
 
-  const creds = await getCredentials(clinicId, "rfid");
-  const previous = creds?.previous_webhook_secret?.trim();
-  if (previous) {
-    await storeCredentials(clinicId, "rfid", { webhook_secret: previous });
+  // The row is now terminally `rolled_back`, but the blob still holds the NEW secret as current.
+  // If restoring `previous` as current fails, revert the row to grace so the (unchanged) blob and
+  // the state agree and the rollback stays retryable — never a terminal row whose rollback
+  // silently did not take effect.
+  try {
+    const creds = await getCredentials(clinicId, "rfid");
+    const previous = creds?.previous_webhook_secret?.trim();
+    if (previous) {
+      await storeCredentials(clinicId, "rfid", { webhook_secret: previous });
+    }
+  } catch (err) {
+    await revertRotationToGrace(clinicId, rotationId, now);
+    throw err;
   }
   incrementMetric("rfid_secret_rolled_back");
   return toEnvelope(claimed);

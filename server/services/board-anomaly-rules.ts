@@ -92,9 +92,9 @@ export interface BoardAnomalyInput {
   batteryOnset: Map<string, string>;
 }
 
-/** A finite, in-range battery percentage; null/NaN/±Infinity => fail-safe (no reading). */
+/** A finite, in-range (0..100) battery percentage; null/NaN/±Infinity/out-of-range => fail-safe. */
 function isUsablePercent(value: number | null): value is number {
-  return value != null && Number.isFinite(value);
+  return value != null && Number.isFinite(value) && value >= 0 && value <= 100;
 }
 
 /** A real, parseable instant; null/Invalid Date => fail-safe (no timestamp). */

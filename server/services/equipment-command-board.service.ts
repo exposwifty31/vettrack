@@ -169,9 +169,11 @@ export function deriveUnitRfid(
   const isExternal =
     input.latestEgressAt != null &&
     input.latestEgressAt.getTime() >= input.lastRfidSeenAt.getTime();
+  // A populated roomId whose room did not resolve to a name (deleted/inaccessible room) has no
+  // resolvable location, so it is "unresolved" rather than a nameless "room".
   const locationKind: "room" | "external_zone" | "unresolved" = isExternal
     ? "external_zone"
-    : input.lastRfidRoomId == null
+    : input.lastRfidRoomId == null || input.lastRfidRoomName == null
       ? "unresolved"
       : "room";
 

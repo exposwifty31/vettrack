@@ -394,7 +394,13 @@ export async function ingestRfidBatch(
     await tx
       .update(rfidReaders)
       .set({ lastReaderHeartbeatAt: serverNow })
-      .where(and(eq(rfidReaders.clinicId, clinicId), inArray(rfidReaders.gatewayCode, gatewayCodes)));
+      .where(
+        and(
+          eq(rfidReaders.clinicId, clinicId),
+          eq(rfidReaders.status, "active"),
+          inArray(rfidReaders.gatewayCode, gatewayCodes),
+        ),
+      );
 
     for (const ev of coalesced) {
       const eqRow = equipmentByEpc.get(ev.tagEpc);
@@ -561,6 +567,15 @@ export async function ingestRfidBatch(
         continue;
       }
 
+      // Reject stale reads BEFORE any egress persistence: a delayed exit older than the last
+      // sighting must not mint a fresh "current" egress signal (the asset has since been seen
+      // more recently). This gates the external-exit branch below as well as room advances.
+      if (eqRow.lastRfidSeenAt && readAt.getTime() <= eqRow.lastRfidSeenAt.getTime()) {
+        result.stale += 1;
+        incrementMetric("rfid_event_stale");
+        continue;
+      }
+
       // External exit (boundary/dock gate toward the NULL endpoint) => possible egress. It is
       // ADVISORY: it never advances last-seen (the asset keeps its last known room) and NEVER
       // mutates custody. Idempotent per the correlation key (retries/out-of-order dedupe).
@@ -619,12 +634,6 @@ export async function ingestRfidBatch(
 
       const destRoomId = resolution.destRoomId;
 
-      if (eqRow.lastRfidSeenAt && readAt.getTime() <= eqRow.lastRfidSeenAt.getTime()) {
-        result.stale += 1;
-        incrementMetric("rfid_event_stale");
-        continue;
-      }
-
       if (eqRow.lastRfidRoomId === destRoomId) {
         const advanced = await tx
           .update(equipment)
@@ -637,8 +646,12 @@ export async function ingestRfidBatch(
           continue;
         }
         eqRow.lastRfidSeenAt = readAt;
+        // The directional destination WAS resolved (it just matched the current room), so this
+        // counts toward directionalResolved per the field's documented semantics.
         result.unchanged += 1;
+        result.directionalResolved += 1;
         incrementMetric("rfid_event_unchanged");
+        incrementMetric("rfid_event_directional_resolved");
         continue;
       }
 

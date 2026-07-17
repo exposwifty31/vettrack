@@ -239,6 +239,11 @@ export type AuditActionType =
   | "equipment_rfid_observed_room_changed"
   | "rfid_reader_offline"
   | "rfid_reader_recovered"
+  // R-M1.1b/1.1c — admin-only RFID reader lifecycle + ingest-enablement audit trail.
+  | "rfid_reader_created"
+  | "rfid_reader_renamed"
+  | "rfid_reader_deactivated"
+  | "rfid_ingest_enabled_changed"
   | "equipment_semi_dock_notified"
   | "equipment_stale_checkout_nudged"
   // T3.5 — staleReturnedSweep nudge worker (returned-unverified → nudge managers).

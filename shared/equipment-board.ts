@@ -106,7 +106,14 @@ export type EquipmentBoardAlert = {
  * mirrors this enum. `since` is the condition's first-observed ISO instant; `sourceRef` is
  * the {table,id} of the row that tripped the rule.
  */
-export type BoardAnomalyType = "battery_critical" | "cart_unverified" | "rfid_reader_offline";
+/**
+ * Runtime source of truth for the closed anomaly-type enum. The type union AND every server-side
+ * validator (e.g. the R-BDF-1.3 telemetry gate in server/routes/realtime.ts) derive from this one
+ * tuple, so a new anomaly type cannot compile in one place while being silently rejected in another.
+ */
+export const BOARD_ANOMALY_TYPES = ["battery_critical", "cart_unverified", "rfid_reader_offline"] as const;
+
+export type BoardAnomalyType = (typeof BOARD_ANOMALY_TYPES)[number];
 
 /** Two-level glance severity: `calm` stays quiet, `pressure` escalates (color+size). */
 export type BoardAnomalySeverity = "calm" | "pressure";

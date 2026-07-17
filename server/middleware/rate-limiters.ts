@@ -1,8 +1,6 @@
 import type { Request } from "express";
 import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 
-import { readRfidClinicId } from "../lib/rfid/clinic-header.js";
-
 // Audit (2026-06-10): GLOBAL reduced from 6_000 to 100 (per-IP backstop).
 // Per-user limiters (scan/checkout/write) remain at 600 — test contract
 // tests/rate-limiters-f2.test.ts requires >= 100 per user, and ward scenarios
@@ -81,16 +79,17 @@ export const pushTestLimiter = rateLimit({
   message: { error: "Too many test notifications. Please wait a minute." },
 });
 // Write operations: 30/min — POST/PATCH/DELETE on equipment
-// RFID doorway ingest: 120/min per clinic+IP.
+// RFID doorway ingest: 120/min per IP.
 //
-// Per-clinic keying reads the canonical two-`t` `x-vettrack-clinic` header (the
-// spelling the signer/brand emit — Node lowercases `X-VetTrack-*` on the wire).
-// Two clinics behind one IP get independent 120/min buckets; the per-IP tail
-// only applies when the clinic header is truly absent.
+// This limiter runs BEFORE HMAC signature verification (see server/routes/rfid.ts),
+// and the RFID ingest route is mounted ahead of the global per-IP limiter, so it is the
+// ONLY pre-auth backstop on that endpoint. The `x-vettrack-clinic` header is
+// attacker-controlled at this stage: keying by it would let one IP mint an unbounded
+// number of 120/min buckets simply by varying the header, defeating the DoS backstop.
+// Pre-authentication keying is therefore IP-only. (Per-verified-clinic isolation, if ever
+// needed for NAT'd sites, belongs in a separate limiter applied AFTER signature validation.)
 export function rfidEventLimiterKey(req: Request): string {
-  const clinicId = readRfidClinicId(req);
-  const ip = ipKeyGenerator(req.ip ?? "127.0.0.1");
-  return `${clinicId}:${ip}`;
+  return `ip:${ipKeyGenerator(req.ip ?? "127.0.0.1")}`;
 }
 
 export const rfidEventLimiter = rateLimit({

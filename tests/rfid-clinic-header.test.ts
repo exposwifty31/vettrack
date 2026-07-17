@@ -33,23 +33,25 @@ describe("readRfidClinicId — shared canonical x-vettrack-clinic parse", () => 
   });
 });
 
-describe("route + limiter derive the SAME clinicId (no header-spelling drift)", () => {
-  it("the limiter key's clinic segment equals the route's readRfidClinicId", () => {
+describe("pre-auth limiter is decoupled from the attacker-controlled clinic header", () => {
+  it("the route reads the clinic header, but the pre-auth limiter key is IP-only", () => {
     const req = fakeReq({ "x-vettrack-clinic": "clinic-a" }, "198.51.100.9");
     // Route path: the MISSING_CLINIC gate + downstream keying use readRfidClinicId.
     const routeClinicId = readRfidClinicId(req);
-    // Limiter path: rfidEventLimiterKey is `${clinicId}:${ip}`.
+    // Limiter path runs BEFORE HMAC verification, so it must NOT trust the clinic header —
+    // keying by it would let one IP mint unbounded buckets by varying the header.
     const limiterKey = rfidEventLimiterKey(req);
     expect(routeClinicId).toBe("clinic-a");
-    expect(limiterKey).toBe(`${routeClinicId}:198.51.100.9`);
+    expect(limiterKey).toBe("ip:198.51.100.9");
+    expect(limiterKey).not.toContain(routeClinicId);
   });
 
-  it("both paths agree the one-`t` spelling is NOT clinic-scoped", () => {
-    const req = fakeReq({ "x-vetrack-clinic": "clinic-a" }, "198.51.100.9");
-    const routeClinicId = readRfidClinicId(req);
-    const limiterKey = rfidEventLimiterKey(req);
-    expect(routeClinicId).toBe("");
-    // Empty clinic segment → per-IP tail, identical for both consumers.
-    expect(limiterKey).toBe(`:198.51.100.9`);
+  it("varying the clinic header from one IP cannot escape the per-IP bucket", () => {
+    const ip = "198.51.100.9";
+    const a = rfidEventLimiterKey(fakeReq({ "x-vettrack-clinic": "clinic-a" }, ip));
+    const b = rfidEventLimiterKey(fakeReq({ "x-vettrack-clinic": "clinic-b" }, ip));
+    const none = rfidEventLimiterKey(fakeReq({}, ip));
+    expect(a).toBe(b);
+    expect(a).toBe(none);
   });
 });

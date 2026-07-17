@@ -78,34 +78,60 @@ export async function runRfidReaderOfflineSweep(
 
     if (target === prior) continue; // no change — dedup: no write, no signal
 
-    // Compare-and-set: only the sweep observing `prior` flips the row, so overlapping sweeps
-    // never double-emit. Clinic-scoped write (tenant safety).
-    const updated = await db
-      .update(rfidReaders)
-      .set({ readerHealthStatus: target, readerHealthChangedAt: now })
-      .where(
-        and(
-          eq(rfidReaders.clinicId, reader.clinicId),
-          eq(rfidReaders.id, reader.id),
-          eq(rfidReaders.readerHealthStatus, prior),
-        ),
-      )
-      .returning({ id: rfidReaders.id });
-    if (updated.length === 0) continue; // lost the race to a concurrent sweep
+    // The compare-and-set health flip and its transition outbox event are committed ATOMICALLY.
+    // If the outbox insert failed after a standalone CAS, the persisted health would already
+    // match `target`, so every future sweep would skip it (target===prior) and the offline/
+    // recovery alert would be lost forever. Wrapping both in one transaction rolls the health
+    // change back with the event on failure. Emit ONLY on the two real transitions; unknown->*
+    // (first observation / never-healthy) persists silently so the board isn't spammed.
+    const transition = await db.transaction(async (tx) => {
+      // CAS: only the sweep observing `prior` flips the row, so overlapping sweeps never
+      // double-emit. Clinic-scoped write (tenant safety).
+      const updated = await tx
+        .update(rfidReaders)
+        .set({ readerHealthStatus: target, readerHealthChangedAt: now })
+        .where(
+          and(
+            eq(rfidReaders.clinicId, reader.clinicId),
+            eq(rfidReaders.id, reader.id),
+            eq(rfidReaders.readerHealthStatus, prior),
+          ),
+        )
+        .returning({ id: rfidReaders.id });
+      if (updated.length === 0) return "lost_race" as const; // concurrent sweep won
 
-    // Emit ONLY on the two health transitions. unknown->healthy (first observation) and
-    // unknown->offline (a never-healthy reader) persist silently so the board isn't spammed.
-    if (prior === "healthy" && target === "offline") {
+      if (prior === "healthy" && target === "offline") {
+        await insertRealtimeDomainEvent(tx, {
+          clinicId: reader.clinicId,
+          type: RFID_READER_OFFLINE_EVENT,
+          category: "ALERT",
+          level: "WARNING",
+          payload: { readerId: reader.id, at: now.toISOString() },
+          occurredAt: now,
+        });
+        return "offline" as const;
+      }
+      if (prior === "offline" && target === "healthy") {
+        await insertRealtimeDomainEvent(tx, {
+          clinicId: reader.clinicId,
+          type: RFID_READER_RECOVERED_EVENT,
+          category: "ALERT",
+          level: "INFO",
+          payload: { readerId: reader.id, at: now.toISOString() },
+          occurredAt: now,
+        });
+        return "recovered" as const;
+      }
+      return "silent" as const;
+    });
+
+    if (transition === "lost_race") continue;
+
+    // Metrics + audit run AFTER commit. logAudit is append-only + fire-and-forget by convention,
+    // so it is deliberately kept out of the state-change transaction.
+    if (transition === "offline") {
       wentOffline += 1;
       incrementMetric("rfid_reader_offline_detected");
-      await insertRealtimeDomainEvent(db, {
-        clinicId: reader.clinicId,
-        type: RFID_READER_OFFLINE_EVENT,
-        category: "ALERT",
-        level: "WARNING",
-        payload: { readerId: reader.id, at: now.toISOString() },
-        occurredAt: now,
-      });
       logAudit({
         clinicId: reader.clinicId,
         actionType: "rfid_reader_offline",
@@ -115,17 +141,9 @@ export async function runRfidReaderOfflineSweep(
         targetType: "rfid_reader",
         metadata: { lastReaderHeartbeatAt: heartbeatIso },
       });
-    } else if (prior === "offline" && target === "healthy") {
+    } else if (transition === "recovered") {
       recovered += 1;
       incrementMetric("rfid_reader_recovered");
-      await insertRealtimeDomainEvent(db, {
-        clinicId: reader.clinicId,
-        type: RFID_READER_RECOVERED_EVENT,
-        category: "ALERT",
-        level: "INFO",
-        payload: { readerId: reader.id, at: now.toISOString() },
-        occurredAt: now,
-      });
       logAudit({
         clinicId: reader.clinicId,
         actionType: "rfid_reader_recovered",
