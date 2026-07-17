@@ -53,6 +53,43 @@ describe("RfidController — end-to-end pipeline (no DB, injected fetch)", () =>
     expect(Object.keys(parsed.events[0]).sort()).toEqual(["gatewayCode", "readAt", "tagEpc"]);
   });
 
+  it("honors the server backoff and governs the retry pass (does not re-send immediately)", async () => {
+    const sleeps: number[] = [];
+    let now = 0;
+    const sleep = async (ms: number): Promise<void> => {
+      sleeps.push(ms);
+      now += ms;
+    };
+    let calls = 0;
+    const fetchFn = vi.fn(async () => {
+      calls += 1;
+      // First attempt: 429 (Retry-After 5s) → buffered. Retry: 202.
+      return calls === 1
+        ? new Response(JSON.stringify({ error: "slow" }), { status: 429, headers: { "retry-after": "5" } })
+        : new Response(JSON.stringify({ ok: true, accepted: 1 }), { status: 202 });
+    }) as unknown as typeof fetch;
+
+    const config = loadConfig({ apiOrigin: "https://api.test", clinicId: "clinic-a", debounceMs: 1_000 });
+    const sender = new HttpSender({ apiOrigin: config.apiOrigin, clinicId: config.clinicId, fetchFn });
+    const controller = new RfidController({
+      config,
+      secretSource: new StaticSecretSource(SECRET),
+      sender,
+      now: () => now,
+      sleep,
+    });
+
+    const summary = await controller.run(
+      new SyntheticAdapter([{ tagEpc: "E1", gatewayCode: "GW-1", readAt: new Date(1_800_000_000_000) }]),
+    );
+
+    // The retry pass slept for the server's Retry-After before re-sending.
+    expect(sleeps).toContain(5_000);
+    expect(summary.backoff).toBe(1);
+    expect(summary.accepted).toBe(1);
+    expect(summary.undelivered).toBe(0);
+  });
+
   it("surfaces a dropped validation outcome without buffering", async () => {
     const fetchFn = vi.fn(async () =>
       new Response(JSON.stringify({ ok: false, code: "INVALID_SIGNATURE" }), { status: 401 }),

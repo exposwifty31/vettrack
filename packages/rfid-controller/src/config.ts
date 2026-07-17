@@ -43,6 +43,21 @@ export function loadConfig(input: ControllerConfigInput): ControllerConfig {
   const bufferCap = input.bufferCap ?? DEFAULT_CONFIG.bufferCap;
   const rateLimitPerMinute = input.rateLimitPerMinute ?? DEFAULT_CONFIG.rateLimitPerMinute;
 
+  // loadConfigFromFile feeds untyped JSON through the ControllerConfigInput cast,
+  // so a field may arrive as NaN, Infinity, a numeric string, or an array. Reject
+  // any non-integer here: NaN/Infinity would silently pass every range comparison
+  // below (and NaN maxEventsPerBatch makes the aggregator loop non-terminating).
+  for (const [name, value] of [
+    ["debounceMs", debounceMs],
+    ["maxEventsPerBatch", maxEventsPerBatch],
+    ["bufferCap", bufferCap],
+    ["rateLimitPerMinute", rateLimitPerMinute],
+  ] as const) {
+    if (typeof value !== "number" || !Number.isInteger(value)) {
+      throw new Error(`config: ${name} must be an integer`);
+    }
+  }
+
   if (debounceMs < 0) throw new Error("config: debounceMs must be >= 0");
   if (maxEventsPerBatch < 1 || maxEventsPerBatch > RFID_LIMITS.maxEventsPerBatch) {
     throw new Error(`config: maxEventsPerBatch must be 1..${RFID_LIMITS.maxEventsPerBatch}`);

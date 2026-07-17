@@ -36,8 +36,23 @@ export type Movement =
       readAt: Date;
     };
 
+/**
+ * Ceiling on distinct tags held in `lastGatewayByTag`. A long-running controller
+ * fed noisy or hostile reader input would otherwise grow this map without bound
+ * and eventually terminate the process. Well above any real clinic's tag
+ * population, so recently active tags are always retained; only long-idle EPCs
+ * are evicted (LRU), degrading their next read to a first-sighting crossing —
+ * advisory only, the server re-derives room state.
+ */
+const MAX_TRACKED_TAGS = 100_000;
+
 export class DirectionTracker {
   private readonly lastGatewayByTag = new Map<string, string>();
+  private readonly maxTrackedTags: number;
+
+  constructor(maxTrackedTags: number = MAX_TRACKED_TAGS) {
+    this.maxTrackedTags = Math.max(1, Math.floor(maxTrackedTags));
+  }
 
   /** Last gateway a tag was seen at, or null if never seen. */
   lastGateway(tagEpc: string): string | null {
@@ -47,7 +62,14 @@ export class DirectionTracker {
   /** Classify a read as a same-gateway presence or a crossing to a new gateway. */
   observe(read: RfidRead): Movement {
     const prev = this.lastGatewayByTag.get(read.tagEpc) ?? null;
+    // Delete-then-set moves this tag to the most-recent (insertion-order) slot so
+    // eviction targets the least-recently-observed EPC.
+    this.lastGatewayByTag.delete(read.tagEpc);
     this.lastGatewayByTag.set(read.tagEpc, read.gatewayCode);
+    if (this.lastGatewayByTag.size > this.maxTrackedTags) {
+      const oldest = this.lastGatewayByTag.keys().next().value;
+      if (oldest !== undefined) this.lastGatewayByTag.delete(oldest);
+    }
 
     if (prev === read.gatewayCode) {
       return { kind: "same", tagEpc: read.tagEpc, gatewayCode: read.gatewayCode, readAt: read.readAt };

@@ -41,4 +41,14 @@ describe("ReadDebouncer", () => {
     expect(d.accept(read("E1", "GW-1", base))).not.toBeNull();
     expect(d.accept(read("E2", "GW-1", base + 100))).not.toBeNull();
   });
+
+  it("does not collide distinct (tag,gateway) pairs sharing a boundary char (structural key)", () => {
+    const d = new ReadDebouncer({ windowMs: 5_000 });
+    const base = 1_800_000_000_000;
+    // A `${tag}<sep>${gateway}` scheme collides these two DISTINCT pairs whenever
+    // the separator can appear inside a field. Both must be accepted as new.
+    const sep = String.fromCharCode(0x1f);
+    expect(d.accept(read(`A${sep}B`, "C", base))).not.toBeNull();
+    expect(d.accept(read("A", `B${sep}C`, base))).not.toBeNull();
+  });
 });

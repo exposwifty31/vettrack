@@ -45,6 +45,16 @@ describe("MovementAggregator — one movement per crossing, floods coalesced", (
     expect(logs.some((l) => l.includes("flush_flood_split"))).toBe(true);
   });
 
+  it("rejects a non-positive / out-of-range / non-integer maxEventsPerBatch", () => {
+    // maxEventsPerBatch <= 0 would make drainBatches() non-terminating.
+    expect(() => new MovementAggregator({ maxEventsPerBatch: 0 })).toThrow();
+    expect(() => new MovementAggregator({ maxEventsPerBatch: -5 })).toThrow();
+    // > 200 produces batches the canonical ingest rejects.
+    expect(() => new MovementAggregator({ maxEventsPerBatch: 201 })).toThrow();
+    expect(() => new MovementAggregator({ maxEventsPerBatch: 1.5 })).toThrow();
+    expect(() => new MovementAggregator({ maxEventsPerBatch: Number.NaN })).toThrow();
+  });
+
   it("draining clears the pending buffer", () => {
     const agg = new MovementAggregator();
     agg.ingest(read("E1", "GW-1", 1_000));

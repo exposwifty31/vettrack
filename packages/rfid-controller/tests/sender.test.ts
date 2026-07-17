@@ -64,6 +64,25 @@ describe("HttpSender — response classifier", () => {
     if (out.kind === "stopped") expect(out.code).toBe("RFID_INGEST_DISABLED");
   });
 
+  it("403 WITHOUT RFID_INGEST_DISABLED → dropped (not stopped)", async () => {
+    const fetchFn = vi.fn(async () => jsonResponse(403, { ok: false, code: "FORBIDDEN" })) as unknown as typeof fetch;
+    const sender = senderWith(fetchFn);
+    const out = await sender.send(req());
+    expect(out.kind).toBe("dropped");
+    if (out.kind === "dropped") expect(out.code).toBe("FORBIDDEN");
+    expect(sender.bufferedCount()).toBe(0);
+  });
+
+  it("bounds each POST with an AbortSignal (a hung request cannot wedge the flush)", async () => {
+    let seenSignal: unknown;
+    const fetchFn = vi.fn(async (_url: string, init: RequestInit) => {
+      seenSignal = init.signal;
+      return jsonResponse(202, { ok: true });
+    }) as unknown as typeof fetch;
+    await senderWith(fetchFn).send(req());
+    expect(seenSignal).toBeInstanceOf(AbortSignal);
+  });
+
   it("429 → backoff, honoring Retry-After seconds", async () => {
     const fetchFn = vi.fn(async () => jsonResponse(429, { error: "slow down" }, { "retry-after": "5" })) as unknown as typeof fetch;
     const out = await senderWith(fetchFn).send(req());

@@ -37,17 +37,21 @@ export interface HttpSenderOptions {
   fetchFn?: typeof fetch;
   bufferCap?: number;
   defaultRetryAfterMs?: number;
+  /** Per-POST operational deadline; a hung request aborts and is buffered. */
+  requestTimeoutMs?: number;
   logger?: Logger;
 }
 
 const DEFAULT_BUFFER_CAP = 10_000;
 const DEFAULT_RETRY_AFTER_MS = 1_000;
+const DEFAULT_REQUEST_TIMEOUT_MS = 10_000;
 
 export class HttpSender {
   private readonly url: string;
   private readonly fetchFn: typeof fetch;
   private readonly bufferCap: number;
   private readonly defaultRetryAfterMs: number;
+  private readonly requestTimeoutMs: number;
   private readonly logger: Logger;
   private buffer: PreparedRequest[] = [];
   private dropped = 0;
@@ -57,6 +61,7 @@ export class HttpSender {
     this.fetchFn = opts.fetchFn ?? fetch;
     this.bufferCap = opts.bufferCap ?? DEFAULT_BUFFER_CAP;
     this.defaultRetryAfterMs = opts.defaultRetryAfterMs ?? DEFAULT_RETRY_AFTER_MS;
+    this.requestTimeoutMs = opts.requestTimeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS;
     this.logger = opts.logger ?? noopLogger;
   }
 
@@ -118,6 +123,9 @@ export class HttpSender {
           "content-type": "application/json",
         },
         body: request.body,
+        // Bound the POST: a hung server/socket must not wedge the flush pass and
+        // strand buffered evidence. A timeout aborts → caught below → buffered.
+        signal: AbortSignal.timeout(this.requestTimeoutMs),
       });
     } catch (err) {
       this.logger.warn("send_network_error", {
@@ -148,7 +156,10 @@ export class HttpSender {
     // 4xx: validation / auth / disabled — none of these succeed on retry.
     const body = (await safeJson(res)) as { code?: unknown } | undefined;
     const code = typeof body?.code === "string" ? body.code : `HTTP_${status}`;
-    if (status === 403) {
+    // Only the ingest-disabled flag stops the controller. Other 403s (a
+    // permission/tenant/authorization failure) are non-retryable but must NOT be
+    // misclassified as feature-disablement — drop them like any other 4xx.
+    if (status === 403 && code === "RFID_INGEST_DISABLED") {
       this.logger.error("send_stopped_ingest_disabled", { clinicId: request.clinicId, status, code });
       return { kind: "stopped", status, code };
     }

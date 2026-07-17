@@ -12,13 +12,14 @@ describe("StaticSecretSource", () => {
 });
 
 describe("RotatableSecretSource — hot-swap on rotation", () => {
-  it("swaps the signing secret and retains the previous for observability", () => {
+  it("hot-swaps the signing secret without retaining the rotated-out plaintext", () => {
     const src = new RotatableSecretSource("old");
     expect(src.current()).toBe("old");
-    expect(src.previous()).toBeNull();
     src.rotate("new");
     expect(src.current()).toBe("new");
-    expect(src.previous()).toBe("old");
+    // The rotated-out secret must NOT be exposed / retained (no `previous()`).
+    expect((src as unknown as { previous?: unknown }).previous).toBeUndefined();
+    expect(JSON.stringify(src)).not.toContain("old");
   });
 
   it("signing follows the hot-swapped secret (verified against the real verifier)", () => {

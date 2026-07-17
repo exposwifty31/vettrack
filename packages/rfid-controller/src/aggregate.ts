@@ -48,7 +48,20 @@ export class MovementAggregator {
   private readonly logger: Logger;
 
   constructor(opts: AggregatorOptions = {}) {
-    this.maxEventsPerBatch = opts.maxEventsPerBatch ?? RFID_LIMITS.maxEventsPerBatch;
+    const maxEventsPerBatch = opts.maxEventsPerBatch ?? RFID_LIMITS.maxEventsPerBatch;
+    // A non-positive value makes drainBatches() non-terminating (the loop stride
+    // never advances) and eventually exhausts memory; a value above the canonical
+    // 200 produces batches the ingest rejects. Reject both up front.
+    if (
+      !Number.isInteger(maxEventsPerBatch) ||
+      maxEventsPerBatch < 1 ||
+      maxEventsPerBatch > RFID_LIMITS.maxEventsPerBatch
+    ) {
+      throw new RangeError(
+        `MovementAggregator: maxEventsPerBatch must be an integer 1..${RFID_LIMITS.maxEventsPerBatch}`,
+      );
+    }
+    this.maxEventsPerBatch = maxEventsPerBatch;
     this.logger = opts.logger ?? noopLogger;
   }
 

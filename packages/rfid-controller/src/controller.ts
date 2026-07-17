@@ -107,6 +107,7 @@ export class RfidController {
     }
 
     const batches = aggregator.drainBatches();
+    let maxRetryAfterMs = 0;
     for (const events of batches) {
       await this.acquireToken(governor);
       const { body } = buildEnvelope(events, {
@@ -118,6 +119,9 @@ export class RfidController {
       const outcome = await this.sender.send({ body, clinicId: this.config.clinicId, signature });
       summary.batches += 1;
       this.tally(summary, outcome);
+      if (outcome.kind === "backoff") {
+        maxRetryAfterMs = Math.max(maxRetryAfterMs, outcome.retryAfterMs);
+      }
       if (outcome.kind === "stopped") {
         // Ingest is disabled for this clinic — stop; the operator must re-enable.
         this.logger.error("run_stopped_ingest_disabled", { clinicId: this.config.clinicId });
@@ -126,7 +130,14 @@ export class RfidController {
     }
 
     // One retry pass for anything buffered by transient 5xx/network/429 failures.
+    // The main loop is rate-governed; the retry pass must be too — honor the
+    // largest Retry-After the server asked for, then acquire a governor token per
+    // buffered batch so re-sends stay within rateLimitPerMinute rather than
+    // bursting immediately.
     if (this.sender.bufferedCount() > 0) {
+      if (maxRetryAfterMs > 0) await this.sleep(maxRetryAfterMs);
+      const toRetry = this.sender.bufferedCount();
+      for (let i = 0; i < toRetry; i += 1) await this.acquireToken(governor);
       for (const outcome of await this.sender.flush()) this.tally(summary, outcome);
     }
 

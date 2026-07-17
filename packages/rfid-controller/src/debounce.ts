@@ -15,16 +15,15 @@ export interface DebounceOptions {
 }
 
 /**
- * Dedup-key separator: U+001F (ASCII Unit Separator). Written as the escape
- * `\u001f` so THIS source file stays pure-ASCII and git treats it as text
- * (diffable/blameable), unlike a literal NUL which flags the file as binary.
- * U+001F cannot appear inside an EPC or gateway code, so the key stays
- * collision-free.
+ * Dedup key. `normalizeRead` does NOT forbid separator characters inside an EPC
+ * or gateway code, so a `${tag}<sep>${gateway}` scheme is not provably
+ * injective — an adversarial pair could embed the separator and collide with a
+ * distinct pair, suppressing a valid read. JSON.stringify of the tuple is
+ * unambiguous (quoting + escaping guarantee distinct pairs map to distinct
+ * keys) and stays pure-ASCII / diffable.
  */
-const KEY_SEP = "\u001f";
-
 function key(read: RfidRead): string {
-  return `${read.tagEpc}${KEY_SEP}${read.gatewayCode}`;
+  return JSON.stringify([read.tagEpc, read.gatewayCode]);
 }
 
 export class ReadDebouncer {

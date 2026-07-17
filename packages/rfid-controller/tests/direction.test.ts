@@ -45,4 +45,25 @@ describe("DirectionTracker — time/sequence-based movement inference (internal 
     expect(t.lastGateway("E2")).toBe("GW-9");
     expect(t.lastGateway("E3")).toBeNull();
   });
+
+  it("bounds per-tag state — evicts the least-recently-observed tag beyond capacity", () => {
+    const t = new DirectionTracker(2);
+    t.observe(read("E1", "GW-1", 1));
+    t.observe(read("E2", "GW-2", 2));
+    t.observe(read("E3", "GW-3", 3)); // over capacity → evict oldest (E1)
+    expect(t.lastGateway("E1")).toBeNull();
+    expect(t.lastGateway("E2")).toBe("GW-2");
+    expect(t.lastGateway("E3")).toBe("GW-3");
+  });
+
+  it("retains recently-active tags (re-observing a tag refreshes its recency)", () => {
+    const t = new DirectionTracker(2);
+    t.observe(read("E1", "GW-1", 1));
+    t.observe(read("E2", "GW-2", 2));
+    t.observe(read("E1", "GW-1", 3)); // touch E1 → E2 becomes least-recent
+    t.observe(read("E3", "GW-3", 4)); // over capacity → evict E2, keep E1
+    expect(t.lastGateway("E2")).toBeNull();
+    expect(t.lastGateway("E1")).toBe("GW-1");
+    expect(t.lastGateway("E3")).toBe("GW-3");
+  });
 });

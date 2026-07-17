@@ -25,6 +25,18 @@ describe("loadConfig", () => {
     expect(() => loadConfig({ apiOrigin: "x", clinicId: "c", debounceMs: -1 })).toThrow();
   });
 
+  it("rejects NaN / Infinity / non-integer / non-number numeric fields", () => {
+    // NaN and Infinity silently pass every range comparison; reject them up front.
+    expect(() => loadConfig({ apiOrigin: "x", clinicId: "c", debounceMs: Number.POSITIVE_INFINITY })).toThrow();
+    expect(() => loadConfig({ apiOrigin: "x", clinicId: "c", maxEventsPerBatch: Number.NaN })).toThrow();
+    expect(() => loadConfig({ apiOrigin: "x", clinicId: "c", bufferCap: 1.5 })).toThrow();
+    // Untyped JSON from loadConfigFromFile can deliver a numeric string / array.
+    // @ts-expect-error — runtime guard for the untyped file-config path
+    expect(() => loadConfig({ apiOrigin: "x", clinicId: "c", rateLimitPerMinute: "50" })).toThrow();
+    // @ts-expect-error — runtime guard for the untyped file-config path
+    expect(() => loadConfig({ apiOrigin: "x", clinicId: "c", debounceMs: [1] })).toThrow();
+  });
+
   it("does NOT carry a secret (secrets come from env/secret-source only)", () => {
     const cfg = loadConfig({
       apiOrigin: "https://api.test",

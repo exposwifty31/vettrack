@@ -9,8 +9,10 @@
  * operational rotation procedure is: rotate the server's per-clinic
  * `webhook_secret` (opening the server-side grace), then hot-swap the
  * controller's source; the server grace covers requests in flight across the
- * swap. The previous secret is retained here for observability only, NOT for
- * signing.
+ * swap. The rotated-out secret is NOT retained here — the controller never
+ * signs with it, and keeping plaintext credential material resident after
+ * rotation is an unnecessary exposure. Observability records rotation metadata,
+ * never secret material.
  *
  * Secrets are read from env/config, never from argv, and never logged.
  */
@@ -31,7 +33,6 @@ export class StaticSecretSource implements SecretSource {
 
 export class RotatableSecretSource implements SecretSource {
   private secret: string;
-  private prev: string | null = null;
 
   constructor(initial: string) {
     if (!initial.trim()) throw new Error("RotatableSecretSource: empty initial secret");
@@ -42,16 +43,10 @@ export class RotatableSecretSource implements SecretSource {
     return this.secret;
   }
 
-  /** Retained for observability only — the controller never signs with it. */
-  previous(): string | null {
-    return this.prev;
-  }
-
   /** Hot-swap the signing secret. Takes effect on the next `current()` call. */
   rotate(next: string): void {
     if (!next.trim()) throw new Error("RotatableSecretSource.rotate: empty secret");
     if (next === this.secret) return;
-    this.prev = this.secret;
     this.secret = next;
   }
 }
