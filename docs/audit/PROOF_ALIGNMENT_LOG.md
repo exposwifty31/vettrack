@@ -3926,3 +3926,20 @@ Reviewer returned 1 HIGH + 1 MEDIUM + 2 LOW on the committed sub-card; all four 
 - Command: `pnpm typecheck` → exit 0 (tsc frontend + server, no errors).
 
 **Verdict:** VERIFIED
+
+## 2026-07-18 — Extract shared readRfidClinicId (DRY the x-vettrack-clinic parse) (pending-commit)
+
+**Claim:** The RFID route handler (`server/routes/rfid.ts`) and the rate-limiter key (`server/middleware/rate-limiters.ts:rfidEventLimiterKey`) each independently re-parsed `req.headers["x-vettrack-clinic"]` with the same string/array/trim ladder — the exact header-spelling surface that produced the original one-`t` bug. Extracted ONE shared helper `readRfidClinicId(req): string` in `server/lib/rfid/clinic-header.ts` and had BOTH consume it, so they can never drift. Behavior identical: MISSING_CLINIC still 400s (helper returns "" when absent → `if (!clinicId)` gate), limiter still keys per-clinic (`${clinicId}:${ip}`).
+
+**Evidence:**
+- New `server/lib/rfid/clinic-header.ts` — canonical two-`t` parse: string → trim; array → `[0]?.trim() ?? ""`; else "". Returns "" for absent/empty (caller decides meaning).
+- `server/routes/rfid.ts` — replaced the inline ladder with `const clinicId = readRfidClinicId(req);` (import added). The one behavioral nuance made explicit: the old route branch returned `undefined` for an empty array; the helper returns "" — both are falsy so the `if (!clinicId)` MISSING_CLINIC 400 gate is unchanged.
+- `server/middleware/rate-limiters.ts` — `rfidEventLimiterKey` now `const clinicId = readRfidClinicId(req);` (import added); key format `${clinicId}:${ip}` unchanged.
+- Test (new) `tests/rfid-clinic-header.test.ts` — asserts the helper reads the two-`t` header (trimmed), returns "" for the buggy one-`t` `x-vetrack-clinic`, "" when absent, tolerates/trims array headers, "" for empty array; PLUS a cross-path block asserting the limiter key's clinic segment equals the route's `readRfidClinicId(req)` for a canonical two-`t` header (`clinic-a:198.51.100.9`) and that both agree the one-`t` spelling is not clinic-scoped (`:198.51.100.9`).
+- Commands:
+  - `pnpm test -- tests/rfid-clinic-header.test.ts tests/rfid-rate-limiter-key.test.ts` → `Test Files 2 passed (2)`, `Tests 11 passed (11)`.
+  - `pnpm test -- tests/rfid-webhook-signature.test.ts tests/rfid-gate-e2e.test.ts` (route regression) → `Test Files 2 passed (2)`, `Tests 12 passed (12)`.
+  - `pnpm typecheck` (frontend + server tsconfig) → exit 0, zero errors.
+- **Guardrails held:** ingest surface behavior byte-identical (MISSING_CLINIC 400 gate + per-clinic limiter key preserved); no transport/schema/authority change; helper is pure header parsing.
+
+**Verdict:** VERIFIED

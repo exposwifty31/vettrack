@@ -9,6 +9,7 @@ import { z } from "zod";
 import { verifyVetTrackWebhookSignature } from "../integrations/webhooks/verify-signature.js";
 import { ingestRfidBatch, RfidDirectionalRejection } from "../lib/rfid-ingest.js";
 import { isRfidIngestEnabled } from "../lib/rfid/config.js";
+import { readRfidClinicId } from "../lib/rfid/clinic-header.js";
 import { getRfidVerificationSecrets } from "../lib/rfid/provisioning.js";
 import { incrementMetric } from "../lib/metrics.js";
 import { rfidEventLimiter } from "../middleware/rate-limiters.js";
@@ -46,13 +47,7 @@ function jsonErr(res: Response, status: number, code: string, message: string) {
 }
 
 router.post("/events", rfidEventLimiter, async (req: Request, res: Response) => {
-  const clinicHeader = req.headers["x-vettrack-clinic"];
-  const clinicId =
-    typeof clinicHeader === "string"
-      ? clinicHeader.trim()
-      : Array.isArray(clinicHeader)
-        ? clinicHeader[0]?.trim()
-        : "";
+  const clinicId = readRfidClinicId(req);
 
   if (!clinicId) {
     return jsonErr(res, 400, "MISSING_CLINIC", "X-VetTrack-Clinic header is required");

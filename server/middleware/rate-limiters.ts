@@ -1,6 +1,8 @@
 import type { Request } from "express";
 import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 
+import { readRfidClinicId } from "../lib/rfid/clinic-header.js";
+
 // Audit (2026-06-10): GLOBAL reduced from 6_000 to 100 (per-IP backstop).
 // Per-user limiters (scan/checkout/write) remain at 600 — test contract
 // tests/rate-limiters-f2.test.ts requires >= 100 per user, and ward scenarios
@@ -86,13 +88,7 @@ export const pushTestLimiter = rateLimit({
 // Two clinics behind one IP get independent 120/min buckets; the per-IP tail
 // only applies when the clinic header is truly absent.
 export function rfidEventLimiterKey(req: Request): string {
-  const clinicHeader = req.headers["x-vettrack-clinic"];
-  const clinicId =
-    typeof clinicHeader === "string"
-      ? clinicHeader.trim()
-      : Array.isArray(clinicHeader)
-        ? clinicHeader[0]?.trim() ?? ""
-        : "";
+  const clinicId = readRfidClinicId(req);
   const ip = ipKeyGenerator(req.ip ?? "127.0.0.1");
   return `${clinicId}:${ip}`;
 }
