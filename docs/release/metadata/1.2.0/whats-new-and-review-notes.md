@@ -56,6 +56,7 @@ VetTrack is a **real native iOS app** (Capacitor), not a web wrapper. It present
 
 ## Owner approval checklist before submit
 - [ ] "What's New" copy (en + he) reads true to what shipped
-- [ ] Demo account seeded: vet/senior role + active roster shift spanning the review window; password matches the credentials field
-- [ ] Screenshots current (see screenshot track) or existing 1.0.1 shots acceptable
-- [ ] Build 26 uploaded + processed (VALID)
+- [x] Demo account + review details complete on ASC (contact Dan Erez, `reviewer@vettrack.uk`, password + notes set) — verify the account is seeded vet/senior role with an active roster shift spanning the review window
+- [x] Screenshots current — **5 fresh Hebrew branded iPhone shots uploaded to APP_IPHONE_67** (home · code-blue · crash-cart · equipment · alerts, 1290×2796); 3 existing iPad shots retained (English — optional Hebrew refresh deferred)
+- [ ] Build 26 uploaded + processed (VALID) + attached → **the only remaining `asc validate` blocker**
+- [ ] Confirm App Privacy is published (ASC UI) + decide release type (currently MANUAL)

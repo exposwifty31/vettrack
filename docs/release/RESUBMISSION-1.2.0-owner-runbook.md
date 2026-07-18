@@ -8,6 +8,8 @@ ASC app id `6778937527` · **1.2.0 version id `750d3540-a267-4e47-aca8-6c3814abb
 - ✅ Native shell **rebuilt** from the fixed tree → `ios/App/App/public` now carries the fixes (ready to archive).
 - ✅ ASC **1.2.0 version created** (copied description/keywords/URLs from 1.0.1) + **Hebrew "What's New" set** (469 chars). Store stays Hebrew-only (matches 1.0.1).
 - ✅ Review-notes copy drafted → `docs/release/metadata/1.2.0/whats-new-and-review-notes.md`.
+- ✅ **Review details already complete on ASC** (contact + demo account `reviewer@vettrack.uk` + password + notes) — verified via `asc review details-for-version`. No CLI action needed.
+- ✅ **iPhone screenshots replaced** — 5 fresh **Hebrew, branded** shots (home · code-blue · crash-cart · equipment · alerts) generated from the live app, dev QA/E2E fixtures stripped, uploaded to `APP_IPHONE_67` (1290×2796, accepted for the 6.9″/6.7″ slot). Replaced the prior 3 English/stale-UI shots. Source + repro: `docs/release/metadata/1.2.0/screenshots/`. **iPad set left as-is** (3 existing English shots — owner deferred a Hebrew iPad refresh).
 
 ## Owner steps to finish (in order)
 
@@ -33,21 +35,14 @@ Xcode → "Any iOS Device" → Product ▸ Archive → Organizer ▸ Distribute 
 Once build 26 is VALID:
 ```bash
 export ASC_APP_ID=6778937527
-# attach the processed build
+# attach the processed build (THE ONLY REMAINING BLOCKER per `asc validate`)
 asc versions attach-build --version-id 750d3540-a267-4e47-aca8-6c3814abba4c --build <BUILD_26_ID>
-# review details: set contact + notes via CLI (no secrets on the command line).
-# The demo PASSWORD must NOT be passed as a CLI arg (it lands in process args /
-# shell history) — enter it in App Store Connect → your 1.2.0 version → App Review
-# Information → "Sign-In required" → Username/Password fields instead.
-asc review details-create --version-id 750d3540-a267-4e47-aca8-6c3814abba4c \
-  --contact-first-name '<you>' --contact-last-name '<you>' --contact-email '<you>' --contact-phone '<you>' \
-  --demo-account-required --demo-account-name 'reviewer@vettrack.uk' \
-  --notes "$(sed -n '/App Review notes/,/Owner approval/p' docs/release/metadata/1.2.0/whats-new-and-review-notes.md)"
-# → then set the demo password in the ASC UI (above), not here.
-# SCREENSHOTS: the API created empty sets. Easiest = App Store Connect UI → 1.2.0 → Screenshots →
-#   carry forward from 1.0.1 (App Store allows keeping prior shots for an update), OR add fresh.
-#   (Fresh capture/frame/upload via `asc screenshots` is available but experimental — ask me to run it.)
-asc validate --app 6778937527 --version 1.2.0 --platform IOS --output table   # must be clean
+# Review details: ALREADY COMPLETE on ASC (contact Dan Erez + demo reviewer@vettrack.uk + password + notes).
+#   Verified via `asc review details-for-version --version-id 750d3540-…`. No action needed.
+# Screenshots: ALREADY DONE — 5 Hebrew branded iPhone shots live in APP_IPHONE_67 (01→05),
+#   3 existing iPad shots retained. Re-verify anytime with:
+#   asc screenshots list --version-localization cc104529-1988-4ab8-8361-bf0dfd054aa4
+asc validate --app 6778937527 --version 1.2.0 --platform IOS --output table   # after attach: expect 0 blocking
 ```
 
 ### 5. Submit (irreversible — your call)
