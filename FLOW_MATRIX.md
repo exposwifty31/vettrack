@@ -145,8 +145,8 @@ Role hierarchy (numeric): `admin` 40 · `vet` 30 · `senior_technician` 25 · `t
 
 | Flow ID | UI route | Role floor | API | Mutation | Realtime | Side effects | Success | Failure | Verify |
 |---------|----------|------------|-----|----------|----------|--------------|---------|---------|--------|
-| DISP-01 | `/board` (`/display`, `/equipment-board` → redirect `/board`) | auth | `GET /api/display/snapshot` | no | SSE + snapshot resync | ward + ER + code blue summary | board render | 401; stale cursor → full resync | ❌ |
-| DISP-02 | `/board` (was `/display`) | auth | `POST /api/display/heartbeat` | **yes** | — | kiosk liveness | 200 | — | ❌ |
+| DISP-01 | `/board` (`/display`, `/equipment-board` → redirect `/board`) | auth or paired-device token | `GET /api/display/snapshot` | no | SSE + snapshot resync | ward + ER + code blue summary | board render | 401; stale cursor → full resync | ❌ |
+| DISP-02 | `/board` (was `/display`) | auth or paired-device token | `POST /api/display/heartbeat` | **yes** | — | kiosk liveness | 200 | — | ❌ |
 | DISP-03 | `/code-blue/display` | auth | same snapshot + SSE | no | `KEEPALIVE` stormHint | emergency takeover UI | live session | offline read OK; writes blocked | ❌ |
 
 **Cache denylist (SW):** `/api/display/snapshot`, `/api/code-blue/sessions/active`, `/api/realtime/*` — never Cache Storage.

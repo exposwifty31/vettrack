@@ -120,7 +120,11 @@ BN=$(grep -m1 'CURRENT_PROJECT_VERSION = ' ios/App/App.xcodeproj/project.pbxproj
 # the first digit run. A malformed file like "build-25-old" must fail the `^[0-9]+$`
 # check below (fail closed), not silently parse to "25".
 if [ -f ios/.last-shipped-build ]; then
-  FILE_LAST=$(tr -d '[:space:]' < ios/.last-shipped-build)
+  # Strip ONLY surrounding whitespace, never internal — a malformed "2 6" / "2\n6"
+  # must fail the ^[0-9]+$ check below (fail closed), not silently parse to "26".
+  FILE_LAST=$(<ios/.last-shipped-build)
+  FILE_LAST="${FILE_LAST#"${FILE_LAST%%[![:space:]]*}"}"
+  FILE_LAST="${FILE_LAST%"${FILE_LAST##*[![:space:]]}"}"
 else
   FILE_LAST=""
 fi

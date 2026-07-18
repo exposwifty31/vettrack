@@ -1,6 +1,6 @@
 # VetTrack 1.2.0 — App Store submission copy (draft for owner approval)
 
-App: VetTrack (`uk.vettrack.app`, ASC id 6778937527) · Live store version **1.0.1** → target **1.2.0**, build **26** · Locales: **he** (default) + **en**.
+App: VetTrack (`uk.vettrack.app`, ASC id 6778937527) · Live store version **1.0.1** → target **1.2.0**, build **26** · **Store localization: Hebrew only** (matches live 1.0.1). The English "What's New" below is reference copy for the review notes / a future English localization — it is **not** on the listing.
 
 ---
 
@@ -50,7 +50,7 @@ VetTrack is a **real native iOS app** (Capacitor), not a web wrapper. It present
 4. Open the **Command Center** board (or pair a display via the pairing code).
 5. Open **Shift handover** to see the shift summary.
 
-**Account deletion (Guideline 5.1.1(v)):** Settings → Danger zone → **Delete account** (also reachable from the pending screen for a freshly created account). A confirmation is required; deletion removes the account and signs out. The demo/reviewer account is intentionally protected from deletion.
+**Account deletion (Guideline 5.1.1(v)):** Settings → Danger zone → **Delete account** (also reachable from the pending screen for a freshly created account). A confirmation is required; deletion removes the account and signs out. The demo/reviewer account is clinic-assigned and deletes normally; it is separately protected from deletion for the walkthrough. Note: a brand-new **clinic-less** Apple ID created in-app still returns `MISSING_CLINIC_ID` on delete — a documented pre-submit owner-decision (see the runbook), not the reviewer's path.
 
 ---
 

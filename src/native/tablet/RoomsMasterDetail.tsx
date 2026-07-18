@@ -27,7 +27,7 @@ export default function RoomsMasterDetail() {
       }
       detail={
         id ? (
-          <PageErrorBoundary>
+          <PageErrorBoundary key={id}>
             <RoomRadarPage />
           </PageErrorBoundary>
         ) : null

@@ -37,7 +37,7 @@ export default function EquipmentMasterDetail() {
       }
       detail={
         id ? (
-          <PageErrorBoundary>
+          <PageErrorBoundary key={id}>
             <EquipmentDetailScreen equipmentId={id} hideBack />
           </PageErrorBoundary>
         ) : null

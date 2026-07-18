@@ -28,7 +28,11 @@ function normalizedLength(raw: string): number {
 
 /** The 15s AbortController timeout or a fetch-level failure — no HTTP response reached the client. */
 function isConnectivityError(error: unknown): boolean {
-  if (error instanceof TypeError) return true; // fetch rejected (offline / DNS / CORS)
+  // Only a fetch-transport TypeError counts as connectivity — a non-network
+  // TypeError (a response-handling / client bug) must NOT be mislabelled offline.
+  if (error instanceof TypeError && /failed to fetch|load failed|networkerror|network request failed/i.test(error.message)) {
+    return true;
+  }
   return error instanceof Error && error.name === "AbortError"; // request timed out
 }
 

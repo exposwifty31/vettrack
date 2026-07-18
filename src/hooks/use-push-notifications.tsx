@@ -69,9 +69,13 @@ async function waitForServiceWorkerReady(timeoutMs = 8000): Promise<ServiceWorke
     throw new Error(t.pushErrors.serviceWorkerUnsupported);
   }
 
-  const existing = await getServiceWorkerRegistrationSafe();
+  // Always (re)register the build-versioned worker so an existing install on an
+  // old script URL is updated too — `existing ??` would skip cache-busting for
+  // everyone but fresh installs. Fall back to any existing registration if the
+  // register call itself fails.
   const registration =
-    existing ?? (await registerServiceWorkerSafe(`/sw.js?v=${encodeURIComponent(__VT_BUILD_TAG__)}`));
+    (await registerServiceWorkerSafe(`/sw.js?v=${encodeURIComponent(__VT_BUILD_TAG__)}`)) ??
+    (await getServiceWorkerRegistrationSafe());
   if (!registration) {
     throw new Error(t.pushErrors.serviceWorkerUnavailable);
   }

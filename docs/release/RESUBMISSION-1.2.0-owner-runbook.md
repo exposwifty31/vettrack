@@ -16,7 +16,7 @@ The critical deletion carve-out, `/me preferredLocale`, push VAPID gate, anonymi
 
 ### 2. Pre-archive gates (needs your secrets)
 ```bash
-export REVIEWER_PASSWORD='<demo password>'   # from your password manager
+export REVIEWER_PASSWORD='<from your password manager>'   # from your password manager
 pnpm verify:resubmission     # expect PASS incl. LOGIN: complete (build 26 > 25 already passes)
 ```
 - If demo-login ≠ `complete` → Clerk **Client Trust** re-enabled (§G): Dashboard → Configure → Updates → revert. (#1 re-rejection risk.)
@@ -38,7 +38,7 @@ asc versions attach-build --version-id 750d3540-a267-4e47-aca8-6c3814abba4c --bu
 # review details (your contact + demo password — I did not set these; password is a credential)
 asc review details-create --version-id 750d3540-a267-4e47-aca8-6c3814abba4c \
   --contact-first-name '<you>' --contact-last-name '<you>' --contact-email '<you>' --contact-phone '<you>' \
-  --demo-account-required --demo-account-name 'reviewer@vettrack.uk' --demo-account-password '<demo password>' \
+  --demo-account-required --demo-account-name 'reviewer@vettrack.uk' --demo-account-password '<from your password manager>' \
   --notes "$(sed -n '/App Review notes/,/Owner approval/p' docs/release/metadata/1.2.0/whats-new-and-review-notes.md)"
 # SCREENSHOTS: the API created empty sets. Easiest = App Store Connect UI → 1.2.0 → Screenshots →
 #   carry forward from 1.0.1 (App Store allows keeping prior shots for an update), OR add fresh.
