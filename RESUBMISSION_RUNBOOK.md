@@ -3,8 +3,8 @@
 **Audience:** a future Claude session (or Dan) executing the resubmission cold.
 **Goal:** ship an App Store **update** to the live VetTrack app.
 > **Historical origin (resolved):** this runbook was first written to clear the **5.1.1(v)** rejection of build 15 and land **1.0.1 (20)** — submission `a0758d36-14b9-49c0-bf20-eb337ffcb8c6`. That rejection is **resolved and the app is LIVE**, so every run of this runbook is now an update / re-upload, not a first submission.
-**Current version fields:** marketing **1.1.2** (`package.json` = source of truth), build **25** (`CURRENT_PROJECT_VERSION`; `ios/.last-shipped-build` records the last build uploaded). Bump only via `pnpm resubmit` (§B.1) — never by hand.
-**Last verified:** 2026-07-10, version fields single-sourced + reconciled to 1.1.2 / build 25 (tooling in §B.1); production includes account deletion + native Apple token link.
+**Current version fields:** marketing **1.2.0** (pbxproj `MARKETING_VERSION`, single-sourced), build **26** (`CURRENT_PROJECT_VERSION`; `ios/.last-shipped-build` = **26**). Bump only via `pnpm resubmit` (§B.1) — never by hand.
+**Last verified:** 2026-07-18 — **1.2.0 (build 26) SUBMITTED for App Store review** (state `WAITING_FOR_REVIEW`, submission `7a850cf3-074b-4cda-b8db-891981f28dc1`). For *this* submission, follow the step-by-step **[`docs/release/RESUBMISSION-1.2.0-owner-runbook.md`](docs/release/RESUBMISSION-1.2.0-owner-runbook.md)** — start there. The sections below are the durable A–Z reference (rejection history, §F OAuth chain, version tooling) that every resubmission reuses.
 
 > Secrets: this file never contains the live Clerk key. Export it from Railway first:
 > `export CLERK_SECRET_KEY=$(cd /Users/dan/.vt-deploy 2>/dev/null && railway variables --json 2>/dev/null | python3 -c "import json,sys;print(json.load(sys.stdin)['CLERK_SECRET_KEY'])")`
@@ -26,7 +26,7 @@
 - **Code:** account deletion + Playwright CI fixes merged to `github/main` (PR #1). Local `main` synced. Deploy to Railway before App Review (§K).
 - **Production web** (`https://vettrack.uk`): serving the current bundle. The iOS shell is a **bundled app** (no `server.url`) — it does NOT depend on production for the frontend, but the API + Clerk it calls are production.
 - **Clerk (production instance `clerk.vettrack.uk`):** redirect URLs, allowed origins, Apple+Google OAuth, demo account, Client Trust — all configured (verify in §C).
-- **Version:** the app is **LIVE on the App Store**, so every submission is an update. Version fields are single-sourced (`package.json` = the marketing version of record = **1.1.2**; iOS `MARKETING_VERSION` reconciled to match; `CURRENT_PROJECT_VERSION` = **25**; `Info.plist CFBundleVersion` = `$(CURRENT_PROJECT_VERSION)`, no literal). **Do not hand-edit version fields — use `pnpm resubmit` / `pnpm resubmit:release` (§B.1).**
+- **Version:** the app is **LIVE on the App Store**, so every submission is an update. Version fields are single-sourced (pbxproj `MARKETING_VERSION` = **1.2.0**; `CURRENT_PROJECT_VERSION` = **26**; `Info.plist CFBundleVersion` = `$(CURRENT_PROJECT_VERSION)`, no literal). **Do not hand-edit version fields — use `pnpm resubmit` / `pnpm resubmit:release` (§B.1).**
 - **Synced shell:** `npx cap sync ios` already run from HEAD. `dist/public` == `ios/App/App/public`.
 - **Legal pages:** `/privacy`, `/terms`, and `/support` are implemented — verify all three on production after deploy before setting App Store / Play Console URLs. See `docs/legal-pages.md`.
 

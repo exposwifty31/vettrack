@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VetTrack — Web Management Console</title>
+<template id="__bundler_thumbnail"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="20" fill="#4f46e5"/><g fill="none" stroke="#fff" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"><path d="M72 34a3 3 0 0 0-1.5-2.6l-19-11a3 3 0 0 0-3 0l-19 11A3 3 0 0 0 28 34v22a3 3 0 0 0 1.5 2.6l19 11a3 3 0 0 0 3 0l19-11A3 3 0 0 0 72 56Z"/><path d="m29 33 21 12 21-12"/><path d="M50 69V45"/></g></svg></template>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Heebo:wght@400;500;600;700;800&family=Noto+Sans+Hebrew:wght@400;500;600;700&display=swap">
+<style>
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  html{font-size:17px}
+  body{margin:0;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;background:#e7e7ec}
+  :root{
+    --background:rgb(242 242 247); --surface:rgb(255 255 255); --surface-2:rgb(250 250 252);
+    --surface-hover:rgb(247 246 243); --surface-active:rgb(239 237 232);
+    --foreground:rgb(28 28 30); --muted-foreground:rgba(60,60,67,0.6);
+    --border:rgba(60,60,67,0.16); --border-strong:rgba(60,60,67,0.28); --hairline:rgba(60,60,67,0.1);
+    --brand:rgb(79 70 229); --brand-foreground:rgb(255 255 255); --brand-deep:rgb(67 56 202);
+    --brand-ink:rgb(30 27 75); --brand-soft:rgb(238 242 255); --brand-border:rgb(199 210 254);
+    --accent:rgb(233 233 240);
+    --action:rgb(47 111 94); --action-foreground:rgb(255 255 255);
+    --sys-red:255 59 48; --sys-orange:255 149 0; --sys-green:52 199 89; --sys-blue:0 122 255; --sys-gray:142 142 147;
+    --status-ok-bg:rgb(52 199 89 / 0.14); --status-ok-fg:#1b7a3d; --status-ok-border:rgb(52 199 89 / 0.28);
+    --status-issue-bg:rgb(255 59 48 / 0.12); --status-issue-fg:#c1271d; --status-issue-border:rgb(255 59 48 / 0.24);
+    --status-maint-bg:rgb(255 149 0 / 0.14); --status-maint-fg:#8a4b00; --status-maint-border:rgb(255 149 0 / 0.28);
+    --status-steril-bg:rgb(0 122 255 / 0.12); --status-steril-fg:#0a56c9; --status-steril-border:rgb(0 122 255 / 0.24);
+    --status-stale-bg:rgb(175 82 222 / 0.12); --status-stale-fg:#7d3ec9; --status-stale-border:rgb(175 82 222 / 0.28); --stale:175 82 222;
+    --status-unknown-bg:rgb(142 142 147 / 0.16); --status-unknown-fg:#55555a; --status-unknown-border:rgb(142 142 147 / 0.30);
+    --shadow-overlay:0 24px 64px rgba(0,0,0,0.28),0 4px 12px rgba(0,0,0,0.12);
+    --ease-standard:cubic-bezier(0.2,0,0,1); --dur-fast:120ms; --dur-base:200ms;
+    --font-sans:-apple-system,system-ui,"Heebo","Noto Sans Hebrew","Segoe UI",Roboto,sans-serif;
+    --font-num:"DM Mono",ui-monospace,SFMono-Regular,monospace;
+    --tonal:rgba(120,120,128,0.16);
+    --on-ink:rgb(255 255 255); --on-ink-strong:rgba(255,255,255,0.82); --on-ink-muted:rgba(255,255,255,0.6);
+  }
+  #root{height:100%}
+  a{color:var(--brand);text-decoration:none} a:hover{color:var(--brand-deep)}
+  :focus-visible{outline:none;box-shadow:0 0 0 2px var(--surface),0 0 0 4px var(--brand)}
+  ::selection{background:var(--brand-soft)}
+  /* hovers */
+  .vt-row{transition:background var(--dur-fast) var(--ease-standard)}
+  .vt-row:hover{background:var(--accent)}
+  .vt-nav-item{transition:background var(--dur-fast) var(--ease-standard)}
+  .vt-nav-item:hover{background:var(--accent)}
+  .vt-nav-active:hover{background:var(--brand-soft)!important}
+  .vt-btn{transition:background var(--dur-fast) var(--ease-standard),border-color var(--dur-fast)}
+  .vt-btn-primary:hover{background:var(--brand-deep)!important}
+  .vt-btn-ghost:hover,.vt-btn-link:hover,.vt-select:hover,.vt-iconbtn:hover{background:var(--surface-hover)!important}
+  .vt-btn-danger:hover{background:var(--status-issue-bg)!important}
+  .vt-chip{transition:background var(--dur-fast),border-color var(--dur-fast)}
+  .vt-chip:hover{background:var(--surface-hover)}
+  .vt-tab{transition:all var(--dur-fast) var(--ease-standard)}
+  .vt-step:hover{background:var(--accent)!important}
+  .vt-clinic:hover{background:var(--accent)!important}
+  /* skeleton */
+  @keyframes vt-shimmer{100%{transform:translateX(100%)}}
+  .skd{position:relative;overflow:hidden;background:rgba(120,120,128,0.16);border-radius:16px}
+  .skd::after{content:"";position:absolute;inset:0;transform:translateX(-100%);background:linear-gradient(90deg,transparent,rgba(255,255,255,0.55),transparent);animation:vt-shimmer 1.4s infinite}
+  /* transitions */
+  @keyframes vt-fade{from{opacity:0}to{opacity:1}}
+  @keyframes vt-slide{from{transform:translateX(var(--vt-slide-from,24px));opacity:.4}to{transform:translateX(0);opacity:1}}
+  @keyframes vt-page{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+  [dir=rtl]{--vt-slide-from:-24px}
+  .vt-page{animation:vt-page .26s var(--ease-standard)}
+  .vt-scroll::-webkit-scrollbar{width:11px;height:11px}
+  .vt-scroll::-webkit-scrollbar-thumb{background:rgba(120,120,128,.35);border-radius:999px;border:3px solid transparent;background-clip:content-box}
+  .vt-scroll::-webkit-scrollbar-thumb:hover{background:rgba(120,120,128,.55);background-clip:content-box}
+  @media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important}.skd::after{display:none}}
+  #vt-guard{display:none}
+  @media (max-width:1023px){#vt-app{display:none!important}#vt-guard{display:flex}}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<div id="vt-guard" style="position:fixed;inset:0;flex-direction:column;align-items:center;justify-content:center;gap:14px;text-align:center;padding:30px;font-family:var(--font-sans);background:var(--background)">
+  <div style="width:60px;height:60px;border-radius:16px;background:var(--brand);color:#fff;display:flex;align-items:center;justify-content:center"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8"/><path d="M12 17v4"/></svg></div>
+  <h1 style="font:700 20px var(--font-sans);margin:0;color:var(--foreground)">Desktop only</h1>
+  <p style="font:400 14px/1.5 var(--font-sans);color:var(--muted-foreground);margin:0;max-width:320px">The VetTrack management console is designed for screens ≥ 1024px. Open it on a desktop browser.</p>
+</div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="console/data.js"></script>
+<script type="text/babel" src="console/ui.jsx"></script>
+<script type="text/babel" src="console/modules.jsx"></script>
+<script type="text/babel" src="console/modules2.jsx"></script>
+<script type="text/babel" data-presets="react">
+const { useState, useRef, useEffect } = React;
+const U = window.UI, D = window.VTDATA, e = U.e;
+const { t, tn, Icon, Avatar } = U;
+
+const COMP = {
+  home: 'Home', people: 'People', equipment: 'Equipment', inventory: 'Inventory',
+  integrations: 'Integrations', notifications: 'Notifications', rfid: 'Rfid',
+  ops: 'Ops', analytics: 'Analytics', audit: 'Audit',
+};
+
+function PersonaMenu({ persona, setPersona, loc, open, setOpen }) {
+  const p = D.personas[persona], he = loc === 'he';
+  const opt = (key) => {
+    const pp = D.personas[key], active = persona === key;
+    return e('button', { key, type: 'button', className: 'vt-btn-ghost', onClick: () => { setPersona(key); setOpen(false); },
+      style: { display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '9px 12px', border: 'none', background: active ? 'var(--brand-soft)' : 'transparent', cursor: 'pointer', textAlign: 'start', borderRadius: 10 } },
+      e(Avatar, { brand: key === 'admin', size: 30 }, pp.initials),
+      e('span', { style: { flex: 1, minWidth: 0 } },
+        e('span', { style: { display: 'block', font: '600 13px var(--font-sans)', color: 'var(--foreground)' } }, tn(pp.name, loc)),
+        e('span', { style: { display: 'block', font: '500 11px var(--font-sans)', color: 'var(--muted-foreground)' } }, tn(pp.role, loc) + (key === 'lead' ? ' · ' + tn(D.t.readonly, loc) : ''))),
+      active && e(Icon, { name: 'check', size: 15, sw: 2.4, color: 'var(--brand)' }));
+  };
+  return e('div', { style: { position: 'relative' } },
+    e('button', { type: 'button', className: 'vt-clinic', onClick: () => setOpen(!open),
+      style: { display: 'flex', alignItems: 'center', gap: 9, height: 40, padding: '0 8px 0 12px', borderRadius: 11, border: '1px solid var(--border)', background: 'var(--surface)', cursor: 'pointer' } },
+      e(Avatar, { brand: persona === 'admin', size: 28 }, p.initials),
+      e('span', { style: { textAlign: 'start', lineHeight: 1.15 } },
+        e('span', { style: { display: 'block', font: '600 12.5px var(--font-sans)', color: 'var(--foreground)', whiteSpace: 'nowrap' } }, tn(p.name, loc)),
+        e('span', { style: { display: 'block', font: '500 10.5px var(--font-sans)', color: 'var(--muted-foreground)', whiteSpace: 'nowrap' } }, tn(p.role, loc))),
+      e(Icon, { name: 'chevrable', size: 13, sw: 2, color: 'var(--muted-foreground)' })),
+    open && e(React.Fragment, null,
+      e('div', { onClick: () => setOpen(false), style: { position: 'fixed', inset: 0, zIndex: 60 } }),
+      e('div', { dir: he ? 'rtl' : 'ltr', style: { position: 'absolute', top: 46, insetInlineEnd: 0, width: 268, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14, boxShadow: 'var(--shadow-overlay)', zIndex: 70, padding: 6, animation: 'vt-page .16s ease' } },
+        e('div', { style: { padding: '7px 12px 4px', font: '700 10px var(--font-sans)', letterSpacing: '.06em', textTransform: 'uppercase', color: 'var(--muted-foreground)' } }, tn({ e: 'View console as', h: 'צפייה בקונסולה כ' }, loc)),
+        opt('admin'), opt('lead'))));
+}
+
+function Sidebar({ active, navigate, loc, persona }) {
+  const he = loc === 'he';
+  return e('aside', { style: { width: 250, flexShrink: 0, background: 'var(--surface)', borderInlineEnd: '1px solid var(--border)', display: 'flex', flexDirection: 'column', overflow: 'hidden' } },
+    e('div', { style: { padding: '18px 18px 10px', display: 'flex', alignItems: 'center', gap: 9 } },
+      e('div', { style: { width: 30, height: 30, borderRadius: 8, background: 'var(--brand)', color: 'var(--brand-foreground)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } }, e(Icon, { name: 'box', size: 17, sw: 2.2 })),
+      e('div', { style: { display: 'flex', flexDirection: 'column' } }, e('span', { style: { font: '800 15px var(--font-sans)', letterSpacing: '-.01em', color: 'var(--foreground)' } }, 'VetTrack'), e('span', { style: { font: '600 10px var(--font-sans)', letterSpacing: '.06em', textTransform: 'uppercase', color: 'var(--muted-foreground)' } }, tn({ e: 'Console', h: 'קונסולה' }, loc)))),
+    e('div', { style: { padding: '0 12px 8px' } },
+      e('button', { type: 'button', className: 'vt-clinic', style: { width: '100%', display: 'flex', alignItems: 'center', gap: 9, padding: '8px 10px', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--surface)', cursor: 'pointer' } },
+        e('span', { style: { width: 26, height: 26, borderRadius: 7, background: 'var(--brand-soft)', color: 'var(--brand)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } }, e(Icon, { name: 'building', size: 15, sw: 1.9 })),
+        e('span', { style: { flex: 1, minWidth: 0, textAlign: 'start' } }, e('span', { style: { display: 'block', font: '700 12.5px var(--font-sans)', color: 'var(--foreground)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' } }, tn(D.clinic.name, loc)), e('span', { style: { display: 'block', font: '500 10px var(--font-sans)', color: 'var(--muted-foreground)' } }, tn({ e: 'Switch clinic', h: 'החלפת מרפאה' }, loc))),
+        e(Icon, { name: 'chevrable', size: 14, sw: 2, color: 'var(--muted-foreground)' }))),
+    e('nav', { className: 'vt-scroll', style: { flex: 1, overflowY: 'auto', padding: '4px 10px 12px' } },
+      D.nav.map((n, i) => {
+        if (n.header) return e('div', { key: i, style: { padding: '14px 10px 4px', font: '700 10px var(--font-sans)', letterSpacing: '.08em', textTransform: 'uppercase', color: 'var(--muted-foreground)' } }, tn(n.header, loc));
+        const on = active === n.id;
+        return e('div', { key: i, role: 'button', tabIndex: 0, onClick: () => navigate(n.id), onKeyDown: (ev) => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); navigate(n.id); } },
+          className: 'vt-nav-item' + (on ? ' vt-nav-active' : ''),
+          style: { display: 'flex', alignItems: 'center', gap: 11, padding: '9px 10px', borderRadius: 10, marginBottom: 2, cursor: 'pointer', background: on ? 'var(--brand-soft)' : 'transparent', color: on ? 'var(--brand)' : 'var(--muted-foreground)' } },
+          e(Icon, { name: n.icon, size: 19, sw: on ? 2.05 : 1.8 }),
+          e('span', { style: { flex: 1, font: (on ? 700 : 500) + ' 13.5px var(--font-sans)' } }, tn(n.label, loc)),
+          n.badge && e('span', { dir: 'ltr', style: { flexShrink: 0, minWidth: 18, height: 18, padding: '0 5px', borderRadius: 999, background: n.danger ? 'var(--status-issue-bg)' : 'var(--tonal)', color: n.danger ? 'var(--status-issue-fg)' : 'var(--muted-foreground)', font: '700 10.5px var(--font-num)', display: 'flex', alignItems: 'center', justifyContent: 'center' } }, n.badge));
+      })),
+    e('div', { style: { borderTop: '1px solid var(--border)', padding: 12, display: 'flex', alignItems: 'center', gap: 10 } },
+      e(Avatar, { brand: persona === 'admin', size: 32 }, D.personas[persona].initials),
+      e('div', { style: { flex: 1, minWidth: 0 } }, e('p', { style: { font: '600 13px var(--font-sans)', color: 'var(--foreground)', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' } }, tn(D.personas[persona].name, loc)), e('p', { style: { font: '500 11px var(--font-sans)', color: 'var(--muted-foreground)', margin: '1px 0 0' } }, tn(D.personas[persona].role, loc)))));
+}
+
+class VTBoundary extends React.Component {
+  constructor(p){ super(p); this.state = { err: null }; }
+  static getDerivedStateFromError(err){ return { err }; }
+  componentDidCatch(err, info){ console.error('[VT module error]', err, info && info.componentStack); }
+  componentDidUpdate(prev){ if (prev.rk !== this.props.rk && this.state.err) this.setState({ err: null }); }
+  render(){
+    if (this.state.err) return e('div', { style: { maxWidth: 520, margin: '64px auto', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 } },
+      e(Icon, { name: 'alert', size: 40, sw: 1.7, color: 'var(--status-issue-fg)' }),
+      e('h2', { style: { font: '700 19px var(--font-sans)', margin: 0, color: 'var(--foreground)' } }, 'This module hit an error'),
+      e('p', { dir: 'ltr', style: { font: '500 12.5px var(--font-num)', color: 'var(--muted-foreground)', margin: 0, wordBreak: 'break-word' } }, String(this.state.err && this.state.err.message || this.state.err)));
+    return this.props.children;
+  }
+}
+
+function App() {
+  const [active, setActive] = useState('home');
+  const [persona, setPersona] = useState('admin');
+  const [loc, setLoc] = useState('he');
+  const [menu, setMenu] = useState(false);
+  const scrollRef = useRef(null);
+  const he = loc === 'he', isLead = persona === 'lead';
+  const navigate = (id) => { setActive(id); if (scrollRef.current) scrollRef.current.scrollTop = 0; };
+  useEffect(() => { document.documentElement.lang = he ? 'he' : 'en'; }, [he]);
+
+  const Comp = window.MODULES[COMP[active]];
+  const localeSeg = e('div', { style: { display: 'flex', gap: 3, padding: 3, background: 'var(--tonal)', borderRadius: 9 } },
+    [['he', 'עברית'], ['en', 'English']].map((o) => {
+      const on = loc === o[0];
+      return e('button', { key: o[0], type: 'button', className: 'vt-tab', onClick: () => setLoc(o[0]),
+        style: { border: 'none', cursor: 'pointer', padding: '6px 11px', borderRadius: 7, font: (on ? 700 : 500) + ' 12px var(--font-sans)', whiteSpace: 'nowrap', background: on ? 'var(--surface)' : 'transparent', color: on ? 'var(--foreground)' : 'var(--muted-foreground)', boxShadow: on ? '0 1px 2px rgba(0,0,0,.14)' : 'none' } }, o[1]);
+    }));
+
+  return e('div', { id: 'vt-app', dir: he ? 'rtl' : 'ltr', style: { height: '100%', display: 'flex', fontFamily: 'var(--font-sans)', color: 'var(--foreground)', background: 'var(--background)' } },
+    e(Sidebar, { active, navigate, loc, persona }),
+    e('div', { style: { flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' } },
+      e('header', { style: { height: 62, flexShrink: 0, display: 'flex', alignItems: 'center', gap: 14, padding: '0 24px', background: 'var(--surface)', borderBottom: '1px solid var(--border)', zIndex: 20 } },
+        e('div', { style: { display: 'flex', flexDirection: 'column' } },
+          e('span', { style: { font: '500 11px var(--font-sans)', color: 'var(--muted-foreground)' } }, tn({ e: 'Console', h: 'קונסולה' }, loc) + ' · ' + tn(D.crumb[active], loc)),
+          e('span', { style: { font: '700 18px var(--font-sans)', letterSpacing: '-.01em', color: 'var(--foreground)' } }, tn(D.title[active], loc))),
+        e('div', { style: { marginInlineStart: 'auto', display: 'flex', alignItems: 'center', gap: 12 } },
+          e('div', { style: { display: 'flex', alignItems: 'center', gap: 8, height: 38, padding: '0 12px', borderRadius: 10, background: 'var(--background)', border: '1px solid var(--border)', minWidth: 200 } }, e(Icon, { name: 'search', size: 15, sw: 2, color: 'var(--muted-foreground)' }), e('span', { style: { font: '500 13px var(--font-sans)', color: 'var(--muted-foreground)' } }, tn(D.t.search, loc))),
+          localeSeg,
+          e(PersonaMenu, { persona, setPersona, loc, open: menu, setOpen: setMenu }))),
+      isLead && e('div', { style: { flexShrink: 0, display: 'flex', alignItems: 'center', gap: 9, padding: '9px 24px', background: 'var(--brand-soft)', borderBottom: '1px solid var(--brand-border)' } }, e(Icon, { name: 'info', size: 15, sw: 2, color: 'var(--brand)' }), e('span', { style: { font: '500 12.5px var(--font-sans)', color: 'var(--brand-ink)' } }, tn(D.t.leadBanner, loc))),
+      e('main', { style: { flex: 1, minHeight: 0, position: 'relative', overflow: 'hidden' } },
+        e('div', { ref: scrollRef, className: 'vt-scroll', style: { position: 'absolute', inset: 0, overflowY: 'auto', padding: '22px 24px 40px' } },
+          e('div', { key: active + persona + loc, className: 'vt-page' },
+            e(VTBoundary, { rk: active + persona + loc },
+              Comp ? e(Comp, { loc, persona, isLead, navigate }) : e('div', { style: { padding: 40, color: 'var(--muted-foreground)' } }, 'Module not found: ' + active)))))));
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(App));
+</script>
+</body>
+</html>

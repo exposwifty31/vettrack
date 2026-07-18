@@ -14,8 +14,8 @@
 | **Feature / Sprint** | Consolidated Audit × 10x |
 | **Author** | VetTrack Team |
 | **Created** | 2026-07-12 |
-| **Last updated** | 2026-07-12 |
-| **Status** | `in-progress` — Phase 0 |
+| **Last updated** | 2026-07-18 |
+| **Status** | `in-progress` — R-PDF-1 (#114) + R-SH-F1 (#115) shipped to `main`; R-RTC-1 deferred; phase-4 massives parked. App Store **1.2.0 (build 26) submitted** for review. |
 | **Branch** | `claude/audit-10x-consolidated-plan` (off `main`) |
 | **Tasks** | See TASKS.md |
 | **Plan library** | `docs/plans/consolidated-audit-10x/README.md` |
