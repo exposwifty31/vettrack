@@ -3022,6 +3022,10 @@
     "expiry": {
       "title": "ציוד עומד לפוג תוקף",
       "body": "{name} — תוקף ב-{date}"
+    },
+    "handover": {
+      "title": "מסירת המשמרת מוכנה",
+      "body": "המשמרת היוצאת השאירה לך מסירה. הקש לצפייה."
     }
   },
   "shiftChat": {
@@ -4377,6 +4381,35 @@
     "noHomeHint": "לא הוגדרה עמדת בית לציוד זה — בקש ממנהל להגדיר אחת",
     "stationUnresolvedHint": "עמדת הבית של הציוד עדיין לא הוגדרה — בטל את הסימון כדי להחזיר ללא עגינה",
     "offlineDockHint": "החזרה לעגינה דורשת חיבור לרשת — מוחזר כעת ללא עגינה"
+  },
+  "handoverPage": {
+    "title": "מסירת משמרת",
+    "loading": "טוען את המסירה…",
+    "loadError": "לא ניתן לטעון את המסירה. משוך לרענון.",
+    "emptyTitle": "אין מסירה עדיין",
+    "emptyBody": "מסירה נוצרת אוטומטית בסוף כל משמרת.",
+    "deltasHeading": "מה השתנה במשמרת",
+    "deltaCustody": "העברות ציוד",
+    "deltaTasks": "עדכוני משימות",
+    "deltaAlerts": "התראות",
+    "deltaDispenses": "ניפוקים",
+    "openItemsHeading": "פריטים פתוחים",
+    "openItemsNone": "לא נותרו פריטים פתוחים.",
+    "worklistHeading": "מטופלים בטיפול",
+    "worklistNotConfigured": "לא מחוברת מערכת מטופלים.",
+    "worklistError": "רשימת המטופלים אינה זמינה כרגע.",
+    "worklistEmpty": "לא נרשמו מטופלים במשמרת זו.",
+    "staffHeading": "במשמרת זו",
+    "acknowledgeCta": "אישור קבלת המסירה",
+    "acknowledgePrompt": "אשר שקראת וקיבלת את המסירה.",
+    "acknowledgeConfirm": "אישור קבלה",
+    "acknowledgeCancel": "ביטול",
+    "acknowledgedLabel": "המסירה אושרה",
+    "unconfirmCta": "ביטול האישור",
+    "unconfirmedAnnounce": "האישור בוטל.",
+    "acknowledgeError": "לא ניתן לרשום את האישור. נסה שוב.",
+    "unconfirmError": "לא ניתן לבטל את האישור. נסה שוב.",
+    "back": "חזרה"
   },
   "readinessForecast": {
     "title": "מוכנות חזויה",

@@ -66,6 +66,7 @@ const EXPECTED_MOUNT_PATHS = [
   "/api/clinical",
   "/api/dispense",
   "/api/shift-chat",
+  "/api/shift-handover",
   "/api/whatsapp",
 ];
 

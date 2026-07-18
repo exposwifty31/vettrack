@@ -152,6 +152,24 @@ export interface VetTrackBillingEntry {
  */
 export type IntegrationCredentials = Record<string, string>;
 
+/** The `[start, end)` window the port pulls an end-of-shift worklist for. */
+export interface PatientWorklistWindow {
+  start: Date;
+  end: Date;
+}
+
+/**
+ * A single raw worklist entry returned by an adapter through the port.
+ * `externalId` / `display` are the external PMS animal id + label; `byTechId` is
+ * the INTERNAL VetTrack `vt_users.id` of the technician who worked that animal
+ * (validated to be in-clinic by `serializePatientWorklist` before persistence).
+ */
+export interface PatientWorklistProviderEntry {
+  externalId: string;
+  display: string;
+  byTechId: string;
+}
+
 // ---------------------------------------------------------------------------
 // Integration configuration (mirrors vt_integration_configs row)
 // ---------------------------------------------------------------------------

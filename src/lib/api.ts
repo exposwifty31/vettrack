@@ -78,6 +78,7 @@ import type {
 import type { AuthoritySnapshot } from "../../shared/authority.js";
 
 import type { ShiftActivityItem } from "@/types";
+import type { ShiftHandoverArtifact, ShiftHandoverResponse } from "@/types/shift-handover";
 import type {
   IntegrationAdapter,
   IntegrationConfig,
@@ -1407,5 +1408,19 @@ export const api = {
         `/api/integrations/ops/webhooks/${id}/replay`,
         { method: "POST" },
       ),
+  },
+  shiftHandover: {
+    /** The current (latest) handover artifact for the caller's clinic, or null. */
+    current: () => request<ShiftHandoverResponse>("/api/shift-handover/current"),
+    /** Deliberate confirm — records the actor + flips read-state to read. */
+    acknowledge: (id: string) =>
+      request<{ handover: ShiftHandoverArtifact }>(`/api/shift-handover/${id}/acknowledge`, {
+        method: "POST",
+      }),
+    /** Persisted UNCONFIRM — clears the ack + restores the unread read-state. */
+    unconfirm: (id: string) =>
+      request<{ handover: ShiftHandoverArtifact }>(`/api/shift-handover/${id}/acknowledge`, {
+        method: "DELETE",
+      }),
   },
 };

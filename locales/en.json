@@ -3022,6 +3022,10 @@
     "expiry": {
       "title": "Equipment expiring soon",
       "body": "{name} — expires {date}"
+    },
+    "handover": {
+      "title": "Shift handover ready",
+      "body": "The outgoing shift left a handover for you. Tap to review."
     }
   },
   "shiftChat": {
@@ -4377,6 +4381,35 @@
     "noHomeHint": "No home station assigned yet — ask an admin to set one",
     "stationUnresolvedHint": "This item's home station isn't set up yet — uncheck to return without docking",
     "offlineDockHint": "Dock return needs a connection — returning without docking for now"
+  },
+  "handoverPage": {
+    "title": "Shift handover",
+    "loading": "Loading the handover…",
+    "loadError": "Couldn't load the handover. Pull to retry.",
+    "emptyTitle": "No handover yet",
+    "emptyBody": "A handover is generated automatically at the end of each shift.",
+    "deltasHeading": "What changed this shift",
+    "deltaCustody": "Custody moves",
+    "deltaTasks": "Task updates",
+    "deltaAlerts": "Alerts",
+    "deltaDispenses": "Dispenses",
+    "openItemsHeading": "Open items",
+    "openItemsNone": "Nothing left open.",
+    "worklistHeading": "Patients worked",
+    "worklistNotConfigured": "No patient system connected.",
+    "worklistError": "Patient list is temporarily unavailable.",
+    "worklistEmpty": "No patients recorded this shift.",
+    "staffHeading": "On this shift",
+    "acknowledgeCta": "Acknowledge handover",
+    "acknowledgePrompt": "Confirm you've read and accepted this handover.",
+    "acknowledgeConfirm": "Confirm receipt",
+    "acknowledgeCancel": "Cancel",
+    "acknowledgedLabel": "Handover acknowledged",
+    "unconfirmCta": "Undo acknowledgement",
+    "unconfirmedAnnounce": "Acknowledgement undone.",
+    "acknowledgeError": "Couldn't record your acknowledgement. Please try again.",
+    "unconfirmError": "Couldn't undo the acknowledgement. Please try again.",
+    "back": "Back"
   },
   "readinessForecast": {
     "title": "Predictive readiness",

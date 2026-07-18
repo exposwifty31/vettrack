@@ -835,6 +835,8 @@ const translations = {
 
   stabilityPage: d.stabilityPage,
 
+  handoverPage: d.handoverPage,
+
   shiftSummaryPage: {
     ...d.shiftSummaryPage,
     reportHeader: (dateStr: string) => tr(d.shiftSummaryPage.reportHeader, { dateStr }),
