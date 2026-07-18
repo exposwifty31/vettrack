@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 import { reportBoardAnomalyActivated } from "@/lib/realtime";
 import { useBoardEntityCoPresence } from "@/board/board-copresence-context";
 import { usePrefersReducedMotion } from "@/hooks/use-prefers-reduced-motion";
+import { useDirection } from "@/hooks/useDirection";
 import type { EquipmentCommandBoardSnapshot } from "@/types/safety-surfaces";
 import type { EquipmentBoardUnitRow, EquipmentReadinessStatus } from "../../../../shared/equipment-board";
 import { STATUS_BG, STATUS_BAR_COLOR, statusLabel } from "../status-tokens";
@@ -345,9 +346,10 @@ function PressureMain({
   board: EquipmentCommandBoardSnapshot;
   needAttention: EquipmentBoardUnitRow[];
 }) {
+  const dir = useDirection();
   const linked = board.activeEmergency?.linkedEquipment ?? [];
   return (
-    <main id="main-content" className="flex-1 overflow-hidden p-4 flex flex-col gap-3" dir="rtl">
+    <main id="main-content" className="flex-1 overflow-hidden p-4 flex flex-col gap-3" dir={dir}>
       <section className="flex-1 overflow-auto rounded-xl border border-[var(--status-issue-border)] bg-[var(--status-issue-bg)] p-6 flex flex-col gap-4">
         <div className="flex items-center gap-3 flex-wrap">
           <span className="w-3 h-3 rounded-full bg-[hsl(var(--status-issue))] motion-safe:animate-pulse" aria-hidden />
@@ -408,6 +410,7 @@ export function CommandBoard({
   kioskMode?: boolean;
 }) {
   const [, navigate] = useLocation();
+  const dir = useDirection();
   // Same ?kiosk=1 contract as WardDisplayPage — wall displays get no exit button.
   // The /board route passes kioskMode explicitly; it wins over the URL read.
   const kioskModeFromUrl = useKioskModeFromUrl();
@@ -431,7 +434,7 @@ export function CommandBoard({
   );
 
   return (
-    <div className="flex flex-col min-h-screen bg-[rgb(var(--ivory-bg))] text-ivory-text" dir="rtl">
+    <div className="flex flex-col min-h-screen bg-[rgb(var(--ivory-bg))] text-ivory-text" dir={dir}>
 
       {/* Header */}
       <header className="bg-[var(--brand-navy)] flex items-center gap-4 px-5 py-3 shrink-0 flex-wrap">

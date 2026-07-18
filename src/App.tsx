@@ -36,7 +36,12 @@ export default function App() {
       <Suspense fallback={<RouteFallback />}>
         <PageErrorBoundary fallbackLabel={t.errorCard.defaultMessage}>
           <PlatformRouter>
-            <AppRoutes />
+            {/* Inner boundary: a lazy page's first-load suspension resolves HERE,
+                inside the shell, so NativeShell chrome (tab bar / header) stays
+                mounted. The outer boundary still catches anything above the shell. */}
+            <Suspense fallback={<RouteFallback />}>
+              <AppRoutes />
+            </Suspense>
           </PlatformRouter>
         </PageErrorBoundary>
       </Suspense>

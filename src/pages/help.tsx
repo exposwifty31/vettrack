@@ -23,6 +23,7 @@ import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { LegalFooterLinks } from "@/components/legal-footer-links";
 import { getBundledAppVersion } from "@/lib/app-version";
+import { isCapacitorNative } from "@/lib/capacitor-runtime";
 
 interface CheatItemProps {
   icon: React.ElementType;
@@ -227,13 +228,18 @@ export default function HelpPage() {
             title={t.helpPage.activeAlertsTitle}
             description={t.helpPage.activeAlertsDescription}
           />
-          <CheatItem
-            icon={Wifi}
-            iconBg="bg-primary/10"
-            iconColor="text-primary"
-            title={t.helpPage.pushAlertsTitle}
-            description={t.helpPage.pushAlertsDescription}
-          />
+          {/* Push notifications don't exist on the Capacitor shell (no PushManager);
+              the Settings → Push section is hidden there, so this instruction would
+              dead-end for a native reviewer. Web only. */}
+          {!isCapacitorNative() && (
+            <CheatItem
+              icon={Wifi}
+              iconBg="bg-primary/10"
+              iconColor="text-primary"
+              title={t.helpPage.pushAlertsTitle}
+              description={t.helpPage.pushAlertsDescription}
+            />
+          )}
         </Section>
 
         {/* Legal */}

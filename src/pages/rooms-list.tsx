@@ -379,13 +379,13 @@ export default function RoomsListPage({ singleColumn = false }: { singleColumn?:
             subMessage={
               isAdmin
                 ? t.roomsListPage.createFirstRoomHint
-                : "No rooms have been created yet. Ask an admin to set them up."
+                : t.roomsListPage.emptyRoomsHintNonAdmin
             }
             action={
               isAdmin ? (
                 <Button size="sm" onClick={() => setCreateOpen(true)} className="gap-2 h-11">
                   <Plus className="w-4 h-4" />
-                  Add First Room
+                  {t.roomsListPage.addFirstRoom}
                 </Button>
               ) : undefined
             }

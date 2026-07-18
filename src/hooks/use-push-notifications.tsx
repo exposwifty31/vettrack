@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { authFetch } from "@/lib/auth-fetch";
+import { t } from "@/lib/i18n";
 import {
   getServiceWorkerReadySafe,
   getServiceWorkerRegistrationSafe,
@@ -21,7 +22,7 @@ interface PushState {
 function getPushSupportBlocker(): string | null {
   const ua = typeof navigator !== "undefined" ? navigator.userAgent.toLowerCase() : "";
   if (ua.includes("cursor")) {
-    return "Push notifications are not supported in Cursor's built-in browser. Open VetTrack in Chrome or Edge.";
+    return t.pushErrors.cursorUnsupported;
   }
   return null;
 }
@@ -51,7 +52,7 @@ function waitForActivation(
   if (worker.state === "activated") return Promise.resolve();
 
   return new Promise<void>((resolve, reject) => {
-    const timer = window.setTimeout(() => reject(new Error("Service worker initialization timed out")), timeoutMs);
+    const timer = window.setTimeout(() => reject(new Error(t.pushErrors.serviceWorkerTimeout)), timeoutMs);
     const onStateChange = () => {
       if (worker.state === "activated") {
         window.clearTimeout(timer);
@@ -65,13 +66,14 @@ function waitForActivation(
 
 async function waitForServiceWorkerReady(timeoutMs = 8000): Promise<ServiceWorkerRegistration> {
   if (!isServiceWorkerSupported()) {
-    throw new Error("Service worker is not supported");
+    throw new Error(t.pushErrors.serviceWorkerUnsupported);
   }
 
   const existing = await getServiceWorkerRegistrationSafe();
-  const registration = existing ?? (await registerServiceWorkerSafe("/sw.js"));
+  const registration =
+    existing ?? (await registerServiceWorkerSafe(`/sw.js?v=${encodeURIComponent(__VT_BUILD_TAG__)}`));
   if (!registration) {
-    throw new Error("Service worker registration unavailable");
+    throw new Error(t.pushErrors.serviceWorkerUnavailable);
   }
 
   if (registration.active) {
@@ -83,14 +85,23 @@ async function waitForServiceWorkerReady(timeoutMs = 8000): Promise<ServiceWorke
 }
 
 async function getVapidPublicKey(): Promise<string> {
+  // Prefer the server's runtime key — it is the public half of the pair the server signs with.
+  // Only fall back to a build-time key when the server has none configured, so a stale
+  // VITE_VAPID_PUBLIC_KEY baked into the bundle can't produce subscriptions the server can't push to.
+  try {
+    const res = await authFetch("/api/push/vapid-public-key");
+    if (res.ok) {
+      const { publicKey } = await res.json();
+      if (publicKey) return publicKey;
+    }
+  } catch {
+    // fall through to a build-time key
+  }
   const envVapidKey = import.meta.env.VITE_VAPID_PUBLIC_KEY as string | undefined;
   if (envVapidKey && envVapidKey.trim()) {
     return envVapidKey.trim();
   }
-  const res = await authFetch("/api/push/vapid-public-key");
-  if (!res.ok) throw new Error("Failed to fetch VAPID key");
-  const { publicKey } = await res.json();
-  return publicKey;
+  throw new Error(t.pushErrors.vapidFetchFailed);
 }
 
 function urlBase64ToUint8Array(base64String: string): Uint8Array<ArrayBuffer> {
@@ -174,18 +185,18 @@ export function usePushNotifications() {
       }
 
       if (!isServiceWorkerSupported() || !("PushManager" in window)) {
-        throw new Error("Push not supported");
+        throw new Error(t.pushErrors.notSupported);
       }
 
       const permission = await requestNotificationPermissionWithTimeout();
       setState((s) => ({ ...s, permission }));
 
       if (permission !== "granted") {
-        setState((s) => ({ ...s, loading: false, error: "Permission denied" }));
+        setState((s) => ({ ...s, loading: false, error: t.pushErrors.permissionDenied }));
         return false;
       }
 
-      const vapidKey = import.meta.env.VITE_VAPID_PUBLIC_KEY || await getVapidPublicKey();
+      const vapidKey = await getVapidPublicKey();
       const registration = await waitForServiceWorkerReady();
 
       const subscription = await registration.pushManager.subscribe({
@@ -214,14 +225,14 @@ export function usePushNotifications() {
 
       if (!res.ok) {
         const errData = (await res.json().catch(() => ({}))) as { message?: string };
-        throw new Error(errData.message || "Failed to save subscription");
+        throw new Error(errData.message || t.pushErrors.saveFailed);
       }
 
       safeStorageSetItem("push_subscription_endpoint", subJson.endpoint || "");
       setState((s) => ({ ...s, subscribed: true, loading: false }));
       return true;
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Failed to subscribe";
+      const msg = err instanceof Error ? err.message : t.pushErrors.subscribeFailed;
       setState((s) => ({ ...s, loading: false, error: msg, subscribed: false }));
       return false;
     }

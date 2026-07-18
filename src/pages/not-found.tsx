@@ -10,18 +10,18 @@ export default function NotFoundPage() {
     <AppShell>
       <Helmet>
         <title>{t.notFoundPage.title}</title>
-        <meta name="description" content="The page you are looking for does not exist. Return to the VetTrack dashboard." />
+        <meta name="description" content={t.notFoundPage.metaDescription} />
       </Helmet>
       <div className="flex flex-col items-center justify-center py-20 text-center gap-4">
         <div className="w-20 h-20 rounded-2xl bg-muted flex items-center justify-center">
           <Frown className="w-10 h-10 text-muted-foreground" />
         </div>
-        <h1 className="text-2xl font-bold">הדף לא נמצא</h1>
-        <p className="text-muted-foreground">הדף שחיפשת אינו קיים.</p>
+        <h1 className="text-2xl font-bold">{t.notFoundPage.heading}</h1>
+        <p className="text-muted-foreground">{t.notFoundPage.body}</p>
         <Link href="/home">
           <Button data-testid="btn-go-home">
             <Home className="w-4 h-4 ms-2" />
-            לדף הבית
+            {t.notFoundPage.goHome}
           </Button>
         </Link>
       </div>

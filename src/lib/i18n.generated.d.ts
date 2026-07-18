@@ -1482,6 +1482,21 @@ export interface TStructure {
   };
   notFoundPage: {
     title: string;
+    metaDescription: string;
+    heading: string;
+    body: string;
+    goHome: string;
+  };
+  pushErrors: {
+    notSupported: string;
+    permissionDenied: string;
+    vapidFetchFailed: string;
+    serviceWorkerTimeout: string;
+    serviceWorkerUnsupported: string;
+    serviceWorkerUnavailable: string;
+    cursorUnsupported: string;
+    saveFailed: string;
+    subscribeFailed: string;
   };
   homePage: {
     greeting: string;
@@ -1840,6 +1855,8 @@ export interface TStructure {
     subtitleEmpty: string;
     emptyRooms: string;
     createFirstRoomHint: string;
+    emptyRoomsHintNonAdmin: string;
+    addFirstRoom: string;
     createRoomDialogTitle: string;
     roomName: string;
     roomFloorOptional: string;
@@ -3875,6 +3892,7 @@ export interface TStructure {
     hint: string;
     revokedNoticeTitle: string;
     revokedNoticeMessage: string;
+    rateLimited: string;
   };
   board: {
     deployableNow: string;

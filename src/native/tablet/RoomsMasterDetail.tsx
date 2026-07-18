@@ -1,6 +1,7 @@
 import { useParams } from "wouter";
 import { TwoPaneLayout } from "@/native/tablet/TwoPaneLayout";
 import { SelectItemPlaceholder } from "@/native/tablet/SelectItemPlaceholder";
+import { PageErrorBoundary } from "@/components/ui/page-error-boundary";
 import RoomsListPage from "@/pages/rooms-list";
 import RoomRadarPage from "@/pages/room-radar";
 import { t } from "@/lib/i18n";
@@ -18,8 +19,19 @@ export default function RoomsMasterDetail() {
   return (
     <TwoPaneLayout
       masterLabel={t.nav.rooms}
-      master={<RoomsListPage singleColumn />}
-      detail={id ? <RoomRadarPage /> : null}
+      detailLabel={t.roomRadarPage.roomFallback}
+      master={
+        <PageErrorBoundary>
+          <RoomsListPage singleColumn />
+        </PageErrorBoundary>
+      }
+      detail={
+        id ? (
+          <PageErrorBoundary>
+            <RoomRadarPage />
+          </PageErrorBoundary>
+        ) : null
+      }
       placeholder={
         <SelectItemPlaceholder
           title={t.roomsListPage.selectRoomTitle}

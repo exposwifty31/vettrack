@@ -132,7 +132,7 @@ router.get("/me", requireAuth, async (req, res) => {
     });
 
     const [profileRow] = await db
-      .select({ avatarUrl: users.avatarUrl })
+      .select({ avatarUrl: users.avatarUrl, preferredLocale: users.preferredLocale })
       .from(users)
       .where(and(eq(users.clinicId, req.clinicId!), eq(users.id, req.authUser.id)))
       .limit(1);
@@ -157,6 +157,7 @@ router.get("/me", requireAuth, async (req, res) => {
     res.json({
       ...req.authUser,
       avatarUrl,
+      preferredLocale: profileRow?.preferredLocale ?? "he",
       effectiveRole: resolved.effectiveRole,
       roleSource: resolved.source,
       activeShift: resolved.activeShift,
@@ -1351,8 +1352,15 @@ router.post("/apple-link", requireAuth, authSensitiveLimiter, validateBody(apple
  * the Clerk user. The client signs out and redirects on success.
  *
  * Always operates on the CALLER's own account — never an arbitrary id.
+ *
+ * Uses requireAuthAny (not requireAuth) so a freshly-created status='pending'
+ * account can still exercise its Guideline 5.1.1(v) right to self-delete — the
+ * strict requireAuth gate would 403 (ACCOUNT_PENDING_APPROVAL) before this
+ * handler runs. Self-scoped by construction (deleteOwnAccount reads req.authUser
+ * only), and the demo/reviewer protected-account 403 stays enforced in the
+ * service layer.
  */
-router.delete("/delete-account", requireAuth, authSensitiveLimiter, async (req, res) => {
+router.delete("/delete-account", requireAuthAny, authSensitiveLimiter, async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
   try {
     const actor = req.authUser!;

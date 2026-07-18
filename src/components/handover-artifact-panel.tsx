@@ -50,7 +50,14 @@ export function HandoverArtifactPanel({
   const dir = useDirection();
   const BackIcon = dir === "rtl" ? ArrowRight : ArrowLeft;
   return (
-    <div className="flex flex-col gap-4 p-4">
+    <div
+      className="flex flex-col gap-4 p-4"
+      // /handoff is a fullscreen native route (NativeHeader hidden) and the phone
+      // shell adds no top inset, so the panel owns the status-bar safe area — else
+      // the back button + title clip under the notch. The tablet shell already pads
+      // safe-area-top, so only the phone variant adds it here.
+      style={variant === "phone" ? { paddingTop: "calc(env(safe-area-inset-top) + 16px)" } : undefined}
+    >
       <header className="flex items-center gap-2">
         {onBack && (
           <button

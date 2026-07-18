@@ -455,7 +455,7 @@ export function HomeTabletDashboard() {
               <Link
                 key={room.id}
                 href={`/rooms/${room.id}`}
-                style={{ display: "flex", alignItems: "center", gap: 10, textDecoration: "none", minHeight: 32 }}
+                style={{ display: "flex", alignItems: "center", gap: 10, textDecoration: "none", minHeight: 44 }}
                 title={t.homeSurface.readinessTileTitle(pct)}
               >
                 <span

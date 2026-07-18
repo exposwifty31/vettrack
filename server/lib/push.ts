@@ -67,7 +67,13 @@ export async function initVapid(): Promise<void> {
 }
 
 export async function getVapidPublicKey(): Promise<string | null> {
-  if (process.env.VAPID_PUBLIC_KEY) return process.env.VAPID_PUBLIC_KEY;
+  // Only expose a public key the server can actually sign with (matches isVapidReady()).
+  if (!isVapidReady()) return null;
+  // The env pair wins only when both keys are present — mirrors initVapid()'s preference.
+  // A lone VAPID_PUBLIC_KEY does not identify the signing pair (initVapid falls through to DB).
+  if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
+    return process.env.VAPID_PUBLIC_KEY;
+  }
   try {
     const rows = await db
       .select()

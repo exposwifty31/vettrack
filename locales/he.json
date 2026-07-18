@@ -1478,7 +1478,22 @@
     "personalDebtNone": "כל ההשאלות נראות מעודכנות"
   },
   "notFoundPage": {
-    "title": "העמוד לא נמצא — VetTrack"
+    "title": "העמוד לא נמצא — VetTrack",
+    "metaDescription": "הדף שחיפשת אינו קיים. חזרה ללוח הבקרה של VetTrack.",
+    "heading": "הדף לא נמצא",
+    "body": "הדף שחיפשת אינו קיים.",
+    "goHome": "לדף הבית"
+  },
+  "pushErrors": {
+    "notSupported": "התראות Push אינן נתמכות במכשיר זה.",
+    "permissionDenied": "ההרשאה להתראות נדחתה.",
+    "vapidFetchFailed": "לא ניתן היה להתחבר לשרת ההתראות. נסה שוב.",
+    "serviceWorkerTimeout": "הגדרת ההתראות ארכה זמן רב מדי. נסה שוב.",
+    "serviceWorkerUnsupported": "התראות Push אינן נתמכות בדפדפן זה.",
+    "serviceWorkerUnavailable": "לא ניתן היה להפעיל התראות. נסה שוב.",
+    "cursorUnsupported": "התראות Push אינן נתמכות בדפדפן המובנה של Cursor. פתח את VetTrack ב-Chrome או ב-Edge.",
+    "saveFailed": "לא ניתן היה לשמור את המנוי להתראות. נסה שוב.",
+    "subscribeFailed": "לא ניתן היה להפעיל התראות. נסה שוב."
   },
   "homePage": {
     "greeting": "שלום, {name}",
@@ -1837,6 +1852,8 @@
     "subtitleEmpty": "מלאי ציוד לפי חדר",
     "emptyRooms": "אין חדרים עדיין",
     "createFirstRoomHint": "צור את החדר הראשון כדי לארגן ציוד לפי מיקום.",
+    "emptyRoomsHintNonAdmin": "עדיין לא נוצרו חדרים. בקש ממנהל להגדיר אותם.",
+    "addFirstRoom": "הוסף חדר ראשון",
     "createRoomDialogTitle": "יצירת חדר",
     "roomName": "שם החדר *",
     "roomFloorOptional": "קומה / אזור (אופציונלי)",
@@ -3871,7 +3888,8 @@
     "pairButton": "קישור המסך",
     "hint": "בקשו ממנהל להפיק קוד מתוך ‘מסכי תצוגה’ בקונסולת הניהול.",
     "revokedNoticeTitle": "הצימוד של מסך זה בוטל",
-    "revokedNoticeMessage": "מנהל ביטל את גישת המסך הזה, או שהצימוד כבר אינו תקף. הזינו קוד קישור חדש כדי לחבר מחדש."
+    "revokedNoticeMessage": "מנהל ביטל את גישת המסך הזה, או שהצימוד כבר אינו תקף. הזינו קוד קישור חדש כדי לחבר מחדש.",
+    "rateLimited": "יותר מדי ניסיונות. המתן דקה ונסה שוב."
   },
   "board": {
     "deployableNow": "זמין לפריסה כעת",

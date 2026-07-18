@@ -367,7 +367,7 @@ function ActiveSession() {
   if (!session) return null;
 
   return (
-    <div className="flex flex-col bg-emergency-bg text-white overflow-hidden" dir={dir} style={{ height: "100%", paddingTop: "env(safe-area-inset-top)", borderTop: "3px solid var(--destructive)" }}>
+    <div className="flex flex-col bg-emergency-bg text-white overflow-hidden" dir={dir} style={{ height: "100%", paddingTop: "env(safe-area-inset-top)", borderTop: "3px solid hsl(var(--destructive))" }}>
       <div className="flex-shrink-0 bg-emergency-surface border-b border-emergency-surface px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
           {/* Leave the live view without ending the session (it persists for the
