@@ -4410,5 +4410,28 @@
     "acknowledgeError": "לא ניתן לרשום את האישור. נסה שוב.",
     "unconfirmError": "לא ניתן לבטל את האישור. נסה שוב.",
     "back": "חזרה"
+  },
+  "readinessForecast": {
+    "title": "מוכנות חזויה",
+    "subtitle": "טווח תחזית: {hours} השעות הקרובות",
+    "shortfallsHeading": "מחסורים צפויים",
+    "recommendationsHeading": "המלצות רכש",
+    "recommendedOnly": "המלצה בלבד — לא מבוצעת הזמנה עד לאישורך",
+    "shortBadge": "חסרים {count} {unit}",
+    "requiredLabel": "נדרש",
+    "availableLabel": "זמין",
+    "sourceLine": "מתוך {count} פעולות מתוזמנות",
+    "burnLine": "{units} נוצלו ב-14 הימים האחרונים",
+    "incomingLine": "{units} מגיעים בתוך הטווח",
+    "equipmentKind": "ציוד",
+    "consumableKind": "מתכלה",
+    "sourceRefsLabel": "שורות מקור",
+    "suggestedQtyLabel": "כמות מומלצת",
+    "createPo": "יצירת הזמנת רכש",
+    "confirmPo": "אישור הזמנה",
+    "cancelPo": "ביטול",
+    "allReadyTitle": "אתם מוכנים",
+    "allReadyBody": "לא צפויים מחסורים עבור הפעולות המתוזמנות הקרובות.",
+    "loadError": "טעינת תחזית המוכנות נכשלה"
   }
 }

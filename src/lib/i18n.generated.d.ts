@@ -4414,4 +4414,27 @@ export interface TStructure {
     unconfirmError: string;
     back: string;
   };
+  readinessForecast: {
+    title: string;
+    subtitle: string;
+    shortfallsHeading: string;
+    recommendationsHeading: string;
+    recommendedOnly: string;
+    shortBadge: string;
+    requiredLabel: string;
+    availableLabel: string;
+    sourceLine: string;
+    burnLine: string;
+    incomingLine: string;
+    equipmentKind: string;
+    consumableKind: string;
+    sourceRefsLabel: string;
+    suggestedQtyLabel: string;
+    createPo: string;
+    confirmPo: string;
+    cancelPo: string;
+    allReadyTitle: string;
+    allReadyBody: string;
+    loadError: string;
+  };
 }

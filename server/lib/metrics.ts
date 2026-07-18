@@ -351,7 +351,10 @@ type MetricName =
   // emits once per (type,unitId) activation via the R-BDF-1.2 state machine.
   | "board_anomaly_battery_critical"
   | "board_anomaly_reader_offline"
-  | "board_anomaly_cart_unverified";
+  | "board_anomaly_cart_unverified"
+  // R-PDF-1.1 — predictive-readiness demand key excluded on a freeform-metadata
+  // unit conflict (bounded; no keyId/unit label — degrades per key, not per clinic).
+  | "readiness_forecast_demand_unit_conflict";
 
 type MetricBuckets = Record<MetricName, number>;
 
@@ -1024,6 +1027,7 @@ const DEFAULT_COUNTERS: MetricBuckets = {
   board_anomaly_battery_critical: 0,
   board_anomaly_reader_offline: 0,
   board_anomaly_cart_unverified: 0,
+  readiness_forecast_demand_unit_conflict: 0,
 };
 
 const metrics: MetricBuckets = { ...DEFAULT_COUNTERS };

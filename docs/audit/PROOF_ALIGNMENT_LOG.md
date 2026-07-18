@@ -3662,6 +3662,65 @@ Reviewer returned 1 HIGH + 1 MEDIUM + 2 LOW on the committed sub-card; all four 
 - **GREEN (minimal):** the 20-case surface suite covers — generate fires the push ONCE per next-shift roster user (not the current-shift user, no duplicates); push-targets (`resolveNextShiftRoster`) ≡ ack-authorized (`resolveAckAuthorizedUserIds`) ≡ the seeded next roster, cross-clinic user in NEITHER; a retry generate fires NO additional push; acknowledge records actor + `acknowledgedAt` + flips `notificationReadAt`→read and fires NO follow-up push (spy on `enqueueNotificationJob` — 0 calls) and never retracts a device notification; acknowledge REJECTED (`ShiftHandoverAccessError`) for a current-shift (non-next-roster) user; unconfirm clears ack + restores `notificationReadAt`→null + writes its own audit row; loading/error/empty/ready each render+announced (role=status / role=alert); iPhone (`data-handover-pane` count) < iPad two-pane; exactly ONE `<h1>` + ≥1 `<h2>`; `<bdi>` wraps "John Smith"; deliberate two-step confirm focuses INTO the confirm button on open and RETURNS focus to the trigger after unconfirm; acknowledged control exposes `aria-pressed=true`; `/handoff` deep-link renders exactly one `<h1>`; he/en both render `handoverPage.title`.
 - **Frozen guardrails intact:** every read/write to audit, outbox, shifts/sessions, notification, and `vt_shift_handover` carries an explicit target-table `clinicId` predicate; deltas still read only from the existing audit/outbox (no new realtime path/transport — the push reuses the existing `push_to_user` notification job, no new transport); NO public generate route (generation stays system-derived via the scheduler); ack = a deliberate confirm; unconfirm is server-persisted + audited (`shift_handover_unconfirmed`); push-targets ≡ ack-authorized set (same helper); reused SH-1.1's `serializePatientWorklist` + `PatientWorklist` union unchanged (no forked contract) — the client mirrors the union by shape; no reintroduced internal patient model (worklist externalId/display + name-resolved staff only); no hardcoded Hebrew in `.ts`/`.tsx` (all copy in `locales/*.json` via typed `t.handoverPage.*`; parity enforced).
 - **Commands:** `pnpm typecheck` (frontend `tsc --noEmit` + server `tsconfig.server.json`) → exit 0. `pnpm exec vitest run tests/shift-handover-surface.test.tsx` → `Tests 20 passed (20)`. Sibling regression `pnpm exec vitest run tests/shift-handover-{generator,observed,patient-worklist,contract}.test.ts tests/shift-handover-surface.test.tsx` → `Test Files 5 passed (5)`, `Tests 40 passed (40)`. `pnpm i18n:check` → deep key parity OK. `pnpm test` (full) → 0 failed (added `/api/shift-handover` to the route-registration contract test's expected mount list).
+## 2026-07-18 — R-PDF-1.1 · Demand model behind a single DemandSource interface
+
+**Claim:** Added `DemandSource` interface + v1 schedule-only `ScheduleDemandSource` (aggregates required equipment/consumables from scheduled procedures; never reads consumption). Pure engine module, no schema change.
+
+**Evidence:**
+- `server/lib/readiness-forecast-engine.ts:78` — `ScheduleDemandSource.getDemand()` reads only `reader.scheduledProcedures()`; no consumption/burn read exists in the class.
+- Test: `pnpm test -- tests/readiness-forecast-demand.test.ts` → `Test Files 1 passed (1) / Tests 5 passed (5)` — includes the schedule-only invariant (varying usage history leaves demand unchanged), the interface-contract shape test, and the cross-tenant negative.
+- Command: `pnpm typecheck` → exit 0 (frontend + server tsconfig, no errors).
+
+**Verdict:** VERIFIED
+
+## 2026-07-18 — R-PDF-1.2 · Supply model (readySupply = available ∧ ready intersection)
+
+**Claim:** Added `computeReadySupply` + `isUnitAvailable`/`isUnitReady` predicates. readySupply is the intersection of available ∧ ready per asset type (never a sum); composes the clinic readiness rules' staleEvidenceMs; consumables have reserved=0 (no reservation table exists — confirmed migration 170 only adds an advisory column).
+
+**Evidence:**
+- `server/lib/readiness-forecast-engine.ts` — `computeReadySupply` increments `readySupply` only when `available && ready`; `available`/`ready` tracked separately for cross-checks, never summed.
+- `migrations/170_vt_equipment_reserved_for_session.sql:20` — `ALTER TABLE vt_equipment ADD COLUMN ... reserved_for_session_id TEXT` (advisory column, not a reservations table) — confirms reserved=0 for consumables.
+- Test: `pnpm test -- tests/readiness-forecast-supply.test.ts` → `Test Files 1 passed / Tests 8 passed` — includes intersection (not sum), counted-once, staleness composition, per-asset-type grouping, cross-tenant negative.
+- Command: `pnpm typecheck` → exit 0.
+
+**Verdict:** VERIFIED
+
+## 2026-07-18 — R-PDF-1.3 · Shortfall join + burn-rate projection
+
+**Claim:** Added `computeShortfalls` (pinned equation: required = ceil(demand + burnRatePerHour×horizon); available = floor(readySupply + availableCurrentStock + incomingStock-within-horizon); shortfall = max(0, required−available)), `burnRatePerHour` (trailing 14d → per-hour), and the `computeReadinessForecast` orchestrator behind the `ReadinessForecastReader` port.
+
+**Evidence:**
+- `server/lib/readiness-forecast-engine.ts` — `computeShortfalls` computes per demand key in its own unit; equipment readySupply and consumable stock never summed across keys; `Math.ceil` on required, `Math.floor` on available; incoming filtered by `etaMs <= window.toMs` (no-ETA excluded); sort desc shortfall then keyId.
+- Test: `pnpm test -- tests/readiness-forecast-shortfall.test.ts` → `Test Files 1 passed / Tests 13 passed` — covers burn sign (higher burn raises shortfall), max(0,…), on-hand reduces shortfall, reserved excluded, incoming horizon cutoff, packs→units conversion, ceil/floor, per-key isolation, ordering, explainability source rows, and the cross-tenant negative via the orchestrator.
+- Command: `pnpm typecheck` → exit 0.
+
+**Verdict:** VERIFIED
+
+## 2026-07-18 — R-PDF-1.4 · Analytics panel + read-only PO recommendations
+
+**Claim:** Added the redacted forecast DTO + `ReadinessForecastPanel` inside the EXISTING Analytics console (no new surface family, no home tile), the Drizzle reader/orchestrator service, `GET /api/analytics/readiness-forecast` (read-only), api client fn, client types, and i18n he/en parity. Rendering/refresh creates zero POs.
+
+**Evidence:**
+- `server/services/readiness-forecast.service.ts` — every reader method filters its target table by clinicId; PO recommendations only (no insert into purchaseOrders/poLines); consumables reserved=0.
+- `src/features/analytics/ReadinessForecastPanel.tsx` — presentational; `onCreatePurchaseOrder` invoked only from the confirm button, never on render; single `<h2>` region heading (page owns h1); status by icon+text via AA-verified `--status-*` tokens.
+- `src/pages/analytics.tsx` — panel mounted in the existing analytics page; forecast query failure is non-fatal.
+- Test: `pnpm test -- tests/readiness-forecast-panel.test.tsx` → 16 passed (a11y single-heading, redacted DTO no-PII, zero-PO-on-render, confirm-gated PO, empty state, he+en+RTL, light+dark contrast).
+- Command: `pnpm i18n:check` → "in deep key parity"; `pnpm typecheck` → exit 0; `tests/i18n-no-hebrew-in-source.test.ts` → passed.
+
+**Verdict:** VERIFIED
+
+## 2026-07-18 — R-PDF-1.5 · Acceptance bar + gates
+
+**Claim:** Added a consolidated acceptance test (two-clinic seed) asserting exact shortfalls (precision + correct sign), redacted explainability listing only the requested clinic's source rows, calm empty state on a healthy clinic, and cross-tenant isolation across demand + supply + shortfall + explainability. All spec gates run.
+
+**Evidence:**
+- Test: `pnpm test -- tests/readiness-forecast-accept.test.ts` → 4 passed (incl. equipment shortfall 2 with clinic-b's 5 ventilators excluded, consumable shortfall 8 with clinic-b's 999/500 excluded, DTO carries only ids/counts, clinic-b forecast independently correct).
+- Four RED suites: demand 5 / supply 8 / shortfall 13 / panel 16 — all pass.
+- Command: `pnpm typecheck` → exit 0. `pnpm i18n:check` → "deep key parity". `pnpm architecture:gates` → "All G1 checks passed" (0 new cycles, no dependency violations). `tests/i18n-no-hebrew-in-source.test.ts` → passed.
+- Command: `pnpm test` (full) → 5392 passed / 197 skipped; 12 pre-existing `*.integration.test.ts` files fail only on the missing `vettrack_test` DB (environmental) — none are in this branch's diff (`git diff --name-only origin/main...HEAD`).
+
+**Verdict:** VERIFIED
+
 ## 2026-07-17 — R-M1.0 · Reconcile the resolver-precedence conflict (RFID advisory-only)
 
 **Claim:** Fixed the evidence-graph location resolver so a recent RFID read can no longer OUTRANK a human-confirmed room in the `location_summary`. The bug: `server/domain/equipment/evidence/resolver/location.ts` summary ladder placed the `rfid_room` branch ABOVE `dock_station` and `room` (`eq.roomId`), so a passive RFID last-seen (no accountable person) overrode a human-confirmed location — violating the PINNED precedence (ADR-006, RFID advisory-only): active checkout > dock station > human-confirmed roomId > RFID last-seen > free-text > unknown. Fix = reorder the summary branches to that ladder; RFID stays a citation/corroboration (the citation-push block above the ladder is unchanged, so `rfid` citations are still emitted). Resolver-READ logic only — ingest (`rfid-ingest.ts`), the `vt_equipment_rfid_reads` table, `custodian.ts`, and the inference service (`equipment-location-inference.ts`, which already ranks RFID as the lowest tier ~L193-204) were NOT touched. No custody write on the RFID path (asserted).
@@ -4156,5 +4215,36 @@ Reviewer returned 1 HIGH + 1 MEDIUM + 2 LOW on the committed sub-card; all four 
 **Guardrails held:** ownership CAS ADDS safety without removing the legitimate revert-on-failure for the non-raced case (verified — the failure-revert test still reverts `finalizing`→`grace`); no transient-`completed` window reintroduced (`completed` still commits only after the durable delete); every rotation query clinic-scoped (the sweep stays the documented cross-clinic system scan with per-row clinic-scoped writes); migration 176 additive+idempotent; RFID advisory-only (no custody writes); no-rotation ingest fast-path (`if (!previous) return [current]`) + scan-only golden path byte-for-byte unchanged; metrics stay bounded-enum (reuses `rfid_secret_rotation_reclaimed`, now incremented exactly once per real reclaim). No transport/authority change.
 
 **Reasoned decline (CodeRabbit 3607058084 — migration up/down rollback coverage):** NOT implemented. This repo's migrations are FORWARD-ONLY, hand-authored, additive+idempotent (173 header: `drizzle-kit generate` non-functional; no down-migration infra; no `tests/migrations/*` exercises a rollback). The "up" direction (widened CHECK accepts `finalizing`, rejects garbage) is already covered by the provisioning DB tests. Adding a bespoke down-migration + rollback test would introduce infra this repo deliberately does not have.
+
+**Verdict:** VERIFIED
+
+## 2026-07-18 — R-PDF-1 · CodeRabbit review fixes on PR #114 (+ merge of origin/main)
+
+**Claim:** Merged origin/main (PR #113) into the branch keeping both sides of the additive conflicts, and addressed the 7 CodeRabbit findings on PR #114 (6 fixed, 1 verified-then-fixed).
+
+**Evidence:**
+- **Merge:** `git merge origin/main` — only `docs/audit/PROOF_ALIGNMENT_LOG.md` conflicted (append-only log); resolved by keeping both sides + restoring the R-PDF-1.5 verdict line. `src/lib/api.ts` / `locales/{en,he}.json` / `i18n.ts` auto-merged (both added keys). Post-merge `pnpm typecheck` → 0; `pnpm i18n:check` → deep key parity.
+- **Finding 1 (unit merge):** `assertConsistentDemandUnit` throws on same-key/different-unit; wired into `ScheduleDemandSource.add` and `computeShortfalls`. Test: mixed mL/vial for one ref → rejects `/unit conflict/i`.
+- **Finding 2 (isUnitReady):** null `readinessStateSince` now returns false BEFORE the freshness check. Test: ready + null since → excluded (readySupply 1 of 2).
+- **Finding 3 (incoming window):** filter is now inclusive `[fromMs, toMs]` — ETAs before window start excluded. Test: past ETA dropped, ETA == fromMs included.
+- **Finding 4 (resolveQuantity):** distinguishes ABSENT (→ fallback 1) from explicit-INVALID (0/neg/NaN/non-number → null → requirement dropped, not coerced); applied at all `extractRequirements` call sites; inventoryItemId can't resurrect a dropped item. New `tests/readiness-forecast-service.test.ts` → 12 passed.
+- **Finding 5 (consumption timestamp):** VERIFIED `dispenseEvents` has `confirmed_at`/`completed_at` (server/schema/inventory.ts:236-237); burn window now keys on `COALESCE(completedAt, confirmedAt, createdAt)` (clinic/status/item filters preserved).
+- **Finding 6 (PO join tenancy):** added `eq(purchaseOrders.clinicId, clinicId)` to the incomingStock join predicate.
+- **Finding 7 (panel loading/error):** analytics.tsx now renders a Skeleton while loading and an ErrorCard (`t.readinessForecast.loadError` + Retry) on error, keeping the rest of Analytics rendered.
+- **Gates:** `pnpm typecheck` → 0. Readiness suites (`demand/supply/shortfall/panel/accept/service`) → 60 passed. `pnpm i18n:check` → parity. `pnpm architecture:gates` → All G1 passed. `pnpm test` (full) → 5522 passed / 255 skipped; the same 12 `*.integration.test.ts` files fail only on the missing `vettrack_test` DB (environmental, unchanged by this diff).
+
+**Verdict:** VERIFIED
+
+## 2026-07-18 — R-PDF-1 · Adversarial-review round 2 on PR #114 (revert finding #3, degrade unit conflict)
+
+**Claim:** Reverted CodeRabbit finding #3 (the incoming-ETA lower bound — a HIGH regression for this data model) and changed the demand-unit-conflict guard from throw-the-whole-forecast to degrade-per-key with a bounded counter + log.
+
+**Evidence:**
+- **HIGH revert (finding #3):** `server/lib/readiness-forecast-engine.ts` incoming filter is back to `if (inc.etaMs == null || inc.etaMs > window.toMs) continue;` (upper bound kept, lower bound dropped). Rationale: `DrizzleReadinessForecastReader.incomingStock` returns only outstanding PO stock (`status IN ('ordered','partial')`, `quantityOrdered − quantityReceived`) and `purchaseOrders.expectedAt` is set once at creation and never updated (grep: no `UPDATE ... expected_at` / no `.set({ expectedAt })` anywhere) → an overdue-but-outstanding PO keeps a stale past ETA and must still count as incoming, else its units vanish from both supply terms → spurious shortfall + re-order of an already-ordered item (violates precision-first). Test: `tests/readiness-forecast-shortfall.test.ts` "COUNTS an overdue-but-outstanding PO (stale PAST ETA)" — outstanding PO ordered/10/received 0/ETA −3d → `incomingStock 10`, `shortfall 0`.
+- **MEDIUM degrade (assertConsistentDemandUnit → per-key exclusion):** removed the throwing function; `ScheduleDemandSource` and `computeShortfalls` now EXCLUDE only the conflicting key (via `UnitConflictOptions.onUnitConflict`), keeping every other key. The service (`getReadinessForecast`) passes a callback that calls `incrementMetric("readiness_forecast_demand_unit_conflict")` (added to the closed `MetricName` union + `DEFAULT_COUNTERS` in `server/lib/metrics.ts`) + `console.warn`. Tests: demand suite "degrades a unit conflict PER KEY" + "degrades silently (no throw) when no hook"; shortfall suite "degrades a same-key unit conflict PER KEY".
+- **LOW (deferred, note only):** the `COALESCE(completedAt, confirmedAt, createdAt)` consumption range has no covering index (`vt_dispense_events` indexes are `(clinicId,status)` and `(clinicId,createdAt)`). Perf-only, not correctness. NOT fixed — R-PDF-1 is zero-schema; adding an index is a follow-up if forecast latency shows up in profiling.
+- **Gates:** `pnpm typecheck` → 0. Readiness suites (`demand/supply/shortfall/panel/accept/service`) → 62 passed. `pnpm i18n:check` → parity. `pnpm architecture:gates` → All G1 passed (0 new cycles — the new service→metrics import did not add a cycle). `pnpm test` (full) → 5524 passed / 255 skipped; the same 12 `*.integration.test.ts` files fail only on the missing `vettrack_test` DB (environmental), no readiness-forecast file among them.
+
+**Note on history:** CodeRabbit finding #3 was IMPLEMENTED (prior commit 400bc9556) then REVERTED here — `expectedAt` is immutable, so the lower bound breaks overdue-but-outstanding orders. The coordinator replies the reasoned decline on the CodeRabbit thread.
 
 **Verdict:** VERIFIED

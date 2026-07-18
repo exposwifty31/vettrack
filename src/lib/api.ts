@@ -14,6 +14,7 @@ import type {
   ActivityFeedItem,
   HomeDashboardPulse,
   AnalyticsSummary,
+  ReadinessForecast,
   User,
   UploadUrlRequest,
   UploadUrlResponse,
@@ -418,6 +419,7 @@ export const api = {
   },
   analytics: {
     summary: () => request<AnalyticsSummary>("/api/analytics"),
+    readinessForecast: () => request<ReadinessForecast>("/api/analytics/readiness-forecast"),
     shiftCompletion: (from?: string, to?: string) => {
       const qs = new URLSearchParams();
       if (from) qs.set("from", from);
