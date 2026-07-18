@@ -20,17 +20,17 @@
 -- `vt_rfid_secret_rotations_status_check`. Drop + recreate it to widen the accepted set. Safe on
 -- a populated table: `finalizing` is purely additive and every pre-existing value is preserved.
 --
+-- The unconditional DROP ... IF EXISTS below always clears the constraint first, so the ADD is
+-- guaranteed to run against a table with no such constraint — no existence guard is needed (an
+-- earlier DO-block guard checked `conname` GLOBALLY across every table, which was both redundant
+-- here and wrong: a same-named constraint on an unrelated table would have suppressed this ADD).
+-- Re-running the migration repeats DROP-then-ADD, so it stays idempotent.
+--
 -- Hand-authored (drizzle-kit generate is non-functional in this repo). Additive + idempotent.
 
 ALTER TABLE vt_rfid_secret_rotations
   DROP CONSTRAINT IF EXISTS vt_rfid_secret_rotations_status_check;
 
-DO $$ BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_constraint WHERE conname = 'vt_rfid_secret_rotations_status_check'
-  ) THEN
-    ALTER TABLE vt_rfid_secret_rotations
-      ADD CONSTRAINT vt_rfid_secret_rotations_status_check
-      CHECK (status IN ('grace', 'finalizing', 'completed', 'rolled_back'));
-  END IF;
-END $$;
+ALTER TABLE vt_rfid_secret_rotations
+  ADD CONSTRAINT vt_rfid_secret_rotations_status_check
+  CHECK (status IN ('grace', 'finalizing', 'completed', 'rolled_back'));

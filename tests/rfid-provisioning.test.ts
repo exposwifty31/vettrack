@@ -105,6 +105,27 @@ async function waitFor(cond: () => boolean, timeoutMs = 4000): Promise<void> {
   }
 }
 
+// Validated pool accessor: `it.runIf(dbReachable)` implies the probe Pool was constructed, so this
+// null-checks once (throwing an explicit error otherwise) instead of a bare non-null assertion at
+// every call site — no `!` without a justification.
+function dbPool(): Pool {
+  if (!probePool) throw new Error("probePool must be initialised when dbReachable");
+  return probePool;
+}
+
+// A one-shot gate for the credential-delete hook. `open` is assigned a no-op default (no
+// definite-assignment `!`) then reassigned synchronously inside the executor. `open(true)` rejects
+// with the injected-failure message; `open()` resolves. Settling twice is a harmless no-op, so a
+// test's `finally` can always release the parked hook even after an earlier assertion threw.
+function makeGate(): { promise: Promise<void>; open: (fail?: boolean) => void } {
+  let open: (fail?: boolean) => void = () => {};
+  const promise = new Promise<void>((resolve, reject) => {
+    open = (fail = false) =>
+      fail ? reject(new Error("injected credential-store delete failure")) : resolve();
+  });
+  return { promise, open };
+}
+
 const uid = () => randomUUID();
 const sign = (body: string, secret: string): string =>
   `sha256=${createHmac("sha256", secret).update(Buffer.from(body, "utf8")).digest("hex")}`;
@@ -120,7 +141,10 @@ const {
   getRotation,
   reclaimStrandedFinalizingRotations,
   RfidRotationError,
+  __test,
 } = await import("../server/lib/rfid/provisioning.js");
+// Internal CAS transitions (test-only export) — drive the revert-stomp ownership boundary directly.
+const { finalizeRotation, revertRotationToGrace } = __test;
 // Mocked credential-manager (see vi.mock above): delegates to the real store when no finalize
 // hook is armed. Used by the POST-delete crash-recovery test to strip `previous` from the blob.
 const { storeCredentials } = await import("../server/integrations/credential-manager.js");
@@ -164,7 +188,7 @@ describe("R-M1.1c · HMAC rotation contract (DB-integration)", () => {
 
   it.runIf(dbReachable)("first provision returns a secret ONCE; no previous to roll back", async () => {
     const clinic = `test-rfidp-${uid()}`;
-    await seedClinic(probePool!, clinic);
+    await seedClinic(dbPool(), clinic);
 
     const env = await rotateRfidSecret(clinic, `key-${uid()}`);
     expect(env.secret).toBeTypeOf("string");
@@ -184,8 +208,8 @@ describe("R-M1.1c · HMAC rotation contract (DB-integration)", () => {
 
   it.runIf(dbReachable)("rotate with active readers → grace: BOTH current and previous verify", async () => {
     const clinic = `test-rfidp-${uid()}`;
-    await seedClinic(probePool!, clinic);
-    await seedReader(probePool!, clinic);
+    await seedClinic(dbPool(), clinic);
+    await seedReader(dbPool(), clinic);
 
     const first = await rotateRfidSecret(clinic, `key-${uid()}`);
     const second = await rotateRfidSecret(clinic, `key-${uid()}`, { graceTtlMs: 60_000 });
@@ -203,8 +227,8 @@ describe("R-M1.1c · HMAC rotation contract (DB-integration)", () => {
 
   it.runIf(dbReachable)("same-key retry returns the ORIGINAL envelope — no second secret, no double-rotation", async () => {
     const clinic = `test-rfidp-${uid()}`;
-    await seedClinic(probePool!, clinic);
-    await seedReader(probePool!, clinic);
+    await seedClinic(dbPool(), clinic);
+    await seedReader(dbPool(), clinic);
     await rotateRfidSecret(clinic, `key-${uid()}`);
 
     const key = `key-${uid()}`;
@@ -223,8 +247,8 @@ describe("R-M1.1c · HMAC rotation contract (DB-integration)", () => {
 
   it.runIf(dbReachable)("two concurrent rotations → exactly one wins, the other is rejected", async () => {
     const clinic = `test-rfidp-${uid()}`;
-    await seedClinic(probePool!, clinic);
-    await seedReader(probePool!, clinic);
+    await seedClinic(dbPool(), clinic);
+    await seedReader(dbPool(), clinic);
     await rotateRfidSecret(clinic, `key-${uid()}`); // establish a current secret
 
     const results = await Promise.allSettled([
@@ -242,8 +266,8 @@ describe("R-M1.1c · HMAC rotation contract (DB-integration)", () => {
 
   it.runIf(dbReachable)("after grace EXPIRY the previous secret is rejected and rollback is unavailable", async () => {
     const clinic = `test-rfidp-${uid()}`;
-    await seedClinic(probePool!, clinic);
-    await seedReader(probePool!, clinic);
+    await seedClinic(dbPool(), clinic);
+    await seedReader(dbPool(), clinic);
     const first = await rotateRfidSecret(clinic, `key-${uid()}`);
     const second = await rotateRfidSecret(clinic, `key-${uid()}`, { graceTtlMs: 1 });
 
@@ -259,8 +283,8 @@ describe("R-M1.1c · HMAC rotation contract (DB-integration)", () => {
 
   it.runIf(dbReachable)("all-snapshot-readers acknowledged → previous invalidated + rollback unavailable at that instant", async () => {
     const clinic = `test-rfidp-${uid()}`;
-    await seedClinic(probePool!, clinic);
-    const readerId = await seedReader(probePool!, clinic);
+    await seedClinic(dbPool(), clinic);
+    const readerId = await seedReader(dbPool(), clinic);
     await rotateRfidSecret(clinic, `key-${uid()}`);
     const second = await rotateRfidSecret(clinic, `key-${uid()}`, { graceTtlMs: 600_000 });
 
@@ -320,8 +344,8 @@ describe("R-M1.1c · HMAC rotation contract (DB-integration)", () => {
   // ── FS-1: `finalizing` intermediate state (transient-`completed` window closed) ──────────────
   it.runIf(dbReachable)("FS-1 happy path: grace → finalizing → completed, previous invalidated", async () => {
     const clinic = `test-rfidp-${uid()}`;
-    await seedClinic(probePool!, clinic);
-    const readerId = await seedReader(probePool!, clinic);
+    await seedClinic(dbPool(), clinic);
+    const readerId = await seedReader(dbPool(), clinic);
     await rotateRfidSecret(clinic, `key-${uid()}`);
     const second = await rotateRfidSecret(clinic, `key-${uid()}`, { graceTtlMs: 600_000 });
     expect(second.status).toBe("grace");
@@ -344,17 +368,14 @@ describe("R-M1.1c · HMAC rotation contract (DB-integration)", () => {
 
   it.runIf(dbReachable)("FS-1: a credential-delete FAILURE during finalize reverts finalizing → grace; a concurrent read NEVER sees completed", async () => {
     const clinic = `test-rfidp-${uid()}`;
-    await seedClinic(probePool!, clinic);
-    const readerId = await seedReader(probePool!, clinic);
+    await seedClinic(dbPool(), clinic);
+    const readerId = await seedReader(dbPool(), clinic);
     const first = await rotateRfidSecret(clinic, `key-${uid()}`);
     const second = await rotateRfidSecret(clinic, `key-${uid()}`, { graceTtlMs: 600_000 });
 
     // Block the durable delete in the `finalizing` state, then FAIL it.
     let reachedFinalize = false;
-    let release!: (fail: boolean) => void;
-    const gate = new Promise<void>((resolve, reject) => {
-      release = (fail) => (fail ? reject(new Error("injected credential-store delete failure")) : resolve());
-    });
+    const { promise: gate, open: release } = makeGate();
     credHooks.beforeFinalizeDelete = async () => {
       reachedFinalize = true;
       await gate;
@@ -362,84 +383,100 @@ describe("R-M1.1c · HMAC rotation contract (DB-integration)", () => {
 
     // Kick off finalize (all readers acked) without awaiting — it parks in the blocked delete.
     const ackPromise = ackRotationReader(clinic, second.rotationId, readerId);
-    await waitFor(() => reachedFinalize);
+    try {
+      await waitFor(() => reachedFinalize);
 
-    // CONCURRENT observation while the row is `finalizing`: never `completed`.
-    const midStatus = (await getRotation(clinic, second.rotationId))?.status;
-    expect(midStatus).toBe("finalizing");
-    expect(midStatus).not.toBe("completed");
-    // Ingest still accepts previous — the blob delete has not committed.
-    const midSecrets = await getRfidVerificationSecrets(clinic);
-    expect(midSecrets).toHaveLength(2);
-    expect(midSecrets).toContain(first.secret);
-    expect(midSecrets).toContain(second.secret);
+      // CONCURRENT observation while the row is `finalizing`: never `completed`.
+      const midStatus = (await getRotation(clinic, second.rotationId))?.status;
+      expect(midStatus).toBe("finalizing");
+      expect(midStatus).not.toBe("completed");
+      // Ingest still accepts previous — the blob delete has not committed.
+      const midSecrets = await getRfidVerificationSecrets(clinic);
+      expect(midSecrets).toHaveLength(2);
+      expect(midSecrets).toContain(first.secret);
+      expect(midSecrets).toContain(second.secret);
 
-    // Fail the delete → revert to grace, surface the error, NEVER a terminal `completed`.
-    release(true);
-    await expect(ackPromise).rejects.toThrow(/injected credential-store delete failure/);
+      // Fail the delete → revert to grace, surface the error, NEVER a terminal `completed`.
+      release(true);
+      await expect(ackPromise).rejects.toThrow(/injected credential-store delete failure/);
 
-    const persisted = await getRotation(clinic, second.rotationId);
-    expect(persisted?.status).toBe("grace");
-    expect(persisted?.status).not.toBe("completed");
-    expect(persisted?.previousRetained).toBe(true);
-    // Recoverable: previous still verifies after the revert.
-    expect(await getRfidVerificationSecrets(clinic)).toHaveLength(2);
+      const persisted = await getRotation(clinic, second.rotationId);
+      expect(persisted?.status).toBe("grace");
+      expect(persisted?.status).not.toBe("completed");
+      expect(persisted?.previousRetained).toBe(true);
+      // Recoverable: previous still verifies after the revert.
+      expect(await getRfidVerificationSecrets(clinic)).toHaveLength(2);
+    } finally {
+      // An earlier assertion throwing must never strand the parked hook / hang teardown.
+      release(true);
+      await ackPromise.catch(() => {});
+    }
   });
 
   it.runIf(dbReachable)("FS-1: rollback is REJECTED while the rotation is finalizing", async () => {
     const clinic = `test-rfidp-${uid()}`;
-    await seedClinic(probePool!, clinic);
-    const readerId = await seedReader(probePool!, clinic);
+    await seedClinic(dbPool(), clinic);
+    const readerId = await seedReader(dbPool(), clinic);
     await rotateRfidSecret(clinic, `key-${uid()}`);
     const second = await rotateRfidSecret(clinic, `key-${uid()}`, { graceTtlMs: 600_000 });
 
     let reachedFinalize = false;
-    let release!: () => void;
-    const gate = new Promise<void>((resolve) => (release = resolve));
+    const { promise: gate, open: release } = makeGate();
     credHooks.beforeFinalizeDelete = async () => {
       reachedFinalize = true;
       await gate;
     };
 
     const ackPromise = ackRotationReader(clinic, second.rotationId, readerId);
-    await waitFor(() => reachedFinalize);
+    try {
+      await waitFor(() => reachedFinalize);
 
-    // The row is `finalizing` — rollback must be refused (valid only during `grace`).
-    await expect(rollbackRfidSecret(clinic, second.rotationId)).rejects.toMatchObject({
-      code: "ROLLBACK_UNAVAILABLE",
-    });
+      // The row is `finalizing` — rollback must be refused (valid only during `grace`).
+      await expect(rollbackRfidSecret(clinic, second.rotationId)).rejects.toMatchObject({
+        code: "ROLLBACK_UNAVAILABLE",
+      });
 
-    release();
-    const acked = await ackPromise;
-    expect(acked.status).toBe("completed");
+      release();
+      const acked = await ackPromise;
+      expect(acked.status).toBe("completed");
+    } finally {
+      // An earlier assertion throwing must never strand the parked hook / hang teardown.
+      release();
+      await ackPromise.catch(() => {});
+    }
   });
 
   it.runIf(dbReachable)("FS-1: getRfidVerificationSecrets returns [current, previous] while finalizing, [current] once the delete commits", async () => {
     const clinic = `test-rfidp-${uid()}`;
-    await seedClinic(probePool!, clinic);
-    const readerId = await seedReader(probePool!, clinic);
+    await seedClinic(dbPool(), clinic);
+    const readerId = await seedReader(dbPool(), clinic);
     const first = await rotateRfidSecret(clinic, `key-${uid()}`);
     const second = await rotateRfidSecret(clinic, `key-${uid()}`, { graceTtlMs: 600_000 });
 
     let reachedFinalize = false;
-    let release!: () => void;
-    const gate = new Promise<void>((resolve) => (release = resolve));
+    const { promise: gate, open: release } = makeGate();
     credHooks.beforeFinalizeDelete = async () => {
       reachedFinalize = true;
       await gate;
     };
 
     const ackPromise = ackRotationReader(clinic, second.rotationId, readerId);
-    await waitFor(() => reachedFinalize);
+    try {
+      await waitFor(() => reachedFinalize);
 
-    // During `finalizing`, before the delete commits: both secrets verify.
-    const during = await getRfidVerificationSecrets(clinic);
-    expect(during).toEqual([second.secret, first.secret]);
+      // During `finalizing`, before the delete commits: both secrets verify.
+      const during = await getRfidVerificationSecrets(clinic);
+      expect(during).toEqual([second.secret, first.secret]);
 
-    // Let the delete commit → [current] only.
-    release();
-    await ackPromise;
-    expect(await getRfidVerificationSecrets(clinic)).toEqual([second.secret]);
+      // Let the delete commit → [current] only.
+      release();
+      await ackPromise;
+      expect(await getRfidVerificationSecrets(clinic)).toEqual([second.secret]);
+    } finally {
+      // An earlier assertion throwing must never strand the parked hook / hang teardown.
+      release();
+      await ackPromise.catch(() => {});
+    }
   });
 
   it.runIf(dbReachable)("FS-1 crash-recovery: a stranded `finalizing` row (mid-finalize crash) is reclaimed and the one-in-flight gate is released — rotation is NOT bricked", async () => {
@@ -525,10 +562,126 @@ describe("R-M1.1c · HMAC rotation contract (DB-integration)", () => {
     expect(third.status).toBe("grace");
   });
 
+  // ── Revert-stomp ownership CAS (HIGH regression + the two sibling invariants) ─────────────────
+  it.runIf(dbReachable)(
+    "HIGH: a losing finalize's late revert must NOT stomp a row a concurrent reclaimer already drove to `completed` (gate stays free)",
+    async () => {
+      const clinic = `test-rfidp-${uid()}`;
+      const pool = dbPool();
+      await seedClinic(pool, clinic);
+      await seedReader(pool, clinic);
+      await rotateRfidSecret(clinic, `key-${uid()}`); // establish a current secret
+      const second = await rotateRfidSecret(clinic, `key-${uid()}`, { graceTtlMs: 600_000 });
+      expect(second.status).toBe("grace");
+
+      // Process A's Phase-1 claim landed the row in `finalizing`, then A's Phase-2 delete sat SLOW
+      // (>FINALIZING_STALE_MS) — NOT crashed. Model that with a stale `updated_at`; capture the exact
+      // stamp A's own claiming CAS would hold and thread into A's late revert.
+      await pool.query(
+        `UPDATE vt_rfid_secret_rotations
+           SET status='finalizing', previous_retained=true, updated_at = NOW() - INTERVAL '10 minutes'
+         WHERE clinic_id=$1 AND id=$2`,
+        [clinic, second.rotationId],
+      );
+      const strandedRow = await getRotation(clinic, second.rotationId);
+      if (!strandedRow) throw new Error("stranded finalizing row must exist");
+      const aClaimedUpdatedAt = new Date(strandedRow.updatedAt);
+
+      // A concurrent reclaimer (the sweep) re-claims the stale row and drives it to a durable
+      // `completed`: `previous` dropped from the blob, previous_retained=false, gate released, and
+      // `updated_at` re-stamped to the reclaim instant (≠ A's captured stamp).
+      const swept = await reclaimStrandedFinalizingRotations();
+      expect(swept.reclaimed).toBeGreaterThanOrEqual(1);
+      const completedRow = await getRotation(clinic, second.rotationId);
+      expect(completedRow?.status).toBe("completed");
+      expect(completedRow?.previousRetained).toBe(false);
+
+      // NOW A's slow delete finally FAILS and A runs its compensating revert with its OWN (now
+      // stale) claimed stamp. The ownership CAS (status='finalizing' AND updated_at=A's stamp) must
+      // match 0 rows: the `completed` row must STAY completed — an unguarded revert stomps it back to
+      // grace+previous_retained=true (no `previous` in the blob), bricking the one-in-flight gate
+      // forever (getRfidVerificationSecrets short-circuits on `!previous`; the sweep only selects
+      // `finalizing` — no backstop could ever reach it again).
+      await revertRotationToGrace(clinic, second.rotationId, "finalizing", aClaimedUpdatedAt, Date.now());
+
+      const afterRevert = await getRotation(clinic, second.rotationId);
+      expect(afterRevert?.status).toBe("completed"); // NOT stomped back to grace
+      expect(afterRevert?.previousRetained).toBe(false);
+
+      // Gate is FREE: a fresh rotation succeeds (would be ROTATION_IN_PROGRESS forever if stomped).
+      const third = await rotateRfidSecret(clinic, `key-${uid()}`, { graceTtlMs: 600_000 });
+      expect(third.status).toBe("grace");
+    },
+  );
+
+  it.runIf(dbReachable)(
+    "a FRESH (non-stale) `finalizing` row is never reclaimed by the sweep — an actively in-flight finalize is not stomped",
+    async () => {
+      const clinic = `test-rfidp-${uid()}`;
+      const pool = dbPool();
+      await seedClinic(pool, clinic);
+      await seedReader(pool, clinic);
+      await rotateRfidSecret(clinic, `key-${uid()}`);
+      const second = await rotateRfidSecret(clinic, `key-${uid()}`, { graceTtlMs: 600_000 });
+
+      // A genuinely in-flight finalize: `finalizing` with a FRESH `updated_at` (now).
+      await pool.query(
+        `UPDATE vt_rfid_secret_rotations
+           SET status='finalizing', previous_retained=true, updated_at = NOW()
+         WHERE clinic_id=$1 AND id=$2`,
+        [clinic, second.rotationId],
+      );
+
+      await reclaimStrandedFinalizingRotations(); // must leave the fresh row untouched
+
+      const row = await getRotation(clinic, second.rotationId);
+      expect(row?.status).toBe("finalizing"); // NOT reclaimed
+      expect(row?.previousRetained).toBe(true);
+    },
+  );
+
+  it.runIf(dbReachable)(
+    "two concurrent finalizes racing the SAME stale `finalizing` row → exactly ONE wins (true→completed); the loser returns false, 0 rows, no throw",
+    async () => {
+      const clinic = `test-rfidp-${uid()}`;
+      const pool = dbPool();
+      await seedClinic(pool, clinic);
+      await seedReader(pool, clinic);
+      await rotateRfidSecret(clinic, `key-${uid()}`);
+      const second = await rotateRfidSecret(clinic, `key-${uid()}`, { graceTtlMs: 600_000 });
+
+      // Stranded stale `finalizing` row (still holding the gate).
+      await pool.query(
+        `UPDATE vt_rfid_secret_rotations
+           SET status='finalizing', previous_retained=true, updated_at = NOW() - INTERVAL '10 minutes'
+         WHERE clinic_id=$1 AND id=$2`,
+        [clinic, second.rotationId],
+      );
+      const rot = await getRotation(clinic, second.rotationId);
+      if (!rot) throw new Error("stranded finalizing row must exist");
+
+      const now = Date.now();
+      const results = await Promise.allSettled([
+        finalizeRotation(clinic, rot, now),
+        finalizeRotation(clinic, rot, now),
+      ]);
+      // Neither throws; exactly one drives the row to `completed` (returns true), the other 0-rows
+      // its Phase-1 (or Phase-3) CAS and returns false — the "drove it to completed" contract that a
+      // blanket `return true` violated (double-counting the reclaim metric).
+      expect(results.every((r) => r.status === "fulfilled")).toBe(true);
+      const wins = results.filter((r) => r.status === "fulfilled" && r.value === true);
+      expect(wins).toHaveLength(1);
+
+      const row = await getRotation(clinic, second.rotationId);
+      expect(row?.status).toBe("completed");
+      expect(row?.previousRetained).toBe(false);
+    },
+  );
+
   it.runIf(dbReachable)("rollback within grace restores previous as current + invalidates the new secret", async () => {
     const clinic = `test-rfidp-${uid()}`;
-    await seedClinic(probePool!, clinic);
-    await seedReader(probePool!, clinic);
+    await seedClinic(dbPool(), clinic);
+    await seedReader(dbPool(), clinic);
     const first = await rotateRfidSecret(clinic, `key-${uid()}`);
     const second = await rotateRfidSecret(clinic, `key-${uid()}`, { graceTtlMs: 600_000 });
 
@@ -542,8 +695,8 @@ describe("R-M1.1c · HMAC rotation contract (DB-integration)", () => {
 
   it.runIf(dbReachable)("rotation with NO active readers completes immediately (previous invalidated, no rollback)", async () => {
     const clinic = `test-rfidp-${uid()}`;
-    await seedClinic(probePool!, clinic);
-    await seedReader(probePool!, clinic, "inactive"); // not eligible for the snapshot
+    await seedClinic(dbPool(), clinic);
+    await seedReader(dbPool(), clinic, "inactive"); // not eligible for the snapshot
     const first = await rotateRfidSecret(clinic, `key-${uid()}`);
     const second = await rotateRfidSecret(clinic, `key-${uid()}`, { graceTtlMs: 600_000 });
 
@@ -558,9 +711,9 @@ describe("R-M1.1c · HMAC rotation contract (DB-integration)", () => {
   it.runIf(dbReachable)("cross-clinic rotationId is NOT_FOUND — never rolled back/acked across tenants", async () => {
     const clinicA = `test-rfidp-a-${uid()}`;
     const clinicB = `test-rfidp-b-${uid()}`;
-    await seedClinic(probePool!, clinicA);
-    await seedClinic(probePool!, clinicB);
-    await seedReader(probePool!, clinicA);
+    await seedClinic(dbPool(), clinicA);
+    await seedClinic(dbPool(), clinicB);
+    await seedReader(dbPool(), clinicA);
     await rotateRfidSecret(clinicA, `key-${uid()}`);
     const rot = await rotateRfidSecret(clinicA, `key-${uid()}`, { graceTtlMs: 600_000 });
 
@@ -576,22 +729,22 @@ describe("R-M1.1c · HMAC rotation contract (DB-integration)", () => {
 
   it.runIf(dbReachable)("GUARDRAIL (1): a rotation never mutates custody — vt_equipment is byte-for-byte unchanged", async () => {
     const clinic = `test-rfidp-${uid()}`;
-    await seedClinic(probePool!, clinic);
+    await seedClinic(dbPool(), clinic);
     const eqId = uid();
-    await probePool!.query(
+    await dbPool().query(
       "INSERT INTO vt_equipment (id, name, clinic_id) VALUES ($1,$2,$3)",
       [eqId, "cust-probe", clinic],
     );
-    const before = await probePool!.query("SELECT * FROM vt_equipment WHERE id=$1", [eqId]);
+    const before = await dbPool().query("SELECT * FROM vt_equipment WHERE id=$1", [eqId]);
 
-    await seedReader(probePool!, clinic);
+    await seedReader(dbPool(), clinic);
     await rotateRfidSecret(clinic, `key-${uid()}`);
     const r = await rotateRfidSecret(clinic, `key-${uid()}`, { graceTtlMs: 600_000 });
     await getRfidVerificationSecrets(clinic);
     await rollbackRfidSecret(clinic, r.rotationId);
 
-    const after = await probePool!.query("SELECT * FROM vt_equipment WHERE id=$1", [eqId]);
-    const countAll = await probePool!.query(
+    const after = await dbPool().query("SELECT * FROM vt_equipment WHERE id=$1", [eqId]);
+    const countAll = await dbPool().query(
       "SELECT count(*)::int AS c FROM vt_equipment WHERE clinic_id=$1",
       [clinic],
     );
@@ -601,8 +754,8 @@ describe("R-M1.1c · HMAC rotation contract (DB-integration)", () => {
 
   it.runIf(dbReachable)("the plaintext secret is never written to console (not logged)", async () => {
     const clinic = `test-rfidp-${uid()}`;
-    await seedClinic(probePool!, clinic);
-    await seedReader(probePool!, clinic);
+    await seedClinic(dbPool(), clinic);
+    await seedReader(dbPool(), clinic);
     const seen: string[] = [];
     const spies = (["log", "info", "warn", "error", "debug"] as const).map((m) =>
       vi.spyOn(console, m).mockImplementation((...a: unknown[]) => {
@@ -667,7 +820,7 @@ describe("R-M1.1c · route guards", () => {
 
   it.runIf(dbReachable)("derives clinicId from auth ONLY — a body clinicId is ignored", async () => {
     const authedClinic = currentAuthUser!.clinicId;
-    await seedClinic(probePool!, authedClinic);
+    await seedClinic(dbPool(), authedClinic);
     const { res, captured } = makeRes();
     await dispatch(
       makeReq({ method: "POST", url: "/rfid-provisioning/rotate", body: { idempotencyKey: uid(), clinicId: "attacker-clinic" } }),

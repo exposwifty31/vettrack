@@ -122,12 +122,37 @@ async function getActiveReaderIds(clinicId: string): Promise<string[]> {
  * blob — `previous` is still retained and accepted — so a later verify/ack/rollback retries the
  * transition cleanly instead of being stranded on a `finalizing`/terminal row that no longer
  * matches the stored secrets.
+ *
+ * OWNERSHIP CAS (revert-stomp guard): the revert matches ONLY the exact row THIS caller claimed —
+ * its `fromStatus` (`finalizing` for a finalize delete failure, `rolled_back` for a rollback
+ * restore failure) AND the `claimedUpdatedAt` its own claiming CAS stamped. If a concurrent
+ * reclaimer has since re-claimed the row (updated_at changed) or driven it terminal (status
+ * changed) — e.g. finalizeRotation's Phase-1 was widened to reclaim a stale `finalizing` row, so a
+ * slow-but-not-crashed finalize and a sweep can both act on the same row — the predicate matches 0
+ * rows and this late/losing revert is a NO-OP. Without this guard a losing revert would stomp an
+ * already-`completed` row back to `grace` + `previous_retained=true` with no `previous` in the blob,
+ * bricking the one-in-flight gate forever (getRfidVerificationSecrets short-circuits on `!previous`
+ * and the sweep only selects `finalizing`, so no backstop could ever reach it). The legitimate
+ * non-raced revert (this caller still owns the row) still matches and restores grace.
  */
-async function revertRotationToGrace(clinicId: string, rotationId: string, now: number): Promise<void> {
+async function revertRotationToGrace(
+  clinicId: string,
+  rotationId: string,
+  fromStatus: RotationStatus,
+  claimedUpdatedAt: Date,
+  now: number,
+): Promise<void> {
   await db
     .update(rfidSecretRotations)
     .set({ status: "grace", previousRetained: true, completedAt: null, updatedAt: new Date(now) })
-    .where(and(eq(rfidSecretRotations.clinicId, clinicId), eq(rfidSecretRotations.id, rotationId)));
+    .where(
+      and(
+        eq(rfidSecretRotations.clinicId, clinicId),
+        eq(rfidSecretRotations.id, rotationId),
+        eq(rfidSecretRotations.status, fromStatus),
+        eq(rfidSecretRotations.updatedAt, claimedUpdatedAt),
+      ),
+    );
 }
 
 /**
@@ -183,6 +208,9 @@ async function finalizeRotation(clinicId: string, rot: RfidSecretRotation, now: 
     )
     .returning();
   if (claimed.length === 0) return false; // terminal, rolled_back, or an actively in-flight (fresh) finalize
+  // The exact `updated_at` THIS claim stamped — threaded into the ownership CAS of both the Phase-2
+  // revert and the Phase-3 commit so a concurrent reclaimer's row is never stomped/double-completed.
+  const claimedRow = claimed[0];
 
   // Phase 2 — durable credential delete of the retained previous secret.
   try {
@@ -193,12 +221,17 @@ async function finalizeRotation(clinicId: string, rot: RfidSecretRotation, now: 
       await storeCredentials(clinicId, "rfid", next);
     }
   } catch (err) {
-    await revertRotationToGrace(clinicId, rot.id, now);
+    // Ownership revert: no-op if a concurrent reclaimer already re-claimed/completed this row.
+    await revertRotationToGrace(clinicId, rot.id, "finalizing", claimedRow.updatedAt, now);
     throw err;
   }
 
-  // Phase 3 — the delete durably committed; only now advance to the terminal `completed`.
-  await db
+  // Phase 3 — the delete durably committed; only now advance to the terminal `completed`. Scoped to
+  // THIS claim (status + the claimed updated_at) and `.returning()`d so the win is observable: only
+  // the call that still owns the claim matched a row → `true`; a call whose claim a concurrent
+  // reclaimer already superseded matches 0 rows → `false`. This is the "returns whether THIS call
+  // drove it to completed" contract (a blanket `return true` double-counted the reclaim metric).
+  const completed = await db
     .update(rfidSecretRotations)
     .set({ status: "completed", previousRetained: false, completedAt: new Date(now), updatedAt: new Date(now) })
     .where(
@@ -206,9 +239,11 @@ async function finalizeRotation(clinicId: string, rot: RfidSecretRotation, now: 
         eq(rfidSecretRotations.clinicId, clinicId),
         eq(rfidSecretRotations.id, rot.id),
         eq(rfidSecretRotations.status, "finalizing"),
+        eq(rfidSecretRotations.updatedAt, claimedRow.updatedAt),
       ),
-    );
-  return true;
+    )
+    .returning();
+  return completed.length > 0;
 }
 
 /**
@@ -546,9 +581,19 @@ export async function rollbackRfidSecret(
       await storeCredentials(clinicId, "rfid", { webhook_secret: previous });
     }
   } catch (err) {
-    await revertRotationToGrace(clinicId, rotationId, now);
+    // Ownership revert of the row THIS rollback just CAS-claimed into `rolled_back` (no concurrent
+    // path touches a `rolled_back` row, but the guard keeps the revert precise and symmetric).
+    await revertRotationToGrace(clinicId, rotationId, "rolled_back", claimed.updatedAt, now);
     throw err;
   }
   incrementMetric("rfid_secret_rolled_back");
   return toEnvelope(claimed);
 }
+
+/**
+ * Test-only surface. Exposes the two internal CAS transitions so the revert-stomp ownership guard
+ * (finalizeRotation Phase-1 claim → the exact claimed `updated_at` → revertRotationToGrace /
+ * Phase-3 commit) can be exercised directly at the concurrency boundary the DB tests otherwise
+ * cannot reach. Never imported by production code.
+ */
+export const __test = { finalizeRotation, revertRotationToGrace };
