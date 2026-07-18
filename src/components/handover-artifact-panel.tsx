@@ -12,7 +12,9 @@
  * (`src/pages/handoff.tsx`).
  */
 import { useEffect, useRef, useState } from "react";
+import { ArrowLeft, ArrowRight } from "lucide-react";
 import { t } from "@/lib/i18n";
+import { useDirection } from "@/hooks/useDirection";
 import { Bdi } from "@/components/ui/bdi";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -42,6 +44,11 @@ export function HandoverArtifactPanel({
   onUnconfirm,
   onBack,
 }: HandoverArtifactPanelProps) {
+  // Hebrew is default (RTL): the back affordance must be a direction-aware icon,
+  // never a hardcoded "←" glyph (which does not flip). Matches the app's other
+  // back controls (e.g. code-blue-history).
+  const dir = useDirection();
+  const BackIcon = dir === "rtl" ? ArrowRight : ArrowLeft;
   return (
     <div className="flex flex-col gap-4 p-4">
       <header className="flex items-center gap-2">
@@ -52,7 +59,7 @@ export function HandoverArtifactPanel({
             aria-label={t.handoverPage.back}
             className="rounded-full px-2 py-1 text-sm text-muted-foreground hover:bg-muted"
           >
-            ←
+            <BackIcon className="h-4 w-4" aria-hidden />
           </button>
         )}
         <h1 className="text-lg font-bold leading-tight">{t.handoverPage.title}</h1>
@@ -71,7 +78,7 @@ export function HandoverArtifactPanel({
       )}
 
       {state === "empty" && (
-        <div className="py-8 text-center">
+        <div role="status" className="py-8 text-center">
           <h2 className="text-sm font-semibold">{t.handoverPage.emptyTitle}</h2>
           <p className="mt-1 text-sm text-muted-foreground">{t.handoverPage.emptyBody}</p>
         </div>
@@ -225,23 +232,32 @@ function AcknowledgeControl({
   const isAcknowledged = artifact.acknowledgedBy != null;
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [announcement, setAnnouncement] = useState("");
 
   const triggerRef = useRef<HTMLButtonElement>(null);
+  const undoRef = useRef<HTMLButtonElement>(null);
   const confirmRef = useRef<HTMLButtonElement>(null);
   const wasAcknowledged = useRef(isAcknowledged);
-  const returnFocusToTrigger = useRef(false);
+  const pendingUnconfirm = useRef(false);
 
-  // Focus INTO the confirm affordance when it opens.
+  // Focus INTO the confirm affordance when it discloses.
   useEffect(() => {
     if (confirmOpen) confirmRef.current?.focus();
   }, [confirmOpen]);
 
-  // RETURN focus to the trigger on unconfirm (acknowledged → unacknowledged) or
-  // when the confirm affordance closes without confirming.
+  // React to a SERVER-CONFIRMED acknowledged-state transition (the parent
+  // re-renders with the flipped artifact): move focus to the stable control and
+  // announce the result via the live region — the UI never optimistically flips.
   useEffect(() => {
-    if (wasAcknowledged.current && !isAcknowledged && returnFocusToTrigger.current) {
+    const was = wasAcknowledged.current;
+    if (!was && isAcknowledged) {
+      undoRef.current?.focus();
+      setAnnouncement(t.handoverPage.acknowledgedLabel);
+    } else if (was && !isAcknowledged && pendingUnconfirm.current) {
       triggerRef.current?.focus();
-      returnFocusToTrigger.current = false;
+      setAnnouncement(t.handoverPage.unconfirmedAnnounce);
+      pendingUnconfirm.current = false;
     }
     wasAcknowledged.current = isAcknowledged;
   }, [isAcknowledged]);
@@ -249,9 +265,15 @@ function AcknowledgeControl({
   const handleConfirm = async () => {
     if (busy) return;
     setBusy(true);
+    setError(null);
     try {
       await onAcknowledge();
+      // The parent flips the artifact → acknowledged on server confirmation; the
+      // transition effect above then moves focus + announces. Close the disclosure.
       setConfirmOpen(false);
+    } catch {
+      // Keep the confirm affordance open so the user can retry a failed attempt.
+      setError(t.handoverPage.acknowledgeError);
     } finally {
       setBusy(false);
     }
@@ -264,58 +286,77 @@ function AcknowledgeControl({
 
   const handleUnconfirm = async () => {
     if (busy) return;
-    returnFocusToTrigger.current = true;
     setBusy(true);
+    setError(null);
+    pendingUnconfirm.current = true;
     try {
       await onUnconfirm();
+      // Stays acknowledged until the parent flips it back (server-confirmed); the
+      // transition effect handles focus return + the undo announcement.
+    } catch {
+      setError(t.handoverPage.unconfirmError);
+      pendingUnconfirm.current = false;
     } finally {
       setBusy(false);
     }
   };
 
-  if (isAcknowledged) {
-    return (
-      <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3">
-        <p className="mb-2 text-sm font-semibold text-emerald-800">{t.handoverPage.acknowledgedLabel}</p>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          aria-pressed="true"
-          onClick={() => void handleUnconfirm()}
-          disabled={busy}
-        >
-          {t.handoverPage.unconfirmCta}
-        </Button>
-      </div>
-    );
-  }
-
-  if (confirmOpen) {
-    return (
-      <div className="rounded-xl border border-primary/30 bg-primary/5 p-3">
-        <p className="mb-2 text-sm font-medium">{t.handoverPage.acknowledgePrompt}</p>
-        <div className="flex gap-2">
-          <Button ref={confirmRef} type="button" size="sm" onClick={() => void handleConfirm()} disabled={busy}>
-            {t.handoverPage.acknowledgeConfirm}
-          </Button>
-          <Button type="button" variant="ghost" size="sm" onClick={handleCancel} disabled={busy}>
-            {t.handoverPage.acknowledgeCancel}
-          </Button>
+  const body = isAcknowledged ? (
+    <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3">
+      <p className="mb-2 text-sm font-semibold text-emerald-800">{t.handoverPage.acknowledgedLabel}</p>
+      <Button
+        ref={undoRef}
+        type="button"
+        variant="outline"
+        size="sm"
+        aria-pressed="true"
+        onClick={() => void handleUnconfirm()}
+        disabled={busy}
+      >
+        {t.handoverPage.unconfirmCta}
+      </Button>
+    </div>
+  ) : (
+    <div className="flex flex-col gap-2">
+      <Button
+        ref={triggerRef}
+        type="button"
+        className={cn("w-full")}
+        aria-haspopup="dialog"
+        aria-expanded={confirmOpen}
+        onClick={() => setConfirmOpen(true)}
+      >
+        {t.handoverPage.acknowledgeCta}
+      </Button>
+      {confirmOpen && (
+        <div className="rounded-xl border border-primary/30 bg-primary/5 p-3">
+          <p className="mb-2 text-sm font-medium">{t.handoverPage.acknowledgePrompt}</p>
+          <div className="flex gap-2">
+            <Button ref={confirmRef} type="button" size="sm" onClick={() => void handleConfirm()} disabled={busy}>
+              {t.handoverPage.acknowledgeConfirm}
+            </Button>
+            <Button type="button" variant="ghost" size="sm" onClick={handleCancel} disabled={busy}>
+              {t.handoverPage.acknowledgeCancel}
+            </Button>
+          </div>
         </div>
-      </div>
-    );
-  }
+      )}
+    </div>
+  );
 
   return (
-    <Button
-      ref={triggerRef}
-      type="button"
-      className={cn("w-full")}
-      aria-pressed="false"
-      onClick={() => setConfirmOpen(true)}
-    >
-      {t.handoverPage.acknowledgeCta}
-    </Button>
+    <div className="flex flex-col gap-2">
+      {body}
+      {error && (
+        <p role="alert" className="text-sm text-destructive">
+          {error}
+        </p>
+      )}
+      {/* Stable polite live region — survives the confirm→acknowledged unmount so
+          the success/undo result is announced, not lost. */}
+      <div aria-live="polite" className="sr-only">
+        {announcement}
+      </div>
+    </div>
   );
 }

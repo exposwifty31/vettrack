@@ -270,6 +270,19 @@ describe.skipIf(!DATABASE_URL)("R-SH-F1.5 — generate push + acknowledge/unconf
     expect(acked.notificationReadAt).toBeInstanceOf(Date); // flipped to read
     // ack NEVER fires a push (no follow-up push, no device retraction)
     expect(enqueueSpy).not.toHaveBeenCalled();
+
+    // its own audit row (server-persisted attestation): actor, clinicId,
+    // handover id, and the unread→read transition — asserted like the
+    // unconfirm reversal row below.
+    expect(logAuditMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        actionType: "shift_handover_acknowledged",
+        clinicId,
+        targetId: row.id,
+        performedBy: actor,
+        metadata: expect.objectContaining({ readStateTransition: "unread_to_read" }),
+      }),
+    );
   });
 
   it("acknowledge is rejected for a user NOT on the next-shift roster (ack-authorized ≡ push-targets)", async () => {
@@ -438,6 +451,13 @@ describe("R-SH-F1.5 — bidi isolation", () => {
   });
 });
 
+const ACKED_VM: HandoverArtifactViewModel = {
+  ...READY_VM,
+  acknowledgedBy: "u-noa",
+  acknowledgedAt: "2026-06-02T12:00:00Z",
+  notificationReadAt: "2026-06-02T12:00:00Z",
+};
+
 describe("R-SH-F1.5 — acknowledge control (deliberate, reversible, keyboard-operable)", () => {
   it("acknowledge is a deliberate two-step confirm; focus moves INTO the confirm affordance on open", async () => {
     renderPanel();
@@ -447,34 +467,84 @@ describe("R-SH-F1.5 — acknowledge control (deliberate, reversible, keyboard-op
     await waitFor(() => expect(document.activeElement).toBe(confirm));
   });
 
-  it("confirming via keyboard records the acknowledgement", async () => {
+  it("the acknowledge CTA is a coherent disclosure — aria-expanded tracks the confirm, no misleading aria-pressed", async () => {
+    renderPanel();
+    const trigger = screen.getByRole("button", { name: t.handoverPage.acknowledgeCta });
+    // Opening a separate confirm affordance is a disclosure, not a toggle: the
+    // trigger must NOT lie with aria-pressed (that toggle lives on the undo CTA).
+    expect(trigger.getAttribute("aria-pressed")).toBeNull();
+    expect(trigger.getAttribute("aria-haspopup")).toBeTruthy();
+    expect(trigger.getAttribute("aria-expanded")).toBe("false");
+    fireEvent.click(trigger);
+    await waitFor(() => expect(trigger.getAttribute("aria-expanded")).toBe("true"));
+  });
+
+  it("the confirm control is keyboard-operable (a focusable native button) and activating it records the acknowledgement", async () => {
     const onAcknowledge = vi.fn().mockResolvedValue(undefined);
     renderPanel({ onAcknowledge });
     fireEvent.click(screen.getByRole("button", { name: t.handoverPage.acknowledgeCta }));
     const confirm = await screen.findByRole("button", { name: t.handoverPage.acknowledgeConfirm });
-    fireEvent.keyDown(confirm, { key: "Enter" });
-    fireEvent.click(confirm); // Enter activates a button; assert the handler ran
+    // Keyboard-operability guarantee: a real <button> (the platform fires
+    // Enter/Space → click) that is focusable — not a div-with-role, not tabIndex=-1.
+    // happy-dom cannot synthesize the platform Enter→click, so we assert the
+    // native-button invariant + real activation rather than a no-op keyDown.
+    expect(confirm.tagName).toBe("BUTTON");
+    expect(confirm.getAttribute("tabindex")).not.toBe("-1");
+    confirm.focus();
+    expect(document.activeElement).toBe(confirm);
+    fireEvent.click(confirm);
     await waitFor(() => expect(onAcknowledge).toHaveBeenCalledTimes(1));
   });
 
   it("an acknowledged artifact exposes a reversible control with aria-pressed=true", () => {
-    renderPanel({
-      artifact: { ...READY_VM, acknowledgedBy: "u-noa", acknowledgedAt: "2026-06-02T12:00:00Z", notificationReadAt: "2026-06-02T12:00:00Z" },
-    });
+    renderPanel({ artifact: ACKED_VM });
     const undo = screen.getByRole("button", { name: t.handoverPage.unconfirmCta });
     expect(undo.getAttribute("aria-pressed")).toBe("true");
   });
 
-  it("unconfirm is keyboard-operable and RETURNS focus to the acknowledge trigger", async () => {
+  it("on a successful acknowledge the focus moves to the undo toggle and the result is announced", async () => {
+    const onAcknowledge = vi.fn().mockResolvedValue(undefined);
+    const { rerender } = renderPanel({ onAcknowledge });
+    fireEvent.click(screen.getByRole("button", { name: t.handoverPage.acknowledgeCta }));
+    const confirm = await screen.findByRole("button", { name: t.handoverPage.acknowledgeConfirm });
+    fireEvent.click(confirm);
+    await waitFor(() => expect(onAcknowledge).toHaveBeenCalledTimes(1));
+
+    // Parent flips the artifact to acknowledged (server-confirmed) → the confirm
+    // control unmounts. Focus must land on a stable element (the undo toggle) and
+    // the success must be announced via a live region rather than lost silently.
+    const { hook } = memoryLocation({ path: "/handoff" });
+    rerender(
+      <Router hook={hook}>
+        <HandoverArtifactPanel
+          state="ready"
+          artifact={ACKED_VM}
+          variant="phone"
+          canAcknowledge
+          onAcknowledge={onAcknowledge}
+          onUnconfirm={vi.fn()}
+        />
+      </Router>,
+    );
+    const undo = await screen.findByRole("button", { name: t.handoverPage.unconfirmCta });
+    await waitFor(() => expect(document.activeElement).toBe(undo));
+    const live = document.querySelector('[aria-live="polite"]');
+    await waitFor(() => expect(live?.textContent).toContain(t.handoverPage.acknowledgedLabel));
+  });
+
+  it("unconfirm is keyboard-operable and RETURNS focus to the acknowledge trigger + announces the undo", async () => {
     const onUnconfirm = vi.fn().mockResolvedValue(undefined);
     // Start acknowledged, then unconfirm; the component flips to unacknowledged and
     // must move focus back to the acknowledge trigger.
-    const { rerender } = renderPanel({
-      artifact: { ...READY_VM, acknowledgedBy: "u-noa", acknowledgedAt: "2026-06-02T12:00:00Z", notificationReadAt: "2026-06-02T12:00:00Z" },
-      onUnconfirm,
-    });
+    const { rerender } = renderPanel({ artifact: ACKED_VM, onUnconfirm });
     const undo = screen.getByRole("button", { name: t.handoverPage.unconfirmCta });
-    fireEvent.keyDown(undo, { key: "Enter" });
+    // Keyboard-operability guarantee: a real focusable <button> (the platform
+    // fires Enter/Space → click). happy-dom cannot synthesize the platform
+    // Enter→click, so assert the native-button invariant + real activation —
+    // consistent with the acknowledge-confirm keyboard test above.
+    expect(undo.tagName).toBe("BUTTON");
+    undo.focus();
+    expect(document.activeElement).toBe(undo);
     fireEvent.click(undo);
     await waitFor(() => expect(onUnconfirm).toHaveBeenCalledTimes(1));
 
@@ -493,30 +563,82 @@ describe("R-SH-F1.5 — acknowledge control (deliberate, reversible, keyboard-op
     );
     const trigger = await screen.findByRole("button", { name: t.handoverPage.acknowledgeCta });
     await waitFor(() => expect(document.activeElement).toBe(trigger));
+    const live = document.querySelector('[aria-live="polite"]');
+    await waitFor(() => expect(live?.textContent).toContain(t.handoverPage.unconfirmedAnnounce));
+  });
+
+  it("surfaces a user-visible error when acknowledge fails (403/404/network) and keeps the confirm open", async () => {
+    const onAcknowledge = vi.fn().mockRejectedValue(new Error("403"));
+    renderPanel({ onAcknowledge });
+    fireEvent.click(screen.getByRole("button", { name: t.handoverPage.acknowledgeCta }));
+    const confirm = await screen.findByRole("button", { name: t.handoverPage.acknowledgeConfirm });
+    fireEvent.click(confirm);
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toContain(t.handoverPage.acknowledgeError);
+    // UI stays consistent: still unacknowledged, confirm affordance still available.
+    expect(screen.getByRole("button", { name: t.handoverPage.acknowledgeConfirm })).toBeTruthy();
+  });
+
+  it("surfaces a user-visible error when unconfirm fails", async () => {
+    const onUnconfirm = vi.fn().mockRejectedValue(new Error("network"));
+    renderPanel({ artifact: ACKED_VM, onUnconfirm });
+    fireEvent.click(screen.getByRole("button", { name: t.handoverPage.unconfirmCta }));
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toContain(t.handoverPage.unconfirmError);
+    // Stays acknowledged (server never confirmed the reversal).
+    expect(screen.getByRole("button", { name: t.handoverPage.unconfirmCta })).toBeTruthy();
+  });
+});
+
+describe("R-SH-F1.5 — surface announcements + back affordance", () => {
+  it("announces the empty state (role=status) so it is not silently rendered", () => {
+    renderPanel({ state: "empty", artifact: null });
+    const status = screen.getByRole("status");
+    expect(status.textContent).toContain(t.handoverPage.emptyTitle);
+  });
+
+  it("renders an RTL-safe back affordance (icon, not a hardcoded non-flipping arrow)", () => {
+    const onBack = vi.fn();
+    renderPanel({ onBack });
+    const back = screen.getByRole("button", { name: t.handoverPage.back });
+    // A hardcoded U+2190 "←" does not flip for RTL (Hebrew is default): the
+    // affordance must be a logical/RTL-aware icon, never the raw glyph.
+    expect(back.textContent).not.toContain("←");
+    expect(back.querySelector("svg")).toBeTruthy();
   });
 });
 
 describe("R-SH-F1.5 — /handoff deep-link fallback", () => {
-  it("falls back to /home when there is no history to go back to", () => {
-    const { hook, navigate } = memoryLocation({ path: "/handoff", record: true });
+  it("navigates to /home when there is no history to go back to (fallback is actually taken)", async () => {
+    // Deep-link entry with no back history → handleBack must route to /home.
+    vi.spyOn(window.history, "length", "get").mockReturnValue(1);
+    const { hook, history } = memoryLocation({ path: "/handoff", record: true });
     render(
       <Router hook={hook}>
         <HandoffPage />
       </Router>,
     );
-    void navigate;
     // exactly one <h1> on the /handoff surface
     expect(document.querySelectorAll("h1").length).toBe(1);
+
+    const back = screen.getByRole("button", { name: t.handoverPage.back });
+    fireEvent.click(back);
+    await waitFor(() => expect(history).toContain("/home"));
   });
 });
 
 describe("R-SH-F1.5 — he/en parity of the handover surface copy", () => {
-  it("every handoverPage key renders in both locales", () => {
-    refreshTranslations("he");
-    expect(typeof t.handoverPage.title).toBe("string");
-    expect(t.handoverPage.title.length).toBeGreaterThan(0);
-    refreshTranslations("en");
-    expect(typeof t.handoverPage.title).toBe("string");
-    expect(t.handoverPage.title.length).toBeGreaterThan(0);
+  it("every handoverPage key renders a non-empty string in BOTH locales", () => {
+    const keys = Object.keys(t.handoverPage) as Array<keyof typeof t.handoverPage>;
+    expect(keys.length).toBeGreaterThan(1);
+
+    for (const locale of ["he", "en"] as const) {
+      refreshTranslations(locale);
+      for (const key of keys) {
+        const value = t.handoverPage[key];
+        expect(typeof value, `${locale}:handoverPage.${String(key)}`).toBe("string");
+        expect((value as string).length, `${locale}:handoverPage.${String(key)}`).toBeGreaterThan(0);
+      }
+    }
   });
 });

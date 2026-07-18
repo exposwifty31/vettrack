@@ -101,19 +101,67 @@ async function seedAudit(
   return id;
 }
 
-async function seedOutbox(clinicId: string, type: string, at: Date): Promise<string> {
+async function seedOutbox(
+  clinicId: string,
+  type: string,
+  at: Date,
+  payload: Record<string, unknown> = {},
+): Promise<string> {
   const [row] = await db
     .insert(eventOutbox)
-    .values({ clinicId, type, payload: {}, occurredAt: at })
+    .values({ clinicId, type, payload, occurredAt: at })
     .returning({ id: eventOutbox.id });
   return String(row!.id);
+}
+
+/** The shift_handover_generated audit rows for a given handover id (clinic-scoped). */
+async function countHandoverAudits(clinicId: string, handoverId: string): Promise<number> {
+  const rows = await db
+    .select({ id: auditLogs.id })
+    .from(auditLogs)
+    .where(
+      and(
+        eq(auditLogs.clinicId, clinicId),
+        eq(auditLogs.actionType, "shift_handover_generated"),
+        eq(auditLogs.targetId, handoverId),
+      ),
+    );
+  return rows.length;
+}
+
+/** Poll for the fire-and-forget shift_handover_generated audit row after a fresh generate. */
+async function waitForHandoverAudit(
+  clinicId: string,
+  handoverId: string,
+): Promise<{ actionType: string } | null> {
+  for (let i = 0; i < 50; i++) {
+    const [r] = await db
+      .select({ actionType: auditLogs.actionType })
+      .from(auditLogs)
+      .where(
+        and(
+          eq(auditLogs.clinicId, clinicId),
+          eq(auditLogs.actionType, "shift_handover_generated"),
+          eq(auditLogs.targetId, handoverId),
+        ),
+      )
+      .limit(1);
+    if (r) return r;
+    await new Promise((res) => setTimeout(res, 40));
+  }
+  return null;
 }
 
 /** Seed the FULL in/out-of-window + cross-clinic delta fixture for one clinic. */
 async function seedClinicDeltas(clinicId: string, userId: string) {
   return {
     custodyAudit: await seedAudit(clinicId, userId, "equipment_checked_out", "eq1", IN_WINDOW),
-    custodyOutbox: await seedOutbox(clinicId, "EQUIPMENT_CUSTODY_STATE_CHANGED", IN_WINDOW),
+    // A REALISTIC dual-emit: equipment checkout writes the audit row above AND
+    // pairs a domain-outbox EQUIPMENT_CUSTODY_STATE_CHANGED for the SAME equipment
+    // at the SAME instant. It is ONE logical custody transition — must not count twice.
+    custodyOutbox: await seedOutbox(clinicId, "EQUIPMENT_CUSTODY_STATE_CHANGED", IN_WINDOW, {
+      equipmentId: "eq1",
+    }),
     taskStarted: await seedAudit(clinicId, userId, "task_started", "task1", IN_WINDOW),
     taskCompleted: await seedAudit(clinicId, userId, "task_completed", "task2", IN_WINDOW),
     alertCreated: await seedAudit(clinicId, userId, "whatsapp_alert_created", "alert1", IN_WINDOW),
@@ -167,7 +215,10 @@ describe.skipIf(!DATABASE_URL)("R-SH-F1.2 — shift-handover delta generator", (
     const row = await generateShiftHandover(clinicA, sessionA);
 
     const custodyIds = row.deltas.custody.map((d) => d.sourceId).sort();
-    expect(custodyIds).toEqual([fixtureA.custodyAudit, fixtureA.custodyOutbox].sort());
+    // ONE logical checkout: the audit row is kept and its paired
+    // EQUIPMENT_CUSTODY_STATE_CHANGED domain-outbox mirror (same equipment, same
+    // instant) is de-duplicated — the custody delta is NOT double-counted.
+    expect(custodyIds).toEqual([fixtureA.custodyAudit]);
 
     const taskIds = row.deltas.taskState.map((d) => d.sourceId).sort();
     expect(taskIds).toEqual([fixtureA.taskStarted, fixtureA.taskCompleted].sort());
@@ -207,7 +258,9 @@ describe.skipIf(!DATABASE_URL)("R-SH-F1.2 — shift-handover delta generator", (
       ].map((d) => d.sourceId),
     );
     // Clinic B's rows must never leak in — assert counts are the clinic-A-only totals.
-    expect(row.deltas.custody).toHaveLength(2);
+    // Custody is 1: the checkout's audit row + its paired domain-outbox mirror are
+    // ONE logical transition (de-duplicated), not two.
+    expect(row.deltas.custody).toHaveLength(1);
     expect(row.deltas.taskState).toHaveLength(2);
     expect(row.deltas.alerts).toHaveLength(1);
     expect(row.deltas.dispenses).toHaveLength(1);
@@ -221,6 +274,39 @@ describe.skipIf(!DATABASE_URL)("R-SH-F1.2 — shift-handover delta generator", (
     ]) {
       expect(allIds.has(d.sourceId)).toBe(false);
     }
+  });
+
+  it("de-duplicates a paired audit+domain-outbox custody dual-emit, keeping an audit-less domain event", async () => {
+    // A domain custody event with NO paired audit row is a legitimately-distinct
+    // delta and must survive de-duplication (only the DUPLICATE is dropped).
+    const unpairedOutbox = await seedOutbox(
+      clinicA,
+      "EQUIPMENT_CUSTODY_STATE_CHANGED",
+      IN_WINDOW,
+      { equipmentId: "eqUNPAIRED" },
+    );
+    const row = await generateShiftHandover(clinicA, sessionA);
+    const custodyIds = new Set(row.deltas.custody.map((d) => d.sourceId));
+    // the eq1 checkout audit survives; its paired outbox mirror is dropped
+    expect(custodyIds.has(fixtureA.custodyAudit)).toBe(true);
+    expect(custodyIds.has(fixtureA.custodyOutbox)).toBe(false);
+    // the audit-less domain event (eqUNPAIRED) is a distinct delta — kept
+    expect(custodyIds.has(unpairedOutbox)).toBe(true);
+    expect(row.deltas.custody).toHaveLength(2);
+  });
+
+  it("writes a shift_handover_generated audit on a fresh generate but NOT on a retry", async () => {
+    const first = await generateShiftHandover(clinicA, sessionA);
+    const auditRow = await waitForHandoverAudit(clinicA, first.id);
+    expect(auditRow).toBeTruthy();
+    expect(auditRow?.actionType).toBe("shift_handover_generated");
+    expect(await countHandoverAudits(clinicA, first.id)).toBe(1);
+
+    // A retry returns the persisted revision verbatim and emits NO new audit row.
+    const retry = await generateShiftHandover(clinicA, sessionA);
+    expect(retry.id).toBe(first.id);
+    await new Promise((res) => setTimeout(res, 200)); // settle any fire-and-forget write
+    expect(await countHandoverAudits(clinicA, first.id)).toBe(1);
   });
 
   it("is IDEMPOTENT — retry returns the persisted current revision unchanged", async () => {

@@ -4406,6 +4406,9 @@
     "acknowledgeCancel": "ביטול",
     "acknowledgedLabel": "המסירה אושרה",
     "unconfirmCta": "ביטול האישור",
+    "unconfirmedAnnounce": "האישור בוטל.",
+    "acknowledgeError": "לא ניתן לרשום את האישור. נסה שוב.",
+    "unconfirmError": "לא ניתן לבטל את האישור. נסה שוב.",
     "back": "חזרה"
   }
 }

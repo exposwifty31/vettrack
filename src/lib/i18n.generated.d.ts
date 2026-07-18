@@ -3026,6 +3026,10 @@ export interface TStructure {
       title: string;
       body: string;
     };
+    handover: {
+      title: string;
+      body: string;
+    };
   };
   shiftChat: {
     broadcast: {
@@ -4380,5 +4384,34 @@ export interface TStructure {
     noHomeHint: string;
     stationUnresolvedHint: string;
     offlineDockHint: string;
+  };
+  handoverPage: {
+    title: string;
+    loading: string;
+    loadError: string;
+    emptyTitle: string;
+    emptyBody: string;
+    deltasHeading: string;
+    deltaCustody: string;
+    deltaTasks: string;
+    deltaAlerts: string;
+    deltaDispenses: string;
+    openItemsHeading: string;
+    openItemsNone: string;
+    worklistHeading: string;
+    worklistNotConfigured: string;
+    worklistError: string;
+    worklistEmpty: string;
+    staffHeading: string;
+    acknowledgeCta: string;
+    acknowledgePrompt: string;
+    acknowledgeConfirm: string;
+    acknowledgeCancel: string;
+    acknowledgedLabel: string;
+    unconfirmCta: string;
+    unconfirmedAnnounce: string;
+    acknowledgeError: string;
+    unconfirmError: string;
+    back: string;
   };
 }

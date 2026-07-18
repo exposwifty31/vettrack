@@ -4406,6 +4406,9 @@
     "acknowledgeCancel": "Cancel",
     "acknowledgedLabel": "Handover acknowledged",
     "unconfirmCta": "Undo acknowledgement",
+    "unconfirmedAnnounce": "Acknowledgement undone.",
+    "acknowledgeError": "Couldn't record your acknowledgement. Please try again.",
+    "unconfirmError": "Couldn't undo the acknowledgement. Please try again.",
     "back": "Back"
   }
 }
