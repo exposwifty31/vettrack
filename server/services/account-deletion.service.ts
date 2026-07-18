@@ -35,12 +35,14 @@ export class AccountDeletionProtectedError extends Error {
 }
 
 function protectedDeletionEmails(): string[] {
-  const raw = process.env.ACCOUNT_DELETION_PROTECTED_EMAILS?.trim();
-  if (!raw) return DEFAULT_PROTECTED_EMAILS;
-  return raw
+  const fromEnv = (process.env.ACCOUNT_DELETION_PROTECTED_EMAILS ?? "")
     .split(",")
     .map((e) => e.trim().toLowerCase())
     .filter(Boolean);
+  // The built-in reviewer default is ALWAYS protected — the env var ADDS to the
+  // list rather than replacing it, so a Railway override can never accidentally
+  // make the App Review demo account self-deletable mid-review.
+  return Array.from(new Set([...DEFAULT_PROTECTED_EMAILS, ...fromEnv]));
 }
 
 /** True when the email is blocked from self-service deletion (demo / review accounts). */
@@ -108,6 +110,10 @@ async function anonymizeUser(clinicId: string, userId: string, actorId: string):
         email: `deleted+${userId}@account-deleted.invalid`,
         name: "",
         displayName: "Deleted account",
+        // Strip every remaining PII/verification artifact so the tombstone holds
+        // no personal data — the hard-delete path removes these via row deletion.
+        vetLicenseNumber: null,
+        avatarUrl: null,
         status: "blocked",
         deletedAt: new Date(),
         deletedBy: actorId,

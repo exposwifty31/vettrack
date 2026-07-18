@@ -11,6 +11,7 @@ import { setAuthStateRef, clearHaltQueue, processQueue } from "@/lib/sync-engine
 import { maybeReportOfflineSyncTelemetry } from "@/lib/offline-sync-telemetry-reporter";
 import { isOnline, safeReloadPage } from "@/lib/safe-browser";
 import { isCapacitorNative } from "@/lib/capacitor-runtime";
+import { applyPreferredLocale } from "@/lib/i18n";
 import {
   resolveNativeClerkSessionToken,
   summarizeClerkToken,
@@ -186,6 +187,9 @@ function DevAuthProviderInner({ children }: { children: ReactNode }) {
         const status = (data.status ?? "active") as UserStatus;
         const resolvedEmail = typeof data.email === "string" ? data.email : "";
         const resolvedName = typeof data.name === "string" ? data.name : "";
+        // Apply the server-side preferred locale (e.g. reviewer account = "en")
+        // once the profile is known, unless the user made an explicit in-app choice.
+        applyPreferredLocale(typeof data.preferredLocale === "string" ? data.preferredLocale : undefined);
         if (!dbUserId) {
           throw new Error("Missing DB user ID in /api/users/me response");
         }

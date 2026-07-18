@@ -40,7 +40,10 @@ export function TwoPaneLayout({
       <section
         aria-label={masterLabel}
         style={{
-          width: masterWidth,
+          // Responsive master width: shrink with the viewport (fraction) but
+          // keep a usable floor and never grow past `masterWidth`, so the
+          // detail pane stays wide enough on 11"-class iPads in portrait.
+          width: `clamp(260px, 42%, ${masterWidth}px)`,
           flexShrink: 0,
           minHeight: 0,
           overflowY: "auto",

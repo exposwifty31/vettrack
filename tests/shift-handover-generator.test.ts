@@ -178,15 +178,27 @@ async function purge(clinicId: string) {
   // vt_audit_logs is append-only (DO INSTEAD NOTHING delete rule); disable it
   // briefly to purge this test's own seeded rows, then restore it. Its clinic
   // FK is RESTRICT, so the clinic can't be dropped while audit rows survive.
-  await db.execute(sql`ALTER TABLE vt_audit_logs DISABLE RULE no_delete_audit_logs`);
-  try {
-    await db.delete(auditLogs).where(eq(auditLogs.clinicId, clinicId));
-  } finally {
-    await db.execute(sql`ALTER TABLE vt_audit_logs ENABLE RULE no_delete_audit_logs`);
-  }
+  const purgeAuditRows = async () => {
+    await db.execute(sql`ALTER TABLE vt_audit_logs DISABLE RULE no_delete_audit_logs`);
+    try {
+      await db.delete(auditLogs).where(eq(auditLogs.clinicId, clinicId));
+    } finally {
+      await db.execute(sql`ALTER TABLE vt_audit_logs ENABLE RULE no_delete_audit_logs`);
+    }
+  };
+  await purgeAuditRows();
   await db.delete(shiftSessions).where(eq(shiftSessions.clinicId, clinicId));
   await db.delete(users).where(eq(users.clinicId, clinicId));
-  await db.delete(clinics).where(eq(clinics.id, clinicId));
+  // generateShiftHandover writes a FIRE-AND-FORGET shift_handover_generated audit
+  // that can land AFTER the first purge; on the resulting clinic-FK violation,
+  // re-purge the late audit row and retry once so teardown is timing-independent.
+  try {
+    await db.delete(clinics).where(eq(clinics.id, clinicId));
+  } catch {
+    await new Promise((r) => setTimeout(r, 200));
+    await purgeAuditRows();
+    await db.delete(clinics).where(eq(clinics.id, clinicId));
+  }
 }
 
 describe.skipIf(!DATABASE_URL)("R-SH-F1.2 — shift-handover delta generator", () => {

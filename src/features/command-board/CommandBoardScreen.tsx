@@ -33,6 +33,7 @@ import { STATUS_BG } from "./status-tokens";
 import { CommandBoard } from "./components/CommandBoard";
 import { CodeBlueOverlay } from "./components/CodeBlueOverlay";
 import { useKioskModeFromUrl } from "./use-kiosk-mode-from-url";
+import { useDirection } from "@/hooks/useDirection";
 
 interface CommandBoardScreenProps {
   kioskMode?: boolean;
@@ -61,6 +62,7 @@ function toKnownEquipmentStatus(status: string): EquipmentStatus {
 
 function CommandBoardScreen({ kioskMode: kioskModeProp }: CommandBoardScreenProps) {
   const qc = useQueryClient();
+  const dir = useDirection();
   const realtimeIngestor = useMemo(() => new EventIngestor(qc), [qc]);
 
   // Phase 9 PR 9.2 — `?kiosk=1` opts a Department Display surface into TV-grade
@@ -145,7 +147,7 @@ function CommandBoardScreen({ kioskMode: kioskModeProp }: CommandBoardScreenProp
     return (
       <div
         className="dark flex flex-col min-h-screen bg-[rgb(var(--ivory-bg))] text-ivory-text"
-        dir="rtl"
+        dir={dir}
         data-testid="board-skeleton"
         role="status"
         aria-live="polite"
@@ -185,7 +187,7 @@ function CommandBoardScreen({ kioskMode: kioskModeProp }: CommandBoardScreenProp
   if (!board) {
     // commandBoard timed out or service error — show legacy equipment list
     return (
-      <div className="min-h-screen bg-[rgb(var(--ivory-bg))] text-ivory-text flex flex-col dark" dir="rtl">
+      <div className="min-h-screen bg-[rgb(var(--ivory-bg))] text-ivory-text flex flex-col dark" dir={dir}>
         <div className="flex items-center gap-3 px-5 py-3 bg-[var(--brand-navy)]">
           <span className="text-sm font-bold text-white/70">{t.board.subtitle}</span>
           <span className="vt-text-2xs text-emergency-amber ms-auto">{t.board.fallbackBoardUnavailable}</span>

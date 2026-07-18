@@ -4,7 +4,13 @@
 # Exit 0 only if every gate passes. Any FAIL exits non-zero.
 set -uo pipefail
 
-REPO="${REPO:-/Users/dan/vettrack}"
+# Resolve this script's own repo root (the checkout containing THIS file) and use
+# it as the default REPO. A stale hardcoded default would cd into a different/older
+# checkout, reading CURRENT_PROJECT_VERSION and the last-shipped baseline from the
+# wrong tree and false-failing the build-number gate. Still overridable via $REPO.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+REPO="${REPO:-$SCRIPT_REPO_ROOT}"
 cd "$REPO" || { echo "FAIL: repo not found at $REPO"; exit 2; }
 
 # Private temp dir (0700, unpredictable name) for the response bodies + the sign-in
@@ -113,7 +119,15 @@ BN=$(grep -m1 'CURRENT_PROJECT_VERSION = ' ios/App/App.xcodeproj/project.pbxproj
 # Read the WHOLE baseline file (stripping surrounding whitespace) — do NOT grep out
 # the first digit run. A malformed file like "build-25-old" must fail the `^[0-9]+$`
 # check below (fail closed), not silently parse to "25".
-FILE_LAST=$(tr -d '[:space:]' < ios/.last-shipped-build 2>/dev/null || true)
+if [ -f ios/.last-shipped-build ]; then
+  # Strip ONLY surrounding whitespace, never internal — a malformed "2 6" / "2\n6"
+  # must fail the ^[0-9]+$ check below (fail closed), not silently parse to "26".
+  FILE_LAST=$(<ios/.last-shipped-build)
+  FILE_LAST="${FILE_LAST#"${FILE_LAST%%[![:space:]]*}"}"
+  FILE_LAST="${FILE_LAST%"${FILE_LAST##*[![:space:]]}"}"
+else
+  FILE_LAST=""
+fi
 LAST="${LAST_SHIPPED_BUILD:-${FILE_LAST:-}}"
 # Validate both integers before the numeric compare. BN comes from a parsed
 # pbxproj; LAST can come from a hand-set LAST_SHIPPED_BUILD env or a garbled

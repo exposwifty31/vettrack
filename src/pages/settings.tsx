@@ -13,6 +13,7 @@ import { withToast } from "@/lib/toast-result";
 import { Button } from "@/components/ui/button";
 import { Bdi } from "@/components/ui/bdi";
 import { maskEmail } from "@/lib/mask-email";
+import { isCapacitorNative } from "@/lib/capacitor-runtime";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ErrorCard } from "@/components/ui/error-card";
 import {
@@ -305,8 +306,8 @@ export default function SettingsPage() {
           </div>
         </section>
 
-        {/* Push Notifications */}
-        {push.supported && (
+        {/* Push Notifications — web push only; hidden on the Capacitor shell (no web-push / APNs plugin) */}
+        {push.supported && !isCapacitorNative() && (
           <section className="space-y-2">
             <SettingsSectionHeader label={t.settingsPage.pushNotifications} />
             <div className="space-y-2">

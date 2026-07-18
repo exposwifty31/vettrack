@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { useLocation, useParams, useSearch } from "wouter";
 import { TwoPaneLayout } from "@/native/tablet/TwoPaneLayout";
 import { SelectItemPlaceholder } from "@/native/tablet/SelectItemPlaceholder";
+import { PageErrorBoundary } from "@/components/ui/page-error-boundary";
 import { EquipmentListScreen, EquipmentDetailScreen } from "@/features/equipment";
 import { t } from "@/lib/i18n";
 
@@ -29,8 +30,18 @@ export default function EquipmentMasterDetail() {
     <TwoPaneLayout
       masterLabel={t.nav.equipment}
       detailLabel={t.equipmentDetail.atGlance}
-      master={<EquipmentListScreen />}
-      detail={id ? <EquipmentDetailScreen equipmentId={id} hideBack /> : null}
+      master={
+        <PageErrorBoundary>
+          <EquipmentListScreen />
+        </PageErrorBoundary>
+      }
+      detail={
+        id ? (
+          <PageErrorBoundary key={id}>
+            <EquipmentDetailScreen equipmentId={id} hideBack />
+          </PageErrorBoundary>
+        ) : null
+      }
       placeholder={<SelectItemPlaceholder />}
     />
   );

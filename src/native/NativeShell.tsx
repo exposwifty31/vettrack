@@ -24,8 +24,13 @@ type Props = {
  *     to protect interactive content.
  *   - Bottom: NativeTabBar adds paddingBottom via env(safe-area-inset-bottom).
  */
-/** Signed-out surfaces own their whole viewport — no header, tab bar, or sidebar. */
-const AUTH_ROUTE_PATTERN = /^\/(signin|signup)(\/|$)/;
+/**
+ * Bare-chrome surfaces own their whole viewport — no header, tab bar, or sidebar.
+ * Auth (signin/signup) plus the legal/marketing pages (privacy/terms/support),
+ * which are linked from the signed-out sign-in footer and render as standalone
+ * documents (own back → /signin) rather than inside the signed-in app chrome.
+ */
+const AUTH_ROUTE_PATTERN = /^\/(signin|signup|privacy|terms|support)(\/|$)/;
 
 export function NativeShell({ children }: Props) {
   const [moreOpen, setMoreOpen] = useState(false);

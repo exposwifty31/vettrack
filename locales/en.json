@@ -1478,7 +1478,22 @@
     "personalDebtNone": "All checkouts look current"
   },
   "notFoundPage": {
-    "title": "Page not found — VetTrack"
+    "title": "Page not found — VetTrack",
+    "metaDescription": "The page you are looking for does not exist. Return to the VetTrack dashboard.",
+    "heading": "Page not found",
+    "body": "The page you are looking for does not exist.",
+    "goHome": "Go to home"
+  },
+  "pushErrors": {
+    "notSupported": "Push notifications aren't supported on this device.",
+    "permissionDenied": "Notification permission was denied.",
+    "vapidFetchFailed": "Couldn't reach the notification server. Please try again.",
+    "serviceWorkerTimeout": "Notification setup timed out. Please try again.",
+    "serviceWorkerUnsupported": "Push notifications aren't supported in this browser.",
+    "serviceWorkerUnavailable": "Couldn't start notifications. Please try again.",
+    "cursorUnsupported": "Push notifications aren't supported in Cursor's built-in browser. Open VetTrack in Chrome or Edge.",
+    "saveFailed": "Couldn't save your notification subscription. Please try again.",
+    "subscribeFailed": "Couldn't enable notifications. Please try again."
   },
   "homePage": {
     "greeting": "Hello, {name}",
@@ -1837,6 +1852,8 @@
     "subtitleEmpty": "Room-by-room inventory",
     "emptyRooms": "No rooms yet",
     "createFirstRoomHint": "Create the first room to organize equipment by location.",
+    "emptyRoomsHintNonAdmin": "No rooms have been created yet. Ask an admin to set them up.",
+    "addFirstRoom": "Add first room",
     "createRoomDialogTitle": "Create room",
     "roomName": "Room name *",
     "roomFloorOptional": "Floor / area (optional)",
@@ -3871,7 +3888,8 @@
     "pairButton": "Pair display",
     "hint": "Ask an admin to issue a code from Displays in the management console.",
     "revokedNoticeTitle": "This display's pairing was revoked",
-    "revokedNoticeMessage": "An admin revoked this display's access, or its pairing is no longer valid. Enter a new pairing code to reconnect."
+    "revokedNoticeMessage": "An admin revoked this display's access, or its pairing is no longer valid. Enter a new pairing code to reconnect.",
+    "rateLimited": "Too many attempts. Wait a minute, then try again."
   },
   "board": {
     "deployableNow": "Deployable now",

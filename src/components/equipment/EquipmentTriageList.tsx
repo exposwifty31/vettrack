@@ -1,4 +1,4 @@
-import { Link } from "wouter";
+import { Link, useSearch } from "wouter";
 import { getEquipmentDisplayName } from "@/lib/equipment-display";
 import { Bdi } from "@/components/ui/bdi";
 import { t } from "@/lib/i18n";
@@ -42,6 +42,11 @@ interface EquipmentTriageListProps {
 export function EquipmentTriageList({ items, className }: EquipmentTriageListProps) {
   const direction = useDirection();
   const Chevron = direction === "rtl" ? ChevronLeft : ChevronRight;
+  // Preserve the active filter/search query when opening a row so the iPad
+  // master pane keeps its filters as the detail swaps (query is separate from
+  // the `:id` route param). On phone the query is ignored by the detail route
+  // but restored on Back — harmless there.
+  const search = useSearch();
 
   const sorted = [...items].sort((a, b) => {
     const ta = TRIAGE_ORDER[equipmentTriageTier(a)];
@@ -65,7 +70,7 @@ export function EquipmentTriageList({ items, className }: EquipmentTriageListPro
         const updated = eq.lastSeen ?? eq.checkedOutAt ?? eq.createdAt;
         return (
           <Link
-            href={`/equipment/${eq.id}`}
+            href={`/equipment/${eq.id}${search ? `?${search}` : ""}`}
             className="eqp-row flex min-h-[56px] items-stretch gap-0 transition-colors motion-safe:active:bg-muted/50"
             data-testid={`equipment-triage-row-${eq.id}`}
           >

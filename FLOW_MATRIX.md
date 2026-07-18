@@ -32,7 +32,7 @@ Role hierarchy (numeric): `admin` 40 · `vet` 30 · `senior_technician` 25 · `t
 |---------|----------|------------|-----|----------|----------|--------------|---------|---------|--------|
 | AUTH-01 | `/signin` | public | Clerk FAPI (client) | — | — | — | Signed-in session | Clerk / bot protection | ❌ |
 | AUTH-02 | `/signup` | public | Clerk + `POST /api/users/sync` | sync user row | — | `vt_users.status=pending` (non-admin email) | Account created | validation / trust | ❌ |
-| AUTH-03 | `/pending` | pending | `GET /api/users/me` | — | — | — | Pending screen (`AuthGuard`) | API 403 `ACCOUNT_PENDING_APPROVAL` on protected routes | ❌ |
+| AUTH-03 | pending state rendered by `AuthGuard` (`/pending` → redirect `/equipment`) | pending | `GET /api/users/me` | — | — | — | Pending screen (`AuthGuard.tsx`) | API 403 `ACCOUNT_PENDING_APPROVAL` on protected routes | ❌ |
 | AUTH-04 | any `<AuthGuard>` | blocked | `GET /api/users/me` | — | — | — | Blocked screen | API 403 `ACCOUNT_BLOCKED` | ❌ |
 | AUTH-05 | any protected | active | `GET /api/users/me` | — | — | role from DB | App shell | 401 → `/signin`; tenant errors in guard | ⚠️ `auth-gates.spec` API only |
 | AUTH-06 | `/admin` (user mgmt) | admin | `PATCH /api/users/:id/status` | PATCH status | — | audit | User activated | 403 non-admin | ❌ |
@@ -145,8 +145,8 @@ Role hierarchy (numeric): `admin` 40 · `vet` 30 · `senior_technician` 25 · `t
 
 | Flow ID | UI route | Role floor | API | Mutation | Realtime | Side effects | Success | Failure | Verify |
 |---------|----------|------------|-----|----------|----------|--------------|---------|---------|--------|
-| DISP-01 | `/display` | auth | `GET /api/display/snapshot` | no | SSE + snapshot resync | ward + ER + code blue summary | board render | 401; stale cursor → full resync | ❌ |
-| DISP-02 | `/display` | auth | `POST /api/display/heartbeat` | **yes** | — | kiosk liveness | 200 | — | ❌ |
+| DISP-01 | `/board` (`/display`, `/equipment-board` → redirect `/board`) | auth or paired-device token | `GET /api/display/snapshot` | no | SSE + snapshot resync | ward + ER + code blue summary | board render | 401; stale cursor → full resync | ❌ |
+| DISP-02 | `/board` (was `/display`) | auth or paired-device token | `POST /api/display/heartbeat` | **yes** | — | kiosk liveness | 200 | — | ❌ |
 | DISP-03 | `/code-blue/display` | auth | same snapshot + SSE | no | `KEEPALIVE` stormHint | emergency takeover UI | live session | offline read OK; writes blocked | ❌ |
 
 **Cache denylist (SW):** `/api/display/snapshot`, `/api/code-blue/sessions/active`, `/api/realtime/*` — never Cache Storage.
@@ -209,8 +209,9 @@ Role hierarchy (numeric): `admin` 40 · `vet` 30 · `senior_technician` 25 · `t
 
 ## Route index (`src/app/routes.tsx`)
 
-Public: `/`, `/landing`, `/signin`, `/signup`.  
-Gated (`AuthGuard`): all paths in sections above plus `/analytics/*`, `/dashboard`, `/print`, `/help`, `/settings`, `/whats-new`, `/app-tour`, `/alerts`, `/pharmacy-forecast`, `/patients/:id`, etc.
+Public: `/` (RootRoute: signed-out → `/signin`, signed-in → `/home`), `/signin`, `/signup`. Board kiosk: `/board`, `/board/pair` (device-token paired, not Clerk). `/landing` has no route (falls through to the 404 page).  
+Gated (`AuthGuard`): all paths in sections above plus `/analytics/*`, `/dashboard`, `/print`, `/help`, `/settings`, `/whats-new`, `/app-tour`, `/alerts`, etc.  
+Legacy redirects (no screen): `/pending`, `/pending-emergencies`, `/patients`, `/patients/:id` → `/equipment`; `/display`, `/equipment-board` → `/board`.
 
 ---
 

@@ -4248,3 +4248,8 @@ Reviewer returned 1 HIGH + 1 MEDIUM + 2 LOW on the committed sub-card; all four 
 **Note on history:** CodeRabbit finding #3 was IMPLEMENTED (prior commit 400bc9556) then REVERTED here — `expectedAt` is immutable, so the lower bound breaks overdue-but-outstanding orders. The coordinator replies the reasoned decline on the CodeRabbit thread.
 
 **Verdict:** VERIFIED
+
+## 2026-07-18 — Pre-resubmission 4-flow audit (findings-only)
+- **Claim:** 4-flow audit (iPhone/iPad/Website/Board) complete; 42 findings (1 critical, 14 moderate, 27 low); all 15 critical/moderate CONFIRMED by adversarial verifiers.
+- **Checked:** workflow wf_40396e92-056 (23 agents, 0 errors on resume): 7 code auditors cited real file:line (each critical/moderate re-read by an independent refuter agent); live Playwright flow-walk ran 6/6 green — fresh matrix artifacts/flow-walk/web-matrix.json 2026-07-18T10:19:08Z: 147 rows / 145 pass / 0 broken / 2 degraded (known shift-chat archive 404, byte-identical to 2026-07-16 baseline). §F SIWA chain verified intact at exact lines incl. compiled shell bundle. No fixes applied.
+- **Report:** docs/audit/pre-resubmission-4flow-audit-2026-07-18.md

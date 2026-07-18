@@ -3,7 +3,7 @@ import { useMemo } from "react";
 
 export function useEquipmentFilters() {
   const searchStr = useSearch();
-  const [, navigate] = useLocation();
+  const [location, navigate] = useLocation();
 
   const params = useMemo(() => new URLSearchParams(searchStr), [searchStr]);
   const search = params.get("q") ?? "";
@@ -17,7 +17,7 @@ export function useEquipmentFilters() {
       next.delete("q");
     }
     const qs = next.toString();
-    navigate(qs ? `/equipment?${qs}` : "/equipment", { replace: true });
+    navigate(qs ? `${location}?${qs}` : location, { replace: true });
   }
 
   function setStatusFilter(value: string) {
@@ -28,7 +28,7 @@ export function useEquipmentFilters() {
       next.delete("status");
     }
     const qs = next.toString();
-    navigate(qs ? `/equipment?${qs}` : "/equipment", { replace: true });
+    navigate(qs ? `${location}?${qs}` : location, { replace: true });
   }
 
   return { search, statusFilter, setSearch, setStatusFilter };

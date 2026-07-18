@@ -72,7 +72,7 @@ export default function SignInPage() {
       <Helmet>
         <title>{t.authPage.signInMetaTitle}</title>
         <meta name="description" content={t.authPage.signInMetaDescription} />
-        <link rel="canonical" href="https://vettrack.replit.app/signin" />
+        <link rel="canonical" href="https://vettrack.uk/signin" />
         <meta name="robots" content="noindex" />
       </Helmet>
 
@@ -170,12 +170,6 @@ export default function SignInPage() {
 
           <div className="text-center mt-6 space-y-3">
             <LegalFooterLinks />
-            <Link
-              href="/"
-              className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-primary transition-colors rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-            >
-              → {t.authPage.moreAboutVetTrack}
-            </Link>
           </div>
         </div>
       </div>

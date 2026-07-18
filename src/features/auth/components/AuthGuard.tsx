@@ -10,6 +10,7 @@ import { usePlatformTarget } from "@/app/platform";
 import { isClerkEnabled } from "@/lib/auth-fetch";
 import { useExperience } from "@/hooks/use-experience";
 import { ManagementWebGate } from "@/app/platform/guards/ManagementWebGate";
+import { DeleteAccountDialog } from "@/components/delete-account-dialog";
 
 /**
  * Agent-friendly diagnostics shown only on prolonged load timeout in dev.
@@ -27,6 +28,7 @@ function buildDevTimeoutDiagnostics(): string[] {
 
 export function AuthGuard({ children }: { children: ReactNode }) {
   const [loadTimedOut, setLoadTimedOut] = useState(false);
+  const [deleteAccountOpen, setDeleteAccountOpen] = useState(false);
   const [location, navigate] = useLocation();
   const search = useSearch();
   const { isLoaded, isSignedIn, status, accessDeniedReason, signOut, refreshAuth } = useAuth();
@@ -121,11 +123,21 @@ export function AuthGuard({ children }: { children: ReactNode }) {
 
   if (!isSignedIn) return <Redirect to="/signin" replace />;
 
+  // A freshly-created (status='pending') account can only reach this screen — the
+  // guard fronts every route including /settings. Surface the deletion affordance
+  // here too so a reviewer/user can exercise their Guideline 5.1.1(v) right to
+  // delete the account they just created in-app.
   if (status === "pending") return (
     <div className="flex h-screen flex-col items-center justify-center text-center p-6">
       <Clock className="h-16 w-16 text-amber-500 mb-4" />
       <h1 className="text-2xl font-bold">{t.auth.guard.pendingTitle}</h1>
-      <Button className="mt-4" onClick={signOut}>{t.auth.guard.signOut}</Button>
+      <div className="mt-4 flex flex-col items-center gap-2">
+        <Button onClick={signOut}>{t.auth.guard.signOut}</Button>
+        <Button variant="ghost" onClick={() => setDeleteAccountOpen(true)}>
+          {t.settingsPage.deleteAccount}
+        </Button>
+      </div>
+      <DeleteAccountDialog open={deleteAccountOpen} onOpenChange={setDeleteAccountOpen} />
     </div>
   );
 

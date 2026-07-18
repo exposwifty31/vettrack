@@ -519,7 +519,10 @@ test.describe("PWA — Standalone / install behaviour", () => {
 test.describe("PWA — Console error checks", () => {
   test("P13: no critical console errors on home route", async ({ page }) => {
     const getErrors = collectCriticalErrors(page);
-    await page.goto(BASE_URL, { waitUntil: "networkidle" });
+    // domcontentloaded, not networkidle: a signed-in `/` opens the persistent SSE
+    // stream, so "networkidle" (500ms of zero network) never fires and the nav
+    // times out. waitForShellReady below is the real readiness gate.
+    await page.goto(BASE_URL, { waitUntil: "domcontentloaded" });
     await waitForShellReady(page);
     expect(getErrors(), "critical console errors on /").toHaveLength(0);
   });

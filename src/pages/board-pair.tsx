@@ -10,6 +10,7 @@ import { useLocation } from "wouter";
 import { useMutation } from "@tanstack/react-query";
 import { MonitorSmartphone, Loader2, TriangleAlert } from "lucide-react";
 import { claimDisplayPairing } from "@/lib/api";
+import { ApiError } from "@/lib/request-core";
 import {
   setStoredDisplayToken,
   consumeDisplayRevokedNotice,
@@ -23,6 +24,31 @@ import { Input } from "@/components/ui/input";
 /** Strip spaces/dashes for the 8-char length check; the server normalizes the same way. */
 function normalizedLength(raw: string): number {
   return raw.replace(/[\s-]/g, "").length;
+}
+
+/** The 15s AbortController timeout or a fetch-level failure — no HTTP response reached the client. */
+function isConnectivityError(error: unknown): boolean {
+  // Only a fetch-transport TypeError counts as connectivity — a non-network
+  // TypeError (a response-handling / client bug) must NOT be mislabelled offline.
+  if (error instanceof TypeError && /failed to fetch|load failed|networkerror|network request failed/i.test(error.message)) {
+    return true;
+  }
+  return error instanceof Error && error.name === "AbortError"; // request timed out
+}
+
+/**
+ * Map a failed claim to actionable copy so a rate-limited operator isn't told the
+ * code is bad (and burns fresh codes retrying). The server collapses invalid vs.
+ * expired into one 400 code, so those share the default message.
+ */
+function pairErrorMessage(error: unknown): string {
+  if (error instanceof ApiError) {
+    if (error.status === 429) return t.boardPair.rateLimited;
+    if (error.status >= 500) return t.api.serverError;
+    return t.boardPair.error; // 400 invalid/expired code + any other 4xx
+  }
+  if (isConnectivityError(error)) return t.api.networkUnavailable;
+  return t.boardPair.error;
 }
 
 export default function BoardPairPage() {
@@ -125,7 +151,7 @@ export default function BoardPairPage() {
 
           {mutation.isError && (
             <p id="board-pair-error" role="alert" className="text-sm text-emergency-amber">
-              {t.boardPair.error}
+              {pairErrorMessage(mutation.error)}
             </p>
           )}
 

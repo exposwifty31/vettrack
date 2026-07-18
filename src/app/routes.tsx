@@ -1,5 +1,5 @@
 import { Redirect, Route, Switch, useSearch } from "wouter";
-import { lazy } from "react";
+import { lazy, useState, useEffect } from "react";
 import { AuthGuard } from "@/features/auth/components/AuthGuard";
 import { AuthBootstrapSpinner } from "@/components/native-clerk-gate";
 import { RouteFallback } from "@/components/route-fallback";
@@ -104,14 +104,40 @@ function RootRoute() {
   return <Redirect to="/signin" replace />;
 }
 
+/** `/board` — a paired headless display (device token in localStorage, no Clerk
+ *  user) gets the bare kiosk; a signed-in operator goes through AuthGuard. The
+ *  display-token read happens HERE, at route-match/mount time, so a fresh
+ *  /board/pair → /board client handoff sees the just-stored token — AppRoutes
+ *  itself does not re-render on navigation, so reading it there would go stale.
+ *  Only the paired kiosk forces kioskMode; a signed-in visitor omits the prop and
+ *  falls back to the internal ?kiosk=1 read, so /equipment/board → /board keeps a
+ *  working exit affordance instead of trapping them in the kiosk. */
+function BoardRoute() {
+  if (hasStoredDisplayToken()) {
+    return <CommandBoardScreen kioskMode />;
+  }
+  return (
+    <AuthGuard>
+      <CommandBoardScreen />
+    </AuthGuard>
+  );
+}
+
 export function AppRoutes() {
   // iPad (native tablet) uses combined `/base/:id?` routes so the master list
   // stays mounted while the detail pane swaps; phone/web keep separate routes.
-  const isNativeTablet = useIsNativeTablet();
-  // Phase 9 — a paired display device (device token in localStorage, no Clerk
-  // user) may view /board without AuthGuard. The stored token still authorizes
-  // every board data request server-side; AuthGuard stays for normal users.
-  const isDisplayPaired = hasStoredDisplayToken();
+  // Latch it true for the session: a native iPad that crosses below 768px
+  // mid-session (portrait rotation / Split View resize) must NOT swap the whole
+  // route set, which would remount the active route and discard its in-page
+  // state. Once tablet-class, stay tablet-class — this only ever engages on a
+  // real native iPad (web and native phones never report tablet width).
+  const isNativeTabletLive = useIsNativeTablet();
+  // Latch via state (never mutate during render): once tablet-class, an effect
+  // pins it and never unsets, so a mid-session flip below 768px can't remount.
+  const [isNativeTablet, setIsNativeTablet] = useState(isNativeTabletLive);
+  useEffect(() => {
+    if (isNativeTabletLive) setIsNativeTablet(true);
+  }, [isNativeTabletLive]);
   return (
     <PageErrorBoundary fallbackLabel="Page rendering failed">
       <Switch>
@@ -136,15 +162,14 @@ export function AppRoutes() {
             legacy /equipment/board web route redirects to it (owner decision), so
             there is one board surface. Bookmarks/deep-links + ?kiosk=1 preserved. */}
         <Route path="/equipment/board"><RedirectPreserveSearch to="/board" /></Route>
-        {/* Standalone Command Center kiosk. AuthGuard only — the platform target */}
-        {/* already does the gating WebOnlyGuard would: native → mobile (NativeShell), */}
-        {/* narrow browser at /board → board (full BoardShell kiosk, not the desktop */}
-        {/* interstitial). BoardShell (via PlatformRouter) owns the dark kiosk chrome. */}
-        <Route path="/board">
-          {isDisplayPaired
-            ? <CommandBoardScreen kioskMode />
-            : <AuthGuard><CommandBoardScreen kioskMode /></AuthGuard>}
-        </Route>
+        {/* Standalone Command Center kiosk (BoardRoute owns the paired-display-vs-
+            signed-in split — see its doc). No WebOnlyGuard here, and the platform
+            target does NOT stand in for one: on Capacitor-native the resolver
+            returns "mobile" (native is checked before the board path), so /board
+            renders inside NativeShell rather than redirecting — it is simply
+            unreachable from native nav today. A browser at /board resolves to the
+            "board" target → BoardShell owns the dark full-bleed kiosk chrome. */}
+        <Route path="/board"><BoardRoute /></Route>
         {/* Display-device pairing kiosk. NO AuthGuard — a headless display has no */}
         {/* Clerk user; it redeems a pairing code for a device token, then → /board. */}
         {/* Matches isBoardPathname (/board/*) so it renders inside BoardShell. */}

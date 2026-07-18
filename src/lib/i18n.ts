@@ -77,15 +77,47 @@ export function resolveClientLocale(locale: string | null | undefined): Locale {
   return "he";
 }
 
+// The signed-in user's server-side preferred locale (vt_users.preferred_locale),
+// applied post-auth via applyPreferredLocale. It is a resolution *fallback* only —
+// an explicit in-app choice (LOCALE_STORAGE_KEY) always wins, and it is never
+// persisted, so an anonymous session keeps the Hebrew default.
+let sessionPreferredLocale: Locale | null = null;
+
 export function getStoredLocale(): Locale {
   try {
     if (typeof window === "undefined") return "he";
     const stored = safeStorageGetItem(LOCALE_STORAGE_KEY);
-    if (!stored) return "he"; // Default to Hebrew in native context
-    return resolveClientLocale(stored);
+    if (stored) return resolveClientLocale(stored);
+    // No explicit choice — honor the authenticated user's preferred locale
+    // before falling back to the Hebrew default (native context).
+    if (sessionPreferredLocale) return sessionPreferredLocale;
+    return "he";
   } catch {
     return "he";
   }
+}
+
+/**
+ * Apply the signed-in user's server-side preferred locale as the active UI locale,
+ * but only when the user has NOT made an explicit in-app language choice
+ * (LOCALE_STORAGE_KEY absent). An explicit choice always takes precedence, and an
+ * anonymous session is left on the Hebrew default. The value is not written to
+ * storage, so it never masquerades as an explicit choice on the next load.
+ *
+ * Call this once the authenticated user's profile is known (e.g. after
+ * /api/users/me resolves). Unsupported/empty values are ignored.
+ */
+export function applyPreferredLocale(locale: string | null | undefined): void {
+  if (!isSupportedLocale(locale)) return;
+  sessionPreferredLocale = locale;
+  try {
+    // An explicit stored choice wins — don't override it.
+    if (typeof window !== "undefined" && safeStorageGetItem(LOCALE_STORAGE_KEY)) return;
+  } catch {
+    return;
+  }
+  refreshTranslations(locale);
+  applyLocaleDocumentAttributes(locale);
 }
 
 export function setStoredLocale(locale: string): Locale {
@@ -747,6 +779,8 @@ const translations = {
   myEquipmentPage: d.myEquipmentPage,
 
   notFoundPage: d.notFoundPage,
+
+  pushErrors: d.pushErrors,
 
   homePage: {
     ...d.homePage,
