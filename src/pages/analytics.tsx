@@ -41,10 +41,11 @@ import {
   MapPin,
 } from "lucide-react";
 import { formatChartBucketDay } from "@/lib/utils";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Bdi } from "@/components/ui/bdi";
 import { toCsv, downloadCsv, type CsvCell } from "@/lib/csv-export";
+import { ReadinessForecastPanel } from "@/features/analytics/ReadinessForecastPanel";
 
 const STATUS_COLORS = {
   ok: "hsl(var(--status-ok))",
@@ -55,9 +56,25 @@ const STATUS_COLORS = {
 
 export default function AnalyticsPage() {
   const { userId } = useAuth();
+  const [, navigate] = useLocation();
   const { data: analytics, isLoading, isError, refetch } = useQuery({
     queryKey: ["/api/analytics"],
     queryFn: api.analytics.summary,
+    enabled: !!userId,
+    retry: false,
+    refetchOnWindowFocus: false,
+  });
+
+  // R-PDF-1 predictive readiness. Read-only; failure is non-fatal (its section
+  // shows a scoped error + retry) so a forecast error never blanks the page.
+  const {
+    data: readinessForecast,
+    isLoading: forecastLoading,
+    isError: forecastError,
+    refetch: refetchForecast,
+  } = useQuery({
+    queryKey: ["/api/analytics/readiness-forecast"],
+    queryFn: api.analytics.readinessForecast,
     enabled: !!userId,
     retry: false,
     refetchOnWindowFocus: false,
@@ -281,6 +298,18 @@ export default function AnalyticsPage() {
             </Card>
           </div>
         )}
+
+        {/* R-PDF-1 predictive readiness (read-only PO recommendations) */}
+        {forecastError ? (
+          <ErrorCard message={t.readinessForecast.loadError} onRetry={() => refetchForecast()} />
+        ) : forecastLoading ? (
+          <Skeleton className="h-40 rounded-2xl" />
+        ) : readinessForecast ? (
+          <ReadinessForecastPanel
+            data={readinessForecast}
+            onCreatePurchaseOrder={() => navigate("/procurement")}
+          />
+        ) : null}
 
         {/* Status distribution */}
         <Card className="bg-card border-border/60 shadow-sm">

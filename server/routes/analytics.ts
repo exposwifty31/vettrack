@@ -15,6 +15,7 @@ import {
 } from "../lib/analytics-kpis.js";
 import { INACTIVE_THRESHOLD_DAYS } from "../../shared/constants.js";
 import { resolveRequestId, apiError } from "../lib/route-utils.js";
+import { getReadinessForecast } from "../services/readiness-forecast.service.js";
 
 /*
  * PERMISSIONS MATRIX — /api/analytics
@@ -316,6 +317,30 @@ router.get("/shift-completion", requireAuth, requireAdmin, async (req, res) => {
     console.error(err);
     res.status(500).json(
       apiError({ code: "INTERNAL_ERROR", reason: "SHIFT_COMPLETION_FAILED", message: "Failed to get shift completion stats", requestId }),
+    );
+  }
+});
+
+/**
+ * GET /api/analytics/readiness-forecast — R-PDF-1 predictive readiness.
+ * READ-ONLY: returns forecast shortfalls + redacted explainability + PO
+ * RECOMMENDATIONS. Creates no purchase orders. Technician+ (procurement-adjacent).
+ */
+router.get("/readiness-forecast", requireAuth, requireEffectiveRole("technician"), async (req, res) => {
+  const requestId = resolveRequestId(res, req.headers["x-request-id"]);
+  try {
+    const clinicId = req.clinicId!;
+    const forecast = await getReadinessForecast(clinicId);
+    res.json(forecast);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json(
+      apiError({
+        code: "INTERNAL_ERROR",
+        reason: "READINESS_FORECAST_FAILED",
+        message: "Failed to compute readiness forecast",
+        requestId,
+      }),
     );
   }
 });

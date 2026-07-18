@@ -4377,5 +4377,28 @@
     "noHomeHint": "לא הוגדרה עמדת בית לציוד זה — בקש ממנהל להגדיר אחת",
     "stationUnresolvedHint": "עמדת הבית של הציוד עדיין לא הוגדרה — בטל את הסימון כדי להחזיר ללא עגינה",
     "offlineDockHint": "החזרה לעגינה דורשת חיבור לרשת — מוחזר כעת ללא עגינה"
+  },
+  "readinessForecast": {
+    "title": "מוכנות חזויה",
+    "subtitle": "טווח תחזית: {hours} השעות הקרובות",
+    "shortfallsHeading": "מחסורים צפויים",
+    "recommendationsHeading": "המלצות רכש",
+    "recommendedOnly": "המלצה בלבד — לא מבוצעת הזמנה עד לאישורך",
+    "shortBadge": "חסרים {count} {unit}",
+    "requiredLabel": "נדרש",
+    "availableLabel": "זמין",
+    "sourceLine": "מתוך {count} פעולות מתוזמנות",
+    "burnLine": "{units} נוצלו ב-14 הימים האחרונים",
+    "incomingLine": "{units} מגיעים בתוך הטווח",
+    "equipmentKind": "ציוד",
+    "consumableKind": "מתכלה",
+    "sourceRefsLabel": "שורות מקור",
+    "suggestedQtyLabel": "כמות מומלצת",
+    "createPo": "יצירת הזמנת רכש",
+    "confirmPo": "אישור הזמנה",
+    "cancelPo": "ביטול",
+    "allReadyTitle": "אתם מוכנים",
+    "allReadyBody": "לא צפויים מחסורים עבור הפעולות המתוזמנות הקרובות.",
+    "loadError": "טעינת תחזית המוכנות נכשלה"
   }
 }
