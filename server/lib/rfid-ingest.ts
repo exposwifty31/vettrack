@@ -1,6 +1,14 @@
-import { randomUUID } from "crypto";
-import { and, eq, inArray, isNull, lt, or } from "drizzle-orm";
-import { db, docks, equipment, equipmentRfidReads, rooms } from "../db.js";
+import { createHash, randomUUID } from "crypto";
+import { and, eq, gte, inArray, isNull, lt, or } from "drizzle-orm";
+import {
+  db,
+  docks,
+  equipment,
+  equipmentRfidReads,
+  rfidEgressSignals,
+  rfidReaders,
+  rooms,
+} from "../db.js";
 import { logAudit } from "./audit.js";
 import { incrementMetric } from "./metrics.js";
 import { insertRealtimeDomainEvent } from "./realtime-outbox.js";
@@ -12,10 +20,17 @@ import {
 } from "./semi-dock-notify.js";
 import { getCurrentAnchor, invalidateCurrentAnchor } from "../services/equipment-anchor.service.js";
 
+export type RfidDirection = "entered" | "exited";
+
 export interface RfidBatchEvent {
   tagEpc: string;
   gatewayCode: string;
   readAt: string;
+  /** R-M1.2a — optional directional intent, interpreted relative to the reader's from/to rooms. */
+  direction?: RfidDirection;
+  /** R-M1.2a — optional COMPLETE gateway pair (both or neither); corroborates direction. */
+  fromGateway?: string;
+  toGateway?: string;
 }
 
 export interface RfidBatchInput {
@@ -31,6 +46,154 @@ export interface RfidIngestResult {
   unknownTag: number;
   unknownGateway: number;
   stale: number;
+  /** R-M1.2 — directional reads whose destination room was resolved from direction. */
+  directionalResolved: number;
+  /** R-M1.2c — new possible_egress signals persisted (post-dedup) this batch. */
+  possibleEgress: number;
+}
+
+/**
+ * R-M1.2a — a directional payload that cannot be resolved DETERMINISTICALLY is a hard reject
+ * (4xx), never a silent downgrade to last-seen. Thrown from the ingest and mapped to an HTTP
+ * status by the route. Legacy (no-direction) payloads never trigger this.
+ */
+export type RfidDirectionalRejectionCode =
+  | "PARTIAL_GATEWAY_PAIR"
+  | "UNKNOWN_GATEWAY"
+  | "GATEWAY_NOT_DIRECTIONAL"
+  | "DIRECTION_GATEWAY_DISAGREEMENT"
+  | "DIRECTION_UNRESOLVABLE";
+
+export class RfidDirectionalRejection extends Error {
+  readonly code: RfidDirectionalRejectionCode;
+  constructor(code: RfidDirectionalRejectionCode, message: string) {
+    super(message);
+    this.name = "RfidDirectionalRejection";
+    this.code = code;
+  }
+}
+
+/** Bounded window: an exit is a "possible egress" only when no matching entry precedes it here. */
+const EGRESS_MATCHING_ENTRY_WINDOW_MS = 24 * 60 * 60 * 1000;
+
+function isDirectionalEvent(ev: RfidBatchEvent): boolean {
+  return ev.direction != null || ev.fromGateway != null || ev.toGateway != null;
+}
+
+type ReaderConfig = {
+  id: string;
+  gatewayCode: string;
+  roomId: string | null;
+  fromRoomId: string | null;
+  toRoomId: string | null;
+  gateType: string | null;
+};
+
+type DirectionalResolution = {
+  gateId: string;
+  direction: RfidDirection;
+  /** the room the asset moved FROM (null => external zone). */
+  srcRoomId: string | null;
+  /** the room the asset moved TO (null => external zone => possible egress). */
+  destRoomId: string | null;
+  /** the gate's home/mounting (internal) room — used to match a prior entry for egress. */
+  internalRoomId: string;
+  gateType: string;
+};
+
+/**
+ * R-M1.2a — resolve a directional event to a src/dest room DETERMINISTICALLY, or throw a hard
+ * rejection. PINNED precedence: direction is interpreted relative to the reader's configured
+ * from/to rooms (home = mounting room, away = the other endpoint, which is NULL/external for a
+ * boundary or dock gate); a supplied gateway pair must be complete, in-clinic, and agree with
+ * `direction`. `entered` => destination = home; `exited` => destination = away.
+ */
+function resolveDirectionalEvent(
+  ev: RfidBatchEvent,
+  readerByGateway: Map<string, ReaderConfig>,
+): DirectionalResolution {
+  const hasFrom = ev.fromGateway != null;
+  const hasTo = ev.toGateway != null;
+  if (hasFrom !== hasTo) {
+    throw new RfidDirectionalRejection(
+      "PARTIAL_GATEWAY_PAIR",
+      "A gateway pair must supply BOTH fromGateway and toGateway",
+    );
+  }
+
+  const reader = readerByGateway.get(ev.gatewayCode);
+  if (!reader) {
+    throw new RfidDirectionalRejection(
+      "UNKNOWN_GATEWAY",
+      `Gateway ${ev.gatewayCode} is not a managed reader in this clinic`,
+    );
+  }
+  if (reader.gateType == null || reader.roomId == null) {
+    throw new RfidDirectionalRejection(
+      "GATEWAY_NOT_DIRECTIONAL",
+      `Reader ${ev.gatewayCode} is not configured for directional resolution`,
+    );
+  }
+
+  const home = reader.roomId;
+  const away = reader.fromRoomId === home ? reader.toRoomId : reader.fromRoomId;
+
+  let pairDirection: RfidDirection | null = null;
+  if (hasFrom && hasTo) {
+    const fromGateway = ev.fromGateway as string;
+    const toGateway = ev.toGateway as string;
+    if (!readerByGateway.has(fromGateway) || !readerByGateway.has(toGateway)) {
+      throw new RfidDirectionalRejection(
+        "UNKNOWN_GATEWAY",
+        "A gateway pair referenced a reader outside this clinic",
+      );
+    }
+    if (toGateway === ev.gatewayCode) {
+      pairDirection = "entered";
+    } else if (fromGateway === ev.gatewayCode) {
+      pairDirection = "exited";
+    } else {
+      throw new RfidDirectionalRejection(
+        "DIRECTION_GATEWAY_DISAGREEMENT",
+        "The event gateway is not part of the supplied gateway pair",
+      );
+    }
+  }
+
+  if (ev.direction != null && pairDirection != null && ev.direction !== pairDirection) {
+    throw new RfidDirectionalRejection(
+      "DIRECTION_GATEWAY_DISAGREEMENT",
+      `direction '${ev.direction}' contradicts the supplied gateway pair`,
+    );
+  }
+
+  const direction = ev.direction ?? pairDirection;
+  if (direction == null) {
+    throw new RfidDirectionalRejection(
+      "DIRECTION_UNRESOLVABLE",
+      "A directional payload must supply a direction or a complete gateway pair",
+    );
+  }
+
+  return {
+    gateId: reader.id,
+    direction,
+    srcRoomId: direction === "entered" ? away : home,
+    destRoomId: direction === "entered" ? home : away,
+    internalRoomId: home,
+    gateType: reader.gateType,
+  };
+}
+
+/**
+ * Deterministic fingerprint of the intrinsic read (equipment + gateway + readAt + direction) —
+ * NOT the batch id — so a retry or an out-of-order batch that re-reports the SAME physical exit
+ * collapses to the SAME correlation key and dedupes, while two distinct exits stay separate.
+ */
+function egressSourceEventId(equipmentId: string, gatewayCode: string, readAtIso: string): string {
+  return createHash("sha256")
+    .update(`${equipmentId}|${gatewayCode}|${readAtIso}|exited`)
+    .digest("hex");
 }
 
 type EquipmentRfidRow = {
@@ -126,13 +289,30 @@ export async function ingestRfidBatch(
     unknownTag: 0,
     unknownGateway: 0,
     stale: 0,
+    directionalResolved: 0,
+    possibleEgress: 0,
   };
 
-  const coalesced = coalesceLatestPerTag(batch.events);
-  if (coalesced.length === 0) return result;
+  const serverNow = new Date();
+  // R-M1.2 — directional events are NOT coalesced-per-tag (each is a distinct movement/crossing
+  // and multiple legitimate crossings of one tag in a batch must all be processed). The legacy
+  // (no-direction) path keeps its byte-for-byte coalesce-latest-per-tag behavior.
+  const legacyEvents = batch.events.filter((e) => !isDirectionalEvent(e));
+  const directionalEvents = batch.events
+    .filter((e) => isDirectionalEvent(e))
+    .sort((a, b) => new Date(a.readAt).getTime() - new Date(b.readAt).getTime());
+  const coalesced = coalesceLatestPerTag(legacyEvents);
+  if (coalesced.length === 0 && directionalEvents.length === 0) return result;
 
-  const tagEpcs = [...new Set(coalesced.map((e) => e.tagEpc))];
-  const gatewayCodes = [...new Set(coalesced.map((e) => e.gatewayCode))];
+  const tagEpcs = [...new Set(batch.events.map((e) => e.tagEpc))];
+  const gatewayCodes = [...new Set(batch.events.map((e) => e.gatewayCode))];
+  const directionalGatewayCodes = [
+    ...new Set(
+      directionalEvents.flatMap((e) =>
+        [e.gatewayCode, e.fromGateway, e.toGateway].filter((c): c is string => Boolean(c)),
+      ),
+    ),
+  ];
   const semiDockCandidates: SemiDockNotifyCandidate[] = [];
   const rfidElsewhereCandidates: RfidElsewhereCandidate[] = [];
 
@@ -180,6 +360,47 @@ export async function ingestRfidBatch(
     for (const row of roomRows) {
       if (row.gatewayCode) roomByGateway.set(row.gatewayCode, row.id);
     }
+
+    // R-M1.2 — directional resolution keys off the MANAGED reader registry (vt_rfid_readers),
+    // never the legacy rooms.gateway_code mapping. Fetched only when the batch carries
+    // directional events, so the legacy path issues zero extra queries.
+    const readerByGateway = new Map<string, ReaderConfig>();
+    if (directionalGatewayCodes.length > 0) {
+      const readerRows = await tx
+        .select({
+          id: rfidReaders.id,
+          gatewayCode: rfidReaders.gatewayCode,
+          roomId: rfidReaders.roomId,
+          fromRoomId: rfidReaders.fromRoomId,
+          toRoomId: rfidReaders.toRoomId,
+          gateType: rfidReaders.gateType,
+        })
+        .from(rfidReaders)
+        .where(
+          and(
+            eq(rfidReaders.clinicId, clinicId),
+            inArray(rfidReaders.gatewayCode, directionalGatewayCodes),
+          ),
+        );
+      for (const r of readerRows) readerByGateway.set(r.gatewayCode, r);
+    }
+
+    // R-M1.1d — reader-level liveness: an accepted ingest batch IS a heartbeat for every managed
+    // reader whose gateway appears in it (independent of per-event tag matches — the reader is
+    // transmitting). Server-set timestamp, NEVER the client-supplied readAt. Feeds the
+    // reader-offline sweep's staleness check (server/lib/rfid/reader-offline-sweep.ts). Matches 0
+    // rows for a legacy clinic with no managed readers, so legacy ingest stays byte-for-byte
+    // unchanged. Never touches custody (R-M1 guardrail 1).
+    await tx
+      .update(rfidReaders)
+      .set({ lastReaderHeartbeatAt: serverNow })
+      .where(
+        and(
+          eq(rfidReaders.clinicId, clinicId),
+          eq(rfidReaders.status, "active"),
+          inArray(rfidReaders.gatewayCode, gatewayCodes),
+        ),
+      );
 
     for (const ev of coalesced) {
       const eqRow = equipmentByEpc.get(ev.tagEpc);
@@ -319,6 +540,212 @@ export async function ingestRfidBatch(
           checkedOutById: eqRow.checkedOutById,
           checkedOutAt: eqRow.checkedOutAt,
           homeRoomId: roomId,
+        });
+      }
+    }
+
+    // R-M1.2 — directional processing. PINNED: validate EVERY directional event first (a
+    // partial pair / direction-gateway disagreement / unknown-or-cross-clinic gateway is a HARD
+    // REJECT that rolls the whole batch back — never a silent downgrade to last-seen). Then apply.
+    const resolvedDirectional = directionalEvents.map((ev) => ({
+      ev,
+      resolution: resolveDirectionalEvent(ev, readerByGateway),
+    }));
+
+    for (const { ev, resolution } of resolvedDirectional) {
+      const eqRow = equipmentByEpc.get(ev.tagEpc);
+      if (!eqRow) {
+        result.unknownTag += 1;
+        incrementMetric("rfid_event_unknown_tag");
+        continue;
+      }
+
+      const readAt = new Date(ev.readAt);
+      if (Number.isNaN(readAt.getTime())) {
+        result.stale += 1;
+        incrementMetric("rfid_event_stale");
+        continue;
+      }
+
+      // Reject stale reads BEFORE any egress persistence: a delayed exit older than the last
+      // sighting must not mint a fresh "current" egress signal (the asset has since been seen
+      // more recently). This gates the external-exit branch below as well as room advances.
+      if (eqRow.lastRfidSeenAt && readAt.getTime() <= eqRow.lastRfidSeenAt.getTime()) {
+        result.stale += 1;
+        incrementMetric("rfid_event_stale");
+        continue;
+      }
+
+      // External exit (boundary/dock gate toward the NULL endpoint) => possible egress. It is
+      // ADVISORY: it never advances last-seen (the asset keeps its last known room) and NEVER
+      // mutates custody. Idempotent per the correlation key (retries/out-of-order dedupe).
+      if (resolution.destRoomId == null) {
+        const windowStart = new Date(readAt.getTime() - EGRESS_MATCHING_ENTRY_WINDOW_MS);
+        const priorEntry = await tx
+          .select({ id: equipmentRfidReads.id })
+          .from(equipmentRfidReads)
+          .where(
+            and(
+              eq(equipmentRfidReads.clinicId, clinicId),
+              eq(equipmentRfidReads.equipmentId, eqRow.id),
+              eq(equipmentRfidReads.gatewayCode, ev.gatewayCode),
+              eq(equipmentRfidReads.toRoomId, resolution.internalRoomId),
+              lt(equipmentRfidReads.readAt, readAt),
+              gte(equipmentRfidReads.readAt, windowStart),
+            ),
+          )
+          .limit(1);
+        if (priorEntry.length > 0) {
+          // A matching prior entry through this gate => expected round-trip, not an egress.
+          continue;
+        }
+
+        const sourceEventId = egressSourceEventId(eqRow.id, ev.gatewayCode, readAt.toISOString());
+        const inserted = await tx
+          .insert(rfidEgressSignals)
+          .values({
+            id: randomUUID(),
+            clinicId,
+            equipmentId: eqRow.id,
+            gateId: resolution.gateId,
+            gatewayCode: ev.gatewayCode,
+            sourceEventId,
+            fromRoomId: resolution.internalRoomId,
+            batchId: batch.batchId,
+            detectedAt: readAt,
+          })
+          .onConflictDoNothing({
+            target: [
+              rfidEgressSignals.clinicId,
+              rfidEgressSignals.equipmentId,
+              rfidEgressSignals.gateId,
+              rfidEgressSignals.sourceEventId,
+            ],
+          })
+          .returning({ id: rfidEgressSignals.id });
+        if (inserted.length > 0) {
+          result.possibleEgress += 1;
+          incrementMetric("rfid_possible_egress");
+        } else {
+          incrementMetric("rfid_possible_egress_deduped");
+        }
+        continue;
+      }
+
+      const destRoomId = resolution.destRoomId;
+
+      if (eqRow.lastRfidRoomId === destRoomId) {
+        const advanced = await tx
+          .update(equipment)
+          .set({ lastRfidSeenAt: readAt, lastRfidGatewayCode: ev.gatewayCode })
+          .where(equipmentRfidUpdateScope(eqRow.id, clinicId, readAt))
+          .returning({ id: equipment.id });
+        if (advanced.length === 0) {
+          result.stale += 1;
+          incrementMetric("rfid_event_stale");
+          continue;
+        }
+        eqRow.lastRfidSeenAt = readAt;
+        // The directional destination WAS resolved (it just matched the current room), so this
+        // counts toward directionalResolved per the field's documented semantics.
+        result.unchanged += 1;
+        result.directionalResolved += 1;
+        incrementMetric("rfid_event_unchanged");
+        incrementMetric("rfid_event_directional_resolved");
+        continue;
+      }
+
+      const advanced = await tx
+        .update(equipment)
+        .set({
+          lastRfidRoomId: destRoomId,
+          lastRfidSeenAt: readAt,
+          lastRfidGatewayCode: ev.gatewayCode,
+        })
+        .where(equipmentRfidUpdateScope(eqRow.id, clinicId, readAt))
+        .returning({ id: equipment.id });
+      if (advanced.length === 0) {
+        result.stale += 1;
+        incrementMetric("rfid_event_stale");
+        continue;
+      }
+
+      await tx.insert(equipmentRfidReads).values({
+        id: randomUUID(),
+        clinicId,
+        equipmentId: eqRow.id,
+        fromRoomId: resolution.srcRoomId,
+        toRoomId: destRoomId,
+        gatewayCode: ev.gatewayCode,
+        readAt,
+        batchId: batch.batchId,
+      });
+
+      await logAudit({
+        tx,
+        clinicId,
+        actionType: "equipment_rfid_observed_room_changed",
+        performedBy: "system:rfid",
+        performedByEmail: "rfid@vettrack.system",
+        targetId: eqRow.id,
+        targetType: "equipment",
+        metadata: {
+          fromRoomId: resolution.srcRoomId,
+          toRoomId: destRoomId,
+          direction: resolution.direction,
+          gatewayCode: ev.gatewayCode,
+          readAt: readAt.toISOString(),
+          batchId: batch.batchId,
+        },
+      });
+
+      await insertRealtimeDomainEvent(tx, {
+        clinicId,
+        type: "EQUIPMENT_RFID_OBSERVED",
+        category: "SYSTEM",
+        level: "INFO",
+        payload: {
+          equipmentId: eqRow.id,
+          fromRoomId: resolution.srcRoomId,
+          toRoomId: destRoomId,
+          direction: resolution.direction,
+          gatewayCode: ev.gatewayCode,
+          at: readAt.toISOString(),
+        },
+        occurredAt: readAt,
+      });
+
+      eqRow.lastRfidRoomId = destRoomId;
+      eqRow.lastRfidSeenAt = readAt;
+      result.updated += 1;
+      result.directionalResolved += 1;
+      incrementMetric("rfid_event_room_changed");
+      incrementMetric("rfid_event_directional_resolved");
+
+      rfidElsewhereCandidates.push({
+        equipmentId: eqRow.id,
+        dockId: eqRow.dockId,
+        newRoomId: destRoomId,
+      });
+
+      const dirHomeRoomIds = buildEquipmentHomeRoomIds(
+        eqRow.roomId,
+        eqRow.dockId ? dockRoomByDockId.get(eqRow.dockId) ?? null : null,
+      );
+      if (
+        eqRow.custodyState === "checked_out" &&
+        eqRow.checkedOutById &&
+        eqRow.checkedOutAt &&
+        dirHomeRoomIds.size > 0 &&
+        isEquipmentHomeRoom(destRoomId, dirHomeRoomIds)
+      ) {
+        semiDockCandidates.push({
+          clinicId,
+          equipmentId: eqRow.id,
+          equipmentName: eqRow.name,
+          checkedOutById: eqRow.checkedOutById,
+          checkedOutAt: eqRow.checkedOutAt,
+          homeRoomId: destRoomId,
         });
       }
     }

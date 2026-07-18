@@ -40,6 +40,7 @@ const KNOWN_DEBT_ALLOWLIST = new Set<string>([
   "server/routes/admin-outbox-dlq.ts", // owner: outbox
   "server/routes/admin-outbox-health.ts", // owner: outbox
   "server/routes/admin-rfid-readers.ts", // owner: rfid (admin observability; English-only like sibling admin-* routes)
+  "server/routes/admin-rfid-provisioning.ts", // owner: rfid (admin-only HMAC provisioning/rotation; English-only like sibling admin-* routes)
   "server/routes/admin-task-ownership.ts", // owner: authority
   "server/routes/alert-acks.ts", // owner: alerts
   "server/routes/analytics.ts", // owner: analytics

@@ -480,6 +480,15 @@ const translations = {
       line: (room: string, relative: string) =>
         tr(d.equipment.rfidLastSeen.line, { room, relative }),
     },
+    rfidDirection: {
+      // Raw templates (with `{from}`/`{to}` placeholders) consumed by the
+      // bidi-isolated React renderer in RfidDirectionLine, which wraps each room
+      // name in a <bdi>. `exited` = a from→to crossing; `entered` = a crossing
+      // with no resolvable origin room (destination only). No plain interpolating
+      // accessor: every render path goes through the bidi renderer.
+      exitedTemplate: d.equipment.rfidDirection.exited,
+      enteredTemplate: d.equipment.rfidDirection.entered,
+    },
     rfidAttention: {
       checkedOutMismatch: (room: string, holder: string) =>
         tr(d.equipment.rfidAttention.checkedOutMismatch, { room, holder }),

@@ -930,6 +930,10 @@
     "rfidLastSeen": {
       "line": "זוהה לאחרונה ב־RFID ליד {room} · {relative}"
     },
+    "rfidDirection": {
+      "exited": "יצא מ־{from} → {to}",
+      "entered": "נכנס ל־{to}"
+    },
     "rfidAttention": {
       "checkedOutMismatch": "זוהה ליד {room} בעוד שאול ל־{holder}"
     }
@@ -3589,7 +3593,41 @@
     },
     "rfidReaders": {
       "title": "קוראי RFID",
-      "subtitle": "פעימות וכיסוי קוראים"
+      "subtitle": "פעימות וכיסוי קוראים",
+      "addReader": "הוספת קורא",
+      "createTitle": "הוספת קורא RFID",
+      "createDescription": "רישום שער כקורא מנוהל. ניתן להגדיר את כיוון השער בהמשך.",
+      "nameLabel": "שם",
+      "gatewayLabel": "קוד שער",
+      "physicalLocationLabel": "מיקום פיזי (רשות)",
+      "create": "יצירת קורא",
+      "created": "הקורא נוצר",
+      "createFailed": "לא ניתן ליצור את הקורא",
+      "duplicateGateway": "כבר קיים קורא לשער זה",
+      "manageTitle": "ניהול קורא",
+      "save": "שמירת שם",
+      "renamed": "שם הקורא עודכן",
+      "renameFailed": "לא ניתן לשנות את שם הקורא",
+      "deactivate": "השבתת קורא",
+      "deactivateConfirm": "אישור השבתה",
+      "deactivated": "הקורא הושבת",
+      "deactivateFailed": "לא ניתן להשבית את הקורא",
+      "colHealth": "תקינות",
+      "lifecycleActive": "פעיל",
+      "lifecycleInactive": "מושבת",
+      "provisionSecret": "הפקת סוד קליטה",
+      "provisioning": "מפיק…",
+      "provisionTitle": "סוד קליטת RFID",
+      "provisionDescription": "סוד זה חותם על מטעני קליטה מהקוראים. הוא מוצג פעם אחת בלבד — העתיקו אותו כעת ושמרו אותו בהגדרות הקורא. הפקה חוזרת מחליפה את הסוד.",
+      "provisionFailed": "לא ניתן להפיק את סוד הקליטה",
+      "provisionInProgress": "החלפת סוד כבר מתבצעת",
+      "ingestSection": "קליטת קוראים",
+      "ingestSectionHelp": "הפעלה או השהיה של קבלת אירועים חתומים מהקוראים במרפאה זו.",
+      "ingestEnable": "הפעלת קליטה",
+      "ingestDisable": "השהיית קליטה",
+      "ingestEnabled": "קליטת הקוראים הופעלה",
+      "ingestDisabled": "קליטת הקוראים הושהתה",
+      "ingestFailed": "לא ניתן לשנות את הגדרת הקליטה"
     },
     "opsHealth": {
       "title": "תקינות מערכת",
@@ -3648,6 +3686,7 @@
     "colLastSeen": "נראה לאחרונה",
     "colObserved": "ציוד שזוהה",
     "readerOnline": "מקוון",
+    "readerOffline": "לא מקוון",
     "readerStale": "לא עדכני",
     "readerNoSignal": "אין אות",
     "readerUnassigned": "לא משויך",
@@ -3843,6 +3882,9 @@
     "ready": "מוכן",
     "noUnitsHere": "אין יחידות כאן",
     "attention": "דורשים טיפול",
+    "anomalyBatteryCritical": "סוללה קריטית",
+    "anomalyCartUnverified": "עגלה לא מאומתת",
+    "anomalySince": "מאז",
     "live": "חי",
     "updated": "עודכן",
     "ward": "המחלקה · ציוד קריטי",
@@ -3876,6 +3918,13 @@
     "staging": "היערכות",
     "inQueue": "בתור",
     "highLoad": "עומס גבוה",
+    "rfidTag": "RFID",
+    "rfidExternalZone": "יצא מהמרפאה",
+    "rfidUnresolved": "מיקום לא ברור",
+    "rfidReaderOffline": "קורא לא מקוון",
+    "rfidPossibleEgress": "יציאה אפשרית",
+    "rfidConflict": "אי-התאמת RFID",
+    "rfidAmbiguous": "RFID סותר",
     "collab": {
       "present": "נוכחים בלוח"
     }

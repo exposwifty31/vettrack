@@ -1,0 +1,23 @@
+{
+  "name": "@vettrack/rfid-controller",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Vendor-agnostic core of the RFID signing middleware (ADR-005/006). Emits signed movement-evidence batches to POST /api/rfid/events. No runtime deps.",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "bin": {
+    "rfid-controller": "./src/cli.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run --config vitest.config.ts"
+  },
+  "devDependencies": {
+    "vitest": "^4.1.5"
+  }
+}
