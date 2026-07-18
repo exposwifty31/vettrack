@@ -30,6 +30,10 @@ import { and, desc, eq, gte, lt } from "drizzle-orm";
 import { db, auditLogs, eventOutbox, scanLogs, shiftSessions, shifts, shiftHandover, users } from "../db.js";
 import type { ShiftHandoverRow } from "../schema/ops.js";
 import { OUTBOX_TYPE_AUDIT_LOG } from "./event-publisher.js";
+import { resolveNextShiftRoster } from "./shift-handover-roster.js";
+import { enqueueNotificationJob } from "./queue.js";
+import { getLocaleDictionaries } from "../../lib/i18n/loader.js";
+import { translate } from "../../lib/i18n/index.js";
 import {
   serializePatientWorklist,
   type ShiftHandoverDeltas,
@@ -109,7 +113,7 @@ export function classifyDeltaKind(kind: string): DeltaCategory | null {
   return null;
 }
 
-interface ShiftWindow {
+export interface ShiftWindow {
   start: Date;
   end: Date;
 }
@@ -119,7 +123,7 @@ interface ShiftWindow {
  * `clinicId` predicate. Supports both a legacy `vt_shift_sessions` id and a
  * roster window id (`win:<clinic>:<date>:<start>` — the shift-chat frame).
  */
-async function resolveShiftWindow(
+export async function resolveShiftWindow(
   clinicId: string,
   shiftSessionId: string,
 ): Promise<ShiftWindow> {
@@ -332,6 +336,20 @@ async function currentHandover(
   return row;
 }
 
+/**
+ * R-SH-F1.5 — injectable seams for the "push once to the next-shift roster" step
+ * fired when a NEW handover revision is inserted. Production passes none (real
+ * `resolveNextShiftRoster` + `enqueueNotificationJob`); tests override `enqueue`
+ * (and optionally `resolveRoster`) to assert the once-only fan-out without a
+ * live queue. The push-target roster is the SAME `resolveNextShiftRoster` output
+ * that authorizes acknowledge (server/services/shift-handover.service.ts), so
+ * push-targets ≡ ack-authorized set by construction.
+ */
+export interface ShiftHandoverNotifyDeps {
+  resolveRoster?: (clinicId: string, afterEnd: Date) => Promise<string[]>;
+  enqueue?: (userId: string, ctx: { clinicId: string; handoverId: string }) => Promise<void>;
+}
+
 export interface GenerateShiftHandoverOptions {
   /** Force a NEW revision (max+1) preserving priors — the manual "handover now" path. */
   regenerate?: boolean;
@@ -341,6 +359,67 @@ export interface GenerateShiftHandoverOptions {
    * override to drive a mock adapter through the SAME port.
    */
   worklistDeps?: PatientWorklistDeps;
+  /** R-SH-F1.5 — override the next-shift push fan-out (tests inject a spy). */
+  notifyDeps?: ShiftHandoverNotifyDeps;
+}
+
+/**
+ * Build + enqueue the default per-user handover push (`push_to_user`). Copy is
+ * pulled from `push.handover.*` at the recipient's own locale — no hardcoded
+ * strings — and the `idempotencyKey` makes the fan-out once-only even under a
+ * scheduler retry. `enqueueNotificationJob` never throws.
+ */
+async function defaultEnqueueHandoverPush(
+  clinicId: string,
+  userId: string,
+  handoverId: string,
+): Promise<void> {
+  const [row] = await db
+    .select({ preferredLocale: users.preferredLocale })
+    .from(users)
+    .where(and(eq(users.id, userId), eq(users.clinicId, clinicId)))
+    .limit(1);
+  const locale = row?.preferredLocale ?? "he";
+  const { primary, fallback, locale: lc } = getLocaleDictionaries(locale);
+  const title = translate(primary, "push.handover.title", undefined, { fallbackDict: fallback, locale: lc });
+  const body = translate(primary, "push.handover.body", undefined, { fallbackDict: fallback, locale: lc });
+  await enqueueNotificationJob({
+    type: "push_to_user",
+    clinicId,
+    userId,
+    title,
+    body,
+    tag: `handover-ready-${handoverId}`,
+    url: "/handoff",
+    priority: "NORMAL",
+    idempotencyKey: `handover-ready:${handoverId}:${userId}`,
+  });
+}
+
+/**
+ * Fire the handover push ONCE to the next-shift roster (the users rostered on
+ * the earliest shift starting after the current shift's end). Guarded so a push
+ * failure never breaks generation. Called only on a genuine NEW insert.
+ */
+async function notifyNextShiftRoster(
+  clinicId: string,
+  afterEnd: Date,
+  handoverId: string,
+  deps?: ShiftHandoverNotifyDeps,
+): Promise<void> {
+  try {
+    const resolveRoster = deps?.resolveRoster ?? resolveNextShiftRoster;
+    const roster = await resolveRoster(clinicId, afterEnd);
+    const enqueue =
+      deps?.enqueue ??
+      ((userId: string, ctx: { clinicId: string; handoverId: string }) =>
+        defaultEnqueueHandoverPush(ctx.clinicId, userId, ctx.handoverId));
+    for (const userId of roster) {
+      await enqueue(userId, { clinicId, handoverId });
+    }
+  } catch (err) {
+    console.error("[shift-handover] next-shift push failed", { clinicId, handoverId, err });
+  }
 }
 
 /**
@@ -395,6 +474,10 @@ export async function generateShiftHandover(
         patientWorklist,
       })
       .returning();
+    // R-SH-F1.5 — a NEW revision was persisted: push ONCE to the next-shift
+    // roster. The retry path (returned `existing` above) never reaches here, so
+    // the fan-out is once-only per artifact.
+    await notifyNextShiftRoster(clinicId, window.end, row!.id, opts?.notifyDeps);
     return row!;
   } catch (err) {
     // Concurrent no-opts generate lost the race on the unique

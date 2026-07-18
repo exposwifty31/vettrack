@@ -61,6 +61,7 @@ import procurementRoutes from "../routes/procurement.js";
 import clinicalCheckInRoutes from "../routes/clinical-check-in.js";
 import dispenseRoutes from "../routes/dispense.js";
 import shiftChatRoutes from "../routes/shift-chat.js";
+import shiftHandoverRoutes from "../routes/shift-handover.js";
 import whatsappRoutes from "../routes/whatsapp.js";
 
 function registerInfrastructureRoutes(app: express.Express) {
@@ -143,6 +144,7 @@ function registerPlatformRoutes(app: express.Express) {
   app.use("/api/clinical", clinicalCheckInRoutes);
   app.use("/api/dispense", dispenseRoutes);
   app.use("/api/shift-chat", shiftChatRoutes);
+  app.use("/api/shift-handover", shiftHandoverRoutes);
   app.use("/api/whatsapp", whatsappRoutes);
 }
 
