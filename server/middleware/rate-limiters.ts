@@ -79,24 +79,26 @@ export const pushTestLimiter = rateLimit({
   message: { error: "Too many test notifications. Please wait a minute." },
 });
 // Write operations: 30/min — POST/PATCH/DELETE on equipment
-// RFID doorway ingest: 120/min per clinic+IP
+// RFID doorway ingest: 120/min per IP.
+//
+// This limiter runs BEFORE HMAC signature verification (see server/routes/rfid.ts),
+// and the RFID ingest route is mounted ahead of the global per-IP limiter, so it is the
+// ONLY pre-auth backstop on that endpoint. The `x-vettrack-clinic` header is
+// attacker-controlled at this stage: keying by it would let one IP mint an unbounded
+// number of 120/min buckets simply by varying the header, defeating the DoS backstop.
+// Pre-authentication keying is therefore IP-only. (Per-verified-clinic isolation, if ever
+// needed for NAT'd sites, belongs in a separate limiter applied AFTER signature validation.)
+export function rfidEventLimiterKey(req: Request): string {
+  return `ip:${ipKeyGenerator(req.ip ?? "127.0.0.1")}`;
+}
+
 export const rfidEventLimiter = rateLimit({
   windowMs: 60_000,
   max: 120,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: "Too many RFID events. Please wait a moment." },
-  keyGenerator: (req) => {
-    const clinicHeader = req.headers["x-vetrack-clinic"];
-    const clinicId =
-      typeof clinicHeader === "string"
-        ? clinicHeader.trim()
-        : Array.isArray(clinicHeader)
-          ? clinicHeader[0]?.trim() ?? ""
-          : "";
-    const ip = ipKeyGenerator(req.ip ?? "127.0.0.1");
-    return `${clinicId}:${ip}`;
-  },
+  keyGenerator: rfidEventLimiterKey,
   skip: shouldSkipPerIpApiThrottles,
 });
 

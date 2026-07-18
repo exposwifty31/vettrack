@@ -35,6 +35,8 @@
     "auth:preflight": "tsx scripts/auth-preflight.ts",
     "auth:user-status": "tsx scripts/dev-user-status.ts",
     "test": "vitest run",
+    "test:rfid-controller": "vitest run --config packages/rfid-controller/vitest.config.ts",
+    "rfid-controller:typecheck": "tsc --noEmit -p packages/rfid-controller/tsconfig.json",
     "typecheck": "tsc --noEmit && tsc -p tsconfig.server.json --noEmit",
     "typecheck:server": "tsc -p tsconfig.server.json --noEmit",
     "contracts:typecheck": "tsc --noEmit -p node_modules/@vettrack/contracts/tsconfig.json",

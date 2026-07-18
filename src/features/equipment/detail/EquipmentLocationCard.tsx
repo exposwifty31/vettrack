@@ -1,5 +1,6 @@
 import { t } from "@/lib/i18n";
 import { formatRelativeTime } from "@/lib/utils";
+import { RfidDirectionLine } from "@/features/equipment/RfidDirectionLine";
 import type { LocationInference, LocationConfidence } from "./hooks/use-equipment-detail";
 
 // iOS system palette per the Stage 6 confidence ladder (medium = blue, not amber).
@@ -127,6 +128,18 @@ export function EquipmentLocationCard({ inference }: Props) {
         >
           {reasoningText}
         </p>
+        {inference.rfidDirection && (
+          <RfidDirectionLine
+            direction={inference.rfidDirection}
+            style={{
+              fontSize: "var(--text-sm)",
+              color: "rgba(255,255,255,0.55)",
+              margin: "4px 0 0",
+              lineHeight: 1.4,
+            }}
+            testId="equipment-detail-rfid-direction"
+          />
+        )}
       </div>
 
       {inference.accountablePerson && (
