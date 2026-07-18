@@ -30,6 +30,10 @@ import type {
   VetTrackBillingEntry,
   VetTrackPatient,
 } from "../types.js";
+import type {
+  PatientWorklistProviderEntry,
+  PatientWorklistWindow,
+} from "../patient-worklist-port.js";
 
 export interface IntegrationAdapter {
   /**
@@ -86,6 +90,19 @@ export interface IntegrationAdapter {
     credentials: IntegrationCredentials,
     patient: VetTrackPatient,
   ): Promise<ExternalSyncResult>;
+
+  /**
+   * PatientWorklistProvider port (optional) — pull the end-of-shift patient/
+   * animal worklist for a shift window (R-SH-F1.4). Returns external PMS ids +
+   * display + the INTERNAL `byTechId` of the tech who worked each animal. Throw
+   * a `PatientWorklistProviderError` (closed code) on failure — never leak a raw
+   * PMS message. Called by the shift-handover generator through the port; the
+   * framework resolves the adapter per-clinic from `vt_integration_configs`.
+   */
+  getPatientWorklist?(
+    credentials: IntegrationCredentials,
+    window: PatientWorklistWindow,
+  ): Promise<PatientWorklistProviderEntry[]>;
 
   // ------------------------------------------------------------------
   // Inventory sync (optional)

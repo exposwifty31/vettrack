@@ -27,7 +27,7 @@
  */
 import { randomUUID } from "crypto";
 import { and, desc, eq, gte, lt } from "drizzle-orm";
-import { db, auditLogs, eventOutbox, scanLogs, shiftSessions, shifts, shiftHandover } from "../db.js";
+import { db, auditLogs, eventOutbox, scanLogs, shiftSessions, shifts, shiftHandover, users } from "../db.js";
 import type { ShiftHandoverRow } from "../schema/ops.js";
 import { OUTBOX_TYPE_AUDIT_LOG } from "./event-publisher.js";
 import {
@@ -37,6 +37,10 @@ import {
   type ShiftHandoverObservedSignal,
   type ShiftHandoverOpenItem,
 } from "./shift-handover.js";
+import {
+  resolvePatientWorklist,
+  type PatientWorklistDeps,
+} from "../integrations/patient-worklist-port.js";
 import {
   isWindowSessionId,
   parseWindowSessionId,
@@ -331,6 +335,25 @@ async function currentHandover(
 export interface GenerateShiftHandoverOptions {
   /** Force a NEW revision (max+1) preserving priors — the manual "handover now" path. */
   regenerate?: boolean;
+  /**
+   * Injectable seams for the PMS-agnostic patient-worklist port (R-SH-F1.4).
+   * The scheduler path passes none (real registry + credential store); tests
+   * override to drive a mock adapter through the SAME port.
+   */
+  worklistDeps?: PatientWorklistDeps;
+}
+
+/**
+ * The internal `vt_users.id` set for a clinic — every `ready` worklist
+ * `byTechId` must be a member (a cross-clinic id is rejected on serialize).
+ * Explicit `clinicId` predicate.
+ */
+async function loadClinicTechIds(clinicId: string): Promise<Set<string>> {
+  const rows = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(eq(users.clinicId, clinicId));
+  return new Set(rows.map((r) => r.id));
 }
 
 /**
@@ -353,10 +376,9 @@ export async function generateShiftHandover(
   const deltas = await aggregateDeltas(clinicId, window);
   const openItems = deriveOpenItems(deltas);
   const observedSignals = await collectObservedSignals(clinicId, window);
-  const patientWorklist = serializePatientWorklist(
-    { state: "not_configured" },
-    { validTechIds: [] },
-  );
+  const validTechIds = await loadClinicTechIds(clinicId);
+  const resolvedWorklist = await resolvePatientWorklist(clinicId, window, opts?.worklistDeps);
+  const patientWorklist = serializePatientWorklist(resolvedWorklist, { validTechIds });
   const revision = existing ? existing.revision + 1 : 1;
 
   try {
