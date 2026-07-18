@@ -276,56 +276,47 @@ describe.skipIf(!DATABASE_URL)("R-SH-F1.2 — shift-handover delta generator", (
     }
   });
 
-  it("de-duplicates a paired audit+domain-outbox custody dual-emit, keeping an audit-less domain event", async () => {
-    // A domain custody event with NO paired audit row is a legitimately-distinct
-    // delta and must survive de-duplication (only the DUPLICATE is dropped).
-    const unpairedOutbox = await seedOutbox(
+  it("excludes the custody transport MIRROR type — the move is counted once, from the audit", async () => {
+    // EQUIPMENT_CUSTODY_STATE_CHANGED is a realtime-transport mirror of a custody
+    // audit, not an independent handover record, so it is excluded regardless of
+    // whether a paired audit exists (the audit log is the record of truth). The
+    // move is therefore counted exactly once, never doubled.
+    const auditLessMirror = await seedOutbox(
       clinicA,
       "EQUIPMENT_CUSTODY_STATE_CHANGED",
       IN_WINDOW,
-      { equipmentId: "eqUNPAIRED" },
+      { equipmentId: "eqAUDITLESS" },
     );
     const row = await generateShiftHandover(clinicA, sessionA);
     const custodyIds = new Set(row.deltas.custody.map((d) => d.sourceId));
-    // the eq1 checkout audit survives; its paired outbox mirror is dropped
-    expect(custodyIds.has(fixtureA.custodyAudit)).toBe(true);
-    expect(custodyIds.has(fixtureA.custodyOutbox)).toBe(false);
-    // the audit-less domain event (eqUNPAIRED) is a distinct delta — kept
-    expect(custodyIds.has(unpairedOutbox)).toBe(true);
-    expect(row.deltas.custody).toHaveLength(2);
+    expect(custodyIds.has(fixtureA.custodyAudit)).toBe(true); // audit kept
+    expect(custodyIds.has(fixtureA.custodyOutbox)).toBe(false); // paired mirror excluded
+    expect(custodyIds.has(auditLessMirror)).toBe(false); // an unpaired mirror is still a transport artifact
+    expect(row.deltas.custody).toHaveLength(1);
   });
 
-  it("de-dupes a dual-emit whose audit + mirror land in DIFFERENT seconds (timestamp skew)", async () => {
-    // The audit row is written fire-and-forget AFTER the mutation commits, so its
-    // timestamp is systematically later than the in-transaction domain mirror —
-    // frequently across a whole-second boundary. Pairing is a per-entity budget,
-    // NOT a time bucket, so the pair must still collapse; and an audit-less mirror
-    // on a different entity keeps its own slot regardless.
-    const skewMirror = await seedOutbox(
-      clinicA,
-      "EQUIPMENT_CUSTODY_STATE_CHANGED",
-      new Date("2026-03-10T10:04:59.900Z"),
-      { equipmentId: "eqSKEW" },
-    );
-    const skewAudit = await seedAudit(
+  it("keeps a DISTINCT non-mirror domain event on the same entity as an audit (never over-drops history)", async () => {
+    // Regression for the over-drop trap CodeRabbit flagged: a domain event whose
+    // type is NOT a known audit mirror must survive even when an audit exists for
+    // the same entity — a task_completed audit must never swallow an independent
+    // TASK_REASSIGNED. (The earlier per-entity budget could have consumed it.)
+    const completedAudit = await seedAudit(
       clinicA,
       userA,
-      "equipment_checked_out",
-      "eqSKEW",
-      new Date("2026-03-10T10:05:00.200Z"),
+      "task_completed",
+      "taskDISTINCT",
+      new Date("2026-03-10T10:05:00.000Z"),
     );
-    const loneMirror = await seedOutbox(
+    const reassigned = await seedOutbox(
       clinicA,
-      "EQUIPMENT_CUSTODY_STATE_CHANGED",
-      new Date("2026-03-10T10:06:00.000Z"),
-      { equipmentId: "eqLONE" },
+      "TASK_REASSIGNED", // classifies as taskState via keyword; NOT an audit mirror
+      new Date("2026-03-10T10:05:01.000Z"),
+      { taskId: "taskDISTINCT" },
     );
-
     const row = await generateShiftHandover(clinicA, sessionA);
-    const ids = new Set(row.deltas.custody.map((d) => d.sourceId));
-    expect(ids.has(skewAudit)).toBe(true); // audit kept
-    expect(ids.has(skewMirror)).toBe(false); // cross-second mirror still de-duped
-    expect(ids.has(loneMirror)).toBe(true); // audit-less mirror (other entity) survives
+    const taskIds = new Set(row.deltas.taskState.map((d) => d.sourceId));
+    expect(taskIds.has(completedAudit)).toBe(true); // the audit is kept
+    expect(taskIds.has(reassigned)).toBe(true); // the distinct domain event survives
   });
 
   it("writes a shift_handover_generated audit on a fresh generate but NOT on a retry", async () => {

@@ -340,7 +340,9 @@ function AcknowledgeControl({
           role="dialog"
           aria-label={t.handoverPage.acknowledgePrompt}
           onKeyDown={(e) => {
-            if (e.key === "Escape") handleCancel();
+            // Don't let Escape hide the confirm while a request is in flight — it
+            // could still succeed, leaving the UI inconsistent with the server.
+            if (e.key === "Escape" && !busy) handleCancel();
           }}
           className="rounded-xl border border-primary/30 bg-primary/5 p-3"
         >

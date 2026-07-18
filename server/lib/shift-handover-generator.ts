@@ -115,45 +115,14 @@ export function classifyDeltaKind(kind: string): DeltaCategory | null {
 }
 
 /**
- * Payload keys that carry the domain-entity id a domain-outbox event refers to,
- * in priority order. A paired dual-emit (an audit row + a domain-outbox event for
- * the same logical change) identifies its entity via one of these on the outbox
- * side and via `targetId` on the audit side — matching them is how the duplicate
- * is found and dropped.
+ * Domain-outbox event types that are a realtime-TRANSPORT MIRROR of a
+ * vt_audit_logs row (the same logical transition, emitted for SSE delivery) —
+ * NOT an independent handover record. They are excluded from delta aggregation
+ * so a custody move is counted ONCE, from its authoritative audit row, never
+ * doubled. A type absent from this set is treated as a distinct record and kept,
+ * so a genuinely independent domain event is never silently dropped.
  */
-const ENTITY_ID_PAYLOAD_KEYS = [
-  "targetId",
-  "equipmentId",
-  "containerId",
-  "itemId",
-  "taskId",
-  "appointmentId",
-  "alertId",
-  "dispenseId",
-  "id",
-] as const;
-
-/**
- * Pairing key for a dual-emit: ONE logical transition per (category, entity).
- * Deliberately time-independent: the audit row and its domain-outbox mirror are
- * written in SEPARATE transactions (the audit fire-and-forget AFTER the mutation
- * commits), so their timestamps do not reliably share an instant. Pairing is
- * one-for-one per entity via a consumable budget (see aggregateDeltas), never a
- * time bucket, so cross-transaction clock skew cannot split a pair and an
- * audit-less domain event always keeps its own slot.
- */
-function twinKey(category: DeltaCategory, entityId: string): string {
-  return `${category} ${entityId}`;
-}
-
-/** The domain-entity id a domain-outbox payload refers to, or null if none is present. */
-function extractOutboxEntityId(payload: Record<string, unknown>): string | null {
-  for (const key of ENTITY_ID_PAYLOAD_KEYS) {
-    const value = payload[key];
-    if (typeof value === "string" && value.length > 0) return value;
-  }
-  return null;
-}
+const AUDIT_MIRROR_OUTBOX_TYPES = new Set<string>(["EQUIPMENT_CUSTODY_STATE_CHANGED"]);
 
 export interface ShiftWindow {
   start: Date;
@@ -222,10 +191,6 @@ async function aggregateDeltas(
   window: ShiftWindow,
 ): Promise<ShiftHandoverDeltas> {
   const deltas = emptyDeltas();
-  // Budget of manually-logged (audit) transitions per (category, entity). Each
-  // paired domain-outbox mirror consumes one unit below (both sides describe one
-  // logical event); an audit-less domain event finds no budget and survives.
-  const auditTwinBudget = new Map<string, number>();
 
   const auditRows = await db
     .select({
@@ -256,10 +221,6 @@ async function aggregateDeltas(
       at: r.timestamp.toISOString(),
     };
     deltas[category].push(entry);
-    if (r.targetId) {
-      const k = twinKey(category, r.targetId);
-      auditTwinBudget.set(k, (auditTwinBudget.get(k) ?? 0) + 1);
-    }
   }
 
   const outboxRows = await db
@@ -281,23 +242,13 @@ async function aggregateDeltas(
 
   for (const r of outboxRows) {
     if (r.type === OUTBOX_TYPE_AUDIT_LOG) continue;
+    // A realtime-transport mirror of a custody audit already counted from the
+    // audit log (the authoritative record) — excluded so the move is not doubled.
+    // A type NOT in the set is a distinct record and is kept. See AUDIT_MIRROR_OUTBOX_TYPES.
+    if (AUDIT_MIRROR_OUTBOX_TYPES.has(r.type)) continue;
     const category = classifyDeltaKind(r.type);
     if (!category) continue;
     const payload = (r.payload ?? {}) as Record<string, unknown>;
-    // Drop the domain-outbox mirror of a paired audit dual-emit by consuming one
-    // unit of that (category, entity) audit budget. Budget-based (not time-based)
-    // so a cross-transaction timestamp skew can't split the pair, and once the
-    // budget is exhausted every further domain event on that entity — i.e. an
-    // audit-less one — survives.
-    const outboxEntityId = extractOutboxEntityId(payload);
-    if (outboxEntityId) {
-      const k = twinKey(category, outboxEntityId);
-      const budget = auditTwinBudget.get(k) ?? 0;
-      if (budget > 0) {
-        auditTwinBudget.set(k, budget - 1);
-        continue;
-      }
-    }
     const targetId = typeof payload.targetId === "string" ? payload.targetId : null;
     const targetType = typeof payload.targetType === "string" ? payload.targetType : null;
     const entry: ShiftHandoverDeltaEntry = {
@@ -308,6 +259,13 @@ async function aggregateDeltas(
       at: r.occurredAt.toISOString(),
     };
     deltas[category].push(entry);
+  }
+
+  // Audit rows are appended before outbox rows, so each dimension is not globally
+  // chronological. Sort oldest->newest by `at` so deriveOpenItems' "latest wins"
+  // reflects true chronology and a stale older event cannot reopen a terminal one.
+  for (const dim of Object.keys(deltas) as DeltaCategory[]) {
+    deltas[dim].sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0));
   }
 
   return deltas;
@@ -525,7 +483,7 @@ export async function generateShiftHandover(
   const revision = existing ? existing.revision + 1 : 1;
 
   try {
-    const [row] = await db
+    const [insertedRow] = await db
       .insert(shiftHandover)
       .values({
         id: randomUUID(),
@@ -538,10 +496,15 @@ export async function generateShiftHandover(
         patientWorklist,
       })
       .returning();
+    if (!insertedRow) {
+      // INSERT ... RETURNING yields the row on success; a missing row means the
+      // insert did not take, so fail loudly rather than assert non-null blindly.
+      throw new Error("shift-handover: INSERT ... RETURNING produced no row");
+    }
     // R-SH-F1.5 — a NEW revision was persisted: push ONCE to the next-shift
     // roster. The retry path (returned `existing` above) never reaches here, so
     // the fan-out is once-only per artifact.
-    await notifyNextShiftRoster(clinicId, window.end, row!.id, opts?.notifyDeps);
+    await notifyNextShiftRoster(clinicId, window.end, insertedRow.id, opts?.notifyDeps);
     // Record the generation ONCE — only on this fresh/regenerated-revision path.
     // The retry short-circuit returned `existing` above, so no duplicate audit
     // is ever written for an idempotent re-generate (fire-and-forget).
@@ -550,10 +513,10 @@ export async function generateShiftHandover(
       actionType: "shift_handover_generated",
       performedBy: "system:shift_handover",
       performedByEmail: "shift-handover@vettrack.system",
-      targetId: row!.id,
+      targetId: insertedRow.id,
       targetType: "shift_handover",
     });
-    return row!;
+    return insertedRow;
   } catch (err) {
     // Concurrent no-opts generate lost the race on the unique
     // (clinicId, shiftSessionId, revision) key — return the row the winner

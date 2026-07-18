@@ -97,10 +97,11 @@ async function makeSession(clinicId: string, userId: string): Promise<string> {
 }
 
 /**
- * Seed one in-window scan (observed signal) + one in-window custody outbox event
- * (delta) so "the rest of the handover still generates" is provable. The custody
- * event is sourced from `vt_event_outbox` (cascade FK) rather than the
- * append-only `vt_audit_logs`, which cannot be purged between tests.
+ * Seed one in-window scan (observed signal) + one in-window NON-mirror domain
+ * event (a task-state delta) so "the rest of the handover still generates" is
+ * provable. It comes from `vt_event_outbox` (cascade FK, purgeable) rather than
+ * the append-only `vt_audit_logs`, and is deliberately NOT an audit-mirror type —
+ * EQUIPMENT_CUSTODY_STATE_CHANGED is excluded from aggregation as a transport mirror.
  */
 async function seedNonPmsSignals(clinicId: string, userId: string): Promise<void> {
   await db.insert(scanLogs).values({
@@ -114,8 +115,8 @@ async function seedNonPmsSignals(clinicId: string, userId: string): Promise<void
   });
   await db.insert(eventOutbox).values({
     clinicId,
-    type: "EQUIPMENT_CUSTODY_STATE_CHANGED",
-    payload: { targetId: "eqWL", targetType: "equipment" },
+    type: "TASK_UPDATED",
+    payload: { targetId: "taskWL", targetType: "task" },
     occurredAt: IN_WINDOW,
   });
 }
@@ -209,7 +210,7 @@ describe.skipIf(!DATABASE_URL)("R-SH-F1.4 — shift-handover patient worklist vi
     expect(row.patientWorklist).toEqual({ state: "not_configured" });
     // The rest of the handover still generates.
     expect(row.observedSignals.length).toBeGreaterThan(0);
-    expect(row.deltas.custody.length).toBeGreaterThan(0);
+    expect(row.deltas.taskState.length).toBeGreaterThan(0);
   });
 
   it("configured-but-failing adapter → { state: 'error', code } (not not_configured/empty) while the rest still generates", async () => {
@@ -224,7 +225,7 @@ describe.skipIf(!DATABASE_URL)("R-SH-F1.4 — shift-handover patient worklist vi
     expect(JSON.stringify(row.patientWorklist)).not.toContain("raw PMS detail");
     // The rest of the handover still generates on a PMS failure.
     expect(row.observedSignals.length).toBeGreaterThan(0);
-    expect(row.deltas.custody.length).toBeGreaterThan(0);
+    expect(row.deltas.taskState.length).toBeGreaterThan(0);
   });
 
   it("a SECOND, different stub adapter through the SAME port yields the same shape (adapter-agnostic)", async () => {
