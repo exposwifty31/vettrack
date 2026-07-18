@@ -711,6 +711,18 @@ const translations = {
     issueCountBadge: (count: number) => tr(d.analyticsPage.issueCountBadge, { count }),
   },
 
+  // R-PDF-1.4 — predictive-readiness Analytics panel. The buildTranslations
+  // gotcha: without this block t.readinessForecast is undefined at runtime even
+  // with the JSON keys present. Interpolated keys are wired explicitly.
+  readinessForecast: {
+    ...d.readinessForecast,
+    subtitle: (hours: number) => tr(d.readinessForecast.subtitle, { hours }),
+    shortBadge: (count: number, unit: string) => tr(d.readinessForecast.shortBadge, { count, unit }),
+    sourceLine: (count: number) => tr(d.readinessForecast.sourceLine, { count }),
+    burnLine: (units: number) => tr(d.readinessForecast.burnLine, { units }),
+    incomingLine: (units: number) => tr(d.readinessForecast.incomingLine, { units }),
+  },
+
   monthlyReport: {
     ...d.monthlyReport,
     andMore: (count: number) => tr(d.monthlyReport.andMore, { count }),

@@ -3633,3 +3633,16 @@ Reviewer returned 1 HIGH + 1 MEDIUM + 2 LOW on the committed sub-card; all four 
 - Command: `pnpm typecheck` → exit 0.
 
 **Verdict:** VERIFIED
+
+## 2026-07-18 — R-PDF-1.4 · Analytics panel + read-only PO recommendations
+
+**Claim:** Added the redacted forecast DTO + `ReadinessForecastPanel` inside the EXISTING Analytics console (no new surface family, no home tile), the Drizzle reader/orchestrator service, `GET /api/analytics/readiness-forecast` (read-only), api client fn, client types, and i18n he/en parity. Rendering/refresh creates zero POs.
+
+**Evidence:**
+- `server/services/readiness-forecast.service.ts` — every reader method filters its target table by clinicId; PO recommendations only (no insert into purchaseOrders/poLines); consumables reserved=0.
+- `src/features/analytics/ReadinessForecastPanel.tsx` — presentational; `onCreatePurchaseOrder` invoked only from the confirm button, never on render; single `<h2>` region heading (page owns h1); status by icon+text via AA-verified `--status-*` tokens.
+- `src/pages/analytics.tsx` — panel mounted in the existing analytics page; forecast query failure is non-fatal.
+- Test: `pnpm test -- tests/readiness-forecast-panel.test.tsx` → 16 passed (a11y single-heading, redacted DTO no-PII, zero-PO-on-render, confirm-gated PO, empty state, he+en+RTL, light+dark contrast).
+- Command: `pnpm i18n:check` → "in deep key parity"; `pnpm typecheck` → exit 0; `tests/i18n-no-hebrew-in-source.test.ts` → passed.
+
+**Verdict:** VERIFIED

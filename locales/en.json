@@ -4328,5 +4328,28 @@
     "noHomeHint": "No home station assigned yet — ask an admin to set one",
     "stationUnresolvedHint": "This item's home station isn't set up yet — uncheck to return without docking",
     "offlineDockHint": "Dock return needs a connection — returning without docking for now"
+  },
+  "readinessForecast": {
+    "title": "Predictive readiness",
+    "subtitle": "Forecast horizon: next {hours}h",
+    "shortfallsHeading": "Forecast shortfalls",
+    "recommendationsHeading": "Purchase recommendations",
+    "recommendedOnly": "Recommended — nothing is ordered until you confirm",
+    "shortBadge": "Short {count} {unit}",
+    "requiredLabel": "Required",
+    "availableLabel": "Available",
+    "sourceLine": "From {count} scheduled procedures",
+    "burnLine": "{units} used in the last 14 days",
+    "incomingLine": "{units} arriving within the horizon",
+    "equipmentKind": "Equipment",
+    "consumableKind": "Consumable",
+    "sourceRefsLabel": "Source rows",
+    "suggestedQtyLabel": "Suggested quantity",
+    "createPo": "Create purchase order",
+    "confirmPo": "Confirm order",
+    "cancelPo": "Cancel",
+    "allReadyTitle": "You're ready",
+    "allReadyBody": "No shortfalls forecast for the scheduled procedures ahead.",
+    "loadError": "Couldn't load the readiness forecast"
   }
 }

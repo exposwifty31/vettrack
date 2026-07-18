@@ -439,3 +439,78 @@ export async function computeReadinessForecast(deps: ForecastDeps, clinicId: str
 
   return { window, demand, shortfalls };
 }
+
+// ---------------------------------------------------------------------------
+// Redacted, clinicId-scoped explainability DTO (R-PDF-1.4).
+// Source-row REFERENCES + counts only — never raw PII.
+// ---------------------------------------------------------------------------
+
+export interface ShortfallWarningDTO {
+  keyId: string;
+  kind: DemandKind;
+  ref: string;
+  unit: string;
+  required: number;
+  available: number;
+  shortfall: number;
+  /** Explainability: source appointment ids + count (ids only — never PII). */
+  sourceAppointmentIds: string[];
+  sourceAppointmentCount: number;
+  /** Trailing-window consumption that drove the burn term (null when none). */
+  burnConsumedUnits: number | null;
+  /** Unreserved on-hand at forecast time (null for equipment keys). */
+  onHand: number | null;
+  incomingUnits: number;
+  incomingPurchaseOrderIds: string[];
+}
+
+/** A READ-ONLY purchase-order recommendation. Rendering it creates no PO; a PO
+ *  is created only through the existing explicit confirm + authorization flow. */
+export interface PoRecommendationDTO {
+  itemId: string;
+  unit: string;
+  suggestedQuantity: number;
+  shortfallKeyId: string;
+}
+
+export interface ReadinessForecastDTO {
+  clinicId: string;
+  generatedAtMs: number;
+  horizonHours: number;
+  warnings: ShortfallWarningDTO[];
+  recommendations: PoRecommendationDTO[];
+}
+
+/**
+ * Project shortfall rows into the redacted, clinicId-scoped DTO. Only keys with
+ * a positive shortfall become warnings (a "no shortfall" clinic yields empty
+ * arrays → calm state). Consumable shortfalls yield read-only PO recommendations.
+ */
+export function toRedactedForecastDTO(
+  clinicId: string,
+  shortfalls: ShortfallRow[],
+  opts: { horizonHours: number; generatedAtMs: number },
+): ReadinessForecastDTO {
+  const active = shortfalls.filter((r) => r.shortfall > 0);
+  const warnings: ShortfallWarningDTO[] = active.map((r) => ({
+    keyId: r.keyId,
+    kind: r.key.kind,
+    ref: r.key.ref,
+    unit: r.key.unit,
+    required: r.requiredThroughHorizon,
+    available: r.availableSupplyThroughHorizon,
+    shortfall: r.shortfall,
+    sourceAppointmentIds: r.source.appointmentIds,
+    sourceAppointmentCount: r.source.appointmentIds.length,
+    burnConsumedUnits: r.source.burn ? r.source.burn.consumedUnits : null,
+    onHand: r.source.stock ? r.source.stock.onHand : null,
+    incomingUnits: r.incomingStock,
+    incomingPurchaseOrderIds: r.source.incoming.map((i) => i.purchaseOrderId),
+  }));
+
+  const recommendations: PoRecommendationDTO[] = active
+    .filter((r) => r.key.kind === "consumable")
+    .map((r) => ({ itemId: r.key.ref, unit: r.key.unit, suggestedQuantity: r.shortfall, shortfallKeyId: r.keyId }));
+
+  return { clinicId, generatedAtMs: opts.generatedAtMs, horizonHours: opts.horizonHours, warnings, recommendations };
+}
