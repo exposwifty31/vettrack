@@ -29,11 +29,9 @@ import type {
   VetTrackAppointment,
   VetTrackBillingEntry,
   VetTrackPatient,
-} from "../types.js";
-import type {
   PatientWorklistProviderEntry,
   PatientWorklistWindow,
-} from "../patient-worklist-port.js";
+} from "../types.js";
 
 export interface IntegrationAdapter {
   /**

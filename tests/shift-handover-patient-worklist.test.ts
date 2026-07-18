@@ -26,7 +26,16 @@
  * Run: pnpm test -- tests/shift-handover-patient-worklist.test.ts
  */
 import "dotenv/config";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+// The generator writes a fire-and-forget shift_handover_generated audit; this
+// suite doesn't assert audit, and a real audit row would make the append-only
+// vt_audit_logs block the clinic teardown (RESTRICT FK). Mock it to a no-op so
+// teardown stays a plain clinic delete with no global rule-toggle race.
+vi.mock("../server/lib/audit.js", async (importActual) => {
+  const actual = await importActual<typeof import("../server/lib/audit.js")>();
+  return { ...actual, logAudit: vi.fn() };
+});
 import { randomUUID } from "crypto";
 import { eq } from "drizzle-orm";
 import {

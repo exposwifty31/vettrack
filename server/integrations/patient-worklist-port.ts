@@ -26,29 +26,22 @@ import { and, eq } from "drizzle-orm";
 import { db, integrationConfigs } from "../db.js";
 import { getAdapter } from "./index.js";
 import { getCredentials } from "./credential-manager.js";
-import type { IntegrationCredentials } from "./types.js";
+import type {
+  IntegrationCredentials,
+  PatientWorklistWindow,
+  PatientWorklistProviderEntry,
+} from "./types.js";
 import type {
   PatientWorklist,
   PatientWorklistErrorCode,
 } from "../lib/shift-handover.js";
 
-/** The `[start, end)` window the port pulls an end-of-shift worklist for. */
-export interface PatientWorklistWindow {
-  start: Date;
-  end: Date;
-}
-
 /**
- * A single raw worklist entry returned by an adapter through the port.
- * `externalId` / `display` are the external PMS animal id + label; `byTechId` is
- * the INTERNAL VetTrack `vt_users.id` of the technician who worked that animal
- * (validated to be in-clinic by `serializePatientWorklist` before persistence).
+ * Worklist data shapes moved to ./types.js to keep the leaf type graph acyclic
+ * (adapters/base.ts imports them without depending on this port). Re-exported
+ * here so existing `patient-worklist-port` importers keep their public surface.
  */
-export interface PatientWorklistProviderEntry {
-  externalId: string;
-  display: string;
-  byTechId: string;
-}
+export type { PatientWorklistWindow, PatientWorklistProviderEntry };
 
 /**
  * The port capability an adapter implements to expose an end-of-shift patient
