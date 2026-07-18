@@ -202,6 +202,40 @@ describe("R-PDF-1.3 · computeShortfalls", () => {
     expect(rows.map((r) => r.keyId)).toEqual(["consumable:bbb", "consumable:aaa", "consumable:ccc"]);
   });
 
+  it("does NOT offset demand with SUPPLY counted in a mismatched unit (shortfall survives)", () => {
+    // Demand is in mL; the item's on-hand + incoming stock are counted in vials.
+    // The two are dimensionally incompatible, so mismatched supply must NOT cancel
+    // the demand — a real shortfall would otherwise be silently suppressed.
+    const demand: DemandEntry[] = [
+      { key: { kind: "consumable", ref: "iv", unit: "mL" }, requiredQuantity: 10, sourceAppointmentIds: ["a"] },
+    ];
+    const rows = computeShortfalls(
+      base({
+        demand,
+        consumableStock: [{ itemId: "iv", clinicId: "clinic-a", onHand: 100, reserved: 0, unit: "vial" }],
+        incoming: [{ itemId: "iv", clinicId: "clinic-a", purchaseOrderId: "po-1", quantity: 50, unitsPerPack: 1, etaMs: NOW + HOUR }],
+      }),
+      NOW,
+    );
+    const row = rows.find((r) => r.keyId === "consumable:iv")!;
+    expect(row.availableCurrentStock).toBe(0); // mismatched-unit on-hand cannot offset
+    expect(row.incomingStock).toBe(0); // mismatched-unit incoming cannot offset either
+    expect(row.shortfall).toBe(10); // preserved — NOT cancelled by 100 vials + 50 incoming
+  });
+
+  it("still offsets demand when the supply unit MATCHES the demand unit (no false shortfall)", () => {
+    const demand: DemandEntry[] = [
+      { key: { kind: "consumable", ref: "iv", unit: "mL" }, requiredQuantity: 10, sourceAppointmentIds: ["a"] },
+    ];
+    const rows = computeShortfalls(
+      base({ demand, consumableStock: [{ itemId: "iv", clinicId: "clinic-a", onHand: 4, reserved: 0, unit: "mL" }] }),
+      NOW,
+    );
+    const row = rows.find((r) => r.keyId === "consumable:iv")!;
+    expect(row.availableCurrentStock).toBe(4); // same unit → offsets normally
+    expect(row.shortfall).toBe(6);
+  });
+
   it("degrades a same-key unit conflict PER KEY (excludes it, forecasts every other key)", () => {
     const demand: DemandEntry[] = [
       { key: { kind: "consumable", ref: "iv", unit: "mL" }, requiredQuantity: 2, sourceAppointmentIds: ["a"] },

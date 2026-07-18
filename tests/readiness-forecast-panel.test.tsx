@@ -45,6 +45,8 @@ const FORECAST: ReadinessForecast = {
     },
   ],
   recommendations: [{ itemId: "iv-set", unit: "unit", suggestedQuantity: 4, shortfallKeyId: "consumable:iv" }],
+  degraded: false,
+  omittedRequirementCount: 0,
 };
 
 const HEALTHY: ReadinessForecast = {
@@ -53,6 +55,8 @@ const HEALTHY: ReadinessForecast = {
   horizonHours: 24,
   warnings: [],
   recommendations: [],
+  degraded: false,
+  omittedRequirementCount: 0,
 };
 
 // --- WCAG contrast math (real sRGB token values; no fabricated numbers) -------

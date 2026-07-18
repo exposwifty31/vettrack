@@ -38,4 +38,11 @@ export interface ReadinessForecast {
   horizonHours: number;
   warnings: ReadinessShortfallWarning[];
   recommendations: ReadinessPoRecommendation[];
+  /** True when one or more requirements were DROPPED from the forecast (e.g. a
+   *  same-key demand authored in conflicting units): `warnings` is then PARTIAL,
+   *  so an empty/short list must NOT be read as "no shortfall". */
+  degraded: boolean;
+  /** Bounded count of omitted requirements — a plain count only, never keyId /
+   *  unit labels / per-requirement metadata. */
+  omittedRequirementCount: number;
 }

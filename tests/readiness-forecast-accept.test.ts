@@ -11,6 +11,7 @@ import {
   type ConsumptionRow,
   type IncomingStockRow,
   type ForecastWindow,
+  type DemandUnitConflict,
 } from "../server/lib/readiness-forecast-engine.js";
 import { DEFAULT_EQUIPMENT_READINESS_RULES_V1 } from "../shared/equipment-readiness-rules.js";
 
@@ -189,6 +190,63 @@ describe("R-PDF-1.5 · acceptance bar", () => {
     const dto = toRedactedForecastDTO("clinic-c", shortfalls, { horizonHours: 24, generatedAtMs: NOW });
     expect(dto.warnings).toEqual([]);
     expect(dto.recommendations).toEqual([]);
+  });
+
+  it("a COMPLETE forecast reports no degradation (degraded=false, omittedRequirementCount=0)", () => {
+    const dto = toRedactedForecastDTO("clinic-a", [], { horizonHours: 24, generatedAtMs: NOW });
+    expect(dto.degraded).toBe(false);
+    expect(dto.omittedRequirementCount).toBe(0);
+  });
+
+  it("exposes a REDACTED degradation flag + bounded count WITHOUT leaking per-requirement metadata", () => {
+    const dto = toRedactedForecastDTO("clinic-a", [], { horizonHours: 24, generatedAtMs: NOW, omittedRequirementCount: 2 });
+    // Incomplete forecast is signalled to the caller...
+    expect(dto.degraded).toBe(true);
+    expect(dto.omittedRequirementCount).toBe(2);
+    // ...but the degradation surface is a bounded count only — no keyId / unit
+    // labels / conflict metadata (frozen bounded-telemetry rule).
+    const degradationSurface = { degraded: dto.degraded, omittedRequirementCount: dto.omittedRequirementCount };
+    expect(typeof degradationSurface.degraded).toBe("boolean");
+    expect(typeof degradationSurface.omittedRequirementCount).toBe("number");
+    expect(JSON.stringify(degradationSurface)).not.toMatch(/keyId|unit|mL|vial|consumable:|equipment:/i);
+  });
+
+  it("a dropped same-key unit conflict surfaces as forecast degradation (bounded count only)", async () => {
+    // Two appointments demand the SAME item in incompatible units → the key is
+    // dropped from the forecast entirely (so shortfalls look COMPLETE). Wire the
+    // shared conflict callback exactly like the service, count distinct drops, and
+    // pass the bounded count to the DTO so the caller learns the forecast is partial.
+    const seed: Seed = {
+      procedures: [
+        proc({ id: "d-1", clinicId: "clinic-d", requiredConsumables: [{ itemId: "iv", quantity: 2, unit: "mL" }] }),
+        proc({ id: "d-2", clinicId: "clinic-d", requiredConsumables: [{ itemId: "iv", quantity: 3, unit: "vial" }] }),
+      ],
+      units: [],
+      stock: [],
+      consumption: [],
+      incoming: [],
+    };
+    const reader = new InMemoryReader(seed);
+    const droppedKeys = new Set<string>();
+    const onUnitConflict = (c: DemandUnitConflict): void => {
+      droppedKeys.add(c.keyId);
+    };
+    const { shortfalls } = await computeReadinessForecast(
+      { reader, demandSource: new ScheduleDemandSource(reader, { onUnitConflict }), nowMs: NOW, onUnitConflict },
+      "clinic-d",
+    );
+    // The conflicted requirement is omitted — the shortfall list looks complete.
+    expect(shortfalls.find((r) => r.keyId === "consumable:iv")).toBeUndefined();
+
+    const dto = toRedactedForecastDTO("clinic-d", shortfalls, {
+      horizonHours: 24,
+      generatedAtMs: NOW,
+      omittedRequirementCount: droppedKeys.size,
+    });
+    // The DTO now signals the incomplete forecast rather than masquerading as complete.
+    expect(dto.warnings).toEqual([]);
+    expect(dto.degraded).toBe(true);
+    expect(dto.omittedRequirementCount).toBe(1);
   });
 
   it("cross-tenant: clinic-b's forecast is independently correct (no clinic-a leak)", async () => {

@@ -208,10 +208,13 @@ export function isUnitAvailable(u: EquipmentUnitRow): boolean {
  */
 export function isUnitReady(u: EquipmentUnitRow, rules: EquipmentReadinessRulesV1, nowMs: number): boolean {
   if (u.readinessState !== "ready") return false;
-  // A missing evidence timestamp cannot clear the freshness check — without a
-  // `since` we can't confirm the "ready" evidence is current, so (precision-first)
-  // the unit is excluded from supply rather than assumed fresh.
-  if (u.readinessStateSince == null) return false;
+  // A missing OR future-dated evidence timestamp cannot clear the freshness check.
+  // Without a `since` we can't confirm the "ready" evidence is current; a `since`
+  // later than now (clock skew / bad write) yields a NEGATIVE age that would
+  // trivially pass `age > staleEvidenceMs`, silently overstating ready supply. In
+  // both cases the unit is excluded from supply rather than assumed fresh
+  // (precision-first).
+  if (u.readinessStateSince == null || u.readinessStateSince > nowMs) return false;
   if (nowMs - u.readinessStateSince > rules.staleEvidenceMs) return false;
   return true;
 }
@@ -378,14 +381,22 @@ export function computeShortfalls(
     // Supply terms — each nonzero only for its own key kind (per-key, same unit).
     const readySupply = agg.key.kind === "equipment" ? input.readySupplyByAssetType.get(agg.key.ref) ?? 0 : 0;
 
+    // Supply (on-hand + incoming) is counted in the inventory item's stock unit;
+    // demand may be authored in a different (freeform) unit. Supply can only offset
+    // demand when the two are dimensionally the same — a demand in "mL" offset by
+    // stock counted in "vial" would silently SUPPRESS a real shortfall. The stock
+    // row carries the authoritative supply unit; when it mismatches the demand unit
+    // the supply is NOT counted and the shortfall survives (precision-first). When
+    // no stock row exists the supply unit is unknown, so incoming is still counted
+    // (dropping it would invent a spurious shortfall instead).
+    const stockRow = isConsumable ? stockByItem.get(agg.key.ref) : undefined;
+    const supplyUnitMismatch = stockRow != null && stockRow.unit !== agg.key.unit;
+
     let availableCurrentStock = 0;
     let stockSource: ShortfallSource["stock"] = null;
-    if (isConsumable) {
-      const s = stockByItem.get(agg.key.ref);
-      if (s) {
-        availableCurrentStock = Math.max(0, s.onHand - s.reserved);
-        stockSource = { onHand: s.onHand, reserved: s.reserved };
-      }
+    if (isConsumable && stockRow && !supplyUnitMismatch) {
+      availableCurrentStock = Math.max(0, stockRow.onHand - stockRow.reserved);
+      stockSource = { onHand: stockRow.onHand, reserved: stockRow.reserved };
     }
 
     let consumedUnits = 0;
@@ -405,7 +416,7 @@ export function computeShortfalls(
     // the units from both supply terms and invent a spurious shortfall.
     let incomingStock = 0;
     const incomingSource: ShortfallSource["incoming"] = [];
-    if (isConsumable) {
+    if (isConsumable && !supplyUnitMismatch) {
       for (const inc of incomingByItem.get(agg.key.ref) ?? []) {
         if (inc.etaMs == null || inc.etaMs > window.toMs) continue;
         const units = inc.quantity * inc.unitsPerPack; // explicit packs→units conversion
@@ -540,6 +551,19 @@ export interface ReadinessForecastDTO {
   horizonHours: number;
   warnings: ShortfallWarningDTO[];
   recommendations: PoRecommendationDTO[];
+  /**
+   * True when one or more clinical requirements were DROPPED from this forecast
+   * (e.g. a same-key demand authored in conflicting units) — so `warnings` is a
+   * PARTIAL, not complete, picture. The caller must not read an empty/short
+   * `warnings` list as "no shortfall" when this is set.
+   */
+  degraded: boolean;
+  /**
+   * Bounded count of requirements omitted from the forecast. Deliberately a plain
+   * count — never keyId / unit labels / per-requirement metadata (frozen
+   * bounded-telemetry / no-PII rule).
+   */
+  omittedRequirementCount: number;
 }
 
 /**
@@ -550,7 +574,7 @@ export interface ReadinessForecastDTO {
 export function toRedactedForecastDTO(
   clinicId: string,
   shortfalls: ShortfallRow[],
-  opts: { horizonHours: number; generatedAtMs: number },
+  opts: { horizonHours: number; generatedAtMs: number; omittedRequirementCount?: number },
 ): ReadinessForecastDTO {
   const active = shortfalls.filter((r) => r.shortfall > 0);
   const warnings: ShortfallWarningDTO[] = active.map((r) => ({
@@ -573,5 +597,14 @@ export function toRedactedForecastDTO(
     .filter((r) => r.key.kind === "consumable")
     .map((r) => ({ itemId: r.key.ref, unit: r.key.unit, suggestedQuantity: r.shortfall, shortfallKeyId: r.keyId }));
 
-  return { clinicId, generatedAtMs: opts.generatedAtMs, horizonHours: opts.horizonHours, warnings, recommendations };
+  const omittedRequirementCount = Math.max(0, opts.omittedRequirementCount ?? 0);
+  return {
+    clinicId,
+    generatedAtMs: opts.generatedAtMs,
+    horizonHours: opts.horizonHours,
+    warnings,
+    recommendations,
+    degraded: omittedRequirementCount > 0,
+    omittedRequirementCount,
+  };
 }

@@ -103,6 +103,18 @@ describe("R-PDF-1.2 · computeReadySupply — available ∧ ready intersection",
     expect(computeReadySupply(units, RULES, NOW).get("asset-ventilator")?.readySupply).toBe(1);
   });
 
+  it("excludes a ready unit with FUTURE-DATED evidence (readinessStateSince > now cannot pass freshness)", () => {
+    // A `since` in the future yields a NEGATIVE age, which trivially clears the
+    // `age > staleEvidenceMs` check — silently overstating ready supply. Clock skew
+    // or a bad write must NOT be trusted as fresh evidence (precision-first).
+    const units = [
+      unit({ id: "fresh", readinessStateSince: NOW - HOUR }), // valid past evidence → counts
+      unit({ id: "future", readinessState: "ready", readinessStateSince: NOW + HOUR }), // future-dated → excluded
+    ];
+    expect(isUnitReady(units[1], RULES, NOW)).toBe(false);
+    expect(computeReadySupply(units, RULES, NOW).get("asset-ventilator")?.readySupply).toBe(1);
+  });
+
   it("groups readySupply per asset type (never sums different types together)", () => {
     const units = [
       unit({ id: "v1", assetTypeId: "asset-ventilator" }),

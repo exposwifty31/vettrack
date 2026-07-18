@@ -278,8 +278,13 @@ export async function getReadinessForecast(
 
   // A freeform-metadata unit conflict degrades that key only (it is excluded from
   // the forecast); every other key still forecasts. Count + log it — bounded
-  // counter (no keyId/unit label leaks into the metric).
+  // counter (no keyId/unit label leaks into the metric). Distinct dropped keys are
+  // tracked so the returned DTO can signal that the forecast is PARTIAL rather than
+  // masquerade as complete (an omitted requirement would otherwise read as "no
+  // shortfall" in the Analytics panel).
+  const droppedKeys = new Set<string>();
   const onUnitConflict = (conflict: DemandUnitConflict): void => {
+    droppedKeys.add(conflict.keyId);
     incrementMetric("readiness_forecast_demand_unit_conflict");
     console.warn(
       `[readiness-forecast] demand unit conflict for ${conflict.keyId} ("${conflict.existingUnit}" vs "${conflict.conflictingUnit}") — key excluded`,
@@ -291,5 +296,9 @@ export async function getReadinessForecast(
     clinicId,
   );
 
-  return toRedactedForecastDTO(clinicId, shortfalls, { horizonHours, generatedAtMs: nowMs });
+  return toRedactedForecastDTO(clinicId, shortfalls, {
+    horizonHours,
+    generatedAtMs: nowMs,
+    omittedRequirementCount: droppedKeys.size,
+  });
 }
