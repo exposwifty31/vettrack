@@ -24,7 +24,7 @@
  * advisory-only (ADR-006): this module never touches custody.
  */
 import { randomBytes, randomUUID } from "crypto";
-import { and, eq } from "drizzle-orm";
+import { and, eq, lte, or } from "drizzle-orm";
 import { db, rfidReaders, rfidSecretRotations } from "../../db.js";
 import type { RfidSecretRotation } from "../../schema/equipment.js";
 import { getCredentials, storeCredentials } from "../../integrations/credential-manager.js";
@@ -33,6 +33,13 @@ import { incrementMetric } from "../metrics.js";
 const DEFAULT_GRACE_TTL_MS = 24 * 60 * 60 * 1000; // 24h
 const SECRET_BYTES = 32;
 const ONE_INFLIGHT_INDEX = "vt_rfid_secret_rotations_one_inflight_uq";
+// A legitimate finalize (Phase-1 CAS → credential delete → Phase-3 CAS) completes in milliseconds.
+// A `finalizing` row that has sat untouched longer than this can only be a crash-stranded claim (the
+// finalizing process was hard-killed — SIGKILL/OOM/deploy restart — between the Phase-1 commit and
+// the Phase-2 revert / Phase-3 commit). Past this threshold the row is reclaimable so its held
+// one-in-flight gate is not stranded forever. Kept well above any real finalize latency so a
+// genuinely in-flight finalize is NEVER stomped by a concurrent reclaimer.
+const FINALIZING_STALE_MS = 60 * 1000; // 60s
 
 export type RotationStatus = "grace" | "finalizing" | "completed" | "rolled_back";
 
@@ -128,13 +135,24 @@ async function revertRotationToGrace(clinicId: string, rotationId: string, now: 
  * (FS-1) so the row is never observably `completed` until the external credential delete durably
  * commits:
  *
- *   1. CAS `grace` → `finalizing` (claim). `previous_retained` stays `true`, so the one-in-flight
- *      partial unique index still holds and ingest keeps accepting `previous` while the blob
- *      carries it. If the CAS matches 0 rows the grace row was already claimed (a concurrent
- *      finalize → `finalizing`/`completed`, or a rollback → `rolled_back`): return `false`.
- *   2. Delete the retained `previous_webhook_secret` from the credential blob. On FAILURE, revert
- *      `finalizing` → `grace` (previous still retained, blob unchanged) and surface the error, so
- *      the flow stays recoverable and no terminal `completed` row ever carries `previous_webhook_secret`.
+ *   1. CAS into the transient `finalizing` state (claim). `previous_retained` stays `true`, so the
+ *      one-in-flight partial unique index still holds and ingest keeps accepting `previous` while
+ *      the blob carries it. Two shapes are claimable:
+ *        • a live `grace` row — the normal finalize; OR
+ *        • a STRANDED `finalizing` row — one a prior finalize CAS'd into `finalizing` but never drove
+ *          to `completed`/`grace` because the process was hard-killed mid-delete (SIGKILL/OOM/deploy
+ *          restart). Such a row keeps `previous_retained=true` and would otherwise hold the
+ *          one-in-flight gate FOREVER (bricking rotation for the clinic). We reclaim it ONLY once it
+ *          is demonstrably stale (`updated_at <= now − FINALIZING_STALE_MS`) so an actively in-flight
+ *          finalize is never stomped. The CAS re-stamps `updated_at = now`, which also serializes
+ *          concurrent reclaimers: the first winner freshens the row and the losers' stale predicate
+ *          no longer matches (they get 0 rows → `false`).
+ *      If the CAS matches 0 rows the row was already claimed / terminal (a concurrent finalize, a
+ *      rollback → `rolled_back`, or a not-yet-stale `finalizing`): return `false`.
+ *   2. Delete the retained `previous_webhook_secret` from the credential blob (idempotent — a no-op
+ *      if a prior stranded attempt already removed it). On FAILURE, revert `finalizing` → `grace`
+ *      (previous still retained, blob unchanged) and surface the error, so the flow stays recoverable
+ *      and no terminal `completed` row ever carries `previous_webhook_secret`.
  *   3. On delete SUCCESS, CAS `finalizing` → `completed` (`previous_retained = false`).
  *
  * Returns whether THIS call drove the row to a durable `completed`. `false` means it did not win
@@ -144,7 +162,8 @@ async function revertRotationToGrace(clinicId: string, rotationId: string, now: 
  * `completed` is reached ONLY after the durable delete.
  */
 async function finalizeRotation(clinicId: string, rot: RfidSecretRotation, now: number): Promise<boolean> {
-  // Phase 1 — claim the grace row into the transient `finalizing` state.
+  // Phase 1 — claim a live `grace` row OR a crash-stranded (stale) `finalizing` row into `finalizing`.
+  const staleBefore = new Date(now - FINALIZING_STALE_MS);
   const claimed = await db
     .update(rfidSecretRotations)
     .set({ status: "finalizing", updatedAt: new Date(now) })
@@ -152,12 +171,18 @@ async function finalizeRotation(clinicId: string, rot: RfidSecretRotation, now: 
       and(
         eq(rfidSecretRotations.clinicId, clinicId),
         eq(rfidSecretRotations.id, rot.id),
-        eq(rfidSecretRotations.status, "grace"),
         eq(rfidSecretRotations.previousRetained, true),
+        or(
+          eq(rfidSecretRotations.status, "grace"),
+          and(
+            eq(rfidSecretRotations.status, "finalizing"),
+            lte(rfidSecretRotations.updatedAt, staleBefore),
+          ),
+        ),
       ),
     )
     .returning();
-  if (claimed.length === 0) return false; // already finalizing/completed/rolled_back by a concurrent caller
+  if (claimed.length === 0) return false; // terminal, rolled_back, or an actively in-flight (fresh) finalize
 
   // Phase 2 — durable credential delete of the retained previous secret.
   try {
@@ -296,20 +321,32 @@ export async function getRfidVerificationSecrets(
   if (!previous) return [current];
 
   // A previous secret exists → there is (or was) an in-flight rotation. At most one exists
-  // (partial unique index). A `finalizing` row (FS-1) is treated like `grace`: the delete has not
-  // durably committed yet — the blob still carries `previous` (else the early `!previous` return
-  // above would have fired) — so `previous` is still accepted while retained.
+  // (partial unique index). A `finalizing` row (FS-1) is normally treated like `grace`: the delete
+  // has not durably committed yet — the blob still carries `previous` (else the early `!previous`
+  // return above would have fired) — so `previous` is still accepted while retained.
   const [rot] = await db
     .select()
     .from(rfidSecretRotations)
     .where(and(eq(rfidSecretRotations.clinicId, clinicId), eq(rfidSecretRotations.previousRetained, true)))
     .limit(1);
   if (!rot || (rot.status !== "grace" && rot.status !== "finalizing")) return [current];
-  if (now > new Date(rot.graceExpiresAt).getTime()) {
-    // Lazy-finalize through the same two-phase path. A no-op `false` (row already `finalizing`
-    // under a concurrent caller) is fine: grace has expired, so `previous` is on its way out.
+
+  const graceExpired = now > new Date(rot.graceExpiresAt).getTime();
+  // A `finalizing` row that is older than the stale threshold is a crash-stranded finalize (its
+  // process died between the Phase-1 claim and the Phase-3 commit). Left alone it holds the
+  // one-in-flight gate forever. Ingest is the natural liveness driver here (the finalizing state
+  // only arises when the clinic has active readers, i.e. it is producing ingest traffic), so this
+  // path re-drives the stranded finalize to release the gate.
+  const finalizingStranded =
+    rot.status === "finalizing" && now - new Date(rot.updatedAt).getTime() >= FINALIZING_STALE_MS;
+
+  if (graceExpired || finalizingStranded) {
+    // Lazy-finalize through the two-phase path. Its Phase-1 CAS now accepts `grace` OR a stale
+    // `finalizing`, so this actually COMPLETES a crash-stranded finalize (previously a silent no-op)
+    // and releases the gate. A no-op `false` (row freshly claimed by a concurrent finalize, or
+    // already terminal) is fine: `previous` is on its way out either way.
     await finalizeRotation(clinicId, rot, now);
-    incrementMetric("rfid_secret_grace_expired");
+    incrementMetric(finalizingStranded ? "rfid_secret_rotation_reclaimed" : "rfid_secret_grace_expired");
     return [current];
   }
   return [current, previous];

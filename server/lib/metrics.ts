@@ -307,6 +307,7 @@ type MetricName =
   | "rfid_secret_rotation_conflict"
   | "rfid_secret_rolled_back"
   | "rfid_secret_grace_expired"
+  | "rfid_secret_rotation_reclaimed"
   | "rfid_batch_verified_grace_previous"
   | "rfid_reader_offline_detected"
   | "rfid_reader_recovered"
@@ -989,6 +990,7 @@ const DEFAULT_COUNTERS: MetricBuckets = {
   rfid_secret_rotation_conflict: 0,
   rfid_secret_rolled_back: 0,
   rfid_secret_grace_expired: 0,
+  rfid_secret_rotation_reclaimed: 0,
   rfid_batch_verified_grace_previous: 0,
   rfid_reader_offline_detected: 0,
   rfid_reader_recovered: 0,

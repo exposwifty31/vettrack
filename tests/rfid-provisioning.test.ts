@@ -438,6 +438,44 @@ describe("R-M1.1c · HMAC rotation contract (DB-integration)", () => {
     expect(await getRfidVerificationSecrets(clinic)).toEqual([second.secret]);
   });
 
+  it.runIf(dbReachable)("FS-1 crash-recovery: a stranded `finalizing` row (mid-finalize crash) is reclaimed and the one-in-flight gate is released — rotation is NOT bricked", async () => {
+    const clinic = `test-rfidp-${uid()}`;
+    const pool = probePool;
+    if (!pool) throw new Error("probePool must be initialised when dbReachable");
+    await seedClinic(pool, clinic);
+    await seedReader(pool, clinic);
+    await rotateRfidSecret(clinic, `key-${uid()}`); // establish a current secret
+    const second = await rotateRfidSecret(clinic, `key-${uid()}`, { graceTtlMs: 600_000 });
+    expect(second.status).toBe("grace");
+
+    // Simulate a HARD crash (SIGKILL/OOM/deploy restart) between the grace→finalizing Phase-1 CAS
+    // commit and the Phase-2 revert / Phase-3 commit: the row is stranded `finalizing` with
+    // previous_retained=true (still holding the one-in-flight gate) and a STALE updated_at. Grace has
+    // NOT expired (600s window) — so ONLY the staleness path can reclaim it, not grace-expiry.
+    await pool.query(
+      `UPDATE vt_rfid_secret_rotations
+         SET status='finalizing', previous_retained=true, updated_at = NOW() - INTERVAL '10 minutes'
+       WHERE clinic_id=$1 AND id=$2`,
+      [clinic, second.rotationId],
+    );
+
+    // BEFORE reclaim the stranded row holds the gate: a fresh rotation trips the one-in-flight index.
+    await expect(
+      rotateRfidSecret(clinic, `key-${uid()}`, { graceTtlMs: 600_000 }),
+    ).rejects.toMatchObject({ code: "ROTATION_IN_PROGRESS" });
+
+    // The lazy ingest-verification path reclaims the stranded finalize (widened Phase-1 CAS): the
+    // retained previous is dropped from the blob and the row advances to a durable `completed`.
+    expect(await getRfidVerificationSecrets(clinic)).toEqual([second.secret]);
+    const rec = await getRotation(clinic, second.rotationId);
+    expect(rec?.status).toBe("completed");
+    expect(rec?.previousRetained).toBe(false);
+
+    // Gate RELEASED: a fresh rotation now succeeds (grace again) instead of ROTATION_IN_PROGRESS forever.
+    const third = await rotateRfidSecret(clinic, `key-${uid()}`, { graceTtlMs: 600_000 });
+    expect(third.status).toBe("grace");
+  });
+
   it.runIf(dbReachable)("rollback within grace restores previous as current + invalidates the new secret", async () => {
     const clinic = `test-rfidp-${uid()}`;
     await seedClinic(probePool!, clinic);

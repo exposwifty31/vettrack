@@ -8,6 +8,19 @@
 > `ackRotationReader` / `getRfidVerificationSecrets` / `rollbackRfidSecret` in
 > `server/lib/rfid/provisioning.ts`, the `RotationStatus` / `RfidRotationStatus` unions, and the
 > FS-1 tests in `tests/rfid-provisioning.test.ts`. Kept for provenance — do not delete.
+>
+> **RE-ATTEMPT HARDENING (2026-07-18, liveness fix).** The first FS-1 cut introduced a NEW
+> liveness defect flagged in review: a HARD process crash (SIGKILL/OOM/deploy restart) between the
+> Phase-1 `grace`→`finalizing` CAS and the Phase-3 commit left the row stranded `finalizing` with
+> `previous_retained=true`, permanently holding the one-in-flight gate (`UNIQUE (clinic_id) WHERE
+> previous_retained=true`) → `rotateRfidSecret` bricked forever (worse than pre-FS-1
+> recoverability). Fixed by making finalize idempotently reclaimable: `finalizeRotation`'s Phase-1
+> CAS now claims `status='grace'` OR a **stale** `status='finalizing'` (`updated_at <= now −
+> FINALIZING_STALE_MS`, 60s — never stomps an actively in-flight finalize; the CAS re-stamp also
+> serializes concurrent reclaimers). `getRfidVerificationSecrets` re-drives a stranded `finalizing`
+> row (not just a grace-expired one), so the lazy ingest path actually COMPLETES a stranded finalize
+> and releases the gate (previously a silent no-op). New bounded counter
+> `rfid_secret_rotation_reclaimed`. New crash-recovery test in `tests/rfid-provisioning.test.ts`.
 
 Tracked deferral of a CodeRabbit finding on `server/lib/rfid/provisioning.ts`
 (finalize-vs-rollback), review comment id `3606912682`. Deliberately deferred at
