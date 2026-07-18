@@ -1,5 +1,5 @@
 import { Redirect, Route, Switch, useSearch } from "wouter";
-import { lazy, useRef } from "react";
+import { lazy, useState, useEffect } from "react";
 import { AuthGuard } from "@/features/auth/components/AuthGuard";
 import { AuthBootstrapSpinner } from "@/components/native-clerk-gate";
 import { RouteFallback } from "@/components/route-fallback";
@@ -132,9 +132,12 @@ export function AppRoutes() {
   // state. Once tablet-class, stay tablet-class — this only ever engages on a
   // real native iPad (web and native phones never report tablet width).
   const isNativeTabletLive = useIsNativeTablet();
-  const nativeTabletLatch = useRef(false);
-  if (isNativeTabletLive) nativeTabletLatch.current = true;
-  const isNativeTablet = nativeTabletLatch.current;
+  // Latch via state (never mutate during render): once tablet-class, an effect
+  // pins it and never unsets, so a mid-session flip below 768px can't remount.
+  const [isNativeTablet, setIsNativeTablet] = useState(isNativeTabletLive);
+  useEffect(() => {
+    if (isNativeTabletLive) setIsNativeTablet(true);
+  }, [isNativeTabletLive]);
   return (
     <PageErrorBoundary fallbackLabel="Page rendering failed">
       <Switch>
