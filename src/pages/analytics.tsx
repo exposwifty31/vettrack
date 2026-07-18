@@ -65,9 +65,14 @@ export default function AnalyticsPage() {
     refetchOnWindowFocus: false,
   });
 
-  // R-PDF-1 predictive readiness. Read-only; failure is non-fatal (the panel
-  // simply doesn't render) so a forecast error never blanks the analytics page.
-  const { data: readinessForecast } = useQuery({
+  // R-PDF-1 predictive readiness. Read-only; failure is non-fatal (its section
+  // shows a scoped error + retry) so a forecast error never blanks the page.
+  const {
+    data: readinessForecast,
+    isLoading: forecastLoading,
+    isError: forecastError,
+    refetch: refetchForecast,
+  } = useQuery({
     queryKey: ["/api/analytics/readiness-forecast"],
     queryFn: api.analytics.readinessForecast,
     enabled: !!userId,
@@ -295,12 +300,16 @@ export default function AnalyticsPage() {
         )}
 
         {/* R-PDF-1 predictive readiness (read-only PO recommendations) */}
-        {readinessForecast && (
+        {forecastError ? (
+          <ErrorCard message={t.readinessForecast.loadError} onRetry={() => refetchForecast()} />
+        ) : forecastLoading ? (
+          <Skeleton className="h-40 rounded-2xl" />
+        ) : readinessForecast ? (
           <ReadinessForecastPanel
             data={readinessForecast}
             onCreatePurchaseOrder={() => navigate("/procurement")}
           />
-        )}
+        ) : null}
 
         {/* Status distribution */}
         <Card className="bg-card border-border/60 shadow-sm">

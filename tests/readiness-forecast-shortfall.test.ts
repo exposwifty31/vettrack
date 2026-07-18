@@ -115,6 +115,20 @@ describe("R-PDF-1.3 · computeShortfalls", () => {
     expect(row.source.incoming.map((i) => i.purchaseOrderId)).toEqual(["po-early"]);
   });
 
+  it("excludes incoming whose ETA is BEFORE the window start (inclusive window only)", () => {
+    const demand = [consumableDemand("iv", 10, ["a"])];
+    const incoming: IncomingStockRow[] = [
+      // Already landed before now → belongs to on-hand, not incoming.
+      { itemId: "iv", clinicId: "clinic-a", purchaseOrderId: "po-past", quantity: 50, unitsPerPack: 1, etaMs: NOW - HOUR },
+      // Exactly at the window start → inclusive, counts.
+      { itemId: "iv", clinicId: "clinic-a", purchaseOrderId: "po-now", quantity: 4, unitsPerPack: 1, etaMs: NOW },
+    ];
+    const rows = computeShortfalls(base({ demand, incoming }), NOW);
+    const row = rows.find((r) => r.keyId === "consumable:iv")!;
+    expect(row.incomingStock).toBe(4); // po-past excluded; po-now (== fromMs) included
+    expect(row.source.incoming.map((i) => i.purchaseOrderId)).toEqual(["po-now"]);
+  });
+
   it("applies an explicit per-item packs→units conversion (unitsPerPack)", () => {
     const demand = [consumableDemand("iv", 10, ["a"])];
     const incoming: IncomingStockRow[] = [

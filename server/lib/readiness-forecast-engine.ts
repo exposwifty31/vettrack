@@ -37,6 +37,20 @@ export function demandKeyId(key: DemandKey): string {
   return `${key.kind}:${key.ref}`;
 }
 
+/**
+ * Guard the pinned per-key-canonical-unit invariant: two demand entries that
+ * share a demandKeyId (kind:ref) but disagree on `unit` cannot be aggregated —
+ * summing quantities across different units would be dimensionally wrong. Fail
+ * loudly rather than silently mixing units.
+ */
+export function assertConsistentDemandUnit(existing: DemandKey, incoming: DemandKey): void {
+  if (existing.unit !== incoming.unit) {
+    throw new Error(
+      `Demand unit conflict for ${demandKeyId(incoming)}: "${existing.unit}" vs "${incoming.unit}"`,
+    );
+  }
+}
+
 export interface DemandEntry {
   key: DemandKey;
   /** Required quantity across the forecast window, in `key.unit`. */
@@ -97,6 +111,7 @@ export class ScheduleDemandSource implements DemandSource {
       const id = demandKeyId(key);
       const existing = byKey.get(id);
       if (existing) {
+        assertConsistentDemandUnit(existing.key, key);
         existing.requiredQuantity += quantity;
         if (!existing.sourceAppointmentIds.includes(appointmentId)) {
           existing.sourceAppointmentIds.push(appointmentId);
@@ -172,9 +187,11 @@ export function isUnitAvailable(u: EquipmentUnitRow): boolean {
  */
 export function isUnitReady(u: EquipmentUnitRow, rules: EquipmentReadinessRulesV1, nowMs: number): boolean {
   if (u.readinessState !== "ready") return false;
-  if (u.readinessStateSince != null && nowMs - u.readinessStateSince > rules.staleEvidenceMs) {
-    return false;
-  }
+  // A missing evidence timestamp cannot clear the freshness check — without a
+  // `since` we can't confirm the "ready" evidence is current, so (precision-first)
+  // the unit is excluded from supply rather than assumed fresh.
+  if (u.readinessStateSince == null) return false;
+  if (nowMs - u.readinessStateSince > rules.staleEvidenceMs) return false;
   return true;
 }
 
@@ -313,6 +330,7 @@ export function computeShortfalls(input: ShortfallInput, _nowMs: number = Date.n
     const id = demandKeyId(entry.key);
     const agg = demandByKey.get(id);
     if (agg) {
+      assertConsistentDemandUnit(agg.key, entry.key);
       agg.quantity += entry.requiredQuantity;
       for (const a of entry.sourceAppointmentIds) if (!agg.appointmentIds.includes(a)) agg.appointmentIds.push(a);
     } else {
@@ -345,12 +363,14 @@ export function computeShortfalls(input: ShortfallInput, _nowMs: number = Date.n
     }
     const perHour = isConsumable ? burnRatePerHour(consumedUnits) : 0;
 
-    // incomingStock counts ONLY arrivals within the horizon; no-ETA is excluded.
+    // incomingStock counts ONLY arrivals whose ETA falls INSIDE the inclusive
+    // horizon window [fromMs, toMs]. No-ETA is excluded; an ETA before the window
+    // start is excluded too (already-landed stock is counted in on-hand, not here).
     let incomingStock = 0;
     const incomingSource: ShortfallSource["incoming"] = [];
     if (isConsumable) {
       for (const inc of incomingByItem.get(agg.key.ref) ?? []) {
-        if (inc.etaMs == null || inc.etaMs > window.toMs) continue;
+        if (inc.etaMs == null || inc.etaMs < window.fromMs || inc.etaMs > window.toMs) continue;
         const units = inc.quantity * inc.unitsPerPack; // explicit packs→units conversion
         incomingStock += units;
         incomingSource.push({ purchaseOrderId: inc.purchaseOrderId, quantityUnits: units, etaMs: inc.etaMs });

@@ -136,6 +136,16 @@ describe("R-PDF-1.1 · ScheduleDemandSource — schedule-only demand", () => {
     expect(Object.keys(a[0].key).sort()).toEqual(Object.keys(b[0].key).sort());
   });
 
+  it("rejects a unit conflict: same demand key (kind:ref) with DIFFERENT units fails loudly", async () => {
+    const reader = new InMemoryScheduleReader([
+      proc({ id: "appt-1", clinicId: "clinic-a", requiredConsumables: [{ itemId: "iv-set", quantity: 2, unit: "mL" }] }),
+      proc({ id: "appt-2", clinicId: "clinic-a", requiredConsumables: [{ itemId: "iv-set", quantity: 3, unit: "vial" }] }),
+    ]);
+    const source = new ScheduleDemandSource(reader);
+    // Summing 2 mL + 3 vial under one key would be dimensionally wrong — must throw.
+    await expect(source.getDemand("clinic-a", WINDOW)).rejects.toThrow(/unit conflict/i);
+  });
+
   it("cross-tenant negative: demand includes ONLY the requested clinic's appointment rows", async () => {
     const reader = new InMemoryScheduleReader([
       proc({ id: "a-1", clinicId: "clinic-a", requiredConsumables: [{ itemId: "shared-item", quantity: 2, unit: "unit" }] }),

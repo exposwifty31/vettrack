@@ -4155,3 +4155,20 @@ Reviewer returned 1 HIGH + 1 MEDIUM + 2 LOW on the committed sub-card; all four 
 **Reasoned decline (CodeRabbit 3607058084 — migration up/down rollback coverage):** NOT implemented. This repo's migrations are FORWARD-ONLY, hand-authored, additive+idempotent (173 header: `drizzle-kit generate` non-functional; no down-migration infra; no `tests/migrations/*` exercises a rollback). The "up" direction (widened CHECK accepts `finalizing`, rejects garbage) is already covered by the provisioning DB tests. Adding a bespoke down-migration + rollback test would introduce infra this repo deliberately does not have.
 
 **Verdict:** VERIFIED
+
+## 2026-07-18 — R-PDF-1 · CodeRabbit review fixes on PR #114 (+ merge of origin/main)
+
+**Claim:** Merged origin/main (PR #113) into the branch keeping both sides of the additive conflicts, and addressed the 7 CodeRabbit findings on PR #114 (6 fixed, 1 verified-then-fixed).
+
+**Evidence:**
+- **Merge:** `git merge origin/main` — only `docs/audit/PROOF_ALIGNMENT_LOG.md` conflicted (append-only log); resolved by keeping both sides + restoring the R-PDF-1.5 verdict line. `src/lib/api.ts` / `locales/{en,he}.json` / `i18n.ts` auto-merged (both added keys). Post-merge `pnpm typecheck` → 0; `pnpm i18n:check` → deep key parity.
+- **Finding 1 (unit merge):** `assertConsistentDemandUnit` throws on same-key/different-unit; wired into `ScheduleDemandSource.add` and `computeShortfalls`. Test: mixed mL/vial for one ref → rejects `/unit conflict/i`.
+- **Finding 2 (isUnitReady):** null `readinessStateSince` now returns false BEFORE the freshness check. Test: ready + null since → excluded (readySupply 1 of 2).
+- **Finding 3 (incoming window):** filter is now inclusive `[fromMs, toMs]` — ETAs before window start excluded. Test: past ETA dropped, ETA == fromMs included.
+- **Finding 4 (resolveQuantity):** distinguishes ABSENT (→ fallback 1) from explicit-INVALID (0/neg/NaN/non-number → null → requirement dropped, not coerced); applied at all `extractRequirements` call sites; inventoryItemId can't resurrect a dropped item. New `tests/readiness-forecast-service.test.ts` → 12 passed.
+- **Finding 5 (consumption timestamp):** VERIFIED `dispenseEvents` has `confirmed_at`/`completed_at` (server/schema/inventory.ts:236-237); burn window now keys on `COALESCE(completedAt, confirmedAt, createdAt)` (clinic/status/item filters preserved).
+- **Finding 6 (PO join tenancy):** added `eq(purchaseOrders.clinicId, clinicId)` to the incomingStock join predicate.
+- **Finding 7 (panel loading/error):** analytics.tsx now renders a Skeleton while loading and an ErrorCard (`t.readinessForecast.loadError` + Retry) on error, keeping the rest of Analytics rendered.
+- **Gates:** `pnpm typecheck` → 0. Readiness suites (`demand/supply/shortfall/panel/accept/service`) → 60 passed. `pnpm i18n:check` → parity. `pnpm architecture:gates` → All G1 passed. `pnpm test` (full) → 5522 passed / 255 skipped; the same 12 `*.integration.test.ts` files fail only on the missing `vettrack_test` DB (environmental, unchanged by this diff).
+
+**Verdict:** VERIFIED

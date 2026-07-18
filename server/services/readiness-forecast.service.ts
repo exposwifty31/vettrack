@@ -46,13 +46,22 @@ interface AppointmentRequirementsMeta {
   dispenseQuantity?: unknown;
 }
 
-function asPositiveNumber(v: unknown, fallback: number): number {
-  return typeof v === "number" && Number.isFinite(v) && v > 0 ? v : fallback;
+/**
+ * Resolve a requirement quantity from loosely-typed metadata. An ABSENT value
+ * (undefined/null) falls back to `fallbackWhenAbsent`; an explicitly-provided but
+ * INVALID value (0, negative, NaN, non-number) returns null so the caller DROPS
+ * the requirement. Coercing invalid input to a default would invent demand,
+ * violating the precision-first bias.
+ */
+export function resolveQuantity(v: unknown, fallbackWhenAbsent: number): number | null {
+  if (v === undefined || v === null) return fallbackWhenAbsent;
+  if (typeof v === "number" && Number.isFinite(v) && v > 0) return v;
+  return null;
 }
 
 /** Derive required equipment/consumables from EXISTING appointment fields only
  *  (metadata arrays + the inventoryItemId column). No schema, no template table. */
-function extractRequirements(row: {
+export function extractRequirements(row: {
   metadata: unknown;
   inventoryItemId: string | null;
 }): Pick<ScheduledProcedureRow, "requiredEquipment" | "requiredConsumables"> {
@@ -61,9 +70,11 @@ function extractRequirements(row: {
   const requiredEquipment: NonNullable<ScheduledProcedureRow["requiredEquipment"]> = [];
   for (const e of Array.isArray(meta.requiredEquipment) ? meta.requiredEquipment : []) {
     if (typeof e?.assetTypeId === "string" && e.assetTypeId) {
+      const quantity = resolveQuantity(e.quantity, 1);
+      if (quantity === null) continue; // explicit-invalid → drop (do not invent demand)
       requiredEquipment.push({
         assetTypeId: e.assetTypeId,
-        quantity: asPositiveNumber(e.quantity, 1),
+        quantity,
         unit: typeof e.unit === "string" ? e.unit : undefined,
       });
     }
@@ -73,25 +84,34 @@ function extractRequirements(row: {
   const seenItems = new Set<string>();
   for (const c of Array.isArray(meta.requiredConsumables) ? meta.requiredConsumables : []) {
     if (typeof c?.itemId === "string" && c.itemId) {
+      // Mark referenced up-front so the inventoryItemId fallback below never
+      // resurrects an item whose explicit quantity we just dropped as invalid.
+      seenItems.add(c.itemId);
+      const quantity = resolveQuantity(c.quantity, 1);
+      if (quantity === null) continue; // explicit-invalid → drop (do not invent demand)
       requiredConsumables.push({
         itemId: c.itemId,
-        quantity: asPositiveNumber(c.quantity, 1),
+        quantity,
         unit: typeof c.unit === "string" ? c.unit : undefined,
       });
-      seenItems.add(c.itemId);
     }
   }
   // The medication task's primary item column — count it once (not if already listed).
   if (row.inventoryItemId && !seenItems.has(row.inventoryItemId)) {
-    requiredConsumables.push({
-      itemId: row.inventoryItemId,
-      quantity: asPositiveNumber(meta.dispenseQuantity, 1),
-    });
+    const quantity = resolveQuantity(meta.dispenseQuantity, 1);
+    if (quantity !== null) {
+      requiredConsumables.push({ itemId: row.inventoryItemId, quantity });
+    }
   }
 
   return { requiredEquipment, requiredConsumables };
 }
 
+/**
+ * Postgres/Drizzle implementation of the forecast reader port. Every method
+ * filters its target table by clinicId (multi-tenancy), reads existing columns
+ * only, and returns the plain row shapes the pure engine consumes.
+ */
 export class DrizzleReadinessForecastReader implements ReadinessForecastReader {
   async scheduledProcedures(clinicId: string, window: ForecastWindow): Promise<ScheduledProcedureRow[]> {
     const rows = await db
@@ -173,6 +193,11 @@ export class DrizzleReadinessForecastReader implements ReadinessForecastReader {
 
   async consumption(clinicId: string, fromMs: number, toMs: number, itemIds: string[]): Promise<ConsumptionRow[]> {
     if (itemIds.length === 0) return [];
+    // Burn keys on WHEN the dispense actually happened: completedAt for COMPLETED
+    // events, confirmedAt for CONFIRMED-not-yet-completed events. COALESCE falls
+    // back to createdAt only if both are somehow null (defensive; should not occur
+    // for CONFIRMED/COMPLETED rows).
+    const dispensedAt = sql`COALESCE(${dispenseEvents.completedAt}, ${dispenseEvents.confirmedAt}, ${dispenseEvents.createdAt})`;
     const rows = await db
       .select({ items: dispenseEvents.items })
       .from(dispenseEvents)
@@ -180,8 +205,8 @@ export class DrizzleReadinessForecastReader implements ReadinessForecastReader {
         and(
           eq(dispenseEvents.clinicId, clinicId),
           inArray(dispenseEvents.status, ACTIVE_DISPENSE_STATES as unknown as string[]),
-          gte(dispenseEvents.createdAt, new Date(fromMs)),
-          lte(dispenseEvents.createdAt, new Date(toMs)),
+          sql`${dispensedAt} >= ${new Date(fromMs)}`,
+          sql`${dispensedAt} <= ${new Date(toMs)}`,
         ),
       );
 
@@ -213,6 +238,9 @@ export class DrizzleReadinessForecastReader implements ReadinessForecastReader {
       .where(
         and(
           eq(poLines.clinicId, clinicId),
+          // Tenancy: the JOINED purchaseOrders table must also be clinic-scoped,
+          // not only poLines (repo rule — every query filters clinicId).
+          eq(purchaseOrders.clinicId, clinicId),
           inArray(poLines.itemId, itemIds),
           inArray(purchaseOrders.status, INCOMING_PO_STATES as unknown as Array<"ordered" | "partial">),
         ),

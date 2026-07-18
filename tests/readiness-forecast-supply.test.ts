@@ -94,6 +94,15 @@ describe("R-PDF-1.2 · computeReadySupply — available ∧ ready intersection",
     expect(supply.get("asset-ventilator")?.readySupply).toBe(1);
   });
 
+  it("excludes a ready unit with NO evidence timestamp (null readinessStateSince cannot pass freshness)", () => {
+    const units = [
+      unit({ id: "fresh", readinessStateSince: NOW - HOUR }), // has evidence → counts
+      unit({ id: "no-since", readinessState: "ready", readinessStateSince: null }), // no evidence → excluded
+    ];
+    expect(isUnitReady(units[1], RULES, NOW)).toBe(false);
+    expect(computeReadySupply(units, RULES, NOW).get("asset-ventilator")?.readySupply).toBe(1);
+  });
+
   it("groups readySupply per asset type (never sums different types together)", () => {
     const units = [
       unit({ id: "v1", assetTypeId: "asset-ventilator" }),
