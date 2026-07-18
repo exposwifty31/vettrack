@@ -3599,3 +3599,14 @@ Reviewer returned 1 HIGH + 1 MEDIUM + 2 LOW on the committed sub-card; all four 
 - **Commands:** `pnpm typecheck` (frontend `tsc --noEmit` + server `tsconfig.server.json`) → exit 0. The 5 touched files → `Test Files 4 passed | 1 skipped (5)`, `Tests 35 passed | 11 skipped`. All collab tests (`tests/collab`) → `Test Files 15 passed | 1 skipped (16)`, `Tests 126 passed | 11 skipped`. Broad `DATABASE_URL= pnpm test` → `592 passed | 12 failed | 11 skipped` where all 12 failures are pre-existing DB-integration tests (docking/room/equipment/sweep) failing on `database "vettrack_test" does not exist` — confirmed identical failure on baseline via `git stash` of my 6 files (`tests/sweep-escalation.test.ts` `1 failed` unchanged), none are collab files, and my diff touches no module they import.
 
 **Verdict:** VERIFIED
+
+## 2026-07-18 — R-PDF-1.1 · Demand model behind a single DemandSource interface
+
+**Claim:** Added `DemandSource` interface + v1 schedule-only `ScheduleDemandSource` (aggregates required equipment/consumables from scheduled procedures; never reads consumption). Pure engine module, no schema change.
+
+**Evidence:**
+- `server/lib/readiness-forecast-engine.ts:78` — `ScheduleDemandSource.getDemand()` reads only `reader.scheduledProcedures()`; no consumption/burn read exists in the class.
+- Test: `pnpm test -- tests/readiness-forecast-demand.test.ts` → `Test Files 1 passed (1) / Tests 5 passed (5)` — includes the schedule-only invariant (varying usage history leaves demand unchanged), the interface-contract shape test, and the cross-tenant negative.
+- Command: `pnpm typecheck` → exit 0 (frontend + server tsconfig, no errors).
+
+**Verdict:** VERIFIED
