@@ -3646,3 +3646,15 @@ Reviewer returned 1 HIGH + 1 MEDIUM + 2 LOW on the committed sub-card; all four 
 - Command: `pnpm i18n:check` → "in deep key parity"; `pnpm typecheck` → exit 0; `tests/i18n-no-hebrew-in-source.test.ts` → passed.
 
 **Verdict:** VERIFIED
+
+## 2026-07-18 — R-PDF-1.5 · Acceptance bar + gates
+
+**Claim:** Added a consolidated acceptance test (two-clinic seed) asserting exact shortfalls (precision + correct sign), redacted explainability listing only the requested clinic's source rows, calm empty state on a healthy clinic, and cross-tenant isolation across demand + supply + shortfall + explainability. All spec gates run.
+
+**Evidence:**
+- Test: `pnpm test -- tests/readiness-forecast-accept.test.ts` → 4 passed (incl. equipment shortfall 2 with clinic-b's 5 ventilators excluded, consumable shortfall 8 with clinic-b's 999/500 excluded, DTO carries only ids/counts, clinic-b forecast independently correct).
+- Four RED suites: demand 5 / supply 8 / shortfall 13 / panel 16 — all pass.
+- Command: `pnpm typecheck` → exit 0. `pnpm i18n:check` → "deep key parity". `pnpm architecture:gates` → "All G1 checks passed" (0 new cycles, no dependency violations). `tests/i18n-no-hebrew-in-source.test.ts` → passed.
+- Command: `pnpm test` (full) → 5392 passed / 197 skipped; 12 pre-existing `*.integration.test.ts` files fail only on the missing `vettrack_test` DB (environmental) — none are in this branch's diff (`git diff --name-only origin/main...HEAD`).
+
+**Verdict:** VERIFIED
