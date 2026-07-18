@@ -6,6 +6,12 @@ import {
 import { vtTable } from "./helpers.js";
 import { clinics, users } from "./core.js";
 import { appointments } from "./tasks.js";
+import type {
+  ShiftHandoverDeltas,
+  ShiftHandoverObservedSignal,
+  ShiftHandoverOpenItem,
+  PatientWorklist,
+} from "../lib/shift-handover.js";
 
 export const shiftRole = pgEnum("vt_shift_role", ["technician", "senior_technician", "admin"]);
 
@@ -496,3 +502,63 @@ export const displayDevices = vtTable(
   }),
 );
 export type DisplayDevice = typeof displayDevices.$inferSelect;
+
+/**
+ * R-SH-F1.1 — Shift-handover artifact (migration 177). Auto-generated at shift
+ * end (R-SH-F1.2 generator, called in-process by the scheduler — no public
+ * generate route in v1). Additive/independent: `shift_session_id` carries a
+ * roster-window or legacy vt_shift_sessions id and stays FK-free, mirroring
+ * `vt_shift_messages` (roster-window ids coexist). External PMS ids only in the
+ * worklist — no FKs to the removed internal patient/ER tables (migrations
+ * 142–143).
+ *
+ * Persisted key: `(clinicId, shiftSessionId, revision)` with a monotonic
+ * `revision` int; the CURRENT artifact for a session = the row with max
+ * `revision`. A retry-safe generate returns the current revision unchanged; an
+ * intentional regenerate inserts `max(revision)+1` preserving priors.
+ *
+ * `notificationReadAt` is the explicit per-artifact, clinic-scoped notification
+ * read-state — `null` = unread, a timestamp = read. Acknowledge flips it to
+ * read and records `acknowledgedBy`/`acknowledgedAt`; the persisted unconfirm
+ * (`DELETE .../acknowledge`) clears all three back to null — the reversal is
+ * server-persisted, not local-only.
+ *
+ * `patientWorklist` is a discriminated, PMS-agnostic union (see
+ * server/lib/shift-handover.ts) — a PMS failure surfaces as `{ state:'error',
+ * code }`, never a silent empty `ready` list.
+ */
+export const shiftHandover = vtTable(
+  "vt_shift_handover",
+  {
+    id: text("id").primaryKey(),
+    clinicId: text("clinic_id").notNull().references(() => clinics.id, { onDelete: "restrict" }),
+    shiftSessionId: text("shift_session_id").notNull(),
+    revision: integer("revision").notNull(),
+    deltas: jsonb("deltas").notNull().$type<ShiftHandoverDeltas>(),
+    openItems: jsonb("open_items").notNull().default(sql`'[]'::jsonb`).$type<ShiftHandoverOpenItem[]>(),
+    observedSignals: jsonb("observed_signals")
+      .notNull()
+      .default(sql`'[]'::jsonb`)
+      .$type<ShiftHandoverObservedSignal[]>(),
+    patientWorklist: jsonb("patient_worklist").notNull().$type<PatientWorklist>(),
+    acknowledgedBy: text("acknowledged_by").references(() => users.id, { onDelete: "set null" }),
+    acknowledgedAt: timestamp("acknowledged_at", { withTimezone: true }),
+    notificationReadAt: timestamp("notification_read_at", { withTimezone: true }),
+    generatedAt: timestamp("generated_at", { withTimezone: true }).notNull().defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    clinicSessionRevisionUq: uniqueIndex("ux_vt_shift_handover_clinic_session_revision").on(
+      t.clinicId,
+      t.shiftSessionId,
+      t.revision,
+    ),
+    clinicSessionCurrentIdx: index("idx_vt_shift_handover_clinic_session_current").on(
+      t.clinicId,
+      t.shiftSessionId,
+      t.revision.desc(),
+    ),
+  }),
+);
+export type ShiftHandoverRow = typeof shiftHandover.$inferSelect;
+export type NewShiftHandoverRow = typeof shiftHandover.$inferInsert;

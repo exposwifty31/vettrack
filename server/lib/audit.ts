@@ -284,7 +284,17 @@ export type AuditActionType =
   | "display_device_renamed"
   | "display_device_revoked"
   // Phase 10 (T21) — admin removes a dead (already-revoked) registry row.
-  | "display_device_deleted";
+  | "display_device_deleted"
+  // R-SH-F1 — Shift-handover artifact. `_generated`: the artifact is generated
+  // at shift end (in-process generator; targetId = the handover id). `_acknowledged`:
+  // the incoming-shift actor confirms receipt — records acknowledgedBy/At and
+  // flips the clinic-scoped notification read-state to read. `_unconfirmed`: the
+  // persisted reversal (DELETE .../acknowledge) — clears the ack and restores the
+  // unread read-state; audited with actor, clinicId, handover id, and the
+  // ack→unread transition so the reversal is a real, attributable event.
+  | "shift_handover_generated"
+  | "shift_handover_acknowledged"
+  | "shift_handover_unconfirmed";
 
 export interface LogAuditParams {
   clinicId: string;
