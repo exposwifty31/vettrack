@@ -2,6 +2,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, request, ApiError } from "@/lib/api";
 import type { Equipment } from "@/types";
 import { t } from "@/lib/i18n";
+import { getRfidDirection, type RfidDirection } from "@/lib/equipment-rfid-display";
 
 export type LocationConfidence = "high" | "medium" | "low" | "unknown";
 export type SignalSource = "checkout" | "dock" | "scan" | "rfid" | "none";
@@ -17,6 +18,12 @@ export interface LocationInference {
   } | null;
   lastConfirmedAt: string | null;
   reasoning: string;
+  /**
+   * R-M1.4 — directional RFID last-seen ("exited ER → Ward"), when a fresh
+   * directional read resolved both an origin and a destination room. Display
+   * only; never overrides the resolved location (R-M1.0 precedence).
+   */
+  rfidDirection?: RfidDirection | null;
 }
 
 function fallbackInference(equipment: Equipment): LocationInference {
@@ -42,6 +49,7 @@ function fallbackInference(equipment: Equipment): LocationInference {
       accountablePerson: null,
       lastConfirmedAt: equipment.lastRfidSeenAt ?? null,
       reasoning: t.equipmentDetail.locationCard.reasoning.rfid(equipment.lastRfidRoomName),
+      rfidDirection: getRfidDirection(equipment),
     };
   }
   if (equipment.roomName) {

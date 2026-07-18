@@ -41,6 +41,7 @@ import adminOutboxHealthRoutes from "../routes/admin-outbox-health.js";
 import adminOutboxDlqRoutes from "../routes/admin-outbox-dlq.js";
 import adminTaskOwnershipRoutes from "../routes/admin-task-ownership.js";
 import adminRfidReadersRoutes from "../routes/admin-rfid-readers.js";
+import adminRfidProvisioningRoutes from "../routes/admin-rfid-provisioning.js";
 import adminEquipmentGovernanceRoutes from "../routes/admin-equipment-governance.js";
 import adminWebhooksRoutes from "../routes/admin-webhooks.js";
 import adminNotificationsRoutes from "../routes/admin-notifications.js";
@@ -119,6 +120,7 @@ function registerAdminConfigRoutes(app: express.Express) {
   app.use("/api/admin", adminOutboxDlqRoutes);
   app.use("/api/admin", adminTaskOwnershipRoutes);
   app.use("/api/admin", adminRfidReadersRoutes);
+  app.use("/api/admin", adminRfidProvisioningRoutes);
   app.use("/api/admin", adminEquipmentGovernanceRoutes);
   app.use("/api/admin", adminWebhooksRoutes);
   app.use("/api/admin", adminNotificationsRoutes);

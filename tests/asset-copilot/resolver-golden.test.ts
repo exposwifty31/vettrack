@@ -717,7 +717,10 @@ const CASES: GoldenCase[] = [
     },
   },
   {
-    // A latest RFID room still beats the current anchor.
+    // R-M1.0 (PINNED precedence): the current anchor (human-confirmed dock)
+    // outranks a conflicting RFID room. RFID is advisory-only (ADR-006) — it
+    // corroborates via citations but must NEVER override a human-confirmed
+    // location.
     id: "anchor-02",
     category: "anchor",
     graph: buildSyntheticEvidenceGraph({
@@ -752,7 +755,9 @@ const CASES: GoldenCase[] = [
     }),
     async assert() {
       const r = await resolveCurrentLocation(ctx(), this.graph);
-      expect(r.summary).toBe("rfid_room:ICU");
+      expect(r.summary).toBe("dock_station:Home Bay 1");
+      // RFID is preserved as a corroborating citation, never the summary.
+      expect(r.citations.some((c) => c.type === "rfid" && c.id === "rfid-a2")).toBe(true);
     },
   },
   {

@@ -6,25 +6,37 @@
 import { Router } from "express";
 import type { Request, Response } from "express";
 import { z } from "zod";
-import { getCredentials } from "../integrations/credential-manager.js";
 import { verifyVetTrackWebhookSignature } from "../integrations/webhooks/verify-signature.js";
-import { ingestRfidBatch } from "../lib/rfid-ingest.js";
+import { ingestRfidBatch, RfidDirectionalRejection } from "../lib/rfid-ingest.js";
 import { isRfidIngestEnabled } from "../lib/rfid/config.js";
+import { readRfidClinicId } from "../lib/rfid/clinic-header.js";
+import { getRfidVerificationSecrets } from "../lib/rfid/provisioning.js";
 import { incrementMetric } from "../lib/metrics.js";
 import { rfidEventLimiter } from "../middleware/rate-limiters.js";
 
 const router = Router();
 
-const RfidBatchSchema = z.object({
+// R-M1.2a — optional directional fields. A payload MAY carry direction, the gateway pair, both,
+// or neither; the ingest resolver makes every combination deterministic. Schema-level guard: a
+// gateway pair is BOTH-or-NEITHER (a partial pair is INVALID_SCHEMA, never a silent downgrade).
+export const RfidBatchSchema = z.object({
   batchId: z.string().min(1).max(64),
   controllerVersion: z.string().max(32).optional(),
   events: z
     .array(
-      z.object({
-        tagEpc: z.string().min(1).max(128),
-        gatewayCode: z.string().min(1).max(64),
-        readAt: z.string().datetime(),
-      }),
+      z
+        .object({
+          tagEpc: z.string().min(1).max(128),
+          gatewayCode: z.string().min(1).max(64),
+          readAt: z.string().datetime(),
+          direction: z.enum(["entered", "exited"]).optional(),
+          fromGateway: z.string().min(1).max(64).optional(),
+          toGateway: z.string().min(1).max(64).optional(),
+        })
+        .refine((e) => (e.fromGateway == null) === (e.toGateway == null), {
+          message: "fromGateway and toGateway must be supplied together",
+          path: ["fromGateway"],
+        }),
     )
     .min(1)
     .max(200),
@@ -35,13 +47,7 @@ function jsonErr(res: Response, status: number, code: string, message: string) {
 }
 
 router.post("/events", rfidEventLimiter, async (req: Request, res: Response) => {
-  const clinicHeader = req.headers["x-vetrack-clinic"];
-  const clinicId =
-    typeof clinicHeader === "string"
-      ? clinicHeader.trim()
-      : Array.isArray(clinicHeader)
-        ? clinicHeader[0]?.trim()
-        : "";
+  const clinicId = readRfidClinicId(req);
 
   if (!clinicId) {
     return jsonErr(res, 400, "MISSING_CLINIC", "X-VetTrack-Clinic header is required");
@@ -52,19 +58,29 @@ router.post("/events", rfidEventLimiter, async (req: Request, res: Response) => 
     return jsonErr(res, 400, "INVALID_BODY", "Expected raw request body");
   }
 
-  const credentials = await getCredentials(clinicId, "rfid");
-  if (!credentials?.webhook_secret?.trim()) {
+  // During a secret rotation's grace window this returns [current, previous]; otherwise just
+  // [current] (byte-for-byte the pre-rotation path — no extra query). The HMAC mechanism is
+  // unchanged; rotation only widens the accepted-secret set (R-M1.1c).
+  const secrets = await getRfidVerificationSecrets(clinicId);
+  if (secrets.length === 0) {
     return jsonErr(res, 401, "RFID_NOT_CONFIGURED", "RFID credentials not configured for clinic");
   }
 
-  const signatureOk = verifyVetTrackWebhookSignature(
-    rawBody,
-    credentials.webhook_secret,
-    req.headers["x-vetrack-signature"],
-  );
-  if (!signatureOk) {
+  const signatureHeader = req.headers["x-vettrack-signature"];
+  let matchedIndex = -1;
+  for (let i = 0; i < secrets.length; i++) {
+    if (verifyVetTrackWebhookSignature(rawBody, secrets[i], signatureHeader)) {
+      matchedIndex = i;
+      break;
+    }
+  }
+  if (matchedIndex === -1) {
     incrementMetric("rfid_batch_rejected_signature");
     return jsonErr(res, 401, "INVALID_SIGNATURE", "Signature verification failed");
+  }
+  if (matchedIndex > 0) {
+    // Verified against the retained PREVIOUS secret during the grace window.
+    incrementMetric("rfid_batch_verified_grace_previous");
   }
 
   const enabled = await isRfidIngestEnabled(clinicId);
@@ -84,8 +100,18 @@ router.post("/events", rfidEventLimiter, async (req: Request, res: Response) => 
 
   incrementMetric("rfid_batch_received");
 
-  const ingestResult = await ingestRfidBatch(clinicId, parsed);
-  return res.status(202).json({ ok: true, ...ingestResult });
+  try {
+    const ingestResult = await ingestRfidBatch(clinicId, parsed);
+    return res.status(202).json({ ok: true, ...ingestResult });
+  } catch (err) {
+    // R-M1.2a — a directional payload that cannot be resolved deterministically is a HARD
+    // 4xx reject (never a silent downgrade). Any other failure is a genuine 500.
+    if (err instanceof RfidDirectionalRejection) {
+      incrementMetric("rfid_event_directional_rejected");
+      return jsonErr(res, 422, err.code, err.message);
+    }
+    throw err;
+  }
 });
 
 export default router;

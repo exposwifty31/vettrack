@@ -6,6 +6,7 @@ import { getCurrentClinicId } from "@/lib/auth-store";
 import { applyEvent, DISPLAY_SNAPSHOT_QUERY_KEY, forceResyncWardErCaches, resetRealtimeCaches } from "@/lib/event-reducer";
 import { getStoredDisplayToken, clearStoredDisplayToken } from "@/lib/display-token-store";
 import type { RealtimeEvent } from "@/types/realtime-events";
+import type { BoardAnomaly, BoardAnomalyType } from "../../shared/equipment-board";
 import { SUPPORTED_REALTIME_EVENT_SCHEMA_VERSION } from "../../shared/realtime-schema-version";
 
 export type { RealtimeEventType, RealtimeEvent } from "@/types/realtime-events";
@@ -105,6 +106,38 @@ export function reportNudgeShown(kind: string): void {
     const bucket = classifyNudgeShown(kind);
     if (!bucket) return;
     void api.realtime.telemetry({ nudgeShown: bucket }).catch(() => {});
+  } catch {
+    // never throw from telemetry path
+  }
+}
+
+// R-BDF-1.3 — board anomaly activation telemetry classifier. Closed bounded enum
+// mirrors the shared `BoardAnomalyType` and the server's ALLOWED_BOARD_ANOMALY_TYPES
+// in server/routes/realtime.ts. An unrecognized type classifies to `null` so the
+// poster never emits an out-of-enum value (unconditional client-side rejection).
+const BOARD_ANOMALY_TELEMETRY_TYPES: readonly BoardAnomalyType[] = [
+  "battery_critical",
+  "cart_unverified",
+  "rfid_reader_offline",
+];
+
+export function classifyBoardAnomalyType(type: string): BoardAnomalyType | null {
+  return (BOARD_ANOMALY_TELEMETRY_TYPES as readonly string[]).includes(type)
+    ? (type as BoardAnomalyType)
+    : null;
+}
+
+/**
+ * R-BDF-1.3 — the single-shot telemetry seam wired into R-BDF-1.2's board anomaly
+ * state machine (`absent→active` `onActivate`). Fires once per `(type,unitId)`
+ * activation, NOT once per snapshot. Each in-enum type maps 1:1 to a server metric
+ * id; an out-of-enum type is never posted. Best-effort — never throws.
+ */
+export function reportBoardAnomalyActivated(anomaly: Pick<BoardAnomaly, "type">): void {
+  try {
+    const type = classifyBoardAnomalyType(anomaly.type);
+    if (!type) return;
+    void api.realtime.telemetry({ boardAnomalyActivated: type }).catch(() => {});
   } catch {
     // never throw from telemetry path
   }

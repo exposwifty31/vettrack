@@ -303,6 +303,18 @@ type MetricName =
   | "rfid_event_stale"
   | "rfid_event_unchanged"
   | "rfid_event_room_changed"
+  | "rfid_secret_rotated"
+  | "rfid_secret_rotation_conflict"
+  | "rfid_secret_rolled_back"
+  | "rfid_secret_grace_expired"
+  | "rfid_secret_rotation_reclaimed"
+  | "rfid_batch_verified_grace_previous"
+  | "rfid_reader_offline_detected"
+  | "rfid_reader_recovered"
+  | "rfid_event_directional_resolved"
+  | "rfid_event_directional_rejected"
+  | "rfid_possible_egress"
+  | "rfid_possible_egress_deduped"
   | "semi_dock_notified"
   | "semi_dock_skipped_deduped"
   | "stale_checkout_nudged"
@@ -333,7 +345,13 @@ type MetricName =
   | "collab_presence"
   | "collab_cursor_dropped"
   | "collab_board_rate_limited"
-  | "collab_record_presence";
+  | "collab_record_presence"
+  // R-BDF-1.3 — ambient board anomaly activation telemetry (bounded enum, no
+  // PII, no unitId label). One counter per closed BoardAnomalyType; the client
+  // emits once per (type,unitId) activation via the R-BDF-1.2 state machine.
+  | "board_anomaly_battery_critical"
+  | "board_anomaly_reader_offline"
+  | "board_anomaly_cart_unverified";
 
 type MetricBuckets = Record<MetricName, number>;
 
@@ -968,6 +986,18 @@ const DEFAULT_COUNTERS: MetricBuckets = {
   rfid_event_stale: 0,
   rfid_event_unchanged: 0,
   rfid_event_room_changed: 0,
+  rfid_secret_rotated: 0,
+  rfid_secret_rotation_conflict: 0,
+  rfid_secret_rolled_back: 0,
+  rfid_secret_grace_expired: 0,
+  rfid_secret_rotation_reclaimed: 0,
+  rfid_batch_verified_grace_previous: 0,
+  rfid_reader_offline_detected: 0,
+  rfid_reader_recovered: 0,
+  rfid_event_directional_resolved: 0,
+  rfid_event_directional_rejected: 0,
+  rfid_possible_egress: 0,
+  rfid_possible_egress_deduped: 0,
   semi_dock_notified: 0,
   semi_dock_skipped_deduped: 0,
   stale_checkout_nudged: 0,
@@ -990,6 +1020,10 @@ const DEFAULT_COUNTERS: MetricBuckets = {
   collab_cursor_dropped: 0,
   collab_board_rate_limited: 0,
   collab_record_presence: 0,
+  // R-BDF-1.3 — ambient board anomaly activation counters.
+  board_anomaly_battery_critical: 0,
+  board_anomaly_reader_offline: 0,
+  board_anomaly_cart_unverified: 0,
 };
 
 const metrics: MetricBuckets = { ...DEFAULT_COUNTERS };

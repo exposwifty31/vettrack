@@ -40,7 +40,9 @@ import { ReadinessBadge } from "@/components/ui/readiness-badge";
 import {
   isRfidSubtitleFresh,
   shouldShowRfidAttentionBadge,
+  getRfidDirection,
 } from "@/lib/equipment-rfid-display";
+import { RfidDirectionLine } from "@/features/equipment/RfidDirectionLine";
 import { DockReturnFlow } from "@/components/equipment/DockReturnFlow";
 import {
   Plus,
@@ -1036,6 +1038,10 @@ export function EquipmentItem({
   const checkedOutByMe = eq.checkedOutById === userId;
   const expiryState = getExpiryBadgeState(eq.expiryDate);
   const displayName = getEquipmentDisplayName(eq);
+  // Evaluate the RFID direction once per row: two calls (one with a fresh
+  // default `Date.now()` each) could straddle the freshness boundary and
+  // disagree (truthy guard, then a null deref).
+  const rfidDirection = getRfidDirection(eq);
   const recoveryBadgeKey = isEquipmentRecoveryUiEnabled
     ? resolveEquipmentListRecoveryBadgeKey(
         deriveEquipmentRecoverySnapshotFromSource(eq),
@@ -1250,16 +1256,26 @@ export function EquipmentItem({
                     {t.equipmentList.linkedInUse(eq.linkedAnimalName)}
                   </p>
                 )}
-                {isRfidSubtitleFresh(eq.lastRfidSeenAt) && eq.lastRfidRoomName && (
-                  <p
+                {rfidDirection ? (
+                  <RfidDirectionLine
+                    direction={rfidDirection}
+                    relative={formatRelativeTime(eq.lastRfidSeenAt!)}
                     className="text-xs text-muted-foreground mt-0.5"
-                    data-testid={`equipment-rfid-last-seen-${eq.id}`}
-                  >
-                    {t.equipment.rfidLastSeen.line(
-                      eq.lastRfidRoomName,
-                      formatRelativeTime(eq.lastRfidSeenAt!),
-                    )}
-                  </p>
+                    testId={`equipment-rfid-direction-${eq.id}`}
+                  />
+                ) : (
+                  isRfidSubtitleFresh(eq.lastRfidSeenAt) &&
+                  eq.lastRfidRoomName && (
+                    <p
+                      className="text-xs text-muted-foreground mt-0.5"
+                      data-testid={`equipment-rfid-last-seen-${eq.id}`}
+                    >
+                      {t.equipment.rfidLastSeen.line(
+                        eq.lastRfidRoomName,
+                        formatRelativeTime(eq.lastRfidSeenAt!),
+                      )}
+                    </p>
+                  )
                 )}
                 {shouldShowRfidAttentionBadge(eq) && (
                   <button

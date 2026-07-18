@@ -135,6 +135,12 @@ export interface Equipment {
   lastRfidRoomId?: string | null;
   lastRfidRoomName?: string | null;
   lastRfidGatewayCode?: string | null;
+  /**
+   * Origin room of the most recent directional RFID gate crossing (R-M1.4).
+   * Read-only display signal; `null` for a non-directional / legacy read. The
+   * destination is `lastRfidRoomName`.
+   */
+  lastRfidFromRoomName?: string | null;
   /** True when last RFID room has at least one vt_docks row (equipment storage). */
   lastRfidRoomIsDock?: boolean;
   lastVerifiedAt?: string | null;

@@ -18,11 +18,16 @@ See **[TRIGGERS.md](./TRIGGERS.md)** for the full table (mirrors [architecture-h
 | ID | Title | Status | Path |
 |----|-------|--------|------|
 | ADR-001 | Two medication task models | accepted | [adr-001-medication-task-models.md](../adr-001-medication-task-models.md) (legacy path) |
+| ADR-001 | Capacitor + Ionic React mobile shell | accepted | [ADR-001-capacitor-ionic.md](./ADR-001-capacitor-ionic.md) |
 | ADR-002 | appointments.service.ts decomposition | accepted | [adr-002-appointments-service-split.md](../adr-002-appointments-service-split.md) (legacy path) |
+| ADR-003 | Asset Copilot evidence resolver | accepted | [adr-003-asset-copilot-evidence-resolver.md](../adr-003-asset-copilot-evidence-resolver.md) (legacy path) |
+| ADR-004 | RFID reader selection & Israeli band (915–917 MHz) | proposed | [ADR-004-rfid-reader-selection-and-band.md](./ADR-004-rfid-reader-selection-and-band.md) |
+| ADR-005 | RFID HMAC-signing middleware placement | proposed | [ADR-005-rfid-hmac-middleware-placement.md](./ADR-005-rfid-hmac-middleware-placement.md) |
+| ADR-006 | RFID reader-side adapter boundary & advisory-only invariant | proposed | [ADR-006-rfid-adapter-boundary-and-advisory-invariant.md](./ADR-006-rfid-adapter-boundary-and-advisory-invariant.md) |
 
 New ADRs use **`docs/architecture/adr/NNN-slug.md`**. Legacy files stay in place until an optional move PR; do not renumber without team agreement.
 
-**Next suggested number:** ADR-003
+**Next suggested number:** ADR-007
 
 ## Lifecycle
 

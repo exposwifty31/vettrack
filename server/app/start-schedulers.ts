@@ -27,6 +27,8 @@ import { startStaleCheckoutSweepWorker } from "../workers/staleCheckoutSweepWork
 import { startStaleReturnedSweepWorker } from "../workers/stale-returned-sweep.worker.js";
 import { startSweepEscalationWorker } from "../workers/sweep-escalation.worker.js";
 import { startShiftHandoverScheduler } from "../lib/shift-handover-scheduler.js";
+import { startRfidReaderOfflineSweep } from "../lib/rfid/reader-offline-sweep.js";
+import { startRfidFinalizingSweep } from "../lib/rfid/finalizing-sweep.js";
 
 export async function startBackgroundSchedulers() {
   if (process.env.NODE_ENV === "test") {
@@ -78,4 +80,12 @@ export async function startBackgroundSchedulers() {
 
   // R-SH-F1.2 — shift-end handover generator (in-process; no public generate route).
   startShiftHandoverScheduler();
+
+  // R-M1.1d — RFID reader-offline detection (heartbeat staleness → rfid_reader_offline signal).
+  startRfidReaderOfflineSweep();
+
+  // FS-1 (re-attempt) — reclaim crash-stranded `finalizing` rotation rows so a hard-crash mid-
+  // finalize can never brick a clinic's one-in-flight rotation gate (time-bounded backstop for the
+  // post-delete window + quiet-clinic case the lazy ingest reclaim cannot cover).
+  startRfidFinalizingSweep();
 }

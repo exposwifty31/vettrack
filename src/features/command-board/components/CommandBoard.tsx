@@ -7,12 +7,15 @@ import { useLocation } from "wouter";
 import { Settings2, X } from "lucide-react";
 import { t } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
+import { reportBoardAnomalyActivated } from "@/lib/realtime";
 import { useBoardEntityCoPresence } from "@/board/board-copresence-context";
+import { usePrefersReducedMotion } from "@/hooks/use-prefers-reduced-motion";
 import type { EquipmentCommandBoardSnapshot } from "@/types/safety-surfaces";
 import type { EquipmentBoardUnitRow, EquipmentReadinessStatus } from "../../../../shared/equipment-board";
 import { STATUS_BG, STATUS_BAR_COLOR, statusLabel } from "../status-tokens";
 import { useKioskModeFromUrl } from "../use-kiosk-mode-from-url";
 import { countCriticalAlerts, useBoardMode } from "../use-board-mode";
+import { BoardAttentionSection } from "./BoardAttentionSection";
 import { DocksPanel, PowerPanel, StagingPanel, WaitlistPanel } from "./board-panels";
 
 /** The six readiness buckets that make up a stacked readiness bar. */
@@ -211,6 +214,45 @@ function LocationCard({ row }: { row: EquipmentCommandBoardSnapshot["byLocation"
   );
 }
 
+// ── RFID chip ─────────────────────────────────────────────────────────────────
+
+/**
+ * R-M1.3 — advisory RFID last-seen chip. The pinned `locationKind` discriminator
+ * renders three DISTINCT, non-blank surfaces — 'external_zone' (left clinic) and
+ * 'unresolved' (no resolvable room) never collapse to the same/blank surface, and
+ * a resolved room shows its name. Advisory only: the human-confirmed room stays the
+ * unit's resolved location (never overridden here).
+ */
+function RfidChip({ unit }: { unit: EquipmentBoardUnitRow }) {
+  const rfid = unit.rfid;
+  if (!rfid) return null;
+  const kindStyle =
+    rfid.locationKind === "external_zone"
+      ? "border-[var(--status-issue-border)] bg-[var(--status-issue-bg)] text-[var(--status-issue-fg)]"
+      : rfid.locationKind === "unresolved"
+        ? "border-[var(--status-stale-border)] bg-[var(--status-stale-bg)] text-[var(--status-stale-fg)]"
+        : "border-ivory-border bg-[rgb(var(--ivory-surface))] text-ivory-text2";
+  const label =
+    rfid.locationKind === "external_zone"
+      ? t.board.rfidExternalZone
+      : rfid.locationKind === "unresolved"
+        ? t.board.rfidUnresolved
+        : (rfid.locationName ?? t.board.rfidTag);
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center gap-1 vt-text-2xs font-semibold px-1.5 py-0.5 rounded border",
+        kindStyle,
+      )}
+      data-testid={`board-unit-rfid-${unit.equipmentId}`}
+      data-rfid-kind={rfid.locationKind}
+    >
+      <span>{t.board.rfidTag}</span>
+      <span>{label}</span>
+    </span>
+  );
+}
+
 // ── UnitRow ───────────────────────────────────────────────────────────────────
 
 function UnitRow({ unit }: { unit: EquipmentBoardUnitRow }) {
@@ -261,6 +303,11 @@ function UnitRow({ unit }: { unit: EquipmentBoardUnitRow }) {
             <span className="vt-text-xs text-[hsl(var(--status-issue))]">{blocking}</span>
           )}
         </div>
+        {unit.rfid && (
+          <div className="mt-1">
+            <RfidChip unit={unit} />
+          </div>
+        )}
       </div>
       <span
         className={cn(
@@ -366,6 +413,8 @@ export function CommandBoard({
   const kioskModeFromUrl = useKioskModeFromUrl();
   const kioskMode = kioskModeProp ?? kioskModeFromUrl;
   const mode = useBoardMode(board);
+  const reducedMotion = usePrefersReducedMotion();
+  const anomalies = board.anomalies ?? [];
   const now = new Date(currentTime);
   const timeStr = now.toLocaleTimeString("he-IL", {
     hour: "2-digit",
@@ -431,6 +480,16 @@ export function CommandBoard({
           </button>
         )}
       </header>
+
+      {/* Ambient anomaly attention (R-BDF-1.2) — glance-only, present in both modes */}
+      {anomalies.length > 0 && (
+        <BoardAttentionSection
+          anomalies={anomalies}
+          mode={mode}
+          reducedMotion={reducedMotion}
+          onAnomalyActivated={reportBoardAnomalyActivated}
+        />
+      )}
 
       {/* Body */}
       {mode === "pressure" && <PressureMain board={board} needAttention={needAttention} />}

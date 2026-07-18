@@ -849,6 +849,44 @@ export const api = {
         readers: import("@/types").RfidReaderRow[];
         requestId: string;
       }>("/api/admin/rfid-readers"),
+    listManaged: () =>
+      request<{
+        clinicId: string;
+        readers: import("@/types").ManagedRfidReaderRow[];
+        requestId: string;
+      }>("/api/admin/rfid-readers/managed"),
+    create: (body: {
+      name: string;
+      gatewayCode: string;
+      roomId?: string | null;
+      physicalLocation?: string | null;
+    }) =>
+      request<{ clinicId: string; reader: import("@/types").ManagedRfidReaderRow; requestId: string }>(
+        "/api/admin/rfid-readers",
+        { method: "POST", body: JSON.stringify(body) },
+      ),
+    rename: (id: string, name: string) =>
+      request<{ clinicId: string; reader: import("@/types").ManagedRfidReaderRow; requestId: string }>(
+        `/api/admin/rfid-readers/${encodeURIComponent(id)}`,
+        { method: "PATCH", body: JSON.stringify({ name }) },
+      ),
+    deactivate: (id: string) =>
+      request<{ clinicId: string; reader: import("@/types").ManagedRfidReaderRow; requestId: string }>(
+        `/api/admin/rfid-readers/${encodeURIComponent(id)}/deactivate`,
+        { method: "POST" },
+      ),
+    /** Provision (first time) or rotate the per-clinic HMAC ingest secret (R-M1.1c). Secret is returned once. */
+    provision: (idempotencyKey: string) =>
+      request<{ clinicId: string; rotation: import("@/types").RfidRotationEnvelope; requestId: string }>(
+        "/api/admin/rfid-provisioning/rotate",
+        { method: "POST", body: JSON.stringify({ idempotencyKey }) },
+      ),
+    /** Toggle rfid.ingest_enabled.<clinicId> (R-M1.1c). */
+    setIngest: (enabled: boolean) =>
+      request<{ clinicId: string; enabled: boolean; requestId: string }>(
+        "/api/admin/rfid-provisioning/ingest",
+        { method: "PUT", body: JSON.stringify({ enabled }) },
+      ),
   },
   webhooks: {
     list: () =>
@@ -1201,6 +1239,9 @@ export const api = {
       // T-30a2-ii — bounded enum: which nudge-feed kind was shown. Mirrors
       // the server's closed ALLOWED_NUDGE_SHOWN enum (T-30a2-i).
       nudgeShown?: NudgeKind;
+      // R-BDF-1.3 — bounded enum: which board anomaly type just activated
+      // (absent→active). Mirrors the server's closed ALLOWED_BOARD_ANOMALY_TYPES.
+      boardAnomalyActivated?: "battery_critical" | "cart_unverified" | "rfid_reader_offline";
     }) =>
       request<{ ok: boolean }>("/api/realtime/telemetry", {
         method: "POST",
