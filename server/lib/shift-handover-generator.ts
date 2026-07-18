@@ -16,20 +16,25 @@
  * generate route in v1 — the only caller is the shift-end scheduler, so
  * `clinicId` is always system-derived.
  *
+ * System-derived observed signals (R-SH-F1.3) are collected on their OWN
+ * clinic-scoped read path over `vt_scan_logs` (app-observed custody/scan/
+ * readiness events, distinct from the manually-logged audit/outbox deltas).
+ *
  * Every read carries an explicit target-table `clinicId` predicate (audit,
- * outbox, shift-sessions, handover) — a cross-clinic event is never aggregated.
- * `patientWorklist` is left `{ state: 'not_configured' }` here; R-SH-F1.4
- * populates it through the PMS-agnostic port.
+ * outbox, scan-logs, shift-sessions, handover) — a cross-clinic event is never
+ * aggregated. `patientWorklist` is left `{ state: 'not_configured' }` here;
+ * R-SH-F1.4 populates it through the PMS-agnostic port.
  */
 import { randomUUID } from "crypto";
 import { and, desc, eq, gte, lt } from "drizzle-orm";
-import { db, auditLogs, eventOutbox, shiftSessions, shifts, shiftHandover } from "../db.js";
+import { db, auditLogs, eventOutbox, scanLogs, shiftSessions, shifts, shiftHandover } from "../db.js";
 import type { ShiftHandoverRow } from "../schema/ops.js";
 import { OUTBOX_TYPE_AUDIT_LOG } from "./event-publisher.js";
 import {
   serializePatientWorklist,
   type ShiftHandoverDeltas,
   type ShiftHandoverDeltaEntry,
+  type ShiftHandoverObservedSignal,
   type ShiftHandoverOpenItem,
 } from "./shift-handover.js";
 import {
@@ -237,6 +242,42 @@ async function aggregateDeltas(
 }
 
 /**
+ * Collect SYSTEM-DERIVED observed signals over `[start, end)` on their OWN
+ * clinic-scoped read path — `vt_scan_logs` (app-observed custody/scan/readiness
+ * events the system recorded, distinct from the manually-logged audit/outbox
+ * deltas). Carries an explicit `clinicId` predicate; a cross-clinic scan is
+ * never observed. Ordered oldest→newest for a stable snapshot. The `kind` is a
+ * bounded `scan:<status>` label derived from the scan's own status column — no
+ * PII, no free-form text.
+ */
+async function collectObservedSignals(
+  clinicId: string,
+  window: ShiftWindow,
+): Promise<ShiftHandoverObservedSignal[]> {
+  const scanRows = await db
+    .select({
+      id: scanLogs.id,
+      status: scanLogs.status,
+      timestamp: scanLogs.timestamp,
+    })
+    .from(scanLogs)
+    .where(
+      and(
+        eq(scanLogs.clinicId, clinicId),
+        gte(scanLogs.timestamp, window.start),
+        lt(scanLogs.timestamp, window.end),
+      ),
+    )
+    .orderBy(scanLogs.timestamp, scanLogs.id);
+
+  return scanRows.map((r) => ({
+    sourceId: r.id,
+    kind: `scan:${r.status}`,
+    at: r.timestamp.toISOString(),
+  }));
+}
+
+/**
  * Derive open items from the task/alert deltas: for each distinct `targetId`,
  * the item is open when its LATEST delta in the window is non-terminal (a task
  * still in progress, an alert still unresolved). Deltas ordered oldest→newest.
@@ -311,6 +352,7 @@ export async function generateShiftHandover(
   const window = await resolveShiftWindow(clinicId, shiftSessionId);
   const deltas = await aggregateDeltas(clinicId, window);
   const openItems = deriveOpenItems(deltas);
+  const observedSignals = await collectObservedSignals(clinicId, window);
   const patientWorklist = serializePatientWorklist(
     { state: "not_configured" },
     { validTechIds: [] },
@@ -327,7 +369,7 @@ export async function generateShiftHandover(
         revision,
         deltas,
         openItems,
-        observedSignals: [],
+        observedSignals,
         patientWorklist,
       })
       .returning();
