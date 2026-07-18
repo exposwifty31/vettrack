@@ -11,17 +11,17 @@
 ## Locked scope (owner) — four dimensions
 
 1. **All 4 delta types** — custody moves, task state, alerts, dispenses (not a subset).
-2. **Per-technician patient/animal worklist** — which animals each tech worked on. ⚠ **sourced from the external PMS (Priza), NOT a reintroduced internal patient model** (internal patient/ER tables were removed, migrations 142–143).
+2. **Per-technician patient/animal worklist** — which animals each tech worked on. ⚠ **sourced from the external PMS through the integration adapter layer (any supported PMS — Priza is one adapter), NOT a reintroduced internal patient model** (internal patient/ER tables were removed, migrations 142–143).
 3. **App-observed signals** — system-derived observations during the shift (custody/scan/readiness/alert events in the shift window), not just manually-logged actions.
-4. **Future integration — Priza:** shape the schema + generator so dimensions (2) and (3) can be **sourced from / exported to Priza without a rewrite** — a stable, integration-friendly contract; do NOT hard-couple to internal-only sources.
+4. **PMS-agnostic integration (owner-expanded 2026-07-18):** shape the schema + generator so dimensions (2) and (3) are sourced through a **generic PMS port / adapter interface** — resolved per-clinic from the integration config (`vt_integration_configs`), so **any supported PMS** plugs in without a rewrite (Priza is one reference adapter, not an assumption). A stable, PMS-agnostic contract (external ids + display); do NOT hard-couple to a named PMS or to internal-only sources.
 
 ## Reuse anchors (verify at build)
 
-`src/pages/handoff.tsx` (`ShiftSummarySheet` — extend) · `vt_shifts` / `vt_shift_sessions`; `server/routes/shifts.ts`, `shift-adjustments.ts`, `shift-chat.ts` · `vt_audit_logs` + `vt_event_outbox` (the delta sources) · `notification.worker` (push to incoming shift) · `src/features/today/surfaces/*` (entry point) · `server/integrations/` (the PMS seam for Priza).
+`src/pages/handoff.tsx` (`ShiftSummarySheet` — extend) · `vt_shifts` / `vt_shift_sessions`; `server/routes/shifts.ts`, `shift-adjustments.ts`, `shift-chat.ts` · `vt_audit_logs` + `vt_event_outbox` (the delta sources) · `notification.worker` (push to incoming shift) · `src/features/today/surfaces/*` (entry point) · `server/integrations/` (the PMS **adapter layer** + `vt_integration_configs` — the PMS-agnostic port; Priza is one adapter).
 
 ## Frozen guardrails (every card)
 
-**Every read/write to any table this workflow touches — `vt_audit_logs`, `vt_event_outbox`, `vt_shifts`/`vt_shift_sessions`, the notification + Priza-integration tables, and `vt_shift_handover` (+ its ack) — carries an explicit target-table `clinicId` predicate** (not merely "clinicId-scoped") · deltas read from existing audit/outbox — **no new realtime path** · **ack = a deliberate confirm** (attestation — the sanctioned exception to undo-first) · the Priza contract stays stable/integration-friendly (no internal-only hard-coupling) · no reintroduced internal patient model.
+**Every read/write to any table this workflow touches — `vt_audit_logs`, `vt_event_outbox`, `vt_shifts`/`vt_shift_sessions`, the notification + PMS-integration tables (`vt_integration_configs`), and `vt_shift_handover` (+ its ack) — carries an explicit target-table `clinicId` predicate** (not merely "clinicId-scoped") · deltas read from existing audit/outbox — **no new realtime path** · **ack = a deliberate confirm** (attestation — the sanctioned exception to undo-first) · the **PMS adapter-port contract stays PMS-agnostic** (external ids + display; no named-PMS coupling, no internal-only hard-coupling) · no reintroduced internal patient model.
 
 ---
 
@@ -44,11 +44,11 @@
 - **RED:** `tests/shift-handover-observed.test.ts` — seeded system events in the window appear as observed signals; events outside the window excluded; **cross-clinic negative — a same-looking observed event from another clinic is excluded (observed signals have a separate read path; assert the `clinicId` predicate there too)**.
 - **Verify:** `pnpm test -- tests/shift-handover-observed.test.ts` + `pnpm typecheck` (also covers the server tsconfig).
 
-### R-SH-F1.4 · Patient/animal worklist via the Priza PMS seam
+### R-SH-F1.4 · Patient/animal worklist via the PMS integration port (adapter-agnostic)
 
-- **Goal:** populate `patientWorklist` from the external PMS through `server/integrations/` (Priza adapter). **Two distinct states (pinned):** *not configured* → `patientWorklist = { state: 'not_configured' }` (the discriminator — graceful, no error, **NOT** an empty `ready` list); ***configured but failing*** → an **explicit error state** on the artifact — never silently show empty on failure. **The rest of the handover (deltas, open-items, observed-signals) still generates normally; only `patientWorklist` carries the error state** — a PMS failure never blocks the whole artifact.
-- **RED:** `tests/shift-handover-patient-worklist.test.ts` — a **mocked Priza feed** populates the worklist per tech; **no PMS configured → `patientWorklist` is exactly `{ state: 'not_configured' }` (the discriminator, NOT an empty `ready` list) + the rest of the handover still generates; configured-but-failing adapter → `{ state: 'error', code }` on `patientWorklist` (not `not_configured`, not empty) while deltas/open-items/observed-signals still generate**.
-- **Guardrail:** no internal patient model; the adapter boundary is the only patient-data source.
+- **Goal:** populate `patientWorklist` through a **PMS-agnostic port** in `server/integrations/` — define a `PatientWorklistProvider` interface (the adapter contract), NOT a Priza-specific call. The concrete adapter is **resolved per-clinic from the integration config (`vt_integration_configs`)**, so any supported PMS plugs in; **Priza is one reference adapter** (ship the port + the Priza adapter + a mock for tests — v1 needs the seam, not a live connection). The generator calls the **port**, never a named PMS. An end-of-shift **pull** through the port (not a realtime feed in v1). **Two distinct states (pinned):** *not configured* (no PMS integration resolved for the clinic) → `patientWorklist = { state: 'not_configured' }` (the discriminator — graceful, no error, **NOT** an empty `ready` list); ***configured but failing*** → an **explicit error state** `{ state: 'error', code }` (closed enum, no raw PMS detail) — never silently show empty on failure. **The rest of the handover (deltas, open-items, observed-signals) still generates normally; only `patientWorklist` carries the error state** — a PMS failure never blocks the whole artifact.
+- **RED:** `tests/shift-handover-patient-worklist.test.ts` — a **mocked PMS adapter (through the port)** populates the worklist per tech; **no PMS configured for the clinic → `patientWorklist` is exactly `{ state: 'not_configured' }` (the discriminator, NOT an empty `ready` list) + the rest of the handover still generates; configured-but-failing adapter → `{ state: 'error', code }` on `patientWorklist` (not `not_configured`, not empty) while deltas/open-items/observed-signals still generate**; **a SECOND stub adapter resolved through the SAME port yields the same worklist shape — proving the seam is adapter-agnostic, not Priza-coupled**.
+- **Guardrail:** no internal patient model; the PMS integration port is the ONLY patient-data source; the port contract stays PMS-agnostic (external ids + display) — no named-PMS or adapter-specific field leaks into the artifact.
 - **Verify:** `pnpm test -- tests/shift-handover-patient-worklist.test.ts` + `pnpm typecheck` (also covers the server tsconfig).
 
 ### R-SH-F1.5 · Surface — extend `/handoff` + acknowledge + push
@@ -69,4 +69,4 @@
 ## Resolved (were open decisions — now pinned)
 
 - **Generation trigger:** **auto-generate at shift end** in v1; an on-demand "handover now" button is a later addition.
-- **Priza feed:** an **end-of-shift pull** through the `server/integrations/` adapter (not a realtime feed in v1); the adapter contract is PMS-agnostic (external ids + display), with error-vs-not-connected distinguished (R-SH-F1.4).
+- **PMS feed (any supported PMS via the port):** an **end-of-shift pull** through the `server/integrations/` `PatientWorklistProvider` port, with the concrete adapter resolved per-clinic from `vt_integration_configs` (Priza is one adapter; not a realtime feed in v1); the port contract is PMS-agnostic (external ids + display), with error-vs-not-configured distinguished (R-SH-F1.4).
