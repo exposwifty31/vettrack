@@ -3622,3 +3622,14 @@ Reviewer returned 1 HIGH + 1 MEDIUM + 2 LOW on the committed sub-card; all four 
 - Command: `pnpm typecheck` → exit 0.
 
 **Verdict:** VERIFIED
+
+## 2026-07-18 — R-PDF-1.3 · Shortfall join + burn-rate projection
+
+**Claim:** Added `computeShortfalls` (pinned equation: required = ceil(demand + burnRatePerHour×horizon); available = floor(readySupply + availableCurrentStock + incomingStock-within-horizon); shortfall = max(0, required−available)), `burnRatePerHour` (trailing 14d → per-hour), and the `computeReadinessForecast` orchestrator behind the `ReadinessForecastReader` port.
+
+**Evidence:**
+- `server/lib/readiness-forecast-engine.ts` — `computeShortfalls` computes per demand key in its own unit; equipment readySupply and consumable stock never summed across keys; `Math.ceil` on required, `Math.floor` on available; incoming filtered by `etaMs <= window.toMs` (no-ETA excluded); sort desc shortfall then keyId.
+- Test: `pnpm test -- tests/readiness-forecast-shortfall.test.ts` → `Test Files 1 passed / Tests 13 passed` — covers burn sign (higher burn raises shortfall), max(0,…), on-hand reduces shortfall, reserved excluded, incoming horizon cutoff, packs→units conversion, ceil/floor, per-key isolation, ordering, explainability source rows, and the cross-tenant negative via the orchestrator.
+- Command: `pnpm typecheck` → exit 0.
+
+**Verdict:** VERIFIED
