@@ -3610,3 +3610,15 @@ Reviewer returned 1 HIGH + 1 MEDIUM + 2 LOW on the committed sub-card; all four 
 - Command: `pnpm typecheck` → exit 0 (frontend + server tsconfig, no errors).
 
 **Verdict:** VERIFIED
+
+## 2026-07-18 — R-PDF-1.2 · Supply model (readySupply = available ∧ ready intersection)
+
+**Claim:** Added `computeReadySupply` + `isUnitAvailable`/`isUnitReady` predicates. readySupply is the intersection of available ∧ ready per asset type (never a sum); composes the clinic readiness rules' staleEvidenceMs; consumables have reserved=0 (no reservation table exists — confirmed migration 170 only adds an advisory column).
+
+**Evidence:**
+- `server/lib/readiness-forecast-engine.ts` — `computeReadySupply` increments `readySupply` only when `available && ready`; `available`/`ready` tracked separately for cross-checks, never summed.
+- `migrations/170_vt_equipment_reserved_for_session.sql:20` — `ALTER TABLE vt_equipment ADD COLUMN ... reserved_for_session_id TEXT` (advisory column, not a reservations table) — confirms reserved=0 for consumables.
+- Test: `pnpm test -- tests/readiness-forecast-supply.test.ts` → `Test Files 1 passed / Tests 8 passed` — includes intersection (not sum), counted-once, staleness composition, per-asset-type grouping, cross-tenant negative.
+- Command: `pnpm typecheck` → exit 0.
+
+**Verdict:** VERIFIED

@@ -130,3 +130,86 @@ export class ScheduleDemandSource implements DemandSource {
     return [...byKey.values()];
   }
 }
+
+// ---------------------------------------------------------------------------
+// Supply model (R-PDF-1.2) — readySupply = intersection of available ∧ ready.
+// ---------------------------------------------------------------------------
+
+/** An equipment unit with the operational-state columns the forecast reads. */
+export interface EquipmentUnitRow {
+  id: string;
+  clinicId: string;
+  assetTypeId: string | null;
+  readinessState: string; // ready | not_ready | unknown
+  readinessStateSince: number | null;
+  usageState: string; // available | staged | in_use | emergency_use | procedure_bound
+  custodyState: string; // untracked | docked | checked_out | returned
+  reservedForSessionId: string | null;
+  deletedAt: number | null;
+}
+
+/** Usage states that mean a unit is actively committed and NOT free to allocate. */
+const COMMITTED_USAGE_STATES = new Set(["in_use", "emergency_use", "procedure_bound", "staged"]);
+
+/**
+ * A unit is AVAILABLE when it is free to be allocated: not soft-deleted, not
+ * checked out to a technician, not actively in use/staged, and not soft-reserved
+ * for an active Code Blue session. (Consumables have no reservation concept.)
+ */
+export function isUnitAvailable(u: EquipmentUnitRow): boolean {
+  if (u.deletedAt != null) return false;
+  if (u.custodyState === "checked_out") return false;
+  if (COMMITTED_USAGE_STATES.has(u.usageState)) return false;
+  if (u.reservedForSessionId != null) return false;
+  return true;
+}
+
+/**
+ * A unit is READY when its persisted readinessState is "ready" AND its readiness
+ * evidence is not stale beyond the clinic's staleEvidenceMs (composes the
+ * readiness-rules service). A ready unit with stale evidence can no longer be
+ * trusted as ready, so it is excluded from supply.
+ */
+export function isUnitReady(u: EquipmentUnitRow, rules: EquipmentReadinessRulesV1, nowMs: number): boolean {
+  if (u.readinessState !== "ready") return false;
+  if (u.readinessStateSince != null && nowMs - u.readinessStateSince > rules.staleEvidenceMs) {
+    return false;
+  }
+  return true;
+}
+
+export interface AssetTypeSupply {
+  /** |available ∧ ready| — the exact term consumed by the shortfall equation. */
+  readySupply: number;
+  /** |available| — for cross-checks only; NEVER summed with `ready`. */
+  available: number;
+  /** |ready| — for cross-checks only; NEVER summed with `available`. */
+  ready: number;
+}
+
+/**
+ * Per-asset-type readySupply as the intersection of available ∧ ready. Each unit
+ * is evaluated once and contributes at most one to `readySupply`. Units with no
+ * asset type are ignored (they cannot satisfy a typed demand key).
+ */
+export function computeReadySupply(
+  units: EquipmentUnitRow[],
+  rules: EquipmentReadinessRulesV1,
+  nowMs: number,
+): Map<string, AssetTypeSupply> {
+  const byType = new Map<string, AssetTypeSupply>();
+  for (const u of units) {
+    if (!u.assetTypeId) continue;
+    let row = byType.get(u.assetTypeId);
+    if (!row) {
+      row = { readySupply: 0, available: 0, ready: 0 };
+      byType.set(u.assetTypeId, row);
+    }
+    const available = isUnitAvailable(u);
+    const ready = isUnitReady(u, rules, nowMs);
+    if (available) row.available++;
+    if (ready) row.ready++;
+    if (available && ready) row.readySupply++; // intersection — counted once
+  }
+  return byType;
+}
