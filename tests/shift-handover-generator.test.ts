@@ -289,9 +289,9 @@ describe.skipIf(!DATABASE_URL)("R-SH-F1.2 — shift-handover delta generator", (
     );
     const row = await generateShiftHandover(clinicA, sessionA);
     const custodyIds = new Set(row.deltas.custody.map((d) => d.sourceId));
-    expect(custodyIds.has(fixtureA.custodyAudit)).toBe(true); // audit kept
-    expect(custodyIds.has(fixtureA.custodyOutbox)).toBe(false); // paired mirror excluded
-    expect(custodyIds.has(auditLessMirror)).toBe(false); // an unpaired mirror is still a transport artifact
+    expect(custodyIds.has(fixtureA.custodyAudit)).toBe(true);
+    expect(custodyIds.has(fixtureA.custodyOutbox)).toBe(false);
+    expect(custodyIds.has(auditLessMirror)).toBe(false);
     expect(row.deltas.custody).toHaveLength(1);
   });
 
@@ -315,8 +315,8 @@ describe.skipIf(!DATABASE_URL)("R-SH-F1.2 — shift-handover delta generator", (
     );
     const row = await generateShiftHandover(clinicA, sessionA);
     const taskIds = new Set(row.deltas.taskState.map((d) => d.sourceId));
-    expect(taskIds.has(completedAudit)).toBe(true); // the audit is kept
-    expect(taskIds.has(reassigned)).toBe(true); // the distinct domain event survives
+    expect(taskIds.has(completedAudit)).toBe(true);
+    expect(taskIds.has(reassigned)).toBe(true);
   });
 
   it("writes a shift_handover_generated audit on a fresh generate but NOT on a retry", async () => {
