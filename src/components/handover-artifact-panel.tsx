@@ -240,6 +240,7 @@ function AcknowledgeControl({
   const confirmRef = useRef<HTMLButtonElement>(null);
   const wasAcknowledged = useRef(isAcknowledged);
   const pendingUnconfirm = useRef(false);
+  const pendingAck = useRef(false);
 
   // Focus INTO the confirm affordance when it discloses.
   useEffect(() => {
@@ -251,9 +252,13 @@ function AcknowledgeControl({
   // announce the result via the live region — the UI never optimistically flips.
   useEffect(() => {
     const was = wasAcknowledged.current;
-    if (!was && isAcknowledged) {
+    // Guarded on the local-initiation flags so a transition driven by THIS user's
+    // ack/unconfirm moves focus + announces — while any future remote or refetch
+    // flip of the artifact never steals focus or fires a stray announcement.
+    if (!was && isAcknowledged && pendingAck.current) {
       undoRef.current?.focus();
       setAnnouncement(t.handoverPage.acknowledgedLabel);
+      pendingAck.current = false;
     } else if (was && !isAcknowledged && pendingUnconfirm.current) {
       triggerRef.current?.focus();
       setAnnouncement(t.handoverPage.unconfirmedAnnounce);
@@ -266,6 +271,7 @@ function AcknowledgeControl({
     if (busy) return;
     setBusy(true);
     setError(null);
+    pendingAck.current = true;
     try {
       await onAcknowledge();
       // The parent flips the artifact → acknowledged on server confirmation; the
@@ -273,6 +279,7 @@ function AcknowledgeControl({
       setConfirmOpen(false);
     } catch {
       // Keep the confirm affordance open so the user can retry a failed attempt.
+      pendingAck.current = false;
       setError(t.handoverPage.acknowledgeError);
     } finally {
       setBusy(false);
@@ -329,7 +336,14 @@ function AcknowledgeControl({
         {t.handoverPage.acknowledgeCta}
       </Button>
       {confirmOpen && (
-        <div className="rounded-xl border border-primary/30 bg-primary/5 p-3">
+        <div
+          role="dialog"
+          aria-label={t.handoverPage.acknowledgePrompt}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") handleCancel();
+          }}
+          className="rounded-xl border border-primary/30 bg-primary/5 p-3"
+        >
           <p className="mb-2 text-sm font-medium">{t.handoverPage.acknowledgePrompt}</p>
           <div className="flex gap-2">
             <Button ref={confirmRef} type="button" size="sm" onClick={() => void handleConfirm()} disabled={busy}>

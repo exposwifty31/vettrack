@@ -295,6 +295,39 @@ describe.skipIf(!DATABASE_URL)("R-SH-F1.2 — shift-handover delta generator", (
     expect(row.deltas.custody).toHaveLength(2);
   });
 
+  it("de-dupes a dual-emit whose audit + mirror land in DIFFERENT seconds (timestamp skew)", async () => {
+    // The audit row is written fire-and-forget AFTER the mutation commits, so its
+    // timestamp is systematically later than the in-transaction domain mirror —
+    // frequently across a whole-second boundary. Pairing is a per-entity budget,
+    // NOT a time bucket, so the pair must still collapse; and an audit-less mirror
+    // on a different entity keeps its own slot regardless.
+    const skewMirror = await seedOutbox(
+      clinicA,
+      "EQUIPMENT_CUSTODY_STATE_CHANGED",
+      new Date("2026-03-10T10:04:59.900Z"),
+      { equipmentId: "eqSKEW" },
+    );
+    const skewAudit = await seedAudit(
+      clinicA,
+      userA,
+      "equipment_checked_out",
+      "eqSKEW",
+      new Date("2026-03-10T10:05:00.200Z"),
+    );
+    const loneMirror = await seedOutbox(
+      clinicA,
+      "EQUIPMENT_CUSTODY_STATE_CHANGED",
+      new Date("2026-03-10T10:06:00.000Z"),
+      { equipmentId: "eqLONE" },
+    );
+
+    const row = await generateShiftHandover(clinicA, sessionA);
+    const ids = new Set(row.deltas.custody.map((d) => d.sourceId));
+    expect(ids.has(skewAudit)).toBe(true); // audit kept
+    expect(ids.has(skewMirror)).toBe(false); // cross-second mirror still de-duped
+    expect(ids.has(loneMirror)).toBe(true); // audit-less mirror (other entity) survives
+  });
+
   it("writes a shift_handover_generated audit on a fresh generate but NOT on a retry", async () => {
     const first = await generateShiftHandover(clinicA, sessionA);
     const auditRow = await waitForHandoverAudit(clinicA, first.id);
