@@ -212,6 +212,64 @@ async function finalizeRotation(clinicId: string, rot: RfidSecretRotation, now: 
 }
 
 /**
+ * Time-bounded liveness backstop for crash-stranded `finalizing` rows (FS-1 re-attempt).
+ *
+ * A hard process kill (SIGKILL/OOM/deploy restart) between finalizeRotation's Phase-1 claim
+ * (grace→finalizing, `previous_retained` still true) and its Phase-3 commit strands the row at
+ * `status='finalizing'`, holding the one-in-flight gate (`UNIQUE (clinic_id) WHERE
+ * previous_retained=true`). The lazy ingest reclaim in `getRfidVerificationSecrets` closes only
+ * HALF of that window and only under continued traffic:
+ *   - POST-delete sub-window (crash AFTER the Phase-2 blob delete durably committed): the blob no
+ *     longer carries `previous`, so `getRfidVerificationSecrets` short-circuits at its `!previous`
+ *     early return (frozen no-extra-query common path) and NEVER re-drives finalize; and
+ *   - a clinic whose readers fall quiet right after stranding produces no ingest/ack traffic, so
+ *     the lazy driver is never called at all.
+ * In both cases the gate would be held with NO upper bound until traffic happens to resume.
+ *
+ * This scheduled sweep is the unbounded-wait backstop: it re-drives every STALE `finalizing` row
+ * through the same two-phase finalize regardless of blob state (Phase-2's delete is idempotent — a
+ * no-op when the blob already lacks `previous`), so a stranded row is reclaimed within one sweep
+ * interval and its gate released. Cross-clinic system sweep (mirrors runRfidReaderOfflineSweep):
+ * the staleness SELECT spans clinics, but every reclaim runs through the clinic-scoped
+ * finalizeRotation, so no per-clinic state is ever crossed. The stale predicate (updated_at <= now
+ * − FINALIZING_STALE_MS) guarantees an actively in-flight finalize is never stomped.
+ */
+export async function reclaimStrandedFinalizingRotations(
+  now: number = Date.now(),
+): Promise<{ scanned: number; reclaimed: number }> {
+  const staleBefore = new Date(now - FINALIZING_STALE_MS);
+  const stranded = await db
+    .select()
+    .from(rfidSecretRotations)
+    .where(
+      and(
+        eq(rfidSecretRotations.status, "finalizing"),
+        eq(rfidSecretRotations.previousRetained, true),
+        lte(rfidSecretRotations.updatedAt, staleBefore),
+      ),
+    );
+
+  let reclaimed = 0;
+  for (const rot of stranded) {
+    try {
+      // finalizeRotation re-drives the two-phase finalize (Phase-1 CAS accepts a stale `finalizing`
+      // row; Phase-2 delete is a no-op when `previous` is already gone; Phase-3 CAS → completed). A
+      // `false` return means a concurrent reclaimer/finalize won the claim — not this call's job.
+      const done = await finalizeRotation(rot.clinicId, rot, now);
+      if (done) {
+        reclaimed += 1;
+        incrementMetric("rfid_secret_rotation_reclaimed");
+      }
+    } catch (err) {
+      // A Phase-2 delete failure reverts the row to `grace` (recoverable, retried next sweep). One
+      // clinic's transient failure must never abort the whole cross-clinic sweep.
+      console.error(`[rfid-finalizing-sweep] reclaim failed for rotation ${rot.id}:`, err);
+    }
+  }
+  return { scanned: stranded.length, reclaimed };
+}
+
+/**
  * Provision (first time) or rotate the per-clinic RFID HMAC secret. Returns the secret
  * exactly once; a same-key retry replays the original envelope without a secret.
  * Concurrent rotations resolve to one winner (loser → ROTATION_IN_PROGRESS).

@@ -118,8 +118,12 @@ const {
   ackRotationReader,
   rollbackRfidSecret,
   getRotation,
+  reclaimStrandedFinalizingRotations,
   RfidRotationError,
 } = await import("../server/lib/rfid/provisioning.js");
+// Mocked credential-manager (see vi.mock above): delegates to the real store when no finalize
+// hook is armed. Used by the POST-delete crash-recovery test to strip `previous` from the blob.
+const { storeCredentials } = await import("../server/integrations/credential-manager.js");
 
 async function seedClinic(pool: Pool, clinicId: string) {
   await pool.query("INSERT INTO vt_clinics (id) VALUES ($1) ON CONFLICT DO NOTHING", [clinicId]);
@@ -472,6 +476,51 @@ describe("R-M1.1c · HMAC rotation contract (DB-integration)", () => {
     expect(rec?.previousRetained).toBe(false);
 
     // Gate RELEASED: a fresh rotation now succeeds (grace again) instead of ROTATION_IN_PROGRESS forever.
+    const third = await rotateRfidSecret(clinic, `key-${uid()}`, { graceTtlMs: 600_000 });
+    expect(third.status).toBe("grace");
+  });
+
+  it.runIf(dbReachable)("FS-1 crash-recovery (POST-delete): stranded `finalizing` with the blob's previous ALREADY dropped — lazy ingest can't reclaim it, the scheduled sweep does; gate released", async () => {
+    const clinic = `test-rfidp-${uid()}`;
+    const pool = probePool;
+    if (!pool) throw new Error("probePool must be initialised when dbReachable");
+    await seedClinic(pool, clinic);
+    await seedReader(pool, clinic);
+    await rotateRfidSecret(clinic, `key-${uid()}`); // establish a current secret
+    const second = await rotateRfidSecret(clinic, `key-${uid()}`, { graceTtlMs: 600_000 });
+    expect(second.status).toBe("grace");
+
+    // Simulate a HARD crash in the POST-delete sub-window: AFTER finalizeRotation's Phase-2 blob
+    // delete durably committed (previous already gone from the credential blob) but BEFORE the
+    // Phase-3 status CAS. The row is stranded `finalizing`, previous_retained=true, updated_at STALE
+    // — while the blob no longer carries `previous`.
+    await storeCredentials(clinic, "rfid", { webhook_secret: second.secret! }); // drop previous from the blob
+    await pool.query(
+      `UPDATE vt_rfid_secret_rotations
+         SET status='finalizing', previous_retained=true, updated_at = NOW() - INTERVAL '10 minutes'
+       WHERE clinic_id=$1 AND id=$2`,
+      [clinic, second.rotationId],
+    );
+
+    // The LAZY ingest path CANNOT reclaim this window: `previous` is already gone from the blob, so
+    // getRfidVerificationSecrets short-circuits at its `!previous` early return (frozen common path)
+    // and never re-drives finalize. The row stays stranded and the one-in-flight gate stays HELD.
+    expect(await getRfidVerificationSecrets(clinic)).toEqual([second.secret]);
+    expect((await getRotation(clinic, second.rotationId))?.status).toBe("finalizing");
+    await expect(
+      rotateRfidSecret(clinic, `key-${uid()}`, { graceTtlMs: 600_000 }),
+    ).rejects.toMatchObject({ code: "ROTATION_IN_PROGRESS" });
+
+    // The scheduled sweep is the backstop: it re-drives the stranded finalize regardless of blob
+    // state (Phase-2 delete is an idempotent no-op here) and advances the row to durable `completed`.
+    const swept = await reclaimStrandedFinalizingRotations();
+    expect(swept.reclaimed).toBeGreaterThanOrEqual(1);
+
+    const rec = await getRotation(clinic, second.rotationId);
+    expect(rec?.status).toBe("completed");
+    expect(rec?.previousRetained).toBe(false);
+
+    // Gate RELEASED: a fresh rotation now succeeds (grace) instead of ROTATION_IN_PROGRESS forever.
     const third = await rotateRfidSecret(clinic, `key-${uid()}`, { graceTtlMs: 600_000 });
     expect(third.status).toBe("grace");
   });

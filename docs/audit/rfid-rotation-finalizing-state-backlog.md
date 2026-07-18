@@ -21,6 +21,26 @@
 > row (not just a grace-expired one), so the lazy ingest path actually COMPLETES a stranded finalize
 > and releases the gate (previously a silent no-op). New bounded counter
 > `rfid_secret_rotation_reclaimed`. New crash-recovery test in `tests/rfid-provisioning.test.ts`.
+>
+> **RE-ATTEMPT ROUND 2 (2026-07-18, POST-delete window + time-bounded backstop).** Review flagged
+> that the lazy-only reclaim above closes only HALF the crash window: (HIGH) a crash in the
+> POST-delete sub-window — after Phase-2 durably removed `previous` from the credential blob but
+> before the Phase-3 status CAS — strands the row `finalizing`/`previous_retained=true` while the
+> blob no longer carries `previous`, so `getRfidVerificationSecrets` short-circuits at its
+> `!previous` early return (the frozen no-extra-query common path) and NEVER re-drives finalize →
+> gate bricked forever; (MEDIUM) even the pre-delete window depends on CONTINUED ingest traffic, so
+> a clinic whose readers fall quiet right after stranding holds the gate with no upper bound. Fixed
+> with a scheduled backstop (fix-direction: sweeper): `reclaimStrandedFinalizingRotations()` in
+> `server/lib/rfid/provisioning.ts` finds every STALE `finalizing` row (`updated_at <= now −
+> FINALIZING_STALE_MS`, `previous_retained=true`) and re-drives it through the same two-phase
+> finalize regardless of blob state (Phase-2 delete is an idempotent no-op when `previous` is already
+> gone). Scheduled at a fixed 60s cadence by `startRfidFinalizingSweep()`
+> (`server/lib/rfid/finalizing-sweep.ts`, registered in `server/app/start-schedulers.ts`), so a
+> stranded gate is released within one sweep interval even with zero ingest/ack traffic. This closes
+> the HIGH post-delete window AND the MEDIUM quiet-clinic case uniformly, without touching the frozen
+> hot ingest path. New DB-integration test (LOW test-gap): a stranded `finalizing` row with the
+> blob's `previous` ALREADY stripped — the lazy ingest path leaves it stranded (asserted), then the
+> scheduled sweep reclaims it and releases the gate.
 
 Tracked deferral of a CodeRabbit finding on `server/lib/rfid/provisioning.ts`
 (finalize-vs-rollback), review comment id `3606912682`. Deliberately deferred at
