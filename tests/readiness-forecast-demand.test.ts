@@ -1,9 +1,10 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import {
   ScheduleDemandSource,
   demandKeyId,
   type DemandEntry,
   type DemandSource,
+  type DemandUnitConflict,
   type ForecastWindow,
   type ScheduledProcedureRow,
   type ScheduleReader,
@@ -136,14 +137,37 @@ describe("R-PDF-1.1 · ScheduleDemandSource — schedule-only demand", () => {
     expect(Object.keys(a[0].key).sort()).toEqual(Object.keys(b[0].key).sort());
   });
 
-  it("rejects a unit conflict: same demand key (kind:ref) with DIFFERENT units fails loudly", async () => {
+  it("degrades a unit conflict PER KEY: excludes the conflicting key, keeps every other key", async () => {
+    const reader = new InMemoryScheduleReader([
+      // iv-set has a same-key/different-unit conflict (mL then vial) → excluded.
+      proc({ id: "appt-1", clinicId: "clinic-a", requiredConsumables: [{ itemId: "iv-set", quantity: 2, unit: "mL" }] }),
+      proc({ id: "appt-2", clinicId: "clinic-a", requiredConsumables: [{ itemId: "iv-set", quantity: 3, unit: "vial" }] }),
+      // gauze is unrelated and must still forecast normally.
+      proc({ id: "appt-3", clinicId: "clinic-a", requiredConsumables: [{ itemId: "gauze", quantity: 4, unit: "unit" }] }),
+    ]);
+    const onUnitConflict = vi.fn<(c: DemandUnitConflict) => void>();
+    const source = new ScheduleDemandSource(reader, { onUnitConflict });
+
+    const demand = await source.getDemand("clinic-a", WINDOW);
+    const keyIds = demand.map((d) => demandKeyId(d.key));
+
+    // Conflicting key dropped; unrelated key preserved (whole clinic NOT denied).
+    expect(keyIds).not.toContain("consumable:iv-set");
+    expect(demand.find((d) => demandKeyId(d.key) === "consumable:gauze")?.requiredQuantity).toBe(4);
+
+    // Surfaced exactly once via the degradation hook, with both units.
+    expect(onUnitConflict).toHaveBeenCalledTimes(1);
+    expect(onUnitConflict).toHaveBeenCalledWith({ keyId: "consumable:iv-set", existingUnit: "mL", conflictingUnit: "vial" });
+  });
+
+  it("degrades silently (no throw) when no conflict hook is provided", async () => {
     const reader = new InMemoryScheduleReader([
       proc({ id: "appt-1", clinicId: "clinic-a", requiredConsumables: [{ itemId: "iv-set", quantity: 2, unit: "mL" }] }),
       proc({ id: "appt-2", clinicId: "clinic-a", requiredConsumables: [{ itemId: "iv-set", quantity: 3, unit: "vial" }] }),
+      proc({ id: "appt-3", clinicId: "clinic-a", requiredConsumables: [{ itemId: "gauze", quantity: 4, unit: "unit" }] }),
     ]);
-    const source = new ScheduleDemandSource(reader);
-    // Summing 2 mL + 3 vial under one key would be dimensionally wrong — must throw.
-    await expect(source.getDemand("clinic-a", WINDOW)).rejects.toThrow(/unit conflict/i);
+    const demand = await new ScheduleDemandSource(reader).getDemand("clinic-a", WINDOW);
+    expect(demand.map((d) => demandKeyId(d.key))).toEqual(["consumable:gauze"]);
   });
 
   it("cross-tenant negative: demand includes ONLY the requested clinic's appointment rows", async () => {

@@ -38,17 +38,22 @@ export function demandKeyId(key: DemandKey): string {
 }
 
 /**
- * Guard the pinned per-key-canonical-unit invariant: two demand entries that
- * share a demandKeyId (kind:ref) but disagree on `unit` cannot be aggregated —
- * summing quantities across different units would be dimensionally wrong. Fail
- * loudly rather than silently mixing units.
+ * A same-key/different-unit collision. v1 metadata is freeform (no schema
+ * enforces per-item unit consistency), so a single malformed row must NOT kill
+ * the whole clinic's forecast: the offending demand key is EXCLUDED (its
+ * quantities can't be summed dimensionally), every other key still forecasts,
+ * and this is surfaced via a callback so the caller can count + log it.
  */
-export function assertConsistentDemandUnit(existing: DemandKey, incoming: DemandKey): void {
-  if (existing.unit !== incoming.unit) {
-    throw new Error(
-      `Demand unit conflict for ${demandKeyId(incoming)}: "${existing.unit}" vs "${incoming.unit}"`,
-    );
-  }
+export interface DemandUnitConflict {
+  keyId: string;
+  existingUnit: string;
+  conflictingUnit: string;
+}
+
+/** Optional degradation hook — invoked once per demand key excluded on a unit
+ *  conflict. Absent → the key is still excluded, just silently. */
+export interface UnitConflictOptions {
+  onUnitConflict?: (conflict: DemandUnitConflict) => void;
 }
 
 export interface DemandEntry {
@@ -100,18 +105,34 @@ const EQUIPMENT_UNIT = "unit";
  * it is a separate shortfall term (R-PDF-1.3), so consumption is counted once.
  */
 export class ScheduleDemandSource implements DemandSource {
-  constructor(private readonly reader: ScheduleReader) {}
+  constructor(
+    private readonly reader: ScheduleReader,
+    private readonly options: UnitConflictOptions = {},
+  ) {}
 
   async getDemand(clinicId: string, window: ForecastWindow): Promise<DemandEntry[]> {
     const procedures = await this.reader.scheduledProcedures(clinicId, window);
 
     const byKey = new Map<string, DemandEntry>();
+    const conflicted = new Set<string>();
     const add = (key: DemandKey, quantity: number, appointmentId: string): void => {
       if (!(quantity > 0)) return;
       const id = demandKeyId(key);
+      if (conflicted.has(id)) return; // key already excluded on an earlier conflict
       const existing = byKey.get(id);
       if (existing) {
-        assertConsistentDemandUnit(existing.key, key);
+        if (existing.key.unit !== key.unit) {
+          // Degrade per-key: drop this key entirely (its units can't be summed),
+          // keep every other key's forecast.
+          conflicted.add(id);
+          byKey.delete(id);
+          this.options.onUnitConflict?.({
+            keyId: id,
+            existingUnit: existing.key.unit,
+            conflictingUnit: key.unit,
+          });
+          return;
+        }
         existing.requiredQuantity += quantity;
         if (!existing.sourceAppointmentIds.includes(appointmentId)) {
           existing.sourceAppointmentIds.push(appointmentId);
@@ -313,7 +334,11 @@ export function burnRatePerHour(consumedUnits: number, windowDays: number = BURN
  * (floor) so shortfall is never understated. Ordered by descending shortfall,
  * then key id.
  */
-export function computeShortfalls(input: ShortfallInput, _nowMs: number = Date.now()): ShortfallRow[] {
+export function computeShortfalls(
+  input: ShortfallInput,
+  _nowMs: number = Date.now(),
+  options: UnitConflictOptions = {},
+): ShortfallRow[] {
   const { window } = input;
   const stockByItem = new Map(input.consumableStock.map((s) => [s.itemId, s]));
   const consumedByItem = new Map(input.consumption.map((c) => [c.itemId, c.consumedUnits]));
@@ -324,13 +349,21 @@ export function computeShortfalls(input: ShortfallInput, _nowMs: number = Date.n
     incomingByItem.set(row.itemId, arr);
   }
 
-  // Aggregate demand per key (a key may span several demand entries).
+  // Aggregate demand per key (a key may span several demand entries). A same-key
+  // unit conflict EXCLUDES that key only — every other key still forecasts.
   const demandByKey = new Map<string, { key: DemandKey; quantity: number; appointmentIds: string[] }>();
+  const conflicted = new Set<string>();
   for (const entry of input.demand) {
     const id = demandKeyId(entry.key);
+    if (conflicted.has(id)) continue;
     const agg = demandByKey.get(id);
     if (agg) {
-      assertConsistentDemandUnit(agg.key, entry.key);
+      if (agg.key.unit !== entry.key.unit) {
+        conflicted.add(id);
+        demandByKey.delete(id);
+        options.onUnitConflict?.({ keyId: id, existingUnit: agg.key.unit, conflictingUnit: entry.key.unit });
+        continue;
+      }
       agg.quantity += entry.requiredQuantity;
       for (const a of entry.sourceAppointmentIds) if (!agg.appointmentIds.includes(a)) agg.appointmentIds.push(a);
     } else {
@@ -363,14 +396,18 @@ export function computeShortfalls(input: ShortfallInput, _nowMs: number = Date.n
     }
     const perHour = isConsumable ? burnRatePerHour(consumedUnits) : 0;
 
-    // incomingStock counts ONLY arrivals whose ETA falls INSIDE the inclusive
-    // horizon window [fromMs, toMs]. No-ETA is excluded; an ETA before the window
-    // start is excluded too (already-landed stock is counted in on-hand, not here).
+    // incomingStock counts outstanding (not-yet-received) stock expected to land
+    // by the horizon: exclude only no-ETA and arrivals AFTER window.toMs (they
+    // can't cover demand due within the horizon). NO lower bound — `expectedAt`
+    // is set once at PO creation and never updated, so an overdue-but-outstanding
+    // PO keeps a stale past ETA; that stock is genuinely still incoming (it was
+    // never received, so it is NOT in on-hand either). Dropping it would vanish
+    // the units from both supply terms and invent a spurious shortfall.
     let incomingStock = 0;
     const incomingSource: ShortfallSource["incoming"] = [];
     if (isConsumable) {
       for (const inc of incomingByItem.get(agg.key.ref) ?? []) {
-        if (inc.etaMs == null || inc.etaMs < window.fromMs || inc.etaMs > window.toMs) continue;
+        if (inc.etaMs == null || inc.etaMs > window.toMs) continue;
         const units = inc.quantity * inc.unitsPerPack; // explicit packs→units conversion
         incomingStock += units;
         incomingSource.push({ purchaseOrderId: inc.purchaseOrderId, quantityUnits: units, etaMs: inc.etaMs });
@@ -424,6 +461,9 @@ export interface ForecastDeps {
   demandSource: DemandSource;
   nowMs?: number;
   horizonHours?: number;
+  /** Degradation hook for a same-key unit conflict surfaced during the shortfall
+   *  join (see also the DemandSource's own hook). Absent → still degrades. */
+  onUnitConflict?: (conflict: DemandUnitConflict) => void;
 }
 
 export interface ForecastResult {
@@ -455,6 +495,7 @@ export async function computeReadinessForecast(deps: ForecastDeps, clinicId: str
   const shortfalls = computeShortfalls(
     { demand, readySupplyByAssetType, consumableStock, consumption, incoming, window },
     nowMs,
+    { onUnitConflict: deps.onUnitConflict },
   );
 
   return { window, demand, shortfalls };

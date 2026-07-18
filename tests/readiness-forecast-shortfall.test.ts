@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import {
   computeShortfalls,
   computeReadinessForecast,
@@ -8,6 +8,7 @@ import {
   DEFAULT_HORIZON_HOURS,
   type ShortfallInput,
   type DemandEntry,
+  type DemandUnitConflict,
   type ConsumableStockRow,
   type ConsumptionRow,
   type IncomingStockRow,
@@ -115,18 +116,28 @@ describe("R-PDF-1.3 · computeShortfalls", () => {
     expect(row.source.incoming.map((i) => i.purchaseOrderId)).toEqual(["po-early"]);
   });
 
-  it("excludes incoming whose ETA is BEFORE the window start (inclusive window only)", () => {
+  it("COUNTS an overdue-but-outstanding PO (stale PAST ETA) — no spurious shortfall", () => {
+    // `purchaseOrders.expectedAt` is set once at PO creation and never updated, so
+    // an overdue order that is still 'ordered' (quantityOrdered 10, received 0)
+    // keeps a past ETA. That stock is genuinely still incoming (never received →
+    // not in on-hand). It must NOT be dropped by a lower ETA bound, or the units
+    // vanish from both supply terms and a spurious shortfall + re-order is invented.
     const demand = [consumableDemand("iv", 10, ["a"])];
     const incoming: IncomingStockRow[] = [
-      // Already landed before now → belongs to on-hand, not incoming.
-      { itemId: "iv", clinicId: "clinic-a", purchaseOrderId: "po-past", quantity: 50, unitsPerPack: 1, etaMs: NOW - HOUR },
-      // Exactly at the window start → inclusive, counts.
-      { itemId: "iv", clinicId: "clinic-a", purchaseOrderId: "po-now", quantity: 4, unitsPerPack: 1, etaMs: NOW },
+      {
+        itemId: "iv",
+        clinicId: "clinic-a",
+        purchaseOrderId: "po-overdue",
+        quantity: 10, // quantityOrdered − quantityReceived, still outstanding
+        unitsPerPack: 1,
+        etaMs: NOW - 3 * 24 * HOUR, // expected 3 days ago, still not received
+      },
     ];
     const rows = computeShortfalls(base({ demand, incoming }), NOW);
     const row = rows.find((r) => r.keyId === "consumable:iv")!;
-    expect(row.incomingStock).toBe(4); // po-past excluded; po-now (== fromMs) included
-    expect(row.source.incoming.map((i) => i.purchaseOrderId)).toEqual(["po-now"]);
+    expect(row.incomingStock).toBe(10); // counted, not dropped
+    expect(row.shortfall).toBe(0); // 10 required − 10 incoming = 0 (no spurious shortfall)
+    expect(row.source.incoming.map((i) => i.purchaseOrderId)).toEqual(["po-overdue"]);
   });
 
   it("applies an explicit per-item packs→units conversion (unitsPerPack)", () => {
@@ -189,6 +200,22 @@ describe("R-PDF-1.3 · computeShortfalls", () => {
     ];
     const rows = computeShortfalls(base({ demand }), NOW);
     expect(rows.map((r) => r.keyId)).toEqual(["consumable:bbb", "consumable:aaa", "consumable:ccc"]);
+  });
+
+  it("degrades a same-key unit conflict PER KEY (excludes it, forecasts every other key)", () => {
+    const demand: DemandEntry[] = [
+      { key: { kind: "consumable", ref: "iv", unit: "mL" }, requiredQuantity: 2, sourceAppointmentIds: ["a"] },
+      { key: { kind: "consumable", ref: "iv", unit: "vial" }, requiredQuantity: 3, sourceAppointmentIds: ["b"] }, // conflict
+      { key: { kind: "consumable", ref: "gauze", unit: "unit" }, requiredQuantity: 5, sourceAppointmentIds: ["c"] },
+    ];
+    const onUnitConflict = vi.fn<(c: DemandUnitConflict) => void>();
+    const rows = computeShortfalls(base({ demand }), NOW, { onUnitConflict });
+
+    // Conflicting key excluded; unrelated key still forecasts.
+    expect(rows.find((r) => r.keyId === "consumable:iv")).toBeUndefined();
+    expect(rows.find((r) => r.keyId === "consumable:gauze")?.shortfall).toBe(5);
+    expect(onUnitConflict).toHaveBeenCalledTimes(1);
+    expect(onUnitConflict).toHaveBeenCalledWith({ keyId: "consumable:iv", existingUnit: "mL", conflictingUnit: "vial" });
   });
 
   it("exposes source appointment / stock / burn rows for explainability", () => {

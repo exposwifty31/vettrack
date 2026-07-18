@@ -20,6 +20,7 @@ import {
   purchaseOrders,
 } from "../db.js";
 import { getReadinessRules } from "./equipment-readiness-rules.service.js";
+import { incrementMetric } from "../lib/metrics.js";
 import {
   ScheduleDemandSource,
   computeReadinessForecast,
@@ -33,6 +34,7 @@ import {
   type ConsumptionRow,
   type IncomingStockRow,
   type ForecastWindow,
+  type DemandUnitConflict,
 } from "../lib/readiness-forecast-engine.js";
 
 const ACTIVE_DISPENSE_STATES = ["CONFIRMED", "COMPLETED"] as const;
@@ -274,8 +276,18 @@ export async function getReadinessForecast(
   const nowMs = options.nowMs ?? Date.now();
   const horizonHours = options.horizonHours ?? DEFAULT_HORIZON_HOURS;
 
+  // A freeform-metadata unit conflict degrades that key only (it is excluded from
+  // the forecast); every other key still forecasts. Count + log it — bounded
+  // counter (no keyId/unit label leaks into the metric).
+  const onUnitConflict = (conflict: DemandUnitConflict): void => {
+    incrementMetric("readiness_forecast_demand_unit_conflict");
+    console.warn(
+      `[readiness-forecast] demand unit conflict for ${conflict.keyId} ("${conflict.existingUnit}" vs "${conflict.conflictingUnit}") — key excluded`,
+    );
+  };
+
   const { shortfalls } = await computeReadinessForecast(
-    { reader, demandSource: new ScheduleDemandSource(reader), nowMs, horizonHours },
+    { reader, demandSource: new ScheduleDemandSource(reader, { onUnitConflict }), nowMs, horizonHours, onUnitConflict },
     clinicId,
   );
 

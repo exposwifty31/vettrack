@@ -4172,3 +4172,17 @@ Reviewer returned 1 HIGH + 1 MEDIUM + 2 LOW on the committed sub-card; all four 
 - **Gates:** `pnpm typecheck` → 0. Readiness suites (`demand/supply/shortfall/panel/accept/service`) → 60 passed. `pnpm i18n:check` → parity. `pnpm architecture:gates` → All G1 passed. `pnpm test` (full) → 5522 passed / 255 skipped; the same 12 `*.integration.test.ts` files fail only on the missing `vettrack_test` DB (environmental, unchanged by this diff).
 
 **Verdict:** VERIFIED
+
+## 2026-07-18 — R-PDF-1 · Adversarial-review round 2 on PR #114 (revert finding #3, degrade unit conflict)
+
+**Claim:** Reverted CodeRabbit finding #3 (the incoming-ETA lower bound — a HIGH regression for this data model) and changed the demand-unit-conflict guard from throw-the-whole-forecast to degrade-per-key with a bounded counter + log.
+
+**Evidence:**
+- **HIGH revert (finding #3):** `server/lib/readiness-forecast-engine.ts` incoming filter is back to `if (inc.etaMs == null || inc.etaMs > window.toMs) continue;` (upper bound kept, lower bound dropped). Rationale: `DrizzleReadinessForecastReader.incomingStock` returns only outstanding PO stock (`status IN ('ordered','partial')`, `quantityOrdered − quantityReceived`) and `purchaseOrders.expectedAt` is set once at creation and never updated (grep: no `UPDATE ... expected_at` / no `.set({ expectedAt })` anywhere) → an overdue-but-outstanding PO keeps a stale past ETA and must still count as incoming, else its units vanish from both supply terms → spurious shortfall + re-order of an already-ordered item (violates precision-first). Test: `tests/readiness-forecast-shortfall.test.ts` "COUNTS an overdue-but-outstanding PO (stale PAST ETA)" — outstanding PO ordered/10/received 0/ETA −3d → `incomingStock 10`, `shortfall 0`.
+- **MEDIUM degrade (assertConsistentDemandUnit → per-key exclusion):** removed the throwing function; `ScheduleDemandSource` and `computeShortfalls` now EXCLUDE only the conflicting key (via `UnitConflictOptions.onUnitConflict`), keeping every other key. The service (`getReadinessForecast`) passes a callback that calls `incrementMetric("readiness_forecast_demand_unit_conflict")` (added to the closed `MetricName` union + `DEFAULT_COUNTERS` in `server/lib/metrics.ts`) + `console.warn`. Tests: demand suite "degrades a unit conflict PER KEY" + "degrades silently (no throw) when no hook"; shortfall suite "degrades a same-key unit conflict PER KEY".
+- **LOW (deferred, note only):** the `COALESCE(completedAt, confirmedAt, createdAt)` consumption range has no covering index (`vt_dispense_events` indexes are `(clinicId,status)` and `(clinicId,createdAt)`). Perf-only, not correctness. NOT fixed — R-PDF-1 is zero-schema; adding an index is a follow-up if forecast latency shows up in profiling.
+- **Gates:** `pnpm typecheck` → 0. Readiness suites (`demand/supply/shortfall/panel/accept/service`) → 62 passed. `pnpm i18n:check` → parity. `pnpm architecture:gates` → All G1 passed (0 new cycles — the new service→metrics import did not add a cycle). `pnpm test` (full) → 5524 passed / 255 skipped; the same 12 `*.integration.test.ts` files fail only on the missing `vettrack_test` DB (environmental), no readiness-forecast file among them.
+
+**Note on history:** CodeRabbit finding #3 was IMPLEMENTED (prior commit 400bc9556) then REVERTED here — `expectedAt` is immutable, so the lower bound breaks overdue-but-outstanding orders. The coordinator replies the reasoned decline on the CodeRabbit thread.
+
+**Verdict:** VERIFIED
