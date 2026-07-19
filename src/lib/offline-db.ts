@@ -34,7 +34,13 @@ export type PendingSyncType =
   | "delete"
   | "checkout"
   | "return"
-  | "return_with_charge";
+  | "return_with_charge"
+  // VetTrack 2.0 Case Spine (task 0.2 spike): attach a physical event to an
+  // operational case. Rides the existing pendingSync queue + processQueue
+  // reconcile machinery. Additive to the union only — Task 1.2 must also add
+  // the offline-mutation-registry allow-producer entry before the real
+  // addPendingSync enqueue path accepts it.
+  | "case_attach";
 
 /** Current Dexie pendingSync row schema version (queue evolution). */
 export const PENDING_SYNC_SCHEMA_VERSION = 2;

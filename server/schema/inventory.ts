@@ -6,6 +6,7 @@ import {
 import { vtTable } from "./helpers.js";
 import { clinics, users } from "./core.js";
 import { rooms } from "./equipment.js";
+import { cases } from "./cases.js";
 
 export const inventoryLogTypeEnum = pgEnum("vt_inventory_log_type", ["restock", "blind_audit", "adjustment"]);
 export const poStatusEnum = pgEnum("vt_po_status", ["draft", "ordered", "partial", "received", "cancelled"]);
@@ -230,6 +231,13 @@ export const dispenseEvents = vtTable(
     items: jsonb("items").notNull(),
     bypassReason: text("bypass_reason"),
     idempotencyKey: text("idempotency_key").notNull(),
+    /**
+     * VetTrack 2.0 Case Spine (task 0.2 spike). Nullable, additive — attaches
+     * this physical dispense event to an operational case. No backfill; existing
+     * rows stay NULL. FK is `set null` so closing/removing a case never destroys
+     * the dispense audit trail.
+     */
+    caseId: text("case_id").references(() => cases.id, { onDelete: "set null" }),
     createdBy: text("created_by").notNull().references(() => users.id, { onDelete: "restrict" }),
     confirmedBy: text("confirmed_by").references(() => users.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
@@ -245,6 +253,10 @@ export const dispenseEvents = vtTable(
       table.requiresCompletion,
       table.status,
     ),
+    // Case Spine (2.0): case-timeline read path (clinic-scoped, partial on attached rows).
+    clinicCaseIdx: index("idx_vt_dispense_events_clinic_case")
+      .on(table.clinicId, table.caseId)
+      .where(sql`${table.caseId} IS NOT NULL`),
   }),
 );
 

@@ -35,6 +35,10 @@ const TYPE_LABELS: Record<SyncQueueItemType, string> = {
   checkout: t.syncQueueSheet.typeCheckout,
   return: t.syncQueueSheet.typeReturn,
   return_with_charge: t.syncQueueSheet.typeReturn,
+  // VetTrack 2.0 Case Spine spike (task 0.2): reuses an existing label to keep
+  // the spike off the parity-enforced i18n surface. Task 1.2 must add a
+  // dedicated `typeCaseAttach` key in locales/en.json + he.json.
+  case_attach: t.syncQueueSheet.typeUpdate,
 };
 
 function extractEquipmentIdFromEndpoint(endpoint: string): string | null {
