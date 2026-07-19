@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash scripts/vettrack-2.0-scope-gate.sh",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -4253,3 +4253,18 @@ Reviewer returned 1 HIGH + 1 MEDIUM + 2 LOW on the committed sub-card; all four 
 - **Claim:** 4-flow audit (iPhone/iPad/Website/Board) complete; 42 findings (1 critical, 14 moderate, 27 low); all 15 critical/moderate CONFIRMED by adversarial verifiers.
 - **Checked:** workflow wf_40396e92-056 (23 agents, 0 errors on resume): 7 code auditors cited real file:line (each critical/moderate re-read by an independent refuter agent); live Playwright flow-walk ran 6/6 green — fresh matrix artifacts/flow-walk/web-matrix.json 2026-07-18T10:19:08Z: 147 rows / 145 pass / 0 broken / 2 degraded (known shift-chat archive 404, byte-identical to 2026-07-16 baseline). §F SIWA chain verified intact at exact lines incl. compiled shell bundle. No fixes applied.
 - **Report:** docs/audit/pre-resubmission-4flow-audit-2026-07-18.md
+
+## 2026-07-19 — VetTrack 2.0 execution plan added (uncommitted)
+
+**Claim:** Added `docs/vettrack-2.0-roadmap.md` — the VetTrack 2.0 execution plan (18 executable tasks in 4 phases + horizon, synthesized from local-only `.claude/docs/ai/vettrack/10x/session-2.md`, technical+design threads merged per task, owner amendments 2026-07-19: fused thesis, Code↔Design working agreement, goal + 18-item scope tracker, delivery methodology with per-item model routing, plugin/haptics hygiene Task 0.7, Android-ship Task 1.3) — plus `scripts/vettrack-2.0-scope-gate.sh` wired as a project Stop hook in `.claude/settings.json` (deterministic end-of-session scope gate).
+
+**Evidence:**
+- `docs/vettrack-2.0-roadmap.md` — created this session; `grep -c '^### Task '` → 18; `grep -c '^- \[ \] '` → 18; head -1 → `# VetTrack 2.0 — Execution Plan`.
+- Source-doc coverage: session-2.md is local-only (not in git); coverage of all its items (5 massive, 4 medium, 3 small gems, 4 backlog, 6 owner decisions, 6 principles) validated in the planning session — recorded in the document's own Coverage note.
+- Repo facts cited by the plan, re-verified this session via ls/grep (Step 1): asset-copilot-orchestrator.service.ts, ai-safety-validator.ts, citation-validator.ts, presence-store.ts, experience-model.ts, canonical.v1.ts, integrations/types.ts exist; package.json pins "dexie": "3.2.7" exact, "socket.io": "^4.8.1".
+- Haptics findings (Task 0.7): src/lib/haptics.ts `.catch(() => {})` on the impact/notification fire path swallows failures; HapticsAdapter.ts has zero consumers; SPM/Gradle pin exact pnpm-store plugin paths.
+- Scope gate: scripts/vettrack-2.0-scope-gate.sh + chmod +x; manual run → `[2.0-gate] VetTrack 2.0 scope: 0/18 shipped.` + 18 open items, exit 0. Stop hook: grep -c 'vettrack-2.0-scope-gate.sh' .claude/settings.json → 1.
+- RED→GREEN: verifier observed RED (exit 1, doc absent) → partial GREEN (3 named fails) → FULL GREEN (exit 0).
+- Command: `git status --porcelain` → exactly ` M docs/audit/PROOF_ALIGNMENT_LOG.md`, `?? docs/vettrack-2.0-roadmap.md`, `?? scripts/vettrack-2.0-scope-gate.sh`, `?? .claude/settings.json`.
+
+**Verdict:** VERIFIED
