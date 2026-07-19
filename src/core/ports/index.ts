@@ -4,12 +4,6 @@
  * Infrastructure adapters implement these; core use-cases depend on them.
  */
 
-export interface IHapticsProvider {
-  impact(style: "light" | "medium" | "heavy"): Promise<void>;
-  selectionChanged(): Promise<void>;
-  notification(type: "success" | "warning" | "error"): Promise<void>;
-}
-
 export interface NfcReadPayload {
   text: string | null;
   url: string | null;

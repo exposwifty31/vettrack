@@ -58,7 +58,7 @@ Stop hook prints the shipped count at every session end.
 - [x] 0.4 Per-org policy layer design
 - [x] 0.5 Operations-memory backtest (synthetic harness — owner-approved deviation, real data unreachable)
 - [ ] 0.6 Pricing-model decision
-- [ ] 0.7 Native shell & plugin hygiene (haptics repair, cap-sync law, edge-to-edge)
+- [x] 0.7 Native shell & plugin hygiene (haptics dev-diagnostic + dead-code removed + docs law; on-device physical confirmation still OPEN — needs real hardware)
 - [ ] 1.1 Shift Autopilot — shadow mode
 - [ ] 1.2 The Case Spine
 - [ ] 1.3 Ship the Android app (Google Play)

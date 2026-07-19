@@ -129,9 +129,27 @@ See [nfc.md](./mobile/nfc.md) for scan/write contracts.
 
 ---
 
-## Android
+## Android & plugin hygiene
 
 `android.permission.NFC` is added by `cap sync` when `@capgo/capacitor-nfc` is installed.
+
+**Plugin version-major match.** All `@capacitor/*` packages must stay pinned to the
+same major version (currently `8`, see root `package.json`). Adding or bumping a
+plugin that drifts to a different major is a silent-breakage risk — the native
+project and the JS bridge can desync without a build error. After `pnpm add`-ing
+or updating any Capacitor plugin, run `npx cap sync` **every time** — a stale
+sync (native project not regenerated) is the most common cause of a plugin that
+compiles fine but silently no-ops or throws at runtime — this is one of several
+ranked candidate causes for `src/lib/haptics.ts`'s swallowed native-call failure
+(not a confirmed root cause; no on-device diagnosis has been run yet — see
+Task 0.7, `docs/vettrack-2.0-roadmap.md`).
+
+**Verify on a REAL device.** The iOS Simulator has no Taptic Engine — haptic
+feedback (and other hardware-backed plugin behavior) cannot be verified there.
+Any change touching a native plugin (haptics, NFC, etc.) must be confirmed
+working on a real iPhone/Android device before being called done. Build only via
+`scripts/build-native-shell.sh` (never plain `pnpm build && cap sync`, see
+above) before that on-device check.
 
 ---
 
