@@ -29,6 +29,7 @@ import { startSweepEscalationWorker } from "../workers/sweep-escalation.worker.j
 import { startShiftHandoverScheduler } from "../lib/shift-handover-scheduler.js";
 import { startRfidReaderOfflineSweep } from "../lib/rfid/reader-offline-sweep.js";
 import { startRfidFinalizingSweep } from "../lib/rfid/finalizing-sweep.js";
+import { startAutopilotHandoverDraftWorker } from "../workers/autopilotHandoverDraftWorker.js";
 
 export async function startBackgroundSchedulers() {
   if (process.env.NODE_ENV === "test") {
@@ -88,4 +89,8 @@ export async function startBackgroundSchedulers() {
   // finalize can never brick a clinic's one-in-flight rotation gate (time-bounded backstop for the
   // post-delete window + quiet-clinic case the lazy ingest reclaim cannot cover).
   startRfidFinalizingSweep();
+
+  // Task 0.3 spike — Shift Autopilot handover-draft staging worker (independent of,
+  // and does not gate, the shipped R-SH-F1 auto-publish scheduler above).
+  await startAutopilotHandoverDraftWorker();
 }

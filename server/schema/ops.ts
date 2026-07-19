@@ -12,6 +12,14 @@ import type {
   ShiftHandoverOpenItem,
   PatientWorklist,
 } from "../lib/shift-handover.js";
+import type {
+  ActionProposalKind,
+  ActionProposalCitedFact,
+  ActionProposalDraftContent,
+  ActionProposalSourceRef,
+  ActionProposalCitationValidation,
+  ActionProposalDecision,
+} from "../lib/autopilot/action-proposal-types.js";
 
 export const shiftRole = pgEnum("vt_shift_role", ["technician", "senior_technician", "admin"]);
 
@@ -562,3 +570,94 @@ export const shiftHandover = vtTable(
 );
 export type ShiftHandoverRow = typeof shiftHandover.$inferSelect;
 export type NewShiftHandoverRow = typeof shiftHandover.$inferInsert;
+
+/**
+ * Task 0.3 spike — "Shift Autopilot" propose->approve loop (VetTrack 2.0,
+ * see docs/design/program-plan.md). A staged, per-clinic operational action
+ * draft awaiting human approve/edit/reject. NEVER auto-executed — every row
+ * starts `status='staged'` and only a human decision (via
+ * server/lib/autopilot/action-proposal-service.ts) advances it.
+ *
+ * SPIKE SCOPE NOTE: this table is independent of, and does not gate, the
+ * shipped R-SH-F1 `vt_shift_handover` auto-publish path (`vt_shift_handover`
+ * above) — see spike findings §7 for the unresolved product question of
+ * whether a future Autopilot proposal replaces, runs alongside, or otherwise
+ * relates to R-SH-F1's auto-publish. This table is NOT read by, written by,
+ * or referenced from `shift-handover-generator.ts` / `shift-handover-scheduler.ts`.
+ *
+ * `sourceSessionId` is a plain (non-FK, mirrors `vt_shift_messages.shift_session_id`
+ * — roster-window ids and legacy `vt_shift_sessions` ids coexist) dedup key:
+ * at most one row per `(clinicId, kind, sourceSessionId)` — enforced by
+ * `sourceKindSessionUq` — so a retried worker tick can never stage a second
+ * draft for the same shift.
+ *
+ * `citedFacts` / `sourceRef` / `citationValidation` are the anti-hallucination
+ * grounding data (see `action-proposal-citation-validator.ts`) — every entry
+ * in `citedFacts` must resolve to a real `vt_audit_logs` / `vt_event_outbox`
+ * row the reader actually returned for the window.
+ */
+export const actionProposal = vtTable(
+  "vt_action_proposal",
+  {
+    id: text("id").primaryKey(),
+    clinicId: text("clinic_id").notNull().references(() => clinics.id, { onDelete: "restrict" }),
+    kind: text("kind").notNull().$type<ActionProposalKind>(),
+    status: varchar("status", { length: 20 }).notNull().default("staged").$type<"staged" | "approved" | "edited" | "rejected">(),
+    sourceSessionId: text("source_session_id").notNull(),
+    summary: text("summary").notNull(),
+    citedFacts: jsonb("cited_facts").notNull().default(sql`'[]'::jsonb`).$type<ActionProposalCitedFact[]>(),
+    draftContent: jsonb("draft_content").notNull().$type<ActionProposalDraftContent>(),
+    sourceRef: jsonb("source_ref").notNull().$type<ActionProposalSourceRef>(),
+    citationValidation: jsonb("citation_validation").notNull().$type<ActionProposalCitationValidation>(),
+    editedContent: jsonb("edited_content").$type<ActionProposalDraftContent | null>(),
+    rejectionReason: text("rejection_reason"),
+    decidedByUserId: text("decided_by_user_id").references(() => users.id, { onDelete: "set null" }),
+    decidedAt: timestamp("decided_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    sourceKindSessionUq: uniqueIndex("ux_vt_action_proposal_clinic_kind_session").on(
+      t.clinicId,
+      t.kind,
+      t.sourceSessionId,
+    ),
+    clinicStatusIdx: index("idx_vt_action_proposal_clinic_status").on(t.clinicId, t.status),
+    clinicKindIdx: index("idx_vt_action_proposal_clinic_kind").on(t.clinicId, t.kind, t.createdAt),
+  }),
+);
+export type ActionProposalDbRow = typeof actionProposal.$inferSelect;
+export type NewActionProposalDbRow = typeof actionProposal.$inferInsert;
+
+/**
+ * Task 0.3 spike — "operations-memory": one append-only row per approve/edit/
+ * reject DECISION, snapshotting exactly what the reviewer was shown (staged
+ * summary/citedFacts/draftContent) alongside what they decided (and, for
+ * `edited`, the edited content). This is the labeled training data the
+ * roadmap's Autopilot learning loop is meant to consume — it is intentionally
+ * NEVER updated once written, so a later change to the source proposal can't
+ * retroactively rewrite what a past decision was based on.
+ */
+export const actionProposalDecisionLog = vtTable(
+  "vt_action_proposal_decision",
+  {
+    id: text("id").primaryKey(),
+    clinicId: text("clinic_id").notNull().references(() => clinics.id, { onDelete: "restrict" }),
+    proposalId: text("proposal_id").notNull().references(() => actionProposal.id, { onDelete: "cascade" }),
+    kind: text("kind").notNull().$type<ActionProposalKind>(),
+    decision: varchar("decision", { length: 20 }).notNull().$type<ActionProposalDecision>(),
+    decidedByUserId: text("decided_by_user_id").notNull().references(() => users.id, { onDelete: "restrict" }),
+    decidedAt: timestamp("decided_at", { withTimezone: true }).notNull().defaultNow(),
+    stagedSummary: text("staged_summary").notNull(),
+    stagedCitedFacts: jsonb("staged_cited_facts").notNull().default(sql`'[]'::jsonb`).$type<ActionProposalCitedFact[]>(),
+    stagedDraftContent: jsonb("staged_draft_content").notNull().$type<ActionProposalDraftContent>(),
+    editedContent: jsonb("edited_content").$type<ActionProposalDraftContent | null>(),
+    rejectionReason: text("rejection_reason"),
+  },
+  (t) => ({
+    clinicDecidedIdx: index("idx_vt_action_proposal_decision_clinic_decided").on(t.clinicId, t.decidedAt),
+    proposalIdx: index("idx_vt_action_proposal_decision_proposal").on(t.proposalId),
+  }),
+);
+export type ActionProposalDecisionDbRow = typeof actionProposalDecisionLog.$inferSelect;
+export type NewActionProposalDecisionDbRow = typeof actionProposalDecisionLog.$inferInsert;

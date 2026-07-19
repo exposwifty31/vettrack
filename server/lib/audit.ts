@@ -301,7 +301,12 @@ export type AuditActionType =
   // ack→unread transition so the reversal is a real, attributable event.
   | "shift_handover_generated"
   | "shift_handover_acknowledged"
-  | "shift_handover_unconfirmed";
+  | "shift_handover_unconfirmed"
+  // Task 0.3 spike — Shift Autopilot propose->approve loop (action_proposal).
+  | "action_proposal_staged"
+  | "action_proposal_approved"
+  | "action_proposal_edited"
+  | "action_proposal_rejected";
 
 export interface LogAuditParams {
   clinicId: string;
