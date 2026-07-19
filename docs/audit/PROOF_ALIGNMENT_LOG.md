@@ -4268,3 +4268,15 @@ Reviewer returned 1 HIGH + 1 MEDIUM + 2 LOW on the committed sub-card; all four 
 - Command: `git status --porcelain` → exactly ` M docs/audit/PROOF_ALIGNMENT_LOG.md`, `?? docs/vettrack-2.0-roadmap.md`, `?? scripts/vettrack-2.0-scope-gate.sh`, `?? .claude/settings.json`.
 
 **Verdict:** VERIFIED
+
+## 2026-07-19 — VetTrack 2.0 Task 0.1 (Case allowlist/denylist spec) completed (uncommitted)
+
+**Claim:** Added `docs/design/case-spine-allowlist.md` — the operational allowlist / clinical-PHI denylist spec for the Case Spine (Task 0.1 of `docs/vettrack-2.0-roadmap.md`), and flipped the 0.1 box in the roadmap's scope tracker (`[ ]` → `[x]`).
+
+**Evidence:**
+- RED→GREEN: wrote `$CLAUDE_JOB_DIR/tmp/verify-task-0.1.sh` first; ran RED (file absent, exit 1) before writing the doc; wrote the doc; ran GREEN (all 5 checks `ok:`, exit 0) — checklist fully checked, 7 allowlist rows cite real `vt_` tables, 9 denylist citations of "decision #1", PMS-key linkage section present, no denylist leakage into the allowlist table (fixed a verifier scoping bug — `-A40` window overran the short Allowlist section into Denylist — root-caused and fixed the check, not the doc).
+- Independent fresh-context review (Agent, no inherited reasoning, given only the diff + Task 0.1's Verify block): **PASS**. Confirmed all 7 cited source tables exist and are `clinicId`-scoped in `server/schema/*.ts` (`scanLogs`→`vt_scan_logs` equipment.ts:553, `rooms`→`vt_rooms` equipment.ts:26, `appointments`→`vt_appointments` tasks.ts:6, `codeBlueSessions`→`vt_code_blue_sessions` er.ts:34, `dispenseEvents`→`vt_dispense_events` inventory.ts:213, `damageEvents`→`vt_damage_events` equipment.ts:646, `equipmentRfidReads`→`vt_equipment_rfid_reads` equipment.ts:190); confirmed `CanonicalPatientV1` (canonical.v1.ts) and `ExternalPatient`/`patientExternalId` (types.ts) exist as cited. Reviewer flagged 2 precision issues (stale line numbers on 2 rows off-by-one; `patientExternalId` conflated with `ExternalPatient` when it's actually on `ExternalAppointment`, types.ts:101) — both fixed in the doc (now cites `ExternalPatient.externalId` at types.ts:46, corrected line refs to equipment.ts:190/646), no boundary/denylist defect. Re-ran the verifier after fixes → still exit 0.
+- Scope gate: `scripts/vettrack-2.0-scope-gate.sh` → `[2.0-gate] VetTrack 2.0 scope: 1/18 shipped.` (17 open items listed).
+- Command: `git status --porcelain` → `M docs/audit/PROOF_ALIGNMENT_LOG.md`, `M docs/vettrack-2.0-roadmap.md`, `?? docs/design/case-spine-allowlist.md` (only these 3 paths).
+
+**Verdict:** VERIFIED
