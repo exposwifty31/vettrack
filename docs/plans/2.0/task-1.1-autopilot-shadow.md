@@ -1,5 +1,12 @@
 # Task 1.1 — Shift Autopilot, `shadow` mode — Execution Plan
 
+> **§0 RESOLVED — owner decision 2026-07-19: option (c), per-org policy gate.** R-SH-F1's auto-publish
+> stays untouched by default for every clinic; retiring it for a given clinic is gated behind Task 0.4's
+> `off | shadow | enforce` + per-org-policy pattern, so a clinic's admin explicitly opts in when ready.
+> This pulls Task 0.4's policy-layer wiring into 1.1's `shift_handover_draft` slice earlier than its
+> original Task 2.5(a) slot (see §0(c) below for the mechanism and §2 for how it binds to the retirement
+> switch). All four proposal-type slices in this plan may now proceed, `shift_handover_draft` included.
+
 > VetTrack 2.0, Task 1.1, Execute step 1 (`docs/vettrack-2.0-roadmap.md` lines 233–249). This is the
 > **planning** deliverable only — no code in this doc. Task 1.1's Execute steps 2–3 (TDD build, one
 > proposal type per PR-sized slice, screenshots) are separate future dispatches that read this plan.
@@ -20,7 +27,26 @@
 
 ---
 
-## §0 — Open rollout-safety question (requires owner sign-off before the `shift_handover_draft` proposal type ships)
+## §0 — RESOLVED (owner sign-off obtained 2026-07-19)
+
+**Mechanism: option (c), per-org policy gate.** R-SH-F1 stays untouched by default for every clinic;
+retiring it for a given clinic is gated behind Task 0.4's `off | shadow | enforce` + per-org-policy
+pattern (`autopilot.policy_enforce.shift_handover_draft.<clinicId>` flipped to `approved` by that clinic's
+admin, per §0(c) below), so a clinic opts in explicitly rather than a single global cutover.
+
+**Fallback sub-question, also resolved: auto-publish-on-timeout.** For an opted-in clinic, if a staged
+`shift_handover_draft` proposal is still unapproved N minutes after shift end, it auto-publishes
+automatically (same content R-SH-F1 would have produced) and the decision-log/audit row is marked
+`auto_published_on_timeout` (a distinct, honest label — never silently indistinguishable from a real human
+approval). This is a rare safety-net path, not the default: continuity of care never breaks, but every
+timeout-fallback event is visible in the audit trail as unreviewed. `N` (the timeout minutes) is a
+per-clinic-configurable value alongside the policy flag, not a hardcoded constant — the §2 implementation
+slice must pick a sensible default and expose it through the same admin console surface as the opt-in
+toggle.
+
+The remainder of this section is kept as the historical record of the tradeoffs considered.
+
+## §0 (historical) — Open rollout-safety question (requires owner sign-off before the `shift_handover_draft` proposal type ships)
 
 **Binding decision already made (2026-07-19):** Autopilot **replaces** R-SH-F1's auto-publish path.
 `startShiftHandoverScheduler()` (`server/lib/shift-handover-scheduler.ts:56`, registered in
@@ -78,10 +104,9 @@ scoped as Task 2.5(a)'s job), pulling that work earlier than planned, and it sti
 "what happens if a clinic is mid-cutover and nobody approves" (the same open sub-question as (a), just
 scoped per-clinic instead of globally).
 
-**Recommendation this plan explicitly withholds:** each option is defensible; (c) is the most
-architecturally consistent with what this repo already ships, but "consistent with existing patterns" is
-not the same as "correct call for a hospital's continuity-of-care risk," which is the owner's call to
-make. **Gate:** whoever executes §2 (`shift_handover_draft`) must have a recorded owner decision on (a) /
+**RESOLVED — see the top of §0 above.** Owner chose (c), with the fallback sub-question resolved as
+auto-publish-on-timeout (labeled distinctly in the audit trail, never conflated with a real approval).
+This historical paragraph is kept for context only. **Gate (satisfied):** whoever executes §2 (`shift_handover_draft`) must have a recorded owner decision on (a) /
 (b) / (c) / other, including the fallback-behavior sub-question, before writing the worker that actually
 stops auto-publishing anything. The other three proposal types (§3–§5) have no such predecessor to retire
 and are not gated by this section — they may proceed independently.
