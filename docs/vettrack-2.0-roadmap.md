@@ -55,7 +55,7 @@ Stop hook prints the shipped count at every session end.
 - [x] 0.1 Case operational allowlist / PHI denylist spec
 - [x] 0.2 `vt_cases` spike — one event path, offline-proven
 - [x] 0.3 Autopilot shadow spike — `action_proposal` + one proposal type
-- [ ] 0.4 Per-org policy layer design
+- [x] 0.4 Per-org policy layer design
 - [ ] 0.5 Operations-memory backtest
 - [ ] 0.6 Pricing-model decision
 - [ ] 0.7 Native shell & plugin hygiene (haptics repair, cap-sync law, edge-to-edge)

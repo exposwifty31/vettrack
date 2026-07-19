@@ -4309,3 +4309,16 @@ Reviewer returned 1 HIGH + 1 MEDIUM + 2 LOW on the committed sub-card; all four 
 - Command: `git status --porcelain` (on `claude/docs-cleanup`; the spike lives entirely in a separate worktree and never touched this branch) → `M docs/audit/PROOF_ALIGNMENT_LOG.md`, `M docs/vettrack-2.0-roadmap.md`, `?? docs/plans/2.0/autopilot-spike-findings.md` (only these 3 paths).
 
 **Verdict:** VERIFIED
+
+## 2026-07-19 — VetTrack 2.0 Task 0.4 (per-org policy layer design) completed (uncommitted)
+
+**Claim:** Wrote `docs/design/autopilot-policy-layer.md` (Opus 4.8, per the roadmap's model-routing policy — no code touched, design-only) — how an explicit org-approved policy sits above the existing `off | shadow | enforce` enforcement envelope as a ceiling clamp, gating `enforce` per proposal-kind per org. Flipped the 0.4 box in the roadmap's scope tracker.
+
+**Evidence:**
+- 8-item RED checklist at the doc's head (storage shape, resolution order, who approves, revocation, audit trail, failure default, admin UX, explicit off/throw-degrades statement) — all checked.
+- Architecture: policy storage reuses the real `vt_server_config` key-embedding convention (clinicId in the key string, not a column — confirmed the `getServerConfigValue` first parameter is genuinely unused in `server/lib/server-config.ts`); resolution is a ceiling clamp evaluated AFTER the base `off|shadow|enforce` mode resolver — `off` short-circuits before the policy layer is ever consulted, `shadow` passes through unaffected, only `enforce` gets clamped down to `shadow` if the org hasn't approved (never promotes upward). Fail-default = `shadow`, reasoned explicitly as the mirror-image of the existing evaluators' fail-open-to-`off` (both "fail toward least-irreversible state," pointed opposite directions because the two systems' default risk profiles are opposite).
+- Independent fresh-context review (Agent, re-derived every citation against the real source rather than trusting the doc): **PASS on all 7 checked claims, zero inaccuracies found.** Confirmed real: `server-config.ts`'s unused-clinicId-param pattern, `clinical-invariant.config.ts`'s exact resolution chain/TTL/cache-map convention the design reuses, the ceiling-clamp architecture as literally specified in the doc (quoted), the fail-open-to-allow precedent in `code-blue-log-drug-shock.ts` (`FAULT_OPEN_INTERNAL`) and `clinical-invariant.metrics.ts`'s fail-open metric, that `server/lib/audit.ts`'s closed `AuditActionType` union was NOT touched (design doc only names prospective future members), that the audit-vs-metrics split mirrors a real existing pattern (`clinical_invariant_fail_open_total` in `server/lib/metrics.ts`), and the explicit non-weakening statements in the doc's §0/§8 (quoted directly).
+- Command: `git status --porcelain` → exactly `?? docs/design/autopilot-policy-layer.md` before this commit's staging — no code/schema/config file touched by this task.
+- Scope gate: `scripts/vettrack-2.0-scope-gate.sh` → expected `4/18 shipped` after this commit (verified below).
+
+**Verdict:** VERIFIED
