@@ -42,7 +42,7 @@ jobs:
             exit 0
           fi
 
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7.0.0
         with:
           # The simulation exercises the deployed staging server; check out
           # the staging ref so the Playwright runner code matches it.
