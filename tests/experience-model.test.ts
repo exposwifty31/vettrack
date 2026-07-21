@@ -318,8 +318,9 @@ describe("experience-model — student is a restricted-tech subset (Phase 8)", (
         "app.adminNav",
         "management.web",
         "management.webWrite",
+        "equipment.actOffShift",
       ],
-      vet: ["codeBlue.manage", "shiftChat.pin", "equipment.vetActions"],
+      vet: ["codeBlue.manage", "shiftChat.pin", "equipment.vetActions", "equipment.actOffShift"],
       lead: ["codeBlue.manage", "shiftChat.broadcast", "shiftChat.pin", "management.web"],
       tech: ["codeBlue.manage"],
       student: [],
@@ -421,5 +422,37 @@ describe("experience-model — custody-only archetype (student)", () => {
     expect(kept).toContain("/home");
     expect(kept).toContain("/equipment");
     expect(kept).not.toContain("/alerts");
+  });
+});
+
+describe("experience-model — equipment.actOffShift (doctor pilot 2026-07)", () => {
+  const exp = (role: UserRole, isAdmin = false) =>
+    buildRoleExperience({ role, effectiveRole: role, roleSource: "permanent", isAdmin });
+
+  it("granted to vet and admin permanent roles", () => {
+    expect(can(exp("vet"), "equipment.actOffShift")).toBe(true);
+    expect(can(exp("admin", true), "equipment.actOffShift")).toBe(true);
+  });
+
+  it("granted via the secondary-admin path (isAdmin without admin role)", () => {
+    expect(can(exp("technician", true), "equipment.actOffShift")).toBe(true);
+  });
+
+  it("NOT granted to lead / tech / student archetypes", () => {
+    expect(can(exp("senior_technician"), "equipment.actOffShift")).toBe(false);
+    expect(can(exp("lead_technician"), "equipment.actOffShift")).toBe(false);
+    expect(can(exp("technician"), "equipment.actOffShift")).toBe(false);
+    expect(can(exp("vet_tech"), "equipment.actOffShift")).toBe(false);
+    expect(can(exp("student"), "equipment.actOffShift")).toBe(false);
+  });
+
+  it("is standing authority — a shift overlay never grants it", () => {
+    const elevated = buildRoleExperience({
+      role: "technician",
+      effectiveRole: "admin",
+      roleSource: "shift",
+      isAdmin: false,
+    });
+    expect(can(elevated, "equipment.actOffShift")).toBe(false);
   });
 });

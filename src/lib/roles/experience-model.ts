@@ -37,7 +37,8 @@ export type Capability =
   | "equipment.vetActions" // vet-only equipment actions — `hasVetAccess`
   | "app.adminNav" // see `adminOnly` nav sections — today's `isAdmin` nav gate
   | "management.web" // Phase 6: reach the web management console
-  | "management.webWrite"; // Phase 6: mutate in the web console (admin only)
+  | "management.webWrite" // Phase 6: mutate in the web console (admin only)
+  | "equipment.actOffShift"; // scan/checkout/claim without an active roster shift — doctor pilot 2026-07; admins per owner decision 2026-07
 
 /**
  * Capabilities that respond to shift elevation (`roleSource === "shift"` overlays
@@ -124,6 +125,7 @@ const WITHHELD_FROM_STUDENT: ReadonlySet<Capability> = new Set<Capability>([
   "app.adminNav",
   "management.web",
   "management.webWrite",
+  "equipment.actOffShift",
 ]);
 
 /** Technician base grant — the floor authority the student archetype is a restricted subset of. */
@@ -146,8 +148,9 @@ const CAPABILITIES_BY_ARCHETYPE: Record<ExperienceArchetype, readonly Capability
     "app.adminNav",
     "management.web",
     "management.webWrite",
+    "equipment.actOffShift",
   ],
-  vet: ["codeBlue.manage", "shiftChat.pin", "equipment.vetActions"],
+  vet: ["codeBlue.manage", "shiftChat.pin", "equipment.vetActions", "equipment.actOffShift"],
   lead: ["codeBlue.manage", "shiftChat.broadcast", "shiftChat.pin", "management.web"],
   tech: TECH_CAPABILITIES,
   // student = tech − WITHHELD_FROM_STUDENT (restricted technician). Derived, not
@@ -189,6 +192,7 @@ const SECONDARY_ADMIN_CAPS: readonly Capability[] = [
   "app.adminNav",
   "management.web",
   "management.webWrite",
+  "equipment.actOffShift",
 ];
 
 export interface RoleExperience {

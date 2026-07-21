@@ -5,6 +5,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
+import { isCapacitorNative } from "@/lib/capacitor-runtime";
 import { t } from "@/lib/i18n";
 import type { Equipment, EquipmentStatus } from "@/types";
 import { buildWhatsAppUrl } from "@/lib/utils";
@@ -37,10 +38,12 @@ export function EquipmentDetailToolsSheet({
           <SheetTitle>{t.equipmentDetail.toolsSheetTitle}</SheetTitle>
         </SheetHeader>
         <div className="mt-4 flex flex-col gap-2 pb-6">
-          <Button variant="outline" className="h-12 justify-start" onClick={onPrintQr}>
-            <QrCode className="w-4 h-4 me-2" />
-            {t.equipmentDetail.printQrButton}
-          </Button>
+          {!isCapacitorNative() && (
+            <Button variant="outline" className="h-12 justify-start" onClick={onPrintQr}>
+              <QrCode className="w-4 h-4 me-2" />
+              {t.equipmentDetail.printQrButton}
+            </Button>
+          )}
           {showWriteNfc && onWriteNfc && (
             <Button variant="outline" className="h-12 justify-start" onClick={onWriteNfc}>
               <Nfc className="w-4 h-4 me-2" />

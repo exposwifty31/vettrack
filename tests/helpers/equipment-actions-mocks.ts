@@ -26,10 +26,22 @@ export const toastSuccess = vi.fn();
 export const toastError = vi.fn();
 export const toastInfo = vi.fn();
 
-export type AuthValue = { userId: string | null; isAdmin: boolean };
+export type AuthValue = {
+  userId: string | null;
+  isAdmin: boolean;
+  role: string;
+  effectiveRole: string;
+  roleSource: "shift" | "permanent";
+};
 export type ShiftValue = { hasActiveShift: boolean; isLoading: boolean; isError: boolean; nextShift: null };
 
-export const DEFAULT_AUTH_VALUE: AuthValue = { userId: "admin-1", isAdmin: true };
+export const DEFAULT_AUTH_VALUE: AuthValue = {
+  userId: "admin-1",
+  isAdmin: true,
+  role: "admin",
+  effectiveRole: "admin",
+  roleSource: "permanent",
+};
 export const DEFAULT_SHIFT_VALUE: ShiftValue = {
   hasActiveShift: true,
   isLoading: false,

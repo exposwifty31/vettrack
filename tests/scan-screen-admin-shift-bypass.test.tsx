@@ -22,12 +22,19 @@ import { t } from "@/lib/i18n";
 let hasActiveShift = false;
 let isAdmin = false;
 let shiftLoading = false;
+let shiftError = false;
+let role = "technician";
 
 vi.mock("@/hooks/use-active-shift", () => ({
-  useActiveShift: () => ({ hasActiveShift, isLoading: shiftLoading, nextShift: null }),
+  useActiveShift: () => ({
+    hasActiveShift,
+    isLoading: shiftLoading,
+    isError: shiftError,
+    nextShift: null,
+  }),
 }));
 vi.mock("@/hooks/use-auth", () => ({
-  useAuth: () => ({ isAdmin }),
+  useAuth: () => ({ isAdmin, role, effectiveRole: role, roleSource: "permanent" }),
 }));
 vi.mock("@/components/qr-scanner", () => ({
   QrScanner: () => <div data-testid="qr-scanner-stub" />,
@@ -44,6 +51,8 @@ describe("ScanScreen — admin shift-gate bypass (T2)", () => {
     hasActiveShift = false;
     isAdmin = false;
     shiftLoading = false;
+    shiftError = false;
+    role = "technician";
   });
 
   it("admin with NO active shift is not blocked — scanner renders", () => {
@@ -94,6 +103,26 @@ describe("ScanScreen — admin shift-gate bypass (T2)", () => {
     render(<ScanScreen />);
 
     expect(screen.queryByTestId("qr-scanner-stub")).toBeNull();
+    expect(screen.queryByText(t.scan.offShiftTitle)).toBeNull();
+  });
+
+  it("vet with NO active shift is not blocked — scanner renders (doctor pilot)", () => {
+    hasActiveShift = false;
+    role = "vet";
+
+    render(<ScanScreen />);
+
+    expect(screen.getByTestId("qr-scanner-stub")).toBeTruthy();
+    expect(screen.queryByText(t.scan.offShiftTitle)).toBeNull();
+  });
+
+  it("technician with a shift-query ERROR is not blocked — server defers", () => {
+    hasActiveShift = false;
+    shiftError = true;
+
+    render(<ScanScreen />);
+
+    expect(screen.getByTestId("qr-scanner-stub")).toBeTruthy();
     expect(screen.queryByText(t.scan.offShiftTitle)).toBeNull();
   });
 });

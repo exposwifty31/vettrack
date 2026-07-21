@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useSearch } from "wouter";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, ArrowRight } from "lucide-react";
+import { ArrowLeft, ArrowRight, Flag } from "lucide-react";
 import { toast } from "sonner";
 import { useEquipmentDetail } from "./hooks/use-equipment-detail";
 import { EquipmentLocationCard } from "./EquipmentLocationCard";
@@ -14,11 +14,28 @@ import { ReportEquipmentIssueSheet } from "./ReportEquipmentIssueSheet";
 import { ReservationBanner } from "@/components/equipment/ReservationBanner";
 import { LoadingSection } from "@/components/ui/loading-section";
 import { ErrorCard } from "@/components/ui/error-card";
+import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  markNfcToggleFired,
+  runEquipmentQuickToggle,
+  wasNfcToggleFiredRecently,
+} from "@/lib/nfc-equipment-toggle";
 import { getEquipmentDisplayName } from "@/lib/equipment-display";
 import { shouldShowReservationBanner } from "@/lib/equipment-waitlist-ui";
 import { useDirection } from "@/hooks/useDirection";
 import { useAuth } from "@/hooks/use-auth";
 import { useActiveShift } from "@/hooks/use-active-shift";
+import { useExperience } from "@/hooks/use-experience";
+import { shouldBlockForShift } from "@/lib/shift-gate";
 import { haptics } from "@/lib/haptics";
 import { t } from "@/lib/i18n";
 import { api, request } from "@/lib/api";
@@ -41,14 +58,47 @@ export function EquipmentDetailScreen({ equipmentId, hideBack }: Props) {
   const searchStr = useSearch();
   const queryClient = useQueryClient();
   const { userId } = useAuth();
-  const { hasActiveShift } = useActiveShift();
+  const { hasActiveShift, isLoading: shiftLoading, isError: shiftError } = useActiveShift();
+  const { can } = useExperience();
   const [issueOpen, setIssueOpen] = useState(false);
+  const [nfcPending, setNfcPending] = useState(false);
 
   // Scanner "Mark Issue" deep-links ?action=issue; only the desktop page read
   // it before, so the button no-oped on native (Phase 7 #1).
   useEffect(() => {
     if (new URLSearchParams(searchStr).get("action") === "issue") setIssueOpen(true);
   }, [searchStr]);
+
+  // NFC deep-link (?nfcAction=toggle) — the desktop page auto-toggles; the phone
+  // asks first. Dismiss the deep-link router's loading toast, strip the params
+  // (fresh nfcTs per tap re-enters; the 8s sessionStorage guard dedupes), then
+  // arm the confirm dialog once the record resolves.
+  useEffect(() => {
+    const params = new URLSearchParams(searchStr);
+    if (params.get("nfcAction") !== "toggle") return;
+    toast.dismiss("nfc-open");
+    navigate(`/equipment/${equipmentId}`, { replace: true });
+    if (wasNfcToggleFiredRecently(equipmentId)) {
+      toast.info(t.equipmentNfc.alreadyToggledRecently);
+      return;
+    }
+    setNfcPending(true);
+  }, [searchStr, equipmentId, navigate]);
+
+  useEffect(() => {
+    if (!nfcPending || !equipment) return;
+    if (equipment.checkedOutById && equipment.checkedOutById !== userId) {
+      toast.error(t.equipmentNfc.toggleBlocked(equipment.checkedOutByEmail ?? t.common.unknown));
+      setNfcPending(false);
+    }
+  }, [nfcPending, equipment, userId]);
+
+  useEffect(() => {
+    if (isError || (!isLoading && !equipment)) {
+      toast.dismiss("nfc-open");
+      setNfcPending(false);
+    }
+  }, [isError, isLoading, equipment]);
 
   // Reservation-ready push deep-links here; without the banner the notified
   // user had no way to claim on native (Phase 7 #2). Same query key as the
@@ -80,9 +130,17 @@ export function EquipmentDetailScreen({ equipmentId, hideBack }: Props) {
       toast.error(t.equipmentDetail.toast.checkoutFailed(err.message));
     },
   });
-  // Same off-shift ownership gate as the desktop checkout choke point.
+  // Same off-shift ownership gate as EquipmentActions.handleCheckout (client
+  // policy; actOffShift exempts; a shift-query error defers to the server).
   const handleReservationCheckout = () => {
-    if (!hasActiveShift) {
+    if (shiftLoading) return;
+    if (
+      shouldBlockForShift({
+        hasActiveShift,
+        shiftError,
+        canActOffShift: can("equipment.actOffShift"),
+      })
+    ) {
       toast.error(t.scan.offShiftBody);
       return;
     }
@@ -135,6 +193,11 @@ export function EquipmentDetailScreen({ equipmentId, hideBack }: Props) {
   }
 
   const displayName = equipment ? getEquipmentDisplayName(equipment) : "";
+  const nfcAction: "take" | "return" = equipment?.checkedOutById ? "return" : "take";
+  const nfcDialogOpen =
+    nfcPending &&
+    !!equipment &&
+    (!equipment.checkedOutById || equipment.checkedOutById === userId);
 
   return (
     <div
@@ -238,6 +301,17 @@ export function EquipmentDetailScreen({ equipmentId, hideBack }: Props) {
 
           <EquipmentActions equipment={equipment} />
 
+          <Button
+            variant="outline"
+            size="lg"
+            className="w-full gap-2"
+            onClick={() => setIssueOpen(true)}
+            data-testid="btn-detail-report-issue"
+          >
+            <Flag className="h-5 w-5" />
+            {t.qrScanner.reportIssue}
+          </Button>
+
           <ReportEquipmentIssueSheet
             equipment={equipment}
             open={issueOpen}
@@ -245,6 +319,41 @@ export function EquipmentDetailScreen({ equipmentId, hideBack }: Props) {
           />
         </>
       ) : null}
+
+      <AlertDialog
+        open={nfcDialogOpen}
+        onOpenChange={(open) => {
+          if (!open) setNfcPending(false);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {nfcAction === "return"
+                ? t.equipmentNfc.confirmReturnTitle(displayName)
+                : t.equipmentNfc.confirmTakeTitle(displayName)}
+            </AlertDialogTitle>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t.common.cancel}</AlertDialogCancel>
+            <AlertDialogAction
+              data-testid="btn-nfc-confirm"
+              onClick={() => {
+                setNfcPending(false);
+                markNfcToggleFired(equipmentId);
+                runEquipmentQuickToggle(equipmentId, displayName, queryClient).catch(() => {
+                  // runEquipmentQuickToggle handles network/409 itself and rethrows
+                  // the rest after clearing the guard — same terminal toast as the
+                  // desktop deep-link path.
+                  toast.error(t.equipmentNfc.onlineRequired);
+                });
+              }}
+            >
+              {nfcAction === "return" ? t.equipmentNfc.confirmReturn : t.equipmentNfc.confirmTake}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

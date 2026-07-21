@@ -3445,6 +3445,10 @@ export interface TStructure {
     writeTag: string;
     alreadyToggledRecently: string;
     toggling: string;
+    confirmTakeTitle: string;
+    confirmReturnTitle: string;
+    confirmTake: string;
+    confirmReturn: string;
   };
   nfcEntry: {
     openingEquipment: string;
@@ -3941,6 +3945,7 @@ export interface TStructure {
     docksReady: string;
     waitlist: string;
     staging: string;
+    custody: string;
     inQueue: string;
     highLoad: string;
     rfidTag: string;

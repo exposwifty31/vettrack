@@ -112,10 +112,10 @@ describe("Stage 6 detail — actions (Checkout / take)", () => {
     expect(actions.includes("api.equipment.checkout")).toBe(true);
     expect(actions.includes("t.equipmentList.quickAction.checkout")).toBe(true);
   });
-  it("gates checkout on availability (not held, status ok, not returned)", () => {
+  it("gates checkout on availability (not held, status ok, not returned unless there is no home dock)", () => {
     expect(
       actions.includes(
-        'const canCheckout =\n    !isCheckedOut && equipment.status === "ok" && equipment.custodyState !== "returned";',
+        'equipment.status === "ok" &&\n    (equipment.custodyState !== "returned" || !equipment.homeRoomId);',
       ),
     ).toBe(true);
   });
