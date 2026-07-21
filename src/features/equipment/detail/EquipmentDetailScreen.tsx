@@ -15,6 +15,20 @@ import { ReservationBanner } from "@/components/equipment/ReservationBanner";
 import { LoadingSection } from "@/components/ui/loading-section";
 import { ErrorCard } from "@/components/ui/error-card";
 import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  markNfcToggleFired,
+  runEquipmentQuickToggle,
+  wasNfcToggleFiredRecently,
+} from "@/lib/nfc-equipment-toggle";
 import { getEquipmentDisplayName } from "@/lib/equipment-display";
 import { shouldShowReservationBanner } from "@/lib/equipment-waitlist-ui";
 import { useDirection } from "@/hooks/useDirection";
@@ -47,12 +61,44 @@ export function EquipmentDetailScreen({ equipmentId, hideBack }: Props) {
   const { hasActiveShift, isLoading: shiftLoading, isError: shiftError } = useActiveShift();
   const { can } = useExperience();
   const [issueOpen, setIssueOpen] = useState(false);
+  const [nfcPending, setNfcPending] = useState(false);
 
   // Scanner "Mark Issue" deep-links ?action=issue; only the desktop page read
   // it before, so the button no-oped on native (Phase 7 #1).
   useEffect(() => {
     if (new URLSearchParams(searchStr).get("action") === "issue") setIssueOpen(true);
   }, [searchStr]);
+
+  // NFC deep-link (?nfcAction=toggle) — the desktop page auto-toggles; the phone
+  // asks first. Dismiss the deep-link router's loading toast, strip the params
+  // (fresh nfcTs per tap re-enters; the 8s sessionStorage guard dedupes), then
+  // arm the confirm dialog once the record resolves.
+  useEffect(() => {
+    const params = new URLSearchParams(searchStr);
+    if (params.get("nfcAction") !== "toggle") return;
+    toast.dismiss("nfc-open");
+    navigate(`/equipment/${equipmentId}`, { replace: true });
+    if (wasNfcToggleFiredRecently(equipmentId)) {
+      toast.info(t.equipmentNfc.alreadyToggledRecently);
+      return;
+    }
+    setNfcPending(true);
+  }, [searchStr, equipmentId, navigate]);
+
+  useEffect(() => {
+    if (!nfcPending || !equipment) return;
+    if (equipment.checkedOutById && equipment.checkedOutById !== userId) {
+      toast.error(t.equipmentNfc.toggleBlocked(equipment.checkedOutByEmail ?? t.common.unknown));
+      setNfcPending(false);
+    }
+  }, [nfcPending, equipment, userId]);
+
+  useEffect(() => {
+    if (isError || (!isLoading && !equipment)) {
+      toast.dismiss("nfc-open");
+      setNfcPending(false);
+    }
+  }, [isError, isLoading, equipment]);
 
   // Reservation-ready push deep-links here; without the banner the notified
   // user had no way to claim on native (Phase 7 #2). Same query key as the
@@ -147,6 +193,11 @@ export function EquipmentDetailScreen({ equipmentId, hideBack }: Props) {
   }
 
   const displayName = equipment ? getEquipmentDisplayName(equipment) : "";
+  const nfcAction: "take" | "return" = equipment?.checkedOutById ? "return" : "take";
+  const nfcDialogOpen =
+    nfcPending &&
+    !!equipment &&
+    (!equipment.checkedOutById || equipment.checkedOutById === userId);
 
   return (
     <div
@@ -268,6 +319,41 @@ export function EquipmentDetailScreen({ equipmentId, hideBack }: Props) {
           />
         </>
       ) : null}
+
+      <AlertDialog
+        open={nfcDialogOpen}
+        onOpenChange={(open) => {
+          if (!open) setNfcPending(false);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {nfcAction === "return"
+                ? t.equipmentNfc.confirmReturnTitle(displayName)
+                : t.equipmentNfc.confirmTakeTitle(displayName)}
+            </AlertDialogTitle>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t.common.cancel}</AlertDialogCancel>
+            <AlertDialogAction
+              data-testid="btn-nfc-confirm"
+              onClick={() => {
+                setNfcPending(false);
+                markNfcToggleFired(equipmentId);
+                runEquipmentQuickToggle(equipmentId, displayName, queryClient).catch(() => {
+                  // runEquipmentQuickToggle handles network/409 itself and rethrows
+                  // the rest after clearing the guard — same terminal toast as the
+                  // desktop deep-link path.
+                  toast.error(t.equipmentNfc.onlineRequired);
+                });
+              }}
+            >
+              {nfcAction === "return" ? t.equipmentNfc.confirmReturn : t.equipmentNfc.confirmTake}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

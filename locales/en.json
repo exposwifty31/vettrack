@@ -3441,7 +3441,11 @@
     "writeUnsupported": "NFC write is not supported on this device",
     "writeTag": "Write NFC checkout tag",
     "alreadyToggledRecently": "Already toggled recently — please wait a moment.",
-    "toggling": "Toggling {{name}}…"
+    "toggling": "Toggling {{name}}…",
+    "confirmTakeTitle": "Take {name}?",
+    "confirmReturnTitle": "Return {name}?",
+    "confirmTake": "Take",
+    "confirmReturn": "Return"
   },
   "nfcEntry": {
     "openingEquipment": "Opening equipment…",

@@ -649,6 +649,10 @@ const translations = {
     writeTag: d.equipmentNfc.writeTag,
     alreadyToggledRecently: d.equipmentNfc.alreadyToggledRecently,
     toggling: (name: string) => tr(d.equipmentNfc.toggling, { name }),
+    confirmTakeTitle: (name: string) => tr(d.equipmentNfc.confirmTakeTitle, { name }),
+    confirmReturnTitle: (name: string) => tr(d.equipmentNfc.confirmReturnTitle, { name }),
+    confirmTake: d.equipmentNfc.confirmTake,
+    confirmReturn: d.equipmentNfc.confirmReturn,
   },
 
   nfcEntry: {

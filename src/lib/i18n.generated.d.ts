@@ -3445,6 +3445,10 @@ export interface TStructure {
     writeTag: string;
     alreadyToggledRecently: string;
     toggling: string;
+    confirmTakeTitle: string;
+    confirmReturnTitle: string;
+    confirmTake: string;
+    confirmReturn: string;
   };
   nfcEntry: {
     openingEquipment: string;

@@ -3441,7 +3441,11 @@
     "writeUnsupported": "כתיבת NFC אינה נתמכת במכשיר זה",
     "writeTag": "כתוב תגית NFC ל-checkout",
     "alreadyToggledRecently": "בוצעה פעולה לאחרונה — המתן רגע.",
-    "toggling": "מעביר {{name}}…"
+    "toggling": "מעביר {{name}}…",
+    "confirmTakeTitle": "לקחת את {name}?",
+    "confirmReturnTitle": "להחזיר את {name}?",
+    "confirmTake": "קח",
+    "confirmReturn": "החזר"
   },
   "nfcEntry": {
     "openingEquipment": "פותח ציוד…",
