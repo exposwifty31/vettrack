@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { UnifiedReturnDialog } from "@/components/equipment/UnifiedReturnDialog";
 import { useAuth } from "@/hooks/use-auth";
 import { useActiveShift } from "@/hooks/use-active-shift";
+import { useExperience } from "@/hooks/use-experience";
+import { shouldBlockForShift } from "@/lib/shift-gate";
 import { api, ApiError } from "@/lib/api";
 import { haptics } from "@/lib/haptics";
 import { t } from "@/lib/i18n";
@@ -36,6 +38,7 @@ export function EquipmentActions({ equipment }: Props) {
   const queryClient = useQueryClient();
   const [returnOpen, setReturnOpen] = useState(false);
   const { hasActiveShift, isLoading: shiftLoading, isError: shiftError } = useActiveShift();
+  const { can } = useExperience();
 
   const isCheckedOut = !!equipment.checkedOutById;
   const checkedOutByMe = !!userId && equipment.checkedOutById === userId;
@@ -96,12 +99,18 @@ export function EquipmentActions({ equipment }: Props) {
       toast.error(err instanceof ApiError ? err.message : t.equipmentDetail.toast.notFoundFailed),
   });
 
-  // Off-shift ownership is not permitted (roster gate). Stay quiet while the
-  // shift query resolves; only a *successful* no-shift read blocks client-side —
-  // a shift-query error defers to the server's authoritative gate (fail loud).
+  // Off-shift ownership is not permitted (roster gate, client policy). Stay quiet
+  // while the shift query resolves; equipment.actOffShift (admin/vet) exempts and
+  // a shift-query error defers to the server's authoritative role gate.
   const handleCheckout = () => {
     if (shiftLoading) return;
-    if (!shiftError && !hasActiveShift) {
+    if (
+      shouldBlockForShift({
+        hasActiveShift,
+        shiftError,
+        canActOffShift: can("equipment.actOffShift"),
+      })
+    ) {
       toast.error(t.scan.offShiftBody);
       return;
     }

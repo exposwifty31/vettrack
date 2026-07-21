@@ -19,6 +19,8 @@ import { shouldShowReservationBanner } from "@/lib/equipment-waitlist-ui";
 import { useDirection } from "@/hooks/useDirection";
 import { useAuth } from "@/hooks/use-auth";
 import { useActiveShift } from "@/hooks/use-active-shift";
+import { useExperience } from "@/hooks/use-experience";
+import { shouldBlockForShift } from "@/lib/shift-gate";
 import { haptics } from "@/lib/haptics";
 import { t } from "@/lib/i18n";
 import { api, request } from "@/lib/api";
@@ -41,7 +43,8 @@ export function EquipmentDetailScreen({ equipmentId, hideBack }: Props) {
   const searchStr = useSearch();
   const queryClient = useQueryClient();
   const { userId } = useAuth();
-  const { hasActiveShift } = useActiveShift();
+  const { hasActiveShift, isLoading: shiftLoading, isError: shiftError } = useActiveShift();
+  const { can } = useExperience();
   const [issueOpen, setIssueOpen] = useState(false);
 
   // Scanner "Mark Issue" deep-links ?action=issue; only the desktop page read
@@ -80,9 +83,17 @@ export function EquipmentDetailScreen({ equipmentId, hideBack }: Props) {
       toast.error(t.equipmentDetail.toast.checkoutFailed(err.message));
     },
   });
-  // Same off-shift ownership gate as the desktop checkout choke point.
+  // Same off-shift ownership gate as EquipmentActions.handleCheckout (client
+  // policy; actOffShift exempts; a shift-query error defers to the server).
   const handleReservationCheckout = () => {
-    if (!hasActiveShift) {
+    if (shiftLoading) return;
+    if (
+      shouldBlockForShift({
+        hasActiveShift,
+        shiftError,
+        canActOffShift: can("equipment.actOffShift"),
+      })
+    ) {
       toast.error(t.scan.offShiftBody);
       return;
     }

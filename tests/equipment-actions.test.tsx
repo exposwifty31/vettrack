@@ -16,6 +16,7 @@ import type { Equipment } from "@/types";
 import {
   authState,
   checkoutMock,
+  DEFAULT_AUTH_VALUE,
   dockReturnMock,
   conditionStatesMock,
   listConditionsMock,
@@ -142,11 +143,28 @@ describe("EquipmentActions — detail checkout", () => {
   });
 
   it("blocks checkout off-shift with an error toast and never calls the API", () => {
+    // A non-exempt role (default authState is admin, which now carries
+    // equipment.actOffShift — see the dedicated exemption test below).
+    authState.value = {
+      ...DEFAULT_AUTH_VALUE,
+      userId: "tech-1",
+      isAdmin: false,
+      role: "technician",
+      effectiveRole: "technician",
+    };
     shiftState.value = { hasActiveShift: false, isLoading: false, isError: false, nextShift: null };
     renderActions(dockedAvailable);
     fireEvent.click(screen.getByTestId("btn-detail-checkout"));
     expect(toastError).toHaveBeenCalled();
     expect(checkoutMock).not.toHaveBeenCalled();
+  });
+
+  it("admin off-shift checkout is exempt via equipment.actOffShift — no block, API fires", async () => {
+    shiftState.value = { hasActiveShift: false, isLoading: false, isError: false, nextShift: null };
+    renderActions(dockedAvailable);
+    fireEvent.click(screen.getByTestId("btn-detail-checkout"));
+    await waitFor(() => expect(checkoutMock).toHaveBeenCalledWith("eq-1"));
+    expect(toastError).not.toHaveBeenCalled();
   });
 
   // Fail-loud (not fail-closed): a *failed* shift read must NOT be read as

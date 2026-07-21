@@ -55,7 +55,7 @@ describe("2 — reservation claim on the slim detail", () => {
   });
 
   it("keeps the off-shift ownership gate", () => {
-    expect(screen).toContain("if (!hasActiveShift)");
+    expect(screen).toContain("shouldBlockForShift({");
     expect(screen).toContain("t.scan.offShiftBody");
   });
 });

@@ -3,23 +3,29 @@ import { useLocation } from "wouter";
 import { CalendarClock } from "lucide-react";
 import { QrScanner } from "@/components/qr-scanner";
 import { useActiveShift } from "@/hooks/use-active-shift";
-import { useAuth } from "@/hooks/use-auth";
+import { useExperience } from "@/hooks/use-experience";
+import { shouldBlockForShift } from "@/lib/shift-gate";
 import { t, formatDateTimeByLocale } from "@/lib/i18n";
 
 export function ScanScreen() {
   const [, navigate] = useLocation();
-  const { hasActiveShift, isLoading: shiftLoading, nextShift } = useActiveShift();
-  const { isAdmin } = useAuth();
+  const { hasActiveShift, isLoading: shiftLoading, isError: shiftError, nextShift } = useActiveShift();
+  const { can } = useExperience();
 
   const handleClose = useCallback(() => {
     navigate("/home");
   }, [navigate]);
 
-  // Off-shift: scanning (and the equipment ownership it captures) is not allowed.
-  // The camera must never mount here — roster-derived authority denies it server-side too.
-  // Admins are exempt from the shift gate (owner decision, 2026-07) — they can
-  // scan without an active roster shift. Non-admin behavior is unchanged.
-  const scanBlocked = !shiftLoading && !hasActiveShift && !isAdmin;
+  // Off-shift: scanning (and the equipment ownership it captures) is blocked as
+  // CLIENT policy only — the server gates custody mutations on role, not roster.
+  // equipment.actOffShift (admins per owner decision 2026-07; vets per doctor
+  // pilot 2026-07) exempts; a shift-query error defers to the server. The render
+  // below handles the pending state (`shiftLoading ? null`), so no loading term here.
+  const scanBlocked = shouldBlockForShift({
+    hasActiveShift,
+    shiftError,
+    canActOffShift: can("equipment.actOffShift"),
+  });
 
   return (
     <div
@@ -59,7 +65,7 @@ export function ScanScreen() {
       </div>
 
       <div style={{ flex: 1, position: "relative", minHeight: 0 }}>
-        {scanBlocked ? (
+        {shiftLoading ? null : scanBlocked ? (
           <div
             style={{
               position: "absolute",
@@ -132,7 +138,7 @@ export function ScanScreen() {
               {t.common.browseEquipment}
             </button>
           </div>
-        ) : shiftLoading ? null : (
+        ) : (
           <QrScanner onClose={handleClose} />
         )}
       </div>
