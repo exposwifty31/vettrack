@@ -1,4 +1,4 @@
-import { and, count, desc, eq, gte, inArray, isNotNull, isNull, sql } from "drizzle-orm";
+import { and, count, eq, gte, inArray, isNotNull, isNull, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import {
   db,
@@ -10,6 +10,7 @@ import {
   rfidReaders,
   rooms,
   stagingQueue,
+  users,
 } from "../db.js";
 import type {
   EquipmentBoardAlert,
@@ -354,6 +355,19 @@ async function queryStaging(clinicId: string): Promise<EquipmentBoardStagingBloc
 /** Bounded "who holds what" roll-up for the kiosk (doctor-pilot board visibility). */
 const CUSTODY_BLOCK_LIMIT = 12;
 
+/** Staff-facing custodian label for the kiosk — clinic display name first, then
+ *  user name; never a full email address (last resort is the email local part). */
+export function resolveCustodianDisplayName(
+  displayName: string | null | undefined,
+  name: string | null | undefined,
+  email: string | null | undefined,
+): string | undefined {
+  const named = displayName?.trim() || name?.trim();
+  if (named) return named;
+  const localPart = email?.split("@")[0]?.trim();
+  return localPart || undefined;
+}
+
 async function queryCustody(clinicId: string): Promise<EquipmentBoardCustodyBlock> {
   const rows = await db
     .select({
@@ -361,8 +375,11 @@ async function queryCustody(clinicId: string): Promise<EquipmentBoardCustodyBloc
       name: equipment.name,
       checkedOutByEmail: equipment.checkedOutByEmail,
       checkedOutAt: equipment.checkedOutAt,
+      custodianDisplayName: users.displayName,
+      custodianUserName: users.name,
     })
     .from(equipment)
+    .leftJoin(users, and(eq(equipment.checkedOutById, users.id), eq(users.clinicId, clinicId)))
     .where(
       and(
         eq(equipment.clinicId, clinicId),
@@ -370,21 +387,26 @@ async function queryCustody(clinicId: string): Promise<EquipmentBoardCustodyBloc
         eq(equipment.custodyState, "checked_out"),
       ),
     )
-    .orderBy(desc(equipment.checkedOutAt))
+    .orderBy(sql`${equipment.checkedOutAt} DESC NULLS LAST`)
     .limit(CUSTODY_BLOCK_LIMIT);
   return {
-    units: rows.flatMap((r) =>
-      r.checkedOutByEmail
+    units: rows.flatMap((r) => {
+      const custodianName = resolveCustodianDisplayName(
+        r.custodianDisplayName,
+        r.custodianUserName,
+        r.checkedOutByEmail,
+      );
+      return custodianName
         ? [
             {
               equipmentId: r.id,
               displayName: r.name,
-              custodianName: r.checkedOutByEmail,
+              custodianName,
               checkedOutAt: r.checkedOutAt?.toISOString(),
             },
           ]
-        : [],
-    ),
+        : [];
+    }),
   };
 }
 
@@ -537,6 +559,8 @@ export const buildCommandBoardSnapshot: BuildCommandBoardSnapshotFn = async (
       checkedOutAt: equipment.checkedOutAt,
       custodyState: equipment.custodyState,
       checkedOutByEmail: equipment.checkedOutByEmail,
+      custodianDisplayName: users.displayName,
+      custodianUserName: users.name,
       readinessState: equipment.readinessState,
       usageState: equipment.usageState,
       lastSeen: equipment.lastSeen,
@@ -548,6 +572,7 @@ export const buildCommandBoardSnapshot: BuildCommandBoardSnapshotFn = async (
       rfidRoomName: rfidRooms.name,
     })
     .from(equipment)
+    .leftJoin(users, and(eq(equipment.checkedOutById, users.id), eq(users.clinicId, clinicId)))
     .leftJoin(rooms, and(eq(equipment.roomId, rooms.id), eq(rooms.clinicId, clinicId)))
     .leftJoin(
       rfidRooms,
@@ -620,7 +645,13 @@ export const buildCommandBoardSnapshot: BuildCommandBoardSnapshotFn = async (
       // the additive rfid block, never overriding locationName.
       locationName: row.roomName ?? undefined,
       custodianName:
-        row.custodyState === "checked_out" ? row.checkedOutByEmail ?? undefined : undefined,
+        row.custodyState === "checked_out"
+          ? resolveCustodianDisplayName(
+              row.custodianDisplayName,
+              row.custodianUserName,
+              row.checkedOutByEmail,
+            )
+          : undefined,
       lastEvidenceAt: row.lastSeen?.toISOString(),
       rfid: rfidDerivation.rfid,
       evidenceConflict: rfidDerivation.evidenceConflict,

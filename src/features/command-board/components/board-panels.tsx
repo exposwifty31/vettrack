@@ -86,7 +86,7 @@ export function CustodyPanel({ custody }: { custody: EquipmentBoardCustodyBlock 
         {custody.units.map((u) => (
           <div key={u.equipmentId} className="flex items-baseline gap-2 min-w-0">
             <span className="vt-text-sm truncate">{u.displayName}</span>
-            <span className="vt-text-xs text-ivory-text2 truncate" dir="ltr">
+            <span className="vt-text-xs text-ivory-text2 truncate" dir="auto">
               {u.custodianName}
             </span>
           </div>
