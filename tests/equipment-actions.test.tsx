@@ -12,6 +12,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { t } from "@/lib/i18n";
 import type { Equipment } from "@/types";
 import {
   authState,
@@ -125,8 +126,8 @@ describe("EquipmentActions — detail checkout", () => {
     expect(screen.queryByTestId("btn-detail-checkin")).toBeNull();
   });
 
-  it("does not show Checkout for a returned item (that path is Dock Return)", () => {
-    renderActions({ ...dockedAvailable, custodyState: "returned" });
+  it("does not show Checkout for a returned item WITH a home dock (that path is Dock Return)", () => {
+    renderActions({ ...dockedAvailable, custodyState: "returned", homeRoomId: "room-1" });
     expect(screen.queryByTestId("btn-detail-checkout")).toBeNull();
   });
 
@@ -196,5 +197,59 @@ describe("EquipmentActions — detail checkout", () => {
   it("shows Checkout for an available item with no custody state (custodyState null)", () => {
     renderActions({ ...dockedAvailable, custodyState: null });
     expect(screen.getByTestId("btn-detail-checkout")).toBeTruthy();
+  });
+
+  it("shows Checkout for a returned item with no home dock (C5)", () => {
+    renderActions({
+      ...dockedAvailable,
+      checkedOutById: null,
+      status: "ok",
+      custodyState: "returned",
+      homeRoomId: null,
+    });
+    expect(screen.getByTestId("btn-detail-checkout")).toBeTruthy();
+  });
+
+  it("hides Checkout for a returned item WITH a home dock (route through Dock Return)", () => {
+    renderActions({
+      ...dockedAvailable,
+      checkedOutById: null,
+      status: "ok",
+      custodyState: "returned",
+      homeRoomId: "room-1",
+    });
+    expect(screen.queryByTestId("btn-detail-checkout")).toBeNull();
+  });
+
+  it("shows Checkout for a docked item with a home dock (unchanged behavior)", () => {
+    renderActions({
+      ...dockedAvailable,
+      checkedOutById: null,
+      status: "ok",
+      custodyState: "docked",
+      homeRoomId: "room-1",
+    });
+    expect(screen.getByTestId("btn-detail-checkout")).toBeTruthy();
+  });
+
+  it("vet off-shift checkout of a returned/no-dock item fires — not blocked by the shift gate", async () => {
+    authState.value = {
+      ...DEFAULT_AUTH_VALUE,
+      userId: "vet-1",
+      isAdmin: false,
+      role: "vet",
+      effectiveRole: "vet",
+    };
+    shiftState.value = { hasActiveShift: false, isLoading: false, isError: false, nextShift: null };
+    renderActions({
+      ...dockedAvailable,
+      checkedOutById: null,
+      status: "ok",
+      custodyState: "returned",
+      homeRoomId: null,
+    });
+    fireEvent.click(screen.getByTestId("btn-detail-checkout"));
+    await waitFor(() => expect(checkoutMock).toHaveBeenCalledWith("eq-1"));
+    expect(toastError).not.toHaveBeenCalledWith(t.scan.offShiftBody);
   });
 });

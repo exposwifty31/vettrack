@@ -43,8 +43,12 @@ export function EquipmentActions({ equipment }: Props) {
   const isCheckedOut = !!equipment.checkedOutById;
   const checkedOutByMe = !!userId && equipment.checkedOutById === userId;
   const canReturn = isCheckedOut && (checkedOutByMe || isAdmin);
+  // `returned` is excluded only to route through Dock Return first — with no
+  // homeRoomId there is no dock, and the server accepts checkout from `returned`.
   const canCheckout =
-    !isCheckedOut && equipment.status === "ok" && equipment.custodyState !== "returned";
+    !isCheckedOut &&
+    equipment.status === "ok" &&
+    (equipment.custodyState !== "returned" || !equipment.homeRoomId);
   // Resting + homed only — a held item is accounted for, and hidden for
   // non-docking clinics (no homeRoomId means no home station to report against).
   const canReportNotFound = !isCheckedOut && !!equipment.homeRoomId;
