@@ -46,11 +46,19 @@ describe("safeBlock — enrichment degradation primitive", () => {
     const hangs = new Promise<number>(() => {});
     await expect(safeBlock(() => withTimeout(hangs, 10))).resolves.toBeUndefined();
   });
+
+  it("degrades a failing custody query to undefined — never throws (doctor-pilot board visibility)", async () => {
+    await expect(
+      safeBlock(async () => {
+        throw new Error("custody aggregate boom");
+      }),
+    ).resolves.toBeUndefined();
+  });
 });
 
 describe("defaultBoardAggregates", () => {
-  it("exposes all four enrichment blocks as functions", () => {
-    for (const key of ["power", "docks", "waitlist", "staging"] as const) {
+  it("exposes all five enrichment blocks as functions", () => {
+    for (const key of ["power", "docks", "waitlist", "staging", "custody"] as const) {
       expect(typeof defaultBoardAggregates[key]).toBe("function");
     }
   });

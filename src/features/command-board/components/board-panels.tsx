@@ -8,6 +8,7 @@ import type { ReactNode } from "react";
 import { t } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import type {
+  EquipmentBoardCustodyBlock,
   EquipmentBoardDocksBlock,
   EquipmentBoardPowerBlock,
 } from "../../../../shared/equipment-board";
@@ -76,4 +77,21 @@ export function WaitlistPanel({ depth }: { depth: number }) {
 
 export function StagingPanel({ depth }: { depth: number }) {
   return <DepthPanel title={t.board.staging} depth={depth} />;
+}
+
+export function CustodyPanel({ custody }: { custody: EquipmentBoardCustodyBlock }) {
+  return (
+    <Panel title={t.board.custody}>
+      <div className="flex flex-col gap-1">
+        {custody.units.map((u) => (
+          <div key={u.equipmentId} className="flex items-baseline gap-2 min-w-0">
+            <span className="vt-text-sm truncate">{u.displayName}</span>
+            <span className="vt-text-xs text-ivory-text2 truncate" dir="ltr">
+              {u.custodianName}
+            </span>
+          </div>
+        ))}
+      </div>
+    </Panel>
+  );
 }

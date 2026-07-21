@@ -17,7 +17,7 @@ import { STATUS_BG, STATUS_BAR_COLOR, statusLabel } from "../status-tokens";
 import { useKioskModeFromUrl } from "../use-kiosk-mode-from-url";
 import { countCriticalAlerts, useBoardMode } from "../use-board-mode";
 import { BoardAttentionSection } from "./BoardAttentionSection";
-import { DocksPanel, PowerPanel, StagingPanel, WaitlistPanel } from "./board-panels";
+import { CustodyPanel, DocksPanel, PowerPanel, StagingPanel, WaitlistPanel } from "./board-panels";
 
 /** The six readiness buckets that make up a stacked readiness bar. */
 type ReadinessCounts = {
@@ -507,6 +507,9 @@ export function CommandBoard({
           {/* Enrichment panels — tolerant-reader: each mounts only when present */}
           {board.power && <PowerPanel power={board.power} />}
           {board.docks && <DocksPanel docks={board.docks} />}
+          {board.custody && board.custody.units.length > 0 && (
+            <CustodyPanel custody={board.custody} />
+          )}
 
           {/* Alerts count */}
           {board.alerts.length > 0 && (

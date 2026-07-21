@@ -158,6 +158,16 @@ export type EquipmentBoardStagingBlock = {
   depth: number;
 };
 
+/** Additive (Phase 5 C2 idiom) — units currently in personal custody, newest first, bounded. */
+export type EquipmentBoardCustodyBlock = {
+  units: Array<{
+    equipmentId: string;
+    displayName: string;
+    custodianName: string;
+    checkedOutAt?: string;
+  }>;
+};
+
 export type EquipmentCommandBoardSnapshot = {
   generatedAt: string;
   clinicId: string;
@@ -195,6 +205,7 @@ export type EquipmentCommandBoardSnapshot = {
   docks?: EquipmentBoardDocksBlock;
   waitlist?: EquipmentBoardWaitlistBlock;
   staging?: EquipmentBoardStagingBlock;
+  custody?: EquipmentBoardCustodyBlock;
   /**
    * R-BDF-1.1 — additive ambient anomaly pass (glance-only). Absent/empty when nothing
    * trips; every client reader must be tolerant (render nothing when the block is absent).

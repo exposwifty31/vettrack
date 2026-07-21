@@ -3942,6 +3942,7 @@
     "docksReady": "Ready",
     "waitlist": "Waitlist",
     "staging": "Staging",
+    "custody": "Checked out",
     "inQueue": "in queue",
     "highLoad": "High load",
     "rfidTag": "RFID",

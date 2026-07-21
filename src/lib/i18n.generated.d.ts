@@ -3945,6 +3945,7 @@ export interface TStructure {
     docksReady: string;
     waitlist: string;
     staging: string;
+    custody: string;
     inQueue: string;
     highLoad: string;
     rfidTag: string;

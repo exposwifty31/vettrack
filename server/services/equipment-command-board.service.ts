@@ -1,4 +1,4 @@
-import { and, count, eq, gte, inArray, isNotNull, isNull, sql } from "drizzle-orm";
+import { and, count, desc, eq, gte, inArray, isNotNull, isNull, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import {
   db,
@@ -13,6 +13,7 @@ import {
 } from "../db.js";
 import type {
   EquipmentBoardAlert,
+  EquipmentBoardCustodyBlock,
   EquipmentBoardDocksBlock,
   EquipmentBoardLocationRow,
   EquipmentBoardPowerBlock,
@@ -350,12 +351,50 @@ async function queryStaging(clinicId: string): Promise<EquipmentBoardStagingBloc
   return { depth: Number(rows[0]?.n ?? 0) };
 }
 
+/** Bounded "who holds what" roll-up for the kiosk (doctor-pilot board visibility). */
+const CUSTODY_BLOCK_LIMIT = 12;
+
+async function queryCustody(clinicId: string): Promise<EquipmentBoardCustodyBlock> {
+  const rows = await db
+    .select({
+      id: equipment.id,
+      name: equipment.name,
+      checkedOutByEmail: equipment.checkedOutByEmail,
+      checkedOutAt: equipment.checkedOutAt,
+    })
+    .from(equipment)
+    .where(
+      and(
+        eq(equipment.clinicId, clinicId),
+        isNull(equipment.deletedAt),
+        eq(equipment.custodyState, "checked_out"),
+      ),
+    )
+    .orderBy(desc(equipment.checkedOutAt))
+    .limit(CUSTODY_BLOCK_LIMIT);
+  return {
+    units: rows.flatMap((r) =>
+      r.checkedOutByEmail
+        ? [
+            {
+              equipmentId: r.id,
+              displayName: r.name,
+              custodianName: r.checkedOutByEmail,
+              checkedOutAt: r.checkedOutAt?.toISOString(),
+            },
+          ]
+        : [],
+    ),
+  };
+}
+
 /** The four enrichment aggregates, injectable so degradation is exercisable in tests. */
 export type BoardAggregateFns = {
   power: (clinicId: string) => Promise<EquipmentBoardPowerBlock | undefined>;
   docks: (clinicId: string) => Promise<EquipmentBoardDocksBlock | undefined>;
   waitlist: (clinicId: string) => Promise<EquipmentBoardWaitlistBlock | undefined>;
   staging: (clinicId: string) => Promise<EquipmentBoardStagingBlock | undefined>;
+  custody: (clinicId: string) => Promise<EquipmentBoardCustodyBlock | undefined>;
 };
 
 // Each aggregate is bounded on BOTH axes: safeBlock catches a throw, and
@@ -370,6 +409,7 @@ export const defaultBoardAggregates: BoardAggregateFns = {
   docks: (clinicId) => safeBlock(() => withTimeout(queryDocks(clinicId), AGGREGATE_TIMEOUT_MS)),
   waitlist: (clinicId) => safeBlock(() => withTimeout(queryWaitlist(clinicId), AGGREGATE_TIMEOUT_MS)),
   staging: (clinicId) => safeBlock(() => withTimeout(queryStaging(clinicId), AGGREGATE_TIMEOUT_MS)),
+  custody: (clinicId) => safeBlock(() => withTimeout(queryCustody(clinicId), AGGREGATE_TIMEOUT_MS)),
 };
 
 // R-M1.3 — reads within this window feed the ambiguity check (≥2 simultaneous candidate rooms).
@@ -496,6 +536,7 @@ export const buildCommandBoardSnapshot: BuildCommandBoardSnapshotFn = async (
       assetTypeId: equipment.assetTypeId,
       checkedOutAt: equipment.checkedOutAt,
       custodyState: equipment.custodyState,
+      checkedOutByEmail: equipment.checkedOutByEmail,
       readinessState: equipment.readinessState,
       usageState: equipment.usageState,
       lastSeen: equipment.lastSeen,
@@ -524,13 +565,14 @@ export const buildCommandBoardSnapshot: BuildCommandBoardSnapshotFn = async (
   // (latency = max, not sum). Each degrades to undefined on its own failure
   // (safeBlock), so Promise.all only rejects on the load-bearing
   // getReadinessRules / rows query — the 2500ms timeout envelope is unchanged.
-  const [rules, rows, power, docks, waitlist, staging] = await Promise.all([
+  const [rules, rows, power, docks, waitlist, staging, custody] = await Promise.all([
     getReadinessRules(clinicId),
     rowsQuery,
     aggregates.power(clinicId),
     aggregates.docks(clinicId),
     aggregates.waitlist(clinicId),
     aggregates.staging(clinicId),
+    aggregates.custody(clinicId),
   ]);
 
   const staleCutoff = new Date(now.getTime() - rules.staleEvidenceMs);
@@ -577,6 +619,8 @@ export const buildCommandBoardSnapshot: BuildCommandBoardSnapshotFn = async (
       // Human-confirmed room stays the RESOLVED location (M1.0) — RFID evidence lives only in
       // the additive rfid block, never overriding locationName.
       locationName: row.roomName ?? undefined,
+      custodianName:
+        row.custodyState === "checked_out" ? row.checkedOutByEmail ?? undefined : undefined,
       lastEvidenceAt: row.lastSeen?.toISOString(),
       rfid: rfidDerivation.rfid,
       evidenceConflict: rfidDerivation.evidenceConflict,
@@ -701,6 +745,7 @@ export const buildCommandBoardSnapshot: BuildCommandBoardSnapshotFn = async (
     docks,
     waitlist,
     staging,
+    custody,
     roiSignals: {
       overusedUnits: sortedByUtil.slice(0, 5),
       underusedUnits: sortedByUtil.slice(-5).reverse(),
