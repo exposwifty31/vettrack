@@ -34,6 +34,7 @@ import {
   deriveBoardAnomalies,
   type ReaderAnomalySource,
 } from "./board-anomaly-rules.js";
+import { resolveCustodianDisplayName } from "../lib/custodian-display-name.js";
 import { resolveReaderStalenessThresholdMs } from "../lib/rfid/reader-offline-sweep.js";
 import { withTimeout } from "../lib/with-timeout.js";
 
@@ -354,19 +355,6 @@ async function queryStaging(clinicId: string): Promise<EquipmentBoardStagingBloc
 
 /** Bounded "who holds what" roll-up for the kiosk (doctor-pilot board visibility). */
 const CUSTODY_BLOCK_LIMIT = 12;
-
-/** Staff-facing custodian label for the kiosk — clinic display name first, then
- *  user name; never a full email address (last resort is the email local part). */
-export function resolveCustodianDisplayName(
-  displayName: string | null | undefined,
-  name: string | null | undefined,
-  email: string | null | undefined,
-): string | undefined {
-  const named = displayName?.trim() || name?.trim();
-  if (named) return named;
-  const localPart = email?.split("@")[0]?.trim();
-  return localPart || undefined;
-}
 
 async function queryCustody(clinicId: string): Promise<EquipmentBoardCustodyBlock> {
   const rows = await db

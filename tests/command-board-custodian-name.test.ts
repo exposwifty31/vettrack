@@ -4,7 +4,7 @@
  * then the email local part; a row with no resolvable label is skipped.
  */
 import { describe, it, expect } from "vitest";
-import { resolveCustodianDisplayName } from "../server/services/equipment-command-board.service";
+import { resolveCustodianDisplayName } from "../server/lib/custodian-display-name";
 
 describe("resolveCustodianDisplayName", () => {
   it("prefers displayName over name and email", () => {
