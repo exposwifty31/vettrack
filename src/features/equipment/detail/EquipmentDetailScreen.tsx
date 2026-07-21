@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useSearch } from "wouter";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, ArrowRight } from "lucide-react";
+import { ArrowLeft, ArrowRight, Flag } from "lucide-react";
 import { toast } from "sonner";
 import { useEquipmentDetail } from "./hooks/use-equipment-detail";
 import { EquipmentLocationCard } from "./EquipmentLocationCard";
@@ -14,6 +14,7 @@ import { ReportEquipmentIssueSheet } from "./ReportEquipmentIssueSheet";
 import { ReservationBanner } from "@/components/equipment/ReservationBanner";
 import { LoadingSection } from "@/components/ui/loading-section";
 import { ErrorCard } from "@/components/ui/error-card";
+import { Button } from "@/components/ui/button";
 import { getEquipmentDisplayName } from "@/lib/equipment-display";
 import { shouldShowReservationBanner } from "@/lib/equipment-waitlist-ui";
 import { useDirection } from "@/hooks/useDirection";
@@ -248,6 +249,17 @@ export function EquipmentDetailScreen({ equipmentId, hideBack }: Props) {
           )}
 
           <EquipmentActions equipment={equipment} />
+
+          <Button
+            variant="outline"
+            size="lg"
+            className="w-full gap-2"
+            onClick={() => setIssueOpen(true)}
+            data-testid="btn-detail-report-issue"
+          >
+            <Flag className="h-5 w-5" />
+            {t.qrScanner.reportIssue}
+          </Button>
 
           <ReportEquipmentIssueSheet
             equipment={equipment}
