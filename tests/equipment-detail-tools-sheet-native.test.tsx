@@ -18,6 +18,13 @@ vi.mock("@/lib/capacitor-runtime", () => ({
 
 import { EquipmentDetailToolsSheet } from "@/components/equipment/EquipmentDetailToolsSheet";
 
+const EQUIPMENT_FIXTURE: Equipment = {
+  id: "eq-1",
+  name: "X",
+  status: "ok",
+  createdAt: "2026-07-21T00:00:00.000Z",
+};
+
 describe("EquipmentDetailToolsSheet — Print QR hidden on native (IPHONE-2)", () => {
   afterEach(() => {
     cleanup();
@@ -28,7 +35,7 @@ describe("EquipmentDetailToolsSheet — Print QR hidden on native (IPHONE-2)", (
     native = false;
     render(
       <EquipmentDetailToolsSheet
-        equipment={{ id: "eq-1", name: "X", status: "ok" } as unknown as Equipment}
+        equipment={EQUIPMENT_FIXTURE}
         equipmentId="eq-1"
         open
         onOpenChange={() => {}}
@@ -45,7 +52,7 @@ describe("EquipmentDetailToolsSheet — Print QR hidden on native (IPHONE-2)", (
     native = true;
     render(
       <EquipmentDetailToolsSheet
-        equipment={{ id: "eq-1", name: "X", status: "ok" } as unknown as Equipment}
+        equipment={EQUIPMENT_FIXTURE}
         equipmentId="eq-1"
         open
         onOpenChange={() => {}}

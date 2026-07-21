@@ -8,7 +8,7 @@
  * happy-dom, mutable-`let` mocks.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, fireEvent, cleanup } from "@testing-library/react";
+import { render, screen, fireEvent, cleanup, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { t } from "@/lib/i18n";
 import type { Equipment } from "@/types";
@@ -174,6 +174,18 @@ describe("EquipmentDetailScreen — NFC deep-link confirm (Task 6, C4)", () => {
 
     expect(quickToggleMock).toHaveBeenCalledTimes(1);
     expect(quickToggleMock).toHaveBeenCalledWith("eq-1");
+  });
+
+  it("quick-toggle rejection surfaces the online-required toast (failure path)", async () => {
+    searchStr = "nfcAction=toggle&nfcTs=1";
+    quickToggleMock.mockRejectedValueOnce(new Error("boom"));
+
+    renderScreen();
+    fireEvent.click(screen.getByTestId("btn-nfc-confirm"));
+
+    await waitFor(() =>
+      expect(toastError).toHaveBeenCalledWith(t.equipmentNfc.onlineRequired),
+    );
   });
 
   it("cancelling closes the dialog without toggling", () => {
