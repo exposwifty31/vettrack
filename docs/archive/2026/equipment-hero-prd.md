@@ -84,7 +84,7 @@ API: `GET /api/equipment/:id/truth` — combines location, deployability, and cu
 | SSE / outbox for equipment events | Duplicate equipment sub-routes |
 | Meds, ER, Code Blue backends | Non-hero nav prominence |
 
-Remove duplicate paths and ghost routes per [Removal protocol](../.cursorrules)—not tenant or safety core.
+Remove duplicate paths and ghost routes per [Removal protocol](../../../.cursorrules)—not tenant or safety core.
 
 ## Success metrics
 
