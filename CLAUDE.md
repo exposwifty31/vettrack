@@ -5,13 +5,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Commands
 
 ```bash
-# Development
+# Development (Node ≥ 22.12, pnpm 9.15.9 — pnpm workspace: root app + packages/*)
 pnpm install
 pnpm dev                    # API on :3001 + Vite on :5000 (kills ports first via predev)
+pnpm dev:bypass             # dev with Clerk forced off (VITE_FORCE_DEV_BYPASS=true CLERK_ENABLED=false)
 
 # Type checking — run after every file change (two tsconfigs: frontend + server)
 pnpm typecheck               # tsc --noEmit (frontend) && tsc -p tsconfig.server.json --noEmit (server)
 pnpm typecheck:server         # server tsconfig only
+pnpm contracts:typecheck      # @vettrack/contracts package
+pnpm rfid-controller:typecheck # packages/rfid-controller
 
 # Tests
 pnpm test                   # vitest unit/integration (excludes DB/live-server tests)
@@ -19,9 +22,12 @@ pnpm test -- --reporter=verbose  # with detail
 pnpm test -- tests/some.test.ts  # single file
 pnpm test:db-integration    # equipment-operational-state DB test (needs DATABASE_URL + migrations)
 pnpm test:integration:ops   # equipment operational-state + waitlist integration tests
-pnpm test:playwright:ci     # Playwright CI suite (Chromium)
+pnpm test:rfid-controller   # packages/rfid-controller unit tests (own vitest config)
+pnpm test:playwright:ci     # Playwright CI suite (Chromium). Suite selection is PW_SUITE env → allowlist in playwright.config.ts
 pnpm test:playwright:phase9 # Phase 9 realtime/PWA drills (needs running app)
+pnpm test:playwright:pwa    # PWA suite; also: :waitlist, :workday, :flow-walk, :ui-smoke
 pnpm test:signup            # signup E2E flow
+pnpm test:staging:e2e       # staging smoke (playwright.staging.config.ts; staging:seed / staging:cleanup manage data)
 
 # Architecture gates (server/schema, module boundaries, dead code)
 pnpm architecture:gates      # tsc (frontend + tsconfig.server-check.json) + depcruise + madge cycles
@@ -38,10 +44,12 @@ pnpm db:migrate             # apply pending migrations on demand (same path runs
 npx drizzle-kit generate    # author the next migration after schema changes in server/db.ts
 npx drizzle-kit push        # push schema directly (dev only)
 
-# Native shell (Capacitor — ios/ + android/ wrap the built web bundle)
+# Native shell (Capacitor — ios/ + android/ wrap the built web bundle). The iOS app is LIVE.
 pnpm cap:build:native       # scripts/build-native-shell.sh --ios (use --android / --all via cap:build:native:android / :all)
 pnpm cap:open:ios           # open Xcode project
 pnpm cap:install:ios-sim    # install onto booted simulator
+pnpm resubmit               # App Store version bump: same marketing version, build n+1 (rejection fix / re-upload)
+pnpm resubmit:release       # new marketing version — pass MAJOR.MINOR.PATCH; version fields only, no app logic
 
 # Other
 pnpm build                  # frontend production build → dist/public
@@ -50,6 +58,7 @@ pnpm worker                 # background job worker (requires Redis)
 pnpm seed:dev               # seed dev database (server/seed.ts)
 pnpm auth:preflight         # verify Clerk config + auth mode
 pnpm validate:prod          # pre-deployment checks
+pnpm docs:audit             # regenerate docs/audit inventories (db.md etc.)
 ```
 
 **Native shell builds must go through `scripts/build-native-shell.sh`** (`pnpm cap:build:native`), never plain `pnpm build && npx cap sync`. The script bakes `VITE_CLERK_PUBLISHABLE_KEY` and `VITE_API_ORIGIN` into the bundle (read from `.env` only — it ignores `.env.local`) and never sets `CAPACITOR_SERVER_URL` (a thin web wrapper breaks App Review 4.2 and social OAuth). A plain `pnpm build` has no Clerk key, so the shell silently falls into dev-bypass and crashes on `useUser`/`ClerkProvider`.
@@ -77,9 +86,9 @@ Omit `CLERK_SECRET_KEY` / `VITE_CLERK_PUBLISHABLE_KEY` to use dev-bypass auth (h
 
 VetTrack is a veterinary hospital operations platform: equipment tracking & custody, Code Blue emergency workflows, inventory/dispense, tasks & shifts, and external PMS integrations for multi-clinic deployments. (Legacy `/patients`, `/er`, `/billing`, `/meds` routes survive only as redirects — see scope note below.)
 
-**Stack:** React 18 + Vite frontend (port 5000) · Express + TypeScript backend (port 3001) · PostgreSQL + Drizzle ORM · BullMQ + Redis · Clerk auth · PWA / offline-first · Capacitor 8 native shell (iOS/Android)
+**Stack:** React 18 + Vite frontend (port 5000) · Express + TypeScript backend (port 3001) · PostgreSQL + Drizzle ORM · BullMQ + Redis · Clerk auth · SSE realtime (+ additive Socket.io collab channel) · PWA / offline-first · Capacitor 8 native shell (iOS/Android, live on the App Store) · Sentry · Railway deploy
 
-**Active program (intent, not yet built):** `docs/design/program-plan.md` is the forward-looking program — per-role UX, the web app as a management console, and the Command Center board as a fourth `"board"` platform target — with `docs/design/{plan-validation-register,platform-strategy-research}.md` as its cited research base. Treat it as direction, not current state.
+**Active program:** `docs/design/program-plan.md` is the forward-looking program — per-role UX, the web app as a management console, and the Command Center board as a fourth `"board"` platform target — with `docs/design/{plan-validation-register,platform-strategy-research}.md` as its cited research base. Parts have since landed (the `"board"` target, `src/features/command-board`, the web console pages); treat the doc as direction and verify against the code for current state. A separate Expo/React Native migration is underway in the companion repo (`literate-dollop`), which consumes `packages/contracts` — bumps to `@vettrack/contracts` may need a cross-repo companion PR.
 
 ### Directory layout
 
@@ -89,7 +98,8 @@ src/              React frontend
   app/platform/   PlatformTarget seam + PlatformRouter + guards/ (WebOnlyGuard) — see "Platform routing seam"
   pages/          Route-level page components
   components/     Shared UI components (shadcn primitives in components/ui/)
-  features/       Feature-scoped modules (alerts, auth, containers, equipment, inventory, profile, rooms, scan, settings, shift-adjustments, shift-chat, today)
+  features/       Feature-scoped modules (alerts, analytics, auth, code-blue, collab, command-board, containers, equipment, inventory, profile, scan, settings, shift-adjustments, shift-chat, today)
+  board/          BoardShell + kiosk co-presence/auto-reload hooks for the /board Command Center target
   core/           Client hexagonal domain: entities/, ports/, use-cases/ (e.g. offline-emergency-block.ts) — pure TS, no framework imports
   infrastructure/ Adapters implementing core ports: api/, auth/, db/ (Dexie equipmentCache/syncQueue), platform/ (haptics/nfc/deepLink)
   native/         Capacitor shell composition: NativeShell, NativeTabBar, NativeTabSidebar, tablet/
@@ -104,13 +114,15 @@ server/
   schema/         pgTable definitions (core, equipment, inventory, tasks, ops, er, integrations)
   migrate.ts      Migration runner (exports runMigrations())
   app/
-    routes.ts     Registers ~46 API route modules
+    routes.ts     Registers ~56 API route modules
     start-schedulers.ts  Starts all BullMQ workers + background schedulers
-  routes/         One file per API resource
+  routes/         One file per API resource (incl. rfid, admin-rfid-*, shift-handover, clinic-join, whatsapp)
   services/       Domain services (appointments, equipment, waitlist, inventory, restock, dispense, code-blue…)
   domain/         Hexagonal equipment evidence-graph + Asset Copilot (domain/equipment/**, service-task.adapter.ts)
   lib/            Business logic (billing, alerts, push, forecast, audit, queues, realtime/event-publisher, code-blue-keepalive, authority…)
   lib/authority/enforcement/ Evaluator families (stale, oprole, task-assignment, stale-task-ownership, code-blue-manager, clinical-invariant); each ships `off | shadow | enforce`
+  lib/rfid/       RFID config, HMAC provisioning/secret rotation, reader-offline + finalizing sweeps
+  lib/realtime-collab/ R-RTC-1 Socket.io collab channel (/collab-ws) — ephemeral presence only, see "Realtime"
   jobs/runtime.ts BullMQ job runtime (charge-alert, expiry-check, stale-checkin-sweep)
   workers/        Worker implementations + in-process equipment/waitlist schedulers
   integrations/   External PMS adapter layer (webhook inbound/outbound, sync jobs)
@@ -118,6 +130,9 @@ server/
 lib/              i18n utilities shared by frontend and backend (typed `t`, parity check, internal-key strip)
 locales/          Translation files: en.json, he.json (Hebrew is default; user-facing copy says "Tasks")
 shared/           Constants + types shared between frontend and backend
+packages/         pnpm workspace packages:
+  contracts/      @vettrack/contracts — shared contract types (emergency, pending-sync); also consumed by the Expo companion repo (literate-dollop)
+  rfid-controller/ Vendor-agnostic RFID signing middleware core (ADR-005/006) — emits signed batches to POST /api/rfid/events; no runtime deps, own vitest config
 migrations/       SQL files run in order via pnpm db:migrate (also applied at server startup)
 tests/            All vitest tests; some groups are excluded by default (see below). Phase 9 drills: deterministic counter contracts (`tests/phase-9-deterministic-drills.test.ts`) + Playwright browser harness (`tests/phase-9-drills.spec.ts`)
 scripts/          Dev/ops scripts (includes scripts/i18n/check-parity.ts and scripts/i18n/generate-types.ts)
@@ -147,7 +162,9 @@ Every DB table has a `clinicId` column. **Every query must filter by `clinicId`.
 
 These exist as load-bearing contracts. Extend or wire additively — do **not** replace, refactor, or weaken:
 
-- **Realtime transport:** SSE via `/api/realtime/stream`, outbox-backed ordering on `vt_event_outbox`, monotonic `id:` cursor, HTTP replay via `/api/realtime/replay`. Not WebSockets, not polling.
+- **Realtime transport:** SSE via `/api/realtime/stream`, outbox-backed ordering on `vt_event_outbox`, monotonic `id:` cursor, HTTP replay via `/api/realtime/replay`. Not WebSockets, not polling. (The R-RTC-1 Socket.io channel on `/collab-ws` is a sanctioned **additive** exception for ephemeral collaboration state only — see below.)
+- **Collab channel is ephemeral-only:** `/collab-ws` (`server/lib/realtime-collab/`) carries presence/cursors/typing/nudges. It **never** carries domain or emergency state, and its init is non-fatal — any failure logs and leaves it disabled while SSE and Code Blue start normally (R-RTC-1.7).
+- **RFID is advisory-only (ADR-006, binding):** RFID is supporting evidence — it **never** overrides a human-confirmed room. Canonical location precedence: active checkout/scan > human `roomId` > RFID last-seen > free-text > unknown. Low-confidence/conflicting reads raise `rfid_location_conflict` / `ambiguous_rfid_location` for a human to resolve; the system never guesses. Ingest is HMAC-signed vendor-controller POSTs to `/api/rfid/events` (raw body parsed before `express.json`, no Clerk session; per-clinic secrets with rotation via `server/lib/rfid/provisioning.ts`).
 - **BroadcastChannel envelope:** cross-tab gossip carries `cursor`, `buildTag`, `ts`, `senderNonce` and `kind ∈ { "cursor", "build_tag", "code_blue_seen" }`. Ordering is rooted in the monotonic outbox cursor; `ts` is advisory.
 - **PWA build-tag:** `__VT_BUILD_TAG__` is the single source of truth for the SW cache name (`vettrack-<buildTag>`) and the split-version detector. Injected at build time into both `public/sw.js` and the client bundle.
 - **Emergency endpoint cache denylist:** `/api/display/snapshot`, `/api/code-blue/sessions/active`, `/api/realtime/{stream,replay,outbox-head,telemetry}` — never read from or written to Cache Storage. The bypass is unconditional and pre-existing entries are purged on SW activate.
@@ -167,6 +184,8 @@ Resolved at startup by `server/lib/auth-mode.ts`:
 
 Role hierarchy (numeric for comparison): `admin=40 · vet=30 · senior_technician=25 · lead_technician=22 · vet_tech=20 · technician=20 · student=10`
 
+**Clinic join codes (ADR-007):** invite-free sign-up membership via `server/routes/clinic-join.ts`. `POST /auth/join-clinic` is deliberately identity-only (not `requireAuth` — a clinic-less user would 403 `MISSING_CLINIC_ID` before provisioning). A join code confers **pending** membership only (`status "pending"`, role `technician`; admin-email allowlist excepted); admins manage the code via `GET /admin/clinic-join-code` + `POST /admin/clinic-join-code/rotate`.
+
 ### Database schema
 
 All tables prefixed `vt_`. Table definitions live in `server/schema/*.ts` (re-exported from `server/db.ts`). Generated inventory: `docs/audit/db.md` (`pnpm docs:audit`).
@@ -176,7 +195,8 @@ All tables prefixed `vt_`. Table definitions live in `server/schema/*.ts` (re-ex
 **Tasks:** `vt_appointments` (unified task model; UI route `/equipment/tasks`)  
 **Emergency:** `vt_code_blue_sessions`, `vt_code_blue_log_entries`, `vt_crash_cart_*`  
 **Inventory:** `vt_containers`, `vt_items`, `vt_dispense_events`, `vt_restock_*`, `vt_purchase_orders`  
-**Ops:** `vt_shifts`, `vt_shift_sessions`, `vt_event_outbox`, `vt_clinical_check_ins`, `vt_audit_logs`  
+**Ops:** `vt_shifts`, `vt_shift_sessions`, `vt_shift_handover` (migration 177), `vt_event_outbox`, `vt_clinical_check_ins`, `vt_audit_logs`  
+**RFID:** `vt_equipment_rfid_reads` (migration 138), `vt_rfid_readers` (migration 172; amended 174), `vt_rfid_secret_rotations` (migration 173; amended 176), `vt_rfid_egress_signals` (migration 175) — migration SQL is the source of truth for the composite-FK details  
 **Integrations:** `vt_integration_configs`, sync log/conflict tables  
 
 **Removed (migrations 142–143):** ER/patient/hospitalization tables, medication tasks, drug formulary, pharmacy forecast. See `docs/scope-change-2026.md`.
@@ -191,6 +211,7 @@ After editing schema files, run `npx drizzle-kit generate` → commit SQL → `p
 - `useRealtimeReconciliation` wires `visibilitychange`, `pageshow` (BFCache), `online`, and Page Lifecycle `freeze`/`resume` to one debounced reconciliation path (replay + `forceResyncWardErCaches`).
 - `BroadcastChannel("vt_realtime_outbox_cursor")` carries the cursor envelope, a build-tag gossip channel for split-version detection, and `code_blue_seen` gossip. Ordering uses the monotonic cursor; tabs never trust each other's clocks.
 - All client telemetry posts (`duplicateDrop`, `gapResync`, `codeBluePropagationBucket`, `displayForcedResyncTrigger`, `splitVersionClientDetected`, `swUpdateConflict`, …) are bounded enums. Adding a new field requires updating both the client classifier and the closed enum check in `server/routes/realtime.ts`.
+- **Collab channel (R-RTC-1):** Socket.io on path `/collab-ws` (`server/lib/realtime-collab/`, initialized non-fatally in `server/index.ts`; client in `src/features/collab/`). Ephemeral-only: presence, cursors, selections, typing, nudges, board co-presence. Per-verb rate limits, byte caps, room-join authorization, Redis adapter when available (in-process fallback governed by config). It shares the HTTP server but is fully separate from SSE — it must never carry domain or emergency state, and a collab failure must never take down the main server.
 
 ### Code Blue runtime guarantees (Phase 9)
 
@@ -228,7 +249,7 @@ All workers and recurring schedulers are registered in `server/app/start-schedul
 |--------|---------|
 | `expiryCheckWorker` (job runtime) | Daily cron 08:00 |
 | `chargeAlertWorker` (job runtime) | Delayed job on return with `isPluggedIn=false` |
-| `integration.worker` | Integration sync events |
+| `integration.worker` + integration schedule/retention crons | Integration sync events |
 | `staleCheckInSweepWorker` (job runtime) | Clinical check-in TTL sweep |
 | `staleTaskOwnershipSweepWorker` | Task-ownership TTL sweep (shadow + enforcement) |
 | `taskOwnershipBackfill.worker` | One-shot ownership backfill |
@@ -236,6 +257,10 @@ All workers and recurring schedulers are registered in `server/app/start-schedul
 | `startEventOutboxPublisher` | Realtime outbox publisher (drives SSE) |
 | `startOutboxJanitor` / `startOutboxDlqScanner` | Outbox retention + DLQ health |
 | `startCodeBlueReconciliationScanner` | Unreconciled Code Blue session sweep |
+| Equipment operational-state workers | `equipmentConditionStaleness`, `stagingExpiry`, `equipment-waitlist-reservation`, `staleCheckoutSweep`, `stale-returned-sweep`, `sweep-escalation` |
+| `startShiftHandoverScheduler` (R-SH-F1.2) | Shift-end handover generation — in-process only, deliberately no public generate route |
+| `startRfidReaderOfflineSweep` / `startRfidFinalizingSweep` | Reader heartbeat staleness → `rfid_reader_offline` signal; reclaim crash-stranded `finalizing` secret-rotation rows |
+| `scanUnresolvedEmergencyDispenses` (interval) | Unresolved emergency dispense escalation (30/60/120-min thresholds) |
 
 Redis is optional in dev (app runs; queues log `QUEUE_DISABLED_NO_REDIS`). Production requires Redis.
 
@@ -268,7 +293,7 @@ Use `logAudit()` from `server/lib/audit.ts` for all critical actions. It is fire
 
 ### Operational doctrine (what NOT to do)
 
-- **No transport replacement.** Don't swap SSE for WebSockets, long-polling, or shared workers. Don't introduce a parallel realtime path.
+- **No transport replacement.** Don't swap SSE for WebSockets, long-polling, or shared workers. Don't introduce a parallel realtime path for domain state. The `/collab-ws` Socket.io channel is the one sanctioned addition and it stays ephemeral-only — never route domain or emergency state through it.
 - **No offline emergency queueing.** Code Blue mutations must fail loud when offline. Do not extend the sync engine to cover them.
 - **No polling-based recovery for Code Blue.** Reconnect goes through replay + reconciliation; the snapshot endpoint is reached only via the bounded degraded-mode path.
 - **No optimistic local termination of emergency state.** UI follows server confirmation.
@@ -276,6 +301,7 @@ Use `logAudit()` from `server/lib/audit.ts` for all critical actions. It is fire
 - **No weakening of authority semantics.** Evaluators must keep their `off | shadow | enforce` envelope and the Strategy A safety-valve fallback. Don't remove Strategy A; don't change `off` to issue clinical-validation queries.
 - **No emergency endpoint in any cache.** Adding a Code Blue, snapshot, or realtime endpoint to Cache Storage is a regression.
 - **No appointment → task renames of internal surfaces.** Rename copy only; the table, route, and `appointmentsPage.*` key namespace stay. (The client page file `src/pages/Tasks.tsx` is the one sanctioned rename — 2026-07-04.)
+- **No RFID-as-authority.** RFID reads must never override a human-confirmed room (ADR-006's binding invariant). Conflicts raise signals for human resolution.
 - **Realtime / PWA work needs browser verification.** Type-check and vitest cover counter contracts; the Playwright drills (`tests/phase-9-drills.spec.ts`) cover the live transport. Both should pass before claiming a Phase-9-adjacent change is done.
 
 ### Tests
@@ -285,7 +311,7 @@ Use `logAudit()` from `server/lib/audit.ts` for all critical actions. It is fire
 - Live-server tests (require dev server on :3001): `tests/charge-alert-worker.test.js`, `tests/code-blue-mode-equipment.test.js`, `tests/equipment-scan-e2e.test.js`, `tests/expiry-api.test.js`, `tests/expiry-check-worker.test.js`, `tests/returns-api.test.js`
 - Phase 9 deterministic drills: `tests/phase-9-deterministic-drills.test.ts` covers bounded-counter contracts in unit form; `tests/phase-9-drills.spec.ts` is the Playwright browser harness for the eight realtime/PWA drills.
 
-E2E tests use Playwright: `pnpm test:signup` (requires Chromium). The Phase 9 drills also use Playwright and require a running app — invoke through the dedicated `playwright.ui.config.ts` / `playwright.config.ts` runners.
+E2E tests use Playwright: `pnpm test:signup` (requires Chromium). The Phase 9 drills also use Playwright and require a running app — invoke through the dedicated `playwright.ui.config.ts` / `playwright.config.ts` runners. Playwright discovery is allowlist-only via the `PW_SUITE` env var (default `ci`); staging E2E uses `playwright.staging.config.ts`. Server-side smoke tests run via `pnpm test:server:smoke` (tsx-executed, not vitest). The `packages/rfid-controller` tests run separately via `pnpm test:rfid-controller`.
 
 ### Adding a new feature (checklist)
 
@@ -298,7 +324,8 @@ E2E tests use Playwright: `pnpm test:signup` (requires Chromium). The Phase 9 dr
 7. New audit kind → add to the `AuditActionType` union in `server/lib/audit.ts`.
 8. New realtime telemetry surface → bounded enum on both client and `server/routes/realtime.ts`, plus a closed-union counter in `server/lib/metrics.ts`.
 9. Touching realtime / Code Blue / PWA? Read the "Frozen architecture surfaces" and "Operational doctrine (what NOT to do)" sections first.
-10. Run `npx tsc --noEmit` — must pass zero errors.
+10. Hard-to-reverse or cross-boundary decisions need an ADR: `docs/architecture/adr/` (copy `template.md`, check `TRIGGERS.md` for when one is required, link `ADR-NNN` from the implementation PR).
+11. Run `npx tsc --noEmit` — must pass zero errors.
 
 ### Cursor project rules
 

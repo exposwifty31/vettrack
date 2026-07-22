@@ -4309,3 +4309,24 @@ Reviewer returned 1 HIGH + 1 MEDIUM + 2 LOW on the committed sub-card; all four 
 - `pnpm architecture:gates` → All G1 checks passed (cycles match baseline).
 
 **Verdict:** VERIFIED
+
+## 2026-07-22 — CLAUDE.md refresh against current repo state (branch claude/claude-md-docs-tvz5ry)
+
+**Claim:** Updated CLAUDE.md to reflect subsystems and commands that landed since it was written: pnpm workspace packages (contracts, rfid-controller), RFID ingest + advisory-only invariant, R-RTC-1 Socket.io collab channel, shift handover, clinic join codes, new workers/schedulers, App Store resubmit scripts, PW_SUITE Playwright suites, ADR process, and corrected stale counts/lists.
+
+**Evidence:**
+- `package.json:10-79` — Read: scripts `dev:bypass`, `resubmit`/`resubmit:release`, `test:rfid-controller`, `contracts:typecheck`, `test:playwright:{pwa,waitlist,workday,flow-walk,ui-smoke}`, `test:staging:e2e`, `test:server:smoke`, `docs:audit` all exist; `engines.node >=22.12.0`, `packageManager pnpm@9.15.9`.
+- `pnpm-workspace.yaml` + `packages/{contracts,rfid-controller}/package.json` — Read: workspace `packages/*`; `@vettrack/contracts` (src: emergency.ts, pending-sync.ts); `@vettrack/rfid-controller` description cites ADR-005/006 and POST /api/rfid/events, no runtime deps, own vitest config.
+- Command: `grep -o 'from "\.\./routes/[^"]*"' server/app/routes.ts | wc -l` → 56 route module imports (was documented as ~46); `ls server/routes | wc -l` → 60 files incl. rfid.ts, admin-rfid-*.ts, shift-handover.ts, clinic-join.ts, whatsapp.ts.
+- `server/app/start-schedulers.ts:33-91` — Read: full current scheduler list incl. startShiftHandoverScheduler (R-SH-F1.2, "no public generate route"), startRfidReaderOfflineSweep, startRfidFinalizingSweep, equipment operational-state workers, scanUnresolvedEmergencyDispenses interval.
+- `server/lib/realtime-collab/server.ts:1-9` — Read: R-RTC-1 Socket.io on distinct `/collab-ws` path, ephemeral-only, never carries domain/emergency state, non-fatal init (R-RTC-1.7); wired non-fatally in `server/index.ts:430-441`.
+- `docs/architecture/adr/ADR-006-…md:27` — Read: binding advisory-only invariant + canonical precedence (active checkout/scan > human roomId > RFID last-seen > free-text > unknown) and `rfid_location_conflict`/`ambiguous_rfid_location` signals — CLAUDE.md wording matches the ADR, not paraphrase drift.
+- `server/routes/clinic-join.ts:14-26` — Read: POST /auth/join-clinic identity-only (deliberately not requireAuth, MISSING_CLINIC_ID rationale), pending membership, admin get/rotate endpoints; `migrations/178` → `ALTER TABLE vt_clinics ADD COLUMN signup_join_code`.
+- `migrations/177_vt_shift_handover.sql:22` → `CREATE TABLE IF NOT EXISTS vt_shift_handover`; `migrations/{138,172,173,175}` → vt_equipment_rfid_reads, vt_rfid_readers, vt_rfid_secret_rotations, vt_rfid_egress_signals confirmed by CREATE TABLE lines.
+- `ls src/features` → alerts, analytics, auth, code-blue, collab, command-board, containers, equipment, inventory, profile, scan, settings, shift-adjustments, shift-chat, today (rooms/ no longer exists); `ls src/board` → BoardShell.tsx + kiosk hooks.
+- `scripts/resubmit.sh:1-28` — Read: "--resubmit" build-only bump vs "--release MAJOR.MINOR.PATCH", version fields only, app is LIVE.
+- `scripts/architecture/run-architecture-gates.mjs` (head+tail) — Read: gates = tsc frontend + tsconfig.server-check.json + depcruise + madge cycle baseline (existing CLAUDE.md description confirmed still accurate).
+- `playwright.config.ts:11` — Read: "Discovery is allowlist-only via PW_SUITE (default ci)".
+- `vite.config.ts:135-153` — Read: vitest exclusion list unchanged from documented set.
+
+**Verdict:** VERIFIED
