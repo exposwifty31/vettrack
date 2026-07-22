@@ -240,6 +240,43 @@ describe("action-proposal-service", () => {
       expect(writer.allDecisions().filter((d) => d.proposalId === staged.id)).toHaveLength(0);
     });
 
+    it("PINNED (open product question, §4 review): editing a restock proposal is terminal and inserts NO purchase order", async () => {
+      // Current status model: staged → {approved | edited | rejected}, all
+      // terminal. Only approve dispatches the PO side effect, so an edited
+      // restock proposal never produces a PO and can never be approved
+      // afterwards. Whether "edit" should instead mean approve-with-changes
+      // (side effect executing the edited content) is an owner decision
+      // pending from the §4 review — this test pins today's behavior so a
+      // future change is deliberate, not accidental.
+      const { buildRestockPoApproveSideEffect } = await import(
+        "../../server/lib/autopilot/restock-po-approve-side-effect.js"
+      );
+      const sideEffectSpy = vi.fn().mockResolvedValue(undefined);
+      vi.mocked(buildRestockPoApproveSideEffect).mockReturnValue(sideEffectSpy);
+
+      const { proposal: staged } = await stageProposal(
+        { writer },
+        { input: buildRestockInput({ sourceSessionId: "restock-session-edit-terminal" }), groundTruthFacts: buildFacts(), stagedBy: STAGED_BY },
+      );
+
+      const edited = await editProposal(
+        { writer },
+        {
+          clinicId: CLINIC_A,
+          proposalId: staged.id,
+          ...ACTOR,
+          editedContent: { supplierName: "Real Supplier Ltd", lines: [{ itemId: "item-1", quantitySuggested: 3 }] },
+        },
+      );
+      expect(edited.status).toBe("edited");
+      expect(sideEffectSpy).not.toHaveBeenCalled();
+
+      await expect(
+        approveProposal({ writer }, { clinicId: CLINIC_A, proposalId: staged.id, ...ACTOR }),
+      ).rejects.toThrow(ActionProposalAlreadyDecidedError);
+      expect(sideEffectSpy).not.toHaveBeenCalled();
+    });
+
     it("does not dispatch a side effect for other kinds (e.g. shift_handover_draft) — approve stays a generic status flip", async () => {
       const { buildRestockPoApproveSideEffect } = await import(
         "../../server/lib/autopilot/restock-po-approve-side-effect.js"

@@ -4651,3 +4651,13 @@ Reviewer returned 1 HIGH + 1 MEDIUM + 2 LOW on the committed sub-card; all four 
 **Verdict:** VERIFIED.
 
 **Verdict:** VERIFIED.
+
+## 2026-07-22 — Task 1.1 §4 post-review addendum — branch feat/2.0-task-1.1-s4-restock-po
+
+**Claim:** §4 independent review PASS (zero blockers). Addendum corrects one stale narrative in the §4 proof entry and pins one reviewed behavior.
+
+**Evidence:**
+- The §4 entry's line "scan-coordinator-reassign … left unfixed, out of this slice's file-ownership scope" is superseded: commit 9f2db49a0 (post-build fix wave, same branch) registered scan-coordinator-reassign in the JobKind union, staticJobDefinitions, and the job-latency list, and updated the governance snapshots — `pnpm exec vitest run tests/jobs/` → 6 passed.
+- Pinned edited-is-terminal behavior: new test "editing a restock proposal is terminal and inserts NO purchase order" → `pnpm exec vitest run tests/autopilot/` → 75 passed (was 74). Whether edit should mean approve-with-changes (side effect on edited content) is an OPEN owner decision from the §4 review — behavior pinned so a future change is deliberate.
+
+**Verdict:** VERIFIED.
