@@ -35,6 +35,12 @@ export interface ActionProposalListFilters {
   offset?: number;
 }
 
+export interface StageOutcome {
+  proposal: ActionProposalRow;
+  /** False when the (clinicId, kind, sourceSessionId) triple was already staged — the existing row is returned. */
+  created: boolean;
+}
+
 export interface StageActionProposalInput extends NewActionProposalInput {
   citationValidation: unknown;
 }
@@ -82,7 +88,7 @@ export interface ActionProposalWriter {
   findStaged(clinicId: string, filters?: ActionProposalListFilters): Promise<ActionProposalRow[]>;
   get(clinicId: string, id: string): Promise<ActionProposalRow | null>;
   /** Idempotent per (clinicId, kind, sourceSessionId) — a repeat stage returns the existing row unchanged. */
-  stage(input: StageActionProposalInput): Promise<ActionProposalRow>;
+  stage(input: StageActionProposalInput): Promise<StageOutcome>;
   /** Guards `status === "staged"` — throws `ActionProposalAlreadyDecidedError` on a second decision attempt. */
   transition(clinicId: string, id: string, patch: ActionProposalTransitionPatch): Promise<ActionProposalRow>;
   recordDecision(entry: NewActionProposalDecisionInput): Promise<ActionProposalDecisionRow>;
@@ -129,7 +135,7 @@ export class DrizzleActionProposalWriter implements ActionProposalWriter {
     return row ?? null;
   }
 
-  async stage(input: StageActionProposalInput): Promise<ActionProposalRow> {
+  async stage(input: StageActionProposalInput): Promise<StageOutcome> {
     const [existing] = await db
       .select()
       .from(actionProposal)
@@ -141,7 +147,7 @@ export class DrizzleActionProposalWriter implements ActionProposalWriter {
         ),
       )
       .limit(1);
-    if (existing) return existing;
+    if (existing) return { proposal: existing, created: false };
 
     const [row] = await db
       .insert(actionProposal)
@@ -162,11 +168,11 @@ export class DrizzleActionProposalWriter implements ActionProposalWriter {
       })
       .returning();
 
-    if (row) return row;
+    if (row) return { proposal: row, created: true };
 
     // Lost the race against a concurrent stage of the same triple.
     const winner = await this.stage(input);
-    return winner;
+    return { proposal: winner.proposal, created: false };
   }
 
   async transition(
@@ -290,12 +296,12 @@ export class InMemoryActionProposalWriter implements ActionProposalWriter {
     return row;
   }
 
-  async stage(input: StageActionProposalInput): Promise<ActionProposalRow> {
+  async stage(input: StageActionProposalInput): Promise<StageOutcome> {
     const key = this.stageKey(input.clinicId, input.kind, input.sourceSessionId);
     const existingId = this.stagedKeys.get(key);
     if (existingId) {
       const existing = this.proposals.get(existingId);
-      if (existing) return existing;
+      if (existing) return { proposal: existing, created: false };
     }
 
     const now = new Date();
@@ -320,7 +326,7 @@ export class InMemoryActionProposalWriter implements ActionProposalWriter {
 
     this.proposals.set(row.id, row);
     this.stagedKeys.set(key, row.id);
-    return row;
+    return { proposal: row, created: true };
   }
 
   async transition(

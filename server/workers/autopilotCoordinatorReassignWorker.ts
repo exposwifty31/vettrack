@@ -130,10 +130,7 @@ export async function runCoordinatorReassignScan(
     const locale = await deps.resolveLocale(clinicId, result.persistedRow.coordinatorUserId);
     const input = composeCoordinatorReassignProposal({ clinicId, shiftDate, reader: result, locale });
 
-    const before = await deps.writer.findStaged(clinicId, { kind: "coordinator_reassign_off_roster" });
-    const alreadyStaged = before.some((row) => row.sourceSessionId === shiftDate);
-
-    await stageProposal(
+    const outcome = await stageProposal(
       { writer: deps.writer },
       {
         input,
@@ -142,7 +139,7 @@ export async function runCoordinatorReassignScan(
       },
     );
 
-    if (!alreadyStaged) staged++;
+    if (outcome.created) staged++;
   }
 
   return { scanned: candidates.length, staged };

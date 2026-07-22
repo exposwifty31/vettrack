@@ -12,6 +12,7 @@ import { validateActionProposalCitations } from "./action-proposal-citation-vali
 import {
   ActionProposalAlreadyDecidedError,
   type ActionProposalWriter,
+  type StageOutcome,
 } from "./action-proposal-writer.port.js";
 import type { ActionProposalCitedFact, NewActionProposalInput } from "./action-proposal-types.js";
 import type { ActionProposalRow } from "../../schema/ops.js";
@@ -43,22 +44,24 @@ export interface StageProposalParams {
 export async function stageProposal(
   deps: ActionProposalServiceDeps,
   params: StageProposalParams,
-): Promise<ActionProposalRow> {
+): Promise<StageOutcome> {
   const citationValidation = validateActionProposalCitations(params.input.citedFacts, params.groundTruthFacts);
-  const row = await deps.writer.stage({ ...params.input, citationValidation });
+  const outcome = await deps.writer.stage({ ...params.input, citationValidation });
 
-  incrementMetric("autopilot_proposal_staged_total");
-  logAudit({
-    clinicId: params.input.clinicId,
-    actionType: "action_proposal_staged",
-    performedBy: params.stagedBy.performedBy,
-    performedByEmail: params.stagedBy.performedByEmail,
-    targetId: row.id,
-    targetType: "action_proposal",
-    metadata: { kind: params.input.kind, sourceSessionId: params.input.sourceSessionId },
-  });
+  if (outcome.created) {
+    incrementMetric("autopilot_proposal_staged_total");
+    logAudit({
+      clinicId: params.input.clinicId,
+      actionType: "action_proposal_staged",
+      performedBy: params.stagedBy.performedBy,
+      performedByEmail: params.stagedBy.performedByEmail,
+      targetId: outcome.proposal.id,
+      targetType: "action_proposal",
+      metadata: { kind: params.input.kind, sourceSessionId: params.input.sourceSessionId },
+    });
+  }
 
-  return row;
+  return outcome;
 }
 
 interface DecideProposalParams {

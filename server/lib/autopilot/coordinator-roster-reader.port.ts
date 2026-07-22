@@ -14,14 +14,18 @@
  *   persisted.coordinatorUserId NOT IN freshCandidates
  *   AND (persisted.escalationStage < 3 OR persisted.coordinatorUserId !== persisted.currentResponsibleUserId)
  * No persisted row, or the persisted coordinator is still a fresh
- * candidate → no signal. The second conjunct exists so a coordinator id
- * that escalation has ALREADY transferred to (stage 3, source
- * `fallback_senior`, `coordinatorUserId` rewritten to the responsible
- * senior — see `sweep-escalation.worker.ts`'s `fireEscalationStage`) is not
- * re-flagged as a *separate* off-roster problem; escalation already handled
- * it. If stage 3 was reached but the stored `coordinatorUserId` still
- * differs from `currentResponsibleUserId`, the drift is still real and is
- * still flagged.
+ * candidate → no signal. The second conjunct suppresses rows where the
+ * stored coordinator already equals `currentResponsibleUserId` at stage ≥ 3
+ * — which arises only when the row was seeded with the senior as
+ * coordinator in the first place (source `fallback_senior`, or the
+ * needs_confirmation floor): `fireEscalationStage`'s stage-3 update sets
+ * only `escalationStage`/`currentResponsibleUserId`/`escalatedAt` and never
+ * rewrites `coordinatorUserId`. If the stored `coordinatorUserId` differs
+ * from `currentResponsibleUserId`, the drift is still real and is still
+ * flagged. Note: stage 4 clears `currentResponsibleUserId` back to null
+ * (see the schema comment on `vt_shift_equipment_coordinator`), so this
+ * carve-out stops applying at stage 4 and an off-roster coordinator
+ * re-flags there — accepted behavior.
  *
  * Every query is `clinicId`-scoped (CLAUDE.md multi-tenancy rule) — a
  * lookup under the wrong clinic returns no persisted row and no signal,
