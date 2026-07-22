@@ -4493,6 +4493,11 @@
         "title": "Equipment Coordinator off roster",
         "summaryTemplate": "The Equipment Coordinator assigned for {shiftDate} is no longer on today's roster — a replacement is suggested below.",
         "proposedCandidateLabel": "Suggested replacement"
+      },
+      "restockPoOnBurn": {
+        "title": "Restock needed — items at or below reorder point",
+        "summaryTemplate": "{itemCount, plural, one {1 item is at or below its reorder point} other {# items are at or below their reorder point}} as of {scanDate} — a draft purchase order is suggested below.",
+        "suggestedQuantityLabel": "Suggested order quantity"
       }
     }
   }

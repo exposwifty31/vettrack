@@ -67,4 +67,50 @@ describe("action-proposal citation validator", () => {
       });
     });
   });
+
+  describe("restock_po_on_burn kind (§4)", () => {
+    const restockGroundTruth: ActionProposalCitedFact[] = [
+      { sourceId: "item-1", sourceTable: "vt_inventory_items", kind: "reorder_point_threshold", at: "2026-07-22T00:00:00.000Z" },
+      { sourceId: "ci-1", sourceTable: "vt_container_items", kind: "on_hand_quantity", at: "2026-07-22T06:00:00.000Z" },
+      { sourceId: "ci-2", sourceTable: "vt_container_items", kind: "on_hand_quantity", at: "2026-07-22T07:00:00.000Z" },
+    ];
+
+    it("validates true when the restock kind's real citations (checked against its own reader's ground truth) are used", () => {
+      const result = validateActionProposalCitations(restockGroundTruth, restockGroundTruth);
+      expect(result.valid).toBe(true);
+      expect(result.checks).toEqual([
+        { sourceId: "item-1", valid: true },
+        { sourceId: "ci-1", valid: true },
+        { sourceId: "ci-2", valid: true },
+      ]);
+    });
+
+    it("flags a fabricated sourceId for the restock kind as citation_not_grounded", () => {
+      const tampered: ActionProposalCitedFact[] = [
+        ...restockGroundTruth,
+        { sourceId: "fabricated-restock-99", sourceTable: "vt_container_items", kind: "on_hand_quantity", at: "2026-07-22T08:00:00.000Z" },
+      ];
+      const result = validateActionProposalCitations(tampered, restockGroundTruth);
+      expect(result.valid).toBe(false);
+      expect(result.checks).toContainEqual({
+        sourceId: "fabricated-restock-99",
+        valid: false,
+        flag: "citation_not_grounded:fabricated-restock-99",
+      });
+    });
+
+    it("flags a derived value (the summed onHand total) cited as if it were an observed row", () => {
+      const tamperedWithDerivedValue: ActionProposalCitedFact[] = [
+        ...restockGroundTruth,
+        { sourceId: "8", sourceTable: "vt_container_items", kind: "on_hand_quantity", at: "2026-07-22T08:00:00.000Z" },
+      ];
+      const result = validateActionProposalCitations(tamperedWithDerivedValue, restockGroundTruth);
+      expect(result.valid).toBe(false);
+      expect(result.checks).toContainEqual({
+        sourceId: "8",
+        valid: false,
+        flag: "citation_not_grounded:8",
+      });
+    });
+  });
 });
