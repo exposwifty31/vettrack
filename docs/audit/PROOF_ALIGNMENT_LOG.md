@@ -4412,3 +4412,17 @@ Reviewer returned 1 HIGH + 1 MEDIUM + 2 LOW on the committed sub-card; all four 
 - CodeRabbit round: 4 fixed in 5125d56de (equipment-hero-prd `.cursorrules` link; root-docs/ARTIFACTS.md 5 links; root-docs/IMPLEMENTATION_PLAN.md 3 links; PF-02 scope-change link) — verified by on-disk resolution loop (10× OK); 7 skipped (rfid-gap-analysis schema paths, wedge-plan fence, pilot-dry-run /api/version, production-overhaul WCAG row, INFRA_CLEANUP token type, ux-friction MedicationCalculator note, offline-operational-architecture Code Blue tables — all content critiques of archived records; plus generated classification json; phantom PRE_SUBMISSION_AUDIT:255 proven via `wc -l` → 104 lines); review dismissed via REST (`DISMISSED`).
 
 **Verdict:** VERIFIED
+
+## 2026-07-22 — Cloud-session env config: shared SessionStart install hook (branch chore/repo-declutter)
+
+**Claim:** Cloud sessions (claude.ai/code / Desktop App) now install deps via a guarded SessionStart hook in a new checked-in `.claude/settings.json`; local sessions are unaffected; the environment's setup script must be emptied by the owner in the web UI (not automatable — Desktop App and `/remote-env` cannot edit it).
+
+**Evidence:**
+- Docs re-verified via claude-code-guide agent against code.claude.com/docs (hooks + claude-code-on-the-web): repo `.claude/settings.json` hooks run in cloud sessions ("part of the clone"); `CLAUDE_CODE_REMOTE=true` is set in cloud; SessionStart `timeout` is seconds (default 600); setup script runs as root pre-clone and is cached — project installs belong in a SessionStart hook; no per-repo cloud env config file exists.
+- Command: `python3 -m json.tool .claude/settings.json` → parsed clean (valid JSON, matcher `startup|resume`, timeout 600).
+- Gate simulation: `sh -c '<hook command>'` with no env → exit 0, no install attempted (local no-op); with `CLAUDE_CODE_REMOTE=true` and node_modules present → exit 0, install skipped. Install branch only reachable when remote AND node_modules missing.
+- `git check-ignore -v .claude/settings.json` → not ignored (only `settings.local.json` is, .gitignore:6), so the file ships with the clone.
+- `grep packageManager package.json` → `pnpm@9.15.9`; hook uses `COREPACK_ENABLE_DOWNLOAD_PROMPT=0 pnpm install --frozen-lockfile` for non-interactive corepack fetch.
+- PENDING (owner-side): empty the "Default" env setup script at claude.ai/code environment settings, then a fresh cloud session must show deps installed + `pnpm typecheck` / `pnpm test` green. Not yet executed — recorded here as the open verification step.
+
+**Verdict:** VERIFIED (repo side); cloud E2E pending owner UI step
