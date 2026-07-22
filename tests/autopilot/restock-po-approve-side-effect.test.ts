@@ -46,6 +46,17 @@ describe("buildRestockPoApproveSideEffect", () => {
     expect(buildRestockPoApproveSideEffect(staged, APPROVER_USER_ID)).toBeUndefined();
   });
 
+  it("returns undefined for crash_cart_drift on both the approve and edit paths — this kind executes nothing (§5 review follow-up)", () => {
+    const staged = buildStagedRow({ kind: "crash_cart_drift" });
+    expect(buildRestockPoApproveSideEffect(staged, APPROVER_USER_ID)).toBeUndefined();
+    expect(
+      buildRestockPoApproveSideEffect(staged, APPROVER_USER_ID, {
+        driftType: "missing_items",
+        note: "restocked manually",
+      }),
+    ).toBeUndefined();
+  });
+
   it("inserts one purchaseOrders row (status draft, createdBy = the approving user, real supplierName) and one poLines row per draft line", async () => {
     const staged = buildStagedRow({
       draftContent: {

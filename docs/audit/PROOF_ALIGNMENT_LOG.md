@@ -4700,3 +4700,14 @@ Reviewer returned 1 HIGH + 1 MEDIUM + 2 LOW on the committed sub-card; all four 
 - Single-decision invariant unchanged: edited stays terminal; later approve still throws (asserted in the new test).
 
 **Verdict:** VERIFIED.
+
+## 2026-07-22 — Task 1.1 §5 post-review addendum — branch feat/2.0-task-1.1-s5-crash-cart-drift
+
+**Claim:** §5 independent review PASS with clinical-safety lens (no veto, zero blockers). One coverage follow-up closed.
+
+**Evidence:**
+- Review confirmed: zero Code Blue/realtime/sw.js/crash-cart-route files in the diff; worker notifies nobody (grep for notification/push/socket/emit clean); zero crash-cart table writes (select-only); threshold constant + per-clinic override + [1,168] clamp verified at reader.port.ts; 24h default's clinical grounding re-verified against RECOVER-aligned sources.
+- Follow-up closed: direct assertion that buildRestockPoApproveSideEffect returns undefined for crash_cart_drift on BOTH approve and edit paths → `pnpm exec vitest run tests/autopilot/ tests/jobs/` → 24 files, 151 passed.
+- Standing family-wide observation (tracked, not §5's defect): stage-time citation grounding is self-referential in all three shadow workers — real anti-hallucination gate deferred to LLM-composition work.
+
+**Verdict:** VERIFIED.
