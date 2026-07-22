@@ -490,7 +490,9 @@ FKs — resolve explicitly before either starts its own Phase 0, don't let two c
    Glass-OFF-on-Code-Blue/board matches Apple's own hierarchy rule.
 3. **Android:** targetSdk 35 / Android 15+ enforces edge-to-edge → insets/safe-area work in Task 0.7
    gates Android shipping (1.3).
-4. **Plugin law (github.com/ionic-team/capacitor-plugins):** plugin major = Capacitor core major;
+4. **Plugin law (github.com/ionic-team/capacitor-plugins):** same-major is a shortcut, not the rule —
+   the published mapping has real exceptions (e.g. Capacitor 3 uses 1.x plugins); consult the actual
+   compatibility matrix or use `latest-X` dist-tags rather than assuming plugin-major = core-major.
    `npx cap sync` after EVERY plugin/dep change (regenerates SPM/Gradle wiring pinning exact pnpm-store
    paths); native builds only via `scripts/build-native-shell.sh`; verify on a real device — the iOS
    Simulator has no Taptic Engine ("resolve without performing any action"). Haptics breakage tracked in

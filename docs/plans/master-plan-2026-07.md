@@ -129,17 +129,23 @@ channel's non-fatal, ephemeral-only, "R-RTC-1.7" invariant as current binding fa
 **Conclusion: R-RTC-1 is safe as currently documented in CLAUDE.md — the "3 CRITICAL" framing came from a
 stale planning doc, not a live gap.**
 
-**A genuinely new, real, currently-open bug found — RFID header-spelling mismatch.**
-`docs/plans/rfid-controller-package.plan.md` documents it; not yet independently re-verified against
-live code this pass, but the mechanism is precise enough to trust and act on: `server/routes/rfid.ts:38,63`
-and `server/middleware/rate-limiters.ts:90` read the clinic header as `x-vetrack-clinic` (one "t"), while
-the signer and docs use `X-VetTrack-*` (two "t"s). Effect: the rate limiter's per-clinic key is always
-empty, so it **silently degrades to per-IP limiting** — every clinic behind one IP shares a single
-120/min bucket — and any spec-following client gets 400 `MISSING_CLINIC`. `tests/rfid-webhook-signature.test.ts:122-123`
-uses the wrong spelling too, so the test suite is green while entrenching the bug. **New candidate task
-(not yet executed — needs the same explicit go-ahead as Tasks 1–9):** fix the header-name constant in one
-place, update the 2 call sites + the test, add a regression test asserting the correct per-clinic rate-limit
-key. Small, bounded, real.
+**RETRACTED 2026-07-22 — the "RFID header-spelling bug" does not exist; the relayed finding was stale.**
+The original entry here (based on `docs/plans/rfid-controller-package.plan.md`, "not yet independently
+re-verified against live code this pass") claimed `server/routes/rfid.ts` and `server/middleware/rate-limiters.ts`
+read the clinic header as `x-vetrack-clinic` (one "t") against a two-"t" signer, silently degrading the
+rate limiter to per-IP. **Verified directly against the actual code while addressing a CodeRabbit comment
+on Task 10 (below) — this is false.** `server/lib/rfid/clinic-header.ts` is a dedicated single-source-of-truth
+helper (`readRfidClinicId`) whose own docstring states it exists specifically to prevent "the exact drift
+behind the original one-`t` bug" — both the route (`rfid.ts:50`) and the rate limiter
+(`rate-limiters.ts:90`, via `rfidEventLimiterKey`) already call it consistently, and
+`tests/rfid-webhook-signature.test.ts:117` is itself named "canonical two-`t` x-vettrack-* headers." The
+bug was real once and is already fixed and regression-tested — `docs/plans/rfid-controller-package.plan.md`
+is stale on this point, the same pattern as the ADR-006/M1.0 and R-RTC-1 false positives above. **Separately,
+and unrelated to the (nonexistent) spelling bug:** the rate limiter is **intentionally** IP-only pre-auth
+— its own comment explains the clinic header is attacker-controlled before HMAC verification, so keying by
+it would let one IP mint unlimited buckets and remove the only pre-auth DoS backstop. Task 10 (below) is
+retracted in full; this stands as a documented example of why every relayed finding gets re-verified before
+being trusted, not skipped past because the first pass didn't have time.
 
 ### Relayed findings (sourced, not independently re-checked this pass)
 
@@ -168,6 +174,9 @@ key. Small, bounded, real.
   #85/#86, as still "Ready to Start" — doc drift, not a live backlog, despite both files' own "read this
   before writing any code" instruction), `docs/FLOW_MATRIX.md` (superseded by the real 2026-07-16
   four-platform live-walk already in this plan's context), `docs/BUG_REGISTER.md` (self-marked historical),
+  **`docs/plans/rfid-controller-package.plan.md`** (its RFID clinic-header spelling claim is stale — the
+  bug it describes is already fixed; see the retracted Task 10 below — do not cite this doc's bug reports
+  without re-verifying against `server/lib/rfid/clinic-header.ts` first),
   and **`docs/vettrack-2.0-roadmap.md`'s own "Platform research addendum (2026-07-19)" §1** ("Shell strategy
   confirmed — Capacitor stays") — directly superseded by the owner's later 2026-07-22 bare-RN decision.
   Confirmed present at `docs/vettrack-2.0-roadmap.md:471`. **Caution for Layer 4/5:** `scripts/vettrack-2.0-scope-gate.sh`
@@ -205,17 +214,18 @@ key. Small, bounded, real.
 
 ---
 
-## Task 10: Fix the RFID clinic-header spelling mismatch (candidate — not yet executed)
+## Task 10: RETRACTED — the RFID clinic-header spelling bug does not exist
 
-**Files:**
-- Modify: `server/routes/rfid.ts:38,63`, `server/middleware/rate-limiters.ts:90`
-- Modify: `tests/rfid-webhook-signature.test.ts:122-123` (currently entrenches the wrong spelling)
-- Add: a regression test asserting the per-clinic rate-limit key is correctly populated (not empty)
+**Original claim:** `server/routes/rfid.ts`, `server/middleware/rate-limiters.ts`, and
+`tests/rfid-webhook-signature.test.ts` all used a one-"t" `x-vetrack-clinic` spelling against a two-"t"
+signer, silently degrading the RFID rate limiter to per-IP.
 
-**Status:** Candidate task surfaced by the docs deep-scan (`docs/plans/rfid-controller-package.plan.md`),
-not yet independently re-verified against the live route code or executed. Needs the owner's explicit
-go-ahead before starting, same as Tasks 1–9 — flagging here so it isn't lost, not because approval is
-assumed.
+**Verified false 2026-07-22**, while checking a CodeRabbit security comment on this task's proposed
+rate-limiter change: `server/lib/rfid/clinic-header.ts`'s `readRfidClinicId()` is the real, already-shipped
+single source of truth for this exact header, consistently used by both the route and the limiter; its own
+docstring documents having fixed "the exact drift behind the original one-`t` bug." There is nothing to
+fix here. `docs/plans/rfid-controller-package.plan.md`, the doc this task was sourced from, is stale on
+this point — see the corrected docs-scan findings above for the full trace. No further action.
 
 ---
 
@@ -922,8 +932,8 @@ git commit -m "feat(2.0): Task 2.3 — StalenessBadge + RoomAvatarRow (text-base
 
 ```tsx
 // tests/floor-presence/FloorPresenceCard.test.tsx
-import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { cleanup, render, screen } from "@testing-library/react";
 import { FloorPresenceCard } from "../../src/features/floor-presence/FloorPresenceCard";
 
 const ROOMS = [{ id: "room-icu", name: "ICU" }, { id: "room-surgery", name: "Surgery" }];
@@ -933,6 +943,9 @@ let roomsListImpl = async () => ROOMS;
 // it — this is what actually exercises the Task 5 fix (handleRoomUpdate wired
 // straight through, not a second disconnected local state) end-to-end through
 // the real FloorPresenceCard, rather than trusting the wiring by inspection.
+// Module-scoped, so it MUST be cleared between tests (beforeEach below) — otherwise
+// a later test could pass by reusing a callback captured from an earlier test's
+// render, rather than the current render actually wiring one up.
 type PresenceUpdateFn = (roomId: string, snapshot: { members: { userId: string; displayName: string }[]; lastUpdatedAt: number }) => void;
 const onUpdateByRoom = new Map<string, PresenceUpdateFn>();
 
@@ -945,6 +958,14 @@ vi.mock("../../src/features/floor-presence/RoomPresenceSubscriber", () => ({
     return null;
   },
 }));
+
+beforeEach(() => {
+  onUpdateByRoom.clear();
+});
+
+afterEach(() => {
+  cleanup();
+});
 
 describe("FloorPresenceCard", () => {
   it("renders a row for every room returned by api.rooms.list()", async () => {
@@ -1356,7 +1377,7 @@ layered on top per how ambiguous/high-stakes the task is.
 | Task 1 — ADR-006 checkbox fix | haiku | low | Deterministic, mechanical, zero ambiguity |
 | Tasks 2–4 — Pilot-fix route tests | sonnet | medium | Established test convention to follow, real but bounded logic |
 | Task 5–9 — Task 2.3 "Who's on the floor" | sonnet | medium | Bounded feature, architecture already resolved |
-| Task 10 — RFID header-spelling fix | sonnet | medium | Small, bounded, but touches rate-limiting/multi-tenancy — needs care, not deep architecture judgment |
+| Task 10 — retracted (no fix needed, see Task 10) | — | — | Verified false; not a real task |
 | docs/ deep-scan research passes | sonnet | medium | Research breadth over architectural judgment |
 | Layer 1 — 27-screen design pass: per-screen implementation | sonnet | medium | Follows an established design-system/component pattern per screen |
 | Layer 1 — Code Blue / TV Board screens specifically | opus | high | Frozen-surface risk, cosmetic-only constraint must be judged carefully |
