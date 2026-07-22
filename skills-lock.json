@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "skills": {
+    "react-native-skills": {
+      "source": "secondsky/claude-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/react-native-skills/skills/react-native-skills/SKILL.md",
+      "computedHash": "634ed5d30e783648d89cdca383b3f6d74e1b1f0cb703f02e46572fe0c46cba32"
+    }
+  }
+}
