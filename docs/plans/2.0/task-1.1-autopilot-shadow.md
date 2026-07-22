@@ -14,7 +14,7 @@
 > | §3 coordinator_reassign_off_roster (reader, composer, worker, atomic decide carry-over) | **DONE** | s3 branch | PASS; HIGH NB-1 duplicate-emission fixed root-cause (`StageOutcome.created` gates audit/metric) |
 > | §4 restock_po_on_burn (reader, composer, ATOMIC approve side effect → real PO+lines, per-kind edit Zod, daily worker) | **DONE** | s4 branch | PASS, 0 blockers; fix wave registered §3's job-registry gap + `vt_items` citation rename |
 > | §5 crash_cart_drift (reader w/ 24h-default + per-clinic-override staleness, composer, daily worker, no side effect) | **DONE** | s5 branch | PASS, clinical-safety lens NO VETO, 0 blockers |
-> | §2 shift_handover_draft | not started (schema/composer may proceed; scheduler-retirement gated by resolved §0) | — | — |
+> | §2 shift_handover_draft (composer over R-SH-F1's own `resolveShiftWindow`/`aggregateDeltas`, 10-min worker, no side effect, R-SH-F1 auto-publish left 100% untouched — parallel-run) | **DONE-pending-review** | s2 branch (`feat/2.0-task-1.1-s2-handover-draft`) | pending fresh-context review |
 > | §6 approval-queue UI shell + §1.5 socket-nudge decision | not started (deferred from §1 deliberately) | — | — |
 >
 > **Owner decisions binding execution (beyond §0):**
