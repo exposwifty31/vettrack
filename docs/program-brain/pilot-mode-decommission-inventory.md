@@ -115,7 +115,7 @@ Legend for **Can remove now?**
 | `docs/pilot.md` | Mixed: mainline runbook + equipment pilot v1 | Split: keep go-live runbook; archive equipment-mode section |
 | `docs/pilot-operator-checklist.md` | Mainline ops | Rename; remove PILOT_MODE references |
 | `docs/pilot-go-no-go-report.md` | Historical | Archive |
-| `docs/pilot-dry-run-report.md` | Historical | Archive |
+| `docs/archive/2026/pilot-dry-run-report.md` | Historical | Archive |
 | `docs/pilot-step8-debug-pass.md` | Historical | Archive |
 | `docs/release-runbook.md` | `pilotMode` version checks | Keep checks until fields renamed |
 
