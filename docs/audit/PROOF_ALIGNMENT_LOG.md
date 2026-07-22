@@ -4491,3 +4491,11 @@ Reviewer returned 1 HIGH + 1 MEDIUM + 2 LOW on the committed sub-card; all four 
 - Also fixed two smaller, real findings from the same round: `onUpdateByRoom` (the FloorPresenceCard test's module-scoped mock map) wasn't cleared between tests — a later test could pass by reusing an earlier test's captured callback rather than proving its own render wired one up; added `beforeEach(() => onUpdateByRoom.clear())` and `afterEach(cleanup)`. And the roadmap's "Plugin law" bullet stated a same-major Capacitor/plugin-version rule as absolute when the published mapping has real exceptions (e.g. Capacitor 3 → 1.x plugins) — reworded to point at the actual compatibility matrix/dist-tags instead.
 
 **Verdict:** VERIFIED — all 3 comments addressed; the highest-value outcome was retracting a previously-unverified claim rather than fixing code around a bug that was never real.
+
+## 2026-07-22 — Fourth CodeRabbit round on PR #133 (branch docs/2.0-planning-corpus)
+
+**Claim:** Fixed the single remaining comment — my own round-3 "Plugin law" fix suggested `latest-X` dist-tags as a compatibility source, which are themselves mutable and not actually pinned.
+
+**Evidence:** Reworded `docs/vettrack-2.0-roadmap.md`'s Plugin law bullet to require pinning to exact plugin versions verified against the compatibility table at bump time, removing the `latest-X` suggestion. Comment counts across all four rounds: 15 → 7 → 3 → 1, converging.
+
+**Verdict:** VERIFIED.
