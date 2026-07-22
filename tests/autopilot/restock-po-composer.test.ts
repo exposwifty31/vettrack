@@ -78,7 +78,7 @@ describe("composeRestockPoProposal", () => {
       expect.objectContaining({ sourceId: "ci-2", sourceTable: "vt_container_items" }),
     );
     expect(input.citedFacts).toContainEqual(
-      expect.objectContaining({ sourceId: "item-1", sourceTable: "vt_inventory_items" }),
+      expect.objectContaining({ sourceId: "item-1", sourceTable: "vt_items" }),
     );
     // no derived/computed value (e.g. the summed onHand=8, or the computed
     // suggested quantity=12) ever appears as a citedFacts sourceId

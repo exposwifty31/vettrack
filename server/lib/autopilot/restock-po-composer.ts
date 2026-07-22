@@ -78,7 +78,7 @@ export function composeRestockPoProposal(input: ComposeRestockPoProposalInput): 
   for (const item of flaggedItems) {
     citedFacts.push({
       sourceId: item.inventoryItemRowId,
-      sourceTable: "vt_inventory_items",
+      sourceTable: "vt_items",
       kind: "reorder_point_threshold",
       at: scanDateAt,
     });

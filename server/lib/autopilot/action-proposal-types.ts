@@ -26,12 +26,10 @@ export type ActionProposalStatus = (typeof ACTION_PROPOSAL_STATUSES)[number];
  * autocompleting the known members. `vt_shift_equipment_coordinator` /
  * `vt_shifts` (§3, `coordinator_reassign_off_roster`) added explicitly per
  * the plan's instruction to extend this union, not rely on the open idiom
- * alone. `vt_container_items` / `vt_inventory_items` (§4, `restock_po_on_burn`)
- * added the same way — note `"vt_inventory_items"` is the citation-label
- * name per the §4 task instruction, not the literal DB table name (the real
- * table is `vt_items`, see `server/schema/inventory.ts`'s `inventoryItems`
- * export); disclosed deviation from the established "citation label ==
- * real table name" pattern the other members follow.
+ * alone. `vt_container_items` / `vt_items` (§4, `restock_po_on_burn`) added
+ * the same way — both literal DB table names (`vt_items` is the real name
+ * behind `server/schema/inventory.ts`'s `inventoryItems` export), keeping
+ * the "citation label == real table name" pattern every member follows.
  */
 export interface ActionProposalCitedFact {
   sourceId: string;
@@ -41,7 +39,7 @@ export interface ActionProposalCitedFact {
     | "vt_shift_equipment_coordinator"
     | "vt_shifts"
     | "vt_container_items"
-    | "vt_inventory_items"
+    | "vt_items"
     | (string & {});
   kind: string;
   at: string;

@@ -70,7 +70,7 @@ describe("action-proposal citation validator", () => {
 
   describe("restock_po_on_burn kind (§4)", () => {
     const restockGroundTruth: ActionProposalCitedFact[] = [
-      { sourceId: "item-1", sourceTable: "vt_inventory_items", kind: "reorder_point_threshold", at: "2026-07-22T00:00:00.000Z" },
+      { sourceId: "item-1", sourceTable: "vt_items", kind: "reorder_point_threshold", at: "2026-07-22T00:00:00.000Z" },
       { sourceId: "ci-1", sourceTable: "vt_container_items", kind: "on_hand_quantity", at: "2026-07-22T06:00:00.000Z" },
       { sourceId: "ci-2", sourceTable: "vt_container_items", kind: "on_hand_quantity", at: "2026-07-22T07:00:00.000Z" },
     ];
