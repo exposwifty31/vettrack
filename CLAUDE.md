@@ -196,7 +196,7 @@ All tables prefixed `vt_`. Table definitions live in `server/schema/*.ts` (re-ex
 **Emergency:** `vt_code_blue_sessions`, `vt_code_blue_log_entries`, `vt_crash_cart_*`  
 **Inventory:** `vt_containers`, `vt_items`, `vt_dispense_events`, `vt_restock_*`, `vt_purchase_orders`  
 **Ops:** `vt_shifts`, `vt_shift_sessions`, `vt_shift_handover` (migration 177), `vt_event_outbox`, `vt_clinical_check_ins`, `vt_audit_logs`  
-**RFID:** `vt_equipment_rfid_reads` (migration 138), `vt_rfid_readers`, `vt_rfid_secret_rotations`, `vt_rfid_egress_signals` (migrations 172–176; migration SQL is the source of truth for the composite-FK details)  
+**RFID:** `vt_equipment_rfid_reads` (migration 138), `vt_rfid_readers` (migration 172; amended 174), `vt_rfid_secret_rotations` (migration 173; amended 176), `vt_rfid_egress_signals` (migration 175) — migration SQL is the source of truth for the composite-FK details  
 **Integrations:** `vt_integration_configs`, sync log/conflict tables  
 
 **Removed (migrations 142–143):** ER/patient/hospitalization tables, medication tasks, drug formulary, pharmacy forecast. See `docs/scope-change-2026.md`.
