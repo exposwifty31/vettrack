@@ -4310,6 +4310,43 @@ Reviewer returned 1 HIGH + 1 MEDIUM + 2 LOW on the committed sub-card; all four 
 
 **Verdict:** VERIFIED
 
+## 2026-07-22 — Vendor Clerk agent skills into .claude/skills (branch claude/clerk-skills-setup-6e5akb)
+
+**Claim:** All 20 skills from github.com/clerk/skills (core, frameworks, features, mobile) vendored flat into `.claude/skills/` so they persist across ephemeral remote sessions and load for every session in this repo. No application code touched.
+
+**Evidence (verified this session):**
+- Cloned `https://github.com/clerk/skills` (README's own "Manual (Claude Code)" path) and copied each of the 20 `skills/*/*/` skill directories into `.claude/skills/<name>/`.
+- `find .claude/skills/clerk* -name SKILL.md | wc -l` → 20; for every dir, the SKILL.md frontmatter `name:` matches the directory name (loop-checked, zero mismatches).
+- No collisions with pre-existing project skills (`apple-platform-ux`, `ecc`, `vettrack-codebase-relevance-audit` untouched — `git status` shows only new `clerk*` dirs).
+- Harness discovery confirmed live: after the copy, all 20 skills appeared in the session's available-skills list (router `clerk` + 19 specific skills).
+- No `.git` metadata vendored (skills copied from the clone's subdirectories, not the repo root).
+
+**Verdict:** VERIFIED
+
+## 2026-07-22 — Add nfc-tools skill to .claude/skills (branch claude/clerk-skills-setup-6e5akb)
+
+**Claim:** `nfc-tools` skill (libnfc/nfc-utils tag discovery/read/write workflows with CONFIRM NFC WRITE / CONFIRM NFC FORMAT safety gates and UID redaction) installed at `.claude/skills/nfc-tools/`. SKILL.md body transcribed verbatim from the skill listing the user provided; the two helper files are reconstructions authored to the contracts SKILL.md itself specifies, because the upstream source (openclaw/skills, per web search) is unreachable from this environment — git clone and api.github.com both denied by the session network proxy (only exposwifty31/vettrack is allowed), raw.githubusercontent.com and the GitHub tree URL returned 404/403 (checked this session).
+
+**Evidence (verified this session):**
+- `SKILL.md` frontmatter name/description match the listing exactly; all sections (Quick start, UID privacy, Discovery, Reading, Writing safety-critical, Erase/format safety-critical, hardware-missing fallback, Resources) transcribed with wording preserved.
+- `scripts/check-nfc.sh`: `sh -n` clean; executable bit set; run in-container → prints MISSING for nfc-list/nfc-poll/nfc-taginfo and exits 1 with pointer to `references/fallback.md` (documented behavior for a host without libnfc).
+- `references/fallback.md` covers the four duties SKILL.md assigns it: document missing-hardware state, plan tag contents, preview binary payloads (ndef-tool/xxd), manual handoff runbook gated on the confirmation phrases.
+- Harness discovery confirmed live: `nfc-tools` appeared in this session's available-skills list after the files were written.
+
+**Verdict:** VERIFIED (with the reconstruction caveat above recorded)
+
+## 2026-07-22 — Add 5 Expo/iOS-shipping skills to .claude/skills (branch claude/clerk-skills-setup-6e5akb)
+
+**Claim:** Five skills from the user's Expo iOS workflow installed verbatim from their upstream repos: `expo-native-ui` (expo/skills — upstream renamed from the requested `building-native-ui`; no skill of that name exists in the repo, grep-confirmed, and expo-native-ui's description matches "Building Native UI (Expo)"), `vercel-react-native-skills` (vercel-labs/agent-skills, dir react-native-skills installed under its frontmatter name), `make-interfaces-feel-better` (jakubkrehel/make-interfaces-feel-better), `app-icon` + `appstore-connect` (melvynx/aiblueprint).
+
+**Evidence (verified this session):**
+- All four source repos shallow-cloned successfully from github.com this session (unlike openclaw/skills earlier); skills copied with full contents (10/42/5/4/2 files respectively — references, scripts, templates included; no .git metadata).
+- Frontmatter `name:` matches destination directory for all five (loop-checked above the copy).
+- No collisions with the 24 pre-existing project skills (`git status` shows only the five new dirs).
+- Harness discovery: prior installs this session (clerk*, nfc-tools) were each picked up live after write; same mechanism applies.
+
+**Verdict:** VERIFIED
+
 ## 2026-07-22 — CLAUDE.md refresh against current repo state (branch claude/claude-md-docs-tvz5ry)
 
 **Claim:** Updated CLAUDE.md to reflect subsystems and commands that landed since it was written: pnpm workspace packages (contracts, rfid-controller), RFID ingest + advisory-only invariant, R-RTC-1 Socket.io collab channel, shift handover, clinic join codes, new workers/schedulers, App Store resubmit scripts, PW_SUITE Playwright suites, ADR process, and corrected stale counts/lists.
