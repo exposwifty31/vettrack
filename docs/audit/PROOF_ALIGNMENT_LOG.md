@@ -4532,3 +4532,14 @@ Reviewer returned 1 HIGH + 1 MEDIUM + 2 LOW on the committed sub-card; all four 
 - Command: `git diff --stat` before this log entry → exactly `docs/plans/master-plan-2026-07.md` + `docs/vettrack-2.0-roadmap.md` (58 insertions, 11 deletions) — no code touched.
 
 **Verdict:** VERIFIED.
+
+## 2026-07-22 — Roadmap artifact-map truth patch after task-1.1 branch push
+
+**Claim:** Updated the day-old "Program state & artifact map" section: `claude/task-1.1-autopilot-shadow` is no longer "local-only, unpushed" — it was pushed to origin (owner-requested), so the durability-risk sentence, the branch parenthetical, and the merge-rule's push precondition were reworded to the on-origin/unmerged state.
+
+**Evidence:**
+- Command: `git push -u origin claude/task-1.1-autopilot-shadow` → `* [new branch]`; `git ls-remote origin claude/task-1.1-autopilot-shadow` → `c745707ac38dffe3564f7e5041a95582f5f85ce7`.
+- Command: `grep -n "local-only\|unpushed"` over the roadmap → 3 stale spots found (lines 90-91, 107, 112-113); all three reworded, nothing else touched.
+- Command: `bash scripts/vettrack-2.0-scope-gate.sh` → exit 0; checkbox-line count still 19.
+
+**Verdict:** VERIFIED.

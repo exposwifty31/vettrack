@@ -87,10 +87,9 @@ by reference — nothing is duplicated into it, and the referenced documents are
 
 **Artifact map.** Where each completed task's deliverable actually lives. Branch-side rows were
 verified locally 2026-07-22 (`git show --stat` per commit); `claude/task-1.1-autopilot-shadow` is
-**local-only on the owner's machine — not on origin** — so fresh clones cannot resolve those paths
-until it is pushed. That is a real durability risk: every Phase-0 execution artifact currently has a
-single-machine copy. Each Phase-0 task also has a PROOF_ALIGNMENT_LOG entry in the branch's copy of
-the log.
+**on origin since 2026-07-22** (pushed at `c745707ac`, owner-authorized) — unmerged, so branch-side
+paths resolve via `origin/claude/task-1.1-autopilot-shadow:<path>`, not `main`. Each Phase-0 task
+also has a PROOF_ALIGNMENT_LOG entry in the branch's copy of the log.
 
 | Task | Artifact | Lives on | Caveat carried forward |
 |---|---|---|---|
@@ -104,14 +103,14 @@ the log.
 | 2.3 plan | `docs/plans/2.0/task-2.3-who-on-floor.md` | **main** | — |
 | Binding decisions | `.claude/docs/ai/vettrack/10x/session-2.md` | **main** | reference-only, never rewritten |
 
-("branch" = `claude/task-1.1-autopilot-shadow`, local-only, unpushed.)
+("branch" = `claude/task-1.1-autopilot-shadow`, on origin, unmerged.)
 
 **Resolved decisions surfaced.** Task 1.1 §0 is owner-resolved (recorded in branch commit
 c745707ac): **per-org policy gate** + **auto-publish-on-timeout fallback**. These bind Task 1.1's
 execution and are reused by Task 1.4's billing auto-publish policy.
 
-**Merge-reconciliation rule** (for the branch's eventual push + PR — precondition: the branch must
-first be pushed from the owner's machine before any PR exists to reconcile). The branch carries
+**Merge-reconciliation rule** (for the branch's eventual PR — the push precondition was satisfied
+2026-07-22, `c745707ac` on origin). The branch carries
 **stale 18-task copies** of this roadmap and `scripts/vettrack-2.0-scope-gate.sh` (pre-1.4, pre-strict
 parser). At merge time, add/add conflicts on those two files resolve toward **main's** 19-task /
 strict-gate versions — main's tracker is strictly ahead and the branch holds no tracker state main
