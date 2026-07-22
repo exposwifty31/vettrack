@@ -10,7 +10,7 @@
 
 ## VetTrack anchors & gotchas
 - All tables prefixed `vt_`; definitions in `server/schema/*.ts`, re-exported from `server/db.ts`. Generated inventory: `docs/audit/db.md` (`pnpm docs:audit`).
-- **Every table carries `clinicId`; every tenant-scoped query must filter by it — a missing target-table filter is release-blocking**, regardless of the warn-only linter.
+- **Every tenant-scoped query must filter the target table by `clinicId` — a missing target-table filter is release-blocking**, regardless of the warn-only linter.
 - **Migration SQL is the source of truth** for composite-FK details (e.g. RFID tables, migrations 172–176) — the Drizzle defs don't capture everything.
 - `vt_audit_logs` is **append-only**: DELETE silently no-ops (Postgres rules) + RESTRICT clinic FK → clinics with audit rows are undeletable; test cleanup needs `ALLOW_AUDIT_LOG_PURGE=1`, unit tests mock `logAudit`.
 - `drizzle-kit push` is dev-only; production changes go through generated, committed SQL in `migrations/` (applied in order).
