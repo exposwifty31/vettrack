@@ -92,6 +92,7 @@ export async function handleJoinClinic(req: Request, res: Response): Promise<Res
   // An existing user (any clinic) is never re-homed by a join code — idempotent no-op.
   const [existing] = await db
     .select({ id: users.id, clinicId: users.clinicId, status: users.status })
+    // tenant-lint:scoped auth-resolution lookup keyed by globally-unique clerkId; the caller has no clinic yet (same as resolveAuthUser's fallback branch)
     .from(users)
     .where(and(eq(users.clerkId, clerkUserId), isNull(users.deletedAt)))
     .limit(1);
@@ -141,6 +142,7 @@ export async function handleJoinClinic(req: Request, res: Response): Promise<Res
     // Concurrent join for the same identity won the race — fall back to the row it created.
     const [raced] = await db
       .select({ status: users.status })
+      // tenant-lint:scoped auth-resolution lookup keyed by globally-unique clerkId (race fallback for the insert above)
       .from(users)
       .where(and(eq(users.clerkId, clerkUserId), isNull(users.deletedAt)))
       .limit(1);
