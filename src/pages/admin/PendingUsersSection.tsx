@@ -122,7 +122,7 @@ function InviteStaffCard() {
   const { userId } = useAuth();
   const queryClient = useQueryClient();
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ["/api/admin/clinic-join-code"],
     queryFn: getClinicJoinCode,
     enabled: !!userId,
@@ -178,6 +178,19 @@ function InviteStaffCard() {
       <CardContent>
         {isLoading ? (
           <Skeleton className="h-12 rounded-xl" />
+        ) : isError ? (
+          // A failed fetch must NOT fall through to the noCode/generate state:
+          // "Generate" would silently rotate an existing, unseen code without
+          // the invalidation confirm. Keep rotation unavailable until the
+          // current state is known.
+          <div className="flex flex-col gap-3" data-testid="invite-staff-error">
+            <p className="text-xs text-destructive" role="alert">
+              {t.adminPage.inviteStaff.loadFailed}
+            </p>
+            <Button size="sm" variant="outline" className="h-11" onClick={() => void refetch()}>
+              {t.auth.guard.retry}
+            </Button>
+          </div>
         ) : (
           <div className="flex flex-col gap-3">
             <p className="text-xs text-muted-foreground">

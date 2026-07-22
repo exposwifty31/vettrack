@@ -172,6 +172,8 @@ router.post("/auth/join-clinic", authSensitiveLimiter, (req, res) => {
 
 router.get("/admin/clinic-join-code", requireAuth, requireAdmin, async (req, res) => {
   try {
+    // requireAuth populates req.clinicId before this handler runs; the Request
+    // type cannot express that middleware-ordering contract.
     const clinicId = req.clinicId!;
     const [row] = await db
       .select({ signupJoinCode: clinics.signupJoinCode })
@@ -187,6 +189,8 @@ router.get("/admin/clinic-join-code", requireAuth, requireAdmin, async (req, res
 
 router.post("/admin/clinic-join-code/rotate", requireAuth, requireAdmin, authSensitiveLimiter, async (req, res) => {
   try {
+    // requireAuth populates req.clinicId before this handler runs; the Request
+    // type cannot express that middleware-ordering contract.
     const clinicId = req.clinicId!;
 
     // Retry on the (vanishingly unlikely) global-uniqueness collision.
@@ -211,6 +215,8 @@ router.post("/admin/clinic-join-code/rotate", requireAuth, requireAdmin, authSen
     logAudit({
       clinicId,
       actionType: "clinic_join_code_rotated",
+      // requireAuth guarantees req.authUser is set before this handler runs;
+      // the Request type cannot express that middleware-ordering contract.
       performedBy: req.authUser!.id,
       performedByEmail: req.authUser!.email,
       targetId: clinicId,

@@ -8,7 +8,7 @@ import { RoleChips, type SignupRequestedRole } from "@/features/auth/components/
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { readCarriedRole } from "@/features/auth/requested-role-store";
-import { writeCarriedJoinCode } from "@/features/auth/join-code-store";
+import { captureJoinCodeFromSearch } from "@/features/auth/join-code-store";
 import { ClerkFailed, ClerkLoaded, ClerkLoading, SignUp } from "@clerk/clerk-react";
 import { useAuth } from "@/hooks/use-auth";
 import { isClerkEnabled } from "@/lib/auth-fetch";
@@ -39,8 +39,7 @@ export default function SignUpPage() {
   // Invite link `/signup?clinic=CODE`: stash the join code so the post-auth
   // JoinClinicScreen can redeem it after Clerk's redirects (join-code-store).
   useEffect(() => {
-    const code = new URLSearchParams(window.location.search).get("clinic");
-    if (code) writeCarriedJoinCode(code.trim());
+    captureJoinCodeFromSearch(window.location.search);
   }, []);
 
   useEffect(() => {

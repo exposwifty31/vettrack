@@ -38,6 +38,12 @@ function mockAuth(overrides: Partial<ReturnType<typeof useAuth>>): {
 } {
   const signOut = vi.fn();
   const refreshAuth = vi.fn();
+  // Deliberately partial fixture, cast because the full AuthContextType carries
+  // a dozen fields (role/effectiveRole/activeShift/…) that the guard clauses
+  // under test never read before returning: every scenario here exits on
+  // status/accessDeniedReason ahead of any role-dependent branch. If AuthGuard
+  // grows a read of an omitted field, these tests fail loudly on undefined
+  // rather than silently passing (same pattern as auth-guard-nfc-toast.test.tsx).
   vi.mocked(useAuth).mockReturnValue({
     isLoaded: true,
     isSignedIn: true,

@@ -20,3 +20,14 @@ export function writeCarriedJoinCode(code: string | null): void {
   if (code && CARRIED_CODE_SHAPE.test(code)) sessionStorage.setItem(KEY, code);
   else sessionStorage.removeItem(KEY);
 }
+
+/**
+ * Capture the `?clinic=CODE` invite-link parameter into the carry store.
+ * Called on mount by /signin and /signup. A malformed value is ignored (the
+ * shape guard in `writeCarriedJoinCode` would clear the store, and a previously
+ * carried valid code must survive a later junk-parameter visit).
+ */
+export function captureJoinCodeFromSearch(search: string): void {
+  const code = new URLSearchParams(search).get("clinic")?.trim();
+  if (code && CARRIED_CODE_SHAPE.test(code)) writeCarriedJoinCode(code);
+}
