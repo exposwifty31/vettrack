@@ -802,6 +802,16 @@ export interface TStructure {
         authSyncFailed: string;
       };
     };
+    joinClinic: {
+      title: string;
+      subtitle: string;
+      codeLabel: string;
+      codePlaceholder: string;
+      submit: string;
+      joining: string;
+      invalidCode: string;
+      genericError: string;
+    };
   };
   shiftAdjustments: {
     requestExtension: string;
@@ -2165,6 +2175,18 @@ export interface TStructure {
     equipmentCoordinatorLabel: string;
     equipmentCoordinatorUpdated: string;
     equipmentCoordinatorUpdateFailed: string;
+    inviteStaff: {
+      title: string;
+      description: string;
+      noCode: string;
+      generate: string;
+      rotate: string;
+      rotateConfirm: string;
+      copyLink: string;
+      copied: string;
+      loadFailed: string;
+      rotateFailed: string;
+    };
   };
   layoutHebrew: {
     home: string;
@@ -3026,6 +3048,14 @@ export interface TStructure {
       noHomeStation: string;
       coordinatorForbidden: string;
       coordinatorNotEligible: string;
+    };
+    clinicJoin: {
+      unauthorized: string;
+      invalidCode: string;
+      profileUnavailable: string;
+      joinFailed: string;
+      codeReadFailed: string;
+      codeRotateFailed: string;
     };
   };
   push: {

@@ -6,6 +6,12 @@ export const clinics = vtTable("vt_clinics", {
   id: text("id").primaryKey(),
   /** IANA timezone for clinic-local day boundaries (tasks, scheduling). */
   timezone: text("timezone").notNull().default("Asia/Jerusalem"),
+  /**
+   * Invite-free sign-up: opaque per-clinic join code (globally unique).
+   * NULL = joining disabled. Confers PENDING membership only — the admin
+   * approval gate stays the authorization step (see routes/clinic-join.ts).
+   */
+  signupJoinCode: text("signup_join_code").unique(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
 

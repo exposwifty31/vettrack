@@ -11,6 +11,7 @@ import { isClerkEnabled } from "@/lib/auth-fetch";
 import { useExperience } from "@/hooks/use-experience";
 import { ManagementWebGate } from "@/app/platform/guards/ManagementWebGate";
 import { DeleteAccountDialog } from "@/components/delete-account-dialog";
+import { JoinClinicScreen } from "@/features/auth/components/JoinClinicScreen";
 
 /**
  * Agent-friendly diagnostics shown only on prolonged load timeout in dev.
@@ -151,6 +152,13 @@ export function AuthGuard({ children }: { children: ReactNode }) {
   );
 
   if (accessDeniedReason) {
+    // Invite-free sign-up: a session with no resolvable clinic is a JOIN step,
+    // not a dead end — the user redeems a clinic join code for pending
+    // membership, then refreshAuth lands them on the pending-approval screen.
+    if (accessDeniedReason === "MISSING_CLINIC_ID") {
+      return <JoinClinicScreen onJoined={refreshAuth} onSignOut={signOut} />;
+    }
+
     const deniedTitle =
       accessDeniedReason === "AUTH_SYNC_FAILED"
         ? t.auth.guard.syncFailedTitle

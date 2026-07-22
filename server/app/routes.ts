@@ -2,6 +2,7 @@ import type express from "express";
 
 // --- Infrastructure ---
 import userRoutes from "../routes/users.js";
+import clinicJoinRoutes from "../routes/clinic-join.js";
 import realtimeRoutes from "../routes/realtime.js";
 import queueRoutes from "../routes/queue.js";
 import metricsRoutes from "../routes/metrics.js";
@@ -67,6 +68,8 @@ import whatsappRoutes from "../routes/whatsapp.js";
 
 function registerInfrastructureRoutes(app: express.Express) {
   app.use("/api/users", userRoutes);
+  // Bare /api mount: paths defined in-router (/auth/join-clinic + /admin/clinic-join-code*).
+  app.use("/api", clinicJoinRoutes);
   app.use("/api/realtime", realtimeRoutes);
   app.use("/api/queue", queueRoutes);
   app.use("/api/metrics", metricsRoutes);

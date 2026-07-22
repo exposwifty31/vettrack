@@ -74,6 +74,8 @@ import type {
   DisplayPairClaim,
   NudgeFeedResponse,
   NudgeKind,
+  ClinicJoinResult,
+  ClinicJoinCodeResponse,
 } from "@/types";
 import type { AuthoritySnapshot } from "../../shared/authority.js";
 
@@ -122,6 +124,7 @@ import {
 } from "./request-core";
 import type { ApiErrorPayload } from "./request-core";
 import { getDevRoleOverride } from "./auth-fetch";
+import { getAuthHeaders } from "./auth-store";
 
 /**
  * Headers for the auth-bootstrap raw fetches (`/users/me`, `/users/sync`). These
@@ -232,6 +235,45 @@ export async function authPostUsersSync(
       body: payload,
     },
   );
+}
+
+/**
+ * Redeem a clinic join code for pending membership (POST /api/auth/join-clinic).
+ * Bootstrap-style raw fetch: the caller is Clerk-authenticated but has NO
+ * vt_users row yet (that's the point of the call), so the authFetch userId
+ * guard would reject it. The bearer token in authStore was populated by
+ * use-auth's syncSession before the 403 that surfaced the join screen.
+ */
+export async function joinClinic(joinCode: string): Promise<ClinicJoinResult> {
+  const payload = JSON.stringify({ joinCode });
+  const withAuth: RequestInit = { headers: getAuthHeaders(), body: payload };
+  const res = await bootstrapFetchWithTimeout("/api/auth/join-clinic", {
+    credentials: bootstrapCredentials(withAuth),
+    method: "POST",
+    headers: bootstrapHeaders(withAuth),
+    body: payload,
+  });
+  const json = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+  if (res.ok) {
+    return {
+      ok: true,
+      status: typeof json.status === "string" ? json.status : "pending",
+      alreadyMember: json.alreadyMember === true,
+    };
+  }
+  if (res.status === 404) return { ok: false, reason: "INVALID_JOIN_CODE" };
+  if (res.status === 401) return { ok: false, reason: "UNAUTHORIZED" };
+  return { ok: false, reason: "ERROR" };
+}
+
+/** Current clinic join code (admin-only). `joinCode: null` = joining disabled. */
+export async function getClinicJoinCode(): Promise<ClinicJoinCodeResponse> {
+  return request<ClinicJoinCodeResponse>("/api/admin/clinic-join-code");
+}
+
+/** Generate/rotate the clinic join code (admin-only). Old code stops working immediately. */
+export async function rotateClinicJoinCode(): Promise<{ joinCode: string }> {
+  return request<{ joinCode: string }>("/api/admin/clinic-join-code/rotate", { method: "POST" });
 }
 
 export interface DeleteAccountResult {

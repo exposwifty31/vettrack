@@ -798,6 +798,16 @@
         "accountPendingApproval": "Your account is pending approval.",
         "authSyncFailed": "The server did not return profile data (offline, API error, or wrong DATABASE_URL). Check that the API is running, then retry."
       }
+    },
+    "joinClinic": {
+      "title": "Join your clinic",
+      "subtitle": "Enter the join code your clinic admin shared with you. After joining, your account waits for admin approval.",
+      "codeLabel": "Clinic join code",
+      "codePlaceholder": "e.g. ABCD23EFGH",
+      "submit": "Join clinic",
+      "joining": "Joining...",
+      "invalidCode": "This join code is not valid. It may have been rotated - ask your clinic admin for the current one.",
+      "genericError": "Joining failed. Check your connection and try again."
     }
   },
   "shiftAdjustments": {
@@ -2161,7 +2171,19 @@
     "secondaryRoleUpdateFailed": "Failed to update secondary role",
     "equipmentCoordinatorLabel": "Equipment Coordinator",
     "equipmentCoordinatorUpdated": "Equipment Coordinator eligibility updated",
-    "equipmentCoordinatorUpdateFailed": "Failed to update Equipment Coordinator eligibility"
+    "equipmentCoordinatorUpdateFailed": "Failed to update Equipment Coordinator eligibility",
+    "inviteStaff": {
+      "title": "Invite staff",
+      "description": "Share this join link with new staff. They sign up themselves and appear below as pending until you approve them.",
+      "noCode": "Joining via link is off. Generate a code to let staff sign up without an invite.",
+      "generate": "Generate code",
+      "rotate": "Rotate code",
+      "rotateConfirm": "Rotate the join code? The current link stops working immediately.",
+      "copyLink": "Copy sign-up link",
+      "copied": "Link copied",
+      "loadFailed": "Could not load the join code.",
+      "rotateFailed": "Could not rotate the join code."
+    }
   },
   "layoutHebrew": {
     "home": "Home",
@@ -3023,6 +3045,14 @@
       "noHomeStation": "This item is not resting, or has no resolvable home station.",
       "coordinatorForbidden": "Only the senior technician on this shift or an admin can confirm the Equipment Coordinator.",
       "coordinatorNotEligible": "This person is not an eligible Equipment Coordinator on this shift."
+    },
+    "clinicJoin": {
+      "unauthorized": "Sign in to join a clinic",
+      "invalidCode": "Invalid or expired join code",
+      "profileUnavailable": "Unable to verify account profile; please retry",
+      "joinFailed": "Join failed. Please try again.",
+      "codeReadFailed": "Failed to load join code",
+      "codeRotateFailed": "Failed to rotate join code"
     }
   },
   "push": {
