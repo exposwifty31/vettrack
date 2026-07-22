@@ -29,6 +29,7 @@ import { startSweepEscalationWorker } from "../workers/sweep-escalation.worker.j
 import { startAutopilotCoordinatorReassignWorker } from "../workers/autopilotCoordinatorReassignWorker.js";
 import { startAutopilotRestockBurnWorker } from "../workers/autopilotRestockBurnWorker.js";
 import { startAutopilotCrashCartDriftWorker } from "../workers/autopilotCrashCartDriftWorker.js";
+import { startAutopilotHandoverDraftWorker } from "../workers/autopilotHandoverDraftWorker.js";
 import { startShiftHandoverScheduler } from "../lib/shift-handover-scheduler.js";
 import { startRfidReaderOfflineSweep } from "../lib/rfid/reader-offline-sweep.js";
 import { startRfidFinalizingSweep } from "../lib/rfid/finalizing-sweep.js";
@@ -101,7 +102,16 @@ export async function startBackgroundSchedulers() {
   startAutopilotCrashCartDriftWorker();
 
   // R-SH-F1.2 — shift-end handover generator (in-process; no public generate route).
+  // FROZEN for VetTrack 2.0, Task 1.1 §2 — this registration and
+  // shift-handover-scheduler.ts are untouched; see the worker below's
+  // header doc for the parallel-run scope boundary.
   startShiftHandoverScheduler();
+
+  // VetTrack 2.0, Task 1.1 §2 — Shift Autopilot `shift_handover_draft` scan
+  // (shadow-mode staging only; R-SH-F1's auto-publish above is UNCHANGED and
+  // runs in parallel for the same ended session — see the worker file's
+  // header comment for the full scope boundary and the §0(c) follow-up).
+  startAutopilotHandoverDraftWorker();
 
   // R-M1.1d — RFID reader-offline detection (heartbeat staleness → rfid_reader_offline signal).
   startRfidReaderOfflineSweep();
