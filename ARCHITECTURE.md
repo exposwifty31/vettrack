@@ -293,10 +293,10 @@ and **knip** (dead code). Run via `pnpm architecture:gates`.
 - **Removed domains as redirect stubs:** `/patients`, `/er`, `/billing`, `/meds`,
   `/pharmacy-forecast`, `/pending` in `src/app/routes.tsx` redirect to equipment surfaces.
   `server/schema/er.ts` was repurposed to **Code Blue / crash cart** (despite the file name).
-- **Root-level scratch/planning docs:** many top-level `*.md` (e.g. `FLOW_MATRIX.md`,
-  `INFRA_CLEANUP_PLAN.md`, `TEST_AUDIT.md`, `STRUCTURE_PLAN.md`) and two large `Archive*.zip`
-  (~100 MB) are historical artifacts, not load-bearing. ⚠ The zip archives look like
-  accidental check-ins — candidates for removal but out of scope for this analysis.
+- **Root-level scratch/planning docs:** the historical planning artifacts
+  (`INFRA_CLEANUP_PLAN.md`, `TEST_AUDIT.md`, `STRUCTURE_PLAN.md`, `IMPLEMENTATION_PLAN.md`,
+  `ARTIFACTS.md`, `DEV_DB.md`) now live in `docs/archive/2026/root-docs/`. `FLOW_MATRIX.md`
+  remains at root — it is actively maintained by the resubmission track.
 - **`vt_xxx` / `vendor-x` placeholders** appear in test/sandbox fixtures, not production tables.
 - **Emerging hexagonal layer** (`src/core`, `src/infrastructure`, `server/domain`) coexists
   with the older `src/lib` / `server/services` style — migration is partial.

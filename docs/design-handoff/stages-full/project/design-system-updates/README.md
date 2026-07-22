@@ -453,7 +453,7 @@ than guessed past.** The review's premise is that the current primary is a
 muted forest green. The actual current `--primary`/`--brand` is **indigo**
 (`#4f46e5`, `hsl(234 85% 63%)`) — confirmed against `src/index.css`'s own
 comment ("VetTrack brand indigo/navy (matches the VT logo: navy #0b1021,
-indigo mark)") and against the literal logo file (`Brand-Logo.png`): navy
+indigo mark)") and against the literal logo file (`brand-icons/Brand-Logo.png`): navy
 background, indigo-to-periwinkle gradient mark, no green anywhere. The one
 real forest green in the app is `--action` (`#15803d`), deliberately
 *reserved* for scan/confirm/task-completion — a secondary accent, not the

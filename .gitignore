@@ -48,6 +48,11 @@ superpowers-main.zip
 
 # Playwright artifacts
 playwright-ui-screenshots/
+
+# Local build outputs + caches (regenerable)
+build/
+.pnpm-store/
+artifacts/
 playwright-report/
 
 # Generated CSS preview captures (see docs/previews/README.md)

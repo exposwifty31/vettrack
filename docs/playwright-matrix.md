@@ -54,4 +54,4 @@ pnpm test:playwright:ui-smoke
 ./scripts/run-safe-tests.sh
 ```
 
-See `TEST_AUDIT.md` and `scripts/run-safe-tests.sh`.
+See `docs/archive/2026/root-docs/TEST_AUDIT.md` and `scripts/run-safe-tests.sh`.

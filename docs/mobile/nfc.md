@@ -100,7 +100,7 @@ VetTrack's current hardware uses **RFID dock readers** (USB HID, web serial) for
 
 The two paths share the same backend API and `vt_equipment.rfid_tag` column but differ in the client-side read mechanism.
 
-See `docs/equipment-readiness-rfid-gap-analysis.md` for the full RFID gap analysis.
+See `docs/archive/2026/equipment-readiness-rfid-gap-analysis.md` for the full RFID gap analysis.
 
 ---
 

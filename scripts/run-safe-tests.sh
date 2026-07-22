@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # CI-safe, non-destructive test runner for VetTrack (Section A).
-# See TEST_AUDIT.md for full inventory and exclusions.
+# See docs/archive/2026/root-docs/TEST_AUDIT.md for full inventory and exclusions.
 #
 # Usage:
 #   ./scripts/run-safe-tests.sh

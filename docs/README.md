@@ -158,7 +158,7 @@ Expo/RN work: [`exposwifty31/literate-dollop`](https://github.com/exposwifty31/l
 | [integrations/new-vendor-playbook.md](./integrations/new-vendor-playbook.md) | Onboard a new vendor adapter |
 | [integrations/adapter-certification-checklist.md](./integrations/adapter-certification-checklist.md) | Adapter certification |
 | [rfid-smoke.md](./rfid-smoke.md) | RFID gateway smoke test |
-| [equipment-readiness-rfid-gap-analysis.md](./equipment-readiness-rfid-gap-analysis.md) | RFID gap analysis |
+| [equipment-readiness-rfid-gap-analysis.md](./archive/2026/equipment-readiness-rfid-gap-analysis.md) | RFID gap analysis |
 
 ---
 
@@ -170,7 +170,7 @@ Pre–scope-change or snapshot docs — read the banner at the top before trusti
 |-----|---------|
 | [strict-schema-audit.md](./strict-schema-audit.md) | Zod `.strict()` audit (May 2026; medication routes removed) |
 | [due-diligence-report.md](./due-diligence-report.md) | Raise readiness tracker (April 2026) |
-| [PF-02-hot-route-n1-investigation.md](./PF-02-hot-route-n1-investigation.md) | Hot-route N+1 investigation (TASK-001) |
+| [PF-02-hot-route-n1-investigation.md](./audit/PF-02-hot-route-n1-investigation.md) | Hot-route N+1 investigation (TASK-001) |
 | [validation/](./validation/) | Phase stabilization reports |
 | [evidence/](./evidence/) | Demo / pilot evidence snapshots |
 | [program-brain/](./program-brain/) | Pilot-era program brain (historical) |

@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "[ \"$CLAUDE_CODE_REMOTE\" = \"true\" ] || exit 0; [ -f node_modules/.vt-install-ok ] || { COREPACK_ENABLE_DOWNLOAD_PROMPT=0 pnpm install --frozen-lockfile && touch node_modules/.vt-install-ok; }",
+            "timeout": 600
+          }
+        ]
+      }
+    ]
+  }
+}
