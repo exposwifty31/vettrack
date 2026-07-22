@@ -4334,3 +4334,15 @@ Reviewer returned 1 HIGH + 1 MEDIUM + 2 LOW on the committed sub-card; all four 
 - Harness discovery confirmed live: `nfc-tools` appeared in this session's available-skills list after the files were written.
 
 **Verdict:** VERIFIED (with the reconstruction caveat above recorded)
+
+## 2026-07-22 — Add 5 Expo/iOS-shipping skills to .claude/skills (branch claude/clerk-skills-setup-6e5akb)
+
+**Claim:** Five skills from the user's Expo iOS workflow installed verbatim from their upstream repos: `expo-native-ui` (expo/skills — upstream renamed from the requested `building-native-ui`; no skill of that name exists in the repo, grep-confirmed, and expo-native-ui's description matches "Building Native UI (Expo)"), `vercel-react-native-skills` (vercel-labs/agent-skills, dir react-native-skills installed under its frontmatter name), `make-interfaces-feel-better` (jakubkrehel/make-interfaces-feel-better), `app-icon` + `appstore-connect` (melvynx/aiblueprint).
+
+**Evidence (verified this session):**
+- All four source repos shallow-cloned successfully from github.com this session (unlike openclaw/skills earlier); skills copied with full contents (10/42/5/4/2 files respectively — references, scripts, templates included; no .git metadata).
+- Frontmatter `name:` matches destination directory for all five (loop-checked above the copy).
+- No collisions with the 24 pre-existing project skills (`git status` shows only the five new dirs).
+- Harness discovery: prior installs this session (clerk*, nfc-tools) were each picked up live after write; same mechanism applies.
+
+**Verdict:** VERIFIED
