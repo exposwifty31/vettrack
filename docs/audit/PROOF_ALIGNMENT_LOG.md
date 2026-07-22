@@ -4309,3 +4309,16 @@ Reviewer returned 1 HIGH + 1 MEDIUM + 2 LOW on the committed sub-card; all four 
 - `pnpm architecture:gates` → All G1 checks passed (cycles match baseline).
 
 **Verdict:** VERIFIED
+
+## 2026-07-22 — Vendor Clerk agent skills into .claude/skills (branch claude/clerk-skills-setup-6e5akb)
+
+**Claim:** All 20 skills from github.com/clerk/skills (core, frameworks, features, mobile) vendored flat into `.claude/skills/` so they persist across ephemeral remote sessions and load for every session in this repo. No application code touched.
+
+**Evidence (verified this session):**
+- Cloned `https://github.com/clerk/skills` (README's own "Manual (Claude Code)" path) and copied each of the 20 `skills/*/*/` skill directories into `.claude/skills/<name>/`.
+- `find .claude/skills/clerk* -name SKILL.md | wc -l` → 20; for every dir, the SKILL.md frontmatter `name:` matches the directory name (loop-checked, zero mismatches).
+- No collisions with pre-existing project skills (`apple-platform-ux`, `ecc`, `vettrack-codebase-relevance-audit` untouched — `git status` shows only new `clerk*` dirs).
+- Harness discovery confirmed live: after the copy, all 20 skills appeared in the session's available-skills list (router `clerk` + 19 specific skills).
+- No `.git` metadata vendored (skills copied from the clone's subdirectories, not the repo root).
+
+**Verdict:** VERIFIED
