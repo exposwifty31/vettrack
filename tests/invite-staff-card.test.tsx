@@ -7,7 +7,7 @@
  * silently rotate an existing, unseen code without the invalidation confirm.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, cleanup } from "@testing-library/react";
+import { render, screen, cleanup, fireEvent, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { t } from "@/lib/i18n";
 
@@ -66,9 +66,16 @@ describe("InviteStaffCard — join-code query states", () => {
 
     expect(await screen.findByTestId("invite-staff-error")).toBeTruthy();
     expect(screen.getByText(t.adminPage.inviteStaff.loadFailed)).toBeTruthy();
-    expect(screen.getByRole("button", { name: t.auth.guard.retry })).toBeTruthy();
     expect(screen.queryByTestId("btn-rotate-join-code")).toBeNull();
     expect(screen.queryByText(t.adminPage.inviteStaff.noCode)).toBeNull();
+
+    // Retry re-fires the query and a now-successful response recovers the card.
+    expect(getClinicJoinCodeMock).toHaveBeenCalledTimes(1);
+    getClinicJoinCodeMock.mockResolvedValue({ joinCode: "ABCD23EFGH" });
+    fireEvent.click(screen.getByRole("button", { name: t.auth.guard.retry }));
+    await waitFor(() => expect(getClinicJoinCodeMock).toHaveBeenCalledTimes(2));
+    expect(await screen.findByTestId("clinic-join-code")).toBeTruthy();
+    expect(screen.queryByTestId("invite-staff-error")).toBeNull();
   });
 
   it("successful response with no code shows the noCode state with generate enabled", async () => {
@@ -76,7 +83,8 @@ describe("InviteStaffCard — join-code query states", () => {
     renderSection();
 
     expect(await screen.findByText(t.adminPage.inviteStaff.noCode)).toBeTruthy();
-    expect(screen.getByTestId("btn-rotate-join-code")).toBeTruthy();
+    const generate = screen.getByTestId("btn-rotate-join-code") as HTMLButtonElement;
+    expect(generate.disabled).toBe(false);
     expect(screen.queryByTestId("invite-staff-error")).toBeNull();
   });
 

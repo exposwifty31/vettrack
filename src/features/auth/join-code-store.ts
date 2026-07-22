@@ -28,6 +28,8 @@ export function writeCarriedJoinCode(code: string | null): void {
  * carried valid code must survive a later junk-parameter visit).
  */
 export function captureJoinCodeFromSearch(search: string): void {
-  const code = new URLSearchParams(search).get("clinic")?.trim();
+  // Uppercase at capture so the carried value matches the server's canonical
+  // code form (sanitizeJoinCode) and the join screen's uppercased input.
+  const code = new URLSearchParams(search).get("clinic")?.trim().toUpperCase();
   if (code && CARRIED_CODE_SHAPE.test(code)) writeCarriedJoinCode(code);
 }

@@ -40,6 +40,11 @@ describe("captureJoinCodeFromSearch — /signin?clinic= and /signup?clinic= entr
     expect(readCarriedJoinCode()).toBe("ABCD23EFGH");
   });
 
+  it("normalizes a lowercase code to the canonical uppercase form", () => {
+    captureJoinCodeFromSearch("?clinic=abcd23efgh");
+    expect(readCarriedJoinCode()).toBe("ABCD23EFGH");
+  });
+
   it("ignores a malformed code (too short / bad chars) — nothing persisted", () => {
     captureJoinCodeFromSearch("?clinic=nope");
     expect(readCarriedJoinCode()).toBeNull();
