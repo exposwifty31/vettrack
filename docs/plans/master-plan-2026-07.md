@@ -654,18 +654,26 @@ interface RoomPresenceSubscriberProps {
  * correctly with zero new server code.
  */
 export function RoomPresenceSubscriber({ roomId, onUpdate }: RoomPresenceSubscriberProps): null {
-  const { presentMembers } = useRecordPresence({ recordType: "room", recordId: roomId });
+  const { isConnected, presentMembers } = useRecordPresence({ recordType: "room", recordId: roomId });
 
   // Effect, not render body: calling onUpdate (which triggers a parent setState)
   // directly during render is invalid — React may warn or loop. Runs whenever this
   // room's presence array reference changes (useRecordPresence returns a new array
   // only on a real membership change), so this doesn't fire on every unrelated render.
+  //
+  // Gated on isConnected: without this, the very first render (before the collab
+  // socket has joined this room) would call onUpdate with the hook's initial empty
+  // presentMembers array and stamp lastUpdatedAt = now — indistinguishable from "we
+  // checked and the room is genuinely empty." Waiting for isConnected means "no
+  // snapshot yet" (parent renders isStale: false, members: [] from having no entry
+  // at all) stays visibly different from "confirmed empty as of lastUpdatedAt."
   useEffect(() => {
+    if (!isConnected) return;
     onUpdate(roomId, { members: presentMembers, lastUpdatedAt: Date.now() });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- onUpdate is a stable
     // callback from useFloorPresence's useCallback; omitting it avoids re-firing
     // on every parent render.
-  }, [roomId, presentMembers]);
+  }, [roomId, isConnected, presentMembers]);
 
   return null;
 }
@@ -921,11 +929,21 @@ import { FloorPresenceCard } from "../../src/features/floor-presence/FloorPresen
 const ROOMS = [{ id: "room-icu", name: "ICU" }, { id: "room-surgery", name: "Surgery" }];
 let roomsListImpl = async () => ROOMS;
 
+// Captures each mounted subscriber's onUpdate so a test can controllably fire
+// it — this is what actually exercises the Task 5 fix (handleRoomUpdate wired
+// straight through, not a second disconnected local state) end-to-end through
+// the real FloorPresenceCard, rather than trusting the wiring by inspection.
+type PresenceUpdateFn = (roomId: string, snapshot: { members: { userId: string; displayName: string }[]; lastUpdatedAt: number }) => void;
+const onUpdateByRoom = new Map<string, PresenceUpdateFn>();
+
 vi.mock("../../src/lib/api", () => ({
   api: { rooms: { list: () => roomsListImpl() } },
 }));
 vi.mock("../../src/features/floor-presence/RoomPresenceSubscriber", () => ({
-  RoomPresenceSubscriber: () => null,
+  RoomPresenceSubscriber: ({ roomId, onUpdate }: { roomId: string; onUpdate: PresenceUpdateFn }) => {
+    onUpdateByRoom.set(roomId, onUpdate);
+    return null;
+  },
 }));
 
 describe("FloorPresenceCard", () => {
@@ -941,6 +959,16 @@ describe("FloorPresenceCard", () => {
     render(<FloorPresenceCard />);
     expect(await screen.findByTestId("floor-presence-error")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /retry|נסה שוב/i })).toBeInTheDocument();
+  });
+
+  it("reflects a subscriber's onUpdate through to the rendered room state (proves the wiring, not just the code shape)", async () => {
+    roomsListImpl = async () => ROOMS;
+    render(<FloorPresenceCard />);
+    await screen.findByText("ICU");
+    const icuUpdate = onUpdateByRoom.get("room-icu");
+    expect(icuUpdate).toBeDefined();
+    icuUpdate!("room-icu", { members: [{ userId: "u1", displayName: "Dana" }], lastUpdatedAt: Date.now() });
+    expect(await screen.findAllByTestId("room-avatar")).toHaveLength(1);
   });
 });
 ```
@@ -1050,25 +1078,32 @@ export function FloorSheet({ open, onOpenChange, floors, currentUserId }: FloorS
   if (!open) return null;
   const allMembers = floors.flatMap((f) => f.members.map((m) => ({ ...m, roomName: f.roomName })));
   return (
-    <div
-      ref={dialogRef}
-      role="dialog"
-      aria-modal="true"
-      aria-label={t.floorPresence.wholeFloor}
-      tabIndex={-1}
-    >
-      <h2>{t.floorPresence.wholeFloor}</h2>
-      <button type="button" onClick={() => onOpenChange(false)} aria-label={t.floorPresence.close}>
-        ×
-      </button>
-      <ul>
-        {allMembers.map((m) => (
-          <li key={m.userId}>
-            {m.displayName} — {m.roomName}
-            {m.userId === currentUserId ? ` (${t.floorPresence.youMarker})` : ""}
-          </li>
-        ))}
-      </ul>
+    // Backdrop dismisses on click; the dialog content stops propagation so a
+    // click anywhere inside it (a list item, the heading) does not bubble up
+    // to the backdrop and close the sheet. Only the backdrop, the close
+    // button, and Escape dismiss it.
+    <div data-testid="floor-sheet-backdrop" onClick={() => onOpenChange(false)}>
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={t.floorPresence.wholeFloor}
+        tabIndex={-1}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h2>{t.floorPresence.wholeFloor}</h2>
+        <button type="button" onClick={() => onOpenChange(false)} aria-label={t.floorPresence.close}>
+          ×
+        </button>
+        <ul>
+          {allMembers.map((m) => (
+            <li key={m.userId}>
+              {m.displayName} — {m.roomName}
+              {m.userId === currentUserId ? ` (${t.floorPresence.youMarker})` : ""}
+            </li>
+          ))}
+        </ul>
+      </div>
     </div>
   );
 }
@@ -1077,7 +1112,7 @@ export function FloorSheet({ open, onOpenChange, floors, currentUserId }: FloorS
 - [ ] **Step 4: Run to verify it passes**
 
 Run: `npx vitest run tests/floor-presence/FloorPresenceCard.test.tsx -v`
-Expected: `Tests  2 passed (2)` (once Task 8's i18n keys — including the new `loading`/`loadError`/`retry`/
+Expected: `Tests  3 passed (3)` (once Task 8's i18n keys — including the new `loading`/`loadError`/`retry`/
 `close` keys — exist; same ordering note as Task 6).
 
 - [ ] **Step 5: Commit**

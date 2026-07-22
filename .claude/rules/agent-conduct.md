@@ -15,12 +15,16 @@ stop and ask. This applies to every agent working in this repo, local or remote/
 (e.g. Ultraplan) — a "revise" request authorizes revising a document, not researching, committing,
 or opening a PR.
 
-**This does not conflict with Rule 1.** Read-only inspection needed to fulfill the literal request —
-reading files, running `git log`/`git status`/`gh pr view`, greping for a claim before repeating it — is
-implicitly authorized by the request itself; that's what Rule 1 requires. What needs *explicit*
-authorization is anything with an external or hard-to-reverse effect: committing, pushing, opening a PR,
-merging, or posting anywhere. When it's unclear whether a specific action falls on the read-only or the
-side-effect side of that line, treat it as a side effect and ask.
+**This does not conflict with Rule 1 — both read-only repo inspection and external research are implicitly
+authorized when they serve the literal request.** Rule 1 requires grounding in real, current knowledge
+before acting; a request cannot simultaneously require that research and forbid it. So: reading files,
+running `git log`/`git status`/`gh pr view`, greping for a claim before repeating it, and external
+lookups (docs sites, package registries, web search) needed to verify a claim in the literal request are
+all implicitly authorized — none of them are actions *on* the repo or *visible to others*, which is what
+Rule 2 is guarding against. What still needs *explicit* authorization is anything with an external or
+hard-to-reverse effect: committing, pushing, opening a PR, merging, or posting anywhere. When it's unclear
+whether a specific action is research (implicitly fine) or a side effect (needs explicit go), treat it as
+a side effect and ask.
 
 > Written in direct response to PR #132 (`claude/refine-local-plan-42a7o6`) being opened on a "revise"
 > request with no explicit execution approval.

@@ -5,6 +5,23 @@ Session 2 | Date: 2026-07-16
 
 > Companion to `session-1.md` (the 10x *feature* program). This session answers a different, higher question: **not "what's the next big feature" but "what change in identity earns the 2.0 badge."** A 2.0 is not a bigger 1.x — it is a change in what the product IS. Every thesis below was adversarially stress-tested against that bar; the ones that were strong-1.x-features-in-disguise are named and killed in "Why NOT 2.0."
 
+> **Editorial note added 2026-07-22 (recovery/reconciliation pass, not a rewrite of the original text):**
+> this is the original 2026-07-16 vision document, preserved verbatim below. Two specific phrasings have
+> since been superseded by concrete architecture decisions made after this doc was written, and are cited
+> here rather than edited in place, since silently rewriting an owner-authored decision doc would
+> misrepresent what was actually decided at the time:
+> - **"live over the Socket.io presence channel"** (Move 2, below): the collab channel (R-RTC-1,
+>   `server/lib/realtime-collab/`) was later locked as **ephemeral-only** — presence/cursors/typing/nudges
+>   — and explicitly **never** carries domain or emergency state (`docs/CLAUDE.md`, "Frozen architecture
+>   surfaces"). The Shift Autopilot's approval queue (proposals/approvals/executions — real domain state)
+>   must route through the existing SSE/outbox transport instead, the same as every other domain event.
+> - **"Equipment tracking, Code Blue, tasks, inventory... must continue when the network... is
+>   unavailable"** (Build-vs-mirror, below): Code Blue is a later-carved-out exception to Offline-First —
+>   emergency mutations are **online-only, fail loud, never queued for offline replay**
+>   (`docs/CLAUDE.md`, "Code Blue runtime guarantees"). The offline-continuity vision holds for equipment
+>   tracking, tasks, inventory, and handovers; Code Blue specifically does not participate in offline
+>   continuation.
+
 ---
 
 ## Current Value

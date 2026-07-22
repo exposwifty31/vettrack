@@ -470,11 +470,16 @@ FKs — resolve explicitly before either starts its own Phase 0, don't let two c
 
 ## Platform research addendum (2026-07-19)
 
-1. **~~Shell strategy confirmed — Capacitor stays.~~ SUPERSEDED 2026-07-22** by the owner's binding
-   decision to migrate to a bare React Native CLI app (see `docs/plans/master-plan-2026-07.md` Layers
-   3–5; ADR-008, pending, is where this supersession becomes formal). The analysis below (RN New
-   Architecture vs. the one-web-bundle/4-platform-seam/offline-PWA strategy) is kept as historical
-   context for *why* Capacitor was originally chosen — it is no longer the operative decision.
+1. **~~Shell strategy confirmed — Capacitor stays.~~ SUPERSEDED 2026-07-22 as the *long-term* shell
+   strategy** by the owner's binding decision to migrate to a bare React Native CLI app (see
+   `docs/plans/master-plan-2026-07.md` Layers 3–5; ADR-008, pending, is where this supersession becomes
+   formal). **This does not change Task 1.3 (Android ship, above): Capacitor remains the vehicle for that
+   near-term release** — Layer 2 (Android via Capacitor) happens *before* Layer 5 (the bare-RN migration)
+   in the master plan's own sequencing, so Capacitor is a deliberate bridge, not a contradiction of the
+   later decision. Task 1.3's Capacitor-specific steps (`scripts/build-native-shell.sh --android`, Play
+   Console signing) stay as written and should execute on schedule; only the *terminal* shell (post-Layer
+   5) is bare RN. The analysis below (RN New Architecture vs. the one-web-bundle/4-platform-seam/
+   offline-PWA strategy) is kept as historical context for *why* Capacitor was originally chosen.
    ~~RN New Architecture (JSI/Fabric/TurboModules, default since 0.76) optimizes native-widget
    rendering — orthogonal to the one-web-bundle / 4-platform-seam / offline-PWA strategy. Migration = UI
    rewrite, discards the App-Store-approved bundled shell.~~ RN's `AccessibilityInfo` retained only as
