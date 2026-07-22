@@ -26,12 +26,32 @@ if [ ! -r "$F" ]; then
   exit 2
 fi
 
-actual_ids=$(grep -oE '^- \[[ x]\] [0-9]+\.[0-9]+' "$F" | grep -oE '[0-9]+\.[0-9]+')
-if [ -z "$actual_ids" ]; then
-  echo "[2.0-gate] BLOCKED: found zero tracker items in $F — parsing failed or the tracker was deleted." >&2
+# ONE strict parser is the source of truth for both the ID set and the done/total
+# counts — deriving them from two independently-scoped greps (as an earlier version
+# of this script did) let them silently drift apart. The pattern requires: "- [ ] "
+# or "- [x] ", then a bare N.N task ID, then a REQUIRED space before the description
+# — anchored so "1.1foo" (no space after the ID) is rejected outright rather than
+# silently parsed as "1.1", and a checklist line elsewhere in the doc that doesn't
+# match this exact shape (an "auxiliary" checkbox) is excluded from both counts.
+records=$(grep -nE '^- \[[ x]\] [0-9]+\.[0-9]+ ' "$F")
+if [ -z "$records" ]; then
+  echo "[2.0-gate] BLOCKED: found zero valid tracker records in $F — parsing failed or the tracker was deleted." >&2
   exit 2
 fi
 
+# Catch malformed near-misses: any checkbox line whose ID token doesn't parse
+# cleanly under the strict pattern above (e.g. "1.1foo", "1", "1.1.1") but still
+# looks like it was meant to be a tracker row. Silently dropping these would let a
+# corrupted ID vanish from the count instead of blocking.
+all_checkbox_lines=$(grep -c '^- \[[ x]\] ' "$F")
+valid_lines=$(echo "$records" | wc -l | tr -d ' ')
+if [ "$all_checkbox_lines" -ne "$valid_lines" ]; then
+  echo "[2.0-gate] BLOCKED: found $all_checkbox_lines checkbox line(s) but only $valid_lines parsed as valid N.N tracker records — a malformed or auxiliary checkbox line exists." >&2
+  grep -nE '^- \[[ x]\] ' "$F" | grep -vE '^[0-9]+:- \[[ x]\] [0-9]+\.[0-9]+ ' | sed 's/^/[2.0-gate]   /' >&2
+  exit 2
+fi
+
+actual_ids=$(echo "$records" | grep -oE '[0-9]+\.[0-9]+' )
 total=$(echo "$actual_ids" | wc -l | tr -d ' ')
 duplicates=$(echo "$actual_ids" | sort | uniq -d)
 if [ -n "$duplicates" ]; then
@@ -65,10 +85,13 @@ if [ "$total" -ne 19 ]; then
   exit 2
 fi
 
-done_count=$(grep -c '^- \[x\] ' "$F")
+# done_count/open-items come from the SAME validated $records set, not a fresh grep
+# over the whole file — the earlier version's separate `grep -c '^- \[x\] '` would
+# have silently counted any auxiliary checkbox line elsewhere in the doc too.
+done_count=$(echo "$records" | grep -cE '^[0-9]+:- \[x\] ')
 echo "[2.0-gate] VetTrack 2.0 scope: $done_count/19 shipped."
 if [ "$done_count" -lt 19 ]; then
   echo "[2.0-gate] Open items:"
-  grep '^- \[ \] ' "$F" | sed 's/^- \[ \] /[2.0-gate]   - /'
+  echo "$records" | grep -E '^[0-9]+:- \[ \] ' | sed -E 's/^[0-9]+:- \[ \] /[2.0-gate]   - /'
 fi
 exit 0

@@ -18,7 +18,7 @@ or opening a PR.
 **This does not conflict with Rule 1 — both read-only repo inspection and external research are implicitly
 authorized when they serve the literal request.** Rule 1 requires grounding in real, current knowledge
 before acting; a request cannot simultaneously require that research and forbid it. So: reading files,
-running `git log`/`git status`/`gh pr view`, greping for a claim before repeating it, and external
+running `git log`/`git status`/`gh pr view`, grepping for a claim before repeating it, and external
 lookups (docs sites, package registries, web search) needed to verify a claim in the literal request are
 all implicitly authorized — none of them are actions *on* the repo or *visible to others*, which is what
 Rule 2 is guarding against. What still needs *explicit* authorization is anything with an external or
