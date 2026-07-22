@@ -59,11 +59,33 @@ export interface TransitionAndRecordDecisionMeta {
   stagedDraftContent: unknown;
 }
 
+/** Drizzle transaction client from `db.transaction` — mirrors `AuditDbExecutor` (`server/lib/audit.ts`), same technique, this module's own type. */
+export type ActionProposalTransactionExecutor = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
 export interface TransitionAndRecordInput {
   clinicId: string;
   proposalId: string;
   patch: ActionProposalTransitionPatch;
   decisionMeta: TransitionAndRecordDecisionMeta;
+  /**
+   * Task 1.1 §4 — kind-dispatched approve side effect (e.g.
+   * `restock_po_on_burn` inserting real `vt_purchase_orders`/`vt_po_lines`
+   * rows). Executed INSIDE the same atomic unit as the transition +
+   * decision-log append:
+   *   - Drizzle impl: inside the same `db.transaction` — receives the `tx`
+   *     handle so its inserts commit/rollback together with the transition.
+   *     A throw here rolls back the WHOLE transaction, so the proposal
+   *     row's `status` update never commits either — the proposal is left
+   *     `staged` in the DB, exactly as if the decision never happened.
+   *   - InMemory fake: invoked before any of this call's mutations are
+   *     applied to the in-memory maps — a throw leaves the proposal
+   *     untouched (still staged), mirroring the Drizzle rollback semantics
+   *     without a real transaction.
+   * Only `approveProposal` for kinds with a registered side effect passes
+   * this; every other decision (edit, reject, and approve for the other 3
+   * kinds) leaves it `undefined` — a pure status flip, unchanged.
+   */
+  sideEffect?: (tx: ActionProposalTransactionExecutor) => Promise<void>;
 }
 
 export interface TransitionAndRecordResult {
@@ -246,6 +268,10 @@ export class DrizzleActionProposalWriter implements ActionProposalWriter {
 
       if (!proposal) throw new ActionProposalAlreadyDecidedError(input.proposalId);
 
+      if (input.sideEffect) {
+        await input.sideEffect(tx);
+      }
+
       const [decision] = await tx
         .insert(actionProposalDecisionLog)
         .values({
@@ -381,6 +407,14 @@ export class InMemoryActionProposalWriter implements ActionProposalWriter {
     const row = this.proposals.get(input.proposalId);
     if (!row || row.clinicId !== input.clinicId || row.status !== "staged") {
       throw new ActionProposalAlreadyDecidedError(input.proposalId);
+    }
+
+    // Mirrors the Drizzle impl's transaction ordering: the side effect runs
+    // AFTER the staged-status guard passes but BEFORE any mutation is
+    // applied to `this.proposals`/`this.decisions` below — a throw here
+    // propagates out with neither map touched, matching a rolled-back tx.
+    if (input.sideEffect) {
+      await input.sideEffect(undefined as unknown as ActionProposalTransactionExecutor);
     }
 
     const updatedProposal = {

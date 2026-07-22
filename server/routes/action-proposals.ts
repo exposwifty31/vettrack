@@ -60,6 +60,16 @@ function mapError(req: Request, res: Response, err: unknown): Response {
   if (err instanceof ActionProposalAlreadyDecidedError) {
     return apiError(req, res, "errors.conflict", undefined, 409);
   }
+  // Task 1.1 §4 (deliverable E) — per-kind edit-body Zod failure
+  // (`ActionProposalEditValidationError`, `action-proposal-service.ts`).
+  // Checked by `.name`, not `instanceof`: this route's unit test
+  // (`tests/autopilot/action-proposals.routes.test.ts`) mocks the whole
+  // `action-proposal-service.js` module and does not export this class —
+  // an `instanceof` check against an `undefined` mocked export throws
+  // instead of falling through to the generic 500 branch below.
+  if (err instanceof Error && err.name === "ActionProposalEditValidationError") {
+    return apiError(req, res, "errors.validation", undefined, 400);
+  }
   console.error("[action-proposals] route error", err);
   return apiError(req, res, "errors.generic", undefined, 500);
 }
