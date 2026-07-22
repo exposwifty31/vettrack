@@ -126,7 +126,63 @@ export const crashCartDriftEditedContentSchema = z
   .strict();
 export type CrashCartDriftEditedContent = z.infer<typeof crashCartDriftEditedContentSchema>;
 
+/**
+ * VetTrack 2.0, Task 1.1 §2 — per-kind edit-body Zod for `shift_handover_draft`.
+ *
+ * Looseness tradeoff (documented per the plan's instruction): the shape is
+ * "loose but safe" — the STRUCTURE is strict (exactly the four delta
+ * dimensions as arrays, `openItems` as an array, an optional `note`; unknown
+ * top-level keys rejected via `.strict()`), but the CONTENT inside each
+ * delta/open-item entry is free-form strings, not closed enums. A human
+ * reviewing a handover before it publishes may need to correct a typo'd
+ * summary, add a manually-noted event the automated aggregation missed, or
+ * adjust a `kind` label — none of that should be blocked by re-validating
+ * against the same closed `classifyDeltaKind` action-type sets the automated
+ * generator uses, which exist to bound what gets AGGREGATED, not what a
+ * human may legitimately WRITE. This keeps the schema a garbage-shape gate
+ * (wrong types, missing dimensions, extra keys) rather than a content
+ * censor — this kind has no approve/edit side effect in this slice (see
+ * `action-proposal-service.ts`'s dispatch site), so an edited handover is
+ * held for the (not-yet-built) §0(c) publish follow-up, not executed here.
+ */
+const shiftHandoverDeltaEntrySchema = z
+  .object({
+    sourceId: z.string().min(1),
+    kind: z.string().min(1),
+    targetId: z.string().nullable(),
+    targetType: z.string().nullable(),
+    at: z.string().min(1),
+  })
+  .strict();
+
+const shiftHandoverDeltasSchema = z
+  .object({
+    custody: z.array(shiftHandoverDeltaEntrySchema),
+    taskState: z.array(shiftHandoverDeltaEntrySchema),
+    alerts: z.array(shiftHandoverDeltaEntrySchema),
+    dispenses: z.array(shiftHandoverDeltaEntrySchema),
+  })
+  .strict();
+
+const shiftHandoverOpenItemSchema = z
+  .object({
+    id: z.string().min(1),
+    kind: z.string().min(1),
+    summary: z.string().min(1),
+  })
+  .strict();
+
+export const shiftHandoverDraftEditedContentSchema = z
+  .object({
+    deltas: shiftHandoverDeltasSchema,
+    openItems: z.array(shiftHandoverOpenItemSchema),
+    note: z.string().min(1).max(2000).optional(),
+  })
+  .strict();
+export type ShiftHandoverDraftEditedContent = z.infer<typeof shiftHandoverDraftEditedContentSchema>;
+
 const PER_KIND_EDITED_CONTENT_SCHEMAS: Partial<Record<ActionProposalKind, z.ZodTypeAny>> = {
+  shift_handover_draft: shiftHandoverDraftEditedContentSchema,
   restock_po_on_burn: restockPoOnBurnEditedContentSchema,
   crash_cart_drift: crashCartDriftEditedContentSchema,
 };
