@@ -58,7 +58,8 @@ first impression waiting to happen.
 
 ### Present, part B — decided and speced, but zero pixels exist
 This is the most important distinction for you specifically. VetTrack 2.0 (Case Spine + Shift
-Autopilot, below) is **6 of 18 tracker items done** — but every one of those six is a written spec, a
+Autopilot, below) is **6 of 19 tracker items done** (`docs/vettrack-2.0-roadmap.md`, count enforced by
+`scripts/vettrack-2.0-scope-gate.sh`) — but every one of those six is a written spec, a
 decisions document, or a throwaway code spike (explicitly not merged, "learning artifact" only per the
 roadmap). **No Case Spine screen, no Autopilot approval queue, no Live Floor view, no ROI ledger exists
 anywhere — not in the app, not in this design project, not as a sketch.** You are not restyling or
@@ -70,7 +71,10 @@ built for a different (1.0-era) feature set. Also **not started at all, in any f
 the approval/edit/reject API, one proposal type's reader/composer) is being actively built right now in
 an isolated git worktree — real, but **uncommitted, unmerged, and backend-only: zero UI, zero copy**.
 The "Autopilot approval queue" spec below reflects that in-progress schema, so you have real field names
-to design against instead of guessing — treat it as authoritative shape, not a finished feature.
+to design against instead of guessing — treat it as the current best-known shape, not a finished feature
+and not a committed contract: it is uncommitted and unmerged, and its field names may still change before
+it lands. If a committed, stable contract is needed instead, use `packages/contracts` (framework-free,
+already merged) rather than this in-progress worktree.
 
 ### The design substrate you have to build on (regardless of era)
 A few things hold across past, present, and future — carry them into every screen you produce:

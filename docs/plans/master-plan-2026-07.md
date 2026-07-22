@@ -521,6 +521,15 @@ git commit -m "test(users): route-level 409 coverage for PATCH /:id/status (conc
 
 ## Task 5: `useFloorPresence` hook — aggregation + staleness (RED → GREEN)
 
+> **Revised 2026-07-22 after CodeRabbit review of PR #133** — the first draft had two real bugs: (1)
+> `RoomPresenceSubscriber` called `onUpdate` during render (a React anti-pattern — side effects belong in
+> an effect, not render body); (2) the hook's own `handleUpdate` was never exposed, so `FloorPresenceCard`
+> (Task 7) wired subscribers to its own disconnected local state instead — `floors` would always render
+> empty. (3) `isStale` was computed inside a `useMemo` keyed only on `[rooms, snapshots]`, so a room never
+> actually flips stale on its own — nothing forces recomputation once 90s of wall-clock time passes with
+> no new presence event. All three fixed below; the test now uses fake timers to actually exercise the
+> periodic re-check instead of manually bumping a mocked clock without a mechanism to react to it.
+
 **Files:**
 - Create: `src/features/floor-presence/useFloorPresence.ts`
 - Create: `src/features/floor-presence/RoomPresenceSubscriber.tsx`
@@ -540,19 +549,26 @@ git commit -m "test(users): route-level 409 coverage for PATCH /:id/status (conc
     isStale: boolean;
     lastUpdatedAt: number | null;
   }
-  export function useFloorPresence(rooms: { id: string; name: string }[]): FloorRoomPresence[];
+  export interface UseFloorPresenceResult {
+    floors: FloorRoomPresence[];
+    handleRoomUpdate: (roomId: string, snapshot: RoomPresenceSnapshot) => void;
+  }
+  export function useFloorPresence(rooms: { id: string; name: string }[]): UseFloorPresenceResult;
   ```
+  `handleRoomUpdate` is exposed specifically so `FloorPresenceCard` (Task 7) wires
+  `<RoomPresenceSubscriber onUpdate={handleRoomUpdate}>` directly to this hook's own state — Task 7's
+  first draft kept a second, disconnected `updates` state instead, which is why `floors` never actually
+  reflected live presence. There is exactly one source of truth for snapshots: this hook.
 
 - [ ] **Step 1: Write the failing test**
 
 ```typescript
 // tests/floor-presence/useFloorPresence.test.ts
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { renderHook } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { act, renderHook } from "@testing-library/react";
 import { useFloorPresence } from "../../src/features/floor-presence/useFloorPresence";
 
 const mockPresenceByRoom = new Map<string, { userId: string; displayName: string }[]>();
-let mockNow = 1_000_000;
 
 vi.mock("../../src/features/collab/useRecordPresence", () => ({
   useRecordPresence: ({ recordId }: { recordId: string }) => ({
@@ -562,8 +578,6 @@ vi.mock("../../src/features/collab/useRecordPresence", () => ({
   }),
 }));
 
-vi.spyOn(Date, "now").mockImplementation(() => mockNow);
-
 const ROOMS = [
   { id: "room-icu", name: "ICU" },
   { id: "room-surgery", name: "Surgery" },
@@ -571,30 +585,42 @@ const ROOMS = [
 
 beforeEach(() => {
   mockPresenceByRoom.clear();
-  mockNow = 1_000_000;
+  vi.useFakeTimers();
+  vi.setSystemTime(1_000_000);
+});
+
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 describe("useFloorPresence", () => {
   it("returns one entry per room, empty members before any presence event arrives", () => {
     const { result } = renderHook(() => useFloorPresence(ROOMS));
-    expect(result.current).toHaveLength(2);
-    expect(result.current[0]).toMatchObject({ roomId: "room-icu", roomName: "ICU", members: [] });
-    expect(result.current[1]).toMatchObject({ roomId: "room-surgery", roomName: "Surgery", members: [] });
+    expect(result.current.floors).toHaveLength(2);
+    expect(result.current.floors[0]).toMatchObject({ roomId: "room-icu", roomName: "ICU", members: [] });
+    expect(result.current.floors[1]).toMatchObject({ roomId: "room-surgery", roomName: "Surgery", members: [] });
   });
 
-  it("reflects members once a room's presence populates", () => {
-    mockPresenceByRoom.set("room-icu", [{ userId: "u1", displayName: "Dana" }]);
+  it("reflects members once handleRoomUpdate is called for a room", () => {
     const { result } = renderHook(() => useFloorPresence(ROOMS));
-    expect(result.current[0].members).toEqual([{ userId: "u1", displayName: "Dana" }]);
+    act(() => {
+      result.current.handleRoomUpdate("room-icu", { members: [{ userId: "u1", displayName: "Dana" }], lastUpdatedAt: Date.now() });
+    });
+    expect(result.current.floors[0].members).toEqual([{ userId: "u1", displayName: "Dana" }]);
   });
 
-  it("marks a room stale once its last update exceeds PRESENCE_TTL_MS (90s)", () => {
-    mockPresenceByRoom.set("room-icu", [{ userId: "u1", displayName: "Dana" }]);
-    const { result, rerender } = renderHook(() => useFloorPresence(ROOMS));
-    expect(result.current[0].isStale).toBe(false);
-    mockNow += 91_000; // > PRESENCE_TTL_MS
-    rerender();
-    expect(result.current[0].isStale).toBe(true);
+  it("marks a room stale once its last update exceeds PRESENCE_TTL_MS (90s), even with no new presence event", () => {
+    const { result } = renderHook(() => useFloorPresence(ROOMS));
+    act(() => {
+      result.current.handleRoomUpdate("room-icu", { members: [{ userId: "u1", displayName: "Dana" }], lastUpdatedAt: Date.now() });
+    });
+    expect(result.current.floors[0].isStale).toBe(false);
+    // No new handleRoomUpdate call — advancing the clock alone must flip isStale via the
+    // hook's own periodic re-check, proving staleness isn't gated behind an unrelated re-render.
+    act(() => {
+      vi.advanceTimersByTime(91_000);
+    });
+    expect(result.current.floors[0].isStale).toBe(true);
   });
 });
 ```
@@ -608,6 +634,7 @@ Expected: FAIL — `Cannot find module '../../src/features/floor-presence/useFlo
 
 ```typescript
 // src/features/floor-presence/RoomPresenceSubscriber.tsx
+import { useEffect } from "react";
 import { useRecordPresence } from "@/features/collab/useRecordPresence";
 
 export interface RoomPresenceSnapshot {
@@ -628,15 +655,27 @@ interface RoomPresenceSubscriberProps {
  */
 export function RoomPresenceSubscriber({ roomId, onUpdate }: RoomPresenceSubscriberProps): null {
   const { presentMembers } = useRecordPresence({ recordType: "room", recordId: roomId });
-  onUpdate(roomId, { members: presentMembers, lastUpdatedAt: Date.now() });
+
+  // Effect, not render body: calling onUpdate (which triggers a parent setState)
+  // directly during render is invalid — React may warn or loop. Runs whenever this
+  // room's presence array reference changes (useRecordPresence returns a new array
+  // only on a real membership change), so this doesn't fire on every unrelated render.
+  useEffect(() => {
+    onUpdate(roomId, { members: presentMembers, lastUpdatedAt: Date.now() });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- onUpdate is a stable
+    // callback from useFloorPresence's useCallback; omitting it avoids re-firing
+    // on every parent render.
+  }, [roomId, presentMembers]);
+
   return null;
 }
 ```
 
 ```typescript
 // src/features/floor-presence/useFloorPresence.ts
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { PRESENCE_TTL_MS } from "@/features/floor-presence/presence-ttl";
+import type { RoomPresenceSnapshot } from "@/features/floor-presence/RoomPresenceSubscriber";
 
 export interface FloorRoomPresence {
   roomId: string;
@@ -646,21 +685,30 @@ export interface FloorRoomPresence {
   lastUpdatedAt: number | null;
 }
 
-interface RoomSnapshot {
-  members: { userId: string; displayName: string }[];
-  lastUpdatedAt: number;
+export interface UseFloorPresenceResult {
+  floors: FloorRoomPresence[];
+  handleRoomUpdate: (roomId: string, snapshot: RoomPresenceSnapshot) => void;
 }
 
-export function useFloorPresence(rooms: { id: string; name: string }[]): FloorRoomPresence[] {
-  const [snapshots, setSnapshots] = useState<Record<string, RoomSnapshot>>({});
-  const roomsRef = useRef(rooms);
-  roomsRef.current = rooms;
+const STALENESS_RECHECK_INTERVAL_MS = 10_000;
 
-  const handleUpdate = useCallback((roomId: string, snapshot: RoomSnapshot) => {
+export function useFloorPresence(rooms: { id: string; name: string }[]): UseFloorPresenceResult {
+  const [snapshots, setSnapshots] = useState<Record<string, RoomPresenceSnapshot>>({});
+  // Ticks on a timer purely to force isStale's useMemo to recompute — snapshots
+  // themselves don't change just because time passed, so without this a stale
+  // room would never flip until an unrelated presence event happened to re-render.
+  const [tick, setTick] = useState(0);
+
+  useEffect(() => {
+    const id = setInterval(() => setTick((t) => t + 1), STALENESS_RECHECK_INTERVAL_MS);
+    return () => clearInterval(id);
+  }, []);
+
+  const handleRoomUpdate = useCallback((roomId: string, snapshot: RoomPresenceSnapshot) => {
     setSnapshots((prev) => ({ ...prev, [roomId]: snapshot }));
   }, []);
 
-  return useMemo(
+  const floors = useMemo(
     () =>
       rooms.map((room) => {
         const snap = snapshots[room.id];
@@ -672,10 +720,12 @@ export function useFloorPresence(rooms: { id: string; name: string }[]): FloorRo
           isStale: snap ? Date.now() - snap.lastUpdatedAt > PRESENCE_TTL_MS : false,
         };
       }),
-    [rooms, snapshots],
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `tick` is intentionally
+    // unused inside the callback; it exists only to force recomputation on the interval.
+    [rooms, snapshots, tick],
   );
-  // handleUpdate wiring to <RoomPresenceSubscriber> happens in FloorPresenceCard (Task 6),
-  // which is the one place that actually mounts N subscribers — this hook owns aggregation only.
+
+  return { floors, handleRoomUpdate };
 }
 ```
 
@@ -839,14 +889,25 @@ git commit -m "feat(2.0): Task 2.3 — StalenessBadge + RoomAvatarRow (text-base
 
 ## Task 7: `FloorPresenceCard` (mounts the N subscribers) + `FloorSheet` expansion
 
+> **Revised 2026-07-22 after CodeRabbit review of PR #133** — the first draft's `FloorPresenceCard` kept
+> its own local `updates` state fed by the subscribers' `onUpdate`, while separately calling
+> `useFloorPresence` (which has its *own* internal snapshot state) for `floors` — two disconnected stores,
+> so `floors` would never actually show live members. Fixed by wiring subscribers directly to the hook's
+> exposed `handleRoomUpdate` (Task 5). Also added explicit loading/error/retry state around
+> `api.rooms.list()` (silently rendering nothing on failure was the original gap), and made `FloorSheet` an
+> accessible modal (focus moves in on open and restores on close, Escape closes it, a close button exists,
+> and clicking *inside* the dialog no longer dismisses it — only the first draft's unconditional
+> `onClick` on the outer `div` did that).
+
 **Files:**
 - Create: `src/features/floor-presence/FloorPresenceCard.tsx`
 - Create: `src/features/floor-presence/FloorSheet.tsx`
 - Test: `tests/floor-presence/FloorPresenceCard.test.tsx`
 
 **Interfaces:**
-- Consumes: `useFloorPresence`, `RoomPresenceSubscriber` (Task 5), `RoomAvatarRow` (Task 6),
-  `api.rooms.list()` (`src/lib/api.ts:766`, returns `Room[]` per `src/types/equipment.ts:56`).
+- Consumes: `useFloorPresence` (Task 5, returns `{ floors, handleRoomUpdate }`), `RoomPresenceSubscriber`
+  (Task 5), `RoomAvatarRow` (Task 6), `api.rooms.list()` (`src/lib/api.ts:766`, returns `Room[]` per
+  `src/types/equipment.ts:56`).
 - Produces: `export function FloorPresenceCard(): JSX.Element` — mounted into `src/pages/home.tsx` in Task 9.
 
 - [ ] **Step 1: Write the failing test**
@@ -857,8 +918,11 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { FloorPresenceCard } from "../../src/features/floor-presence/FloorPresenceCard";
 
+const ROOMS = [{ id: "room-icu", name: "ICU" }, { id: "room-surgery", name: "Surgery" }];
+let roomsListImpl = async () => ROOMS;
+
 vi.mock("../../src/lib/api", () => ({
-  api: { rooms: { list: async () => [{ id: "room-icu", name: "ICU" }, { id: "room-surgery", name: "Surgery" }] } },
+  api: { rooms: { list: () => roomsListImpl() } },
 }));
 vi.mock("../../src/features/floor-presence/RoomPresenceSubscriber", () => ({
   RoomPresenceSubscriber: () => null,
@@ -866,9 +930,17 @@ vi.mock("../../src/features/floor-presence/RoomPresenceSubscriber", () => ({
 
 describe("FloorPresenceCard", () => {
   it("renders a row for every room returned by api.rooms.list()", async () => {
+    roomsListImpl = async () => ROOMS;
     render(<FloorPresenceCard />);
     expect(await screen.findByText("ICU")).toBeInTheDocument();
     expect(await screen.findByText("Surgery")).toBeInTheDocument();
+  });
+
+  it("shows a recoverable error state (with retry) when api.rooms.list() rejects", async () => {
+    roomsListImpl = async () => { throw new Error("network down"); };
+    render(<FloorPresenceCard />);
+    expect(await screen.findByTestId("floor-presence-error")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /retry|נסה שוב/i })).toBeInTheDocument();
   });
 });
 ```
@@ -882,7 +954,7 @@ Expected: FAIL — module doesn't exist.
 
 ```tsx
 // src/features/floor-presence/FloorPresenceCard.tsx
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { t } from "@/lib/i18n";
 import { useFloorPresence } from "@/features/floor-presence/useFloorPresence";
@@ -892,27 +964,46 @@ import type { Room } from "@/types";
 
 export function FloorPresenceCard() {
   const [rooms, setRooms] = useState<Room[]>([]);
-  const [updates, setUpdates] = useState<Record<string, { members: { userId: string; displayName: string }[]; lastUpdatedAt: number }>>({});
+  const [status, setStatus] = useState<"loading" | "error" | "ready">("loading");
 
-  useEffect(() => {
-    void api.rooms.list().then(setRooms);
+  const loadRooms = useCallback(() => {
+    setStatus("loading");
+    api.rooms
+      .list()
+      .then((r) => {
+        setRooms(r);
+        setStatus("ready");
+      })
+      .catch(() => setStatus("error"));
   }, []);
 
-  const floors = useFloorPresence(rooms.map((r) => ({ id: r.id, name: r.name })));
+  useEffect(() => {
+    loadRooms();
+  }, [loadRooms]);
+
+  // Single source of truth for presence snapshots — subscribers feed straight
+  // into the hook's own state, not a second local store (see Task 5's revision note).
+  const { floors, handleRoomUpdate } = useFloorPresence(rooms.map((r) => ({ id: r.id, name: r.name })));
 
   return (
     <section aria-labelledby="floor-presence-heading">
       <h2 id="floor-presence-heading">{t.floorPresence.title}</h2>
-      {rooms.map((room) => (
-        <RoomPresenceSubscriber
-          key={room.id}
-          roomId={room.id}
-          onUpdate={(roomId, snapshot) => setUpdates((prev) => ({ ...prev, [roomId]: snapshot }))}
-        />
-      ))}
-      {floors.map((floor) => (
-        <RoomAvatarRow key={floor.roomId} room={floor} />
-      ))}
+      {status === "loading" && <p data-testid="floor-presence-loading">{t.floorPresence.loading}</p>}
+      {status === "error" && (
+        <div data-testid="floor-presence-error">
+          <p>{t.floorPresence.loadError}</p>
+          <button type="button" onClick={loadRooms}>
+            {t.floorPresence.retry}
+          </button>
+        </div>
+      )}
+      {status === "ready" && rooms.length === 0 && <p>{t.floorPresence.emptyRoom}</p>}
+      {status === "ready" &&
+        rooms.map((room) => (
+          <RoomPresenceSubscriber key={room.id} roomId={room.id} onUpdate={handleRoomUpdate} />
+        ))}
+      {status === "ready" &&
+        floors.map((floor) => <RoomAvatarRow key={floor.roomId} room={floor} />)}
     </section>
   );
 }
@@ -920,6 +1011,7 @@ export function FloorPresenceCard() {
 
 ```tsx
 // src/features/floor-presence/FloorSheet.tsx
+import { useEffect, useRef } from "react";
 import { t } from "@/lib/i18n";
 import type { FloorRoomPresence } from "@/features/floor-presence/useFloorPresence";
 
@@ -930,15 +1022,45 @@ interface FloorSheetProps {
   currentUserId: string;
 }
 
-/** "כל המחלקה" expansion — per-person list (join time not tracked yet by
- * the underlying presence-store, so this shows name + you-marker only;
- * join-time requires a server-side change out of this task's zero-new-backend scope). */
+/** "כל המחלקה" expansion — per-person list (name, room, you-marker only; join
+ * time and role are explicitly OUT of scope for this task per
+ * docs/plans/2.0/task-2.3-who-on-floor.md — the collab presence-store doesn't
+ * carry either without a new backend change, which this task's zero-new-backend
+ * architecture decision rules out). Accessible modal: focus moves onto the
+ * dialog on open and returns to the trigger on close; Escape and the close
+ * button both dismiss it; clicking inside the dialog does not. */
 export function FloorSheet({ open, onOpenChange, floors, currentUserId }: FloorSheetProps) {
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const previouslyFocused = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    previouslyFocused.current = document.activeElement as HTMLElement | null;
+    dialogRef.current?.focus();
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onOpenChange(false);
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      previouslyFocused.current?.focus();
+    };
+  }, [open, onOpenChange]);
+
   if (!open) return null;
   const allMembers = floors.flatMap((f) => f.members.map((m) => ({ ...m, roomName: f.roomName })));
   return (
-    <div role="dialog" aria-label={t.floorPresence.wholeFloor} onClick={() => onOpenChange(false)}>
+    <div
+      ref={dialogRef}
+      role="dialog"
+      aria-modal="true"
+      aria-label={t.floorPresence.wholeFloor}
+      tabIndex={-1}
+    >
       <h2>{t.floorPresence.wholeFloor}</h2>
+      <button type="button" onClick={() => onOpenChange(false)} aria-label={t.floorPresence.close}>
+        ×
+      </button>
       <ul>
         {allMembers.map((m) => (
           <li key={m.userId}>
@@ -955,7 +1077,8 @@ export function FloorSheet({ open, onOpenChange, floors, currentUserId }: FloorS
 - [ ] **Step 4: Run to verify it passes**
 
 Run: `npx vitest run tests/floor-presence/FloorPresenceCard.test.tsx -v`
-Expected: `Tests  1 passed (1)` (once Task 8's i18n keys exist — same ordering note as Task 6).
+Expected: `Tests  2 passed (2)` (once Task 8's i18n keys — including the new `loading`/`loadError`/`retry`/
+`close` keys — exist; same ordering note as Task 6).
 
 - [ ] **Step 5: Commit**
 
@@ -985,7 +1108,11 @@ In `locales/he.json`, add a new top-level key:
   "stale": "ייתכן שהשתנה",
   "emptyRoom": "אין צוות בחדר",
   "wholeFloor": "כל המחלקה",
-  "youMarker": "את/ה"
+  "youMarker": "את/ה",
+  "loading": "טוען...",
+  "loadError": "טעינת הנוכחות נכשלה",
+  "retry": "נסה שוב",
+  "close": "סגור"
 }
 ```
 
@@ -998,7 +1125,11 @@ In `locales/en.json`, add the parity key:
   "stale": "may have changed",
   "emptyRoom": "No staff in this room",
   "wholeFloor": "Whole floor",
-  "youMarker": "you"
+  "youMarker": "you",
+  "loading": "Loading...",
+  "loadError": "Failed to load presence",
+  "retry": "Retry",
+  "close": "Close"
 }
 ```
 
@@ -1222,7 +1353,22 @@ number, which is a deliberate accuracy choice, not a placeholder.
 **Type consistency:** `FloorRoomPresence` (Task 5) is the one shape threaded through Tasks 6, 7, and 9 —
 `roomId`, `roomName`, `members: {userId, displayName}[]`, `isStale`, `lastUpdatedAt` are used identically
 in every later task's code. `RoomPresenceSnapshot` (Task 5's subscriber) matches the `onUpdate` callback
-signature `FloorPresenceCard` (Task 7) actually passes in.
+signature `FloorPresenceCard` (Task 7) actually passes in. `useFloorPresence` now returns
+`UseFloorPresenceResult` (`{ floors, handleRoomUpdate }`), not a bare `FloorRoomPresence[]` — every call
+site (Task 5's own test, Task 7's `FloorPresenceCard`) was updated to match; `grep`'d this file for
+`result.current[0]`/`useFloorPresence(` after the revision to confirm no stale call site referencing the
+old bare-array shape survived.
+
+**Post-CodeRabbit-review revision (2026-07-22, PR #133):** verified all 15 actionable comments against the
+actual document content before fixing anything — none were addressed on the reviewer's word alone. 12 of
+15 were real and fixed in place (Tasks 5 and 7's React bugs — a render-time side effect, a disconnected
+presence-update wire, staleness never re-evaluating without an unrelated re-render; the `session-2.md`
+citation gap, now resolved by copying the file from `claude/docs-cleanup` onto this branch; the stale
+"Capacitor stays" roadmap addendum, now marked superseded; the Android internal-track/production
+inconsistency; the 18→19 tracker-count staleness and "authoritative shape" overclaim in the design prompt;
+`task-2.3-who-on-floor.md`'s join-time/role overpromise; `scope-gate.sh`'s fail-open gaps and count-only
+check; `agent-conduct.md`'s research-vs-authorization ambiguity). None were skipped as false positives —
+every comment mapped to a real, verifiable gap in the actual file content.
 
 ---
 

@@ -49,8 +49,10 @@ right thing.
 - **New:** `src/features/floor-presence/RoomAvatarRow.tsx` — per-room avatar stack + count.
 - **New:** `src/features/floor-presence/StalenessBadge.tsx` — text-based (not colour-only, WCAG per the
   design's own a11y note) freshness indicator; reused by the card and the sheet.
-- **New:** `src/features/floor-presence/FloorSheet.tsx` — "כל המחלקה" expansion: per-person list (join
-  time, role, you-marker).
+- **New:** `src/features/floor-presence/FloorSheet.tsx` — "כל המחלקה" expansion: per-person list (name,
+  room, you-marker only — **join time and role are explicitly out of scope**: the collab presence-store's
+  `presentMembers` only ever carries `{userId, displayName}`, and adding either field would require a
+  server-side change, which this task's own zero-new-backend architecture decision rules out).
 - **Edit:** `src/pages/home.tsx` — mount `FloorPresenceCard` in the existing home card grid.
 - **Edit:** `locales/he.json` + `locales/en.json` — new keys under a `floorPresence.*` namespace (Hebrew
   first; parity enforced by `pnpm i18n:check`).
@@ -69,7 +71,11 @@ right thing.
 4. Implement `FloorPresenceCard` / `RoomAvatarRow` / `StalenessBadge`, wire into `home.tsx`.
 5. Failing test: empty room (no members) renders as an explicit empty row, not hidden (design: "a real
    signal").
-6. Implement, then `FloorSheet` expansion + i18n keys both locales.
+6. Implement, then `FloorSheet` expansion + i18n keys both locales. `FloorSheet` is a real modal — its own
+   test coverage must include: opens/closes via `onOpenChange`; renders an explicit empty state with zero
+   members across all rooms; Escape key dismisses it; focus moves onto the dialog on open and returns to
+   the triggering element on close; a click on content *inside* the dialog does not dismiss it (only the
+   close button / Escape / outside-click do).
 7. Visual evidence: 320/768/1024, Hebrew + English, fresh + stale states — screenshots.
 
 ## Verify

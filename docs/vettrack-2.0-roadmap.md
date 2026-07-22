@@ -284,8 +284,10 @@ Stop hook prints the shipped count at every session end.
   checklist, device test matrix). (2) Execute: internal track first; real-device matrix; then production.
 - **Verify:** Internal-track install works end-to-end (sign-in → scan → Code Blue view) on ≥2 real
   devices; back-button audit checklist green; store listing screenshots match app.
-- **Done when:** App live on Play (or internal track if owner holds production); review passes.
-  **Depends 0.7 (hard). Independent of 1.1/1.2 — ships with current feature set.**
+- **Done when:** App live on Play in **production** (internal track is a verification gate on the way
+  there, not an alternate completion state — `docs/plans/master-plan-2026-07.md`'s Terminal State section
+  is authoritative: the program's definition of done requires a real Play Console production release);
+  review passes. **Depends 0.7 (hard). Independent of 1.1/1.2 — ships with current feature set.**
 
 ### Task 1.4 — Consumable-usage capture (reconnect dispense → patient → billing) · **P0 · L · Opus 4.8 (breakdown + review) / Sonnet 5 (execution)** 🔥 ⚠️
 > Added 2026-07-21 from an owner-provided spec (code-recon-verified, not session-2-derived) — do not
@@ -468,10 +470,15 @@ FKs — resolve explicitly before either starts its own Phase 0, don't let two c
 
 ## Platform research addendum (2026-07-19)
 
-1. **Shell strategy confirmed — Capacitor stays.** RN New Architecture (JSI/Fabric/TurboModules, default
-   since 0.76) optimizes native-widget rendering — orthogonal to the one-web-bundle / 4-platform-seam /
-   offline-PWA strategy. Migration = UI rewrite, discards the App-Store-approved bundled shell. RN's
-   `AccessibilityInfo` retained only as the a11y-parity checklist above.
+1. **~~Shell strategy confirmed — Capacitor stays.~~ SUPERSEDED 2026-07-22** by the owner's binding
+   decision to migrate to a bare React Native CLI app (see `docs/plans/master-plan-2026-07.md` Layers
+   3–5; ADR-008, pending, is where this supersession becomes formal). The analysis below (RN New
+   Architecture vs. the one-web-bundle/4-platform-seam/offline-PWA strategy) is kept as historical
+   context for *why* Capacitor was originally chosen — it is no longer the operative decision.
+   ~~RN New Architecture (JSI/Fabric/TurboModules, default since 0.76) optimizes native-widget
+   rendering — orthogonal to the one-web-bundle / 4-platform-seam / offline-PWA strategy. Migration = UI
+   rewrite, discards the App-Store-approved bundled shell.~~ RN's `AccessibilityInfo` retained only as
+   the a11y-parity checklist above.
 2. **Liquid Glass:** floating controls-layer material — never content layer. Native material auto-adapts
    to Reduced Transparency / Increased Contrast / Reduced Motion; the WKWebView CSS approximation must
    hand-roll those (`prefers-reduced-motion`, `prefers-contrast`, reduced-transparency fallback).
