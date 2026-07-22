@@ -24,7 +24,7 @@ One roster of 37 development partners. Every task gets a **lead** personality (p
 
 ## Graceful degradation
 
-If a mapped resource isn't installed in the current environment (remote/CI sessions lack user-level `[local]` skills, MCP servers, and memories), say so in one line and proceed with the nearest available `[repo]` resource or plain tools — never invent a name, never block on a missing skill.
+If a mapped resource isn't installed in the current environment (remote/CI sessions lack user-level `[local]` skills, MCP servers, and memories), say so in one line and proceed with the nearest available `[repo]` resource or plain tools — never invent a name. This fallback applies to leads and ordinary consultants only. **Standing vetoes fail closed:** when an applicable veto's mapped resource is unavailable, still perform an explicit doctrine check against its reference file and record the pass — or block/escalate to the user; never bypass a veto because its tooling is missing.
 
 ## Roster
 
