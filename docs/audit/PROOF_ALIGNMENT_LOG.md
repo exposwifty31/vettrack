@@ -4397,3 +4397,17 @@ Reviewer returned 1 HIGH + 1 MEDIUM + 2 LOW on the committed sub-card; all four 
 - Protected/untouched: stash@{0}, docs/plans/2.0/ + vettrack-2.0-claude-design-prompt.md (untracked, 2.0 agent), claude/docs-cleanup, chore/relevance-audit-cleanup, claude/new-session-rw4978 (25-file unmerged native NFC work — flagged to owner), dependabot PRs.
 
 **Verdict:** VERIFIED
+
+## 2026-07-22 — Triage of 3 deferred cleanup items (branch chore/repo-declutter)
+
+**Claim:** All 5 item-3 branches verified superseded and deleted (ref-backed); NFC-FAB branch deleted with reference ref + TASKS.md backlog entry; 37-day stale dev server stopped and primary clone switched main-sync→main; CodeRabbit #131 round closed (4 fixed / 7 skipped with reasons, review dismissed).
+
+**Evidence:**
+- Command: `gh pr list --head <b> --state all` → #107 CLOSED (ios-phase0b), #36 CLOSED (design-handoff-s1-s3, recut as #37 MERGED), #40 CLOSED (relevance-audit-cleanup); `ls tests/flow-walk` → harness present in main; `rg holdToConfirm src/` → `src/features/code-blue/HoldToStart.tsx`; `git ls-tree origin/main | grep playwright-ui` → not tracked.
+- Command: `git for-each-ref refs/removed-origin refs/removed-local …` → 37 backup refs listed by name before any remote deletion; `git push origin --delete …` → 4 branches `[deleted]`.
+- `claude/new-session-rw4978`: PR #30 MERGED 2026-06-28 but 25-file delta is post-merge (commits dated 06-28/29, incl. "Phase 5 — wire NFC FAB"); edits `src/shared/platform/PlatformRouter.tsx` while main uses `src/app/platform/` — architectural drift confirmed by path existence check.
+- Command: `ps -o etime -p 24795` → `37-20:21:24` (pnpm dev since ~Jun 14); after kill, `ps -p …` empty and `lsof -i :3001 -i :5000` empty; other sessions' `tsx watch` PIDs (5485…) left untouched.
+- Command: `git -C /Users/dan/vettrack status -sb` → `## main...origin/main` clean; `branch -d main-sync` → deleted (was 7d88caf71).
+- CodeRabbit: link fixes verified by on-disk resolution loop (10× OK); phantom finding proven via `wc -l` → 104 lines; review dismissed via REST (`DISMISSED`).
+
+**Verdict:** VERIFIED
