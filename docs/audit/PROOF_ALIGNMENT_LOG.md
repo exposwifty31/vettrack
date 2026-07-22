@@ -4597,3 +4597,15 @@ Reviewer returned 1 HIGH + 1 MEDIUM + 2 LOW on the committed sub-card; all four 
 **Verdict:** VERIFIED.
 
 **Verdict:** VERIFIED.
+
+## 2026-07-22 — Task 1.1 §3 fix wave (review NB-1/NB-2) — branch feat/2.0-task-1.1-s3-coordinator-reassign
+
+**Claim:** Fixed the HIGH review finding NB-1 (duplicate staged audit/metric emission on repeat scans) at the root cause (writer reports `created`, service gates emission) and corrected the NB-2 inaccurate reader comment; commit ef2d9100b.
+
+**Evidence (commands actually run, real output):**
+- RED first: added "emits the staged audit row and metric exactly once across a repeat stage of the same triple" to tests/autopilot/action-proposal-service.test.ts → `pnpm exec vitest run tests/autopilot/action-proposal-service.test.ts` → `1 failed | 7 passed` (failed on emission count 2 vs expected 1 — the defect, not a typo).
+- GREEN: `pnpm exec vitest run tests/autopilot/` → `Test Files 7 passed (7) · Tests 42 passed (42)`.
+- Typecheck delta: sorted `tsc -p tsconfig.server.json --noEmit` error output diffed against the pre-fix branch snapshot → identical (`TSC DELTA CLEAN`); frontend `tsc --noEmit` shows only the 2 known pre-existing missing-module errors (@clerk/localizations, socket.io-client) documented as present on main in the §1 and §3 verifications.
+- §1/§3 assertions preserved: test diff rebinds stageProposal returns to `.proposal` destructuring only; no assertion weakened (all prior expects intact, suite count 41→42).
+
+**Verdict:** VERIFIED.
