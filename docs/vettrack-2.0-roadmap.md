@@ -72,6 +72,58 @@ Stop hook prints the shipped count at every session end.
 - [ ] 3.2 Controlled-substance compliance module
 - [ ] 3.3 Reception War-Room
 
+## Program state & artifact map (2026-07-22)
+
+**This roadmap is the single authoritative 2.0 plan.** Every other 2.0 document layers under it by
+reference — none is a competing plan:
+
+- `.claude/docs/ai/vettrack/10x/session-2.md` — frozen owner-decision record (2026-07-16). Reference
+  only; never rewritten, never flattened into this doc.
+- `docs/plans/master-plan-2026-07.md` — implementation plan for the ready-now slice + the Layers 0–6
+  program map (incl. Android-ship and bare-RN-migration sequencing).
+- `docs/design/program-plan.md` — experience direction (per-role UX, management console, board target).
+- `docs/plans/2.0/task-*.md` — per-task execution plans (the breakdown-first deliverables).
+
+### Artifact map — where each completed task's deliverables live
+
+Branch-side rows were verified locally on 2026-07-22 (`git show --stat` per commit) on the owner's
+machine. **`claude/task-1.1-autopilot-shadow` is a local-only branch — it has not been pushed to
+origin**, so its paths do not resolve in a fresh clone until it is pushed. That also means every
+Phase-0 execution artifact below currently exists on a single machine — a durability risk that closes
+only when the branch is pushed. Each Phase-0 task also has a PROOF_ALIGNMENT_LOG entry in the branch's
+copy of the log.
+
+| Task | Artifact | Location | Caveat |
+|---|---|---|---|
+| 0.1 | `docs/design/case-spine-allowlist.md` | local branch (5b18a691e) | — |
+| 0.2 | `docs/plans/2.0/case-spine-spike-findings.md` | local branch (6c5699653) | spike code on `worktree-agent-ad05bf556984d8f59` |
+| 0.3 | `docs/plans/2.0/autopilot-spike-findings.md` | local branch (8f52e1257) | spike code on `worktree-agent-a64779cdd0617e6ff` |
+| 0.4 | `docs/design/autopilot-policy-layer.md` | local branch (18c9def43) | — |
+| 0.5 | `docs/plans/2.0/autopilot-backtest.md` + `scripts/analysis/autopilot-backtest.ts` | local branch (179e5aeb1) | **SYNTHETIC harness — never cite for real thresholds** |
+| 0.7 | code + `docs/capacitor-native-app.md` hygiene law | local branch (9766e548f) | on-device physical confirmation still OPEN |
+| 1.1 plan | `docs/plans/2.0/task-1.1-autopilot-shadow.md` | local branch (45d429a85, c745707ac) | ACTIVE task |
+| 2.3 plan | `docs/plans/2.0/task-2.3-who-on-floor.md` | main | — |
+| Binding decisions | `.claude/docs/ai/vettrack/10x/session-2.md` | main | reference-only, never rewritten |
+
+### Resolved decisions carried forward
+
+Task 1.1 §0 was owner-resolved on the branch (commit c745707ac): **per-org policy gate +
+auto-publish-on-timeout fallback**. Task 1.4's billing queue reuses this same per-org policy-gate
+pattern (see Task 1.4's locked decision 2).
+
+### Merge-reconciliation rule for `claude/task-1.1-autopilot-shadow`
+
+Precondition: the branch must first be pushed from the owner's machine — until then there is nothing
+on origin to reconcile. When its PR opens, it will carry **stale 18-task copies** of this roadmap and
+`scripts/vettrack-2.0-scope-gate.sh` that add/add-conflict with main. Resolution is fixed in advance:
+
+1. Both conflicts resolve toward **main's** versions (19-task tracker, strict-parser gate). Main's
+   tracker is strictly ahead — the branch holds no tracker state main lacks.
+2. Branch-side PROOF_ALIGNMENT_LOG entries **append** to main's log (append-only convention), never
+   replace or reorder existing entries.
+3. Everything else on the branch (the Phase-0 artifacts and task-1.1 plan in the table above) merges
+   as-is — main deliberately holds references, not copies, of that content.
+
 ## Delivery methodology (binding on every task)
 
 1. **Verification criteria first.** Before implementation, each task names exact files, the scenario it

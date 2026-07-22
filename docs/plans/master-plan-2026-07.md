@@ -82,6 +82,12 @@ migration that stops at "code exists in a new repo" has not shipped anything and
 resolve in a fresh clone") doesn't hold; (b) **resolve the `session-2.md` citation gap** noted above —
 either commit that file into the repo or downgrade its two citations to historical references.
 
+> **Update 2026-07-22 — Layer 0 fully closed.** Both remaining items were resolved by PR #133: (a) the
+> corpus merged to `main` as merge `7b20772ee` (the corpus evolved through four review rounds beyond
+> the `182ac9ccc` commit cited above before merging); (b) `session-2.md` was recovered and committed in
+> the same PR (`a6e76a3`) — it is now tracked at `.claude/docs/ai/vettrack/10x/session-2.md` on `main`,
+> so both citations are live pointers again. The paragraph above is retained as historical record.
+
 ## Program map (status of every workstream this plan covers)
 
 | # | Workstream | Status | Where |
@@ -186,7 +192,10 @@ being trusted, not skipped past because the first pass didn't have time.
   `.claude/docs/ai/vettrack/10x/` is absent from the checkout), yet it's cited as a live pointer in two
   places: `docs/vettrack-2.0-roadmap.md:3` and `.claude/skills/vettrack-team/references/product-strategist.md:17`.
   Not a blocker for this plan, but a real gap the owner should resolve — either commit the file into the
-  repo or downgrade both citations to a historical reference.
+  repo or downgrade both citations to a historical reference. **RESOLVED 2026-07-22 by PR #133:** the
+  file was recovered and committed (`a6e76a3`, merged as `7b20772ee`) and is now tracked at
+  `.claude/docs/ai/vettrack/10x/session-2.md` on `main`; both citations are live again. The original
+  finding above is retained as historical record.
 - **`docs/design-handoff/` (240 files) is NOT fully stale** — two Claude-Design export bundles
   (`stages-full/` Stage 1–10, an older `vettrack-design-system/`). `Stage 7/8` are still-cited restage
   sources in `docs/design/web-management-brief.md`; `vettrack-design-system/project/MOTION_HAPTICS_SOUND.md`

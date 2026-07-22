@@ -4517,3 +4517,17 @@ Reviewer returned 1 HIGH + 1 MEDIUM + 2 LOW on the committed sub-card; all four 
 - **Ran the rewritten script through 4 scenarios** against a `/tmp`-backed copy of the real roadmap, restoring after each: (1) green path → `6/19 shipped`, exit 0, matches ground truth; (2) injected `1.1foo` malformed ID → `BLOCKED: found 19 checkbox line(s) but only 18 parsed as valid N.N tracker records`, exit 2; (3) injected an unrelated auxiliary `- [x] ` line at file end → `BLOCKED: found 20... but only 19 parsed`, exit 2; (4) injected duplicate `0.1` → `BLOCKED: duplicate task ID(s): 0.1`, exit 2. `diff` against the pre-test backup after restore → identical, confirming no test artifacts leaked into the committed file.
 
 **Verdict:** VERIFIED — 1 real gap found and fixed via direct thread-by-thread review (not trusting the review-decision aggregate alone); the other 6 confirmed already resolved.
+
+## 2026-07-22 — 2.0 corpus consolidation: roadmap program-state & artifact map + stale master-plan fixes (committed with this change on `claude/refine-local-plan-2tuxmq`)
+
+**Claim:** Added a "Program state & artifact map (2026-07-22)" section to `docs/vettrack-2.0-roadmap.md` (one-plan declaration, artifact map table, Task 1.1 §0 resolved decision, merge-reconciliation rule) and annotated the two stale spots in `docs/plans/master-plan-2026-07.md` (Layer-0 "executed, unmerged" block; deep-scan "session-2.md does not exist" bullet) as resolved by PR #133 — annotate-don't-delete.
+
+**Evidence:**
+- Command: `bash scripts/vettrack-2.0-scope-gate.sh` run BEFORE the roadmap edit → `6/19 shipped`, exit 0; run AFTER the edit → identical `6/19 shipped`, exit 0 — the new section adds zero lines matching the strict `^- \[[ x]\] ` parser (confirmed by the gate's own auxiliary-checkbox count check passing).
+- Command: `git cat-file -e HEAD:<path>` → OK for every main-side path cited in the new section: `.claude/docs/ai/vettrack/10x/session-2.md`, `docs/plans/2.0/task-2.3-who-on-floor.md`, `docs/plans/master-plan-2026-07.md`, `docs/design/program-plan.md`.
+- Command: `git rev-parse 7b20772` → `7b20772ee14eda5de54e9ae58518c2892fa8e5ed`; `git log -1 --format='%s'` → "Merge pull request #133 from exposwifty31/docs/2.0-planning-corpus" — the merge hash cited in both master-plan annotations is real.
+- Command: `git ls-remote origin` → NO ref for `claude/task-1.1-autopilot-shadow` — the branch is local-only on the owner's machine. The artifact map's branch-side rows therefore state this explicitly and carry provenance "verified locally 2026-07-22 (`git show --stat` per commit)"; those commit hashes and paths are relayed from that local investigation and are NOT re-verifiable from this remote clone — recorded as such, not rounded up to independently re-verified.
+- Command: `git diff --stat` → exactly `docs/plans/master-plan-2026-07.md | 11 +` and `docs/vettrack-2.0-roadmap.md | 52 +` before this log entry was added — no code touched, no tracker rows or scope-gate script edited.
+- Command: `pnpm i18n:check` → "✓ locales/en.json and locales/he.json are in deep key parity."
+
+**Verdict:** VERIFIED (main-side claims); branch-side artifact locations relayed from the 2026-07-22 local investigation with provenance stated inline.
