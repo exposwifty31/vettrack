@@ -4367,3 +4367,17 @@ Reviewer returned 1 HIGH + 1 MEDIUM + 2 LOW on the committed sub-card; all four 
 - `vite.config.ts:135-153` — Read: vitest exclusion list unchanged from documented set.
 
 **Verdict:** VERIFIED
+
+## 2026-07-22 — vettrack-team personality-router skill (branch claude/vettrack-team-skill)
+
+**Claim:** Added `.claude/skills/vettrack-team/` — a using-superpowers-style router skill with SKILL.md + 37 per-personality reference files across 6 departments, each mapping only verified-installed resources ([repo]/[local] tagged), plus a CLAUDE.md Working Conventions bullet auto-loading it each session.
+
+**Evidence (verified this session):**
+- `ls .claude/skills/vettrack-team/references | wc -l` → 37; every `references/*.md` path extracted from SKILL.md roster tables resolved via `test -f` loop (zero MISSING).
+- All 31 [repo]-tagged agents `test -f .claude/agents/<name>.md`, all 32 [repo]-tagged commands `test -f .claude/commands/<cmd>.md`, and 9 spot-checked [repo] skill dirs `test -d .claude/skills/<sk>` — zero MISSING across all three loops.
+- Harness discovery live: after writing SKILL.md the skill appeared in the session's available-skills list; invoked via the Claude Code Skill tool with input `{skill: "vettrack-team"}` (CLI equivalent: `/vettrack-team`) — the tool returned the full SKILL.md body (roster tables + benched list) as the loaded-skill turn. Reproduce: run `/vettrack-team` in any Claude Code session in this repo.
+- Dry-run routing (reproducible: match each phrase against the SKILL.md "Leads when…" column, then `test -f` the reference path): "Clerk sign-in broken on iPhone shell" → rows "ANY bug…" (Systematic Debugger) + "anything auth" (Clerk Master) + "Capacitor shell, iOS/Android" (Mobile Master); "clean dead files" → row "dead code, unnecessary files" (The Janitor); "make the board prettier" → row "visual design, polish" (UI Master) + standing-veto clause "Code Blue / emergency paths / the board" (Clinical Safety Officer). All matched rows' reference paths passed the `test -f` loop above.
+- CLAUDE.md edit confirmed: one bullet appended to Working Conventions (after the proof-log bullet).
+- Memory content inlined where cited (liquid-glass guardrails, no-removing-core-pages, CodeRabbit loop termination, PGBOUNCER incident, fork role-bleed/worktree lifetime, RED-before-write rule) so anchors work without memory access; `[[name]]` tags kept as provenance.
+
+**Verdict:** VERIFIED
