@@ -75,12 +75,13 @@ migration that stops at "code exists in a new repo" has not shipped anything and
 
 ---
 
-**Layer 0 status:** executed, unmerged. `origin/docs/2.0-planning-corpus` = `main` + one commit
-(`182ac9ccc`) carrying the roadmap, Task 2.3 breakdown, this master plan, the 27-screen scope doc, and
-`.claude/rules/agent-conduct.md`. Two things remain before Layer 0 is fully closed: (a) **merge
-`docs/2.0-planning-corpus` to `main`** — until then, Layer 0's own verification criterion ("cited paths
-resolve in a fresh clone") doesn't hold; (b) **resolve the `session-2.md` citation gap** noted above —
-either commit that file into the repo or downgrade its two citations to historical references.
+**Layer 0 status: CLOSED (2026-07-22).** ~~executed, unmerged.~~ `docs/2.0-planning-corpus` merged to
+`main` via PR #133 (merge commit `7b20772ee`, 2026-07-22) after six review rounds — the corpus evolved
+well beyond the originally cited single commit `182ac9ccc`. Both remaining items are resolved:
+(a) the merge landed, so Layer 0's verification criterion ("cited paths resolve in a fresh clone")
+now holds; (b) the `session-2.md` citation gap is resolved — the file was recovered and committed in
+the same PR (round-2 commit `a6e76a3a9`) and is tracked on `main` at
+`.claude/docs/ai/vettrack/10x/session-2.md`. Original text kept struck-through as historical record.
 
 ## Program map (status of every workstream this plan covers)
 
@@ -182,11 +183,12 @@ being trusted, not skipped past because the first pass didn't have time.
   Confirmed present at `docs/vettrack-2.0-roadmap.md:471`. **Caution for Layer 4/5:** `scripts/vettrack-2.0-scope-gate.sh`
   structurally locks the roadmap's 19-item tracker via a grep contract — any future edit to that addendum
   must not break the script's exact-count check.
-- **`.claude/docs/ai/vettrack/10x/session-2.md` does not exist in this working tree at all** (confirmed —
-  `.claude/docs/ai/vettrack/10x/` is absent from the checkout), yet it's cited as a live pointer in two
-  places: `docs/vettrack-2.0-roadmap.md:3` and `.claude/skills/vettrack-team/references/product-strategist.md:17`.
-  Not a blocker for this plan, but a real gap the owner should resolve — either commit the file into the
-  repo or downgrade both citations to a historical reference.
+- **RESOLVED by PR #133 (2026-07-22):** ~~**`.claude/docs/ai/vettrack/10x/session-2.md` does not exist
+  in this working tree at all** (confirmed — `.claude/docs/ai/vettrack/10x/` is absent from the
+  checkout)~~, yet it's cited as a live pointer in two places: `docs/vettrack-2.0-roadmap.md:3` and
+  `.claude/skills/vettrack-team/references/product-strategist.md:17`. The file was recovered and
+  committed in PR #133's round 2 (`a6e76a3a9`) and is now tracked on `main` — both citations resolve.
+  Original finding kept struck-through as historical record.
 - **`docs/design-handoff/` (240 files) is NOT fully stale** — two Claude-Design export bundles
   (`stages-full/` Stage 1–10, an older `vettrack-design-system/`). `Stage 7/8` are still-cited restage
   sources in `docs/design/web-management-brief.md`; `vettrack-design-system/project/MOTION_HAPTICS_SOUND.md`

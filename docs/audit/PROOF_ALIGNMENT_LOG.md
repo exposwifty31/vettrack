@@ -4517,3 +4517,18 @@ Reviewer returned 1 HIGH + 1 MEDIUM + 2 LOW on the committed sub-card; all four 
 - **Ran the rewritten script through 4 scenarios** against a `/tmp`-backed copy of the real roadmap, restoring after each: (1) green path → `6/19 shipped`, exit 0, matches ground truth; (2) injected `1.1foo` malformed ID → `BLOCKED: found 19 checkbox line(s) but only 18 parsed as valid N.N tracker records`, exit 2; (3) injected an unrelated auxiliary `- [x] ` line at file end → `BLOCKED: found 20... but only 19 parsed`, exit 2; (4) injected duplicate `0.1` → `BLOCKED: duplicate task ID(s): 0.1`, exit 2. `diff` against the pre-test backup after restore → identical, confirming no test artifacts leaked into the committed file.
 
 **Verdict:** VERIFIED — 1 real gap found and fixed via direct thread-by-thread review (not trusting the review-decision aggregate alone); the other 6 confirmed already resolved.
+
+## 2026-07-22 — 2.0 corpus consolidation: Program state & artifact map + stale master-plan fixes
+
+**Claim:** `docs/vettrack-2.0-roadmap.md` is now the single authoritative 2.0 plan — added a "Program state & artifact map (2026-07-22)" section (layer references, per-task artifact locations incl. the local-only branch, resolved Task 1.1 §0 decisions, merge-reconciliation rule) and annotated the two stale Layer-0/session-2 statements in `docs/plans/master-plan-2026-07.md`.
+
+**Evidence:**
+- Command: `bash scripts/vettrack-2.0-scope-gate.sh` after the edit → `[2.0-gate] VetTrack 2.0 scope: 6/19 shipped.`, exit 0 — identical to the pre-edit baseline run this session; the new section added zero checkbox-shaped lines (`grep -c '^- \[[ x]\] ' docs/vettrack-2.0-roadmap.md` → 19, unchanged).
+- Command: `git cat-file -e HEAD:<path>` → OK for all 5 main-side cited paths (`.claude/docs/ai/vettrack/10x/session-2.md`, `docs/plans/2.0/task-2.3-who-on-floor.md`, `docs/plans/master-plan-2026-07.md`, `docs/design/program-plan.md`, `scripts/vettrack-2.0-scope-gate.sh`).
+- Command: `git cat-file -e claude/task-1.1-autopilot-shadow:<path>` → OK for all 7 branch-side artifact paths (case-spine-allowlist, both spike-findings docs, autopilot-policy-layer, autopilot-backtest .md + .ts, task-1.1 plan) — verified against the live local branch, not just the earlier `git show --stat` per-commit inspection (5b18a691e, 6c5699653, 8f52e1257, 18c9def43, 179e5aeb1, 9766e548f, 45d429a85, c745707ac run earlier this session).
+- Command: `git ls-remote origin | grep -c "autopilot"` → 0 — the branch is local-only, confirming the artifact map's durability-risk statement.
+- Command: `git diff claude/task-1.1-autopilot-shadow main -- docs/vettrack-2.0-roadmap.md scripts/vettrack-2.0-scope-gate.sh` (run earlier this session) → main strictly newer on both (19-task tracker incl. 1.4; strict canonical-ID gate parser vs the branch's 18-task loose-grep versions) — grounding the merge-reconciliation rule's direction.
+- `docs/plans/master-plan-2026-07.md:78` — Layer-0 block now reads "CLOSED (2026-07-22)" citing merge `7b20772ee` (verified this session: `git log` shows it as main's PR #133 merge) and recovery commit `a6e76a3a9`; original text struck through, not deleted. Same annotate-don't-delete treatment on the deep-scan session-2 bullet (~line 186).
+- Command: `git diff --stat` before this log entry → exactly `docs/plans/master-plan-2026-07.md` + `docs/vettrack-2.0-roadmap.md` (58 insertions, 11 deletions) — no code touched.
+
+**Verdict:** VERIFIED.
