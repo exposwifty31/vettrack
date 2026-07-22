@@ -81,9 +81,11 @@ export interface TransitionAndRecordInput {
    *     applied to the in-memory maps — a throw leaves the proposal
    *     untouched (still staged), mirroring the Drizzle rollback semantics
    *     without a real transaction.
-   * Only `approveProposal` for kinds with a registered side effect passes
-   * this; every other decision (edit, reject, and approve for the other 3
-   * kinds) leaves it `undefined` — a pure status flip, unchanged.
+   * `approveProposal` AND `editProposal` (owner decision 2026-07-22: edit =
+   * fix-then-execute, running the side effect with the edited content) pass
+   * this for kinds with a registered side effect; `rejectProposal`, and any
+   * decision on the other 3 kinds, leaves it `undefined` — a pure status
+   * flip, unchanged.
    */
   sideEffect?: (tx: ActionProposalTransactionExecutor) => Promise<void>;
 }

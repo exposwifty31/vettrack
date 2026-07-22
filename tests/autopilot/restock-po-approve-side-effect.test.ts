@@ -84,6 +84,28 @@ describe("buildRestockPoApproveSideEffect", () => {
     }
   });
 
+  it("builds the PO from effectiveContent when provided (edit = fix-then-execute, owner decision 2026-07-22), ignoring the staged draftContent", async () => {
+    const staged = buildStagedRow({
+      draftContent: {
+        supplierName: "Autopilot",
+        lines: [{ itemId: "item-1", quantitySuggested: 12 }],
+      },
+    });
+    const editedContent = {
+      supplierName: "Real Supplier Ltd",
+      lines: [{ itemId: "item-1", quantitySuggested: 5 }],
+    };
+    const sideEffect = buildRestockPoApproveSideEffect(staged, APPROVER_USER_ID, editedContent)!;
+    const { tx, insertedValues } = buildFakeTx();
+    await sideEffect(tx);
+
+    const poInserts = insertedValues.filter((v) => "supplierName" in v.values);
+    const lineInserts = insertedValues.filter((v) => "quantityOrdered" in v.values);
+    expect(poInserts[0]!.values).toMatchObject({ supplierName: "Real Supplier Ltd" });
+    expect(lineInserts).toHaveLength(1);
+    expect(lineInserts[0]!.values).toMatchObject({ itemId: "item-1", quantityOrdered: 5 });
+  });
+
   it("uses the approving actor's real userId as createdBy — never a system id", async () => {
     const staged = buildStagedRow();
     const sideEffect = buildRestockPoApproveSideEffect(staged, "user-real-approver-42")!;

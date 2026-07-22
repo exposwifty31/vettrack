@@ -4661,3 +4661,15 @@ Reviewer returned 1 HIGH + 1 MEDIUM + 2 LOW on the committed sub-card; all four 
 - Pinned edited-is-terminal behavior: new test "editing a restock proposal is terminal and inserts NO purchase order" → `pnpm exec vitest run tests/autopilot/` → 75 passed (was 74). Whether edit should mean approve-with-changes (side effect on edited content) is an OPEN owner decision from the §4 review — behavior pinned so a future change is deliberate.
 
 **Verdict:** VERIFIED.
+
+## 2026-07-22 — Owner decision: edit = fix-then-execute — branch feat/2.0-task-1.1-s4-restock-po
+
+**Claim:** Per owner decision (2026-07-22, in-session), `editProposal` now dispatches the kind side effect with the EDITED content — editing a restock proposal executes the corrected PO. Implemented TDD.
+
+**Evidence:**
+- RED: replaced the pinning test with "edit = fix-then-execute … executes the side effect exactly once with the EDITED content" + an edit-path rollback test → `pnpm exec vitest run tests/autopilot/action-proposal-service.test.ts` → `2 failed | 14 passed` (side effect not called on edit — the old behavior, failing for the right reason).
+- GREEN: `buildRestockPoApproveSideEffect` gains `effectiveContent?` (editedContent on edit path, draftContent on approve); `editProposal` passes it; docstrings corrected. `pnpm exec vitest run tests/autopilot/ tests/jobs/` → `21 files, 119 passed`.
+- Typecheck: sorted server tsc output diff vs baseline → identical (TSC DELTA CLEAN).
+- Single-decision invariant unchanged: edited stays terminal; later approve still throws (asserted in the new test).
+
+**Verdict:** VERIFIED.

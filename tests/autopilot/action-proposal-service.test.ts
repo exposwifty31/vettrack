@@ -240,41 +240,66 @@ describe("action-proposal-service", () => {
       expect(writer.allDecisions().filter((d) => d.proposalId === staged.id)).toHaveLength(0);
     });
 
-    it("PINNED (open product question, §4 review): editing a restock proposal is terminal and inserts NO purchase order", async () => {
-      // Current status model: staged → {approved | edited | rejected}, all
-      // terminal. Only approve dispatches the PO side effect, so an edited
-      // restock proposal never produces a PO and can never be approved
-      // afterwards. Whether "edit" should instead mean approve-with-changes
-      // (side effect executing the edited content) is an owner decision
-      // pending from the §4 review — this test pins today's behavior so a
-      // future change is deliberate, not accidental.
+    it("edit = fix-then-execute (owner decision 2026-07-22): editing a restock proposal executes the side effect exactly once with the EDITED content", async () => {
       const { buildRestockPoApproveSideEffect } = await import(
         "../../server/lib/autopilot/restock-po-approve-side-effect.js"
       );
       const sideEffectSpy = vi.fn().mockResolvedValue(undefined);
       vi.mocked(buildRestockPoApproveSideEffect).mockReturnValue(sideEffectSpy);
 
+      const editedContent = { supplierName: "Real Supplier Ltd", lines: [{ itemId: "item-1", quantitySuggested: 3 }] };
       const { proposal: staged } = await stageProposal(
         { writer },
-        { input: buildRestockInput({ sourceSessionId: "restock-session-edit-terminal" }), groundTruthFacts: buildFacts(), stagedBy: STAGED_BY },
+        { input: buildRestockInput({ sourceSessionId: "restock-session-edit-executes" }), groundTruthFacts: buildFacts(), stagedBy: STAGED_BY },
       );
 
       const edited = await editProposal(
         { writer },
-        {
-          clinicId: CLINIC_A,
-          proposalId: staged.id,
-          ...ACTOR,
-          editedContent: { supplierName: "Real Supplier Ltd", lines: [{ itemId: "item-1", quantitySuggested: 3 }] },
-        },
+        { clinicId: CLINIC_A, proposalId: staged.id, ...ACTOR, editedContent },
       );
       expect(edited.status).toBe("edited");
-      expect(sideEffectSpy).not.toHaveBeenCalled();
+      expect(sideEffectSpy).toHaveBeenCalledTimes(1);
+      expect(vi.mocked(buildRestockPoApproveSideEffect)).toHaveBeenLastCalledWith(
+        expect.objectContaining({ id: staged.id }),
+        ACTOR.actorUserId,
+        editedContent,
+      );
 
+      // Still single-decision: edited is terminal, a later approve throws
+      // before any second execution.
       await expect(
         approveProposal({ writer }, { clinicId: CLINIC_A, proposalId: staged.id, ...ACTOR }),
       ).rejects.toThrow(ActionProposalAlreadyDecidedError);
-      expect(sideEffectSpy).not.toHaveBeenCalled();
+      expect(sideEffectSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it("a failing side effect on the edit path rolls back: proposal stays staged, no decision-log row", async () => {
+      const { buildRestockPoApproveSideEffect } = await import(
+        "../../server/lib/autopilot/restock-po-approve-side-effect.js"
+      );
+      const failingSideEffect = vi.fn().mockRejectedValue(new Error("PO insert failed on edit"));
+      vi.mocked(buildRestockPoApproveSideEffect).mockReturnValue(failingSideEffect);
+
+      const { proposal: staged } = await stageProposal(
+        { writer },
+        { input: buildRestockInput({ sourceSessionId: "restock-session-edit-rollback" }), groundTruthFacts: buildFacts(), stagedBy: STAGED_BY },
+      );
+
+      await expect(
+        editProposal(
+          { writer },
+          {
+            clinicId: CLINIC_A,
+            proposalId: staged.id,
+            ...ACTOR,
+            editedContent: { supplierName: "Real Supplier Ltd", lines: [{ itemId: "item-1", quantitySuggested: 3 }] },
+          },
+        ),
+      ).rejects.toThrow("PO insert failed on edit");
+
+      const stillStaged = await writer.get(CLINIC_A, staged.id);
+      expect(stillStaged?.status).toBe("staged");
+      expect(writer.allDecisions().filter((d) => d.proposalId === staged.id)).toHaveLength(0);
     });
 
     it("does not dispatch a side effect for other kinds (e.g. shift_handover_draft) — approve stays a generic status flip", async () => {

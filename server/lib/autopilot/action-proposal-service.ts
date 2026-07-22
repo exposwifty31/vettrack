@@ -167,11 +167,11 @@ async function decide(
 
 /**
  * Task 1.1 §4 — `approveProposal` is a generic status flip for 3 of the 4
- * kinds. For `restock_po_on_burn` specifically, approve ALSO inserts real
- * `vt_purchase_orders`/`vt_po_lines` rows — a kind-dispatched side effect
- * (`buildRestockPoApproveSideEffect`) executed atomically with the
- * transition (same `db.transaction`, see `ActionProposalWriter.
- * transitionAndRecord`). `buildRestockPoApproveSideEffect` itself returns
+ * kinds. For `restock_po_on_burn` specifically, approve (and edit — see
+ * `editProposal`) ALSO inserts real `vt_purchase_orders`/`vt_po_lines` rows
+ * — a kind-dispatched side effect (`buildRestockPoApproveSideEffect`)
+ * executed atomically with the transition (same `db.transaction`, see
+ * `ActionProposalWriter.transitionAndRecord`). The builder returns
  * `undefined` for every other kind, so this stays a no-op for them.
  */
 export async function approveProposal(
@@ -183,11 +183,20 @@ export async function approveProposal(
   );
 }
 
+/**
+ * Owner decision 2026-07-22: edit = fix-then-execute. An edited proposal
+ * executes its kind's side effect with the EDITED content (already validated
+ * against the kind's Zod schema in `decide()` before the transition) —
+ * "edited" is approve-with-changes, not a dead-end record. Kinds without a
+ * side effect are unaffected (builder returns undefined).
+ */
 export async function editProposal(
   deps: ActionProposalServiceDeps,
   params: DecideProposalParams & { editedContent: Record<string, unknown> },
 ): Promise<ActionProposalRow> {
-  return decide(deps, params, "edited", { editedContent: params.editedContent });
+  return decide(deps, params, "edited", { editedContent: params.editedContent }, (staged) =>
+    buildRestockPoApproveSideEffect(staged, params.actorUserId, params.editedContent),
+  );
 }
 
 export async function rejectProposal(

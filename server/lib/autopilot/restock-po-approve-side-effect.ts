@@ -43,16 +43,23 @@ function isRestockPoDraftContent(value: unknown): value is RestockPoDraftContent
   );
 }
 
+/**
+ * `effectiveContent` (owner decision 2026-07-22, edit = fix-then-execute):
+ * the edit path passes the validated `editedContent` so the PO is built from
+ * the human-corrected version; the approve path omits it and the staged
+ * `draftContent` is used as before.
+ */
 export function buildRestockPoApproveSideEffect(
   staged: ActionProposalRow,
   approvingUserId: string,
+  effectiveContent?: unknown,
 ): ((tx: ActionProposalTransactionExecutor) => Promise<void>) | undefined {
   if (staged.kind !== "restock_po_on_burn") return undefined;
 
-  const draft = staged.draftContent;
+  const draft = effectiveContent ?? staged.draftContent;
   if (!isRestockPoDraftContent(draft)) {
     throw new Error(
-      `restock_po_on_burn approve side effect: proposal ${staged.id}'s draftContent does not match the expected RestockPoDraftContent shape`,
+      `restock_po_on_burn approve side effect: proposal ${staged.id}'s ${effectiveContent ? "editedContent" : "draftContent"} does not match the expected RestockPoDraftContent shape`,
     );
   }
 
