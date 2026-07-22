@@ -4287,3 +4287,25 @@ Reviewer returned 1 HIGH + 1 MEDIUM + 2 LOW on the committed sub-card; all four 
 8. `2d6967e2f` feat(board): custody visibility — custodianName on rows + additive custody snapshot block (B1)
 
 **Verdict:** VERIFIED
+
+## 2026-07-22 — Invite-free doctor sign-up: clinic join codes (branch claude/refine-local-plan-oonwtn)
+
+**Claim:** Root-cause fix for the no-org-claim 403 `MISSING_CLINIC_ID` dead end: per-clinic join codes turn membership intent into explicit data. New identity-only endpoint `POST /api/auth/join-clinic` provisions a PENDING `vt_users` row into the clinic that owns the code; admin views/rotates the code in Pending Users; `resolveAuthUser` is byte-identical (its existing existing-row-by-clerkId branch resolves every post-join request). TDD throughout.
+
+**Evidence (verified against real code + real runs this session):**
+- **`server/middleware/auth.ts` untouched:** `git diff --name-only` contains no `middleware/auth` entry (checked directly); all source-text pins on it (`tests/auth-clinic-bootstrap.test.ts`, `tests/access-denied-observability.test.js`, `tests/requested-role-provisioning.test.ts`) pass unmodified in the full run below.
+- **Schema/migration:** `server/schema/core.ts` `clinics.signupJoinCode` (unique, nullable) + hand-authored additive `migrations/178_vt_clinics_signup_join_code.sql` (repo convention per 177's header — drizzle snapshot drifted; `npx drizzle-kit generate` fails on ESM `.js` imports in this env, reproduced). Applied for real: `pnpm db:migrate` against a fresh local Postgres 16 → `✅ Applied migration: 178_vt_clinics_signup_join_code.sql`, all 178 clean.
+- **Route (`server/routes/clinic-join.ts`, mounted in `server/app/routes.ts`):** identity-only auth via `readClerkUserSession` (NOT requireAuth — that 403s pre-provisioning, the chicken-and-egg this breaks); `authSensitiveLimiter` on join + rotate; malformed and unknown codes return the SAME 404 envelope (`errors.clinicJoin.invalidCode` — no enumeration oracle); existing user (any clinic) → idempotent, never re-homed; provisioning reuses `isAdminEmail`/`sanitizeRequestedRole`/`sanitizeVetLicense` with `onConflictDoNothing({target: users.clerkId})` + race fallback; admin GET/rotate scoped by `req.clinicId`. All 4xx/5xx via the i18n `apiError()` (Phase 6 fail-mode test passes without an allowlist entry).
+- **Closed unions:** `AuditActionType` += `user_joined_via_clinic_code`, `clinic_join_code_rotated`; `MetricName` union + `DEFAULT` buckets += `auth_clinic_join_succeeded`, `auth_clinic_join_rejected`.
+- **TDD RED confirmed:** `tests/clinic-join.test.ts` failed on module-not-found before `clinic-join.ts` existed (run captured); `tests/auth-guard-join-clinic.test.tsx` written before the AuthGuard branch.
+- **Client:** `joinClinic()` is a bootstrap-style raw fetch (authFetch's userId guard would reject the not-yet-provisioned caller; bearer comes from authStore, populated by use-auth before the 403); `AuthGuard` renders `JoinClinicScreen` ONLY for `MISSING_CLINIC_ID` (every other reason keeps the denied screen — pinned by test); `?clinic=` param carried via sessionStorage (`join-code-store.ts`, mirror of requested-role-store) with one-shot auto-submit; manual entry covers native social OAuth (verified `native-oauth.ts`/`NativeSocialButtons` carry no unsafeMetadata — link param cannot survive that hop). `InviteStaffCard` in PendingUsersSection: view/generate/rotate + copy `/signup?clinic=<code>` link.
+- **Contract updates forced by this change (each verified as mine before editing):** `tests/routes-registration-contract-slice7.test.ts` mount-order pin += the new `/api` mount; `tests/pending-users-requested-role.test.tsx` api mock += `getClinicJoinCode`/`rotateClinicJoinCode`; `tests/multi-tenancy-hardening.test.js` satisfied by using `req.clinicId` in admin handlers (not a test edit). `docs/architecture/routes-contract.json` regen produced an 824-line pre-existing-drift diff → reverted (file is generator-owned, not gate-checked; regen left to its owner).
+- **New tests:** `tests/clinic-join.test.ts` (16: sanitizer, generator alphabet/uniqueness, provisioning defaults, admin-allowlist mirror, privileged-requestedRole rejection, 401-no-write, 404 malformed/unknown same-envelope, idempotent existing user, source-contract pins incl. never-reads-role/status/clinicId-from-body); `tests/auth-guard-join-clinic.test.tsx` (5: join screen on MISSING_CLINIC_ID only, manual submit → refreshAuth + carried-code cleared, invalid-code error path, auto-submit once).
+
+**Gates (all run this session, real output):**
+- `pnpm typecheck` → exit 0 (both tsconfigs).
+- `pnpm test` (full, local Postgres up) → `Test Files 655 passed (655)`, `Tests 5894 passed | 11 skipped (5905)`, 0 failed.
+- `pnpm i18n:check` → deep key parity (en/he; `auth.joinClinic.*`, `adminPage.inviteStaff.*`, `errors.clinicJoin.*` added to BOTH; `i18n.generated.d.ts` regenerated).
+- `pnpm architecture:gates` → All G1 checks passed (cycles match baseline).
+
+**Verdict:** VERIFIED

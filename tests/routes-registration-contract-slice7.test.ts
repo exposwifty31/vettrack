@@ -11,6 +11,7 @@ const contractPath = path.join(repoRoot, "docs", "architecture", "routes-contrac
 /** Mount paths in registration order (Slice 7 baseline, full platform / non-pilot). */
 const EXPECTED_MOUNT_PATHS = [
   "/api/users",
+  "/api", // clinicJoinRoutes (invite-free sign-up: /auth/join-clinic + /admin/clinic-join-code*)
   "/api/realtime",
   "/api/queue",
   "/api/metrics",

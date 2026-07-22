@@ -12,6 +12,9 @@ export type AuditActionType =
   | "user_status_changed"
   | "user_deleted"
   | "user_restored"
+  // Invite-free sign-up via clinic join code (routes/clinic-join.ts).
+  | "user_joined_via_clinic_code"
+  | "clinic_join_code_rotated"
   // Self-service account deletion (App Store Guideline 5.1.1(v)).
   | "account_self_deleted"
   | "apple_token_linked"

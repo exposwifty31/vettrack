@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api } from "@/lib/api";
+import { api, getClinicJoinCode, rotateClinicJoinCode } from "@/lib/api";
 import { ApiError } from "@/lib/request-core";
 import type { User } from "@/types/platform";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Bdi } from "@/components/ui/bdi";
 import { TruncatedText } from "@/components/ui/truncated-text";
-import { Clock, XCircle, CheckCircle } from "lucide-react";
+import { Clock, XCircle, CheckCircle, Link2, RefreshCw, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
 import { useConfirm } from "@/hooks/use-confirm";
@@ -60,6 +60,8 @@ export function PendingUsersSection() {
   });
 
   return (
+    <div className="flex flex-col gap-4">
+    <InviteStaffCard />
     <Card className="bg-card border-border/60 shadow-sm">
       <CardHeader>
         <CardTitle className="text-sm font-semibold text-foreground flex items-center gap-2">
@@ -101,6 +103,120 @@ export function PendingUsersSection() {
                 }}
               />
             ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+    </div>
+  );
+}
+
+/**
+ * Invite-free sign-up: the per-clinic join code. Staff sign up via the copied
+ * link (or type the code on the post-auth join screen) and land in the pending
+ * list below — approval stays the authorization gate. Rotating the code kills
+ * the old link immediately.
+ */
+function InviteStaffCard() {
+  const confirm = useConfirm();
+  const { userId } = useAuth();
+  const queryClient = useQueryClient();
+
+  const { data, isLoading } = useQuery({
+    queryKey: ["/api/admin/clinic-join-code"],
+    queryFn: getClinicJoinCode,
+    enabled: !!userId,
+    retry: false,
+    refetchOnWindowFocus: false,
+  });
+
+  const rotateMut = useMutation({
+    mutationFn: rotateClinicJoinCode,
+    onSuccess: (result) => {
+      haptics.tap();
+      queryClient.setQueryData(["/api/admin/clinic-join-code"], { joinCode: result.joinCode });
+    },
+    onError: () => {
+      toast.error(t.adminPage.inviteStaff.rotateFailed);
+    },
+  });
+
+  const joinCode = data?.joinCode ?? null;
+  const signupLink = joinCode ? `${window.location.origin}/signup?clinic=${joinCode}` : null;
+
+  async function handleRotate() {
+    if (joinCode) {
+      const confirmed = await confirm({
+        title: t.adminPage.inviteStaff.rotate,
+        description: t.adminPage.inviteStaff.rotateConfirm,
+        confirmLabel: t.adminPage.inviteStaff.rotate,
+        destructive: true,
+      });
+      if (!confirmed) return;
+    }
+    rotateMut.mutate();
+  }
+
+  async function handleCopyLink() {
+    if (!signupLink) return;
+    try {
+      await navigator.clipboard.writeText(signupLink);
+      toast.success(t.adminPage.inviteStaff.copied);
+    } catch {
+      toast.error(t.adminPage.inviteStaff.loadFailed);
+    }
+  }
+
+  return (
+    <Card className="bg-card border-border/60 shadow-sm" data-testid="invite-staff-card">
+      <CardHeader>
+        <CardTitle className="text-sm font-semibold text-foreground flex items-center gap-2">
+          <UserPlus className="w-4 h-4 text-muted-foreground" />
+          {t.adminPage.inviteStaff.title}
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <Skeleton className="h-12 rounded-xl" />
+        ) : (
+          <div className="flex flex-col gap-3">
+            <p className="text-xs text-muted-foreground">
+              {joinCode ? t.adminPage.inviteStaff.description : t.adminPage.inviteStaff.noCode}
+            </p>
+            {joinCode && (
+              <div
+                className="rounded-xl border border-border bg-background px-3 py-2 font-mono text-base tracking-widest text-center"
+                dir="ltr"
+                data-testid="clinic-join-code"
+              >
+                {joinCode}
+              </div>
+            )}
+            <div className="flex gap-2">
+              {joinCode && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-11 flex-1"
+                  onClick={handleCopyLink}
+                  data-testid="btn-copy-join-link"
+                >
+                  <Link2 className="w-3.5 h-3.5 me-1" />
+                  {t.adminPage.inviteStaff.copyLink}
+                </Button>
+              )}
+              <Button
+                size="sm"
+                variant={joinCode ? "ghost" : "default"}
+                className="h-11 flex-1"
+                onClick={handleRotate}
+                disabled={rotateMut.isPending}
+                data-testid="btn-rotate-join-code"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 me-1 ${rotateMut.isPending ? "animate-spin" : ""}`} />
+                {joinCode ? t.adminPage.inviteStaff.rotate : t.adminPage.inviteStaff.generate}
+              </Button>
+            </div>
           </div>
         )}
       </CardContent>

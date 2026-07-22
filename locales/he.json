@@ -798,6 +798,16 @@
         "accountPendingApproval": "החשבון ממתין לאישור.",
         "authSyncFailed": "השרת לא החזיר נתוני פרופיל (אין רשת, שגיאת API או DATABASE_URL שגוי). ודא שהשרת פועל ונסה שוב."
       }
+    },
+    "joinClinic": {
+      "title": "הצטרפות למרפאה",
+      "subtitle": "הזינו את קוד ההצטרפות שקיבלתם ממנהל המרפאה. לאחר ההצטרפות החשבון ימתין לאישור מנהל.",
+      "codeLabel": "קוד הצטרפות למרפאה",
+      "codePlaceholder": "לדוגמה ABCD23EFGH",
+      "submit": "הצטרפות",
+      "joining": "מצטרף...",
+      "invalidCode": "קוד ההצטרפות אינו תקף. ייתכן שהוחלף - בקשו ממנהל המרפאה את הקוד העדכני.",
+      "genericError": "ההצטרפות נכשלה. בדקו את החיבור ונסו שוב."
     }
   },
   "shiftAdjustments": {
@@ -2161,7 +2171,19 @@
     "secondaryRoleUpdateFailed": "עדכון תפקיד משני נכשל",
     "equipmentCoordinatorLabel": "רכז ציוד",
     "equipmentCoordinatorUpdated": "זכאות רכז הציוד עודכנה",
-    "equipmentCoordinatorUpdateFailed": "עדכון זכאות רכז הציוד נכשל"
+    "equipmentCoordinatorUpdateFailed": "עדכון זכאות רכז הציוד נכשל",
+    "inviteStaff": {
+      "title": "הזמנת צוות",
+      "description": "שתפו את קישור ההצטרפות עם אנשי צוות חדשים. הם נרשמים בעצמם ומופיעים למטה כממתינים עד שתאשרו אותם.",
+      "noCode": "הצטרפות בקישור כבויה. צרו קוד כדי לאפשר לצוות להירשם ללא הזמנה.",
+      "generate": "יצירת קוד",
+      "rotate": "החלפת קוד",
+      "rotateConfirm": "להחליף את קוד ההצטרפות? הקישור הנוכחי יפסיק לעבוד מיד.",
+      "copyLink": "העתקת קישור הרשמה",
+      "copied": "הקישור הועתק",
+      "loadFailed": "טעינת קוד ההצטרפות נכשלה.",
+      "rotateFailed": "החלפת קוד ההצטרפות נכשלה."
+    }
   },
   "layoutHebrew": {
     "home": "ראשי",
@@ -3023,6 +3045,14 @@
       "noHomeStation": "פריט זה אינו במנוחה, או שאין לו עמדת בית ניתנת לזיהוי.",
       "coordinatorForbidden": "רק הטכנאי הבכיר במשמרת זו או מנהל מערכת יכולים לאשר את רכז הציוד.",
       "coordinatorNotEligible": "אדם זה אינו רכז ציוד זכאי במשמרת זו."
+    },
+    "clinicJoin": {
+      "unauthorized": "יש להתחבר כדי להצטרף למרפאה",
+      "invalidCode": "קוד הצטרפות שגוי או שפג תוקפו",
+      "profileUnavailable": "לא ניתן לאמת את פרופיל החשבון; נסו שוב",
+      "joinFailed": "ההצטרפות נכשלה. נסו שוב.",
+      "codeReadFailed": "טעינת קוד ההצטרפות נכשלה",
+      "codeRotateFailed": "החלפת קוד ההצטרפות נכשלה"
     }
   },
   "push": {

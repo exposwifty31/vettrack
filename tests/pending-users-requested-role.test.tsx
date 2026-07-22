@@ -27,6 +27,8 @@ vi.mock("@/lib/api", () => ({
       updateStatus: (...a: unknown[]) => updateStatusMock(...a),
     },
   },
+  getClinicJoinCode: vi.fn().mockResolvedValue({ joinCode: null }),
+  rotateClinicJoinCode: vi.fn().mockResolvedValue({ joinCode: "ABCD23EFGH" }),
 }));
 
 vi.mock("@/hooks/use-auth", () => ({

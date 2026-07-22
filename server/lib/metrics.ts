@@ -324,6 +324,10 @@ type MetricName =
   | "stale_returned_skipped"
   | "dock_return_nfc_confirmed"
   | "auth_clerk_profile_fetch_failed"
+  // Clinic join codes — invite-free sign-up (routes/clinic-join.ts). Bounded:
+  // one success + one rejection counter, no code/user labels.
+  | "auth_clinic_join_succeeded"
+  | "auth_clinic_join_rejected"
   // T-30a2-i — nudge telemetry closed enum (nudgeShown: "expiry" | "restock").
   // Mirrors the ALLOWED_CB_PROPAGATION_BUCKETS pattern: an in-enum value
   // increments its own counter; out-of-enum values are rejected via the
@@ -1009,6 +1013,8 @@ const DEFAULT_COUNTERS: MetricBuckets = {
   stale_returned_skipped: 0,
   dock_return_nfc_confirmed: 0,
   auth_clerk_profile_fetch_failed: 0,
+  auth_clinic_join_succeeded: 0,
+  auth_clinic_join_rejected: 0,
   // T-30a2-i — nudge telemetry closed enum counters.
   nudge_shown_expiry: 0,
   nudge_shown_restock: 0,

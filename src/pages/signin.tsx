@@ -6,6 +6,7 @@ import { t } from "@/lib/i18n";
 import { VetTrackMark } from "@/components/vettrack-mark";
 import { RoleChips, type SignupRequestedRole } from "@/features/auth/components/RoleChips";
 import { readCarriedRole, writeCarriedRole } from "@/features/auth/requested-role-store";
+import { writeCarriedJoinCode } from "@/features/auth/join-code-store";
 import { ClerkFailed, ClerkLoaded, ClerkLoading, SignIn, useUser } from "@clerk/clerk-react";
 import { useAuth } from "@/hooks/use-auth";
 import { isClerkEnabled } from "@/lib/auth-fetch";
@@ -60,6 +61,13 @@ export default function SignInPage() {
   // C5: pre-choosing a role here carries it to the sign-up screen.
   const [preRole, setPreRole] = useState<SignupRequestedRole | null>(() => readCarriedRole());
   const isDark = useIsDarkActive();
+
+  // Invite link `?clinic=CODE` may land on /signin too (shared links, redirects) —
+  // stash the join code for the post-auth JoinClinicScreen (join-code-store).
+  useEffect(() => {
+    const code = new URLSearchParams(window.location.search).get("clinic");
+    if (code) writeCarriedJoinCode(code.trim());
+  }, []);
 
   useEffect(() => {
     if (isLoaded && isSignedIn) {
