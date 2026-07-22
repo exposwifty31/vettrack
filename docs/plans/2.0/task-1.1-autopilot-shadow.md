@@ -14,7 +14,7 @@
 > | §3 coordinator_reassign_off_roster (reader, composer, worker, atomic decide carry-over) | **DONE** | s3 branch | PASS; HIGH NB-1 duplicate-emission fixed root-cause (`StageOutcome.created` gates audit/metric) |
 > | §4 restock_po_on_burn (reader, composer, ATOMIC approve side effect → real PO+lines, per-kind edit Zod, daily worker) | **DONE** | s4 branch | PASS, 0 blockers; fix wave registered §3's job-registry gap + `vt_items` citation rename |
 > | §5 crash_cart_drift (reader w/ 24h-default + per-clinic-override staleness, composer, daily worker, no side effect) | **DONE** | s5 branch | PASS, clinical-safety lens NO VETO, 0 blockers |
-> | §2 shift_handover_draft (composer over R-SH-F1's own `resolveShiftWindow`/`aggregateDeltas`, 10-min worker, no side effect, R-SH-F1 auto-publish left 100% untouched — parallel-run) | **DONE-pending-review** | s2 branch (`feat/2.0-task-1.1-s2-handover-draft`) | pending fresh-context review |
+> | §2 shift_handover_draft (composer over R-SH-F1's own `resolveShiftWindow`/`aggregateDeltas`, 10-min worker, no side effect, R-SH-F1 auto-publish left 100% untouched — parallel-run) | **DONE** | s2 branch (`feat/2.0-task-1.1-s2-handover-draft`) | PASS, 0 blockers; draftContent field-parity + edited-draft window metadata recorded as §0(c) cutover preconditions |
 > | §6 approval-queue UI shell + §1.5 socket-nudge decision | not started (deferred from §1 deliberately) | — | — |
 >
 > **Owner decisions binding execution (beyond §0):**
@@ -75,6 +75,21 @@ timeout-fallback event is visible in the audit trail as unreviewed. `N` (the tim
 per-clinic-configurable value alongside the policy flag, not a hardcoded constant — the §2 implementation
 slice must pick a sensible default and expose it through the same admin console surface as the opt-in
 toggle.
+
+**§0(c) cutover-slice preconditions (added 2026-07-22 from the §2 independent review — the cutover
+slice must satisfy ALL of these before any clinic's `scanEndedShiftsForHandover` skip activates):**
+1. **draftContent field-parity with `vt_shift_handover`:** the §2 shadow composer deliberately
+   excludes `observedSignals` + `patientWorklist` (pure-composer constraint; disclosed in
+   `handover-draft-composer.ts`'s header). Harmless while R-SH-F1 still publishes the full artifact,
+   but a cutover clinic would publish LESS than today — a continuity-of-care regression.
+   The cutover slice extends the content source (export `collectObservedSignals` /
+   `resolvePatientWorklist`, or compose off the published row) and asserts field-parity by test.
+2. **Edited-draft window metadata:** the edit-body Zod accepts deltas/openItems/note only — an
+   edited draft loses `shiftSessionId`/`windowStart`/`windowEnd`/`title`. The publish path must
+   re-merge or re-derive window metadata for edited drafts.
+3. The §6 approval-queue UI must be live for the clinic (no approval surface = no cutover), plus the
+   already-resolved auto-publish-on-timeout fallback with the distinct `auto_published_on_timeout`
+   audit label.
 
 The remainder of this section is kept as the historical record of the tradeoffs considered.
 

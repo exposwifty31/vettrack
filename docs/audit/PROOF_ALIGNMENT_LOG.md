@@ -4740,3 +4740,13 @@ Reviewer returned 1 HIGH + 1 MEDIUM + 2 LOW on the committed sub-card; all four 
 - No paging/push/notification of any kind added — the worker only stages a shadow-mode approval-queue proposal; R-SH-F1's own push (`notifyNextShiftRoster`) is untouched and keeps firing exactly as today.
 
 **Verdict:** VERIFIED.
+
+## 2026-07-22 — Task 1.1 §2 post-review addendum — branch feat/2.0-task-1.1-s2-handover-draft
+
+**Claim:** §2 independent review PASS, zero blockers; the two forward-looking findings are now recorded in the plan where the cutover-slice author will read them.
+
+**Evidence:**
+- Review confirmed with evidence: scheduler diff empty, generator diff exactly the one export keyword, R-SH-F1 registration byte-identical; /^\d+$/ citation discriminator proven total (audit ids = randomUUID always hyphenated per audit.ts single insert path; outbox ids = bigserial digits) — not a heuristic; empty-deltas always-stage matches generateShiftHandover's own no-skip behavior; repointed generic tests behavior-neutral; 26 files / 177 tests green re-verified.
+- Findings closed as plan updates (this commit): §0(c) cutover preconditions added to docs/plans/2.0/task-1.1-autopilot-shadow.md — (1) draftContent field-parity with vt_shift_handover (observedSignals + patientWorklist), (2) edited-draft window-metadata re-merge, (3) §6 UI live + auto_published_on_timeout label. Execution-status row flipped to DONE (reviewed).
+
+**Verdict:** VERIFIED.
