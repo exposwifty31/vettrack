@@ -4426,3 +4426,16 @@ Reviewer returned 1 HIGH + 1 MEDIUM + 2 LOW on the committed sub-card; all four 
 - PENDING (owner-side): empty the "Default" env setup script at claude.ai/code environment settings, then a fresh cloud session must show deps installed + `pnpm typecheck` / `pnpm test` green. Not yet executed — recorded here as the open verification step.
 
 **Verdict:** VERIFIED (repo side); cloud E2E pending owner UI step
+
+## 2026-07-22 — Master plan (6 layers) + Layer 3a bare-RN migration research (remote session)
+
+**Claim:** Committed the approved 6-layer master plan (`docs/plans/master-plan-2026-07.md`) and the Layer 3a research report (`docs/design/react-native-migration-research.md`); plan claims were verified against the repo before writing.
+
+**Evidence:**
+- `packages/contracts/package.json` — read this session: zero `dependencies`/`devDependencies` (only a `typecheck` script); `grep -rn "from" packages/contracts/src` shows only relative imports across `emergency.ts`, `pending-sync.ts`, `index.ts` → contracts framework-free claim is VERIFIED, closing that 3a open question.
+- Command: `find docs -iname "*vettrack-2.0*"` + `grep -rln "vettrack-2.0-roadmap" --include="*.md"` → only hit is `.claude/skills/vettrack-team/references/product-strategist.md`; `docs/vettrack-2.0-roadmap.md` and `docs/plans/2.0/task-2.3-who-on-floor.md` do NOT exist in the repo → Layer 0 (commit planning corpus from owner's machine) added to the plan on real evidence.
+- `docs/governance/LITERATE_DOLLOP_PARITY_REPORT.md:14-70` — read this session: CI green, 59 tests, Phase 1 exit-met, Phase 3 in progress, Phase 6 kill-switch gate — matches the plan's context claims.
+- Command: `grep -rln "literate-dollop" --include="*.md" ...` → 21 files; list embedded in plan Layer 4 doc-drift step.
+- Research report: findings sourced via WebSearch this session (RN New-Arch default since 0.76 / legacy off ~0.82; Clerk mobile matrix = @clerk/expo + ClerkKit + clerk-android, corroborated by repo-vendored `.claude/skills/clerk/SKILL.md` mobile routing read this session). clerk.com and reactnative.dev blocked the remote fetcher (HTTP 403) — those two primary pages are marked **[verify locally]** inside the report rather than asserted.
+
+**Verdict:** VERIFIED (repo-side claims); PARTIAL (two primary web sources fetch-blocked, flagged in-report)
