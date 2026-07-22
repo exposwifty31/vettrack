@@ -4322,3 +4322,15 @@ Reviewer returned 1 HIGH + 1 MEDIUM + 2 LOW on the committed sub-card; all four 
 - No `.git` metadata vendored (skills copied from the clone's subdirectories, not the repo root).
 
 **Verdict:** VERIFIED
+
+## 2026-07-22 — Add nfc-tools skill to .claude/skills (branch claude/clerk-skills-setup-6e5akb)
+
+**Claim:** `nfc-tools` skill (libnfc/nfc-utils tag discovery/read/write workflows with CONFIRM NFC WRITE / CONFIRM NFC FORMAT safety gates and UID redaction) installed at `.claude/skills/nfc-tools/`. SKILL.md body transcribed verbatim from the skill listing the user provided; the two helper files are reconstructions authored to the contracts SKILL.md itself specifies, because the upstream source (openclaw/skills, per web search) is unreachable from this environment — git clone and api.github.com both denied by the session network proxy (only exposwifty31/vettrack is allowed), raw.githubusercontent.com and the GitHub tree URL returned 404/403 (checked this session).
+
+**Evidence (verified this session):**
+- `SKILL.md` frontmatter name/description match the listing exactly; all sections (Quick start, UID privacy, Discovery, Reading, Writing safety-critical, Erase/format safety-critical, hardware-missing fallback, Resources) transcribed with wording preserved.
+- `scripts/check-nfc.sh`: `sh -n` clean; executable bit set; run in-container → prints MISSING for nfc-list/nfc-poll/nfc-taginfo and exits 1 with pointer to `references/fallback.md` (documented behavior for a host without libnfc).
+- `references/fallback.md` covers the four duties SKILL.md assigns it: document missing-hardware state, plan tag contents, preview binary payloads (ndef-tool/xxd), manual handoff runbook gated on the confirmation phrases.
+- Harness discovery confirmed live: `nfc-tools` appeared in this session's available-skills list after the files were written.
+
+**Verdict:** VERIFIED (with the reconstruction caveat above recorded)
