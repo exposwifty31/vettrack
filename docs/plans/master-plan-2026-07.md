@@ -109,6 +109,62 @@ Capacitor 8 currency, aging deps, breaking changes on the horizon. Feeds Layer 6
 **Deliverables:** `docs/design/react-native-migration-research.md` (3a) and
 `docs/audit/stack-currency-2026.md` (3b) — sourced, written BEFORE any new repo or migration code exists.
 
+### Layer 3 update (2026-07-22) — deepened via a second Ultraplan research pass
+
+**3a corroborated, not just claimed:** New Architecture confirmed default since 0.76, and sharpened —
+0.82 (Oct 2025) actually **deleted** the legacy Bridge, so `newArchEnabled=false` is now silently
+ignored. Clerk-on-bare-RN gap independently confirmed (no official SDK, `@clerk/expo`-only); found that
+`install-expo-modules` is Expo's own **first-party documented path for bare-RN-CLI projects** — raises
+confidence in the spike approach above (Clerk + `install-expo-modules`) without removing the need to
+spike it before committing. Offline-storage consensus (MMKV's JSI-synchronous design specifically cited
+as the New-Architecture-native pattern) confirmed. `@vettrack/contracts` framework-free status:
+independently reconfirmed (zero deps, zero non-relative imports across its 3 source files).
+
+**3b now has real numbers** (previously just named as a category):
+
+| Dep | Installed | 2026 finding | Action |
+|---|---|---|---|
+| React | 18.3.1 | React 19 now default in every major starter | Non-urgent, size separately |
+| Express | 4.22.1 | Express 5 now production-recommended; 4.x sunset 6–18mo out, no formal EOL; `path-to-regexp` 0.x→8.x closes real ReDoS classes | Worth scheduling, not urgent |
+| Drizzle ORM | 0.45.2 | Current stable; active v1.0.0-beta track (beta.22) with a **breaking** RQBv1→RQBv2 migration | **Do not upgrade yet** — note only |
+| TypeScript | 5.9.3 | Current | No action |
+| Vite | 7.3.2 | Current, React-19-ready | No action |
+| Capacitor | 8.4.0 | Re-verify via `pnpm outdated` at spike time, not search (search results lag real patch releases) | Low priority |
+
+**New — indoor positioning (RFID/BLE/geo-location merged into one question, not three):** these aren't
+separate research topics — "geo-location" for an indoor hospital app is meaningless as GPS (doesn't work
+indoors) and reduces to the same BLE/RFID/UWB choice. A real business-case doc already exists comparing
+them: `docs/business-case/2026-07-12-massive-01-passive-tracking-cost-benefit.md` (RFID-gate pilot
+recommended first — $13k–37k one-time vs BLE/RTLS's lower one-time but $6k–30k/yr recurring at 250 tags)
+— **defer to that doc as the live decision-in-progress**, don't re-litigate it. External corroboration:
+BLE RTLS gives continuous indoor positioning where RFID-gate gives checkpoint identification (0.3–1m
+accuracy, sub-second refresh); device-free positioning (passive tags/computer vision, no app interaction)
+is a growing 2026 pattern relevant to Task 2.3's "Who's on the floor" as a future alternative to the
+record-open-screen presence proxy already flagged as a real gap in that task's own plan doc. **Spike
+risk for Layer 5:** `react-native-ble-plx` has an open, unresolved New Architecture compatibility issue
+(GitHub #1277) — same risk class as the Clerk gap, needs its own verification spike before any BLE work
+is scheduled. Handheld/mobile RFID readers (Android-powered, 15–20m range, 1000+ tags/sec — Zebra/UROVO/
+RFIDLabel) are a **distinct hardware category** from the existing fixed-gate system (ADR-004) — a
+separate future research question, not an extension of it.
+
+**Corrected finding (verified 2026-07-22, don't repeat the error):** a research pass claimed ADR-006's
+M1.0 ("RFID can override a human-confirmed room") was a **live, currently-known bug**. Checked directly
+against code, not relayed: `server/lib/rfid-ingest.ts`'s every `equipment` update writes only
+`lastRfidRoomId`/`lastRfidSeenAt`/`lastRfidGatewayCode`, never `roomId`; conflicts surface only as
+`server/services/equipment-command-board.service.ts`'s board-alert types
+(`rfid_location_conflict`/`ambiguous_rfid_location`), never as a silent overwrite; and
+`tests/rfid-resolver-precedence.test.ts` — whose own docstring says the resolver **"historically"** had
+this bug — passes 5/5. **M1.0 is already fixed and regression-tested; ADR-006's checklist checkbox is
+just stale (never ticked after the fix shipped), not a live safety gap.** Corrected in ADR-006 directly
+(checkbox ticked, test cited) in the same pass that added this section.
+
+**Also verified this pass (unrelated to RN, surfaced because it was asked for):** the "gated
+role-onboarding" pilot fix (commit `3318246`, `feat(auth): gated role-onboarding`) — manager-only,
+`clinicId`-scoped, DB-sourced role, optimistic-concurrency-safe, audited, and its self-selected-role path
+is double-fenced against privilege escalation. Real gap: no route-level test for `PATCH /:id/status`
+itself (403 non-admin / 404 cross-tenant / 409 concurrent-approval) — only the pure `resolveApprovalRole()`
+function is unit-tested. Tracked as a small follow-up TDD task, not blocking this plan.
+
 ## Layer 4 — Record the decision (ADR-008) + literate-dollop disposition
 
 **Decision already made by owner:** bare React Native CLI — contingent only on 3a surfacing no hard blocker.
