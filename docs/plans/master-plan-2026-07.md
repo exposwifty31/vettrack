@@ -1,5 +1,10 @@
 # VetTrack 2.0 Master Plan — Implementation Plan
 
+> **Status:** refined 2026-07-22 (second pass). Home branch: `docs/2.0-planning-corpus` (pushed, unmerged —
+> merge to `main` is Layer 0's own remaining activation step, see Layer 0 below). Supersedes the version on
+> the closed PR #132 (`claude/refine-local-plan-42a7o6`), which was opened on a "revise" request with no
+> execution authorization — see `.claude/rules/agent-conduct.md`.
+>
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Ship the concrete, ready-now pieces of VetTrack's 2.0 program (a doc correction, a real test-coverage
@@ -31,6 +36,52 @@ Capacitor 8, Clerk auth, i18n via a hand-built `t` accessor in `src/lib/i18n.ts`
 
 ---
 
+## Binding methodology (applies to every layer/task below)
+
+Elevated to plan-wide rules per the owner's 2026-07-22 refinement directive — not just Layer 3's concern:
+
+1. **Research-based execution.** Every layer/task opens with a research step grounding it in verified
+   current data — the repo's real state, primary docs, or live store/console state — before any
+   implementation. The Researcher consults on all layers, not only Layer 3. Reasoning stance: *"I have the
+   real info and data on how to implement it — now let's see how to make it better."* Ground in reality
+   first, then optimize; don't optimize a guess.
+2. **Root-cause doctrine everywhere.** Debugging and fixes target the located cause (file:line), never the
+   symptom or surface behavior — this is roadmap methodology #3 elevated to a binding rule across all six
+   layers, not a per-task courtesy.
+3. **Execution authorization.** Per `.claude/rules/agent-conduct.md` (written in direct response to PR
+   #132): each layer needs its own explicit owner go-ahead before execution — a plan being refined or
+   approved for *planning* purposes never implies approval to *execute* it.
+4. **Team routing.** Every layer names its lead/consultants/standing vetoes from the `vettrack-team` roster
+   (`.claude/skills/vettrack-team/SKILL.md`) before work starts — Clinical Safety Officer and Security
+   Master apply wherever a layer's work touches Code Blue/emergency paths or auth/tenancy/secrets,
+   respectively, regardless of which personality leads.
+
+## Terminal state / definition of done
+
+This program is **not** complete at "designed," "decided," or "merged to a docs branch." It is complete
+only when the refreshed, 2.0-featured app is actually live for users and staff:
+
+- **iOS** — deployed to **App Store Connect** (a real release, not just `READY_FOR_DISTRIBUTION` sitting
+  unreleased — verify current state via `asc status --app 6778937527` before claiming this criterion met).
+- **Android** — deployed to **Google Play Console** (first the current Capacitor shell via Layer 2, later
+  the bare-RN successor via Layer 5 — both routes terminate in a real Play Console release, not a built
+  `.aab` sitting on disk).
+- **Backend** — deployed and healthy on **Railway** (`pnpm validate:prod` gate green, per
+  `reference_railway_deploy` conventions already in this repo's practice).
+
+Layer 5 (the bare-RN migration) in particular is **not done at "the new repo builds"** — its terminal
+criterion is real TestFlight/Play-internal-track builds progressing to production store submissions. A
+migration that stops at "code exists in a new repo" has not shipped anything and does not close this layer.
+
+---
+
+**Layer 0 status:** executed, unmerged. `origin/docs/2.0-planning-corpus` = `main` + one commit
+(`182ac9ccc`) carrying the roadmap, Task 2.3 breakdown, this master plan, the 27-screen scope doc, and
+`.claude/rules/agent-conduct.md`. Two things remain before Layer 0 is fully closed: (a) **merge
+`docs/2.0-planning-corpus` to `main`** — until then, Layer 0's own verification criterion ("cited paths
+resolve in a fresh clone") doesn't hold; (b) **resolve the `session-2.md` citation gap** noted above —
+either commit that file into the repo or downgrade its two citations to historical references.
+
 ## Program map (status of every workstream this plan covers)
 
 | # | Workstream | Status | Where |
@@ -40,9 +91,9 @@ Capacitor 8, Clerk auth, i18n via a hand-built `t` accessor in `src/lib/i18n.ts`
 | 3 | Task 2.3 "Who's on the floor" (VetTrack 2.0 roadmap) | **Ready — bite-sized below** | Tasks 5–9 |
 | 4 | Layer 1 — 27-screen Claude Design pass | Scoped, gated on per-screen greenlight | See "Scoped, not bite-sized" |
 | 5 | Layer 2 — Ship Android (Google Play) | Scoped, gated on manual store/signing steps | See "Scoped, not bite-sized" |
-| 6 | Layer 3 — RN-migration + stack-currency research | **Done** (research-only) | See "Already complete" |
-| 7 | Layer 4 — ADR-008 + literate-dollop disposition | Blocked on Layer 3a sign-off | See "Scoped, not bite-sized" |
-| 8 | Layer 5 — Bare-RN migration (new repo) | Blocked on Layer 4 | See "Scoped, not bite-sized" |
+| 6 | Layer 3 — RN-migration + stack-currency research | **Done**; 3a's full report salvaged to `docs/design/react-native-migration-research.md` | See "Already complete" |
+| 7 | Layer 4 — ADR-008 + literate-dollop disposition | Blocked on owner sign-off on 3a + the Clerk mitigation choice | See "Scoped, not bite-sized" |
+| 8 | Layer 5 — Bare-RN migration (new repo, terminates in store submissions) | Blocked on Layer 4 | See "Scoped, not bite-sized" |
 | 9 | Layer 6 — Platform-wide quality lens | Not a standalone track — folded into 4/5/8 | See "Scoped, not bite-sized" |
 | 10 | Task 1.4 — Consumable-usage capture | **Spec-only, explicitly NOT to be implemented** | Already in `docs/vettrack-2.0-roadmap.md` |
 
@@ -116,8 +167,17 @@ key. Small, bounded, real.
   `docs/TASKS.md` + `docs/PLAN.md` (describe the already-merged "Consolidated Audit × 10x" program, PR
   #85/#86, as still "Ready to Start" — doc drift, not a live backlog, despite both files' own "read this
   before writing any code" instruction), `docs/FLOW_MATRIX.md` (superseded by the real 2026-07-16
-  four-platform live-walk already in this plan's context), `docs/BUG_REGISTER.md` (self-marked
-  historical).
+  four-platform live-walk already in this plan's context), `docs/BUG_REGISTER.md` (self-marked historical),
+  and **`docs/vettrack-2.0-roadmap.md`'s own "Platform research addendum (2026-07-19)" §1** ("Shell strategy
+  confirmed — Capacitor stays") — directly superseded by the owner's later 2026-07-22 bare-RN decision.
+  Confirmed present at `docs/vettrack-2.0-roadmap.md:471`. **Caution for Layer 4/5:** `scripts/vettrack-2.0-scope-gate.sh`
+  structurally locks the roadmap's 19-item tracker via a grep contract — any future edit to that addendum
+  must not break the script's exact-count check.
+- **`.claude/docs/ai/vettrack/10x/session-2.md` does not exist in this working tree at all** (confirmed —
+  `.claude/docs/ai/vettrack/10x/` is absent from the checkout), yet it's cited as a live pointer in two
+  places: `docs/vettrack-2.0-roadmap.md:3` and `.claude/skills/vettrack-team/references/product-strategist.md:17`.
+  Not a blocker for this plan, but a real gap the owner should resolve — either commit the file into the
+  repo or downgrade both citations to a historical reference.
 - **`docs/design-handoff/` (240 files) is NOT fully stale** — two Claude-Design export bundles
   (`stages-full/` Stage 1–10, an older `vettrack-design-system/`). `Stage 7/8` are still-cited restage
   sources in `docs/design/web-management-brief.md`; `vettrack-design-system/project/MOTION_HAPTICS_SOUND.md`
@@ -1022,10 +1082,16 @@ tracker box"), get that review before changing `- [ ] 2.3 "Who's on the floor" g
 ## Already complete (no tasks needed — cited, not re-derived)
 
 **Layer 3 — RN-migration + stack-currency research.** Done as research this session, folded into this
-same file's history (see git log for this file) and summarized in the Program Map above:
-- Bare-RN-CLI vs Expo: New Architecture default since 0.76 (0.82 deleted the legacy Bridge); Clerk has no
-  official bare-RN SDK (`install-expo-modules` is Expo's own first-party path for bare-RN-CLI, not a
-  hack — still needs a spike); MMKV's JSI-synchronous design is the New-Architecture-native offline-storage
+same file's history (see git log for this file) and summarized in the Program Map above. The full 3a
+report is now salvaged onto this branch at **`docs/design/react-native-migration-research.md`** (193
+lines, all 7 questions answered — recovered from the closed PR #132's branch, `git show`'d in rather than
+merged, so that branch's stale master-plan version isn't dragged along). Framed per the owner's directive:
+3a is the **research basis feeding the migration** (Layer 5), not a stopping point in itself.
+- Bare-RN-CLI vs Expo: New Architecture default since 0.76 (0.82 deleted the legacy Bridge); **Clerk has no
+  official bare-RN SDK** — the report's one blocker-adjacent risk, three mitigation options given, with
+  `install-expo-modules` + `@clerk/expo` (Expo's own first-party path for bare-RN-CLI) recommended as the
+  spike to run first. This is a named risk **ADR-008 must explicitly resolve**, not merely acknowledge —
+  see Layer 4/5 below. MMKV's JSI-synchronous design is the New-Architecture-native offline-storage
   pattern; `@vettrack/contracts` (`packages/contracts/`) is confirmed framework-free (zero deps, zero
   non-relative imports).
 - Stack currency: React 19 non-urgent, Express 5 worth scheduling (no forcing function), Drizzle ORM has
@@ -1035,6 +1101,9 @@ same file's history (see git log for this file) and summarized in the Program Ma
   RFID-gate pilot first. `react-native-ble-plx` has an open New Architecture compatibility issue (#1277) —
   a real spike risk for a future Layer 5. Handheld RFID readers are a distinct hardware category from the
   existing fixed-gate system (ADR-004).
+- Several report items are marked **[verify locally]** (the remote research session's primary-doc fetcher
+  was blocked by clerk.com/reactnative.dev and corroborated via secondary sources instead) — these carry
+  forward as required checks during ADR-008 drafting, not settled facts.
 
 ---
 
@@ -1045,26 +1114,58 @@ steps — inventing file paths or code for a repo that doesn't exist, or a decis
 would violate that rule in the opposite direction. Each gets its own breakdown-first plan doc once
 unblocked, per `docs/vettrack-2.0-roadmap.md`'s existing convention.
 
-**Layer 1 — 27-screen Claude Design pass.** Fully scoped in `docs/plans/design-pass-27-screens.md`
-(real-file mapping for all 17 existing-screen turns, per-screen workflow, risk notes). Not bite-sized here
-because the owner explicitly wants each of the 17 existing-screen turns individually greenlit before any
-implementation starts — the next screen (Home/Today, turn 1) needs that greenlight, not a pre-written
-task list, per the owner's own "screen-by-screen" decision.
+**Layer 1 — 27-screen Claude Design pass.** Canonical scope lives in `docs/plans/design-pass-27-screens.md`
+(real-file mapping for all 17 existing-screen turns, per-screen workflow, risk notes) — this section is a
+pointer to it, not a restatement. Research basis: the Claude Design export itself plus the repo's real
+design-system components (`.design-sync`, `src/components/ui`). Precondition satisfied: v1.2.0/build 26 is
+READY_FOR_DISTRIBUTION (verified live via `asc`). Not bite-sized here because the owner explicitly wants
+each of the 17 existing-screen turns individually greenlit before any implementation starts — the next
+screen (Home/Today, turn 1) needs that greenlight, not a pre-written task list. Terminal state: each
+landed screen ships to real users via App Store Connect / Railway deploys as it lands — this is not a
+parked branch waiting for all 17 turns to finish.
 
 **Layer 2 — Ship Android (Google Play Console).** Already Task 1.3 in `docs/vettrack-2.0-roadmap.md`.
-Involves real manual steps (keystore generation, Play Console listing, Data-safety form, content rating)
-that aren't code tasks — a bite-sized breakdown belongs in its own `docs/plans/2.0/task-1.3-android-ship.md`
-per the roadmap's "breakdown-first" convention, written when that task is actively picked up.
+**Step zero, before anything else:** Task 0.7's on-device physical confirmation is the hard, currently
+OPEN dependency (`docs/vettrack-2.0-roadmap.md:61,288` — "Depends 0.7 (hard)"; the roadmap's own checkbox
+is ticked but the on-device haptics/edge-to-edge check on real hardware is explicitly still open) — Layer
+2 cannot proceed past this gate. Research basis once unblocked: verify current 2026 Play Console
+requirements (target API level, Data-safety form, content rating) against Google's primary docs before
+shipping, not from memory. Involves real manual steps (keystore generation, listing, forms) that aren't
+code tasks — a bite-sized breakdown belongs in its own `docs/plans/2.0/task-1.3-android-ship.md`, adapting
+the same checklist structure as `docs/mobile/native-ship-checklist.md` (the real, locked iOS gate), written
+when Task 0.7 closes and this is actively picked up. Terminal criterion: the app live on Play (internal
+track → production, per the owner's terminal-state directive).
 
-**Layer 4 — ADR-008 (bare-RN decision) + literate-dollop disposition.** Blocked on Layer 3a's research
-(done above) getting an explicit owner sign-off that no hard blocker was found, before The Architect
-writes the actual ADR. The literate-dollop delete-vs-archive decision and the "lessons learned" note are
-both flagged in this plan's history as needing their own explicit confirmation at execution time — not
-bundled into any other approval.
+**Layer 4 — ADR-008 (bare-RN decision) + literate-dollop disposition.** Blocked on the owner's explicit
+sign-off on the salvaged 3a report (now at `docs/design/react-native-migration-research.md`) — specifically
+on **which Clerk mitigation to take** (spike `install-expo-modules` + `@clerk/expo` first, per the report's
+recommendation) before The Architect writes the actual ADR. ADR-008 must also formally supersede
+`docs/vettrack-2.0-roadmap.md`'s "Platform research addendum §1" ("Capacitor stays," now contradicted by
+the owner's later decision) — respecting the scope-gate script's grep contract when editing that file. The
+literate-dollop delete-vs-archive decision and the "lessons learned" note remain flagged as needing their
+own explicit confirmation at execution time — not bundled into any other approval.
 
-**Layer 5 — Bare-RN migration (new repo).** Cannot be bite-sized: the target repo doesn't exist yet, and
-its scaffolding choices (New Architecture config, build tooling) are themselves gated on ADR-008. Once
-that ADR lands, this becomes its own writing-plans-style document scoped against the real new repo.
+**Layer 5 — Bare-RN migration (new repo), reshaped as a staged, deployment-terminated migration program.**
+This is the owner's core directive for this layer: it is an actual migration ending in shipped software,
+with research as its foundation — not a research exercise or a repo that merely compiles. Cannot be
+bite-sized yet (the target repo doesn't exist, and its scaffolding is gated on ADR-008), but the shape is:
+  1. Scaffold the new repo (bare RN CLI, New Architecture per 3a's findings).
+  2. Clerk auth spike → a working sign-in on a real device (proves or disproves the mitigation from Layer 4
+     before anything else is built on top of it).
+  3. One vertical slice end-to-end (equipment scan) against the **live Railway backend** — server untouched,
+     frozen contracts (`@vettrack/contracts`) intact, no parallel backend.
+  4. Parity milestones per surface, each opening with its own research check before porting — e.g.
+     offline storage (op-sqlite/MMKV vs. the existing Dexie/sync-engine contract), NFC
+     (`react-native-nfc-manager` vs. the current 3-path `src/lib/nfc-platform.ts` abstraction — a concrete
+     port target per the docs-scan findings above), realtime (`react-native-sse` or equivalent vs. the
+     frozen SSE/outbox contract — this is exactly where `docs/governance/FROZEN_SURFACE_CHANGE_PROTOCOL.md`
+     applies, not a new ad hoc checklist).
+  5. TestFlight + Play internal-track builds per milestone.
+  6. **Store submission** — App Store Connect + Play Console production releases of the RN app. This is
+     the layer's actual terminal criterion, not "the new repo exists."
+  7. Capacitor retirement decision only after the RN app is live and stable in both stores.
+Standing vetoes apply per surface as it's ported: Clinical Safety Officer on any Code Blue surface,
+Security Master on the Clerk auth spike and every subsequent auth-touching slice.
 
 **Layer 6 — Platform-wide quality upgrade.** Not a standalone track — a standing lens applied inside
 Layers 1/2/5 as each lands, per this plan's own earlier reasoning (Layer 1 already carries most of the
@@ -1124,6 +1225,19 @@ in every later task's code. `RoomPresenceSnapshot` (Task 5's subscriber) matches
 signature `FloorPresenceCard` (Task 7) actually passes in.
 
 ---
+
+## Immediate next steps (across the whole program, not just Tasks 1–9)
+
+1. **Merge `docs/2.0-planning-corpus` to `main`** — closes Layer 0.
+2. **Greenlight the first Layer 1 screen** (Home/Today, turn 1) — per the owner's screen-by-screen decision.
+3. **Run Task 0.7's on-device physical confirmation** (haptics + edge-to-edge on real hardware) — the hard
+   gate blocking Layer 2 from starting.
+4. **Prep ADR-008**: run the Clerk spike (`install-expo-modules` + `@clerk/expo`, working sign-in on a real
+   device) before The Architect drafts the ADR — a spike result, not a memo, is what unblocks Layer 4.
+
+Per-layer verification now also includes real deployment evidence where applicable — App Store Connect
+build/release state via `asc status`, Play Console track state, and Railway deploy health via
+`pnpm validate:prod` — not just "code merged" or "tests green."
 
 ## Execution handoff
 

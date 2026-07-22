@@ -4426,3 +4426,20 @@ Reviewer returned 1 HIGH + 1 MEDIUM + 2 LOW on the committed sub-card; all four 
 - PENDING (owner-side): empty the "Default" env setup script at claude.ai/code environment settings, then a fresh cloud session must show deps installed + `pnpm typecheck` / `pnpm test` green. Not yet executed — recorded here as the open verification step.
 
 **Verdict:** VERIFIED (repo side); cloud E2E pending owner UI step
+
+## 2026-07-22 — Refined docs/plans/master-plan-2026-07.md (second pass) + salvaged Layer 3a research (branch docs/2.0-planning-corpus)
+
+**Claim:** Refined the VetTrack 2.0 master plan against a cloud Ultraplan session's plan (approved by the owner after independent verification), adding a Binding Methodology section, a Terminal State / definition-of-done section, and updates to Layers 0/1/2/3/4/5 reflecting current repo state; salvaged the closed PR #132's Layer 3a research report onto this branch.
+
+**Evidence (verified this session, before writing any of the above):**
+- `gh pr view 132 --json state,headRefName,baseRefName,closedAt` → `{"state":"CLOSED","headRefName":"claude/refine-local-plan-42a7o6","closedAt":"2026-07-22T08:57:10Z"}` — matches the plan's claim exactly.
+- `git log --oneline origin/main..origin/docs/2.0-planning-corpus` → one commit, `182ac9ccc`; `git show 182ac9ccc --stat` confirms its message and file list (roadmap, task-2.3, master plan, 27-screen scope doc, agent-conduct.md).
+- `git show origin/claude/refine-local-plan-42a7o6:docs/design/react-native-migration-research.md | wc -l` → 193 — matches the plan's line count; salvaged via `git show <branch>:<path> > <path>` (not a branch merge/checkout), confirmed the closed branch's other files were not pulled in (`git status --short` after showed only the one new file).
+- `grep -n "Capacitor stays\|Platform research addendum" docs/vettrack-2.0-roadmap.md` → line 469/471 — confirmed the "Shell strategy confirmed — Capacitor stays" claim is real and dated 2026-07-19, genuinely superseded by the later bare-RN decision.
+- `grep -n "0.7" docs/vettrack-2.0-roadmap.md` → line 61 shows the tracker checkbox is `[x]` but the same line explicitly flags "on-device physical confirmation still OPEN — needs real hardware"; line 288 confirms Task 1.3 (Layer 2) "Depends 0.7 (hard)."
+- `ls -la .claude/docs/ai/vettrack/10x/` → `No such file or directory` — confirmed `session-2.md` doesn't exist anywhere in this working tree (worse than "uncommitted"), while `grep -rn "session-2.md" docs/ .claude/skills/vettrack-team/references/product-strategist.md` shows it's still cited as a live pointer in two places.
+- Path-resolution loop (`test -e`) over every newly-cited path in the refined document (`docs/design/react-native-migration-research.md`, `.claude/rules/agent-conduct.md`, `docs/governance/FROZEN_SURFACE_CHANGE_PROTOCOL.md`, `docs/mobile/native-ship-checklist.md`, `docs/mobile/nfc.md`, `scripts/vettrack-2.0-scope-gate.sh`, `.claude/skills/vettrack-team/SKILL.md`, `.claude/skills/vettrack-team/references/product-strategist.md`, `docs/plans/design-pass-27-screens.md`, `docs/vettrack-2.0-roadmap.md`, `docs/business-case/2026-07-12-massive-01-passive-tracking-cost-benefit.md`, `packages/contracts`, `src/lib/nfc-platform.ts`) → all 13 `OK`, zero MISSING.
+- Confirmed the cloud Ultraplan session that produced this refinement plan did **not** itself execute anything: `git branch -a | grep -i refine-master-plan` → not found (locally or remotely); `gh pr list --state all --limit 10` → no new PR beyond #132 (already closed). Execution was performed locally, on explicit owner approval via `AskUserQuestion`, per `.claude/rules/agent-conduct.md`.
+- `git branch --show-current` → `docs/2.0-planning-corpus` (already 2 commits ahead of `origin/docs/2.0-planning-corpus` from earlier the same day) — this refinement commits directly onto that branch rather than the cloud plan's proposed fresh branch name, since the fresh-branch mechanics assumed a clean ff-merge that didn't reflect the already-ahead local branch.
+
+**Verdict:** VERIFIED
