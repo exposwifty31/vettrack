@@ -4381,3 +4381,19 @@ Reviewer returned 1 HIGH + 1 MEDIUM + 2 LOW on the committed sub-card; all four 
 - Memory content inlined where cited (liquid-glass guardrails, no-removing-core-pages, CodeRabbit loop termination, PGBOUNCER incident, fork role-bleed/worktree lifetime, RED-before-write rule) so anchors work without memory access; `[[name]]` tags kept as provenance.
 
 **Verdict:** VERIFIED
+
+## 2026-07-22 — Repo tidy: git hygiene (tiers 1-2) + root/docs declutter PR (branch chore/repo-declutter)
+
+**Claim:** Local branches 90→41 (merged/`git cherry`-verified only), 10 dead worktrees removed, 12 stashes dropped (backed up), 13 stale origin branches deleted (ref-backed), gitlab remote removed; root planning docs archived to docs/archive/2026/root-docs/, 10 point-in-time docs moved out of docs/ top level, all live references updated.
+
+**Evidence:**
+- Command: `git branch --merged main` → 49 branches listed; deleted with `-d` (refuses unmerged by design); `git branch | wc -l` → 41 after.
+- Command: `git cherry main <b>` → `fix-cr1/2/3, sdd-t23, claude/phase-0-baseline, tmp/phone-t12, fix/device-audit-findings, fix/profile-shell-and-avatar-nav, feat/legal-pages…` each showed 0 unmerged patches before `-D`; `claude/adopt-tooling-gaps` showed 3 → kept.
+- Command: `git for-each-ref refs/stash-backups | wc -l` → 13; patches in ~/Developer/active/vettrack-stash-backups-2026-07-22/; `git stash list` → only stash@{0} (2.0 agent WIP) remains.
+- Command: `git for-each-ref refs/removed-origin | wc -l` → 13 before `git push origin --delete …` → all 13 reported `[deleted]`; `git branch -r | wc -l` → 19 (main + 9 dependabot + 7 kept + HEAD).
+- Command: `git worktree list` → 21→11; removed only clean worktrees whose HEAD was ancestor-of-main or branch-retained; protected lanes (task-1.1-autopilot-shadow, rfid-vendor…doctor-pilot, nostalgic-pike DIRTY) untouched.
+- `ARCHITECTURE.md:295-298`, `scripts/run-safe-tests.sh:3`, `docs/playwright-matrix.md:57`, `docs/README.md:161,173`, `docs/mobile/nfc.md:103` — reference paths updated; verification rg over moved filenames (excluding archive + generated json) → CLEAN.
+- Command: `pnpm typecheck` → exited clean (no errors) after moves.
+- Protected/untouched: stash@{0}, docs/plans/2.0/ + vettrack-2.0-claude-design-prompt.md (untracked, 2.0 agent), claude/docs-cleanup, chore/relevance-audit-cleanup, claude/new-session-rw4978 (25-file unmerged native NFC work — flagged to owner), dependabot PRs.
+
+**Verdict:** VERIFIED
