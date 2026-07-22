@@ -120,4 +120,45 @@ describe("action-proposal-service", () => {
       approveProposal({ writer }, { clinicId: CLINIC_B, proposalId: staged.id, ...ACTOR }),
     ).rejects.toThrow(ActionProposalNotFoundError);
   });
+
+  it("transitionAndRecord is atomic: decision-log row exists iff the transition succeeded (Task 1.1 §3.A carry-over)", async () => {
+    const staged = await stageProposal(
+      { writer },
+      { input: buildInput({ sourceSessionId: "session-atomic" }), groundTruthFacts: buildFacts(), stagedBy: STAGED_BY },
+    );
+
+    const result = await writer.transitionAndRecord({
+      clinicId: CLINIC_A,
+      proposalId: staged.id,
+      patch: { status: "approved", decidedByUserId: ACTOR.actorUserId, decidedAt: new Date() },
+      decisionMeta: {
+        stagedSummary: staged.summary,
+        stagedCitedFacts: staged.citedFacts,
+        stagedDraftContent: staged.draftContent,
+      },
+    });
+    expect(result.proposal.status).toBe("approved");
+    expect(result.decision.decision).toBe("approved");
+    expect(writer.allDecisions()).toHaveLength(1);
+
+    // A second decision attempt on the same (already-decided) proposal must
+    // throw AND must not leave an orphaned decision-log row behind — the
+    // transition and the decision-log append succeed or fail together.
+    await expect(
+      writer.transitionAndRecord({
+        clinicId: CLINIC_A,
+        proposalId: staged.id,
+        patch: { status: "rejected", decidedByUserId: ACTOR.actorUserId, decidedAt: new Date(), rejectionReason: "too late" },
+        decisionMeta: {
+          stagedSummary: staged.summary,
+          stagedCitedFacts: staged.citedFacts,
+          stagedDraftContent: staged.draftContent,
+        },
+      }),
+    ).rejects.toThrow(ActionProposalAlreadyDecidedError);
+    expect(writer.allDecisions()).toHaveLength(1);
+
+    const finalRow = await writer.get(CLINIC_A, staged.id);
+    expect(finalRow?.status).toBe("approved");
+  });
 });
