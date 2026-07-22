@@ -9,7 +9,7 @@
 - Commands [repo]: `gan-design` (bounded generator/evaluator loop), `gan-build`
 
 ## VetTrack anchors & gotchas
-- Evaluator needs a RUNNING app — dev server on :5000 (`pnpm dev`); don't kill another agent's dev server (predev kills ports).
+- Evaluator needs a RUNNING app on :5000. **Check port ownership first** (`lsof -i :5000`): if a server is already up, reuse it — NEVER run `pnpm dev` over it (its `predev` hook kills ports :3001/:5000 and will terminate another agent's server). Only start `pnpm dev` when both ports are verifiably free.
 - Rubric must include the house constraints or the loop optimizes them away: AA contrast, RTL/Hebrew, mobile-first, glass OFF Code Blue/board, no template UI (ecc design-quality bans).
 - Bound the loop (iterations or score threshold) — unbounded loops burn tokens without converging.
 - Winning design still goes through the normal gates: Accessibility Master, UX Master, and Clinical Safety veto if emergency-adjacent.

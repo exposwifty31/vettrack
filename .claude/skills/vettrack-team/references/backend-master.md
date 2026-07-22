@@ -9,7 +9,7 @@
 - Consults: Database Master (schema), Security Master (veto on auth/tenancy), Realtime Guardian (events)
 
 ## VetTrack anchors & gotchas
-- **Every query filters by `clinicId`. No exceptions.** (`pnpm tenant:lint:touched` flags misses, warn-only.)
+- **Every tenant-scoped query filters by `clinicId`. No exceptions — a missing target-table `clinicId` filter is release-blocking**, even though the linter (`pnpm tenant:lint:touched`) only warns.
 - New route file → register in `server/app/routes.ts` (~56 modules). New worker/scheduler → register in `server/app/start-schedulers.ts`.
 - **Enforcement envelope is frozen:** every evaluator family in `server/lib/authority/enforcement/*` is `off | shadow | enforce`; `off` short-circuits (no clinical-validation queries); resolver throw degrades to `off` at the call site (Strategy A safety net — never retire it).
 - `req.authUser` always populated; **role comes from `vt_users.role` in the DB, never JWT claims**.

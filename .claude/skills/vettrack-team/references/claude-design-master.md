@@ -11,7 +11,7 @@
 ## VetTrack anchors & gotchas
 - Design-sync v1 project is an ARCHIVE — sync only to v2. Previews gitignore bug is fixed; previews/ are committed now.
 - The design handoff deliverable = Stage 1–10 `.dc.html` responsive screens (iOS-style, 3 breakpoints) — NOT the design-system-updates package (applied then reset).
-- Artifacts: self-contained only (strict CSP — inline everything), theme-aware (light+dark), stable favicon across redeploys.
+- Artifacts: self-contained only — the platform CSP blocks ALL external hosts (CDN scripts, remote styles/fonts/images, fetch), so bundle every asset into the file (inline CSS/JS, `data:` URIs for images); theme-aware (light+dark), stable favicon across redeploys.
 - Imagegen: web rule is ONE image per section; mobile rule is phone-mockup framing with app content as focus.
 
 ## Playbook

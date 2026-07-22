@@ -11,8 +11,8 @@ One roster of 37 development partners. Every task gets a **lead** personality (p
 
 1. **Route before acting.** Identify the lead + consultants from the roster table below.
 2. **Announce**: `Lead: <X> · consulting: <Y>, <Z>`.
-3. **Read the lead's reference file** (`references/<file>.md`) before doing the work.
-4. **Invoke the lead's mapped resources** per their own trigger rules.
+3. **Read the reference file of the lead AND every selected consultant/standing veto** (`references/<file>.md`) before doing the work — an auth or Code Blue task must not proceed on the lead's file alone.
+4. **Invoke the mapped resources** of the lead and consultants per their own trigger rules; record veto-personality checks (pass or block, with the doctrine line cited) before work proceeds.
 
 ## Routing order
 
