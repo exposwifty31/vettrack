@@ -4488,6 +4488,50 @@
     "loadError": "טעינת תחזית המוכנות נכשלה"
   },
   "autopilotQueue": {
+    "title": "תור אישורים",
+    "empty": "אין כרגע דבר הממתין לאישור.",
+    "loadFailed": "טעינת תור האישורים נכשלה.",
+    "approve": "אישור",
+    "edit": "עריכה",
+    "reject": "דחייה",
+    "rejectDialogTitle": "דחיית ההצעה",
+    "rejectReasonLabel": "סיבת הדחייה",
+    "rejectReasonRequired": "יש להזין סיבה.",
+    "rejectSubmit": "דחייה",
+    "rejectCancel": "ביטול",
+    "citedFactsLabel": "למה — עובדות מצוטטות",
+    "citedFactsShow": "הצג עובדות מצוטטות",
+    "citedFactsHide": "הסתר עובדות מצוטטות",
+    "approveSuccess": "אושר.",
+    "approveError": "האישור נכשל — נסו שוב.",
+    "editSuccess": "התיקון נשמר ובוצע.",
+    "editError": "שמירת העריכה נכשלה — נסו שוב.",
+    "rejectSuccess": "נדחה.",
+    "rejectError": "הדחייה נכשלה — נסו שוב.",
+    "editUnavailableTitle": "עריכה תגיע לקונסולה",
+    "editUnavailableBody": "עורך מובנה עבור סוג הצעה זה עדיין לא זמין. אפשר לאשר או לדחות בינתיים — עריכה מלאה בקונסולה בדרך.",
+    "editUnavailableDismiss": "הבנתי",
+    "modeBadge": {
+      "shadow": "מצב צל — דורש את בדיקתכם",
+      "enforce": "באכיפה"
+    },
+    "tile": {
+      "title": "תור אישורים",
+      "empty": "אין דבר הממתין לאישור.",
+      "topKindHint": "בעיקר {kindTitle}"
+    },
+    "board": {
+      "awaitingApproval": "{count, plural, one {הצעה אחת ממתינה לאישור} other {# הצעות ממתינות לאישור}}"
+    },
+    "editRestock": {
+      "title": "עריכת טיוטת הזמנת רכש",
+      "supplierLabel": "ספק",
+      "lineItemLabel": "פריט",
+      "quantityLabel": "כמות",
+      "submit": "שמירה ואישור",
+      "cancel": "ביטול",
+      "invalid": "יש לבדוק את הספק והכמויות — לכל שורה נדרשת כמות של 1 לפחות."
+    },
     "kinds": {
       "shiftHandoverDraft": {
         "title": "מסירת משמרת מוכנה לבדיקה",
@@ -4496,17 +4540,31 @@
       "coordinatorReassignOffRoster": {
         "title": "רכז הציוד אינו ברשימת הצוות",
         "summaryTemplate": "רכז הציוד שהוקצה למשמרת {shiftDate} אינו נמצא עוד ברשימת הצוות הנוכחית — מוצע תחליף בהמשך.",
-        "proposedCandidateLabel": "תחליף מוצע"
+        "proposedCandidateLabel": "תחליף מוצע",
+        "staleCoordinatorLabel": "משויך כרגע (מחוץ לרשימת הצוות)",
+        "escalationStageLabel": "שלב הסלמה",
+        "statusAuto": "נמצא תחליף מתאים אחד",
+        "statusFallbackSenior": "לא נמצאה התאמה — נופלים חזרה לטכנאי הבכיר",
+        "statusNeedsConfirmation": "מספר מועמדים — דורש אישור",
+        "statusUnresolved": "לא ניתן היה לקבוע תחליף"
       },
       "restockPoOnBurn": {
         "title": "נדרשת השלמת מלאי — פריטים בנקודת ההזמנה החוזרת או מתחתיה",
         "summaryTemplate": "{itemCount, plural, one {פריט אחד נמצא בנקודת ההזמנה החוזרת או מתחתיה} other {# פריטים נמצאים בנקודת ההזמנה החוזרת או מתחתיה}} נכון לתאריך {scanDate} — מוצעת הזמנת רכש טיוטה בהמשך.",
-        "suggestedQuantityLabel": "כמות מוצעת להזמנה"
+        "suggestedQuantityLabel": "כמות מוצעת להזמנה",
+        "supplierLabel": "ספק",
+        "lineItemsLabel": "שורות הזמנת הטיוטה"
       },
       "crashCartDrift": {
         "title": "עגלת ההחייאה דורשת תשומת לב",
         "missingItemSummaryTemplate": "{itemCount, plural, one {פריט אחד בעגלת ההחייאה סומן כלא מוכן} other {# פריטים בעגלת ההחייאה סומנו כלא מוכנים}} בבדיקה האחרונה בתאריך {scanDate}.",
-        "staleSummaryTemplate": "{neverChecked, select, yes {עגלת ההחייאה מעולם לא נבדקה} other {עגלת ההחייאה לא נבדקה כבר {hours} שעות}} — נדרשת בדיקה (סף: {thresholdHours} שעות)."
+        "staleSummaryTemplate": "עגלת ההחייאה לא נבדקה כבר {hours} שעות — נדרשת בדיקה (סף: {thresholdHours} שעות).",
+        "neverCheckedSummaryTemplate": "עגלת ההחייאה מעולם לא נבדקה — נדרשת בדיקה (סף: {thresholdHours} שעות).",
+        "failedItemsLabel": "לא מוכן",
+        "lastCheckedLabel": "נבדק לאחרונה",
+        "neverCheckedLabel": "מעולם לא נבדק",
+        "hoursSinceLabel": "שעות מאז הבדיקה האחרונה",
+        "thresholdLabel": "סף חריגה (שעות)"
       }
     }
   }

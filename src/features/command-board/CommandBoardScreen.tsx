@@ -13,7 +13,7 @@
 // the board's exit-button guard (falls back to the internal ?kiosk=1 read when
 // omitted, so /equipment/board stays byte-identical).
 import { useEffect, useMemo } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   connectRealtime,
   disconnectRealtime,
@@ -27,6 +27,7 @@ import { useRealtimeReconciliation } from "@/hooks/useRealtimeReconciliation";
 import { useCodeBlueKeepaliveReconciliation } from "@/hooks/useCodeBlueKeepaliveReconciliation";
 import { t } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
+import { api } from "@/lib/api";
 import { ReadinessBadge } from "@/components/ui/readiness-badge";
 import type { EquipmentStatus } from "@/types";
 import { STATUS_BG } from "./status-tokens";
@@ -34,6 +35,7 @@ import { CommandBoard } from "./components/CommandBoard";
 import { CodeBlueOverlay } from "./components/CodeBlueOverlay";
 import { useKioskModeFromUrl } from "./use-kiosk-mode-from-url";
 import { useDirection } from "@/hooks/useDirection";
+import { boardProposalCountQueryOptions, proposalQueueQueryKey } from "@/features/autopilot/proposal-queue-keys";
 
 interface CommandBoardScreenProps {
   kioskMode?: boolean;
@@ -64,6 +66,18 @@ function CommandBoardScreen({ kioskMode: kioskModeProp }: CommandBoardScreenProp
   const qc = useQueryClient();
   const dir = useDirection();
   const realtimeIngestor = useMemo(() => new EventIngestor(qc), [qc]);
+
+  // Task 1.1 §6 (deliverable H) — board ambient count only. Plain polling
+  // query (the kiosk board is already a polling-based ambient display, not
+  // a `/collab-ws` consumer); the count still cache-shares (via
+  // `proposalQueueQueryKey`) with whatever the approval-queue page's
+  // collab-ws nudge invalidates elsewhere. No proposal content is read here.
+  const { data: autopilotQueueData } = useQuery({
+    queryKey: proposalQueueQueryKey({ status: "staged" }),
+    queryFn: () => api.actionProposals.list({ status: "staged" }),
+    ...boardProposalCountQueryOptions,
+  });
+  const autopilotQueueCount = autopilotQueueData?.proposals.length ?? 0;
 
   // Phase 9 PR 9.2 — `?kiosk=1` opts a Department Display surface into TV-grade
   // behavior. The /board route passes kioskMode explicitly (it wins); the
@@ -229,6 +243,7 @@ function CommandBoardScreen({ kioskMode: kioskModeProp }: CommandBoardScreenProp
         currentTime={snapshot.currentTime}
         currentShift={snapshot.currentShift}
         kioskMode={kioskMode}
+        proposalCount={autopilotQueueCount}
       />
     </div>
   );

@@ -27,6 +27,7 @@ const EquipmentDetailPage = lazy(() => import("@/pages/equipment-detail"));
 const EquipmentMasterDetail = lazy(() => import("@/features/equipment/tablet/EquipmentMasterDetail"));
 const NewEquipmentPage = lazy(() => import("@/pages/new-equipment"));
 const AlertsPage = lazy(() => import("@/pages/alerts"));
+const AutopilotQueuePage = lazy(() => import("@/pages/autopilot-queue"));
 const MyEquipmentPage = lazy(() => import("@/pages/my-equipment"));
 const RoomsListPage = lazy(() => import("@/pages/rooms-list"));
 const RoomRadarPage = lazy(() => import("@/pages/room-radar"));
@@ -212,6 +213,11 @@ export function AppRoutes() {
         <Route path="/code-blue/display"><AuthGuard><WebOnlyGuard><CodeBlueDisplay /></WebOnlyGuard></AuthGuard></Route>
         <Route path="/crash-cart"><AuthGuard><CrashCartCheckPage /></AuthGuard></Route>
         <Route path="/handoff"><AuthGuard><HandoffPage /></AuthGuard></Route>
+        {/* Task 1.1 §6 — Shift Autopilot approval queue. Mobile-first (per the
+            roadmap's design scope), NOT behind WebOnlyGuard — unlike the
+            admin-only Autopilot Policy console screen (Task 0.4 §7), this is a
+            surface techs use from the phone. */}
+        <Route path="/autopilot/queue"><AuthGuard><AutopilotQueuePage /></AuthGuard></Route>
         <Route path="/admin/code-blue-history"><AuthGuard><CodeBlueHistoryPage /></AuthGuard></Route>
         {/* Legacy aliases — intentional identical-component mounts, not
             distinct surfaces (confirmed 2026-07-11 QA audit finding: "/emergency-equipment-wall
