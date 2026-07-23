@@ -95,7 +95,8 @@ router.post(
     try {
       const proposal = await approveProposal(
         { writer },
-        { clinicId, proposalId: req.params.id!, // the /:id route shape guarantees params.id actorUserId: userId, actorEmail: email, actorRole },
+        // Non-null params.id: the /:id route shape guarantees it.
+        { clinicId, proposalId: req.params.id!, actorUserId: userId, actorEmail: email, actorRole },
       );
       return res.json({ proposal });
     } catch (err) {
