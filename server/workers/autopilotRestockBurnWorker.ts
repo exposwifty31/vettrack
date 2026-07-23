@@ -39,6 +39,7 @@ import { createRedisConnection } from "../lib/redis.js";
 import { DrizzleRestockBurnReader, type RestockBurnReader } from "../lib/autopilot/restock-burn-reader.port.js";
 import { composeRestockPoProposal } from "../lib/autopilot/restock-po-composer.js";
 import { stageProposal } from "../lib/autopilot/action-proposal-service.js";
+import { notifyProposalQueueChanged } from "../lib/realtime-collab/proposal-queue-nudge.js";
 import {
   DrizzleActionProposalWriter,
   type ActionProposalWriter,
@@ -118,7 +119,10 @@ export async function runRestockBurnScan(
       },
     );
 
-    if (outcome.created) staged++;
+    if (outcome.created) {
+      staged++;
+      notifyProposalQueueChanged(clinicId); // Task 1.1 §1.5 — advisory, fire-and-forget
+    }
   }
 
   return { scanned: clinicIds.length, staged };

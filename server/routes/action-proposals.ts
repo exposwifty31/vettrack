@@ -19,6 +19,7 @@ import { actionProposalDecisionLimiter } from "../middleware/rate-limiters.js";
 import { validateBody } from "../middleware/validate.js";
 import { apiError } from "../lib/apiError.js";
 import { resolveAuditActorRole } from "../lib/audit.js";
+import { notifyProposalQueueChanged } from "../lib/realtime-collab/proposal-queue-nudge.js";
 import {
   ACTION_PROPOSAL_KINDS,
   ACTION_PROPOSAL_STATUSES,
@@ -105,6 +106,7 @@ router.post(
         { writer },
         { clinicId, proposalId: req.params.id!, actorUserId: userId, actorEmail: email, actorRole },
       );
+      notifyProposalQueueChanged(clinicId); // Task 1.1 §1.5 — advisory, fire-and-forget
       return res.json({ proposal });
     } catch (err) {
       return mapError(req, res, err);
@@ -132,6 +134,7 @@ router.post(
           editedContent: req.body.editedContent,
         },
       );
+      notifyProposalQueueChanged(clinicId); // Task 1.1 §1.5 — advisory, fire-and-forget
       return res.json({ proposal });
     } catch (err) {
       return mapError(req, res, err);
@@ -159,6 +162,7 @@ router.post(
           rejectionReason: req.body.rejectionReason,
         },
       );
+      notifyProposalQueueChanged(clinicId); // Task 1.1 §1.5 — advisory, fire-and-forget
       return res.json({ proposal });
     } catch (err) {
       return mapError(req, res, err);

@@ -38,6 +38,7 @@ import { createRedisConnection } from "../lib/redis.js";
 import { DrizzleCrashCartDriftReader, type CrashCartDriftReader } from "../lib/autopilot/crash-cart-drift-reader.port.js";
 import { composeCrashCartDriftProposal } from "../lib/autopilot/crash-cart-drift-composer.js";
 import { stageProposal } from "../lib/autopilot/action-proposal-service.js";
+import { notifyProposalQueueChanged } from "../lib/realtime-collab/proposal-queue-nudge.js";
 import {
   DrizzleActionProposalWriter,
   type ActionProposalWriter,
@@ -104,7 +105,10 @@ export async function runCrashCartDriftScan(
       },
     );
 
-    if (outcome.created) staged++;
+    if (outcome.created) {
+      staged++;
+      notifyProposalQueueChanged(clinicId); // Task 1.1 §1.5 — advisory, fire-and-forget
+    }
   }
 
   return { scanned: clinicIds.length, staged };

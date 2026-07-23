@@ -41,6 +41,7 @@ import {
 } from "../lib/autopilot/coordinator-roster-reader.port.js";
 import { composeCoordinatorReassignProposal } from "../lib/autopilot/coordinator-reassign-composer.js";
 import { stageProposal } from "../lib/autopilot/action-proposal-service.js";
+import { notifyProposalQueueChanged } from "../lib/realtime-collab/proposal-queue-nudge.js";
 import {
   DrizzleActionProposalWriter,
   type ActionProposalWriter,
@@ -139,7 +140,10 @@ export async function runCoordinatorReassignScan(
       },
     );
 
-    if (outcome.created) staged++;
+    if (outcome.created) {
+      staged++;
+      notifyProposalQueueChanged(clinicId); // Task 1.1 §1.5 — advisory, fire-and-forget
+    }
   }
 
   return { scanned: candidates.length, staged };
