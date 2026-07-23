@@ -1273,6 +1273,45 @@ const translations = {
     toggleLabelStation: (station: string) => tr(d.returnPlugDialog.toggleLabelStation, { station }),
   },
 
+  autopilotQueue: {
+    ...d.autopilotQueue,
+    tile: {
+      ...d.autopilotQueue.tile,
+      topKindHint: (kindTitle: string) => tr(d.autopilotQueue.tile.topKindHint, { kindTitle }),
+    },
+    board: {
+      awaitingApproval: (count: number) => tr(d.autopilotQueue.board.awaitingApproval, { count }),
+    },
+    kinds: {
+      shiftHandoverDraft: {
+        ...d.autopilotQueue.kinds.shiftHandoverDraft,
+        summaryTemplate: (deltaCount: number) =>
+          tr(d.autopilotQueue.kinds.shiftHandoverDraft.summaryTemplate, { deltaCount }),
+      },
+      coordinatorReassignOffRoster: {
+        ...d.autopilotQueue.kinds.coordinatorReassignOffRoster,
+        summaryTemplate: (shiftDate: string) =>
+          tr(d.autopilotQueue.kinds.coordinatorReassignOffRoster.summaryTemplate, { shiftDate }),
+      },
+      restockPoOnBurn: {
+        ...d.autopilotQueue.kinds.restockPoOnBurn,
+        summaryTemplate: (itemCount: number, scanDate: string) =>
+          tr(d.autopilotQueue.kinds.restockPoOnBurn.summaryTemplate, { itemCount, scanDate }),
+      },
+      crashCartDrift: {
+        ...d.autopilotQueue.kinds.crashCartDrift,
+        missingItemSummaryTemplate: (itemCount: number, scanDate: string) =>
+          tr(d.autopilotQueue.kinds.crashCartDrift.missingItemSummaryTemplate, { itemCount, scanDate }),
+        staleSummaryTemplate: (neverChecked: boolean, hours: number, thresholdHours: number) =>
+          tr(d.autopilotQueue.kinds.crashCartDrift.staleSummaryTemplate, {
+            neverChecked: neverChecked ? "yes" : "no",
+            hours,
+            thresholdHours,
+          }),
+      },
+    },
+  },
+
 } as const;
 
 return stripInternalKeys(translations) as typeof translations;

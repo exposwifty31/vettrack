@@ -4490,4 +4490,84 @@ export interface TStructure {
     allReadyBody: string;
     loadError: string;
   };
+  autopilotQueue: {
+    title: string;
+    empty: string;
+    loadFailed: string;
+    approve: string;
+    edit: string;
+    reject: string;
+    rejectDialogTitle: string;
+    rejectReasonLabel: string;
+    rejectReasonRequired: string;
+    rejectSubmit: string;
+    rejectCancel: string;
+    citedFactsLabel: string;
+    citedFactsShow: string;
+    citedFactsHide: string;
+    approveSuccess: string;
+    approveError: string;
+    editSuccess: string;
+    editError: string;
+    rejectSuccess: string;
+    rejectError: string;
+    editUnavailableTitle: string;
+    editUnavailableBody: string;
+    editUnavailableDismiss: string;
+    modeBadge: {
+      shadow: string;
+      enforce: string;
+    };
+    tile: {
+      title: string;
+      empty: string;
+      topKindHint: string;
+    };
+    board: {
+      awaitingApproval: string;
+    };
+    editRestock: {
+      title: string;
+      supplierLabel: string;
+      lineItemLabel: string;
+      quantityLabel: string;
+      submit: string;
+      cancel: string;
+      invalid: string;
+    };
+    kinds: {
+      shiftHandoverDraft: {
+        title: string;
+        summaryTemplate: string;
+      };
+      coordinatorReassignOffRoster: {
+        title: string;
+        summaryTemplate: string;
+        proposedCandidateLabel: string;
+        staleCoordinatorLabel: string;
+        escalationStageLabel: string;
+        statusAuto: string;
+        statusFallbackSenior: string;
+        statusNeedsConfirmation: string;
+        statusUnresolved: string;
+      };
+      restockPoOnBurn: {
+        title: string;
+        summaryTemplate: string;
+        suggestedQuantityLabel: string;
+        supplierLabel: string;
+        lineItemsLabel: string;
+      };
+      crashCartDrift: {
+        title: string;
+        missingItemSummaryTemplate: string;
+        staleSummaryTemplate: string;
+        failedItemsLabel: string;
+        lastCheckedLabel: string;
+        neverCheckedLabel: string;
+        hoursSinceLabel: string;
+        thresholdLabel: string;
+      };
+    };
+  };
 }

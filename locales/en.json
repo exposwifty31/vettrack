@@ -4488,6 +4488,50 @@
     "loadError": "Couldn't load the readiness forecast"
   },
   "autopilotQueue": {
+    "title": "Approval queue",
+    "empty": "Nothing waiting for approval right now.",
+    "loadFailed": "Couldn't load the approval queue.",
+    "approve": "Approve",
+    "edit": "Edit",
+    "reject": "Reject",
+    "rejectDialogTitle": "Reject this proposal",
+    "rejectReasonLabel": "Reason for rejecting",
+    "rejectReasonRequired": "A reason is required.",
+    "rejectSubmit": "Reject",
+    "rejectCancel": "Cancel",
+    "citedFactsLabel": "Why — cited facts",
+    "citedFactsShow": "Show cited facts",
+    "citedFactsHide": "Hide cited facts",
+    "approveSuccess": "Approved.",
+    "approveError": "Couldn't approve — try again.",
+    "editSuccess": "Saved and applied your fix.",
+    "editError": "Couldn't save your edit — try again.",
+    "rejectSuccess": "Rejected.",
+    "rejectError": "Couldn't reject — try again.",
+    "editUnavailableTitle": "Editing coming to the console",
+    "editUnavailableBody": "A structured editor for this proposal type isn't available yet. Approve or reject for now — a full edit-in-console flow is coming.",
+    "editUnavailableDismiss": "Got it",
+    "modeBadge": {
+      "shadow": "Shadow — needs your review",
+      "enforce": "Enforced"
+    },
+    "tile": {
+      "title": "Approval queue",
+      "empty": "Nothing waiting for approval.",
+      "topKindHint": "Mostly {kindTitle}"
+    },
+    "board": {
+      "awaitingApproval": "{count, plural, one {1 proposal awaiting approval} other {# proposals awaiting approval}}"
+    },
+    "editRestock": {
+      "title": "Edit draft purchase order",
+      "supplierLabel": "Supplier",
+      "lineItemLabel": "Item",
+      "quantityLabel": "Quantity",
+      "submit": "Save and approve",
+      "cancel": "Cancel",
+      "invalid": "Check the supplier and quantities — every line needs a quantity of at least 1."
+    },
     "kinds": {
       "shiftHandoverDraft": {
         "title": "Shift handover ready for review",
@@ -4496,17 +4540,30 @@
       "coordinatorReassignOffRoster": {
         "title": "Equipment Coordinator off roster",
         "summaryTemplate": "The Equipment Coordinator assigned for {shiftDate} is no longer on today's roster — a replacement is suggested below.",
-        "proposedCandidateLabel": "Suggested replacement"
+        "proposedCandidateLabel": "Suggested replacement",
+        "staleCoordinatorLabel": "Currently assigned (off roster)",
+        "escalationStageLabel": "Escalation stage",
+        "statusAuto": "One eligible replacement found",
+        "statusFallbackSenior": "No eligible match — falling back to the senior technician",
+        "statusNeedsConfirmation": "Multiple candidates — needs confirmation",
+        "statusUnresolved": "No replacement could be resolved"
       },
       "restockPoOnBurn": {
         "title": "Restock needed — items at or below reorder point",
         "summaryTemplate": "{itemCount, plural, one {1 item is at or below its reorder point} other {# items are at or below their reorder point}} as of {scanDate} — a draft purchase order is suggested below.",
-        "suggestedQuantityLabel": "Suggested order quantity"
+        "suggestedQuantityLabel": "Suggested order quantity",
+        "supplierLabel": "Supplier",
+        "lineItemsLabel": "Draft order lines"
       },
       "crashCartDrift": {
         "title": "Crash cart needs attention",
         "missingItemSummaryTemplate": "{itemCount, plural, one {1 crash cart item was marked not ready} other {# crash cart items were marked not ready}} at the last check on {scanDate}.",
-        "staleSummaryTemplate": "{neverChecked, select, yes {The crash cart has never been checked} other {The crash cart hasn't been checked in {hours} hours}} — a check is overdue (threshold: {thresholdHours}h)."
+        "staleSummaryTemplate": "{neverChecked, select, yes {The crash cart has never been checked} other {The crash cart hasn't been checked in {hours} hours}} — a check is overdue (threshold: {thresholdHours}h).",
+        "failedItemsLabel": "Not ready",
+        "lastCheckedLabel": "Last checked",
+        "neverCheckedLabel": "Never checked",
+        "hoursSinceLabel": "Hours since last check",
+        "thresholdLabel": "Overdue threshold (hours)"
       }
     }
   }
