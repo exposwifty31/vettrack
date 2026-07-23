@@ -37,6 +37,9 @@ describe("action-proposal-types Zod contracts", () => {
     const ok = rejectActionProposalBodySchema.safeParse({ rejectionReason: "not applicable" });
     expect(ok.success).toBe(true);
 
+    const whitespaceOnly = rejectActionProposalBodySchema.safeParse({ rejectionReason: "   " });
+    expect(whitespaceOnly.success).toBe(false);
+
     const empty = rejectActionProposalBodySchema.safeParse({ rejectionReason: "" });
     expect(empty.success).toBe(false);
 
