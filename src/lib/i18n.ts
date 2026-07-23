@@ -1302,12 +1302,10 @@ const translations = {
         ...d.autopilotQueue.kinds.crashCartDrift,
         missingItemSummaryTemplate: (itemCount: number, scanDate: string) =>
           tr(d.autopilotQueue.kinds.crashCartDrift.missingItemSummaryTemplate, { itemCount, scanDate }),
-        staleSummaryTemplate: (neverChecked: boolean, hours: number, thresholdHours: number) =>
-          tr(d.autopilotQueue.kinds.crashCartDrift.staleSummaryTemplate, {
-            neverChecked: neverChecked ? "yes" : "no",
-            hours,
-            thresholdHours,
-          }),
+        staleSummaryTemplate: (hours: number, thresholdHours: number) =>
+          tr(d.autopilotQueue.kinds.crashCartDrift.staleSummaryTemplate, { hours, thresholdHours }),
+        neverCheckedSummaryTemplate: (thresholdHours: number) =>
+          tr(d.autopilotQueue.kinds.crashCartDrift.neverCheckedSummaryTemplate, { thresholdHours }),
       },
     },
   },

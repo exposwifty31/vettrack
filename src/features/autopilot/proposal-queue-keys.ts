@@ -14,3 +14,17 @@ export function proposalQueueQueryKey(
 ) {
   return [PROPOSAL_QUEUE_QUERY_ROOT_KEY, params] as const;
 }
+
+/**
+ * Query options for the kiosk board's ambient proposal count (§6 review
+ * follow-up): the board tab has no collab-ws nudge subscription and never
+ * refocuses, so a bounded `refetchInterval` is its only way to track a
+ * mid-session queue change. 60s is deliberate — an ambient glance number,
+ * not a task surface.
+ */
+export const boardProposalCountQueryOptions = {
+  staleTime: 30_000,
+  retry: false,
+  refetchOnWindowFocus: false,
+  refetchInterval: 60_000,
+} as const;

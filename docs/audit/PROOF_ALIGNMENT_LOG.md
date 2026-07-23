@@ -4933,3 +4933,15 @@ Disclosed per the task's own "or disclose why not run" allowance — not run to 
 - Minor finding left for review adjudication: handover card open-items render raw `TASK_UPDATED:task-1` identifiers.
 
 **Verdict:** VERIFIED.
+
+## 2026-07-23 — Task 1.1 §6 post-review fix wave — branch feat/2.0-task-1.1-s6-queue-ui
+
+**Claim:** §6 review PASS zero blockers; the two cheap non-blocking findings closed.
+
+**Evidence:**
+- Board refresh cadence (finding 1): RED first — tests/autopilot/board-proposal-count-query-options.test.ts failed on missing export; GREEN — boardProposalCountQueryOptions (staleTime 30s, refetchInterval 60s, no focus refetch) exported from proposal-queue-keys.ts and spread into CommandBoardScreen's count query.
+- Stale accessor (finding 4): src/lib/i18n.ts crashCartDrift.staleSummaryTemplate signature corrected (dead neverChecked param removed) + neverCheckedSummaryTemplate accessor added.
+- `pnpm exec vitest run tests/autopilot/ tests/jobs/` → 36 files / 213 passed. `tsc --noEmit` both tsconfigs → 0 errors (env repaired via pnpm install --frozen-lockfile earlier this session).
+- Deferred to follow-ups (recorded): §2 composer open-item humanization; stored-summary viewer-locale re-localization (design characteristic of compose-once).
+
+**Verdict:** VERIFIED.

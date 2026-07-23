@@ -15,7 +15,7 @@
 > | §4 restock_po_on_burn (reader, composer, ATOMIC approve side effect → real PO+lines, per-kind edit Zod, daily worker) | **DONE** | s4 branch | PASS, 0 blockers; fix wave registered §3's job-registry gap + `vt_items` citation rename |
 > | §5 crash_cart_drift (reader w/ 24h-default + per-clinic-override staleness, composer, daily worker, no side effect) | **DONE** | s5 branch | PASS, clinical-safety lens NO VETO, 0 blockers |
 > | §2 shift_handover_draft (composer over R-SH-F1's own `resolveShiftWindow`/`aggregateDeltas`, 10-min worker, no side effect, R-SH-F1 auto-publish left 100% untouched — parallel-run) | **DONE** | s2 branch (`feat/2.0-task-1.1-s2-handover-draft`) | PASS, 0 blockers; draftContent field-parity + edited-draft window metadata recorded as §0(c) cutover preconditions |
-> | §6 approval-queue UI shell + §1.5 socket-nudge decision | **DONE-pending-review** | s6 branch (`feat/2.0-task-1.1-s6-queue-ui`) | not yet independently reviewed |
+> | §6 approval-queue UI shell + §1.5 nudge (option 1, payload-tested ephemeral) | **DONE** | s6 branch (`feat/2.0-task-1.1-s6-queue-ui`) | PASS, 0 blockers; visual evidence (9 shots, 3 breakpoints, he RTL+en) in docs/audit/screenshots/task-1.1-s6/; ICU summary bug found-by-screenshot + fixed; board 60s cadence + accessor cleanup post-review |
 >
 > **Owner decisions binding execution (beyond §0):**
 > - **Edit = fix-then-execute (2026-07-22, commit `eac36bd10`):** `editProposal` dispatches the kind

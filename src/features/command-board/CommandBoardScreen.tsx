@@ -35,7 +35,7 @@ import { CommandBoard } from "./components/CommandBoard";
 import { CodeBlueOverlay } from "./components/CodeBlueOverlay";
 import { useKioskModeFromUrl } from "./use-kiosk-mode-from-url";
 import { useDirection } from "@/hooks/useDirection";
-import { proposalQueueQueryKey } from "@/features/autopilot/proposal-queue-keys";
+import { boardProposalCountQueryOptions, proposalQueueQueryKey } from "@/features/autopilot/proposal-queue-keys";
 
 interface CommandBoardScreenProps {
   kioskMode?: boolean;
@@ -75,9 +75,7 @@ function CommandBoardScreen({ kioskMode: kioskModeProp }: CommandBoardScreenProp
   const { data: autopilotQueueData } = useQuery({
     queryKey: proposalQueueQueryKey({ status: "staged" }),
     queryFn: () => api.actionProposals.list({ status: "staged" }),
-    staleTime: 30_000,
-    retry: false,
-    refetchOnWindowFocus: false,
+    ...boardProposalCountQueryOptions,
   });
   const autopilotQueueCount = autopilotQueueData?.proposals.length ?? 0;
 
