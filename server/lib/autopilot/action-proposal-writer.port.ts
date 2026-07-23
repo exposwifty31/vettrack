@@ -244,6 +244,8 @@ export class DrizzleActionProposalWriter implements ActionProposalWriter {
         rejectionReason: entry.rejectionReason ?? null,
       })
       .returning();
+    // Non-null: an unconditional single-row INSERT with .returning() always
+    // yields exactly one row — Drizzle's type can't narrow that.
     return row!;
   }
 
@@ -350,6 +352,9 @@ export class InMemoryActionProposalWriter implements ActionProposalWriter {
       decidedAt: null,
       createdAt: now,
       updatedAt: now,
+      // Test-fake cast: jsonb columns infer as `unknown` on the Drizzle row
+      // type; this literal is structurally the row shape but TS can't prove
+      // the jsonb fields without the DB round-trip.
     } as unknown as ActionProposalRow;
 
     this.proposals.set(row.id, row);
