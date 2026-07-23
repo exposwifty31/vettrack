@@ -4546,7 +4546,7 @@ Reviewer returned 1 HIGH + 1 MEDIUM + 2 LOW on the committed sub-card; all four 
 
 ## 2026-07-22 — Task 1.1 §1 Shift Autopilot shared infrastructure (branch feat/2.0-task-1.1-s1-shared-infra)
 
-**Claim:** Built the shared `action_proposal` infrastructure (§1.1 schema, §1.2 types+Zod, §1.3 ports+service, §1.4 citation-validator, §1.6 route) plus API-client plumbing per `docs/plans/2.0/task-1.1-plan.md` §1, TDD (RED confirmed before every implementation file), server-only, no §2–§5 kind-specific work and no §1.5 realtime/§6 UI.
+**Claim:** Built the shared `action_proposal` infrastructure (§1.1 schema, §1.2 types+Zod, §1.3 ports+service, §1.4 citation-validator, §1.6 route) plus API-client plumbing (`src/lib/api.ts` + `src/types/action-proposals.ts` — the one deliberate client-side addition per the repo's API-client pattern; no UI) per `docs/plans/2.0/task-1.1-plan.md` §1, TDD (RED confirmed before each implementation file, with two disclosed exceptions recorded below: the writer port, exercised via the service suite, and the route file, whose test landed after), no §2–§5 kind-specific work and no §1.5 realtime/§6 UI.
 
 **Evidence (commands actually run this session, real output):**
 - RED confirmed per unit before implementing, each run with the file not yet existing: `pnpm exec vitest run tests/autopilot/action-proposal-types.test.ts` → `Cannot find module '.../action-proposal-types.js'`; same pattern for `action-proposal-citation-validator.test.ts` and `action-proposal-service.test.ts` (`Cannot find module '.../action-proposal-service.js'`) — all failed for missing-module, not a typo, before their implementation files were written.

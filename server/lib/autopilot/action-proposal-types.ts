@@ -71,7 +71,7 @@ export type EditActionProposalBody = z.infer<typeof editActionProposalBodySchema
 
 export const rejectActionProposalBodySchema = z
   .object({
-    rejectionReason: z.string().min(1),
+    rejectionReason: z.string().trim().min(1),
   })
   .strict();
 export type RejectActionProposalBody = z.infer<typeof rejectActionProposalBodySchema>;
