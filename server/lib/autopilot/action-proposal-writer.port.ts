@@ -140,7 +140,7 @@ export class DrizzleActionProposalWriter implements ActionProposalWriter {
       .select()
       .from(actionProposal)
       .where(and(...conditions))
-      .orderBy(desc(actionProposal.createdAt));
+      .orderBy(desc(actionProposal.createdAt), desc(actionProposal.id));
 
     if (typeof filters.limit === "number") {
       const limited = query.limit(filters.limit);
@@ -306,13 +306,18 @@ export class InMemoryActionProposalWriter implements ActionProposalWriter {
   private readonly decisions: ActionProposalDecisionRow[] = [];
 
   private stageKey(clinicId: string, kind: string, sourceSessionId: string): string {
-    return `${clinicId}::${kind}::${sourceSessionId}`;
+    // JSON identity: delimiter concatenation collides when a component
+    // contains the delimiter; the serialized tuple cannot.
+    return JSON.stringify([clinicId, kind, sourceSessionId]);
   }
 
   async findStaged(clinicId: string, filters: ActionProposalListFilters = {}): Promise<ActionProposalRow[]> {
     let rows = [...this.proposals.values()]
       .filter((row) => row.clinicId === clinicId)
-      .sort((a, b) => (b.createdAt as unknown as Date).getTime() - (a.createdAt as unknown as Date).getTime());
+      .sort((a, b) => {
+        const dt = b.createdAt.getTime() - a.createdAt.getTime();
+        return dt !== 0 ? dt : b.id.localeCompare(a.id);
+      });
     if (filters.status) rows = rows.filter((row) => row.status === filters.status);
     if (filters.kind) rows = rows.filter((row) => row.kind === filters.kind);
     if (typeof filters.offset === "number") rows = rows.slice(filters.offset);
