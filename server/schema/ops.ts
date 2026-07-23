@@ -12,6 +12,7 @@ import type {
   ShiftHandoverOpenItem,
   PatientWorklist,
 } from "../lib/shift-handover.js";
+import type { ActionProposalCitedFact } from "../lib/autopilot/action-proposal-types.js";
 
 export const shiftRole = pgEnum("vt_shift_role", ["technician", "senior_technician", "admin"]);
 
@@ -562,3 +563,87 @@ export const shiftHandover = vtTable(
 );
 export type ShiftHandoverRow = typeof shiftHandover.$inferSelect;
 export type NewShiftHandoverRow = typeof shiftHandover.$inferInsert;
+
+/**
+ * VetTrack 2.0, Task 1.1 §1.1 — Shift Autopilot `action_proposal` shared
+ * infrastructure. A staged proposal (one of 4 closed kinds) carries a
+ * human-readable summary, the exact grounding facts it cites (`citedFacts`),
+ * a snapshot of the automated citation-grounding check (`citationValidation`
+ * — computed at stage time so a reviewer sees the result without re-running
+ * it), and traceability back to its content source (`sourceRef`). Approve/
+ * edit/reject is a single-decision transition (`status` moves out of
+ * `staged` exactly once); every decision appends an immutable row to
+ * `actionProposalDecisionLog`, the append-only operations-memory table.
+ *
+ * `kind` is a closed pgEnum (not the spike's free-text column) since all 4
+ * kinds are known up front — disclosed deviation from the Task 0.3 spike, see
+ * docs/plans/2.0/task-1.1-plan.md §1.1.
+ *
+ * Idempotency: `ux_vt_action_proposal_clinic_kind_session` enforces one
+ * staged proposal per (clinicId, kind, sourceSessionId) — a worker's second
+ * scan of the same session must not double-stage.
+ */
+export const actionProposalKind = pgEnum("vt_action_proposal_kind", [
+  "shift_handover_draft",
+  "coordinator_reassign_off_roster",
+  "restock_po_on_burn",
+  "crash_cart_drift",
+]);
+export const actionProposalStatus = pgEnum("vt_action_proposal_status", [
+  "staged",
+  "approved",
+  "edited",
+  "rejected",
+]);
+
+export const actionProposal = vtTable(
+  "vt_action_proposal",
+  {
+    id: text("id").primaryKey(),
+    clinicId: text("clinic_id").notNull().references(() => clinics.id, { onDelete: "restrict" }),
+    kind: actionProposalKind("kind").notNull(),
+    status: actionProposalStatus("status").notNull().default("staged"),
+    sourceSessionId: text("source_session_id").notNull(),
+    summary: text("summary").notNull(),
+    citedFacts: jsonb("cited_facts").notNull().$type<ActionProposalCitedFact[]>(),
+    draftContent: jsonb("draft_content").notNull(),
+    sourceRef: jsonb("source_ref").notNull(),
+    citationValidation: jsonb("citation_validation").notNull(),
+    editedContent: jsonb("edited_content"),
+    rejectionReason: text("rejection_reason"),
+    decidedByUserId: text("decided_by_user_id").references(() => users.id, { onDelete: "set null" }),
+    decidedAt: timestamp("decided_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    clinicKindSessionUq: uniqueIndex("ux_vt_action_proposal_clinic_kind_session")
+      .on(t.clinicId, t.kind, t.sourceSessionId),
+    clinicStatusIdx: index("idx_vt_action_proposal_clinic_status").on(t.clinicId, t.status),
+  }),
+);
+
+export const actionProposalDecisionLog = vtTable(
+  "vt_action_proposal_decision",
+  {
+    id: text("id").primaryKey(),
+    proposalId: text("proposal_id").notNull().references(() => actionProposal.id, { onDelete: "restrict" }),
+    clinicId: text("clinic_id").notNull().references(() => clinics.id, { onDelete: "restrict" }),
+    stagedSummary: text("staged_summary").notNull(),
+    stagedCitedFacts: jsonb("staged_cited_facts").notNull(),
+    stagedDraftContent: jsonb("staged_draft_content").notNull(),
+    decision: actionProposalStatus("decision").notNull(),
+    decidedByUserId: text("decided_by_user_id").notNull().references(() => users.id, { onDelete: "restrict" }),
+    decidedAt: timestamp("decided_at", { withTimezone: true }).notNull().defaultNow(),
+    editedContent: jsonb("edited_content"),
+    rejectionReason: text("rejection_reason"),
+  },
+  (t) => ({
+    proposalIdx: index("idx_vt_action_proposal_decision_proposal").on(t.proposalId),
+    clinicIdx: index("idx_vt_action_proposal_decision_clinic").on(t.clinicId),
+  }),
+);
+
+export type ActionProposalRow = typeof actionProposal.$inferSelect;
+export type ActionProposalDecisionRow = typeof actionProposalDecisionLog.$inferSelect;
+export type NewActionProposalRow = typeof actionProposal.$inferInsert;

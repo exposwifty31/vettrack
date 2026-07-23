@@ -358,7 +358,14 @@ type MetricName =
   | "board_anomaly_cart_unverified"
   // R-PDF-1.1 — predictive-readiness demand key excluded on a freeform-metadata
   // unit conflict (bounded; no keyId/unit label — degrades per key, not per clinic).
-  | "readiness_forecast_demand_unit_conflict";
+  | "readiness_forecast_demand_unit_conflict"
+  // VetTrack 2.0, Task 1.1 §1 — Shift Autopilot `action_proposal` shared
+  // infrastructure. Shared across all 4 proposal kinds; no per-clinic/
+  // per-user/per-kind labels.
+  | "autopilot_proposal_staged_total"
+  | "autopilot_proposal_approved_total"
+  | "autopilot_proposal_edited_total"
+  | "autopilot_proposal_rejected_total";
 
 type MetricBuckets = Record<MetricName, number>;
 
@@ -1034,6 +1041,10 @@ const DEFAULT_COUNTERS: MetricBuckets = {
   board_anomaly_reader_offline: 0,
   board_anomaly_cart_unverified: 0,
   readiness_forecast_demand_unit_conflict: 0,
+  autopilot_proposal_staged_total: 0,
+  autopilot_proposal_approved_total: 0,
+  autopilot_proposal_edited_total: 0,
+  autopilot_proposal_rejected_total: 0,
 };
 
 const metrics: MetricBuckets = { ...DEFAULT_COUNTERS };
