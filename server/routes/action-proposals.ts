@@ -45,8 +45,8 @@ const writer = new DrizzleActionProposalWriter();
 
 const DEFAULT_LIST_LIMIT = 50;
 const MAX_LIST_LIMIT = 100;
-// Offset cap: the staged queue is bounded (one proposal per clinic/kind/day);
-// anything past this is a malformed or abusive request, not real pagination.
+// Offset cap: bounds per-request database work — a deep offset scan is a
+// malformed or abusive request, not real pagination of a human-scale queue.
 const MAX_LIST_OFFSET = 10_000;
 
 function isActionProposalKind(value: unknown): value is ActionProposalKind {
