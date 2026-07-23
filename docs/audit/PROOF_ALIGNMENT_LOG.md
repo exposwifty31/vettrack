@@ -4920,3 +4920,16 @@ Disclosed per the task's own "or disclose why not run" allowance — not run to 
   instruction (deliverable E).
 
 **Verdict:** VERIFIED (implementation + test evidence); NOT independently reviewed.
+
+## 2026-07-23 — Task 1.1 §6 visual-evidence pass + ICU summary fix — branch feat/2.0-task-1.1-s6-queue-ui
+
+**Claim:** §6 verified in a real browser against a live dev server with all four kinds staged (crash_cart_drift staged by the REAL worker on server startup, not seed data); one genuine i18n defect found via screenshot and fixed TDD.
+
+**Evidence:**
+- Env repair: pnpm install --frozen-lockfile restored 4 packages missing from this sandbox's node_modules (@aws-sdk/s3-request-presigner, @clerk/localizations, socket.io, socket.io-client — the pre-existing tsc-error set every slice documented); API healthcheck then green (db ok), migrations "all up to date" (179 applied).
+- Staged data: seed script through the REAL composers + DrizzleActionProposalWriter (scratchpad, not committed); GET /api/action-proposals?status=staged → 4 rows, one per kind. crash_cart_drift was already staged by the in-process worker before seeding — real-stream staging demonstrated.
+- Screenshots (docs/audit/screenshots/task-1.1-s6/): queue-1280-he (console master-detail RTL), queue-1280-he-detail (handover card: shadow badge, delta counters, approve/edit/reject, cited-facts toggle), queue-320-he, queue-1280-en, queue-320-en, ops-home-tile-scrolled-768-he (tile: count 4 + top-kind hint), board-count-1280-he ("4 הצעות ממתינות לאישור", count only), queue-1280-he-fixed (post-fix).
+- BUG found by screenshot: crash-cart staleSummaryTemplate rendered raw ICU (`{neverChecked, select, …`) — root cause: lib/i18n interpolate resolves single-level ICU only; a `{hours}` placeholder nested in a select branch cannot resolve. Fix: split into two flat keys (staleSummaryTemplate + neverCheckedSummaryTemplate), composer picks by hasNeverBeenChecked. RED first: new composer test "no raw ICU/placeholder braces leak" → 1 failed | 6 passed; GREEN: 35 files / 212 tests; pnpm i18n:check parity ✓; codegen re-run. Bad stored row deleted + re-staged; post-fix screenshot clean.
+- Minor finding left for review adjudication: handover card open-items render raw `TASK_UPDATED:task-1` identifiers.
+
+**Verdict:** VERIFIED.

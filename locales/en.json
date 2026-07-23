@@ -4558,7 +4558,8 @@
       "crashCartDrift": {
         "title": "Crash cart needs attention",
         "missingItemSummaryTemplate": "{itemCount, plural, one {1 crash cart item was marked not ready} other {# crash cart items were marked not ready}} at the last check on {scanDate}.",
-        "staleSummaryTemplate": "{neverChecked, select, yes {The crash cart has never been checked} other {The crash cart hasn't been checked in {hours} hours}} — a check is overdue (threshold: {thresholdHours}h).",
+        "staleSummaryTemplate": "The crash cart hasn't been checked in {hours} hours — a check is overdue (threshold: {thresholdHours}h).",
+        "neverCheckedSummaryTemplate": "The crash cart has never been checked — a check is overdue (threshold: {thresholdHours}h).",
         "failedItemsLabel": "Not ready",
         "lastCheckedLabel": "Last checked",
         "neverCheckedLabel": "Never checked",

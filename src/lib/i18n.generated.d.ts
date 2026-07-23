@@ -4562,6 +4562,7 @@ export interface TStructure {
         title: string;
         missingItemSummaryTemplate: string;
         staleSummaryTemplate: string;
+        neverCheckedSummaryTemplate: string;
         failedItemsLabel: string;
         lastCheckedLabel: string;
         neverCheckedLabel: string;

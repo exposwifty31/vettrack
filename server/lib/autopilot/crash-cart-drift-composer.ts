@@ -142,11 +142,18 @@ function composeStaleCheck(
     clinicId,
     kind: "crash_cart_drift",
     sourceSessionId: scanDate,
-    summary: t("autopilotQueue.kinds.crashCartDrift.staleSummaryTemplate", {
-      neverChecked: reader.hasNeverBeenChecked ? "yes" : "no",
-      hours: roundedHours ?? 0,
-      thresholdHours: reader.thresholdHours,
-    }),
+    // Two flat keys picked in code, NOT one ICU `select` template: the shared
+    // interpolator (`lib/i18n/index.ts`) resolves only single-level ICU — a
+    // `{hours}` placeholder nested inside a select branch leaks the raw
+    // template into the stored summary (found in the §6 visual-evidence pass).
+    summary: reader.hasNeverBeenChecked
+      ? t("autopilotQueue.kinds.crashCartDrift.neverCheckedSummaryTemplate", {
+          thresholdHours: reader.thresholdHours,
+        })
+      : t("autopilotQueue.kinds.crashCartDrift.staleSummaryTemplate", {
+          hours: roundedHours ?? 0,
+          thresholdHours: reader.thresholdHours,
+        }),
     citedFacts,
     draftContent,
     sourceRef: { clinicId, scanDate, hasNeverBeenChecked: reader.hasNeverBeenChecked },
