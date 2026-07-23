@@ -185,7 +185,8 @@ describe("writer determinism + key identity (CodeRabbit #134 outside-diff round)
     const now = new Date("2026-07-23T08:00:00.000Z");
     const rows = [];
     for (const s of ["s-a", "s-b", "s-c"]) {
-      const proposal = await writer.stage({
+      // s3+ API: stage() returns StageOutcome (the §3 emission fix).
+      const { proposal } = await writer.stage({
         clinicId: "clinic-a", kind: "shift_handover_draft", sourceSessionId: s,
         summary: "x", citedFacts: [], draftContent: {}, sourceRef: {}, citationValidation: {},
       });
@@ -204,6 +205,8 @@ describe("writer determinism + key identity (CodeRabbit #134 outside-diff round)
     const base = { summary: "x", citedFacts: [], draftContent: {}, sourceRef: {}, citationValidation: {} };
     const a = await writer.stage({ clinicId: "c::x", kind: "shift_handover_draft", sourceSessionId: "s", ...base });
     const b = await writer.stage({ clinicId: "c", kind: "shift_handover_draft", sourceSessionId: "x::s", ...base });
-    expect(a.id).not.toBe(b.id);
+    expect(a.created).toBe(true);
+    expect(b.created).toBe(true);
+    expect(a.proposal.id).not.toBe(b.proposal.id);
   });
 });
