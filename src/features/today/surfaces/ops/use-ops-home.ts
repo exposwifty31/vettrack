@@ -4,8 +4,9 @@ import { api } from "@/lib/api";
 import { getCurrentUserId } from "@/lib/auth-store";
 import { equipmentTriageTier } from "@/lib/design-tokens";
 import { useAlertsController } from "@/features/alerts";
+import { proposalQueueQueryKey } from "@/features/autopilot/proposal-queue-keys";
 import { useTodayShift } from "../../hooks/use-today-shift";
-import { ALERT_ORDER, roomPct } from "./ops-tile-helpers";
+import { ALERT_ORDER, roomPct, topStagedKind } from "./ops-tile-helpers";
 import { deriveHeroState } from "../OnShiftHero";
 import type { Room } from "@/types";
 
@@ -33,6 +34,20 @@ export function useOpsHome() {
   const { data: activityData, isLoading: activityLoading } = useQuery({
     queryKey: ["/api/activity"],
     queryFn: () => api.activity.feed(),
+    enabled: !!userId,
+    retry: false,
+    refetchOnWindowFocus: false,
+  });
+
+  // Task 1.1 §6 (deliverable F) — queue-summary tile data. Shares its query
+  // key with `useProposalQueue({status:"staged"})` (the full queue page's
+  // hook) via `proposalQueueQueryKey`, so a nudge-triggered invalidation
+  // fired while the queue page is mounted elsewhere also refreshes this
+  // tile — no separate collab-ws subscription needed just for a count.
+  const { data: autopilotQueueData, isLoading: autopilotQueueLoading } = useQuery({
+    queryKey: proposalQueueQueryKey({ status: "staged" }),
+    queryFn: () => api.actionProposals.list({ status: "staged" }),
+    staleTime: 30_000,
     enabled: !!userId,
     retry: false,
     refetchOnWindowFocus: false,
@@ -78,6 +93,12 @@ export function useOpsHome() {
   // Hero "loading" keys on the pulse only (pre-split parity), not the combined isLoading.
   const heroState = deriveHeroState(today.pulse, today.pulseLoading);
 
+  const autopilotQueueProposals = autopilotQueueData?.proposals ?? [];
+  const autopilotQueueTopKind = useMemo(
+    () => topStagedKind(autopilotQueueProposals),
+    [autopilotQueueProposals],
+  );
+
   return {
     ...coverage,
     itemsOut: today.itemsOutCount,
@@ -99,5 +120,8 @@ export function useOpsHome() {
     alertsLoading: alertsCtl.isLoading,
     recentItems: (activityData?.items ?? []).slice(0, 4),
     activityLoading,
+    autopilotQueueCount: autopilotQueueProposals.length,
+    autopilotQueueTopKind,
+    autopilotQueueLoading,
   };
 }
