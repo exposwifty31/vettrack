@@ -186,7 +186,7 @@ function emptyDeltas(): ShiftHandoverDeltas {
  * outbox `audit_log` wrapper rows are skipped (they mirror audit rows already
  * counted). Ordered oldest→newest for stable open-item resolution.
  */
-async function aggregateDeltas(
+export async function aggregateDeltas(
   clinicId: string,
   window: ShiftWindow,
 ): Promise<ShiftHandoverDeltas> {

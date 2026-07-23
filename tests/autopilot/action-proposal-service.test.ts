@@ -83,7 +83,11 @@ describe("action-proposal-service", () => {
   it("edit stores editedContent and flips status to edited", async () => {
     const { proposal: staged } = await stageProposal(
       { writer },
-      { input: buildInput({ sourceSessionId: "session-edit" }), groundTruthFacts: buildFacts(), stagedBy: STAGED_BY },
+      {
+        input: buildInput({ kind: "coordinator_reassign_off_roster", sourceSessionId: "session-edit" }),
+        groundTruthFacts: buildFacts(),
+        stagedBy: STAGED_BY,
+      },
     );
     const edited = await editProposal(
       { writer },
@@ -369,10 +373,14 @@ describe("action-proposal-service", () => {
       expect(edited.status).toBe("edited");
     });
 
-    it("does not apply the restock schema to other kinds — a shift_handover_draft edit with an arbitrary shape still succeeds", async () => {
+    it("does not apply the restock schema to a kind with no registered schema — a coordinator_reassign_off_roster edit with an arbitrary shape still succeeds", async () => {
       const { proposal: staged } = await stageProposal(
         { writer },
-        { input: buildInput({ sourceSessionId: "session-edit-other-kind" }), groundTruthFacts: buildFacts(), stagedBy: STAGED_BY },
+        {
+          input: buildInput({ kind: "coordinator_reassign_off_roster", sourceSessionId: "session-edit-other-kind" }),
+          groundTruthFacts: buildFacts(),
+          stagedBy: STAGED_BY,
+        },
       );
       const edited = await editProposal(
         { writer },
@@ -447,6 +455,107 @@ describe("action-proposal-service", () => {
       );
       const approved = await approveProposal({ writer }, { clinicId: CLINIC_A, proposalId: staged.id, ...ACTOR });
       expect(approved.status).toBe("approved");
+    });
+
+    it("rejects an edit for shift_handover_draft whose editedContent does not match the per-kind schema (deltas missing a dimension)", async () => {
+      const { proposal: staged } = await stageProposal(
+        { writer },
+        {
+          input: buildInput({
+            kind: "shift_handover_draft",
+            sourceSessionId: "handover-edit-invalid",
+          }),
+          groundTruthFacts: buildFacts(),
+          stagedBy: STAGED_BY,
+        },
+      );
+
+      await expect(
+        editProposal(
+          { writer },
+          {
+            clinicId: CLINIC_A,
+            proposalId: staged.id,
+            ...ACTOR,
+            editedContent: { deltas: { custody: [] }, openItems: [] },
+          },
+        ),
+      ).rejects.toThrow(ActionProposalEditValidationError);
+
+      const stillStaged = await writer.get(CLINIC_A, staged.id);
+      expect(stillStaged?.status).toBe("staged");
+    });
+
+    it("accepts an edit for shift_handover_draft whose editedContent matches the per-kind schema (deltas + openItems + optional note)", async () => {
+      const { proposal: staged } = await stageProposal(
+        { writer },
+        {
+          input: buildInput({
+            kind: "shift_handover_draft",
+            sourceSessionId: "handover-edit-valid",
+          }),
+          groundTruthFacts: buildFacts(),
+          stagedBy: STAGED_BY,
+        },
+      );
+
+      const edited = await editProposal(
+        { writer },
+        {
+          clinicId: CLINIC_A,
+          proposalId: staged.id,
+          ...ACTOR,
+          editedContent: {
+            deltas: { custody: [], taskState: [], alerts: [], dispenses: [] },
+            openItems: [{ id: "task-1", kind: "task", summary: "task_started:task-1" }],
+            note: "Confirmed handover with incoming lead by phone",
+          },
+        },
+      );
+      expect(edited.status).toBe("edited");
+    });
+
+    it("shift_handover_draft has no side-effect dispatch on approve — approve stays a generic status flip", async () => {
+      const { proposal: staged } = await stageProposal(
+        { writer },
+        {
+          input: buildInput({
+            kind: "shift_handover_draft",
+            sourceSessionId: "handover-approve-no-side-effect",
+          }),
+          groundTruthFacts: buildFacts(),
+          stagedBy: STAGED_BY,
+        },
+      );
+      const approved = await approveProposal({ writer }, { clinicId: CLINIC_A, proposalId: staged.id, ...ACTOR });
+      expect(approved.status).toBe("approved");
+    });
+
+    it("shift_handover_draft has no side-effect dispatch on edit — publishing an edited handover is the §0(c) follow-up's job, not this slice's", async () => {
+      const { proposal: staged } = await stageProposal(
+        { writer },
+        {
+          input: buildInput({
+            kind: "shift_handover_draft",
+            sourceSessionId: "handover-edit-no-side-effect",
+          }),
+          groundTruthFacts: buildFacts(),
+          stagedBy: STAGED_BY,
+        },
+      );
+      const edited = await editProposal(
+        { writer },
+        {
+          clinicId: CLINIC_A,
+          proposalId: staged.id,
+          ...ACTOR,
+          editedContent: {
+            deltas: { custody: [], taskState: [], alerts: [], dispenses: [] },
+            openItems: [],
+          },
+        },
+      );
+      expect(edited.status).toBe("edited");
     });
   });
 });
