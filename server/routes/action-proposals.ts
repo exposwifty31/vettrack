@@ -45,6 +45,9 @@ const writer = new DrizzleActionProposalWriter();
 
 const DEFAULT_LIST_LIMIT = 50;
 const MAX_LIST_LIMIT = 100;
+// Offset cap: the staged queue is bounded (one proposal per clinic/kind/day);
+// anything past this is a malformed or abusive request, not real pagination.
+const MAX_LIST_OFFSET = 10_000;
 
 function isActionProposalKind(value: unknown): value is ActionProposalKind {
   return typeof value === "string" && (ACTION_PROPOSAL_KINDS as readonly string[]).includes(value);
@@ -84,8 +87,9 @@ router.get("/", requireAuth, async (req: Request, res: Response) => {
 
   const rawLimit = Number(req.query.limit);
   const rawOffset = Number(req.query.offset);
-  const limit = Number.isFinite(rawLimit) && rawLimit > 0 ? Math.min(rawLimit, MAX_LIST_LIMIT) : DEFAULT_LIST_LIMIT;
-  const offset = Number.isFinite(rawOffset) && rawOffset >= 0 ? rawOffset : 0;
+  const limit = Number.isInteger(rawLimit) && rawLimit > 0 ? Math.min(rawLimit, MAX_LIST_LIMIT) : DEFAULT_LIST_LIMIT;
+  const offset =
+    Number.isInteger(rawOffset) && rawOffset >= 0 ? Math.min(rawOffset, MAX_LIST_OFFSET) : 0;
 
   try {
     const proposals = await writer.findStaged(clinicId, { status, kind, limit, offset });
