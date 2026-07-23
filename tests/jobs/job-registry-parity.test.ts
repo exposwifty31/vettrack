@@ -246,6 +246,8 @@ describe("E3 — job registry / enqueue parity", () => {
       [
         "check-expiry",
         "check-plug",
+        "scan-coordinator-reassign",
+        "scan-restock-burn",
         "stale-task-ownership-sweep",
         "sweep-room-escalation",
         "sweep-stale-checkins",
@@ -285,6 +287,8 @@ describe("E3 — job registry / enqueue parity", () => {
       [
         "check-expiry",
         "check-plug",
+        "scan-coordinator-reassign",
+        "scan-restock-burn",
         "stale-task-ownership-sweep",
         "sweep-room-escalation",
         "sweep-stale-checkins",

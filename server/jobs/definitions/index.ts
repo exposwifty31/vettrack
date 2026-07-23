@@ -33,6 +33,14 @@ import {
   SWEEP_ESCALATION_QUEUE_NAME,
 } from "../../workers/sweep-escalation.worker.js";
 import {
+  AUTOPILOT_RESTOCK_BURN_JOB_NAME,
+  AUTOPILOT_RESTOCK_BURN_QUEUE_NAME,
+} from "../../workers/autopilotRestockBurnWorker.js";
+import {
+  AUTOPILOT_COORDINATOR_REASSIGN_JOB_NAME,
+  AUTOPILOT_COORDINATOR_REASSIGN_QUEUE_NAME,
+} from "../../workers/autopilotCoordinatorReassignWorker.js";
+import {
   resolveBullmqJobName,
   type AnyJobDefinition,
   type JobDefinition,
@@ -57,6 +65,10 @@ export type StaleReturnedSweepJobPayload = Record<string, never>;
 
 export type SweepEscalationJobPayload = Record<string, never>;
 
+/** VetTrack 2.0, Task 1.1 §4 — `autopilotRestockBurnWorker.ts`'s scan job. */
+export type RestockBurnScanJobPayload = Record<string, never>;
+export type CoordinatorReassignScanJobPayload = Record<string, never>;
+
 export type PayloadForStaticKind = {
   "check-plug": ChargeAlertJobPayload;
   "task-ownership-backfill": TaskOwnershipBackfillJobData;
@@ -66,6 +78,8 @@ export type PayloadForStaticKind = {
   "sweep-stale-checkouts": StaleCheckoutSweepJobPayload;
   "sweep-stale-returned": StaleReturnedSweepJobPayload;
   "sweep-room-escalation": SweepEscalationJobPayload;
+  "scan-restock-burn": RestockBurnScanJobPayload;
+  "scan-coordinator-reassign": CoordinatorReassignScanJobPayload;
 };
 
 /** Producer uses per-add opts only (no queue defaultJobOptions); attempts follow BullMQ default (1). */
@@ -158,6 +172,36 @@ const sweepEscalationDefinition: JobDefinition<SweepEscalationJobPayload> = {
   removeOnFail: 100,
 };
 
+/**
+ * VetTrack 2.0, Task 1.1 §4 — registers `autopilotRestockBurnWorker.ts`'s
+ * scan job for the E3 job-registry/enqueue-parity tripwire
+ * (`tests/jobs/job-registry-parity.test.ts`), mirroring
+ * `sweepEscalationDefinition`'s pattern for a standalone (non-Job-registry-
+ * 1b-runtime) inline Queue/Worker file.
+ *
+ */
+const coordinatorReassignScanDefinition: JobDefinition<CoordinatorReassignScanJobPayload> = {
+  kind: AUTOPILOT_COORDINATOR_REASSIGN_JOB_NAME,
+  queue: AUTOPILOT_COORDINATOR_REASSIGN_QUEUE_NAME,
+  bullmqJobName: AUTOPILOT_COORDINATOR_REASSIGN_JOB_NAME,
+  workerConcurrency: 1,
+  attempts: 3,
+  backoff: { type: "exponential", delay: 2000 },
+  removeOnComplete: 50,
+  removeOnFail: 100,
+};
+
+const restockBurnScanDefinition: JobDefinition<RestockBurnScanJobPayload> = {
+  kind: AUTOPILOT_RESTOCK_BURN_JOB_NAME,
+  queue: AUTOPILOT_RESTOCK_BURN_QUEUE_NAME,
+  bullmqJobName: AUTOPILOT_RESTOCK_BURN_JOB_NAME,
+  workerConcurrency: 1,
+  attempts: 3,
+  backoff: { type: "exponential", delay: 2000 },
+  removeOnComplete: 50,
+  removeOnFail: 100,
+};
+
 export const staticJobDefinitions = [
   chargeAlertDefinition,
   taskOwnershipBackfillDefinition,
@@ -167,6 +211,8 @@ export const staticJobDefinitions = [
   staleCheckoutSweepDefinition,
   staleReturnedSweepDefinition,
   sweepEscalationDefinition,
+  restockBurnScanDefinition,
+  coordinatorReassignScanDefinition,
 ] as const;
 
 /** Integration enqueue metadata (dynamic job.name, shard queue per clinic). */

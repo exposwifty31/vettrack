@@ -99,7 +99,8 @@ also has a PROOF_ALIGNMENT_LOG entry in the branch's copy of the log.
 | 0.4 | `docs/design/autopilot-policy-layer.md` | branch (18c9def43) | — |
 | 0.5 | `docs/plans/2.0/autopilot-backtest.md` + `scripts/analysis/autopilot-backtest.ts` | branch (179e5aeb1) | **SYNTHETIC harness — never cite for real thresholds** |
 | 0.7 | code + `docs/capacitor-native-app.md` hygiene law | branch (9766e548f) | on-device physical confirmation still OPEN |
-| 1.1 plan | `docs/plans/2.0/task-1.1-autopilot-shadow.md` | branch (45d429a85, c745707ac) | ACTIVE task — plan may still evolve on the branch |
+| 1.1 plan | `docs/plans/2.0/task-1.1-autopilot-shadow.md` | branch (45d429a85, c745707ac); **now also on the slice stack with an execution-status header** | ACTIVE task |
+| 1.1 slices §1/§3/§4 | code + tests + PROOF entries; plan's execution-status header is the index | **local stacked branches** `feat/2.0-task-1.1-s{1,3,4}-*` (s4 tip carries all three; unpushed, no PRs — owner gate) | §5, §2, §6/§1.5 outstanding; tracker box stays unflipped until all four kinds staged in shadow + visual evidence |
 | 2.3 plan | `docs/plans/2.0/task-2.3-who-on-floor.md` | **main** | — |
 | Binding decisions | `.claude/docs/ai/vettrack/10x/session-2.md` | **main** | reference-only, never rewritten |
 

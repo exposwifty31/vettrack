@@ -11,9 +11,12 @@ import { incrementMetric } from "../metrics.js";
 import { validateActionProposalCitations } from "./action-proposal-citation-validator.js";
 import {
   ActionProposalAlreadyDecidedError,
+  type ActionProposalTransactionExecutor,
   type ActionProposalWriter,
   type StageOutcome,
 } from "./action-proposal-writer.port.js";
+import { buildRestockPoApproveSideEffect } from "./restock-po-approve-side-effect.js";
+import { validateEditedContentForKind } from "./action-proposal-types.js";
 import type { ActionProposalCitedFact, NewActionProposalInput } from "./action-proposal-types.js";
 import type { ActionProposalRow } from "../../schema/ops.js";
 
@@ -23,6 +26,22 @@ export class ActionProposalNotFoundError extends Error {
   constructor(proposalId: string) {
     super(`Action proposal ${proposalId} not found`);
     this.name = "ActionProposalNotFoundError";
+  }
+}
+
+/**
+ * Task 1.1 §4 (deliverable E) — a proposal's edit body failed its kind's
+ * per-kind Zod schema (`validateEditedContentForKind`,
+ * `action-proposal-types.ts`). Named `.name` (not `instanceof`) is what
+ * `server/routes/action-proposals.ts`'s `mapError` checks — deliberately,
+ * since that route's unit test mocks this whole module and an `instanceof`
+ * check against a possibly-`undefined` mocked export throws instead of
+ * falling through.
+ */
+export class ActionProposalEditValidationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ActionProposalEditValidationError";
   }
 }
 
@@ -77,14 +96,29 @@ async function decide(
   params: DecideProposalParams,
   decision: Exclude<ActionProposalRow["status"], "staged">,
   content: { editedContent?: unknown; rejectionReason?: string },
+  buildSideEffect?: (
+    staged: ActionProposalRow,
+  ) => ((tx: ActionProposalTransactionExecutor) => Promise<void>) | undefined,
 ): Promise<ActionProposalRow> {
   const staged = await deps.writer.get(params.clinicId, params.proposalId);
   if (!staged) throw new ActionProposalNotFoundError(params.proposalId);
 
+  if (decision === "edited") {
+    const check = validateEditedContentForKind(staged.kind, content.editedContent);
+    if (!check.valid) {
+      throw new ActionProposalEditValidationError(
+        check.message ?? `editedContent does not match the ${staged.kind} schema`,
+      );
+    }
+  }
+
   const decidedAt = new Date();
   // Task 1.1 §3.A: the transition + decision-log append are ONE atomic
   // writer call (db.transaction in the Drizzle impl) — a decision-log row
-  // exists iff the transition succeeded.
+  // exists iff the transition succeeded. Task 1.1 §4 extends this with an
+  // optional kind-dispatched `sideEffect` (e.g. `restock_po_on_burn`
+  // inserting real PO rows) participating in the SAME atomic unit — see
+  // `ActionProposalWriter.transitionAndRecord`'s docstring.
   const { proposal: updated } = await deps.writer.transitionAndRecord({
     clinicId: params.clinicId,
     proposalId: params.proposalId,
@@ -100,6 +134,7 @@ async function decide(
       stagedCitedFacts: staged.citedFacts,
       stagedDraftContent: staged.draftContent,
     },
+    sideEffect: buildSideEffect?.(staged),
   });
 
   const auditActionType =
@@ -130,18 +165,38 @@ async function decide(
   return updated;
 }
 
+/**
+ * Task 1.1 §4 — `approveProposal` is a generic status flip for 3 of the 4
+ * kinds. For `restock_po_on_burn` specifically, approve (and edit — see
+ * `editProposal`) ALSO inserts real `vt_purchase_orders`/`vt_po_lines` rows
+ * — a kind-dispatched side effect (`buildRestockPoApproveSideEffect`)
+ * executed atomically with the transition (same `db.transaction`, see
+ * `ActionProposalWriter.transitionAndRecord`). The builder returns
+ * `undefined` for every other kind, so this stays a no-op for them.
+ */
 export async function approveProposal(
   deps: ActionProposalServiceDeps,
   params: DecideProposalParams,
 ): Promise<ActionProposalRow> {
-  return decide(deps, params, "approved", {});
+  return decide(deps, params, "approved", {}, (staged) =>
+    buildRestockPoApproveSideEffect(staged, params.actorUserId),
+  );
 }
 
+/**
+ * Owner decision 2026-07-22: edit = fix-then-execute. An edited proposal
+ * executes its kind's side effect with the EDITED content (already validated
+ * against the kind's Zod schema in `decide()` before the transition) —
+ * "edited" is approve-with-changes, not a dead-end record. Kinds without a
+ * side effect are unaffected (builder returns undefined).
+ */
 export async function editProposal(
   deps: ActionProposalServiceDeps,
   params: DecideProposalParams & { editedContent: Record<string, unknown> },
 ): Promise<ActionProposalRow> {
-  return decide(deps, params, "edited", { editedContent: params.editedContent });
+  return decide(deps, params, "edited", { editedContent: params.editedContent }, (staged) =>
+    buildRestockPoApproveSideEffect(staged, params.actorUserId, params.editedContent),
+  );
 }
 
 export async function rejectProposal(
