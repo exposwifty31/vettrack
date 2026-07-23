@@ -4750,3 +4750,173 @@ Reviewer returned 1 HIGH + 1 MEDIUM + 2 LOW on the committed sub-card; all four 
 - Findings closed as plan updates (this commit): §0(c) cutover preconditions added to docs/plans/2.0/task-1.1-autopilot-shadow.md — (1) draftContent field-parity with vt_shift_handover (observedSignals + patientWorklist), (2) edited-draft window-metadata re-merge, (3) §6 UI live + auto_published_on_timeout label. Execution-status row flipped to DONE (reviewed).
 
 **Verdict:** VERIFIED.
+
+## 2026-07-23 — Task 1.1 §6 approval-queue UI shell + §1.5 socket-nudge (option 1) — branch feat/2.0-task-1.1-s6-queue-ui
+
+**Claim:** Implemented the Shift Autopilot approval-queue UI shell (mobile-first list, per-kind card
+renderers, shadow-vs-enforce badge, expandable citation "why", approve/edit/reject actions, ops-home
+tile, console master-detail variant, board ambient count) and the §1.5 realtime decision (option 1,
+nudge-only) exactly as specified at dispatch. RED-before-GREEN throughout; component-test convention
+mirrored from `tests/readiness-tile.render.test.tsx` (happy-dom + RTL + wouter `Router`/`memoryLocation`
+wrapper, `t.*` assertions) since no prior `.test.tsx` existed for this exact component class.
+
+**Evidence — §1.5 nudge channel:**
+- `server/lib/realtime-collab/rooms.ts`: added `proposalQueueRoom(clinicId)` → `` `clinic:${clinicId}:proposal-queue` ``
+  and a `"proposal-queue"` `JoinRequest` branch in `authorizeRoomJoin`, same auth shape as `"board"`
+  (clinic-membership only, no record ACL — confirmed by reading the existing branch it mirrors).
+- RED confirmed before either symbol existed: `pnpm exec vitest run tests/collab-proposal-queue-room.test.ts tests/collab-proposal-queue-nudge.test.ts`
+  → `2 failed` (`proposalQueueRoom is not a function`, `notifyProposalQueueChanged` module not found). GREEN
+  after implementing `rooms.ts` + new `server/lib/realtime-collab/registry.ts` (module-level
+  `setCollabIo`/`getCollabIo` singleton, `server.ts`-only writer) + new
+  `server/lib/realtime-collab/proposal-queue-nudge.ts` → `pnpm exec vitest run tests/collab-proposal-queue-room.test.ts tests/collab-proposal-queue-nudge.test.ts`
+  → `2 files, 7 passed`.
+- Payload contract test (`tests/collab-proposal-queue-nudge.test.ts`) asserts the emitted event is
+  `"proposal-queue-changed"` with payload `{ kind: "proposal_queue_changed" }` and `Object.keys(payload)`
+  is exactly `["kind"]` — plus 3 never-throws cases (io never initialized, `io.to().emit()` itself
+  throws, clinic-scoped room targeting).
+- Disclosed diff to `server/lib/realtime-collab/server.ts` beyond `rooms.ts` wiring: one import
+  (`setCollabIo`) and two call sites — `setCollabIo(undefined)` at the START of `teardown()` (before the
+  socket/adapter close logic, so a racing nudge never emits mid-close) and `setCollabIo(io)` right before
+  the final `return { enabled: true, io, close: teardown }`. The non-fatal init contract (every early
+  return still resolves `{ enabled: false, reason, close(){} }`, never throws) and the "teardown never
+  calls `httpServer.close()`" invariant are both byte-unchanged — confirmed by reading the full
+  before/after diff of the function.
+- Wired fire-and-forget, confirmed by `grep -n "notifyProposalQueueChanged" server/routes/action-proposals.ts server/workers/autopilot*.ts`:
+  3 call sites in `action-proposals.ts` (after `approveProposal`/`editProposal`/`rejectProposal` each
+  succeed, before `res.json`) and 4 call sites in the workers (`autopilotHandoverDraftWorker.ts`,
+  `autopilotCoordinatorReassignWorker.ts`, `autopilotRestockBurnWorker.ts`,
+  `autopilotCrashCartDriftWorker.ts` — each inside the per-clinic scan loop, gated on
+  `outcome.created` alongside the existing `staged++`). NOT called from
+  `action-proposal-service.ts` (service stays transport-free, per the dispatch instruction) — confirmed
+  by `grep -n "notifyProposalQueueChanged" server/lib/autopilot/action-proposal-service.ts` → no match.
+- `pnpm exec vitest run tests/autopilot/ tests/jobs/` after the wiring → `35 files, 211 passed` (no
+  regression in any of the 4 workers' existing scan-shape tests).
+
+**Evidence — client hook + polling fallback:**
+- `src/features/autopilot/use-proposal-queue.ts`: `useQuery` with `refetchOnWindowFocus: true` +
+  `refetchInterval: PROPOSAL_QUEUE_REFETCH_INTERVAL_MS` (60_000) PLUS `useCollabRoom({ joinRequest: {
+  kind: "proposal-queue" }, bindEvents: … })` invalidating the same query key on the
+  `"proposal-queue-changed"` event.
+- RED: `pnpm exec vitest run tests/autopilot/use-proposal-queue.test.tsx` before the file existed →
+  import-resolution failure. GREEN after implementation → `3 passed`, asserting (a) the query's own
+  `refetchOnWindowFocus`/`refetchInterval` options via `queryCache.find(...).options` (not just that the
+  hook renders), (b) `queryClient.invalidateQueries` fires when the mocked `useCollabRoom`'s captured
+  `bindEvents` handler is invoked directly, (c) status/kind filters pass through to `api.actionProposals.list`.
+- Split the query-key builder into a zero-dependency `src/features/autopilot/proposal-queue-keys.ts`
+  (types-only import) so `ProposalCard` (which only needs the key to invalidate on a decision) and the
+  ops-home tile / board don't have to pull in `useCollabRoom` → `collab-socket.ts` → `socket.io-client`'s
+  import chain — confirmed necessary by a live regression (see "Deviations" below).
+
+**Evidence — components (RED→GREEN per file, all under `tests/autopilot/` unless noted):**
+- `AutopilotModeBadge` (`tests/autopilot/autopilot-mode-badge.test.tsx`, 2 tests) — disclosed exception:
+  written after the component, not before (trivial 2-branch presentational component); every other
+  component in this slice was RED-first.
+- `RejectReasonDialog` (`reject-reason-dialog.test.tsx`, 3 tests) — submit disabled until a
+  non-whitespace reason is entered, submits the trimmed value, disabled while pending.
+- `RestockEditDialog` (`restock-edit-dialog.test.tsx`, 4 tests) — pre-fills from the staged draft,
+  submits a shape matching `restockPoOnBurnEditedContentSchema` exactly (confirmed by reading
+  `server/lib/autopilot/action-proposal-types.ts:92-104`), blocks submit on non-positive-integer
+  quantity or blank supplier.
+- `EditUnavailableDialog` (`edit-unavailable-dialog.test.tsx`, 2 tests) — the v1-disclosed generic
+  edit-affordance for the 3 non-restock kinds.
+- Per-kind card renderers (`kind-cards.test.tsx`, 7 tests) — `HandoverDraftCard` (reuses
+  `t.handoverPage.delta*`/`openItems*` labels — SAME `ShiftHandoverDeltas` shape as the live artifact,
+  confirmed no importable sub-components exist in `handover-artifact-panel.tsx` per the §2 log's own
+  grep), `CoordinatorReassignCard`, `RestockPoCard`, `CrashCartDriftCard` (both `missing_items` and
+  `stale_check` branches) — each tested against the composers' REAL `draftContent` shapes (types copied
+  from `server/lib/autopilot/*-composer.ts`, not invented).
+- `ProposalCard` (`proposal-card.test.tsx`, 6 tests) — summary/badge/slot render; citations
+  collapsed-by-default with an `aria-expanded` toggle; approve/reject call the real API mock,
+  invalidate on success (server-confirmed, no optimistic status flip — asserted directly), toast+no-
+  invalidate on failure; edit opens `RestockEditDialog` for `restock_po_on_burn`, `EditUnavailableDialog`
+  otherwise.
+- `ProposalQueueList` (`proposal-queue-list.test.tsx`, 4 tests) — `aria-live="polite"` wrapper, empty
+  state, error state with retry, grouped-by-kind rendering.
+- `AutopilotQueueTile` + `topStagedKind` (`tests/ops-autopilot-queue-tile.test.tsx`, 6 tests) —
+  extracted `topStagedKind` into `ops-tile-helpers.tsx` (mirrors its existing `roomPct`/`ALERT_ORDER`
+  pure-helper pattern) so the tie-break-by-fixed-order logic is unit-testable without mounting the whole
+  `useOpsHome` hook; wired into `use-ops-home.ts` (new `useQuery` sharing `proposalQueueQueryKey`) and
+  `OpsHomeSurface.tsx`.
+- `AutopilotQueuePage` (`autopilot-queue-page.test.tsx`, 2 tests) — mobile renders the stacked
+  `ProposalQueueList`; console (`useIsDesktop` mocked true) renders a compact master row list
+  (`TwoPaneLayout`, same component `EquipmentMasterDetail.tsx` uses) + the SAME `ProposalCard` in the
+  detail pane on row selection — no divergent detail-rendering logic between mobile and console.
+- Board ambient count (`tests/board-attention-proposal-count.test.tsx`, 5 tests, new file — the
+  existing `board-attention-render.test.tsx` left untouched): `BoardAttentionSection` gains an optional
+  `proposalCount` prop; renders a bounded count-only line (`data-testid="board-proposal-queue-count"`,
+  plain text, no glass); the section now also renders when `proposalCount > 0` even with zero anomalies;
+  a dedicated "no interactive targets" assertion re-proves the glance-only guardrail for the new line.
+  Re-ran `board-attention-render.test.tsx` (10 tests) unmodified → still green, confirming no regression
+  to the anomaly-ranking suite this file already owned.
+
+**Full suite re-verification:** `pnpm exec vitest run tests/autopilot/ tests/jobs/ tests/collab-proposal-queue-room.test.ts tests/collab-proposal-queue-nudge.test.ts tests/collab-ws-auth.test.ts tests/collab-board.test.ts tests/collab-dos-hardening.test.ts tests/collab-presence-store.test.ts tests/ops-autopilot-queue-tile.test.tsx tests/readiness-tile.render.test.tsx tests/board-attention-proposal-count.test.tsx tests/board-attention-render.test.tsx tests/board-rfid-render.test.tsx tests/command-board-panels.test.tsx tests/t25-polish-sweep.test.tsx tests/i18n-parity.test.ts tests/i18n-no-hebrew-in-source.test.ts tests/management-surface-denial-unification.test.tsx`
+→ `320 passed | 1 file failed` — the 1 failure (`tests/collab-dos-hardening.test.ts`) is the pre-existing
+sandbox gap (`Cannot find package 'socket.io-client'` at the top-level test import, not touched by this
+slice), confirmed identical on the unmodified base branch via `git stash` round-trip.
+
+**i18n:** New `autopilotQueue.*` keys (title/empty/loadFailed/approve/edit/reject/rejectReason*/
+citedFacts*/approve|edit|reject Success|Error/editUnavailable*/modeBadge.{shadow,enforce}/tile.{title,
+empty,topKindHint}/board.awaitingApproval/editRestock.*) plus per-kind additions (coordinatorReassignOffRoster.
+{staleCoordinatorLabel,escalationStageLabel,status{Auto,FallbackSenior,NeedsConfirmation,Unresolved}},
+restockPoOnBurn.{supplierLabel,lineItemsLabel}, crashCartDrift.{failedItemsLabel,lastCheckedLabel,
+neverCheckedLabel,hoursSinceLabel,thresholdLabel}) added to BOTH `locales/en.json` and `locales/he.json`
+(existing `autopilotQueue.kinds.*.title`/`summaryTemplate` entries from §2–§5 left untouched). Wired the
+new namespace into `src/lib/i18n.ts`'s hand-built `buildTranslations` (per the repo's documented gotcha
+that a JSON key + regenerated `.d.ts` alone is not enough). Commands run: `pnpm i18n:check` →
+"✓ locales/en.json and locales/he.json are in deep key parity."; `pnpm i18n:generate-types` → wrote
+`src/lib/i18n.generated.d.ts` (80 new lines); `pnpm exec vitest run tests/i18n-parity.test.ts tests/i18n-no-hebrew-in-source.test.ts`
+→ `2 files, 6 passed`.
+
+**Typecheck delta:** `npx tsc --noEmit -p tsconfig.json` (frontend) → identical 2 pre-existing errors
+(`@clerk/localizations`, `socket.io-client` module resolution) confirmed present on the unmodified base
+branch via `git stash` round-trip — zero new errors. `npx tsc -p tsconfig.server.json --noEmit` (server)
+→ 6 errors, of which 5 are the pre-existing `socket.io`/`@socket.io/redis-adapter`/`@aws-sdk/s3-request-presigner`
+sandbox gaps already present in `server.ts`; the 6th (`registry.ts(11,29): Cannot find module 'socket.io'`)
+is the SAME root-cause package-resolution gap manifesting in the one new file that imports the `Server`
+type from `socket.io` — not a distinct defect (resolves once `socket.io` is actually installed, same as
+the other 5).
+
+**Architecture gates:** `pnpm depcruise:check` → "no dependency violations found (980 modules, 5072
+dependencies cruised)" (10 pre-existing known-violations ignored, unrelated). `pnpm architecture:cycles`
+→ "server: 2 cycle(s), src: 0 cycle(s) (matches baseline)" — no new cycle introduced.
+`pnpm tenant:lint:touched` (warn-only) → 10 warnings, all in files this slice did NOT modify
+(`action-proposal-writer.port.ts`, `crash-cart-drift-reader.port.ts`, `shift-handover-generator.ts` —
+all from prior §1–§5 slices); zero warnings in any file this slice added or touched (the new
+`proposal-queue-nudge.ts`/`registry.ts` do no DB queries at all — pure in-memory).
+
+**Build:** `pnpm build` fails on this branch — confirmed via `git stash -u` round-trip that it fails
+IDENTICALLY on the clean, unmodified base branch (`error during build: [vite]: Rollup failed to resolve
+import "@clerk/localizations" from "src/lib/clerk-capacitor-config.ts"` — a pre-existing sandbox
+dependency-install gap, unrelated to this slice; fails before reaching any file this slice touched).
+Disclosed per the task's own "or disclose why not run" allowance — not run to green in this session.
+
+**Deviations (disclosed):**
+1. Board and ops-home-tile queries are plain `useQuery` (sharing `proposalQueueQueryKey`), NOT
+   `useProposalQueue`/`useCollabRoom` — discovered via a real regression: wiring `useProposalQueue`
+   directly into `CommandBoard.tsx` broke 5 previously-green board test suites (`board-rfid-render`,
+   `command-board-panels`, `collab-board-wiring`, `readiness-badge-surfaces`, `t25-polish-sweep`) — 3
+   via the `socket.io-client` sandbox gap newly reaching files that never imported it before, 2 via "No
+   QueryClient set" (those tests render the presentational `CommandBoard` directly, without a
+   `QueryClientProvider`). Fixed by keeping `CommandBoard` presentational (per its own header doc) and
+   moving the query up to `CommandBoardScreen.tsx` (already inside a `QueryClientProvider`, confirmed by
+   its existing `useQueryClient()` call), passing `proposalCount` down as a prop — re-verified all 5
+   suites green after the fix (`board-rfid-render`/`command-board-panels`/`t25-polish-sweep`: 42 passed;
+   `collab-board-wiring`/`readiness-badge-surfaces`: confirmed pre-existing/unrelated failure via
+   `git stash` round-trip, unchanged by this fix either way).
+2. `beforeEach(() => listMock.mockReset())` in `proposal-queue-list.test.tsx` was removed after a
+   bisection (5 throwaway repro files, since deleted) proved it — not any application code — was the
+   cause of a spurious "unhandled rejection" test failure in this Vitest/happy-dom environment;
+   documented inline in the test file. `ProposalQueueList`/`useProposalQueue`'s own error-state handling
+   is correct (proven by the identical test body passing with no `beforeEach`/`describe` wrapper).
+3. `AutopilotModeBadge` was written before its test (see component list above) — the only component in
+   this slice not built RED-first; disclosed rather than silently normalized.
+
+**Skipped / deferred (explicitly out of scope, not overlooked):**
+- No independent (fresh-context) review pass — this session was the sole implementer; execution-status
+  marked DONE-pending-review, not DONE.
+- Screenshots — explicitly the orchestrating session's job per the dispatch brief, not run here.
+- Structured edit dialog for the 3 non-restock kinds — v1 scope is restock-only
+  (`RestockEditDialog`); the rest get `EditUnavailableDialog`, per the task's own disclosed-scope
+  instruction (deliverable E).
+
+**Verdict:** VERIFIED (implementation + test evidence); NOT independently reviewed.
