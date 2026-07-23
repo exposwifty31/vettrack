@@ -37,4 +37,34 @@ describe("action-proposal citation validator", () => {
     const result = validateActionProposalCitations([], []);
     expect(result).toEqual({ valid: true, checks: [] });
   });
+
+  describe("coordinator_reassign_off_roster kind (§3)", () => {
+    const coordinatorGroundTruth: ActionProposalCitedFact[] = [
+      { sourceId: "coord-row-1", sourceTable: "vt_shift_equipment_coordinator", kind: "stale_coordinator_assignment", at: "2026-07-22T06:00:00.000Z" },
+      { sourceId: "shift-row-1", sourceTable: "vt_shifts", kind: "roster_shift", at: "2026-07-22T00:00:00.000Z" },
+    ];
+
+    it("validates true when the coordinator kind's real citations (checked against its own reader's ground truth) are used", () => {
+      const result = validateActionProposalCitations(coordinatorGroundTruth, coordinatorGroundTruth);
+      expect(result.valid).toBe(true);
+      expect(result.checks).toEqual([
+        { sourceId: "coord-row-1", valid: true },
+        { sourceId: "shift-row-1", valid: true },
+      ]);
+    });
+
+    it("flags a fabricated sourceId for the coordinator kind as citation_not_grounded", () => {
+      const tampered: ActionProposalCitedFact[] = [
+        ...coordinatorGroundTruth,
+        { sourceId: "fabricated-coord-99", sourceTable: "vt_shift_equipment_coordinator", kind: "stale_coordinator_assignment", at: "2026-07-22T06:10:00.000Z" },
+      ];
+      const result = validateActionProposalCitations(tampered, coordinatorGroundTruth);
+      expect(result.valid).toBe(false);
+      expect(result.checks).toContainEqual({
+        sourceId: "fabricated-coord-99",
+        valid: false,
+        flag: "citation_not_grounded:fabricated-coord-99",
+      });
+    });
+  });
 });

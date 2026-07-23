@@ -35,6 +35,12 @@ export interface ActionProposalListFilters {
   offset?: number;
 }
 
+export interface StageOutcome {
+  proposal: ActionProposalRow;
+  /** False when the (clinicId, kind, sourceSessionId) triple was already staged — the existing row is returned. */
+  created: boolean;
+}
+
 export interface StageActionProposalInput extends NewActionProposalInput {
   citationValidation: unknown;
 }
@@ -45,6 +51,24 @@ export interface ActionProposalTransitionPatch {
   decidedAt: Date;
   editedContent?: unknown;
   rejectionReason?: string;
+}
+
+export interface TransitionAndRecordDecisionMeta {
+  stagedSummary: string;
+  stagedCitedFacts: unknown;
+  stagedDraftContent: unknown;
+}
+
+export interface TransitionAndRecordInput {
+  clinicId: string;
+  proposalId: string;
+  patch: ActionProposalTransitionPatch;
+  decisionMeta: TransitionAndRecordDecisionMeta;
+}
+
+export interface TransitionAndRecordResult {
+  proposal: ActionProposalRow;
+  decision: ActionProposalDecisionRow;
 }
 
 export interface NewActionProposalDecisionInput {
@@ -64,10 +88,22 @@ export interface ActionProposalWriter {
   findStaged(clinicId: string, filters?: ActionProposalListFilters): Promise<ActionProposalRow[]>;
   get(clinicId: string, id: string): Promise<ActionProposalRow | null>;
   /** Idempotent per (clinicId, kind, sourceSessionId) — a repeat stage returns the existing row unchanged. */
-  stage(input: StageActionProposalInput): Promise<ActionProposalRow>;
+  stage(input: StageActionProposalInput): Promise<StageOutcome>;
   /** Guards `status === "staged"` — throws `ActionProposalAlreadyDecidedError` on a second decision attempt. */
   transition(clinicId: string, id: string, patch: ActionProposalTransitionPatch): Promise<ActionProposalRow>;
   recordDecision(entry: NewActionProposalDecisionInput): Promise<ActionProposalDecisionRow>;
+  /**
+   * Task 1.1 §3.A carry-over fix (disclosed in the §1 review): the transition
+   * (status flip, guarded on `status === "staged"`) and the decision-log
+   * append happen as ONE atomic unit — the Drizzle implementation wraps both
+   * in a single `db.transaction`, so a decision-log row exists **iff** the
+   * transition succeeded (never an orphaned decision row, never a
+   * transitioned proposal with no decision-log entry). `decide()` in
+   * `action-proposal-service.ts` calls this instead of `transition` +
+   * `recordDecision` separately. `logAudit` stays fire-and-forget OUTSIDE
+   * this call, per CLAUDE.md's audit-logging convention.
+   */
+  transitionAndRecord(input: TransitionAndRecordInput): Promise<TransitionAndRecordResult>;
 }
 
 export class DrizzleActionProposalWriter implements ActionProposalWriter {
@@ -99,7 +135,7 @@ export class DrizzleActionProposalWriter implements ActionProposalWriter {
     return row ?? null;
   }
 
-  async stage(input: StageActionProposalInput): Promise<ActionProposalRow> {
+  async stage(input: StageActionProposalInput): Promise<StageOutcome> {
     const [existing] = await db
       .select()
       .from(actionProposal)
@@ -111,7 +147,7 @@ export class DrizzleActionProposalWriter implements ActionProposalWriter {
         ),
       )
       .limit(1);
-    if (existing) return existing;
+    if (existing) return { proposal: existing, created: false };
 
     const [row] = await db
       .insert(actionProposal)
@@ -132,11 +168,11 @@ export class DrizzleActionProposalWriter implements ActionProposalWriter {
       })
       .returning();
 
-    if (row) return row;
+    if (row) return { proposal: row, created: true };
 
     // Lost the race against a concurrent stage of the same triple.
     const winner = await this.stage(input);
-    return winner;
+    return { proposal: winner.proposal, created: false };
   }
 
   async transition(
@@ -188,6 +224,51 @@ export class DrizzleActionProposalWriter implements ActionProposalWriter {
     // yields exactly one row — Drizzle's type can't narrow that.
     return row!;
   }
+
+  async transitionAndRecord(input: TransitionAndRecordInput): Promise<TransitionAndRecordResult> {
+    return db.transaction(async (tx) => {
+      const [proposal] = await tx
+        .update(actionProposal)
+        .set({
+          status: input.patch.status,
+          editedContent: input.patch.editedContent ?? null,
+          rejectionReason: input.patch.rejectionReason ?? null,
+          decidedByUserId: input.patch.decidedByUserId,
+          decidedAt: input.patch.decidedAt,
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(actionProposal.clinicId, input.clinicId),
+            eq(actionProposal.id, input.proposalId),
+            eq(actionProposal.status, "staged"),
+          ),
+        )
+        .returning();
+
+      if (!proposal) throw new ActionProposalAlreadyDecidedError(input.proposalId);
+
+      const [decision] = await tx
+        .insert(actionProposalDecisionLog)
+        .values({
+          id: randomUUID(),
+          proposalId: proposal.id,
+          clinicId: input.clinicId,
+          stagedSummary: input.decisionMeta.stagedSummary,
+          stagedCitedFacts: input.decisionMeta.stagedCitedFacts,
+          stagedDraftContent: input.decisionMeta.stagedDraftContent,
+          decision: input.patch.status,
+          decidedByUserId: input.patch.decidedByUserId,
+          decidedAt: input.patch.decidedAt,
+          editedContent: input.patch.editedContent ?? null,
+          rejectionReason: input.patch.rejectionReason ?? null,
+        })
+        .returning();
+
+      if (!decision) throw new Error("transitionAndRecord: decision insert returned no row");
+      return { proposal, decision };
+    });
+  }
 }
 
 /** Test fake. Mirrors the real writer's `clinicId`-scoping semantics — a lookup under the wrong clinic returns nothing. */
@@ -222,12 +303,12 @@ export class InMemoryActionProposalWriter implements ActionProposalWriter {
     return row;
   }
 
-  async stage(input: StageActionProposalInput): Promise<ActionProposalRow> {
+  async stage(input: StageActionProposalInput): Promise<StageOutcome> {
     const key = this.stageKey(input.clinicId, input.kind, input.sourceSessionId);
     const existingId = this.stagedKeys.get(key);
     if (existingId) {
       const existing = this.proposals.get(existingId);
-      if (existing) return existing;
+      if (existing) return { proposal: existing, created: false };
     }
 
     const now = new Date();
@@ -255,7 +336,7 @@ export class InMemoryActionProposalWriter implements ActionProposalWriter {
 
     this.proposals.set(row.id, row);
     this.stagedKeys.set(key, row.id);
-    return row;
+    return { proposal: row, created: true };
   }
 
   async transition(
@@ -300,6 +381,48 @@ export class InMemoryActionProposalWriter implements ActionProposalWriter {
     } as unknown as ActionProposalDecisionRow;
     this.decisions.push(row);
     return row;
+  }
+
+  /**
+   * Mirrors the Drizzle impl's atomicity: the guard check (`status ===
+   * "staged"`) and both mutations (proposal row + decision-log row) happen
+   * in one synchronous pass — a throw leaves neither mutated (in-memory is
+   * single-threaded, so this is naturally all-or-nothing, matching the real
+   * `db.transaction` semantics it stands in for).
+   */
+  async transitionAndRecord(input: TransitionAndRecordInput): Promise<TransitionAndRecordResult> {
+    const row = this.proposals.get(input.proposalId);
+    if (!row || row.clinicId !== input.clinicId || row.status !== "staged") {
+      throw new ActionProposalAlreadyDecidedError(input.proposalId);
+    }
+
+    const updatedProposal = {
+      ...row,
+      status: input.patch.status,
+      editedContent: input.patch.editedContent ?? null,
+      rejectionReason: input.patch.rejectionReason ?? null,
+      decidedByUserId: input.patch.decidedByUserId,
+      decidedAt: input.patch.decidedAt,
+      updatedAt: new Date(),
+    } as ActionProposalRow;
+
+    const decisionRow = {
+      id: randomUUID(),
+      proposalId: updatedProposal.id,
+      clinicId: input.clinicId,
+      stagedSummary: input.decisionMeta.stagedSummary,
+      stagedCitedFacts: input.decisionMeta.stagedCitedFacts,
+      stagedDraftContent: input.decisionMeta.stagedDraftContent,
+      decision: input.patch.status,
+      decidedByUserId: input.patch.decidedByUserId,
+      decidedAt: input.patch.decidedAt,
+      editedContent: input.patch.editedContent ?? null,
+      rejectionReason: input.patch.rejectionReason ?? null,
+    } as unknown as ActionProposalDecisionRow;
+
+    this.proposals.set(updatedProposal.id, updatedProposal);
+    this.decisions.push(decisionRow);
+    return { proposal: updatedProposal, decision: decisionRow };
   }
 
   /** Test-only accessor — not part of the `ActionProposalWriter` contract. */
