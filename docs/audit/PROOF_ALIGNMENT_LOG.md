@@ -4662,6 +4662,33 @@ Reviewer returned 1 HIGH + 1 MEDIUM + 2 LOW on the committed sub-card; all four 
 
 **Verdict:** VERIFIED.
 
+## 2026-07-22 — Task 1.1 §5 `crash_cart_drift` — branch feat/2.0-task-1.1-s5-crash-cart-drift
+
+**Claim:** Implemented the `crash_cart_drift` autopilot proposal type per plan §5: `CrashCartDriftReader` port (missing-item + staleness drift, per-clinic configurable staleness threshold), pure composer (two draft shapes, one kind), daily scan worker registered in `start-schedulers.ts`, job-registry entries, per-kind edit Zod, citation-validator case, i18n keys in both locales — all RED-before-GREEN, zero Code Blue / crash-cart.ts / frozen-surface files touched.
+
+**Evidence:**
+- Branch: created off `feat/2.0-task-1.1-s4-restock-po` via `git checkout -b feat/2.0-task-1.1-s5-crash-cart-drift` — confirmed via `git log --oneline feat/2.0-task-1.1-s4-restock-po..HEAD` → 4 commits (`b50c8805f`, `72e63a54c`, `77db84252`, `fa774f8ae`).
+- RED confirmed BEFORE any production file was written: `pnpm exec vitest run tests/autopilot/crash-cart-drift-reader.test.ts tests/autopilot/crash-cart-drift-composer.test.ts tests/autopilot/autopilot-crash-cart-worker.test.ts tests/autopilot/action-proposal-citation-validator.test.ts tests/autopilot/action-proposal-service.test.ts tests/autopilot/action-proposal-types.test.ts tests/jobs/job-registry-parity.test.ts` → `8 failed | 36 passed (44)` — import/module-resolution failures for the three new files, `TypeError: Cannot read properties of undefined (reading 'safeParse')` for `crashCartDriftEditedContentSchema`, and two inline-snapshot mismatches missing `scan-crash-cart-drift`.
+- GREEN, full suite: `pnpm exec vitest run tests/autopilot/ tests/jobs/` → `Test Files 24 passed (24)` / `Tests 150 passed (150)`, re-run identically after a stash/pop typecheck round-trip.
+- `server/lib/autopilot/crash-cart-drift-reader.port.ts:1-245` — `CRASH_CART_CHECK_STALE_AFTER_HOURS_DEFAULT = 24`, `clampCrashCartStaleHours` clamps to `[1, 168]`, `DrizzleCrashCartStaleHoursConfigReader` reads `vt_server_config` key `autopilot.crash_cart_stale_hours.<clinicId>` via the same raw-SQL shape as `server/lib/queue.ts:403-410` (confirmed by reading that file), injectable via constructor for unit tests (`InMemoryCrashCartStaleHoursConfigReader`). `computeDrift` is the single pure rule shared by the Drizzle and in-memory readers.
+- `server/lib/autopilot/crash-cart-drift-composer.ts:1-167` — pure, no I/O; `driftType: "missing_items" | "stale_check"` under kind `crash_cart_drift`; missing-item priority over staleness when both true; `expiryWarnDays` explicitly not wired (documented in the file header, matches plan §5 step 4's disclosed gap).
+- `server/workers/autopilotCrashCartDriftWorker.ts:1-207` — `AUTOPILOT_CRASH_CART_DRIFT_CRON = "30 6 * * *"` (ahead of restock's `0 7 * * *`), `runCrashCartDriftScan` injectable-deps core, `__test` export, `QUEUE_DISABLED_NO_REDIS` fallback — structure verified against `server/workers/autopilotRestockBurnWorker.ts` side by side.
+- `server/app/start-schedulers.ts` — `startAutopilotCrashCartDriftWorker()` registered additively (import + call site), confirmed via `git diff --stat feat/2.0-task-1.1-s4-restock-po -- server/app/start-schedulers.ts` → `10 +` (import line + call + comment only).
+- Job registry: `server/jobs/registry.ts` (`StaticJobKind` union +1), `server/jobs/definitions/index.ts` (`crashCartDriftScanDefinition` + payload type + map entry), `server/lib/job-latency.ts` (`KNOWN_JOB_KINDS` +1, compile-time exhaustive-check would fail otherwise) — `tests/jobs/job-registry-parity.test.ts`'s two inline snapshots updated with `"scan-crash-cart-drift"` in alphabetical position; test passes.
+- i18n: `locales/en.json` / `locales/he.json` both gained `autopilotQueue.kinds.crashCartDrift.{title,missingItemSummaryTemplate,staleSummaryTemplate}`. Command: `pnpm i18n:check` → `✓ locales/en.json and locales/he.json are in deep key parity.`
+- Typecheck delta: `npx tsc --noEmit --pretty false` (frontend) and `npx tsc -p tsconfig.server.json --noEmit --pretty false` (server) captured on the clean base branch (`git stash -u` round-trip) and on this branch's final committed tree; `diff` of both sorted outputs → exit 0 both times (zero new errors; the 2 frontend + 5 server pre-existing errors are unrelated missing-module errors present on the base branch too).
+- Frozen-surface / Code-Blue diff: `git diff --stat feat/2.0-task-1.1-s4-restock-po -- server/routes/code-blue.ts server/lib/code-blue-keepalive.ts server/lib/code-blue-reconciliation-scanner.ts server/routes/crash-cart.ts public/sw.js server/lib/realtime-collab/ server/routes/realtime.ts server/lib/event-publisher.ts server/lib/realtime-outbox.ts server/lib/shift-handover-scheduler.ts` → empty output, exit 0 — none of these files appear anywhere in the branch diff.
+- `docs/deep-research-report (2).md` never staged: `git status --short` shows it as `??` (untracked) at every commit point; explicit `git add <paths>` used for every commit, never `git add -A`/`.`.
+- No push, no PR, no amend, no `--no-verify` used at any point.
+
+**Skipped / deferred (explicitly out of scope per the task brief, not overlooked):**
+- No `src/features/autopilot/cards/CrashCartDriftCard.tsx` or any other UI file — deferred to the UI-shell slice (matches §4's precedent).
+- No expiry-based drift signal (documented gap — no per-unit expiry-date field exists in `server/schema/er.ts`).
+- No new `AuditActionType` or `MetricName` union members — the shared §1 `stageProposal`/`decide()` calls already cover all 4 kinds generically.
+- No paging/push/notification of any kind added — the worker only stages a shadow-mode approval-queue proposal.
+
+**Verdict:** VERIFIED.
+
 ## 2026-07-22 — Owner decision: edit = fix-then-execute — branch feat/2.0-task-1.1-s4-restock-po
 
 **Claim:** Per owner decision (2026-07-22, in-session), `editProposal` now dispatches the kind side effect with the EDITED content — editing a restock proposal executes the corrected PO. Implemented TDD.
@@ -4671,5 +4698,16 @@ Reviewer returned 1 HIGH + 1 MEDIUM + 2 LOW on the committed sub-card; all four 
 - GREEN: `buildRestockPoApproveSideEffect` gains `effectiveContent?` (editedContent on edit path, draftContent on approve); `editProposal` passes it; docstrings corrected. `pnpm exec vitest run tests/autopilot/ tests/jobs/` → `21 files, 119 passed`.
 - Typecheck: sorted server tsc output diff vs baseline → identical (TSC DELTA CLEAN).
 - Single-decision invariant unchanged: edited stays terminal; later approve still throws (asserted in the new test).
+
+**Verdict:** VERIFIED.
+
+## 2026-07-22 — Task 1.1 §5 post-review addendum — branch feat/2.0-task-1.1-s5-crash-cart-drift
+
+**Claim:** §5 independent review PASS with clinical-safety lens (no veto, zero blockers). One coverage follow-up closed.
+
+**Evidence:**
+- Review confirmed: zero Code Blue/realtime/sw.js/crash-cart-route files in the diff; worker notifies nobody (grep for notification/push/socket/emit clean); zero crash-cart table writes (select-only); threshold constant + per-clinic override + [1,168] clamp verified at reader.port.ts; 24h default's clinical grounding re-verified against RECOVER-aligned sources.
+- Follow-up closed: direct assertion that buildRestockPoApproveSideEffect returns undefined for crash_cart_drift on BOTH approve and edit paths → `pnpm exec vitest run tests/autopilot/ tests/jobs/` → 24 files, 151 passed.
+- Standing family-wide observation (tracked, not §5's defect): stage-time citation grounding is self-referential in all three shadow workers — real anti-hallucination gate deferred to LLM-composition work.
 
 **Verdict:** VERIFIED.

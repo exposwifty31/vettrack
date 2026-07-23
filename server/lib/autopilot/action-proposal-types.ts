@@ -30,6 +30,8 @@ export type ActionProposalStatus = (typeof ACTION_PROPOSAL_STATUSES)[number];
  * the same way — both literal DB table names (`vt_items` is the real name
  * behind `server/schema/inventory.ts`'s `inventoryItems` export), keeping
  * the "citation label == real table name" pattern every member follows.
+ * `vt_crash_cart_checks` / `vt_crash_cart_items` (§5, `crash_cart_drift`)
+ * added the same way.
  */
 export interface ActionProposalCitedFact {
   sourceId: string;
@@ -40,6 +42,8 @@ export interface ActionProposalCitedFact {
     | "vt_shifts"
     | "vt_container_items"
     | "vt_items"
+    | "vt_crash_cart_checks"
+    | "vt_crash_cart_items"
     | (string & {});
   kind: string;
   at: string;
@@ -100,8 +104,31 @@ export const restockPoOnBurnEditedContentSchema = z
   .strict();
 export type RestockPoOnBurnEditedContent = z.infer<typeof restockPoOnBurnEditedContentSchema>;
 
+/**
+ * VetTrack 2.0, Task 1.1 §5 — per-kind edit-body Zod for `crash_cart_drift`.
+ * Unlike `restock_po_on_burn`, this kind has no approve/edit side effect
+ * (nothing to execute — the proposal is a "go check/replenish the cart"
+ * workflow nudge, per `buildRestockPoApproveSideEffect` returning
+ * `undefined` for every kind other than `restock_po_on_burn`). The edit
+ * body still needs validation so an edit can't silently drift the
+ * `driftType` discriminator away from the two real draft shapes
+ * (`crash-cart-drift-composer.ts`) — `note` and `acknowledgedItemKeys` let
+ * a human record what they actually did (e.g. "restocked manually",
+ * acknowledging specific failed item keys) without changing what gets
+ * executed, since nothing does.
+ */
+export const crashCartDriftEditedContentSchema = z
+  .object({
+    driftType: z.enum(["missing_items", "stale_check"]),
+    note: z.string().min(1).max(1000).optional(),
+    acknowledgedItemKeys: z.array(z.string().min(1)).max(50).optional(),
+  })
+  .strict();
+export type CrashCartDriftEditedContent = z.infer<typeof crashCartDriftEditedContentSchema>;
+
 const PER_KIND_EDITED_CONTENT_SCHEMAS: Partial<Record<ActionProposalKind, z.ZodTypeAny>> = {
   restock_po_on_burn: restockPoOnBurnEditedContentSchema,
+  crash_cart_drift: crashCartDriftEditedContentSchema,
 };
 
 export interface EditedContentValidationResult {

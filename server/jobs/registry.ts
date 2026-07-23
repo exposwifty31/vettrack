@@ -21,7 +21,8 @@ export type StaticJobKind =
   | "sweep-stale-returned"
   | "sweep-room-escalation"
   | "scan-restock-burn"
-  | "scan-coordinator-reassign";
+  | "scan-coordinator-reassign"
+  | "scan-crash-cart-drift";
 
 /** Enqueue-only kind for integration sync (dynamic BullMQ `job.name`). */
 export type IntegrationEnqueueKind = "integration-sync-enqueue";

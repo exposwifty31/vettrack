@@ -3,6 +3,8 @@ import {
   approveActionProposalBodySchema,
   editActionProposalBodySchema,
   rejectActionProposalBodySchema,
+  crashCartDriftEditedContentSchema,
+  validateEditedContentForKind,
 } from "../../server/lib/autopilot/action-proposal-types.js";
 
 describe("action-proposal-types Zod contracts", () => {
@@ -45,5 +47,38 @@ describe("action-proposal-types Zod contracts", () => {
 
     const missing = rejectActionProposalBodySchema.safeParse({});
     expect(missing.success).toBe(false);
+  });
+});
+
+describe("crashCartDriftEditedContentSchema (Task 1.1 §5, deliverable D)", () => {
+  it("accepts a valid driftType with optional note and acknowledgedItemKeys", () => {
+    const ok = crashCartDriftEditedContentSchema.safeParse({
+      driftType: "missing_items",
+      note: "Restocked manually",
+      acknowledgedItemKeys: ["epinephrine"],
+    });
+    expect(ok.success).toBe(true);
+  });
+
+  it("accepts driftType alone (note/acknowledgedItemKeys optional)", () => {
+    const ok = crashCartDriftEditedContentSchema.safeParse({ driftType: "stale_check" });
+    expect(ok.success).toBe(true);
+  });
+
+  it("rejects an invalid driftType", () => {
+    const bad = crashCartDriftEditedContentSchema.safeParse({ driftType: "not_a_real_type" });
+    expect(bad.success).toBe(false);
+  });
+
+  it("rejects unknown keys (strict)", () => {
+    const bad = crashCartDriftEditedContentSchema.safeParse({ driftType: "missing_items", extra: "nope" });
+    expect(bad.success).toBe(false);
+  });
+
+  it("is wired into validateEditedContentForKind for crash_cart_drift", () => {
+    const valid = validateEditedContentForKind("crash_cart_drift", { driftType: "stale_check" });
+    expect(valid.valid).toBe(true);
+    const invalid = validateEditedContentForKind("crash_cart_drift", { driftType: "nope" });
+    expect(invalid.valid).toBe(false);
   });
 });

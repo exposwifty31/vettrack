@@ -4498,6 +4498,11 @@
         "title": "Restock needed — items at or below reorder point",
         "summaryTemplate": "{itemCount, plural, one {1 item is at or below its reorder point} other {# items are at or below their reorder point}} as of {scanDate} — a draft purchase order is suggested below.",
         "suggestedQuantityLabel": "Suggested order quantity"
+      },
+      "crashCartDrift": {
+        "title": "Crash cart needs attention",
+        "missingItemSummaryTemplate": "{itemCount, plural, one {1 crash cart item was marked not ready} other {# crash cart items were marked not ready}} at the last check on {scanDate}.",
+        "staleSummaryTemplate": "{neverChecked, select, yes {The crash cart has never been checked} other {The crash cart hasn't been checked in {hours} hours}} — a check is overdue (threshold: {thresholdHours}h)."
       }
     }
   }
