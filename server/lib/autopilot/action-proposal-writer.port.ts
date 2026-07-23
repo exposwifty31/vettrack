@@ -271,6 +271,8 @@ export class InMemoryActionProposalWriter implements ActionProposalWriter {
       decidedByUserId: patch.decidedByUserId,
       decidedAt: patch.decidedAt,
       updatedAt: new Date(),
+      // Test-fake cast: spread of a stored row + patch fields is structurally
+      // the row shape; TS can't re-narrow the jsonb-typed fields post-spread.
     } as ActionProposalRow;
     this.proposals.set(id, updated);
     return updated;
@@ -289,6 +291,7 @@ export class InMemoryActionProposalWriter implements ActionProposalWriter {
       decidedAt: entry.decidedAt,
       editedContent: entry.editedContent ?? null,
       rejectionReason: entry.rejectionReason ?? null,
+      // Test-fake cast: same jsonb-column reasoning as the stage() fake above.
     } as unknown as ActionProposalDecisionRow;
     this.decisions.push(row);
     return row;

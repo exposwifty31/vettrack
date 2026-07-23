@@ -65,6 +65,8 @@ function mapError(req: Request, res: Response, err: unknown): Response {
 }
 
 router.get("/", requireAuth, async (req: Request, res: Response) => {
+  // Non-null: requireAuth populates req.authUser before any handler runs
+  // (server/middleware/auth.ts contract); same for every handler below.
   const { clinicId } = req.authUser!;
   const status = isActionProposalStatus(req.query.status) ? req.query.status : undefined;
   const kind = isActionProposalKind(req.query.kind) ? req.query.kind : undefined;
@@ -88,12 +90,12 @@ router.post(
   actionProposalDecisionLimiter,
   validateBody(approveActionProposalBodySchema),
   async (req: Request, res: Response) => {
-    const { id: userId, email, clinicId } = req.authUser!;
+    const { id: userId, email, clinicId } = req.authUser!; // requireAuth guarantees authUser
     const actorRole = resolveAuditActorRole({ effectiveRole: req.effectiveRole, authUser: req.authUser });
     try {
       const proposal = await approveProposal(
         { writer },
-        { clinicId, proposalId: req.params.id!, actorUserId: userId, actorEmail: email, actorRole },
+        { clinicId, proposalId: req.params.id!, // the /:id route shape guarantees params.id actorUserId: userId, actorEmail: email, actorRole },
       );
       return res.json({ proposal });
     } catch (err) {
@@ -108,14 +110,14 @@ router.post(
   actionProposalDecisionLimiter,
   validateBody(editActionProposalBodySchema),
   async (req: Request, res: Response) => {
-    const { id: userId, email, clinicId } = req.authUser!;
+    const { id: userId, email, clinicId } = req.authUser!; // requireAuth guarantees authUser
     const actorRole = resolveAuditActorRole({ effectiveRole: req.effectiveRole, authUser: req.authUser });
     try {
       const proposal = await editProposal(
         { writer },
         {
           clinicId,
-          proposalId: req.params.id!,
+          proposalId: req.params.id!, // the /:id route shape guarantees params.id
           actorUserId: userId,
           actorEmail: email,
           actorRole,
@@ -135,14 +137,14 @@ router.post(
   actionProposalDecisionLimiter,
   validateBody(rejectActionProposalBodySchema),
   async (req: Request, res: Response) => {
-    const { id: userId, email, clinicId } = req.authUser!;
+    const { id: userId, email, clinicId } = req.authUser!; // requireAuth guarantees authUser
     const actorRole = resolveAuditActorRole({ effectiveRole: req.effectiveRole, authUser: req.authUser });
     try {
       const proposal = await rejectProposal(
         { writer },
         {
           clinicId,
-          proposalId: req.params.id!,
+          proposalId: req.params.id!, // the /:id route shape guarantees params.id
           actorUserId: userId,
           actorEmail: email,
           actorRole,
