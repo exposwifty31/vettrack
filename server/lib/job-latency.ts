@@ -34,6 +34,7 @@ const KNOWN_JOB_KINDS = [
   "sweep-stale-checkouts",
   "sweep-stale-returned",
   "sweep-room-escalation",
+  "scan-coordinator-reassign",
   "integration-sync-enqueue",
 ] as const satisfies readonly JobKind[];
 

@@ -26,6 +26,7 @@ import { startEquipmentWaitlistReservationWorker } from "../workers/equipment-wa
 import { startStaleCheckoutSweepWorker } from "../workers/staleCheckoutSweepWorker.js";
 import { startStaleReturnedSweepWorker } from "../workers/stale-returned-sweep.worker.js";
 import { startSweepEscalationWorker } from "../workers/sweep-escalation.worker.js";
+import { startAutopilotCoordinatorReassignWorker } from "../workers/autopilotCoordinatorReassignWorker.js";
 import { startShiftHandoverScheduler } from "../lib/shift-handover-scheduler.js";
 import { startRfidReaderOfflineSweep } from "../lib/rfid/reader-offline-sweep.js";
 import { startRfidFinalizingSweep } from "../lib/rfid/finalizing-sweep.js";
@@ -77,6 +78,11 @@ export async function startBackgroundSchedulers() {
   startStaleCheckoutSweepWorker();
   startStaleReturnedSweepWorker();
   startSweepEscalationWorker();
+
+  // VetTrack 2.0, Task 1.1 §3 — Shift Autopilot `coordinator_reassign_off_roster`
+  // scan (roster-drift detection; a different mechanism from the sweep-escalation
+  // ladder above — see the worker file's header comment).
+  startAutopilotCoordinatorReassignWorker();
 
   // R-SH-F1.2 — shift-end handover generator (in-process; no public generate route).
   startShiftHandoverScheduler();

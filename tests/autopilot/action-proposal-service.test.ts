@@ -48,7 +48,7 @@ describe("action-proposal-service", () => {
   });
 
   it("stages then approves a proposal (happy path)", async () => {
-    const staged = await stageProposal(
+    const { proposal: staged } = await stageProposal(
       { writer },
       { input: buildInput(), groundTruthFacts: buildFacts(), stagedBy: STAGED_BY },
     );
@@ -60,7 +60,7 @@ describe("action-proposal-service", () => {
   });
 
   it("enforces the single-decision invariant: approve then reject on the same id throws, decision log stays length 1", async () => {
-    const staged = await stageProposal(
+    const { proposal: staged } = await stageProposal(
       { writer },
       { input: buildInput(), groundTruthFacts: buildFacts(), stagedBy: STAGED_BY },
     );
@@ -77,7 +77,7 @@ describe("action-proposal-service", () => {
   });
 
   it("edit stores editedContent and flips status to edited", async () => {
-    const staged = await stageProposal(
+    const { proposal: staged } = await stageProposal(
       { writer },
       { input: buildInput({ sourceSessionId: "session-edit" }), groundTruthFacts: buildFacts(), stagedBy: STAGED_BY },
     );
@@ -91,7 +91,7 @@ describe("action-proposal-service", () => {
   });
 
   it("reject requires a non-empty reason at the service boundary", async () => {
-    const staged = await stageProposal(
+    const { proposal: staged } = await stageProposal(
       { writer },
       { input: buildInput({ sourceSessionId: "session-reject" }), groundTruthFacts: buildFacts(), stagedBy: STAGED_BY },
     );
@@ -102,16 +102,32 @@ describe("action-proposal-service", () => {
 
   it("is idempotent: staging the same (clinicId, kind, sourceSessionId) twice does not double-stage", async () => {
     const input = buildInput({ sourceSessionId: "session-idempotent" });
-    const first = await stageProposal({ writer }, { input, groundTruthFacts: buildFacts(), stagedBy: STAGED_BY });
-    const second = await stageProposal({ writer }, { input, groundTruthFacts: buildFacts(), stagedBy: STAGED_BY });
+    const { proposal: first } = await stageProposal({ writer }, { input, groundTruthFacts: buildFacts(), stagedBy: STAGED_BY });
+    const { proposal: second } = await stageProposal({ writer }, { input, groundTruthFacts: buildFacts(), stagedBy: STAGED_BY });
     expect(second.id).toBe(first.id);
 
     const staged = await writer.findStaged(CLINIC_A, { kind: "shift_handover_draft" });
     expect(staged.filter((row) => row.sourceSessionId === "session-idempotent")).toHaveLength(1);
   });
 
+  it("emits the staged audit row and metric exactly once across a repeat stage of the same triple", async () => {
+    const { logAudit } = await import("../../server/lib/audit.js");
+    const { incrementMetric } = await import("../../server/lib/metrics.js");
+    vi.mocked(logAudit).mockClear();
+    vi.mocked(incrementMetric).mockClear();
+
+    const input = buildInput({ sourceSessionId: "session-emission-once" });
+    await stageProposal({ writer }, { input, groundTruthFacts: buildFacts(), stagedBy: STAGED_BY });
+    await stageProposal({ writer }, { input, groundTruthFacts: buildFacts(), stagedBy: STAGED_BY });
+
+    expect(vi.mocked(incrementMetric).mock.calls.filter(([name]) => name === "autopilot_proposal_staged_total")).toHaveLength(1);
+    expect(
+      vi.mocked(logAudit).mock.calls.filter(([entry]) => entry.actionType === "action_proposal_staged"),
+    ).toHaveLength(1);
+  });
+
   it("cross-tenant negative: a proposal staged for clinic A cannot be fetched or approved with clinic B's id (not-found, not forbidden-leak)", async () => {
-    const staged = await stageProposal(
+    const { proposal: staged } = await stageProposal(
       { writer },
       { input: buildInput({ sourceSessionId: "session-cross-tenant" }), groundTruthFacts: buildFacts(), stagedBy: STAGED_BY },
     );
@@ -119,6 +135,47 @@ describe("action-proposal-service", () => {
     await expect(
       approveProposal({ writer }, { clinicId: CLINIC_B, proposalId: staged.id, ...ACTOR }),
     ).rejects.toThrow(ActionProposalNotFoundError);
+  });
+
+  it("transitionAndRecord is atomic: decision-log row exists iff the transition succeeded (Task 1.1 §3.A carry-over)", async () => {
+    const { proposal: staged } = await stageProposal(
+      { writer },
+      { input: buildInput({ sourceSessionId: "session-atomic" }), groundTruthFacts: buildFacts(), stagedBy: STAGED_BY },
+    );
+
+    const result = await writer.transitionAndRecord({
+      clinicId: CLINIC_A,
+      proposalId: staged.id,
+      patch: { status: "approved", decidedByUserId: ACTOR.actorUserId, decidedAt: new Date() },
+      decisionMeta: {
+        stagedSummary: staged.summary,
+        stagedCitedFacts: staged.citedFacts,
+        stagedDraftContent: staged.draftContent,
+      },
+    });
+    expect(result.proposal.status).toBe("approved");
+    expect(result.decision.decision).toBe("approved");
+    expect(writer.allDecisions()).toHaveLength(1);
+
+    // A second decision attempt on the same (already-decided) proposal must
+    // throw AND must not leave an orphaned decision-log row behind — the
+    // transition and the decision-log append succeed or fail together.
+    await expect(
+      writer.transitionAndRecord({
+        clinicId: CLINIC_A,
+        proposalId: staged.id,
+        patch: { status: "rejected", decidedByUserId: ACTOR.actorUserId, decidedAt: new Date(), rejectionReason: "too late" },
+        decisionMeta: {
+          stagedSummary: staged.summary,
+          stagedCitedFacts: staged.citedFacts,
+          stagedDraftContent: staged.draftContent,
+        },
+      }),
+    ).rejects.toThrow(ActionProposalAlreadyDecidedError);
+    expect(writer.allDecisions()).toHaveLength(1);
+
+    const finalRow = await writer.get(CLINIC_A, staged.id);
+    expect(finalRow?.status).toBe("approved");
   });
 });
 
@@ -128,7 +185,8 @@ describe("writer determinism + key identity (CodeRabbit #134 outside-diff round)
     const now = new Date("2026-07-23T08:00:00.000Z");
     const rows = [];
     for (const s of ["s-a", "s-b", "s-c"]) {
-      const proposal = await writer.stage({
+      // s3+ API: stage() returns StageOutcome (the §3 emission fix).
+      const { proposal } = await writer.stage({
         clinicId: "clinic-a", kind: "shift_handover_draft", sourceSessionId: s,
         summary: "x", citedFacts: [], draftContent: {}, sourceRef: {}, citationValidation: {},
       });
@@ -147,6 +205,8 @@ describe("writer determinism + key identity (CodeRabbit #134 outside-diff round)
     const base = { summary: "x", citedFacts: [], draftContent: {}, sourceRef: {}, citationValidation: {} };
     const a = await writer.stage({ clinicId: "c::x", kind: "shift_handover_draft", sourceSessionId: "s", ...base });
     const b = await writer.stage({ clinicId: "c", kind: "shift_handover_draft", sourceSessionId: "x::s", ...base });
-    expect(a.id).not.toBe(b.id);
+    expect(a.created).toBe(true);
+    expect(b.created).toBe(true);
+    expect(a.proposal.id).not.toBe(b.proposal.id);
   });
 });

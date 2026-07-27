@@ -21,14 +21,21 @@ export type ActionProposalStatus = (typeof ACTION_PROPOSAL_STATUSES)[number];
  * A single grounding fact a proposal's summary/draft is cited against.
  * `sourceTable` names the DB table the fact came from — the initial two
  * members cover the shift-window content source (§2); later proposal kinds
- * (§3–§5) cite their own tables (e.g. `vt_shift_equipment_coordinator`,
- * `vt_container_items`, `vt_crash_cart_checks`) — kept open via the `string &
- * {}` idiom so those additions don't require touching this file, while still
- * autocompleting the known members.
+ * (§3–§5) cite their own tables — kept open via the `string & {}` idiom so
+ * those additions don't require touching this file, while still
+ * autocompleting the known members. `vt_shift_equipment_coordinator` /
+ * `vt_shifts` (§3, `coordinator_reassign_off_roster`) added explicitly per
+ * the plan's instruction to extend this union, not rely on the open idiom
+ * alone.
  */
 export interface ActionProposalCitedFact {
   sourceId: string;
-  sourceTable: "vt_audit_logs" | "vt_event_outbox" | (string & {});
+  sourceTable:
+    | "vt_audit_logs"
+    | "vt_event_outbox"
+    | "vt_shift_equipment_coordinator"
+    | "vt_shifts"
+    | (string & {});
   kind: string;
   at: string;
 }

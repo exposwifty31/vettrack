@@ -4486,5 +4486,14 @@
     "allReadyTitle": "אתם מוכנים",
     "allReadyBody": "לא צפויים מחסורים עבור הפעולות המתוזמנות הקרובות.",
     "loadError": "טעינת תחזית המוכנות נכשלה"
+  },
+  "autopilotQueue": {
+    "kinds": {
+      "coordinatorReassignOffRoster": {
+        "title": "רכז הציוד אינו ברשימת הצוות",
+        "summaryTemplate": "רכז הציוד שהוקצה למשמרת {shiftDate} אינו נמצא עוד ברשימת הצוות הנוכחית — מוצע תחליף בהמשך.",
+        "proposedCandidateLabel": "תחליף מוצע"
+      }
+    }
   }
 }

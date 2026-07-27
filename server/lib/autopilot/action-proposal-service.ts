@@ -12,6 +12,7 @@ import { validateActionProposalCitations } from "./action-proposal-citation-vali
 import {
   ActionProposalAlreadyDecidedError,
   type ActionProposalWriter,
+  type StageOutcome,
 } from "./action-proposal-writer.port.js";
 import type { ActionProposalCitedFact, NewActionProposalInput } from "./action-proposal-types.js";
 import type { ActionProposalRow } from "../../schema/ops.js";
@@ -43,22 +44,24 @@ export interface StageProposalParams {
 export async function stageProposal(
   deps: ActionProposalServiceDeps,
   params: StageProposalParams,
-): Promise<ActionProposalRow> {
+): Promise<StageOutcome> {
   const citationValidation = validateActionProposalCitations(params.input.citedFacts, params.groundTruthFacts);
-  const row = await deps.writer.stage({ ...params.input, citationValidation });
+  const outcome = await deps.writer.stage({ ...params.input, citationValidation });
 
-  incrementMetric("autopilot_proposal_staged_total");
-  logAudit({
-    clinicId: params.input.clinicId,
-    actionType: "action_proposal_staged",
-    performedBy: params.stagedBy.performedBy,
-    performedByEmail: params.stagedBy.performedByEmail,
-    targetId: row.id,
-    targetType: "action_proposal",
-    metadata: { kind: params.input.kind, sourceSessionId: params.input.sourceSessionId },
-  });
+  if (outcome.created) {
+    incrementMetric("autopilot_proposal_staged_total");
+    logAudit({
+      clinicId: params.input.clinicId,
+      actionType: "action_proposal_staged",
+      performedBy: params.stagedBy.performedBy,
+      performedByEmail: params.stagedBy.performedByEmail,
+      targetId: outcome.proposal.id,
+      targetType: "action_proposal",
+      metadata: { kind: params.input.kind, sourceSessionId: params.input.sourceSessionId },
+    });
+  }
 
-  return row;
+  return outcome;
 }
 
 interface DecideProposalParams {
@@ -79,25 +82,24 @@ async function decide(
   if (!staged) throw new ActionProposalNotFoundError(params.proposalId);
 
   const decidedAt = new Date();
-  const updated = await deps.writer.transition(params.clinicId, params.proposalId, {
-    status: decision,
-    decidedByUserId: params.actorUserId,
-    decidedAt,
-    editedContent: content.editedContent,
-    rejectionReason: content.rejectionReason,
-  });
-
-  await deps.writer.recordDecision({
-    proposalId: staged.id,
+  // Task 1.1 §3.A: the transition + decision-log append are ONE atomic
+  // writer call (db.transaction in the Drizzle impl) — a decision-log row
+  // exists iff the transition succeeded.
+  const { proposal: updated } = await deps.writer.transitionAndRecord({
     clinicId: params.clinicId,
-    stagedSummary: staged.summary,
-    stagedCitedFacts: staged.citedFacts,
-    stagedDraftContent: staged.draftContent,
-    decision,
-    decidedByUserId: params.actorUserId,
-    decidedAt,
-    editedContent: content.editedContent,
-    rejectionReason: content.rejectionReason,
+    proposalId: params.proposalId,
+    patch: {
+      status: decision,
+      decidedByUserId: params.actorUserId,
+      decidedAt,
+      editedContent: content.editedContent,
+      rejectionReason: content.rejectionReason,
+    },
+    decisionMeta: {
+      stagedSummary: staged.summary,
+      stagedCitedFacts: staged.citedFacts,
+      stagedDraftContent: staged.draftContent,
+    },
   });
 
   const auditActionType =

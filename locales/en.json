@@ -4486,5 +4486,14 @@
     "allReadyTitle": "You're ready",
     "allReadyBody": "No shortfalls forecast for the scheduled procedures ahead.",
     "loadError": "Couldn't load the readiness forecast"
+  },
+  "autopilotQueue": {
+    "kinds": {
+      "coordinatorReassignOffRoster": {
+        "title": "Equipment Coordinator off roster",
+        "summaryTemplate": "The Equipment Coordinator assigned for {shiftDate} is no longer on today's roster — a replacement is suggested below.",
+        "proposedCandidateLabel": "Suggested replacement"
+      }
+    }
   }
 }
