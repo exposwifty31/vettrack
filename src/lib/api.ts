@@ -82,6 +82,11 @@ import type { AuthoritySnapshot } from "../../shared/authority.js";
 import type { ShiftActivityItem } from "@/types";
 import type { ShiftHandoverArtifact, ShiftHandoverResponse } from "@/types/shift-handover";
 import type {
+  ActionProposal,
+  ListActionProposalsParams,
+  ListActionProposalsResponse,
+} from "@/types/action-proposals";
+import type {
   IntegrationAdapter,
   IntegrationConfig,
   IntegrationDashboardV1,
@@ -1463,6 +1468,34 @@ export const api = {
     unconfirm: (id: string) =>
       request<{ handover: ShiftHandoverArtifact }>(`/api/shift-handover/${id}/acknowledge`, {
         method: "DELETE",
+      }),
+  },
+  actionProposals: {
+    list: (params: ListActionProposalsParams = {}) => {
+      const query = new URLSearchParams();
+      if (params.status) query.set("status", params.status);
+      if (params.kind) query.set("kind", params.kind);
+      if (typeof params.limit === "number") query.set("limit", String(params.limit));
+      if (typeof params.offset === "number") query.set("offset", String(params.offset));
+      const qs = query.toString();
+      return request<ListActionProposalsResponse>(
+        qs ? `/api/action-proposals?${qs}` : "/api/action-proposals",
+      );
+    },
+    approve: (id: string) =>
+      request<{ proposal: ActionProposal }>(`/api/action-proposals/${id}/approve`, {
+        method: "POST",
+        body: JSON.stringify({}),
+      }),
+    edit: (id: string, editedContent: Record<string, unknown>) =>
+      request<{ proposal: ActionProposal }>(`/api/action-proposals/${id}/edit`, {
+        method: "POST",
+        body: JSON.stringify({ editedContent }),
+      }),
+    reject: (id: string, rejectionReason: string) =>
+      request<{ proposal: ActionProposal }>(`/api/action-proposals/${id}/reject`, {
+        method: "POST",
+        body: JSON.stringify({ rejectionReason }),
       }),
   },
 };

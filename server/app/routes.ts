@@ -65,6 +65,7 @@ import dispenseRoutes from "../routes/dispense.js";
 import shiftChatRoutes from "../routes/shift-chat.js";
 import shiftHandoverRoutes from "../routes/shift-handover.js";
 import whatsappRoutes from "../routes/whatsapp.js";
+import actionProposalRoutes from "../routes/action-proposals.js";
 
 function registerInfrastructureRoutes(app: express.Express) {
   app.use("/api/users", userRoutes);
@@ -151,6 +152,7 @@ function registerPlatformRoutes(app: express.Express) {
   app.use("/api/shift-chat", shiftChatRoutes);
   app.use("/api/shift-handover", shiftHandoverRoutes);
   app.use("/api/whatsapp", whatsappRoutes);
+  app.use("/api/action-proposals", actionProposalRoutes);
 }
 
 /**

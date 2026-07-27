@@ -304,7 +304,14 @@ export type AuditActionType =
   // ack→unread transition so the reversal is a real, attributable event.
   | "shift_handover_generated"
   | "shift_handover_acknowledged"
-  | "shift_handover_unconfirmed";
+  | "shift_handover_unconfirmed"
+  // VetTrack 2.0, Task 1.1 §1 — Shift Autopilot `action_proposal` shared
+  // infrastructure. Shared across all 4 proposal kinds (§2–§5) — added once
+  // here, not re-added per kind.
+  | "action_proposal_staged"
+  | "action_proposal_approved"
+  | "action_proposal_edited"
+  | "action_proposal_rejected";
 
 export interface LogAuditParams {
   clinicId: string;

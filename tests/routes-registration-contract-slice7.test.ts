@@ -69,6 +69,8 @@ const EXPECTED_MOUNT_PATHS = [
   "/api/shift-chat",
   "/api/shift-handover",
   "/api/whatsapp",
+  // Task 1.1 §1 — Autopilot action-proposal queue (deliberate guard extension)
+  "/api/action-proposals",
 ];
 
 describe("Slice 7 — routes registration contract lock", () => {

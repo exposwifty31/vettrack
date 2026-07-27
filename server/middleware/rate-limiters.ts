@@ -10,6 +10,10 @@ export const SCAN_LIMITER_MAX_PER_MINUTE = 600;
 export const CHECKOUT_LIMITER_MAX_PER_MINUTE = 600;
 export const WRITE_LIMITER_MAX_PER_MINUTE = 600;
 export const GLOBAL_API_LIMITER_MAX_PER_MINUTE = 100;
+// VetTrack 2.0, Task 1.1 §1.6 — approve/edit/reject are deliberate human
+// decisions, not a high-frequency read/write path — mirrors the
+// checkout/return limiter's shape at a tighter ceiling.
+export const ACTION_PROPOSAL_DECISION_LIMITER_MAX_PER_MINUTE = 20;
 
 /**
  * Playwright CI serves the API via `pnpm dev:api` (NODE_ENV=development) so
@@ -58,6 +62,16 @@ export const checkoutLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: "Too many checkout/return actions. Please wait a moment." },
+  keyGenerator: rateLimitUserKey,
+});
+
+// Action-proposal decisions (approve/edit/reject) — per-user.
+export const actionProposalDecisionLimiter = rateLimit({
+  windowMs: 60_000,
+  max: ACTION_PROPOSAL_DECISION_LIMITER_MAX_PER_MINUTE,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many action proposal decisions. Please wait a moment." },
   keyGenerator: rateLimitUserKey,
 });
 
