@@ -4596,8 +4596,6 @@ Reviewer returned 1 HIGH + 1 MEDIUM + 2 LOW on the committed sub-card; all four 
 
 **Verdict:** VERIFIED.
 
-**Verdict:** VERIFIED.
-
 ## 2026-07-22 — Task 1.1 §3 fix wave (review NB-1/NB-2) — branch feat/2.0-task-1.1-s3-coordinator-reassign
 
 **Claim:** Fixed the HIGH review finding NB-1 (duplicate staged audit/metric emission on repeat scans) at the root cause (writer reports `created`, service gates emission) and corrected the NB-2 inaccurate reader comment; commit ef2d9100b.
@@ -4607,5 +4605,21 @@ Reviewer returned 1 HIGH + 1 MEDIUM + 2 LOW on the committed sub-card; all four 
 - GREEN: `pnpm exec vitest run tests/autopilot/` → `Test Files 7 passed (7) · Tests 42 passed (42)`.
 - Typecheck delta: sorted `tsc -p tsconfig.server.json --noEmit` error output diffed against the pre-fix branch snapshot → identical (`TSC DELTA CLEAN`); frontend `tsc --noEmit` shows only the 2 known pre-existing missing-module errors (@clerk/localizations, socket.io-client) documented as present on main in the §1 and §3 verifications.
 - §1/§3 assertions preserved: test diff rebinds stageProposal returns to `.proposal` destructuring only; no assertion weakened (all prior expects intact, suite count 41→42).
+
+**Verdict:** VERIFIED.
+
+## 2026-07-27 — Task 1.1 §3 CodeRabbit fix wave (PR #135, retargeted to main) — branch feat/2.0-task-1.1-s3-coordinator-reassign
+
+**Claim:** Addressed the 4 CodeRabbit CHANGES_REQUESTED findings on #135 while landing the stack: (1) removed a duplicate `**Verdict:** VERIFIED.` line in this log's §3 section; (3) added additive BullMQ `queue.on("error")` / `worker.on("error")` listeners in `autopilotCoordinatorReassignWorker.ts`. Findings (2) shared tie-break helper and (4) shared test fixture were declined with rationale (see below), logged to backlog.
+
+**Evidence (commands actually run this session, real output):**
+- `pnpm exec vitest run tests/autopilot/autopilot-coordinator-worker.test.ts` → `Test Files 1 passed (1) · Tests 3 passed (3)` (worker still green after adding error listeners).
+- `pnpm exec vitest run tests/autopilot/` → `Test Files 7 passed (7) · Tests 44 passed (44)` — no regressions.
+- `npx tsc -p tsconfig.server.json --noEmit --pretty false` filtered for `error TS` and the touched files → zero errors introduced.
+- Doc dedup: `PROOF_ALIGNMENT_LOG.md` §3 section had two consecutive identical `**Verdict:** VERIFIED.` lines (prev 4597 + 4599); one removed, one retained before the next section header.
+
+**Declined-with-rationale (logged to backlog, not defects):**
+- Finding 2 (extract `deriveProposedReplacement`'s tie-break into a helper shared with `resolveShiftCoordinator`): declined. The slice deliberately keeps `equipment-coordinator.service.ts` read-only (frozen-surface check, diff empty by design); the composer's `deriveProposedReplacement` re-expresses the resolver's branching into the proposal's own return shape without importing resolver internals. A shared helper would force a change to the read-only authority-resolution service and couple shadow-only autopilot to it — higher risk than the maintainability gain. Behavior is identical; documented in the function's own comment.
+- Finding 4 (extract the duplicated `buildPersistedRow` fixture into `tests/autopilot/fixtures.ts`): declined as a test-maintainability nit — no behavior or coverage change; not worth touching 3 test files beyond the landing scope.
 
 **Verdict:** VERIFIED.
