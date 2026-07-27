@@ -57,10 +57,18 @@ export interface ComposeRestockPoProposalInput {
   locale: Locale;
 }
 
-/** Top-up-to-par rule: propose enough to reach `parLevel`, floored at 1 unit; falls back to `reorderPoint` when `parLevel` is untracked (null). */
+/**
+ * Top-up-to-par rule: propose enough to reach `parLevel`, floored at 1 unit;
+ * falls back to `reorderPoint` when `parLevel` is untracked (null).
+ *
+ * The result MUST be a positive integer: `vt_po_lines.quantity_ordered` and the
+ * approve side effect's `Number.isInteger` guard both reject fractional values
+ * (a fractional suggestion would stage a proposal that can never be approved).
+ * Fractional inputs are rounded UP (never under-order below par) and floored at 1.
+ */
 export function computeSuggestedQuantity(item: RestockItemReadResult): number {
-  if (item.parLevel != null) return Math.max(1, item.parLevel - item.onHand);
-  return item.reorderPoint;
+  const raw = item.parLevel != null ? item.parLevel - item.onHand : item.reorderPoint;
+  return Math.max(1, Math.ceil(raw));
 }
 
 export function composeRestockPoProposal(input: ComposeRestockPoProposalInput): NewActionProposalInput {

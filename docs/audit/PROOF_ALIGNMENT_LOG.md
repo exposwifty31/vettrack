@@ -4634,7 +4634,7 @@ Reviewer returned 1 HIGH + 1 MEDIUM + 2 LOW on the committed sub-card; all four 
 - Multi-tenancy: `DrizzleRestockBurnReader.read()` — both the `inventoryItems` query and the `containerItems` query carry an explicit `eq(*.clinicId, clinicId)` predicate (confirmed by Read of the file); `findCandidateClinics()` in the worker is intentionally clinic-unscoped (it exists to enumerate candidate clinicIds, mirroring `expiryCheckWorker.ts`'s `fetchClinicsWithExpiringEquipment` groupBy pattern) but every per-clinic read that follows (`reader.read(clinicId)`) is scoped; `restock-po-approve-side-effect.ts`'s inserts use `staged.clinicId` (read from the already-clinic-scoped staged proposal row, never from caller input) for both the `purchaseOrders` and `poLines` rows.
 
 **Disclosed deviations (per the task's own "disclosed, not silently picked" instruction):**
-- `citedFacts.sourceTable` uses the literal string `"vt_inventory_items"` per the task's explicit instruction, even though the real DB table is `vt_items` (`server/schema/inventory.ts`'s `inventoryItems` export) — breaks the established "citation label == real table name" pattern every other member of the union follows (`vt_audit_logs`, `vt_shifts`, etc. all match real table names exactly). Documented at the union definition site (`action-proposal-types.ts`) and here.
+- `citedFacts.sourceTable` uses the real table name `"vt_items"` (`server/schema/inventory.ts`'s `inventoryItems` export), matching the established "citation label == real table name" pattern every other member of the union follows (`vt_audit_logs`, `vt_shifts`, etc.). (An earlier draft of this slice used `"vt_inventory_items"`; corrected before merge — no deviation remains.)
 - `unitPriceCents` stays at its schema default (0) in every `poLines` insert from the approve side effect — price resolution is explicitly out of scope (Task 1.4's job), per the task brief; not silently rebuilt.
 - Restock proposal locale is `INITIAL_LOCALE` (`lib/i18n/types.ts`, `"he"`) rather than a per-user or per-clinic resolution — unlike the coordinator-reassign kind (tied to one stale coordinator's `preferredLocale`), a restock proposal is clinic-wide with no natural "the one user" to resolve a locale from; inventing a new per-clinic locale-preference mechanism was judged out of scope for this slice. Disclosed at the worker's header comment and here.
 - `edited` proposals (the terminal `"edited"` status, not an intermediate "approved-after-edit" step, per the existing 4-state status model) do NOT trigger the restock PO-insert side effect in this slice — only `"approved"` does. An edited-then-approved two-step flow does not exist in the current status model; building one was judged out of scope.
@@ -4645,8 +4645,6 @@ Reviewer returned 1 HIGH + 1 MEDIUM + 2 LOW on the committed sub-card; all four 
 - No `src/features/autopilot/cards/RestockPoCard.tsx` or any other UI file — deferred to the UI-shell slice.
 - No burn-rate projection (v1 simple-threshold rule only, as instructed).
 - No new `AuditActionType` or `MetricName` union members — the shared §1 `stageProposal`/`decide()` audit+metric calls already cover all 4 kinds generically; restock needed no kind-specific audit/metric surface.
-
-**Verdict:** VERIFIED.
 
 **Verdict:** VERIFIED.
 
@@ -4689,5 +4687,31 @@ Reviewer returned 1 HIGH + 1 MEDIUM + 2 LOW on the committed sub-card; all four 
 **Declined-with-rationale (logged to backlog, not defects):**
 - Finding 2 (extract `deriveProposedReplacement`'s tie-break into a helper shared with `resolveShiftCoordinator`): declined. The slice deliberately keeps `equipment-coordinator.service.ts` read-only (frozen-surface check, diff empty by design); the composer's `deriveProposedReplacement` re-expresses the resolver's branching into the proposal's own return shape without importing resolver internals. A shared helper would force a change to the read-only authority-resolution service and couple shadow-only autopilot to it — higher risk than the maintainability gain. Behavior is identical; documented in the function's own comment.
 - Finding 4 (extract the duplicated `buildPersistedRow` fixture into `tests/autopilot/fixtures.ts`): declined as a test-maintainability nit — no behavior or coverage change; not worth touching 3 test files beyond the landing scope.
+
+**Verdict:** VERIFIED.
+
+## 2026-07-27 — Task 1.1 §4 CodeRabbit fix wave (PR #136, retargeted to main) — branch feat/2.0-task-1.1-s4-restock-po
+
+**Claim:** Addressed the 16 CodeRabbit CHANGES_REQUESTED findings on #136 while landing the stack. Fixed every real defect on-branch; declined pure nits with rationale.
+
+**Real fixes (code):**
+- **Multi-tenancy (finding 9, the critical one):** `restock-po-approve-side-effect.ts` now validates every `draft.lines[].itemId` against `vt_items` filtered by `staged.clinicId` **inside the transaction**, throwing (→ rollback) before any `purchaseOrders`/`poLines` insert if a line references an item not owned by the proposal's clinic. Closes a cross-tenant PO-injection path on the human-editable `editedContent`.
+- **Batched insert (finding 8):** `poLines` now inserts in one `tx.insert(poLines).values([...])` round-trip instead of one insert per line.
+- **Positive-integer contract (finding 10):** `computeSuggestedQuantity` now `Math.max(1, Math.ceil(raw))` — a fractional suggestion would otherwise stage a proposal the approve side effect's `Number.isInteger` guard can never approve. New composer test covers fractional inputs.
+- **Worker resilience (findings 11/12/13):** per-clinic `try/catch` in `runRestockBurnScan` (one clinic's failure no longer aborts the rest, + new failure-path test); half-open Redis connections closed before the `setInterval` fallback; additive BullMQ `queue`/`worker` `"error"` listeners.
+- **Type narrowing (finding 6):** `InMemoryRestockBurnReader`'s candidate filter uses a type predicate, dropping the `as number` cast (the real Drizzle reader keeps its documented `isNotNull`-backed cast).
+- **Test robustness (finding 14):** `autopilot-restock-worker.test.ts` derives the expected `sourceSessionId` from `NOW` the same way the worker does — timezone-independent instead of a hardcoded date.
+- **Docs (findings 1/2/3/4):** removed a duplicate `**Verdict:** VERIFIED.` in the §4 entry; corrected the stale "citation label uses `vt_inventory_items`" deviation bullet (the code uses `vt_items`); the "exactly one PO in the real Drizzle transaction path" wording is InMemory/dispatch-backed in this slice (real-Drizzle atomicity is the `transitionAndRecord` single-`db.transaction` contract, not a DB-backed test here); and the earlier "scan-coordinator-reassign never registered / pre-existing gap" bullets are superseded — that job is now registered on main via #135.
+
+**Evidence (commands actually run this session, real output):**
+- `pnpm exec vitest run tests/autopilot/ tests/jobs/` → `Test Files 21 passed (21) · Tests 124 passed (124)`.
+- `npx tsc -p tsconfig.server.json --noEmit` → 0 errors.
+- New tests: cross-clinic itemId rejection (side-effect), fractional `computeSuggestedQuantity`, per-clinic failure isolation (worker).
+
+**Declined-with-rationale (nitpicks, logged to backlog):**
+- Finding 7 (narrow `isRestockPoDraftContent` to a validated-fields-only type): the predicate already validates exactly the fields the side effect consumes (`supplierName`, `lines[].{itemId,quantitySuggested}`); the unvalidated `RestockPoDraftContent` fields (`scanDate`/`title`/`suggestedQuantityLabel`) are display-only and never read in the PO insert. Behavior-neutral type-honesty nit.
+- Finding 15 (replace non-null assertions in `restock-burn-reader.test.ts` with a helper): test-only readability nit, no behavior/coverage change.
+- Finding 16 (rename a composer test case): pure test-naming nit.
+- Finding 5 (rewrite the §2 handover-sequencing rationale in `docs/plans/2.0/task-1.1-autopilot-shadow.md`): narrative about the §2 slice (#138) landed separately; not a #136 defect.
 
 **Verdict:** VERIFIED.

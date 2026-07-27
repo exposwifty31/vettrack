@@ -27,12 +27,25 @@ function buildStagedRow(overrides: Partial<ActionProposalRow> = {}): ActionPropo
   } as ActionProposalRow;
 }
 
-function buildFakeTx() {
+/**
+ * Fake transaction executor. `select().from().where()` resolves to the
+ * configured owned item rows (the tenancy guard's ownership probe); `insert()`
+ * accepts either a single value object or a batched array, flattening both into
+ * `insertedValues` so per-row assertions stay unchanged across the batch insert.
+ */
+function buildFakeTx(ownedItemIds: string[] = ["item-1", "item-2"]) {
   const insertedValues: { table: unknown; values: Record<string, unknown> }[] = [];
   const tx = {
+    select: () => ({
+      from: () => ({
+        where: () => Promise.resolve(ownedItemIds.map((id) => ({ id }))),
+      }),
+    }),
     insert: (table: unknown) => ({
-      values: (values: Record<string, unknown>) => {
-        insertedValues.push({ table, values });
+      values: (values: Record<string, unknown> | Record<string, unknown>[]) => {
+        for (const v of Array.isArray(values) ? values : [values]) {
+          insertedValues.push({ table, values: v });
+        }
         return Promise.resolve();
       },
     }),
@@ -119,5 +132,23 @@ describe("buildRestockPoApproveSideEffect", () => {
   it("throws when the staged row's draftContent does not match the expected RestockPoDraftContent shape", () => {
     const staged = buildStagedRow({ draftContent: { not: "a valid draft" } });
     expect(() => buildRestockPoApproveSideEffect(staged, APPROVER_USER_ID)).toThrow();
+  });
+
+  it("rejects (and inserts nothing) when a line references an itemId not owned by the proposal's clinic", async () => {
+    const staged = buildStagedRow({
+      draftContent: {
+        supplierName: "Autopilot",
+        lines: [
+          { itemId: "item-1", quantitySuggested: 5 },
+          { itemId: "item-foreign", quantitySuggested: 2 },
+        ],
+      },
+    });
+    const sideEffect = buildRestockPoApproveSideEffect(staged, APPROVER_USER_ID)!;
+    // Ownership probe returns only item-1 for this clinic → item-foreign is rejected.
+    const { tx, insertedValues } = buildFakeTx(["item-1"]);
+    await expect(sideEffect(tx)).rejects.toThrow(/item-foreign/);
+    // The guard runs before any insert, so nothing is written (tx would roll back regardless).
+    expect(insertedValues).toHaveLength(0);
   });
 });
