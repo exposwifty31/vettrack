@@ -33,6 +33,10 @@ import {
   SWEEP_ESCALATION_QUEUE_NAME,
 } from "../../workers/sweep-escalation.worker.js";
 import {
+  AUTOPILOT_COORDINATOR_REASSIGN_JOB_NAME,
+  AUTOPILOT_COORDINATOR_REASSIGN_QUEUE_NAME,
+} from "../../workers/autopilotCoordinatorReassignWorker.js";
+import {
   resolveBullmqJobName,
   type AnyJobDefinition,
   type JobDefinition,
@@ -57,6 +61,9 @@ export type StaleReturnedSweepJobPayload = Record<string, never>;
 
 export type SweepEscalationJobPayload = Record<string, never>;
 
+/** VetTrack 2.0, Task 1.1 §3 — `autopilotCoordinatorReassignWorker.ts`'s scan job. */
+export type CoordinatorReassignScanJobPayload = Record<string, never>;
+
 export type PayloadForStaticKind = {
   "check-plug": ChargeAlertJobPayload;
   "task-ownership-backfill": TaskOwnershipBackfillJobData;
@@ -66,6 +73,7 @@ export type PayloadForStaticKind = {
   "sweep-stale-checkouts": StaleCheckoutSweepJobPayload;
   "sweep-stale-returned": StaleReturnedSweepJobPayload;
   "sweep-room-escalation": SweepEscalationJobPayload;
+  "scan-coordinator-reassign": CoordinatorReassignScanJobPayload;
 };
 
 /** Producer uses per-add opts only (no queue defaultJobOptions); attempts follow BullMQ default (1). */
@@ -158,6 +166,24 @@ const sweepEscalationDefinition: JobDefinition<SweepEscalationJobPayload> = {
   removeOnFail: 100,
 };
 
+/**
+ * VetTrack 2.0, Task 1.1 §3 — registers `autopilotCoordinatorReassignWorker.ts`'s
+ * scan job for the E3 job-registry/enqueue-parity tripwire
+ * (`tests/jobs/job-registry-parity.test.ts`), mirroring
+ * `sweepEscalationDefinition`'s pattern for a standalone inline Queue/Worker file.
+ * The §4 restock-burn scan job is registered in its own slice (#136).
+ */
+const coordinatorReassignScanDefinition: JobDefinition<CoordinatorReassignScanJobPayload> = {
+  kind: AUTOPILOT_COORDINATOR_REASSIGN_JOB_NAME,
+  queue: AUTOPILOT_COORDINATOR_REASSIGN_QUEUE_NAME,
+  bullmqJobName: AUTOPILOT_COORDINATOR_REASSIGN_JOB_NAME,
+  workerConcurrency: 1,
+  attempts: 3,
+  backoff: { type: "exponential", delay: 2000 },
+  removeOnComplete: 50,
+  removeOnFail: 100,
+};
+
 export const staticJobDefinitions = [
   chargeAlertDefinition,
   taskOwnershipBackfillDefinition,
@@ -167,6 +193,7 @@ export const staticJobDefinitions = [
   staleCheckoutSweepDefinition,
   staleReturnedSweepDefinition,
   sweepEscalationDefinition,
+  coordinatorReassignScanDefinition,
 ] as const;
 
 /** Integration enqueue metadata (dynamic job.name, shard queue per clinic). */
