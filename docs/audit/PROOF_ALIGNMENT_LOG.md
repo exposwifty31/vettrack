@@ -4596,8 +4596,6 @@ Reviewer returned 1 HIGH + 1 MEDIUM + 2 LOW on the committed sub-card; all four 
 
 **Verdict:** VERIFIED.
 
-**Verdict:** VERIFIED.
-
 ## 2026-07-22 — Task 1.1 §3 fix wave (review NB-1/NB-2) — branch feat/2.0-task-1.1-s3-coordinator-reassign
 
 **Claim:** Fixed the HIGH review finding NB-1 (duplicate staged audit/metric emission on repeat scans) at the root cause (writer reports `created`, service gates emission) and corrected the NB-2 inaccurate reader comment; commit ef2d9100b.
@@ -4671,5 +4669,25 @@ Reviewer returned 1 HIGH + 1 MEDIUM + 2 LOW on the committed sub-card; all four 
 - GREEN: `buildRestockPoApproveSideEffect` gains `effectiveContent?` (editedContent on edit path, draftContent on approve); `editProposal` passes it; docstrings corrected. `pnpm exec vitest run tests/autopilot/ tests/jobs/` → `21 files, 119 passed`.
 - Typecheck: sorted server tsc output diff vs baseline → identical (TSC DELTA CLEAN).
 - Single-decision invariant unchanged: edited stays terminal; later approve still throws (asserted in the new test).
+
+**Verdict:** VERIFIED.
+
+## 2026-07-27 — Task 1.1 §3 CodeRabbit fix wave (PR #135, retargeted to main) — branch feat/2.0-task-1.1-s3-coordinator-reassign
+
+**Claim:** Addressed the 4 CodeRabbit CHANGES_REQUESTED findings on #135 while landing the stack: (1) removed a duplicate `**Verdict:** VERIFIED.` line in this log's §3 section; (3) added additive BullMQ `queue.on("error")` / `worker.on("error")` listeners in `autopilotCoordinatorReassignWorker.ts`. Findings (2) shared tie-break helper and (4) shared test fixture were declined with rationale (see below), logged to backlog.
+
+**Evidence (commands actually run this session, real output):**
+- `pnpm exec vitest run tests/autopilot/autopilot-coordinator-worker.test.ts` → `Test Files 1 passed (1) · Tests 3 passed (3)` (worker still green after adding error listeners).
+- `pnpm exec vitest run tests/autopilot/` → `Test Files 7 passed (7) · Tests 44 passed (44)` — no regressions.
+- `npx tsc -p tsconfig.server.json --noEmit --pretty false` filtered for `error TS` and the touched files → zero errors introduced.
+- Doc dedup: `PROOF_ALIGNMENT_LOG.md` §3 section had two consecutive identical `**Verdict:** VERIFIED.` lines (prev 4597 + 4599); one removed, one retained before the next section header.
+
+**Real regression fixed while landing on main (CI-gap surfaced by the first real Merge-gate run):** `tests/jobs/job-registry-parity.test.ts` failed on main because #135 enqueues `scan-coordinator-reassign` but its `staticJobDefinitions` entry had been deferred to the stacked #136 (per #135's own PR body). Since #135 lands first, the coordinator job's registration must live in #135. Added the coordinator-only registry entry to this slice: `coordinatorReassignScanDefinition` + `CoordinatorReassignScanJobPayload` + `PayloadForStaticKind`/`StaticJobKind` union members (`server/jobs/definitions/index.ts`, `server/jobs/registry.ts`), the `KNOWN_JOB_KINDS` exhaustiveness entry (`server/lib/job-latency.ts`), and the two diff-limited inline-snapshot updates (one line each: `scan-coordinator-reassign`). The §4 restock-burn registration stays in #136.
+- `pnpm exec vitest run tests/jobs/ tests/autopilot/` → `Test Files 17 passed (17) · Tests 86 passed (86)`.
+- `npx tsc -p tsconfig.server.json --noEmit` → 0 errors.
+
+**Declined-with-rationale (logged to backlog, not defects):**
+- Finding 2 (extract `deriveProposedReplacement`'s tie-break into a helper shared with `resolveShiftCoordinator`): declined. The slice deliberately keeps `equipment-coordinator.service.ts` read-only (frozen-surface check, diff empty by design); the composer's `deriveProposedReplacement` re-expresses the resolver's branching into the proposal's own return shape without importing resolver internals. A shared helper would force a change to the read-only authority-resolution service and couple shadow-only autopilot to it — higher risk than the maintainability gain. Behavior is identical; documented in the function's own comment.
+- Finding 4 (extract the duplicated `buildPersistedRow` fixture into `tests/autopilot/fixtures.ts`): declined as a test-maintainability nit — no behavior or coverage change; not worth touching 3 test files beyond the landing scope.
 
 **Verdict:** VERIFIED.
