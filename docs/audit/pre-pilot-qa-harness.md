@@ -65,17 +65,19 @@ are **owner-run Dashboard/DB/endpoint actions** — no product code (scope freez
 | C-3 | Test mode OFF on Production | **ON ⚠️** (corroborated: user `danerez5+clerk_test@gmail.com` — `+clerk_test` only works in test mode) | Owner toggles OFF (Configure → Instance Settings) after confirming nothing still needs `+clerk_test` identifiers — or explicitly accepts ON in the PROOF log |
 | C-4 | Client Trust stays **OFF** | **OFF ✅** — this is the **desired** state | **Countermand the Dashboard's "Recommended" badge and the audit agent's advice: do NOT enable.** `needs_client_trust` has zero in-app handling (IPHONE-5); enabling it breaks pilot/demo password login (RESUBMISSION_RUNBOOK §G). Cross-ref F-7 (watch-it-stays-off) |
 | C-5 | Native auth surface | `capacitor://localhost` in SSO allowlist ✅; Native API on; bundle `uk.vettrack.app` | Allowlist entry present. Supporting evidence for F-4 — does **not** replace the on-device JWT check |
-| C-6 | **Clerk ↔ app user parity** | **RESOLVED 2026-07-28 (owner-run):** `/me` returned the real clinic org (mismatch ruled out) → backfill executed on the correct org — **13 real staff visible in the app**, pilot doctor already `vet` | Remaining exit-bar step ONLY: a fresh join-code signup appears under Pending and can be approved (join code generated, test pending). **Gates J-0/J-1** |
+| C-6 | **Clerk ↔ app user parity** | **RESOLVED 2026-07-28 (owner-run):** `/me` returned the real clinic org (mismatch ruled out) → backfill executed on the correct org — **13 real staff visible in the app**, pilot doctor already `vet` | **EXIT BAR PASSED 2026-07-28:** after the Clerk-config fix (below), a fresh join-code signup ran clean — no org page → JoinClinicScreen → code → visible in Pending → account then self-deleted successfully (live 5.1.1(v) path proof). **C-6 CLOSED.** |
 | C-7 | Test org removed | **DONE 2026-07-28 (owner-run):** "My Organization" deleted from the Clerk Dashboard — the web `memberships[0]` auto-select hazard is eliminated at the source | — |
 
 ### C-6 diagnosis — why 15 Clerk users can be invisible, and how to fix it (owner, ~10 min)
 
 The app **never lists Clerk identities**. The admin list (`GET /api/users`,
 `server/routes/users.ts:235`) shows only `vt_users` rows `WHERE clinicId = <viewer's clinic> AND
-deletedAt IS NULL`. A `vt_users` row is born in exactly two places: the auth-middleware upsert on
+deletedAt IS NULL`. A `vt_users` row is born in three places: the auth-middleware upsert on
 the user's own authenticated request (`server/middleware/auth.ts:477` — `clinicId` = session org
 claim or DB fallback; `role = admin` iff email ∈ `ADMIN_EMAILS`,
-`server/lib/admin-email-allowlist.ts:5`, else `technician`/`pending`), or the admin backfill
+`server/lib/admin-email-allowlist.ts:5`, else `technician`/`pending`), the first-login sync
+path (`POST /api/users/sync`, `server/routes/users.ts:908-978` — inserts when no matching row
+exists), or the admin backfill
 endpoint `POST /api/users/backfill-clerk` (`server/routes/users.ts:1139` — pages the Clerk org
 membership list **for the admin's own clinic**, inserting missing members as
 `technician`/`active`). Clinic identity == Clerk org id (`ensureClinicExistsForOrg`,
@@ -121,6 +123,21 @@ C-6 diagnosis (read-only until the remedy step)
        first, or backfill is useless and can move your own row.
     3c FILTER/DELETED: check the Pending tab (status filter) and GET /api/users/deleted
        (server/routes/users.ts:212); decide restore vs purge per user.
+
+#### C-6 closure — what it actually was (2026-07-28, same day)
+
+The first exit-bar signup test FAILED and exposed the real root cause, proven from prod logs:
+Clerk Organizations was set membership-required with user org-creation allowed, so a fresh
+signup was FORCED through Clerk's create-organization page → the server minted a brand-new
+vt_clinics row for that junk org (`ensureClinicExistsForOrg`, auth.ts:242, which also seeds
+default rows — 4 vt_containers observed) → the user was JIT-provisioned pending under the junk
+clinic, invisible to the real clinic's admin, and `MISSING_CLINIC_ID` never fired so the
+join-code screen was bypassed entirely. Prod log signature: `[auth] Session org/clinic differs
+from DB; using DB clinic` with three distinct org ids in play. Delete-account also 500'd for
+that account (sole-admin-of-org lock — now unreachable for new signups; hardening tracked).
+Fix: Clerk Dashboard → membership optional + user org-creation OFF; junk Clerk user/orgs
+deleted; prod DB cleaned (zombie vt_users row + 2 junk clinics + their 4 seeded containers,
+audit-FK count was 0). Re-test: full pass incl. self-deletion.
 ```
 
 ## §2 — Layer 1: Automated regression gate (run first, Mode A / CI)
@@ -143,7 +160,7 @@ Catches "a pre-pilot fix regressed something." All are existing suites — run, 
 > relaxes the 100/min limiter at `server/middleware/rate-limiters.ts:27`). Plain `pnpm dev` bounces
 > every row past the cliff to `/signin`.
 
-> **[refined] Automated proof for pilot-path fixes.** Four PR-#126 regression tests run *inside*
+> **[refined] Automated proof for pilot-path fixes.** Five PR-#126 regression-test files (covering four J-rows) run *inside*
 > L1-2 (`pnpm test`) and are the automated proof for the Layer-2/3 rows that Mode B then confirms
 > on device:
 > - `tests/equipment-detail-tools-sheet-native.test.tsx` → **U-3 / IPHONE-2** (Print QR hidden on native)
@@ -269,6 +286,10 @@ need a browser + running app), L1-9 (staging E2E — needs live staging), and al
 
 ### Layer-0 baseline — Clerk Dashboard audit, 2026-07-28 (owner-run, computer-use agent) **[v2]**
 
+> **Historical pre-remediation snapshot (morning 2026-07-28).** C-3/C-6/C-7 rows below were
+> remediated later the same day — current state lives in the §1b table and the C-6 closure note.
+> Do not action rows from this snapshot.
+
 Read-only run of the v1 audit prompt (now committed, revised, as
 `docs/audit/clerk-dashboard-verify.prompt.md`); results as reported by the owner:
 
@@ -281,7 +302,7 @@ Read-only run of the v1 audit prompt (now committed, revised, as
 | Native | Native API ENABLED; bundle `uk.vettrack.app`; `capacitor://localhost` in SSO allowlist (C-5) |
 | Session | custom claim `org_id: {{org.id}}` (org_3CPrzr…) — web sessions bind clinic = Clerk org id |
 | Domain | `vettrack.uk` verified, SSL issued |
-| Users | **15 total in Clerk — 0 visible in the app ⚠️** (C-6, open at time of writing); MAU 3 consistent with only the July sign-ins in-window |
+| Users | **15 total in Clerk — 0 visible in the app ⚠️** (C-6 — pre-remediation reading; CLOSED same day, see C-6 row + closure note); MAU 3 consistent with only the July sign-ins in-window |
 
 The audit agent's recommendation to enable Client Trust was **rejected** (C-4/F-7: unhandled
 `needs_client_trust` would break pilot/demo password login). All C-row remediations are owner-run

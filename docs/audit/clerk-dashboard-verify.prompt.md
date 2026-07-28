@@ -43,6 +43,8 @@ BASELINE (2026-07-28 audit — compare against this, flag drift)
 - Clerk users: 15.
 
 TASKS — for each, record the value, the exact Dashboard location (breadcrumb), and a screenshot.
+PII RULE (applies to every task): committed evidence carries COUNTS and redacted summaries only —
+never a full user list; redact names, emails, and unrelated account data in every screenshot.
 
 1. PLAN & USAGE (harness C-1)
    - Billing/plan area: plan tier, current MAU vs limit, any add-ons (especially "B2B
@@ -73,8 +75,9 @@ TASKS — for each, record the value, the exact Dashboard location (breadcrumb),
      ionic://localhost if present) in the allowlist; record bundle ID. Flag any removal.
 
 6. APP-PARITY CHECK (harness C-6) — the Clerk↔app cross-check
-   - In Users, record the total Clerk user count (a number and the visible names/emails list is
-     enough; do NOT open individual user profiles or export anything).
+   - In Users, record the total Clerk user count ONLY (a number — do not copy the names/emails
+     list, open individual user profiles, or export anything; redact any names/emails if a
+     screenshot is taken).
    - Then open https://vettrack.uk in the same browser. If an authenticated admin session already
      exists, navigate to the admin users area (Admin → Users, including the Pending tab) and
      record the visible user count per tab. If no session exists, record "app side: needs manual
@@ -96,7 +99,7 @@ where a value couldn't be read safely. Row IDs map 1:1 onto harness Layer 0.
 - C-5 capacitor://localhost in allowlist: yes/no; bundle ID: …
 - C-6 Clerk users: N — app users visible: N (per tab) — delta: …
 - C-7 "My Organization" still present: yes/no
-- Screenshots captured: [list of what each shows]
+- Screenshots captured: [list of what each shows] (all PII redacted)
 
 ## Flags (drift vs baseline / expected states)
 …
