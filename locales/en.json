@@ -4094,6 +4094,34 @@
     "backToSignIn": "Back to sign in",
     "lastUpdatedLabel": "Last updated"
   },
+  "accountDeletionPage": {
+    "title": "Account & data deletion",
+    "pageTitle": "Account & Data Deletion — VetTrack",
+    "metaDescription": "How to delete your VetTrack account and the data associated with it, from inside the app or by request.",
+    "lastUpdatedDate": "2026-07-28",
+    "sections": {
+      "overview": {
+        "title": "Overview",
+        "body": "VetTrack lets you permanently delete your account and the personal data associated with it. Deletion is available directly inside the app, and by request if you can no longer sign in. This page describes both paths and exactly what happens to your data."
+      },
+      "inApp": {
+        "title": "Delete from inside the app",
+        "body": "Sign in to the VetTrack app, then go to: Settings → Danger zone → Delete account. After you confirm, deletion takes effect immediately: you are signed out everywhere and your account cannot be recovered. Demo or review accounts may be protected from self-deletion."
+      },
+      "byRequest": {
+        "title": "Request deletion without the app",
+        "body": "If you can no longer access the app, you can request deletion of your account and data through our support page at https://vettrack.uk/support. We will verify that the request comes from the account owner and then process the deletion."
+      },
+      "whatHappens": {
+        "title": "What is deleted and what is retained",
+        "body": "Deletion permanently removes or anonymizes the personal data linked to your account — your name, email address, veterinary license number, and profile photo — and revokes Sign in with Apple tokens when linked. Clinic operational records (for example equipment scan history and audit entries) are retained in de-identified form, as required for the clinic's operational integrity and record-keeping obligations; they no longer identify you."
+      },
+      "subscriptions": {
+        "title": "App Store subscriptions",
+        "body": "Deleting your VetTrack account does not automatically cancel an App Store subscription — manage billing in your Apple ID settings."
+      }
+    }
+  },
   "privacyPage": {
     "title": "Privacy Policy",
     "pageTitle": "Privacy Policy — VetTrack",

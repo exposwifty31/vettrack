@@ -1213,6 +1213,8 @@ const translations = {
 
   legalPage: d.legalPage,
 
+  accountDeletionPage: d.accountDeletionPage,
+
   privacyPage: d.privacyPage,
 
   termsPage: d.termsPage,
