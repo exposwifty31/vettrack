@@ -110,8 +110,15 @@ C-6 diagnosis (read-only until the remedy step)
        inserts the 13 org members under the admin's clinic as technician/active. Then set real
        roles by hand (pilot doctor → vet). The ~2 non-org Clerk users appear on their next
        sign-in via the auth upsert (pending, unless allowlisted).
-       ⚠ Running backfill while the admin sits on the wrong clinic imports all 13 into the
-       WRONG clinic — this is why 3a precedes 3b.
+       ⚠ backfill READS AND WRITES THE SAME ORG (verified users.ts:1142/1155/1199): clinicId
+       = req.clinicId (the admin's ACTIVE org) is used both to list Clerk org members AND as
+       the inserted clinicId. Running it while sitting on "My Organization" does NOT scatter
+       the 13 into the wrong clinic — it scans only that org's members (≈ just you) and
+       inserts ≈0 ("inserted": 0 looks like a broken endpoint). Worse: the upsert conflict
+       target is users.clerkId ALONE (:1208, set clinicId = clinicId), so scanning yourself
+       from the wrong org can RELOCATE your own vt_users row into the empty clinic and break
+       the DB-fallback auth path too. This is why 3a precedes 3b: be on the real clinic org
+       first, or backfill is useless and can move your own row.
     3c FILTER/DELETED: check the Pending tab (status filter) and GET /api/users/deleted
        (server/routes/users.ts:212); decide restore vs purge per user.
 ```
