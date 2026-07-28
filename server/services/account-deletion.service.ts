@@ -15,8 +15,9 @@
  * deletion, so they are logged and the flow continues.
  */
 import { clerkClient } from "@clerk/express";
+import { inArray } from "drizzle-orm";
 import { and, eq } from "drizzle-orm";
-import { db, users, appleOauthTokens } from "../db.js";
+import { clinics, db, users, appleOauthTokens } from "../db.js";
 import { decryptConfigValue } from "../lib/config-crypto.js";
 import { isAppleRevocationConfigured, revokeAppleToken } from "../lib/apple-auth.js";
 import { logAudit } from "../lib/audit.js";
@@ -137,6 +138,82 @@ async function eraseUserData(clinicId: string, userId: string, actorId: string):
   }
 }
 
+/** Self-deletion would orphan a REAL clinic the user solely occupies. */
+export class SoleClinicAdminError extends Error {
+  constructor() {
+    super("SOLE_CLINIC_ADMIN");
+    this.name = "SoleClinicAdminError";
+  }
+}
+
+export interface OrgMembershipLite {
+  orgId: string;
+  membersCount: number;
+}
+
+/**
+ * Pure planner for pre-deletion Clerk-org hygiene: junk orgs (no vt_clinics
+ * row) the user solely occupies are deletable; being the SOLE member of a
+ * REAL clinic org blocks self-deletion instead of orphaning the clinic.
+ * Multi-member orgs are never touched.
+ */
+export function planClerkOrgCleanup(
+  memberships: OrgMembershipLite[],
+  knownClinicIds: Set<string>,
+): { deletableOrgIds: string[]; blockingClinicOrgIds: string[] } {
+  const deletableOrgIds: string[] = [];
+  const blockingClinicOrgIds: string[] = [];
+  for (const m of memberships) {
+    if (m.membersCount !== 1) continue;
+    if (knownClinicIds.has(m.orgId)) blockingClinicOrgIds.push(m.orgId);
+    else deletableOrgIds.push(m.orgId);
+  }
+  return { deletableOrgIds, blockingClinicOrgIds };
+}
+
+/**
+ * Pre-delete Clerk-org sweep. Non-fatal except for the sole-real-clinic-admin
+ * block, which throws BEFORE any DB mutation so the route can 409 cleanly.
+ * Skipped entirely in dev-bypass / unconfigured Clerk (same guards as
+ * deleteClerkUser).
+ */
+async function cleanupClerkOrgsBeforeDeletion(clerkId: string): Promise<void> {
+  if (!process.env.CLERK_SECRET_KEY?.trim()) return;
+  if (!clerkId.trim() || clerkId.startsWith("dev-")) return;
+  let memberships: OrgMembershipLite[] = [];
+  try {
+    const page = await clerkClient.users.getOrganizationMembershipList({ userId: clerkId, limit: 50 });
+    memberships = (page.data ?? []).map((m) => ({
+      orgId: m.organization?.id ?? "",
+      membersCount: m.organization?.membersCount ?? 0,
+    })).filter((m) => m.orgId);
+  } catch (err) {
+    // Non-fatal: without the list we simply skip hygiene (deleteClerkUser is
+    // itself non-fatal on failure).
+    console.error("[account-deletion] org membership list failed (non-fatal)", {
+      err: err instanceof Error ? err.message : err,
+    });
+    return;
+  }
+  if (memberships.length === 0) return;
+  const ids = memberships.map((m) => m.orgId);
+  const known = await db.select({ id: clinics.id }).from(clinics).where(inArray(clinics.id, ids));
+  const plan = planClerkOrgCleanup(memberships, new Set(known.map((k) => k.id)));
+  if (plan.blockingClinicOrgIds.length > 0) {
+    throw new SoleClinicAdminError();
+  }
+  for (const orgId of plan.deletableOrgIds) {
+    try {
+      await clerkClient.organizations.deleteOrganization(orgId);
+    } catch (err) {
+      console.error("[account-deletion] junk-org deletion failed (non-fatal)", {
+        orgId,
+        err: err instanceof Error ? err.message : err,
+      });
+    }
+  }
+}
+
 /** Delete the Clerk user. Skipped in dev-bypass / when Clerk is not configured. */
 async function deleteClerkUser(clerkId: string): Promise<boolean> {
   if (!process.env.CLERK_SECRET_KEY?.trim()) return false;
@@ -159,6 +236,10 @@ export async function deleteOwnAccount(user: AuthUser): Promise<AccountDeletionR
   if (isAccountDeletionProtected(user.email)) {
     throw new AccountDeletionProtectedError();
   }
+
+  // Runs BEFORE any DB mutation: a sole-real-clinic-admin block must leave the
+  // account fully intact (route maps it to 409 SOLE_CLINIC_ADMIN).
+  await cleanupClerkOrgsBeforeDeletion(user.clerkId);
 
   const appleRevocation = await revokeStoredAppleToken(user.clinicId, user.id);
   const dbOutcome = await eraseUserData(user.clinicId, user.id, user.id);

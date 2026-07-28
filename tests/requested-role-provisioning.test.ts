@@ -188,6 +188,10 @@ describe("resolveAuthUser — requested-role capture (secure separation)", () =>
   }
 
   function queueClinicThenUser(userRow: Record<string, unknown>): void {
+    // C-6 hardening (jit-clinic-policy): two guard SELECTs run first — model a
+    // KNOWN clinic so provisioning semantics stay on the original path.
+    dbResolves.push([{ id: "clinic-1" }]); // guard: clinic-exists
+    dbResolves.push([]); // guard: preexisting user (none)
     dbResolves.push(undefined); // ensureClinicExistsForOrg insert
     dbResolves.push([userRow]); // user upsert .returning()
   }

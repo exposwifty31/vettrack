@@ -200,8 +200,15 @@ describe("resolveAuthUser — ADMIN_EMAILS promotion runtime", () => {
   }
 
   function queueClinicAndUserReturning(userRow: Record<string, unknown>): void {
-    dbResolves.push(undefined);
-    dbResolves.push([userRow]);
+    // C-6 hardening (jit-clinic-policy): resolveAuthUser now runs two SELECTs
+    // before the mint/insert — clinic-exists and preexisting-user-by-clerkId.
+    // Model a KNOWN clinic ("proceed") so these lifecycle scenarios keep their
+    // original semantics; the guard's own matrix lives in
+    // tests/jit-clinic-policy.test.ts.
+    dbResolves.push([{ id: "clinic-prod-1" }]); // guard: clinic-exists
+    dbResolves.push([]); // guard: preexisting user (none — insert path)
+    dbResolves.push(undefined); // ensureClinicExistsForOrg insert
+    dbResolves.push([userRow]); // user upsert .returning()
   }
 
   it("insert-time promotion assigns admin role for allowlisted email on first upsert", async () => {
