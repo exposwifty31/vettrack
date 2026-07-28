@@ -5024,6 +5024,19 @@ tracker) and describe the state at authoring time.
   Task 0.5 gate — a real clinic-month backtest with precision/recall/threshold evidence — **remains
   outstanding** and must be run before Task 2.5 sets any `enforce` threshold. The autopilot-backtest doc and
   script were updated in this same landing to state that all four signal streams are synthetic.
+- **Round-2 CodeRabbit #141 hardening (commit `c5e5ceb`):** two design-doc accuracy/safety follow-ups
+  landed on this branch after the first re-review. (1) `docs/design/autopilot-policy-layer.md` §4 revoke
+  note strengthened to require the implementing (Task 2.5(a)) execution path make the **final revoke gate
+  bypass the TTL cache** — an uncached current-version policy read, not the cached `effectiveMode` (which
+  can hold a stale `approved` for the ≤10s window) — **atomically coupled** to the irreversible write
+  (same-transaction / conditional-write-on-current-version, or a transactional-outbox / state-transition
+  for external side effects); the ≤10s TTL stays acceptable for *raising* the floor but not for revoke.
+  §3 also carries a review-flagged note requiring target-clinic authorization (never trust a
+  request-supplied `clinicId`). Both are captured as implementation gates on a not-yet-built route, not
+  changes to landed code. (2) `docs/design/case-spine-allowlist.md`: reconciled the completed checklist
+  with the two documented non-event-table allowlist rows (current-state `vt_rooms`, intrinsic `vt_cases`
+  status) and defined the unresolved-PMS identity-strip rendering (explicit pending badge for a null
+  `patientExternalId`; never a substituted/inferred identity). Docs-only; no compiled code touched.
 
 ---
 
