@@ -1320,11 +1320,17 @@ the pilot→public distribution program (its Phase 3)** — was Task 1.3 in `doc
 OPEN dependency, carried by the same program as its H5 physical-device gate (the roadmap's own checkbox
 is ticked but the on-device haptics/edge-to-edge check on real hardware is explicitly still open) — the
 ship cannot proceed past this gate. Research basis: 2026 Play Console requirements re-verified
-2026-07-28 against Google's primary docs (targetSdk 36 compliant; personal-post-2023 account → 12
-opted-in testers × 14 continuous days of closed testing before production access). Involves real manual
-steps (keystore generation, listing, forms) that aren't code tasks — the bite-sized breakdown lives in
-the distribution program's Phase-3 checklist (superseding the previously planned
-`docs/plans/2.0/task-1.3-android-ship.md`), adapting the same checklist structure as
+2026-07-28 against Google's primary docs, with the exact predicates: personal developer accounts
+**created after 2023-11-13** require 12 opted-in testers × 14 continuous days of closed testing before
+production access ([Play Console Help](https://support.google.com/googleplay/android-developer/answer/14151465))
+— this account matches that predicate (personal, created post-2023-11-13); and new apps must **target
+API 36 from 2026-08-31** ([Play target-API policy](https://support.google.com/googleplay/android-developer/answer/11926878))
+— the repo already sets targetSdk 36, so eligibility holds for any submission date this year. Involves
+real manual steps (keystore generation, listing, forms) that aren't code tasks — the bite-sized
+breakdown lives in the distribution program's Phase-3 checklist, summarized in-repo in
+`docs/vettrack-2.0-roadmap.md` under "Task 1.3 — Ship the Android app (Google Play) · TRANSFERRED"
+(which lists the full gate set), superseding the previously planned
+`docs/plans/2.0/task-1.3-android-ship.md` and adapting the same checklist structure as
 `docs/mobile/native-ship-checklist.md` (the real, locked iOS gate). Terminal criterion unchanged: the
 app live on Play (internal track → production, per the owner's terminal-state directive).
 

@@ -5410,4 +5410,5 @@ no-native-shell-build-path-changes guardrail while a review is open.
   transfer-note mentions; grep for `/19`, `canonical 19`, `expected 19`, `stays 19` over roadmap +
   script → zero hits.
 
-**Verdict:** VERIFIED.
+**Verdict:** VERIFIED (scope: the 18-task tracker contract + the transfer wiring itself — not a claim
+that untracked future items, e.g. the FCM push path, are covered by 18/18).

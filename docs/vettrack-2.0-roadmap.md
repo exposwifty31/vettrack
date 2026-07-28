@@ -58,7 +58,7 @@ Stop hook prints the shipped count at every session end.
 - [x] 0.4 Per-org policy layer design
 - [x] 0.5 Operations-memory backtest (synthetic harness — owner-approved deviation, real data unreachable)
 - [ ] 0.6 Pricing-model decision
-- [x] 0.7 Native shell & plugin hygiene (haptics dev-diagnostic + dead-code removed + docs law; on-device physical confirmation transferred to the distribution program — its Phase-3 H5 physical-device gate)
+- [x] 0.7 Native shell & plugin hygiene (box covers the accepted CODE-LAYER scope only: haptics dev-diagnostic + dead-code removed + docs law; the on-device physical confirmation is explicitly carved OUT of 0.7's acceptance and owned by the distribution program's Phase-3 H5 physical-device gate — still open there)
 - [x] 1.1 Shift Autopilot — shadow mode
 - [ ] 1.2 The Case Spine
 - [ ] 1.4 Consumable-usage capture (reconnect dispense → patient → billing)
@@ -92,7 +92,8 @@ The tracker above now counts **18** tasks; `scripts/vettrack-2.0-scope-gate.sh` 
 commit (its canonical-ID contract requires lockstep edits). Task 0.7's open on-device residual rides
 the same program (its Phase-3 H5 physical-device gate). The Android **FCM push path stays 2.0-side** —
 deliberately not part of the store ship (the native iOS app ships without push today, and the store
-privacy answers say exactly that); it becomes a future 2.0 task when prioritized. **2.0 execution
+privacy answers say exactly that); it is UNTRACKED today — outside the 18/18 completion contract —
+and becomes a real tracker row (+ lockstep scope-gate update) only if the owner prioritizes it. **2.0 execution
 freeze (owner-resolved 2026-07-28):** 2.0 build work stays frozen while the distribution program is in
 flight and resumes — next task: **1.2 The Case Spine** — once BOTH store submissions are in review,
 under one guardrail: no changes on native-shell build paths while a store review is open.
@@ -278,8 +279,10 @@ current versions, and branch-side PROOF_ALIGNMENT_LOG entries append to main's l
   build only via `scripts/build-native-shell.sh` → verify on REAL device (Simulator has no Taptic Engine).
 - **Verify:** On-device checklist green both platforms (visual/physical evidence per methodology #2);
   typecheck 0; no orphan adapter left half-wired.
-- **Done when:** Reviewed; tracker flips. **Gates the Android ship (distribution-program Phase 3,
-  ex-Task 1.3); should precede Phase-1 surfaces.**
+- **Done when:** Reviewed; tracker flips on the code-layer scope (accepted 2026-07-28; the on-device
+  checklist above is the carved-out residual — it lives on as the distribution program's H5 device
+  gate, which the Android ship must still pass). **Gates the Android ship (distribution-program
+  Phase 3, ex-Task 1.3); should precede Phase-1 surfaces.**
 
 ---
 
@@ -334,7 +337,10 @@ current versions, and branch-side PROOF_ALIGNMENT_LOG entries append to main's l
 > scope on transfer: adaptive icon + splash, Clerk OAuth redirect / deep-link verification on Android,
 > and the full system-back audit (sheets, scanner, Code Blue). Deliberately NOT transferred: the FCM
 > push path — not a store requirement (the native iOS app ships without push, and the store privacy
-> answers say so); it stays a future 2.0 capability. Terminal state unchanged and still binding:
+> answers say so); it stays a future 2.0 capability **outside the tracked 18-task completion scope** —
+> `18/18` asserts the tracker rows only, and if FCM is ever prioritized it enters as a NEW tracker row
+> (with a lockstep `CANONICAL_IDS` update in the scope gate), never silently. Terminal state unchanged
+> and still binding:
 > **live on Play in production** (`docs/plans/master-plan-2026-07.md`'s Terminal State). Capacitor
 > remains the vehicle for this ship (Platform research addendum §1 — the bare-RN decision applies
 > post-ship, master-plan Layers 4–5).
