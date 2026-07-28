@@ -5229,3 +5229,17 @@ unrelated to this change).
 **Landed alongside:** PR #144 (allowlist cherry-pick `b2b4eeb7c` — was stranded on a stale local branch), PR #145 (pre-pilot QA harness v2 + census prompt + code-verified C-6 3b correction).
 
 **Verdict:** VERIFIED (audit evidence); execution continues per the approved distribution plan (Phases 0–4).
+
+## 2026-07-28 — C-6 identity-parity incident: root cause, fix, closure (same-day)
+
+**Claim:** C-6 (15 Clerk users / 0 in app) fully closed; a second, deeper defect found and fixed via the exit-bar test.
+
+**Evidence:**
+- Backfill (owner-run, on the correct org after `/me` confirmed it): 13 real staff visible in Admin → Users; pilot doctor already `vet`. "My Organization" deleted (C-7).
+- **Exit-bar signup test #1 FAILED and exposed the real root cause.** Clerk Organizations was membership-required + user-org-creation ON → fresh signup forced through Clerk's create-org page → `ensureClinicExistsForOrg` (auth.ts:242) minted a junk vt_clinics row (+ seeded 4 vt_containers) → user JIT-provisioned pending under the junk clinic, invisible to the real admin; join-code screen bypassed (no MISSING_CLINIC_ID). Prod log proof: `[auth] Session org/clinic differs from DB; using DB clinic` with sessionOrg `org_3H7fTaylZ…`, dbClinic `org_3E4KjESPmR…`, real clinic `org_3CPrzrlC…`; then 403 ACCOUNT_PENDING_APPROVAL under the junk clinic. Delete-account 500'd for that account (sole-org-admin class).
+- **Fix (owner, Clerk Dashboard):** Membership optional + "allow user-created organizations" OFF (both saved, verified in dashboard).
+- **Cleanup:** Clerk user + both junk orgs verified absent (dashboard search); prod DB via railway/psql — zombie vt_users `4b3da2d1-…` deleted (RETURNING confirmed), 4 seeded vt_containers rows deleted, both junk vt_clinics deleted (`remaining-clinics: 0`; vt_audit_logs count for both ids was 0 → no append-only conflict).
+- **Exit-bar signup test #2 PASSED end-to-end:** no org page → JoinClinicScreen → code → visible in Pending → **account self-deleted successfully** — a live prod proof of the Guideline 5.1.1(v) deletion path for a fresh pending account (post-#116 behavior).
+- Hardening tracked (not yet done): delete-account sole-org-admin handling + server-side guard on JIT clinic-minting from unknown session orgs.
+
+**Verdict:** VERIFIED (C-6 + C-7 closed with prod evidence; harness updated on PR #145).
