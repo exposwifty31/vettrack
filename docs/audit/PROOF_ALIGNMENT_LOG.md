@@ -5106,3 +5106,59 @@ tracker) and describe the state at authoring time.
 - Scope gate: `scripts/vettrack-2.0-scope-gate.sh` → expected `5/18 shipped` after this commit (verified below).
 
 **Verdict:** VERIFIED
+
+## 2026-07-28 — Task 1.1 Autopilot: program close-out (stack + Phase-0 docs landed & deployed)
+
+**Claim:** The full Task 1.1 Autopilot deliverable — the 6-PR shadow-only code stack **and** the Task 0.1–0.5
+Phase-0 artifacts — is landed on `main` and live in production. This entry is the close-out record; the
+per-slice and per-artifact entries above (and the 2026-07-28 landing entry) carry the primary evidence.
+
+**Code stack (merged bottom-up, each retargeted to `main` so the real Merge-gate CI ran for the first time):**
+- `#134` (s1 shared-infra) → merge `2ee110a`
+- `#135` (s3 coordinator-reassign) → merge `539187e`. Two genuine issues fixed on-branch before merge: the
+  **job-registry-parity regression** (`scan-coordinator-reassign` registration had been deferred to #136;
+  moved into #135 — commit `9de2e04`, the CI-gap materializing) and CodeRabbit findings (`52156ef`).
+- `#136` (s4 restock-PO) → merge `abc3dd8`. CodeRabbit's **real multi-tenancy defect** fixed on-branch
+  (`b67d54c`): the restock-PO approve side effect inserted `poLines` without validating each `itemId`
+  belongs to `staged.clinicId` — now validated inside the transaction, with a cross-clinic rejection test.
+- `#137` (s5 crash-cart-drift) → merge `47f587d`
+- `#138` (s2 handover-draft) → merge `16ab69f`
+- `#139` (s6 queue-ui) → merge `1789435`
+
+All six production Railway deploys went green (`checks.db==ok`); migration 179 (`vt_action_proposal` /
+`vt_action_proposal_decision`, additive) applied on prod; the feature is **shadow-only** (no `enforce`).
+
+**Phase-0 artifacts (Tasks 0.1–0.5):** landed via clean cherry-pick onto current `main` (PR `#141`, merge
+`c3d7814`) rather than merging the stale `claude/task-1.1-autopilot-shadow` branch — that branch forked
+from an old base and would have conflicted on / reverted newer `main` content and dragged in unrelated
+`.claude/skills/*`, a 10x plan library, and ~54 doc deletions (rationale in the 2026-07-28 landing entry).
+Six files: `case-spine-allowlist.md` (0.1), `case-spine-spike-findings.md` (0.2), `autopilot-spike-findings.md`
+(0.3), `autopilot-policy-layer.md` (0.4), `autopilot-backtest.md` + `scripts/analysis/autopilot-backtest.ts`
+(0.5). Roadmap and scope-gate deliberately untouched (`7/19 shipped` unchanged).
+
+**CodeRabbit on #141:** both review rounds fully addressed; every thread replied-to and resolved. Round 2
+added four accuracy/safety fixes — the honest `pnpm test` evidence (5839 passed / 20 failed, all 16 failing
+files DB-`ECONNREFUSED :5432`, no logic failures, no compiled code touched), the case-spine checklist
+reconciliation, the unresolved-PMS identity-strip rule, and the §4 revoke-gate TTL-cache-bypass hardening.
+
+**Evidence (close-out):**
+- `git log origin/main` shows the seven merges above in order; `main` HEAD = `c3d7814`.
+- Merge-gate CI green on the final PR HEAD `6f195e8` (Typecheck, Tests ×4 shards, Integration ops, Frontend
+  build, Architecture gates, Playwright ×2 all `success`).
+- Main-branch deploy run for `c3d7814` (CI — VetTrack #579) concluded `success` with **0/10 failed jobs** —
+  the Railway prod deploy (health-gated on `/api/health` `checks.db==ok`) is green.
+
+**Deferred backlog (NOT done — for the owner to pick up):**
+- **Step B — Task 0.7 haptics dead-code cleanup:** `HapticsAdapter` is still present on `main`; the removal
+  applies cleanly and is ready as its own small PR. Deliberately not opened this session (avoid another
+  code CI/deploy cycle for tangential dead-code removal).
+- Roadmap §0(c) cutover-slice field-parity (`observedSignals`/`patientWorklist`, window metadata, UI-live
+  gate, `auto_published_on_timeout` label), §2 open-item humanization, stored-summary viewer-locale
+  re-localization, structured edit dialogs for the 3 non-restock kinds, review findings NB-3/NB-4, and the
+  CodeRabbit nits declined this session (7/15/16 test-quality; §2 plan-doc rationale; the backtest
+  `computeMetrics` unit-test suite — deferred to the real-data Task 0.5 gate).
+- The **real-data Task 0.5 backtest** remains outstanding: the landed harness + synthetic run is a
+  smoke-test only (owner-approved deviation); a real clinic-month backtest with precision/recall evidence
+  must run before Task 2.5 sets any `enforce` threshold.
+
+**Verdict:** VERIFIED (close-out — stack + Phase-0 docs landed on `main` and deployed green).
