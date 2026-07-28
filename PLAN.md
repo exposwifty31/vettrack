@@ -14,13 +14,19 @@
 | **Feature / Sprint** | Consolidated Audit × 10x |
 | **Author** | VetTrack Team |
 | **Created** | 2026-07-12 |
-| **Last updated** | 2026-07-12 |
-| **Status** | `in-progress` — Phase 0 |
+| **Last updated** | 2026-07-28 |
+| **Status** | `phase-0A complete` — see status banner below |
 | **Branch** | `claude/audit-10x-consolidated-plan` (off `main`) |
 | **Tasks** | See TASKS.md |
 | **Plan library** | `docs/plans/consolidated-audit-10x/README.md` |
 
 ---
+
+> **2026-07-28 status banner:** Phase 0A (T-05, T-01…T-04) COMPLETED 2026-07-12 — proof-logged
+> (PROOF_ALIGNMENT_LOG "2026-07-12 — Consolidated Audit × 10x" entries; fixes re-verified in-code
+> 2026-07-28: `src/hooks/use-sync.tsx:170` passes QueryClient, `src/pages/code-blue.tsx:328` dedicated
+> Cancel path). The ACTIVE program is the 2.0 roadmap (`docs/vettrack-2.0-roadmap.md`, 7/19 shipped)
+> plus the pilot→distribution track. "Current focus: Phase 0" below is historical reference.
 
 ## Problem
 
@@ -67,7 +73,7 @@ Agents execute **plan cards**, not free-form interpretations of this file. Card 
 - WebSockets or polling as a realtime transport (SSE is frozen)
 - Offline queueing of Code Blue / emergency mutations
 - Appointment → task renames of internal surfaces (only copy changed)
-- Any work in the Expo/RN mobile repo (`exposwifty31/literate-dollop`) — separate repo
+- Any work in the external RN mobile repo (separate private repo; `literate-dollop` retired/deleted — verified 2026-07-28)
 - Phase 4 parked items until entry conditions clear: **massive-03** (clinic network), **medium-04** (copilot/voice)
 - Starting Phase 1+ before Phase 0 exit drill (T-16) passes
 

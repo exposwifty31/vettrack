@@ -89,7 +89,7 @@ VetTrack is a veterinary hospital operations platform: equipment tracking & cust
 
 **Stack:** React 18 + Vite frontend (port 5000) · Express + TypeScript backend (port 3001) · PostgreSQL + Drizzle ORM · BullMQ + Redis · Clerk auth · SSE realtime (+ additive Socket.io collab channel) · PWA / offline-first · Capacitor 8 native shell (iOS/Android, live on the App Store) · Sentry · Railway deploy
 
-**Active program:** `docs/design/program-plan.md` is the forward-looking program — per-role UX, the web app as a management console, and the Command Center board as a fourth `"board"` platform target — with `docs/design/{plan-validation-register,platform-strategy-research}.md` as its cited research base. Parts have since landed (the `"board"` target, `src/features/command-board`, the web console pages); treat the doc as direction and verify against the code for current state. A separate Expo/React Native migration is underway in the companion repo (`literate-dollop`), which consumes `packages/contracts` — bumps to `@vettrack/contracts` may need a cross-repo companion PR.
+**Active program:** `docs/design/program-plan.md` is the forward-looking program — per-role UX, the web app as a management console, and the Command Center board as a fourth `"board"` platform target — with `docs/design/{plan-validation-register,platform-strategy-research}.md` as its cited research base. Parts have since landed (the `"board"` target, `src/features/command-board`, the web console pages); treat the doc as direction and verify against the code for current state. The mobile-native successor is a bare React Native CLI migration in a separate private repo (owner decision 2026-07-22; the old Expo companion `literate-dollop` is retired and no longer exists — verified against the owner's repo list 2026-07-28). `packages/contracts` (`@vettrack/contracts`) remains the framework-free shared layer; contract bumps may need a companion PR in that successor repo.
 
 ### Directory layout
 
@@ -132,7 +132,7 @@ lib/              i18n utilities shared by frontend and backend (typed `t`, pari
 locales/          Translation files: en.json, he.json (Hebrew is default; user-facing copy says "Tasks")
 shared/           Constants + types shared between frontend and backend
 packages/         pnpm workspace packages:
-  contracts/      @vettrack/contracts — shared contract types (emergency, pending-sync); also consumed by the Expo companion repo (literate-dollop)
+  contracts/      @vettrack/contracts — shared contract types (emergency, pending-sync); also consumed by the external RN mobile repo (successor to the retired literate-dollop)
   rfid-controller/ Vendor-agnostic RFID signing middleware core (ADR-005/006) — emits signed batches to POST /api/rfid/events; no runtime deps, own vitest config
 migrations/       SQL files run in order via pnpm db:migrate (also applied at server startup)
 tests/            All vitest tests; some groups are excluded by default (see below). Phase 9 drills: deterministic counter contracts (`tests/phase-9-deterministic-drills.test.ts`) + Playwright browser harness (`tests/phase-9-drills.spec.ts`)

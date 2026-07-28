@@ -5209,3 +5209,23 @@ tests — is removed. No production consumer existed.
 
 **Verdict:** VERIFIED (both parts; the only test failures are the pre-existing DB-unavailable baseline,
 unrelated to this change).
+
+## 2026-07-28 — Pilot→Distribution program: Phase-0 stabilize audit (evidence run)
+
+**Claim:** Distribution plan (Apple resubmission + first Play submission) grounded in real output; living-doc drift corrected; strays landed.
+
+**Evidence (all run 2026-07-28, this machine + prod):**
+- `pnpm typecheck` → 0 errors (both tsconfigs). `pnpm test` → 687 files / 6100 passed / 11 skipped / 0 failed (40.08s, local DB up). `pnpm i18n:check` → deep parity ✓. `pnpm knip` → exit 1, pre-existing no-baseline noise (131-unused-files config hint) — logged as M4, not a regression. Measured on checkout `f003d811d`; clean-main coverage = Merge-gate CI green on `7772e3305` (CI — VetTrack, Playwright Tests, Flake Detection all success).
+- Prod `vettrack.uk/api/health` → `{db:ok, clerk:ok, vapid:ok, worker:ok}`.
+- Railway env scan (CLI, values MASKED — names/lengths only): **no VAPID/PUSH vars on VetTrack or Worker** → keys live in `vt_server_config` per `server/lib/push.ts` env→DB→generate order; "missing VAPID_PRIVATE_KEY" hypothesis for the activation bug DISPROVEN as a defect; historical cause = CROSS-FLOW-4 build-time key precedence, fixed in PR #116 (deployed). Repro attempt scheduled (task 0.4) before any fix work.
+- 4-flow audit fix verification in-file on origin/main: CROSS-FLOW-1 (5.1.1(v)) via `requireAuthAny` + AuthGuard affordance (PR #116 `a428cba42`); IPHONE-1 `handover-artifact-panel.tsx:59` safe-area; IPHONE-2 `EquipmentDetailToolsSheet.tsx:41` native gate; IPHONE-4 `use-auth.tsx:192` applyPreferredLocale.
+- C-6 mechanism verified: `useAutoSelectOrg.ts:32` picks `memberships[0]` (web only — `:21` bails on Capacitor; server DB-fallback `auth.ts:354/390`); backfill reads+writes the ACTIVE org (`users.ts:1142/1155/1199`) with `clerkId`-only upsert target (`:1208`). Owner `/me` on prod = real clinic org → branch 3b/3c.
+- Store rules (web, 2026-07-28): Play personal accounts post-2023-11-13 need 12 opted-in testers × 14 continuous days before production (owner CONFIRMED personal-post-2023 → clock is real); new apps must target API 36 from 2026-08-31 (repo already targetSdk 36); Apple requires Xcode 26 / iOS 26 SDK since 2026-04-28 (machine on Xcode 26.5).
+- Android project state: applicationId `uk.vettrack.app`, minSdk 24 / target+compile 36, NFC+CAMERA permissions present, `@capgo/capacitor-nfc@8`; gaps logged: versionCode 1 / versionName "1.0" (H4), no release keystore yet (expected), physical-device NFC/haptics confirm outstanding (H5 / Task 0.7 gate).
+- iOS: MARKETING_VERSION 1.2.0 / CURRENT_PROJECT_VERSION 26 > `.last-shipped-build` 25.
+
+**Doc corrections in this change (each disproven claim cited above):** CLAUDE.md retired-repo references (owner repo list has no `literate-dollop`); PLAN.md/TASKS.md Phase-0A staleness banners (fixes proof-logged 2026-07-12, re-verified in-code today).
+
+**Landed alongside:** PR #144 (allowlist cherry-pick `b2b4eeb7c` — was stranded on a stale local branch), PR #145 (pre-pilot QA harness v2 + census prompt + code-verified C-6 3b correction).
+
+**Verdict:** VERIFIED (audit evidence); execution continues per the approved distribution plan (Phases 0–4).

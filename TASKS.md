@@ -12,11 +12,15 @@
 
 ## In Progress
 
-_No tasks currently in progress. Pick the next Ready card (T-05 first)._
+_Phase-0A cards below are COMPLETE (2026-07-12) — see banner and Completed. Do not re-execute._
 
 ---
 
 ## Ready to Start — Phase 0A
+
+> **⚠ 2026-07-28:** T-05 · T-01 · T-02 · T-03 · T-04 all COMPLETED 2026-07-12 (commits `b79f0819a`,
+> `bb148cb3`→`b3c1f2e66`, `364d21cfd`→`78c94841c`, `4a1a75cc3`→`e451f0743`, `332c311d2`→`9edf4845d`;
+> batch gate 492 files / 4552 tests, 0 fail — PROOF-logged). Cards retained for card-contract reference only.
 
 > Execution order: **T-05 first**, then T-01…T-04 in any order.
 > Full cards: `docs/plans/consolidated-audit-10x/phase-0-1.plan.md`
@@ -149,6 +153,8 @@ Full cards in the plan library. Summary only:
 ---
 
 ## Completed
+
+- 2026-07-12 — **Phase 0A: T-05, T-01, T-02, T-03, T-04** (HIGH fixes; RED→GREEN, batch gate green) — PROOF_ALIGNMENT_LOG entries "2026-07-12 — Consolidated Audit × 10x".
 
 _Archive completed tasks here with date and notes._
 
