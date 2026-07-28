@@ -281,8 +281,8 @@ current versions, and branch-side PROOF_ALIGNMENT_LOG entries append to main's l
   typecheck 0; no orphan adapter left half-wired.
 - **Done when:** Reviewed; tracker flips on the code-layer scope (accepted 2026-07-28; the on-device
   checklist above is the carved-out residual — it lives on as the distribution program's H5 device
-  gate, which the Android ship must still pass). **Gates the Android ship (distribution-program
-  Phase 3, ex-Task 1.3); should precede Phase-1 surfaces.**
+  gate, which the Android ship must still pass). **Gates the Android ship (the distribution
+  program's Android phase, ex-Task 1.3); should precede Phase-1 surfaces.**
 
 ---
 
@@ -529,8 +529,8 @@ FKs — resolve explicitly before either starts its own Phase 0, don't let two c
 1. **~~Shell strategy confirmed — Capacitor stays.~~ SUPERSEDED 2026-07-22 as the *long-term* shell
    strategy** by the owner's binding decision to migrate to a bare React Native CLI app (see
    `docs/plans/master-plan-2026-07.md` Layers 3–5; ADR-008, pending, is where this supersession becomes
-   formal). **This does not change the Android ship (ex-Task 1.3, transferred 2026-07-28 to the distribution
-   program's Phase 3): Capacitor remains the vehicle for that near-term release** — the Android-via-
+   formal). **This does not change the Android ship (ex-Task 1.3, transferred 2026-07-28 to the
+   distribution program's Android phase): Capacitor remains the vehicle for that near-term release** — the Android-via-
    Capacitor ship happens *before* Layer 5 (the bare-RN migration) in the master plan's own sequencing,
    so Capacitor is a deliberate bridge, not a contradiction of the later decision. The ship's
    Capacitor-specific steps (`scripts/build-native-shell.sh --android`, Play Console signing) stay as
