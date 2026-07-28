@@ -65,8 +65,8 @@ are **owner-run Dashboard/DB/endpoint actions** — no product code (scope freez
 | C-3 | Test mode OFF on Production | **ON ⚠️** (corroborated: user `danerez5+clerk_test@gmail.com` — `+clerk_test` only works in test mode) | Owner toggles OFF (Configure → Instance Settings) after confirming nothing still needs `+clerk_test` identifiers — or explicitly accepts ON in the PROOF log |
 | C-4 | Client Trust stays **OFF** | **OFF ✅** — this is the **desired** state | **Countermand the Dashboard's "Recommended" badge and the audit agent's advice: do NOT enable.** `needs_client_trust` has zero in-app handling (IPHONE-5); enabling it breaks pilot/demo password login (RESUBMISSION_RUNBOOK §G). Cross-ref F-7 (watch-it-stays-off) |
 | C-5 | Native auth surface | `capacitor://localhost` in SSO allowlist ✅; Native API on; bundle `uk.vettrack.app` | Allowlist entry present. Supporting evidence for F-4 — does **not** replace the on-device JWT check |
-| C-6 | **Clerk ↔ app user parity** | **15 users in Clerk — 0 visible in the app ⚠️ (open)** | Decision tree below completed; admin list shows the expected staff under the correct clinic, **and** a fresh join-code signup appears under Pending and can be approved. **Gates J-0/J-1** |
-| C-7 | Test org removed | "My Organization" (1 member, May 22) still present ⚠️ | Deleted (or the admin's membership removed) — doubles as remedy 3a below |
+| C-6 | **Clerk ↔ app user parity** | **RESOLVED 2026-07-28 (owner-run):** `/me` returned the real clinic org (mismatch ruled out) → backfill executed on the correct org — **13 real staff visible in the app**, pilot doctor already `vet` | Remaining exit-bar step ONLY: a fresh join-code signup appears under Pending and can be approved (join code generated, test pending). **Gates J-0/J-1** |
+| C-7 | Test org removed | **DONE 2026-07-28 (owner-run):** "My Organization" deleted from the Clerk Dashboard — the web `memberships[0]` auto-select hazard is eliminated at the source | — |
 
 ### C-6 diagnosis — why 15 Clerk users can be invisible, and how to fix it (owner, ~10 min)
 
