@@ -1314,7 +1314,7 @@ landed screen ships to real users via App Store Connect / Railway deploys as it 
 parked branch waiting for all 17 turns to finish.
 
 **Layer 2 — Ship Android (Google Play Console).** **TRANSFERRED (owner decision 2026-07-28): owned by
-the pilot→public distribution program (its Phase 3)** — was Task 1.3 in `docs/vettrack-2.0-roadmap.md`
+the pilot→public distribution program (its Android phase)** — was Task 1.3 in `docs/vettrack-2.0-roadmap.md`
 (tracker narrowed to 18 tasks in the same decision; the scope-gate script updated in lockstep).
 **Step zero, before anything else:** Task 0.7's on-device physical confirmation is the hard, currently
 OPEN dependency, carried by the same program as its H5 physical-device gate (the roadmap's own checkbox
@@ -1327,7 +1327,7 @@ production access ([Play Console Help](https://support.google.com/googleplay/and
 API 36 from 2026-08-31** ([Play target-API policy](https://support.google.com/googleplay/android-developer/answer/11926878))
 — the repo already sets targetSdk 36, so eligibility holds for any submission date this year. Involves
 real manual steps (keystore generation, listing, forms) that aren't code tasks — the bite-sized
-breakdown lives in the distribution program's Phase-3 checklist, summarized in-repo in
+breakdown lives in the distribution program's Android-phase checklist, summarized in-repo in
 `docs/vettrack-2.0-roadmap.md` under "Task 1.3 — Ship the Android app (Google Play) · TRANSFERRED"
 (which lists the full gate set), superseding the previously planned
 `docs/plans/2.0/task-1.3-android-ship.md` and adapting the same checklist structure as
