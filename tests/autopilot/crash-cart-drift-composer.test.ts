@@ -148,6 +148,27 @@ describe("composeCrashCartDriftProposal", () => {
     expect(staleInputHe.summary).not.toBe(staleInput.summary);
   });
 
+  it("stale summaries fully resolve — no raw ICU/placeholder braces leak into the stored summary (visual-evidence bug 2026-07-23)", () => {
+    for (const locale of ["en", "he"] as const) {
+      const stale = composeCrashCartDriftProposal({
+        clinicId: CLINIC_A,
+        scanDate: SCAN_DATE,
+        reader: buildStaleResult(),
+        locale,
+      });
+      expect(stale.summary).not.toMatch(/[{}]/);
+      expect(stale.summary).toContain("36");
+
+      const never = composeCrashCartDriftProposal({
+        clinicId: CLINIC_A,
+        scanDate: SCAN_DATE,
+        reader: buildStaleResult({ hasNeverBeenChecked: true, lastCheck: null, hoursSinceLastCheck: null }),
+        locale,
+      });
+      expect(never.summary).not.toMatch(/[{}]/);
+    }
+  });
+
   it("throws when neither missingItemsFlagged nor staleFlagged is true (nothing to propose)", () => {
     const reader = buildMissingItemsResult({ missingItemsFlagged: false, failedItems: [], staleFlagged: false });
     expect(() =>

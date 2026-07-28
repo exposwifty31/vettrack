@@ -403,11 +403,21 @@ export function CommandBoard({
   currentTime,
   currentShift,
   kioskMode: kioskModeProp,
+  proposalCount,
 }: {
   board: EquipmentCommandBoardSnapshot;
   currentTime: string;
   currentShift: Array<{ employeeName: string; role: string }>;
   kioskMode?: boolean;
+  /**
+   * VetTrack 2.0, Task 1.1 §6 (deliverable H) — bounded ambient count of
+   * Shift Autopilot proposals awaiting approval, count only. Fetched by the
+   * container (`CommandBoardScreen`, already inside the app's
+   * `QueryClientProvider`) and passed down — `CommandBoard` itself stays
+   * presentational (per this file's own header doc), matching every other
+   * board field (`board`, `currentTime`, `currentShift`).
+   */
+  proposalCount?: number;
 }) {
   const [, navigate] = useLocation();
   const dir = useDirection();
@@ -485,12 +495,13 @@ export function CommandBoard({
       </header>
 
       {/* Ambient anomaly attention (R-BDF-1.2) — glance-only, present in both modes */}
-      {anomalies.length > 0 && (
+      {(anomalies.length > 0 || (proposalCount ?? 0) > 0) && (
         <BoardAttentionSection
           anomalies={anomalies}
           mode={mode}
           reducedMotion={reducedMotion}
           onAnomalyActivated={reportBoardAnomalyActivated}
+          proposalCount={proposalCount}
         />
       )}
 

@@ -15,6 +15,7 @@ import { useOpsHome } from "./ops/use-ops-home";
 import { CoverageCard } from "./ops/CoverageCard";
 import { ExceptionsTile } from "./ops/ExceptionsTile";
 import { ReadinessTile } from "./ops/ReadinessTile";
+import { AutopilotQueueTile } from "./ops/AutopilotQueueTile";
 
 /**
  * Ops home (admin / lead) for phone-web + desktop-web. The ASSESSMENT read: fleet
@@ -69,6 +70,12 @@ export function OpsHomeSurface() {
               />
               <ReadinessTile worstRooms={home.worstRooms} isLoading={home.roomsLoading} />
             </div>
+
+            <AutopilotQueueTile
+              count={home.autopilotQueueCount}
+              topKind={home.autopilotQueueTopKind}
+              isLoading={home.autopilotQueueLoading}
+            />
 
             <OnShiftHero
               pulse={home.pulse}

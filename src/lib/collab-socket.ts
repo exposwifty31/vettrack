@@ -39,6 +39,7 @@ const COLLAB_HEARTBEAT_MS = 30_000;
 export type CollabJoinRequest =
   | { kind: "chat" }
   | { kind: "board" }
+  | { kind: "proposal-queue" }
   | { kind: "record"; recordType: string; recordId: string };
 
 /** The server's join ack (mirrors the `authorizeRoomJoin` decision + presence). */
@@ -57,6 +58,15 @@ export interface ServerToClientEvents {
   "peer-cursor": (payload: { userId: string; x: number; y: number }) => void;
   "peer-selection": (payload: { userId: string; entityId: string }) => void;
   "peer-record": (payload: { userId: string; mode: "editing" | "viewing" }) => void;
+  /**
+   * VetTrack 2.0, Task 1.1 §1.5 (option 1, nudge-only) — advisory-only "the
+   * approval queue changed, go refetch" ping. NEVER carries proposal
+   * content (id/kind/summary/citations/status) — the payload is always
+   * exactly `{ kind: "proposal_queue_changed" }`. Consumers refetch via the
+   * authenticated REST path (`api.actionProposals.list`); this event alone
+   * is never treated as the source of truth for queue state.
+   */
+  "proposal-queue-changed": (payload: { kind: "proposal_queue_changed" }) => void;
 }
 
 /** Client → server events (mirrors the server's `socket.on(...)` handlers). */

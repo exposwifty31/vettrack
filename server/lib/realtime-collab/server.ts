@@ -30,6 +30,7 @@ import {
 } from "./config.js";
 import { validateHandshake } from "./handshake.js";
 import { resolveHandshakeIdentity } from "./identity.js";
+import { setCollabIo } from "./registry.js";
 import {
   authorizeRoomJoin,
   boardRoom,
@@ -114,6 +115,9 @@ export async function initCollabServer(
   // preserving the R-RTC-1.7 non-fatal invariant.
   let adapterSub: Redis | undefined;
   const teardown = async (): Promise<void> => {
+    // Task 1.1 §1.5 — clear the shared registry FIRST so a nudge call that
+    // races the teardown never emits on an io instance mid-close.
+    setCollabIo(undefined);
     try {
       io.disconnectSockets(true);
       io.engine.close();
@@ -349,6 +353,11 @@ export async function initCollabServer(
       rateLimiter.reset(socketRateKeyPrefix(socket.id));
     });
   });
+
+  // Task 1.1 §1.5 — publish the live io instance to the shared registry so
+  // non-socket callers (REST route handlers, BullMQ workers) can emit the
+  // advisory proposal-queue nudge without importing this file's internals.
+  setCollabIo(io);
 
   console.log(`[collab-ws] collaboration channel active on ${COLLAB_SOCKET_PATH}`);
   return {

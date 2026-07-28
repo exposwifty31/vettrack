@@ -3,6 +3,7 @@ import { Link } from "wouter";
 import { ForwardChevron } from "@/components/ui/directional-chevron";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { Alert, Room } from "@/types";
+import type { ActionProposal, ActionProposalKind } from "@/types/action-proposals";
 
 /**
  * Ops-tile helpers (Phase 3). Reimplemented from HomeTabletDashboard's inline,
@@ -57,6 +58,37 @@ export function TileHeader({ title, href, aside }: { title: string; href: string
       {aside}
     </div>
   );
+}
+
+/**
+ * VetTrack 2.0, Task 1.1 §6 (deliverable F) — the autopilot queue tile's
+ * "mostly {kind}" hint: the most frequent `kind` among staged proposals,
+ * ties broken deterministically by this fixed declared order (not
+ * insertion order, which would be non-deterministic against the API's own
+ * `ORDER BY createdAt DESC`).
+ */
+const AUTOPILOT_QUEUE_KIND_ORDER: ActionProposalKind[] = [
+  "shift_handover_draft",
+  "coordinator_reassign_off_roster",
+  "restock_po_on_burn",
+  "crash_cart_drift",
+];
+
+export function topStagedKind(proposals: ActionProposal[]): ActionProposalKind | null {
+  if (proposals.length === 0) return null;
+  const counts = new Map<ActionProposalKind, number>();
+  for (const p of proposals) counts.set(p.kind, (counts.get(p.kind) ?? 0) + 1);
+
+  let best: ActionProposalKind | null = null;
+  let bestCount = 0;
+  for (const kind of AUTOPILOT_QUEUE_KIND_ORDER) {
+    const count = counts.get(kind) ?? 0;
+    if (count > bestCount) {
+      bestCount = count;
+      best = kind;
+    }
+  }
+  return best;
 }
 
 export function SkeletonRows({ rows }: { rows: number }) {

@@ -15,7 +15,7 @@
 > | §4 restock_po_on_burn (reader, composer, ATOMIC approve side effect → real PO+lines, per-kind edit Zod, daily worker) | **DONE** | s4 branch | PASS, 0 blockers; fix wave registered §3's job-registry gap + `vt_items` citation rename |
 > | §5 crash_cart_drift (reader w/ 24h-default + per-clinic-override staleness, composer, daily worker, no side effect) | **DONE** | s5 branch | PASS, clinical-safety lens NO VETO, 0 blockers |
 > | §2 shift_handover_draft (composer over R-SH-F1's own `resolveShiftWindow`/`aggregateDeltas`, 10-min worker, no side effect, R-SH-F1 auto-publish left 100% untouched — parallel-run) | **DONE** | s2 branch (`feat/2.0-task-1.1-s2-handover-draft`) | PASS, 0 blockers; draftContent field-parity + edited-draft window metadata recorded as §0(c) cutover preconditions |
-> | §6 approval-queue UI shell + §1.5 socket-nudge decision | not started (deferred from §1 deliberately) | — | — |
+> | §6 approval-queue UI shell + §1.5 nudge (option 1, payload-tested ephemeral) | **DONE** | s6 branch (`feat/2.0-task-1.1-s6-queue-ui`) | PASS, 0 blockers; visual evidence (9 shots, 3 breakpoints, he RTL+en) in docs/audit/screenshots/task-1.1-s6/; ICU summary bug found-by-screenshot + fixed; board 60s cadence + accessor cleanup post-review |
 >
 > **Owner decisions binding execution (beyond §0):**
 > - **Edit = fix-then-execute (2026-07-22, commit `eac36bd10`):** `editProposal` dispatches the kind
@@ -24,11 +24,33 @@
 >   button = execute-my-fix).
 > - Re-proposal semantics: unique `(clinicId, kind, sourceSessionId)` is status-agnostic — a rejection
 >   suppresses re-proposal for that sourceSessionId (shiftDate / scan-date) by design (noise discipline).
+> - **§1.5 implemented-option-1-nudge (2026-07-23, s6 branch):** the dispatch-time decision ("this plan's
+>   mild preference is option 1") was executed as written — `proposalQueueRoom(clinicId)` added to
+>   `rooms.ts` (same clinic-membership-only auth shape as `boardRoom`, no record ACL), a new
+>   `server/lib/realtime-collab/registry.ts` module holds the live Socket.io instance so REST route
+>   handlers and BullMQ workers can emit outside a connection callback, and
+>   `notifyProposalQueueChanged(clinicId)` emits EXACTLY `{ kind: "proposal_queue_changed" }` to that
+>   room — payload-tested to carry nothing else, and to never throw whether collab is disabled, not yet
+>   initialized, or `io.to().emit()` itself throws. Wired fire-and-forget from the 3 decision routes
+>   (`server/routes/action-proposals.ts`, after approve/edit/reject succeed) and from each of the 4
+>   worker scan loops (after `outcome.created`). The client hook (`useProposalQueue`) treats the nudge as
+>   advisory-only (invalidates the query, never reads its payload) and is never the sole refresh path —
+>   `refetchOnWindowFocus: true` + a 60s `refetchInterval` poll runs identically whether or not the socket
+>   ever connects. `server.ts`'s one disclosed diff beyond `rooms.ts`: two `setCollabIo()` calls (init
+>   success, teardown-start) — the non-fatal init contract and the "shared http.Server must survive
+>   channel teardown" invariant are both unchanged.
 >
 > **Standing deferred findings:** runtime citation validation is self-referential for deterministic
 > kinds (real gate only needed when LLM composition lands); real-Drizzle writer path untested (db-integration
 > tier); route-layer 409/clamp behaviors untested. Review briefs must run `tests/jobs/` in addition to
 > `tests/autopilot/` (lesson from the §3 registry gap).
+> **§6 follow-up, not built (disclosed):** a structured edit dialog exists only for `restock_po_on_burn`
+> (`RestockEditDialog`) — the other 3 kinds' edit button opens a generic "coming to the console"
+> explainer (`EditUnavailableDialog`), per the task's own v1 scope note. The board/tile/console queries
+> are plain polling (`useQuery` + `proposalQueueQueryKey`), NOT `useProposalQueue`/`useCollabRoom` — kept
+> deliberately socket-free there (see the §6 proof-alignment log entry for why: a `CommandBoard`/
+> `CommandBoardScreen` test-suite regression risk in this sandbox, not a design requirement) but they
+> still cache-share with the queue page's nudge-driven invalidation via the shared query key.
 <!-- /AUTO-GENERATED -->
 
 

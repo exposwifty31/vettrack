@@ -28,6 +28,18 @@ export function chatRoom(clinicId: string): string {
 export function boardRoom(clinicId: string): string {
   return `clinic:${clinicId}:board`;
 }
+/**
+ * VetTrack 2.0, Task 1.1 §1.5 (option 1, nudge-only) — advisory room for the
+ * Shift Autopilot approval queue. Same auth shape as `boardRoom` (clinic
+ * membership only, no record ACL): a joined socket receives ONLY a bare
+ * "queue changed" ping (see `proposal-queue-nudge.ts`) and must refetch via
+ * the authenticated REST path (`GET /api/action-proposals`) for content —
+ * this room NEVER carries a proposal's id/summary/citations/status. The REST
+ * route is always the authority; this channel only prompts a refetch.
+ */
+export function proposalQueueRoom(clinicId: string): string {
+  return `clinic:${clinicId}:proposal-queue`;
+}
 export function recordRoom(clinicId: string, type: RecordType, id: string): string {
   return `clinic:${clinicId}:record:${type}:${id}`;
 }
@@ -36,6 +48,7 @@ export function recordRoom(clinicId: string, type: RecordType, id: string): stri
 export type JoinRequest =
   | { kind: "chat" }
   | { kind: "board" }
+  | { kind: "proposal-queue" }
   | { kind: "record"; recordType: string; recordId: string };
 
 /** The authenticated identity attached by the handshake (from the DB session). */
@@ -81,6 +94,7 @@ export async function authorizeRoomJoin(
   const { kind } = req as { kind: unknown };
   if (kind === "chat") return { ok: true, room: chatRoom(identity.clinicId) };
   if (kind === "board") return { ok: true, room: boardRoom(identity.clinicId) };
+  if (kind === "proposal-queue") return { ok: true, room: proposalQueueRoom(identity.clinicId) };
   if (kind !== "record") return { ok: false, reason: "INVALID_JOIN_REQUEST" };
 
   // record

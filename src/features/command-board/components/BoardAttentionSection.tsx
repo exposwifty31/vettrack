@@ -92,16 +92,27 @@ export function BoardAttentionSection({
   mode,
   reducedMotion,
   onAnomalyActivated,
+  proposalCount,
 }: {
   anomalies: readonly BoardAnomaly[];
   mode: BoardMode;
   reducedMotion: boolean;
   /** R-BDF-1.3 telemetry seam — fires once per `(type,unitId)` activation. */
   onAnomalyActivated?: (anomaly: BoardAnomaly) => void;
+  /**
+   * VetTrack 2.0, Task 1.1 §6 (deliverable H) — bounded ambient count of
+   * Shift Autopilot proposals awaiting approval. COUNT ONLY — never a
+   * proposal id, kind, summary, or citation on the board (kiosk/ambient
+   * display, not a task surface; matches the Liquid Glass track's guardrail
+   * that glass/detail chrome stays off ambient board surfaces — this line
+   * is plain text, no glass).
+   */
+  proposalCount?: number;
 }) {
   const { justActivatedKeys } = useBoardAnomalyStateMachine(anomalies, onAnomalyActivated);
   const ranked = rankBoardAnomalies(anomalies);
-  if (ranked.length === 0) return null;
+  const hasProposals = typeof proposalCount === "number" && proposalCount > 0;
+  if (ranked.length === 0 && !hasProposals) return null;
 
   return (
     <section
@@ -116,14 +127,25 @@ export function BoardAttentionSection({
           : "border-ivory-border bg-[rgb(var(--ivory-surface))]",
       )}
     >
-      <h2
-        className={cn(
-          "vt-text-2xs font-bold uppercase tracking-widest mb-2",
-          mode === "pressure" ? "text-[var(--status-issue-fg)]" : "text-ivory-text3",
-        )}
-      >
-        {t.board.attention} · {ranked.length}
-      </h2>
+      {ranked.length > 0 && (
+        <h2
+          className={cn(
+            "vt-text-2xs font-bold uppercase tracking-widest mb-2",
+            mode === "pressure" ? "text-[var(--status-issue-fg)]" : "text-ivory-text3",
+          )}
+        >
+          {t.board.attention} · {ranked.length}
+        </h2>
+      )}
+      {hasProposals && (
+        <p
+          data-testid="board-proposal-queue-count"
+          className="vt-text-2xs font-semibold text-ivory-text3 mb-2 last:mb-0"
+        >
+          {t.autopilotQueue.board.awaitingApproval(proposalCount!)}
+        </p>
+      )}
+      {ranked.length > 0 && (
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
         {ranked.map((anomaly, rank) => {
           const emphasis: CardEmphasis =
@@ -144,6 +166,7 @@ export function BoardAttentionSection({
           );
         })}
       </div>
+      )}
     </section>
   );
 }

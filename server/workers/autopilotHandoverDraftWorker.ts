@@ -72,6 +72,7 @@ import { resolveShiftWindow, aggregateDeltas, type ShiftWindow } from "../lib/sh
 import type { ShiftHandoverDeltas } from "../lib/shift-handover.js";
 import { composeHandoverDraftProposal } from "../lib/autopilot/handover-draft-composer.js";
 import { stageProposal } from "../lib/autopilot/action-proposal-service.js";
+import { notifyProposalQueueChanged } from "../lib/realtime-collab/proposal-queue-nudge.js";
 import {
   DrizzleActionProposalWriter,
   type ActionProposalWriter,
@@ -160,7 +161,10 @@ export async function runHandoverDraftScan(
       },
     );
 
-    if (outcome.created) staged++;
+    if (outcome.created) {
+      staged++;
+      notifyProposalQueueChanged(clinicId); // Task 1.1 §1.5 — advisory, fire-and-forget
+    }
   }
 
   return { scanned: candidates.length, staged };
