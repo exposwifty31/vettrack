@@ -5412,3 +5412,25 @@ no-native-shell-build-path-changes guardrail while a review is open.
 
 **Verdict:** VERIFIED (scope: the 18-task tracker contract + the transfer wiring itself — not a claim
 that untracked future items, e.g. the FCM push path, are covered by 18/18).
+
+## 2026-07-28 — Phase 3.5 spec: NFC sticker E2E audit (docs-only) — branch claude/nfc-sticker-e2e-audit-t22scp
+
+**Claim:** The owner-approved NFC-sticker E2E audit spec (drafted in a prior session on
+`docs/nfc-sticker-e2e-spec` @ dd25b8e62, which was never pushed — branch absent from origin,
+commit unreachable locally) is recreated as `docs/design/nfc-sticker-e2e-audit.md`, strengthened
+per this session's owner approval with a "Custody-model fit" section + audit-matrix rows 8–9
+(matrix 7→9; success criteria updated to "all nine"). No code, schema, or frozen-surface change.
+
+**Evidence:**
+- Lost-branch check: `git ls-remote origin | grep -iE 'nfc|dd25b8e'` → empty;
+  `git cat-file -t dd25b8e62` → "Not a valid object name". Spec text recovered verbatim from the
+  session transcript (duplication artifacts from the paste removed; content otherwise unchanged).
+- Grounding claims re-verified in-repo before recommitting them: `src/lib/deep-link-router.ts:80`
+  = `navigate(\`/equipment/${equipmentId}?nfcAction=toggle&nfcTs=${Date.now()}\`)` (grep);
+  `vettrack://`-only host handling confirmed at deep-link-router.ts:73; `@capgo/capacitor-nfc`
+  present in package.json:92; `src/features/scan/ScanScreen.tsx` exists.
+- Docs-only diff: `git diff --stat` touches `docs/design/nfc-sticker-e2e-audit.md` (new) +
+  this log only.
+
+**Verdict:** VERIFIED (spec recreated + custody strengthenings; grounding re-checked against the
+working tree rather than trusted from the prior session).
