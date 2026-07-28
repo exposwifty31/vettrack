@@ -1313,17 +1313,20 @@ screen (Home/Today, turn 1) needs that greenlight, not a pre-written task list. 
 landed screen ships to real users via App Store Connect / Railway deploys as it lands — this is not a
 parked branch waiting for all 17 turns to finish.
 
-**Layer 2 — Ship Android (Google Play Console).** Already Task 1.3 in `docs/vettrack-2.0-roadmap.md`.
+**Layer 2 — Ship Android (Google Play Console).** **TRANSFERRED (owner decision 2026-07-28): owned by
+the pilot→public distribution program (its Phase 3)** — was Task 1.3 in `docs/vettrack-2.0-roadmap.md`
+(tracker narrowed to 18 tasks in the same decision; the scope-gate script updated in lockstep).
 **Step zero, before anything else:** Task 0.7's on-device physical confirmation is the hard, currently
-OPEN dependency (`docs/vettrack-2.0-roadmap.md:61,288` — "Depends 0.7 (hard)"; the roadmap's own checkbox
-is ticked but the on-device haptics/edge-to-edge check on real hardware is explicitly still open) — Layer
-2 cannot proceed past this gate. Research basis once unblocked: verify current 2026 Play Console
-requirements (target API level, Data-safety form, content rating) against Google's primary docs before
-shipping, not from memory. Involves real manual steps (keystore generation, listing, forms) that aren't
-code tasks — a bite-sized breakdown belongs in its own `docs/plans/2.0/task-1.3-android-ship.md`, adapting
-the same checklist structure as `docs/mobile/native-ship-checklist.md` (the real, locked iOS gate), written
-when Task 0.7 closes and this is actively picked up. Terminal criterion: the app live on Play (internal
-track → production, per the owner's terminal-state directive).
+OPEN dependency, carried by the same program as its H5 physical-device gate (the roadmap's own checkbox
+is ticked but the on-device haptics/edge-to-edge check on real hardware is explicitly still open) — the
+ship cannot proceed past this gate. Research basis: 2026 Play Console requirements re-verified
+2026-07-28 against Google's primary docs (targetSdk 36 compliant; personal-post-2023 account → 12
+opted-in testers × 14 continuous days of closed testing before production access). Involves real manual
+steps (keystore generation, listing, forms) that aren't code tasks — the bite-sized breakdown lives in
+the distribution program's Phase-3 checklist (superseding the previously planned
+`docs/plans/2.0/task-1.3-android-ship.md`), adapting the same checklist structure as
+`docs/mobile/native-ship-checklist.md` (the real, locked iOS gate). Terminal criterion unchanged: the
+app live on Play (internal track → production, per the owner's terminal-state directive).
 
 **Layer 4 — ADR-008 (bare-RN decision) + literate-dollop disposition.** Blocked on the owner's explicit
 sign-off on the salvaged 3a report (now at `docs/design/react-native-migration-research.md`) — specifically

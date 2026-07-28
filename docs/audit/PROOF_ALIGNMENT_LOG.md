@@ -5386,3 +5386,28 @@ before commit; the audit's actionable findings are now harness rows with baselin
 - M2: `privacyPage.sections.collect.body` (+ device-permissions clause) claimed "device push notification tokens"; the native shell registers no push at all (IPHONE-6). Copy now states web-only subscriptions explicitly, en+he, keys unchanged. `pnpm i18n:check` parity ✓.
 
 **Verdict:** VERIFIED (matrix logged; M1 no-change-needed with lock; M2 fixed en+he).
+
+## 2026-07-28 — 2.0 roadmap scope cut: Task 1.3 → distribution program (tracker 19→18) — branch chore/2.0-roadmap-scope-transfer
+
+**Claim:** Owner-approved (3-question decision gate this session): the Android/Play ship (Task 1.3) is
+transferred out of the 2.0 roadmap to the pilot→public distribution program; tracker narrowed 19→18
+with `scripts/vettrack-2.0-scope-gate.sh` updated in lockstep; Task 0.7's on-device caveat closed by
+reference to the program's H5 device gate; stale 1.1 artifact-map rows corrected (slice stack merged);
+master-plan Layer 2 re-pointed. Companion owner decisions recorded: FCM push stays 2.0-side; the 2.0
+freeze lifts (next task: 1.2 Case Spine) once BOTH store submissions are in review, with a
+no-native-shell-build-path-changes guardrail while a review is open.
+
+**Evidence:**
+- RED first: script edited to the 18-ID canonical set BEFORE the tracker edit; run against the
+  still-19 tracker → `[2.0-gate] BLOCKED: tracker ID set doesn't match the canonical 18 — … unexpected: 1.3`, exit 2.
+- GREEN: tracker edited → `[2.0-gate] VetTrack 2.0 scope: 7/18 shipped.` + the 11 open items, exit 0.
+- 1.1-merged claim verified before rewriting the artifact map: `git log --oneline
+  origin/main..feat/2.0-task-1.1-s6-queue-ui` = exactly one non-1.1 stray (`b2b4eeb7c`, superseded
+  allowlist chore) → the full slice-stack content is on origin/main (`b7e221cff`); all Phase-0
+  artifacts confirmed present on origin/main by file-existence check (0.1/0.2/0.3/0.4/0.5 docs +
+  backtest script + the 1.1 plan).
+- Residual sweep: `grep -n "1\.3" docs/vettrack-2.0-roadmap.md` → 7 hits, all deliberate
+  transfer-note mentions; grep for `/19`, `canonical 19`, `expected 19`, `stays 19` over roadmap +
+  script → zero hits.
+
+**Verdict:** VERIFIED.
