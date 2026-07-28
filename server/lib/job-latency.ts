@@ -34,11 +34,11 @@ const KNOWN_JOB_KINDS = [
   "sweep-stale-checkouts",
   "sweep-stale-returned",
   "sweep-room-escalation",
-  "integration-sync-enqueue",
-  "scan-restock-burn",
   "scan-coordinator-reassign",
+  "scan-restock-burn",
   "scan-crash-cart-drift",
   "scan-handover-draft",
+  "integration-sync-enqueue",
 ] as const satisfies readonly JobKind[];
 
 type _ExhaustiveCheck = Exclude<JobKind, (typeof KNOWN_JOB_KINDS)[number]> extends never

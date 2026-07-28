@@ -21,7 +21,8 @@
  * conditionally-skipped one.
  */
 import { randomUUID } from "crypto";
-import { purchaseOrders, poLines } from "../../db.js";
+import { and, eq, inArray } from "drizzle-orm";
+import { purchaseOrders, poLines, inventoryItems } from "../../db.js";
 import type { ActionProposalRow } from "../../schema/ops.js";
 import type { ActionProposalTransactionExecutor } from "./action-proposal-writer.port.js";
 import type { RestockPoDraftContent } from "./restock-po-composer.js";
@@ -64,6 +65,25 @@ export function buildRestockPoApproveSideEffect(
   }
 
   return async (tx: ActionProposalTransactionExecutor) => {
+    // Multi-tenancy guard (binding rule): every referenced itemId must belong to
+    // this proposal's clinic. The edit path lets a human supply itemIds, so we
+    // must never insert a poLine pointing at another clinic's vt_items row.
+    // Validated inside the transaction so a bad reference rolls back the whole PO.
+    const itemIds = draft.lines.map((line) => line.itemId);
+    if (itemIds.length > 0) {
+      const owned = await tx
+        .select({ id: inventoryItems.id })
+        .from(inventoryItems)
+        .where(and(inArray(inventoryItems.id, itemIds), eq(inventoryItems.clinicId, staged.clinicId)));
+      const ownedIds = new Set(owned.map((row) => row.id));
+      const foreign = [...new Set(itemIds)].filter((id) => !ownedIds.has(id));
+      if (foreign.length > 0) {
+        throw new Error(
+          `restock_po_on_burn approve side effect: itemId(s) [${foreign.join(", ")}] do not exist in clinic ${staged.clinicId}`,
+        );
+      }
+    }
+
     const orderId = randomUUID();
     await tx.insert(purchaseOrders).values({
       id: orderId,
@@ -73,15 +93,18 @@ export function buildRestockPoApproveSideEffect(
       createdBy: approvingUserId,
     });
 
-    for (const line of draft.lines) {
-      await tx.insert(poLines).values({
-        id: randomUUID(),
-        clinicId: staged.clinicId,
-        purchaseOrderId: orderId,
-        itemId: line.itemId,
-        quantityOrdered: line.quantitySuggested,
-        // unitPriceCents stays at its schema default (0) — Task 1.4's job.
-      });
+    if (draft.lines.length > 0) {
+      // Single batched insert (one round-trip) instead of one insert per line.
+      await tx.insert(poLines).values(
+        draft.lines.map((line) => ({
+          id: randomUUID(),
+          clinicId: staged.clinicId,
+          purchaseOrderId: orderId,
+          itemId: line.itemId,
+          quantityOrdered: line.quantitySuggested,
+          // unitPriceCents stays at its schema default (0) — Task 1.4's job.
+        })),
+      );
     }
   };
 }
