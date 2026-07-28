@@ -5209,3 +5209,114 @@ tests — is removed. No production consumer existed.
 
 **Verdict:** VERIFIED (both parts; the only test failures are the pre-existing DB-unavailable baseline,
 unrelated to this change).
+
+## 2026-07-28 — Pre-pilot QA harness authored + runnable Layer-1 executed (branch `claude/refine-local-plan-zqgp3v`)
+
+**Claim:** A pre-pilot QA harness (`docs/audit/pre-pilot-qa-harness.md`) was authored — a
+verification-only gate for the doctor-only pilot, refined from the local draft against `origin/main`
+@ `7772e33`. No product/schema/test/config code changed (scope freeze honored). The runnable subset
+of the harness's Layer 1 was executed in this cloud sandbox (no Postgres, no browser, no device) and
+the results below are the **actual** command output, not summaries.
+
+**Evidence — claims re-verified against the tree at `7772e33`:**
+- All 24 pnpm scripts referenced by the harness exist (`node -e` over `package.json` scripts).
+- `"dexie": "3.2.7"` in `package.json` (Z-3). PR #126 = `5f44554` (vet `actOffShift` + mobile NFC
+  confirm + custody affordances + board custody); PR #127 = `571db93` (clinic join codes).
+- Flow-walk baseline `tests/flow-walk/README.md`: web+board+marketing 147 rows / 145 pass / 0 broken
+  / 2 degraded; native iPhone 68/68; iPad 68/68.
+- IPHONE-1..6 findings sourced from `docs/audit/pre-resubmission-4flow-audit-2026-07-18.md` (grep
+  confirmed; the draft never named the file). Mapping: IPHONE-1→U-2, -2→U-3, -3→F-4, -4→U-6, -5→F-7,
+  -6→F-5.
+- **Correction landed in the harness:** IPHONE-1 (/handoff safe-area) is already fixed on `main` —
+  `src/components/handover-artifact-panel.tsx:58-59` sets `paddingTop: "calc(env(safe-area-inset-top)
+  + 16px)"` for the `phone` variant — by a later commit, NOT #126 (`git show --stat 5f44554` does not
+  list that file). Reframed U-2 as verify-still-fixed / off the pilot loop.
+- Four #126 regression tests wired in as the automated (L1-2) proof and confirmed present:
+  `tests/equipment-detail-tools-sheet-native.test.tsx` (U-3), `tests/equipment-detail-screen-nfc-confirm.test.tsx`
+  (J-4), `tests/command-board-custodian-name.test.ts` (J-8; helper `server/lib/custodian-display-name.ts:2`
+  documents "never a full email address (last resort is the email local part)"),
+  `tests/scan-screen-admin-shift-bypass.test.tsx` + `tests/shift-gate.test.ts` (J-5). (Draft mislabeled
+  the custodian test `.tsx`; it is `.test.ts`.)
+- Enrollment-capacity finding (harness §1): native shell keeps Clerk Organizations out of the auth
+  path — `src/features/auth/hooks/useAutoSelectOrg.ts:19` returns early on Capacitor; `server/middleware/auth.ts:162`
+  `DB_CLINIC_FALLBACK` (default on) resolves the clinic from `vt_users.clinicId`. Doctors enroll via
+  the join code (`server/routes/clinic-join.ts`), so Clerk's per-org member cap (5 default / 20 without
+  the B2B Authentication add-on) does not apply; ~50 doctors sit under the Free-plan 50K-MAU ceiling.
+  (Clerk limits grounded in current Clerk docs, not training data.)
+
+**Evidence — runnable Layer-1 executed (verbatim results):**
+- `pnpm typecheck` → exit 0. 0 errors (frontend + `tsconfig.server.json`).
+- `pnpm test` → exit 1. `Test Files 16 failed | 652 passed | 19 skipped (687)`;
+  `Tests 20 failed | 5838 passed | 255 skipped (6113)`; Duration 185.01s. **All 20 failures are
+  `ECONNREFUSED 127.0.0.1:5432`** in 4 shift-handover DB-integration files
+  (`shift-handover-generator.test.ts` 9, `shift-handover-patient-worklist.test.ts` 4,
+  `shift-handover-surface.test.tsx` 4, `shift-handover-observed.test.ts` 3). A grep for any
+  non-`Database connection or schema validation failed` assertion among the failures returned empty.
+  This is the exact no-Postgres baseline recorded in the 2026-07-28 haptics entry above (20 failed /
+  5838 passed). Pass bar (green except DB-only ECONNREFUSED) met.
+- `pnpm architecture:gates` → exit 0. tsc frontend + server clean; dependency-cruiser
+  `✔ no dependency violations found (979 modules, 5070 dependencies cruised)` with the 10 known
+  violations ignored (baseline); madge cycles OK vs baseline (server 2, src 0). No new violations.
+- `pnpm i18n:check` → exit 0. `locales/en.json` and `locales/he.json` in deep key parity.
+
+**Owner-run, not executed here (recorded, not skipped silently):** L1-3 DB-integration
+(`pnpm test:db-integration` + `pnpm test:integration:ops`, needs Postgres + migrations); L1-6/-7/-8
+Playwright (`flow-walk` / `ci` / `pwa` / `ui-smoke` / `phase9`, need a browser + running app); L1-9
+staging E2E (`test:staging:e2e` + `:walkthrough`, needs live staging); and all Mode-B device checks
+(camera QR, NFC tap, Clerk native JWT F-4, push-absence F-5, `needs_client_trust` F-7). These stay
+owner-verified per harness §5/§7.
+
+**Verdict:** VERIFIED (harness authored + runnable Layer-1 green; the only test failures are the
+pre-existing DB-unavailable sandbox baseline, unrelated to this change — which authored docs only).
+
+## 2026-07-28 — Clerk identity-plane audit merged into harness v2 (Layer 0) (branch `claude/refine-local-plan-zqgp3v`)
+
+**Claim:** The owner-run Clerk Dashboard computer-use audit (read-only, 2026-07-28) was merged
+into the pre-pilot QA harness as **Layer 0 (§1b, rows C-1…C-7)**; the audit prompt was revised
+(v2) and committed as `docs/audit/clerk-dashboard-verify.prompt.md`; the §1 capacity row, J-0,
+F-4/F-7, §7 GO criteria, evidence README, and the harness appendix were updated to the audited
+baseline. Docs only — no product/schema/test/config code changed (scope freeze §0 holds).
+
+**Evidence — Dashboard audit results (as reported by the owner; PRODUCTION instance):**
+- Plan Hobby (Monthly $0); MAU **3 / 50,000**; retained orgs 1/100; **no B2B Authentication add-on**.
+- Organizations **ENABLED**; "VetTrack" org **13/20 members** (Apr 16); second org "My Organization"
+  **1 member** (May 22 — test artifact → C-7). Default member limit 20/org.
+- **Test mode ON on Production** (→ C-3) — corroborated in-band: user #10 is
+  `danerez5+clerk_test@gmail.com`, a `+clerk_test` identifier that only works with test mode on.
+- **Client Trust OFF** — the audit agent recommended enabling it; recommendation **rejected**
+  (C-4/F-7): `grep -rn needs_client_trust src/` is empty (no in-app handler, per the 2026-07-18
+  4-flow audit IPHONE-5), so enabling it breaks pilot/demo password login (RESUBMISSION_RUNBOOK §G).
+- Native API enabled, bundle `uk.vettrack.app`; `capacitor://localhost` in the SSO allowlist (→ C-5,
+  supporting evidence for F-4; the on-device JWT round-trip remains owner-verify).
+- Session custom claim `org_id: {{org.id}}` (org_3CPrzr…) — web sessions bind clinic = Clerk org id.
+- **15 users in Clerk — 0 visible in the app** (→ C-6, the new gating finding).
+
+**Evidence — C-6 root-cause analysis (code anchors read this session at `7772e33`):**
+- `server/routes/users.ts:235` — admin list is `WHERE clinicId = <viewer's clinic> AND deletedAt
+  IS NULL` (+ optional status filter); the app never lists Clerk identities directly.
+  Soft-deleted rows only via `GET /api/users/deleted` (`users.ts:212`).
+- `server/middleware/auth.ts:477` — the only organic `vt_users` creation path: upsert on the
+  user's own authenticated request; `clinicId = clerkOrgId` (session org claim or DB fallback,
+  `auth.ts:162`); first-insert `role = admin` iff email ∈ `ADMIN_EMAILS`
+  (`server/lib/admin-email-allowlist.ts:5`), else `technician`/`pending`.
+- `server/routes/users.ts:1139` — `POST /api/users/backfill-clerk` (admin-only) pages
+  `getOrganizationMembershipList` for the admin's own clinic, inserting missing members as
+  `technician`/`active` — the built-in bulk remedy.
+- `src/features/auth/hooks/useAutoSelectOrg.ts` — web auto-activates `memberships[0]`; a
+  dual-org user can silently land in the wrong clinic. Combined with the "My Organization"
+  artifact (creation date matches user #9's last sign-in), the **clinic-mismatch hypothesis ranks
+  first**; full owner decision tree (identity check → row census → ordered remedies, 3a before 3b
+  because backfill imports into the admin's current clinic) is in harness §1b.
+
+**Files changed:** `docs/audit/pre-pilot-qa-harness.md` (v2 — §1b Layer 0 added; §1 capacity row,
+J-0, F-4, F-7, §7 condition 0, appendix baseline table, header provenance note),
+`docs/audit/clerk-dashboard-verify.prompt.md` (new — v2 prompt: baseline-aware expected states,
+Client-Trust recommendation barred, new Task 6 app-parity check),
+`docs/audit/device-audit-evidence/pilot/README.md` (C-row artifact names).
+
+**Owner-run, not performable from this session:** the C-6 SQL census + `/api/users/me` check, the
+`backfill-clerk` call, deleting "My Organization" (C-7), toggling Test mode off (C-3), and
+re-running the audit prompt. Each lands here when done.
+
+**Verdict:** VERIFIED (docs-only merge; all five code anchors re-checked against the working tree
+before commit; the audit's actionable findings are now harness rows with baselines and exit bars).
