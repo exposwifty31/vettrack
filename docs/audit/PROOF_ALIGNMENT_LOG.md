@@ -5268,3 +5268,55 @@ owner-verified per harness §5/§7.
 
 **Verdict:** VERIFIED (harness authored + runnable Layer-1 green; the only test failures are the
 pre-existing DB-unavailable sandbox baseline, unrelated to this change — which authored docs only).
+
+## 2026-07-28 — Clerk identity-plane audit merged into harness v2 (Layer 0) (branch `claude/refine-local-plan-zqgp3v`)
+
+**Claim:** The owner-run Clerk Dashboard computer-use audit (read-only, 2026-07-28) was merged
+into the pre-pilot QA harness as **Layer 0 (§1b, rows C-1…C-7)**; the audit prompt was revised
+(v2) and committed as `docs/audit/clerk-dashboard-verify.prompt.md`; the §1 capacity row, J-0,
+F-4/F-7, §7 GO criteria, evidence README, and the harness appendix were updated to the audited
+baseline. Docs only — no product/schema/test/config code changed (scope freeze §0 holds).
+
+**Evidence — Dashboard audit results (as reported by the owner; PRODUCTION instance):**
+- Plan Hobby (Monthly $0); MAU **3 / 50,000**; retained orgs 1/100; **no B2B Authentication add-on**.
+- Organizations **ENABLED**; "VetTrack" org **13/20 members** (Apr 16); second org "My Organization"
+  **1 member** (May 22 — test artifact → C-7). Default member limit 20/org.
+- **Test mode ON on Production** (→ C-3) — corroborated in-band: user #10 is
+  `danerez5+clerk_test@gmail.com`, a `+clerk_test` identifier that only works with test mode on.
+- **Client Trust OFF** — the audit agent recommended enabling it; recommendation **rejected**
+  (C-4/F-7): `grep -rn needs_client_trust src/` is empty (no in-app handler, per the 2026-07-18
+  4-flow audit IPHONE-5), so enabling it breaks pilot/demo password login (RESUBMISSION_RUNBOOK §G).
+- Native API enabled, bundle `uk.vettrack.app`; `capacitor://localhost` in the SSO allowlist (→ C-5,
+  supporting evidence for F-4; the on-device JWT round-trip remains owner-verify).
+- Session custom claim `org_id: {{org.id}}` (org_3CPrzr…) — web sessions bind clinic = Clerk org id.
+- **15 users in Clerk — 0 visible in the app** (→ C-6, the new gating finding).
+
+**Evidence — C-6 root-cause analysis (code anchors read this session at `7772e33`):**
+- `server/routes/users.ts:235` — admin list is `WHERE clinicId = <viewer's clinic> AND deletedAt
+  IS NULL` (+ optional status filter); the app never lists Clerk identities directly.
+  Soft-deleted rows only via `GET /api/users/deleted` (`users.ts:212`).
+- `server/middleware/auth.ts:477` — the only organic `vt_users` creation path: upsert on the
+  user's own authenticated request; `clinicId = clerkOrgId` (session org claim or DB fallback,
+  `auth.ts:162`); first-insert `role = admin` iff email ∈ `ADMIN_EMAILS`
+  (`server/lib/admin-email-allowlist.ts:5`), else `technician`/`pending`.
+- `server/routes/users.ts:1139` — `POST /api/users/backfill-clerk` (admin-only) pages
+  `getOrganizationMembershipList` for the admin's own clinic, inserting missing members as
+  `technician`/`active` — the built-in bulk remedy.
+- `src/features/auth/hooks/useAutoSelectOrg.ts` — web auto-activates `memberships[0]`; a
+  dual-org user can silently land in the wrong clinic. Combined with the "My Organization"
+  artifact (creation date matches user #9's last sign-in), the **clinic-mismatch hypothesis ranks
+  first**; full owner decision tree (identity check → row census → ordered remedies, 3a before 3b
+  because backfill imports into the admin's current clinic) is in harness §1b.
+
+**Files changed:** `docs/audit/pre-pilot-qa-harness.md` (v2 — §1b Layer 0 added; §1 capacity row,
+J-0, F-4, F-7, §7 condition 0, appendix baseline table, header provenance note),
+`docs/audit/clerk-dashboard-verify.prompt.md` (new — v2 prompt: baseline-aware expected states,
+Client-Trust recommendation barred, new Task 6 app-parity check),
+`docs/audit/device-audit-evidence/pilot/README.md` (C-row artifact names).
+
+**Owner-run, not performable from this session:** the C-6 SQL census + `/api/users/me` check, the
+`backfill-clerk` call, deleting "My Organization" (C-7), toggling Test mode off (C-3), and
+re-running the audit prompt. Each lands here when done.
+
+**Verdict:** VERIFIED (docs-only merge; all five code anchors re-checked against the working tree
+before commit; the audit's actionable findings are now harness rows with baselines and exit bars).

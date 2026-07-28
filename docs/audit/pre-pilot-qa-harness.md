@@ -7,6 +7,13 @@
 > Provenance note: this refines the local draft harness. Every command, path, PR, and version
 > claim below was re-checked against the tree at `7772e33`; the five corrections vs the draft are
 > annotated inline with **[refined]**.
+>
+> **v2 (2026-07-28, same day):** merged the Clerk Dashboard computer-use audit into the harness as
+> **Layer 0 (§1b, rows C-1…C-7)** with the audited run as its baseline (Appendix). The repeatable
+> audit prompt is committed as `docs/audit/clerk-dashboard-verify.prompt.md`. v2 changes are
+> annotated **[v2]**. Key deltas vs v1: Organizations is ENABLED (13/20 seats) — the capacity
+> conclusion now rests on the join-code path, not on Orgs being off; Test mode is ON on prod
+> (C-3); and 15 Clerk users are invisible in the app (C-6, gating).
 
 ## §0 — SCOPE FREEZE (binding for the duration of this harness)
 
@@ -34,13 +41,80 @@ specified; it does not modify them.
 | Core loop | sign-in → home → **scan (QR camera / manual code / NFC tap)** → equipment detail → **Take** (from `returned`, no dock) → **Return** → **report issue**; custody `returned ↔ in-use`. |
 | Board | Separate kiosk/web surface showing live custody + `custodianName` (read-only for the pilot). |
 | Auth | Clerk (prod), native session JWT (`azp = capacitor://localhost`). |
-| **Doctor enrollment capacity [refined]** | Enrollment for the pilot vet — and scale-up to the hospital's ~50 doctors — goes through the clinic **join code** → `vt_users.clinicId` (`server/routes/clinic-join.ts`), **not Clerk Organization seats**. On the native shell Clerk Orgs are out of the auth path (`src/features/auth/hooks/useAutoSelectOrg.ts:19` bails on Capacitor; `server/middleware/auth.ts:162` `DB_CLINIC_FALLBACK` resolves the clinic from the DB user), so Clerk's per-org member cap (**5 by default; max 20 without the B2B Authentication add-on; unlimited/custom only with it**) does **not** apply — doctors are plain Clerk users under the Free-plan **50K MAU** ceiling. **Do not enable Clerk Organizations for the pilot** or you trip the 20-member wall for a 50-doctor hospital. |
+| **Doctor enrollment capacity [v2 — audited 2026-07-28]** | Dashboard reality: **Hobby plan, MAU 3/50,000; Organizations ENABLED; "VetTrack" org 13/20 members; no B2B Authentication add-on** (Layer 0, §1b). The 20-member org wall is avoided **only via the join-code path**: `server/routes/clinic-join.ts` writes `vt_users.clinicId` directly, consuming **zero** org seats, and the server accepts org-less sessions (`server/middleware/auth.ts:162` `DB_CLINIC_FALLBACK`, default on; the native shell never selects an org — `src/features/auth/hooks/useAutoSelectOrg.ts:19` bails on Capacitor). **Binding rule: enroll every pilot doctor via the app's join code — never via a Clerk Dashboard org invite** (only 7 seats remain before the wall; the B2B add-on is the only way past 20). ~50 doctors as plain Clerk users is trivial against the 50K MAU ceiling. See C-2/C-6. |
 | Targets | **Staging** (`vettrack-staging.up.railway.app`) for rehearsal; **prod** (`vettrack.uk`) for the real seed + pilot. |
 | Baseline | Flow-walk green 2026-07-16 (147 web / 68 iPhone / 68 iPad; 145 pass / 0 broken / 2 degraded — `tests/flow-walk/README.md`); doctor-journey fixes = PR #126 (`5f44554`); join codes = #127 (`571db93`). |
 
 **Two device modes — both required, they cover different risk:**
 - **Mode A — dev-bypass sim / flow-walk:** fast, repeatable, broad functional + regression coverage. Bring-up = `docs/audit/phase-0-2-device-audit-playbook.md` §1 (live-reload `CAPACITOR_SERVER_URL=http://localhost:5000 npx cap run ios`, **never** `cap:build:native`).
 - **Mode B — real-device bundled build (Clerk mode):** the ONLY place camera QR, NFC tap, Clerk native JWT, haptics, and push-absence are truly exercised. Build via `pnpm cap:build:native` → TestFlight/device. **Pilot trust lives here.**
+
+## §1b — Layer 0: identity-plane audit (Clerk Dashboard ↔ app parity) **[v2]**
+
+Runs **before Layer 1** because it gates the pilot's front door: if the identity plane is
+misconfigured, every downstream J-row fails for reasons no code test will surface.
+**Method:** run `docs/audit/clerk-dashboard-verify.prompt.md` via a computer-use agent (or walk
+the Dashboard manually). **Baseline:** the 2026-07-28 audited run (results in the Appendix).
+Evidence → `docs/audit/device-audit-evidence/pilot/C-*.png` + a PROOF entry. All C-row remedies
+are **owner-run Dashboard/DB/endpoint actions** — no product code (scope freeze §0 holds).
+
+| ID | Check | 2026-07-28 baseline | Pass bar |
+|---|---|---|---|
+| C-1 | Plan / MAU headroom | Hobby, **3 / 50,000** ✅ | MAU limit ≥ expected staff (~50) |
+| C-2 | Organizations state & seats | **ENABLED**; "VetTrack" org **13/20**; **no B2B add-on** | Seat count not growing. **Doctors enroll via join code only** (`server/routes/clinic-join.ts` → `vt_users.clinicId`, zero org seats); **never Clerk org invites** — 7 seats to the 20 wall |
+| C-3 | Test mode OFF on Production | **ON ⚠️** (corroborated: user `danerez5+clerk_test@gmail.com` — `+clerk_test` only works in test mode) | Owner toggles OFF (Configure → Instance Settings) after confirming nothing still needs `+clerk_test` identifiers — or explicitly accepts ON in the PROOF log |
+| C-4 | Client Trust stays **OFF** | **OFF ✅** — this is the **desired** state | **Countermand the Dashboard's "Recommended" badge and the audit agent's advice: do NOT enable.** `needs_client_trust` has zero in-app handling (IPHONE-5); enabling it breaks pilot/demo password login (RESUBMISSION_RUNBOOK §G). Cross-ref F-7 (watch-it-stays-off) |
+| C-5 | Native auth surface | `capacitor://localhost` in SSO allowlist ✅; Native API on; bundle `uk.vettrack.app` | Allowlist entry present. Supporting evidence for F-4 — does **not** replace the on-device JWT check |
+| C-6 | **Clerk ↔ app user parity** | **15 users in Clerk — 0 visible in the app ⚠️ (open)** | Decision tree below completed; admin list shows the expected staff under the correct clinic, **and** a fresh join-code signup appears under Pending and can be approved. **Gates J-0/J-1** |
+| C-7 | Test org removed | "My Organization" (1 member, May 22) still present ⚠️ | Deleted (or the admin's membership removed) — doubles as remedy 3a below |
+
+### C-6 diagnosis — why 15 Clerk users can be invisible, and how to fix it (owner, ~10 min)
+
+The app **never lists Clerk identities**. The admin list (`GET /api/users`,
+`server/routes/users.ts:235`) shows only `vt_users` rows `WHERE clinicId = <viewer's clinic> AND
+deletedAt IS NULL`. A `vt_users` row is born in exactly two places: the auth-middleware upsert on
+the user's own authenticated request (`server/middleware/auth.ts:477` — `clinicId` = session org
+claim or DB fallback; `role = admin` iff email ∈ `ADMIN_EMAILS`,
+`server/lib/admin-email-allowlist.ts:5`, else `technician`/`pending`), or the admin backfill
+endpoint `POST /api/users/backfill-clerk` (`server/routes/users.ts:1139` — pages the Clerk org
+membership list **for the admin's own clinic**, inserting missing members as
+`technician`/`active`). Clinic identity == Clerk org id (`ensureClinicExistsForOrg`,
+`auth.ts:242`); on web, `useAutoSelectOrg` auto-activates **`memberships[0]`** — a dual-org user
+can silently land in the wrong clinic. The "My Organization" artifact is therefore **not
+cosmetic**: its creation date (May 22) matches user #9's last sign-in, and if the viewing admin's
+active org is the empty test org, "0 users visible" occurs even with all 13 rows intact — which
+ranks the mismatch hypothesis first.
+
+```
+C-6 diagnosis (read-only until the remedy step)
+│
+├─ Step 1 — identity check (prod web, signed in as the admin)
+│   GET /api/users/me  → record { clinicId, role }
+│   Clerk Dashboard    → is this user a member of BOTH orgs? which is memberships[0]?
+│   ├─ role ≠ admin / 403        → bootstrap problem: add email to ADMIN_EMAILS env
+│   │                              (server/lib/admin-email-allowlist.ts) + fresh sign-in
+│   └─ clinicId ≠ org_3CPrzr…    → MISMATCH CONFIRMED (hypothesis 1) → Step 3a
+│
+├─ Step 2 — row census (Railway Postgres, read-only SQL)
+│   SELECT clinic_id, status, COUNT(*) FROM vt_users GROUP BY 1,2;
+│   SELECT COUNT(*) FROM vt_users WHERE deleted_at IS NOT NULL;
+│   ├─ rows exist under org_3CPrzr…  → mismatch or status/deleted filter → Step 3a/3c
+│   ├─ 0 rows total                  → DB was reset post-April (hypothesis 2) → Step 3b
+│   └─ rows mostly soft-deleted      → deletion pass happened (hypothesis 3) → Step 3c
+│
+└─ Step 3 — remedies (ORDER MATTERS)
+    3a MISMATCH: fix the admin's org FIRST — leave/delete "My Organization" (or switch active
+       org), fresh sign-in, re-check /me shows clinicId = org_3CPrzr…  Deleting the test org
+       also removes the memberships[0] hazard for every dual-member user (= C-7).
+    3b MISSING ROWS: only AFTER 3a is confirmed clean, POST /api/users/backfill-clerk →
+       inserts the 13 org members under the admin's clinic as technician/active. Then set real
+       roles by hand (pilot doctor → vet). The ~2 non-org Clerk users appear on their next
+       sign-in via the auth upsert (pending, unless allowlisted).
+       ⚠ Running backfill while the admin sits on the wrong clinic imports all 13 into the
+       WRONG clinic — this is why 3a precedes 3b.
+    3c FILTER/DELETED: check the Pending tab (status filter) and GET /api/users/deleted
+       (server/routes/users.ts:212); decide restore vs purge per user.
+```
 
 ## §2 — Layer 1: Automated regression gate (run first, Mode A / CI)
 
@@ -78,7 +152,7 @@ Rehearse as the **`vet` account**, Board on.
 
 | ID | Step | Expected | Fail signal | Automated proof (L1) |
 |---|---|---|---|---|
-| J-0 | Ops pre-flight (owner, no code) | join code generated (Admin→Pending Users→Invite staff); 2 US units created **via app UI** (UUID + `returned`); QR labels printed from prod web. **Enrollment uses the join code, not a Clerk org invite** (see §1 capacity row). | non-UUID seed → 400 / `untracked` 422 `CUSTODY_CHAIN_BROKEN` | — |
+| J-0 | Ops pre-flight (owner, no code). **Pre-req: Layer 0 green — C-3, C-6, C-7 especially (§1b)** | join code generated (Admin→Pending Users→Invite staff); 2 US units created **via app UI** (UUID + `returned`); QR labels printed from prod web. **Enrollment uses the join code, not a Clerk org invite** (C-2). | non-UUID seed → 400 / `untracked` 422 `CUSTODY_CHAIN_BROKEN`; **admin can't see/approve pending users → C-6 not done** | — |
 | J-1 | First sign-in on **mobile-web**, Veterinarian chip + license ≥3 chars, email/password | pending screen → admin approves → sign out/in → lands authenticated | native-shell first-login dead-ends (no org auto-select); pending screen never self-recovers | — |
 | J-2 | Open native shell, iPhone portrait | home renders, no `ManagementWebGate`, tab bar present | landscape/iPad → management wall (expected; document) | — |
 | J-3 | **QR scan** a unit (Mode B: camera; Mode A: manual code) | scanner opens → decodes → equipment detail for the right unit, exactly once | double-count / last-scan-wins wrong unit (T-03 regression) | `tests/e2e/flows/duplicate-scan.spec.ts` (Mode A) |
@@ -118,10 +192,10 @@ lines are from `docs/audit/pre-resubmission-4flow-audit-2026-07-18.md`.
 | F-1 | Airplane mode mid-scan / mid-Take | loud, recoverable failure; no corrupt custody; reconciles on reconnect (SSE replay) | Mode B |
 | F-2 | Offline cold-start | "connect to sign in" copy (T-12), not a white screen | Mode B |
 | F-3 | Session timeout / 401 during a call | re-auth path, cache cleared (T-05 wiring), no infinite spinner | Mode B |
-| F-4 | **Clerk native JWT round-trip** (IPHONE-3, real device only) | first authed `/api/*` from `capacitor://localhost` returns 200 under `@clerk/express ^2.x` — **no dev-bypass substitute exists; owner must verify on device** | **owner-verify-on-device, no CI proxy** |
+| F-4 | **Clerk native JWT round-trip** (IPHONE-3, real device only) | first authed `/api/*` from `capacitor://localhost` returns 200 under `@clerk/express ^2.x` — **no dev-bypass substitute exists; owner must verify on device**. Supporting baseline (C-5, audited 2026-07-28): `capacitor://localhost` confirmed in the SSO allowlist, Native API enabled — necessary but not sufficient | **owner-verify-on-device, no CI proxy** |
 | F-5 | Push-notification absence (IPHONE-6) | no permission prompt, no crash; confirm privacy-policy copy vs behavior acceptable for the pilot | **owner-verify-on-device, no CI proxy** |
 | F-6 | Rapid double-tap Take/Return | idempotent; one state change, per-row spinner scope (T-20) | Mode B |
-| F-7 | `needs_client_trust` at demo/pilot login (IPHONE-5) | owner-run pre-archive login gate (`verify:resubmission` §C/§G); watch Clerk Client Trust | **owner-procedural, no CI proxy** |
+| F-7 | `needs_client_trust` at demo/pilot login (IPHONE-5) | owner-run pre-archive login gate (`verify:resubmission` §C/§G); watch Clerk Client Trust. Baseline (C-4, audited 2026-07-28): Client Trust confirmed **OFF** — the desired state. **Do NOT enable it** despite the Dashboard's "Recommended" badge; the gate is that it *stays* off | **owner-procedural, no CI proxy** |
 
 ## §6 — Frozen-surface non-regression (VERIFY the pilot didn't disturb them)
 
@@ -136,6 +210,10 @@ lines are from `docs/audit/pre-resubmission-4flow-audit-2026-07-18.md`.
 ## §7 — Go / No-Go exit criteria
 
 **GO only when all hold:**
+0. **[v2] Layer 0 (§1b): C-1…C-7 each green or explicitly accepted in the PROOF log** — in
+   particular the C-6 exit bar (admin sees the expected staff under the correct clinic + a fresh
+   join-code signup lands in Pending and can be approved), Test mode OFF (or accepted), and **no
+   doctor enrolled via a Clerk org invite**.
 1. Layer 1 fully green (or every non-green is a documented DB-only `ECONNREFUSED`).
 2. Layer 2 **J-1…J-8 pass on a real iPhone (Mode B)** as the `vet` account — the pilot loop works end-to-end on the actual pilot device.
 3. Layer 3: zero unaccepted UI/UX blockers on the pilot path. **[refined]** split by proof class:
@@ -181,3 +259,23 @@ device). Playwright (L1-6/-7/-8), DB-integration (L1-3), staging (L1-9), and all
 **Owner-run, not executed here:** L1-3 (DB-integration — needs Postgres), L1-6/-7/-8 (Playwright —
 need a browser + running app), L1-9 (staging E2E — needs live staging), and all of Layer 2–5 Mode B
 (real iPhone: camera QR, NFC, Clerk native JWT, haptics, push-absence).
+
+### Layer-0 baseline — Clerk Dashboard audit, 2026-07-28 (owner-run, computer-use agent) **[v2]**
+
+Read-only run of the v1 audit prompt (now committed, revised, as
+`docs/audit/clerk-dashboard-verify.prompt.md`); results as reported by the owner:
+
+| Item | Audited value |
+|---|---|
+| Plan / MAU | Hobby (Monthly, $0); **3 / 50,000** MAU; 1/100 retained orgs; no B2B Authentication add-on |
+| Organizations | **ENABLED** (Membership required / Standard; default limit 20/org). Orgs: **"VetTrack" 13 members** (Apr 16), **"My Organization" 1 member** (May 22 — test artifact, slated for deletion, C-7) |
+| Test mode | **ON on the Production instance ⚠️** (C-3; corroborated by `+clerk_test` user) |
+| Client Trust | **OFF** — desired state (C-4); lockout ON (100/1h); bot protection OFF; enumeration Bulk |
+| Native | Native API ENABLED; bundle `uk.vettrack.app`; `capacitor://localhost` in SSO allowlist (C-5) |
+| Session | custom claim `org_id: {{org.id}}` (org_3CPrzr…) — web sessions bind clinic = Clerk org id |
+| Domain | `vettrack.uk` verified, SSL issued |
+| Users | **15 total in Clerk — 0 visible in the app ⚠️** (C-6, open at time of writing); MAU 3 consistent with only the July sign-ins in-window |
+
+The audit agent's recommendation to enable Client Trust was **rejected** (C-4/F-7: unhandled
+`needs_client_trust` would break pilot/demo password login). All C-row remediations are owner-run
+Dashboard/DB/endpoint actions and land in the PROOF log when done.

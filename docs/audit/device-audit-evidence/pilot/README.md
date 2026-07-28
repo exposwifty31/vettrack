@@ -17,6 +17,11 @@ J-8.png    # Board shows held/returned + custodianName (never a full email)
 U-2.png    # /handoff header/back clear of the Dynamic Island (verify-still-fixed)
 U-3.png    # Equipment detail Tools sheet on native — no Print QR button
 F-4.png    # First authed /api/* from capacitor://localhost returns 200 (Clerk native JWT)
+C-2.png    # Clerk Dashboard: "VetTrack" org member count vs the 20-seat limit
+C-3.png    # Clerk Dashboard: Production instance Test mode toggle state (expected OFF)
+C-6-me.png # GET /api/users/me — the admin's { clinicId, role } during the parity diagnosis
+C-6-sql.png# vt_users row census (clinic_id/status counts) from the C-6 decision tree
+C-7.png    # Organizations list with "My Organization" deleted
 ```
 
 Multi-shot rows may use a suffix: `J-3-a.png`, `J-3-b.png`.
