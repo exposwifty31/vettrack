@@ -114,6 +114,36 @@ describe("action-proposal citation validator", () => {
     });
   });
 
+  describe("shift_handover_draft kind (§2)", () => {
+    const handoverGroundTruth: ActionProposalCitedFact[] = [
+      { sourceId: "a1b2c3d4-0000-0000-0000-000000000001", sourceTable: "vt_audit_logs", kind: "equipment_checked_out", at: "2026-07-22T07:00:00.000Z" },
+      { sourceId: "42", sourceTable: "vt_event_outbox", kind: "TASK_UPDATED", at: "2026-07-22T08:00:00.000Z" },
+    ];
+
+    it("validates true when the handover kind's real citations (checked against its own reader's ground truth) are used", () => {
+      const result = validateActionProposalCitations(handoverGroundTruth, handoverGroundTruth);
+      expect(result.valid).toBe(true);
+      expect(result.checks).toEqual([
+        { sourceId: "a1b2c3d4-0000-0000-0000-000000000001", valid: true },
+        { sourceId: "42", valid: true },
+      ]);
+    });
+
+    it("flags a fabricated sourceId for the handover kind as citation_not_grounded", () => {
+      const tampered: ActionProposalCitedFact[] = [
+        ...handoverGroundTruth,
+        { sourceId: "fabricated-handover-99", sourceTable: "vt_audit_logs", kind: "equipment_checked_out", at: "2026-07-22T07:05:00.000Z" },
+      ];
+      const result = validateActionProposalCitations(tampered, handoverGroundTruth);
+      expect(result.valid).toBe(false);
+      expect(result.checks).toContainEqual({
+        sourceId: "fabricated-handover-99",
+        valid: false,
+        flag: "citation_not_grounded:fabricated-handover-99",
+      });
+    });
+  });
+
   describe("crash_cart_drift kind (§5)", () => {
     const crashCartGroundTruth: ActionProposalCitedFact[] = [
       { sourceId: "check-1", sourceTable: "vt_crash_cart_checks", kind: "check_missing_items", at: "2026-07-22T10:00:00.000Z" },

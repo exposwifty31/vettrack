@@ -4489,6 +4489,10 @@
   },
   "autopilotQueue": {
     "kinds": {
+      "shiftHandoverDraft": {
+        "title": "מסירת משמרת מוכנה לבדיקה",
+        "summaryTemplate": "{deltaCount, plural, one {עדכון אחד נרשם במהלך המשמרת} other {# עדכונים נרשמו במהלך המשמרת}} — יש לבדוק ולאשר כדי לפרסם את המסירה למשמרת הבאה."
+      },
       "coordinatorReassignOffRoster": {
         "title": "רכז הציוד אינו ברשימת הצוות",
         "summaryTemplate": "רכז הציוד שהוקצה למשמרת {shiftDate} אינו נמצא עוד ברשימת הצוות הנוכחית — מוצע תחליף בהמשך.",

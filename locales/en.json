@@ -4489,6 +4489,10 @@
   },
   "autopilotQueue": {
     "kinds": {
+      "shiftHandoverDraft": {
+        "title": "Shift handover ready for review",
+        "summaryTemplate": "{deltaCount, plural, one {1 update was recorded for this shift} other {# updates were recorded for this shift}} — review and approve to publish the handover to the next shift."
+      },
       "coordinatorReassignOffRoster": {
         "title": "Equipment Coordinator off roster",
         "summaryTemplate": "The Equipment Coordinator assigned for {shiftDate} is no longer on today's roster — a replacement is suggested below.",
