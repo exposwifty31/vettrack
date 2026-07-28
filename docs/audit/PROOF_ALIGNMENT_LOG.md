@@ -5363,6 +5363,19 @@ before commit; the audit's actionable findings are now harness rows with baselin
 
 **Verdict:** VERIFIED (prod, owner-run activation).
 
+## 2026-07-28 — Phase 1 close: identity hardening (#9) + a11y sweep + security spot-checks
+
+**Claims:** (1) JIT clinic-minting guard + sole-clinic-admin deletion block shipped TDD; (2) WCAG pass fixed to Lighthouse a11y 100/100; (3) targeted security checks clean.
+
+**Evidence:**
+- **JIT guard (C-6 defense-in-depth):** `server/lib/auth/jit-clinic-policy.ts` pure decision fn wired into `resolveAuthUser` before `ensureClinicExistsForOrg` — an unknown session org mints a clinic ONLY for the ADMIN_EMAILS bootstrap; unknown org + existing user proceeds on the DB clinic; unknown org + unknown user → 403 MISSING_CLINIC_ID (join-code screen) + new audit kind `jit_clinic_mint_blocked`. RED-first: `tests/jit-clinic-policy.test.ts` failed on missing module, then green (4 cases).
+- **Deletion hardening:** `planClerkOrgCleanup` (pure, RED-first `tests/clerk-org-cleanup-plan.test.ts`, 4 cases) + `cleanupClerkOrgsBeforeDeletion` — junk sole-member orgs (no vt_clinics row) deleted non-fatally BEFORE Clerk user deletion; sole member of a REAL clinic org throws `SoleClinicAdminError` → route 409 `SOLE_CLINIC_ADMIN` BEFORE any DB mutation. `deleteClerkUser` non-fatal semantics unchanged.
+- **Test adaptations (disclosed):** three auth-mock suites (`admin-emails-promotion`, `requested-role-provisioning`, `collab-handshake-identity-clerk`) queued/resolved db results positionally and never modeled `vt_clinics`; their helpers now model a KNOWN clinic so lifecycle semantics stay on the original path (guard matrix lives in its own suite). Full suite: **689 files / 6110 passed / 0 failed** (dev-DB URL; the vitest fallback `vettrack_test` sidecar DB is stale pre-migration-178 — env note, not a defect).
+- **a11y (PR #148):** Lighthouse desktop /home 92→**100**, mobile /equipment 96→**100** (ivory-text3 AA darken light themes; additive sys-*-text tokens + pctTextColor for KPI numerals — Code Blue visuals untouched; 2.5.3 label fixes; FAB-obscured close cleared). Screenshots in docs/audit/screenshots/p1-lighthouse/.
+- **Security spot-checks (1.4):** limiters present on push (`authSensitiveLimiter`/`pushTestLimiter`), action-proposal decisions, clinic-join; live-secret grep over src/server/scripts clean (only prefix-validation code); tenancy refs present in newest routes.
+
+**Verdict:** VERIFIED (RED→GREEN evidence above; full suite green; typecheck 0).
+
 ## 2026-07-28 — Phase 1: L1 matrix + M1 verification + M2 privacy-copy fix
 
 **Claims:** (1) L1 browser matrix run; (2) M1 (tombstone PII) verified already fixed — no change needed; (3) M2 privacy copy corrected.

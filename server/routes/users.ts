@@ -15,7 +15,7 @@ import {
   exchangeAppleAuthorizationCode,
   isAppleRevocationConfigured,
 } from "../lib/apple-auth.js";
-import { deleteOwnAccount, AccountDeletionProtectedError } from "../services/account-deletion.service.js";
+import { deleteOwnAccount, AccountDeletionProtectedError, SoleClinicAdminError } from "../services/account-deletion.service.js";
 import { logAudit, resolveAuditActorRole } from "../lib/audit.js";
 import { resolveApprovalRole } from "../lib/approval-role.js";
 import { resolveCurrentRole } from "../lib/role-resolution.js";
@@ -1369,6 +1369,16 @@ router.delete("/delete-account", requireAuthAny, authSensitiveLimiter, async (re
 
     return res.status(200).json({ success: true, ...result });
   } catch (err) {
+    if (err instanceof SoleClinicAdminError) {
+      return res.status(409).json(
+        apiError({
+          code: "CONFLICT",
+          reason: "SOLE_CLINIC_ADMIN",
+          message: "You are the only member of your clinic's organization; transfer or remove the clinic before deleting this account.",
+          requestId,
+        }),
+      );
+    }
     if (err instanceof AccountDeletionProtectedError) {
       return res.status(403).json(
         apiError({

@@ -2,6 +2,8 @@ import type { Request, Response, NextFunction } from "express";
 import * as Sentry from "@sentry/node";
 import { clerkClient } from "@clerk/express";
 import { clinics, db, displayDevices, users } from "../db.js";
+import { logAudit } from "../lib/audit.js";
+import { decideJitClinicPolicy } from "../lib/auth/jit-clinic-policy.js";
 import { and, eq, isNull, sql } from "drizzle-orm";
 import { constantTimeEqual, hashToken, looksLikeDisplayToken } from "../lib/display-token.js";
 import { randomUUID } from "crypto";
@@ -464,10 +466,54 @@ export async function resolveAuthUser(req: Request): Promise<ResolveResult> {
   // Verification artifact — only meaningful when the user self-requested `vet`.
   const vetLicenseNumber = requestedRole === "vet" ? sanitizeVetLicense(vetLicenseRaw) : null;
 
-  // Guarantee the clinic row exists before inserting the user. A new Clerk
-  // organization has no matching vt_clinics row until this fires; without it
-  // the user insert violates the vt_users_clinic_id_fk FK constraint.
-  await ensureClinicExistsForOrg(clerkOrgId);
+  // C-6 hardening: never mint a vt_clinics row as a sign-in side effect of an
+  // unknown session org (that is how junk clinics were born under Clerk's
+  // forced org-creation). Mint only for the deliberate ADMIN_EMAILS bootstrap;
+  // an unknown org with an existing user proceeds on their DB clinic; an
+  // unknown org with an unknown user is treated as clinic-less so the
+  // join-code screen (ADR-007) takes over.
+  // Common case (known clinic): ONE indexed SELECT and no mint call at all —
+  // cheaper than the previous unconditional insert-on-conflict. The extra
+  // existing-user SELECT and any mint run only on the rare unknown-org path.
+  const [knownClinic] = await db
+    .select({ id: clinics.id })
+    .from(clinics)
+    .where(eq(clinics.id, clerkOrgId))
+    .limit(1);
+  if (!knownClinic) {
+    const [preexistingUser] = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(and(eq(users.clerkId, clerkUserId), isNull(users.deletedAt)))
+      .limit(1);
+    const jitDecision = decideJitClinicPolicy({
+      clinicExists: false,
+      adminEmail,
+      hasExistingUser: Boolean(preexistingUser),
+    });
+    if (jitDecision === "block-clinicless") {
+      logAudit({
+        actorRole: null,
+        clinicId: clerkOrgId,
+        actionType: "jit_clinic_mint_blocked",
+        performedBy: clerkUserId,
+        performedByEmail: clerkEmail || "unknown",
+        targetType: "clinic",
+        targetId: clerkOrgId,
+        metadata: { reason: "unknown_session_org_unknown_user" },
+      });
+      return {
+        ok: false,
+        status: 403,
+        body: buildAccessDeniedBody("MISSING_CLINIC_ID", "User is not assigned to a clinic"),
+      };
+    }
+    if (jitDecision === "proceed-mint") {
+      // Deliberate ADMIN_EMAILS new-clinic bootstrap — the one sanctioned mint.
+      await ensureClinicExistsForOrg(clerkOrgId);
+    }
+    // "proceed-existing": no mint — the upsert keeps the user's DB clinic.
+  }
 
   // SECURITY: Role is ALWAYS resolved from the database record.
   // The onConflictDoUpdate set clause deliberately excludes `role` so that
