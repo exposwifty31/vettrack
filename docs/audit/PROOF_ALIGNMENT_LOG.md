@@ -4987,3 +4987,122 @@ Disclosed per the task's own "or disclose why not run" allowance — not run to 
 - Finding 5 (rewrite the §2 handover-sequencing rationale in `docs/plans/2.0/task-1.1-autopilot-shadow.md`): narrative about the §2 slice (#138) landed separately; not a #136 defect.
 
 **Verdict:** VERIFIED.
+
+## 2026-07-28 — Task 1.1 Phase-0 artifacts landed via cherry-pick (branch claude/refine-local-plan-d4pfl0)
+
+**Claim:** Landed the six net-new Task 0.1–0.5 Phase-0 artifacts on `main` directly (fresh branch off
+current main), NOT by merging the stale `claude/task-1.1-autopilot-shadow` branch (which forked from an
+old base and would have conflicted on/reverted newer main content and dragged in unrelated `.claude/skills/*`,
+a 10x plan library, and ~54 doc deletions). Files landed: `docs/design/case-spine-allowlist.md` (0.1),
+`docs/plans/2.0/case-spine-spike-findings.md` (0.2), `docs/plans/2.0/autopilot-spike-findings.md` (0.3),
+`docs/design/autopilot-policy-layer.md` (0.4), `docs/plans/2.0/autopilot-backtest.md` +
+`scripts/analysis/autopilot-backtest.ts` (0.5). The roadmap and scope-gate were deliberately NOT touched
+(main's strict versions win). The original per-task PROOF entries from the docs branch are reproduced below
+for the audit record; their internal "X/18 shipped" scope-gate references are historical (the old 18-task
+tracker) and describe the state at authoring time.
+
+**Evidence (this landing, verified on branch `claude/refine-local-plan-d4pfl0` off current `main`):**
+- Landed file set = exactly the six files named above + this PROOF append. `git diff --name-only main..HEAD`
+  shows only those seven paths; **no** `docs/vettrack-2.0-roadmap.md` and **no**
+  `scripts/vettrack-2.0-scope-gate.sh` in the diff (main's strict 19-task versions untouched).
+- Scope-gate unchanged: `bash scripts/vettrack-2.0-scope-gate.sh` → `VetTrack 2.0 scope: 7/19 shipped.`
+  (identical to `main` before this branch — the six docs add no `- [ ] N.N` tracker rows).
+- `npx tsc -p tsconfig.server.json --noEmit` and `npx tsc --noEmit` → 0 errors (the backtest script is in
+  neither tsconfig `include`, so it is not typechecked; it is a standalone `tsx`-run harness).
+- `pnpm test` (full vitest suite, run 2026-07-28 on this branch) → **5839 passed, 255 skipped, 20 failed
+  across 16 files**. Every one of the 16 failing files is a DB-backed test (`*.integration.test.ts` plus
+  the `shift-handover-*` suites) and every failure signature is `connect ECONNREFUSED 127.0.0.1:5432` —
+  i.e., no local Postgres in this ephemeral environment, **not** an assertion/logic failure. These are
+  pre-existing environment failures that reproduce identically on `main` (they need `DATABASE_URL` + a
+  running Postgres, per CLAUDE.md's DB-integration test notes); this PR changes **zero** compiled code
+  (six Markdown docs + one standalone `tsx` script in neither tsconfig + this PROOF append), so it cannot
+  introduce a test regression. All non-DB tests pass.
+- `pnpm exec tsx scripts/analysis/autopilot-backtest.ts` runs deterministically and prints its
+  "SYNTHETIC DATA — NOT real clinic history" banner.
+- **Scope caveat carried forward (CodeRabbit #141):** the reproduced Task 0.5 "Verdict: VERIFIED" below
+  covers the **harness + synthetic smoke-test only** (owner-approved deviation). The roadmap's **real-data**
+  Task 0.5 gate — a real clinic-month backtest with precision/recall/threshold evidence — **remains
+  outstanding** and must be run before Task 2.5 sets any `enforce` threshold. The autopilot-backtest doc and
+  script were updated in this same landing to state that all four signal streams are synthetic.
+- **Round-2 CodeRabbit #141 hardening (commit `c5e5ceb`):** two design-doc accuracy/safety follow-ups
+  landed on this branch after the first re-review. (1) `docs/design/autopilot-policy-layer.md` §4 revoke
+  note strengthened to require the implementing (Task 2.5(a)) execution path make the **final revoke gate
+  bypass the TTL cache** — an uncached current-version policy read, not the cached `effectiveMode` (which
+  can hold a stale `approved` for the ≤10s window) — **atomically coupled** to the irreversible write
+  (same-transaction / conditional-write-on-current-version, or a transactional-outbox / state-transition
+  for external side effects); the ≤10s TTL stays acceptable for *raising* the floor but not for revoke.
+  §3 also carries a review-flagged note requiring target-clinic authorization (never trust a
+  request-supplied `clinicId`). Both are captured as implementation gates on a not-yet-built route, not
+  changes to landed code. (2) `docs/design/case-spine-allowlist.md`: reconciled the completed checklist
+  with the two documented non-event-table allowlist rows (current-state `vt_rooms`, intrinsic `vt_cases`
+  status) and defined the unresolved-PMS identity-strip rendering (explicit pending badge for a null
+  `patientExternalId`; never a substituted/inferred identity). Docs-only; no compiled code touched.
+
+---
+
+## 2026-07-19 — VetTrack 2.0 Task 0.1 (Case allowlist/denylist spec) completed (uncommitted)
+
+**Claim:** Added `docs/design/case-spine-allowlist.md` — the operational allowlist / clinical-PHI denylist spec for the Case Spine (Task 0.1 of `docs/vettrack-2.0-roadmap.md`), and flipped the 0.1 box in the roadmap's scope tracker (`[ ]` → `[x]`).
+
+**Evidence:**
+- RED→GREEN: wrote `$CLAUDE_JOB_DIR/tmp/verify-task-0.1.sh` first; ran RED (file absent, exit 1) before writing the doc; wrote the doc; ran GREEN (all 5 checks `ok:`, exit 0) — checklist fully checked, 7 allowlist rows cite real `vt_` tables, 9 denylist citations of "decision #1", PMS-key linkage section present, no denylist leakage into the allowlist table (fixed a verifier scoping bug — `-A40` window overran the short Allowlist section into Denylist — root-caused and fixed the check, not the doc).
+- Independent fresh-context review (Agent, no inherited reasoning, given only the diff + Task 0.1's Verify block): **PASS**. Confirmed all 7 cited source tables exist and are `clinicId`-scoped in `server/schema/*.ts` (`scanLogs`→`vt_scan_logs` equipment.ts:553, `rooms`→`vt_rooms` equipment.ts:26, `appointments`→`vt_appointments` tasks.ts:6, `codeBlueSessions`→`vt_code_blue_sessions` er.ts:34, `dispenseEvents`→`vt_dispense_events` inventory.ts:213, `damageEvents`→`vt_damage_events` equipment.ts:646, `equipmentRfidReads`→`vt_equipment_rfid_reads` equipment.ts:190); confirmed `CanonicalPatientV1` (canonical.v1.ts) and `ExternalPatient`/`patientExternalId` (types.ts) exist as cited. Reviewer flagged 2 precision issues (stale line numbers on 2 rows off-by-one; `patientExternalId` conflated with `ExternalPatient` when it's actually on `ExternalAppointment`, types.ts:101) — both fixed in the doc (now cites `ExternalPatient.externalId` at types.ts:46, corrected line refs to equipment.ts:190/646), no boundary/denylist defect. Re-ran the verifier after fixes → still exit 0.
+- Scope gate: `scripts/vettrack-2.0-scope-gate.sh` → `[2.0-gate] VetTrack 2.0 scope: 1/18 shipped.` (17 open items listed).
+- Command: `git status --porcelain` → `M docs/audit/PROOF_ALIGNMENT_LOG.md`, `M docs/vettrack-2.0-roadmap.md`, `?? docs/design/case-spine-allowlist.md` (only these 3 paths).
+
+**Verdict:** VERIFIED
+
+## 2026-07-19 — VetTrack 2.0 Task 0.2 (`vt_cases` spike) completed (uncommitted)
+
+**Claim:** Ran a TDD spike (Opus 4.8, isolated git worktree per the roadmap's model-routing policy) proving the Case Spine physical×clinical join and offline reconcile on one event path (dispense), wrote `docs/plans/2.0/case-spine-spike-findings.md` from the results, and flipped the 0.2 box in the roadmap's scope tracker.
+
+**Evidence:**
+- Spike built via TDD (RED before code) in worktree `/Users/dan/vettrack/.claude/worktrees/agent-ad05bf556984d8f59`, branch `worktree-agent-ad05bf556984d8f59`, commit `961378e55`, branched from `a428cba42`. **Not merged, not pushed** — per the task's "Done when: spike branch NOT merged (learning artifact)" bar.
+- New: `server/schema/cases.ts` (`vt_cases` — operational-only columns per Task 0.1's allowlist), additive nullable `caseId` on `vt_dispense_events` (`server/schema/inventory.ts:240`), `server/lib/case-spine.ts` (DB-free reader/writer port, `readiness-forecast-engine.ts` DI pattern), `server/services/case-spine.store.ts` (Drizzle adapter, not route-wired), `src/lib/case-attach-offline.ts` + `case_attach` added to `PendingSyncType` (`src/lib/offline-db.ts`, reusing the existing `pendingSync` queue — no Dexie store/version change), `tests/case-spine-spike.test.ts`, `tests/case-attach-offline-reconcile.test.ts`.
+- Independent fresh-context review (Agent, no inherited reasoning, re-ran every command itself against the actual worktree rather than trusting the implementer's report): **PASS** on all 6 checked claims — `pnpm typecheck` 0 errors (re-run, confirmed), `pnpm test -- tests/case-spine-spike.test.ts tests/case-attach-offline-reconcile.test.ts` → 2 files / 5 tests passed (re-run, exact match), `git diff --stat a428cba42..HEAD` matches claimed file set + line counts exactly, zero hits grepping all changed files for frozen-surface terms (`realtime-outbox`, `event-publisher`, `vt_event_outbox`, `code-blue`, `vt_appointments`, `appointmentsPage`) and zero diff on `package.json`'s `dexie` line, every query in the 3 new server files independently re-read and confirmed `clinicId`-scoped, `vt_cases` confirmed to carry no clinical/PHI columns and `caseId` confirmed genuinely nullable. Two non-blocking footnotes: no migration SQL was generated (drizzle-kit@0.28.1 ESM resolution quirk unrelated to the spike, noted as a Task 1.2 seam) and the "untracked files" framing in the original report was stale post-commit (content correct, status description outdated) — both carried into the findings doc.
+- `docs/plans/2.0/case-spine-spike-findings.md` created with 6 sections (schema, server binding, client offline mechanism, seams Task 1.2 must build through, verification evidence, spike branch) — every seam from the implementer's report cross-checked against the independent reviewer's findings before being written.
+- Scope gate: `scripts/vettrack-2.0-scope-gate.sh` → expected `2/18 shipped` after this commit (verified below).
+- Command: `git status --porcelain` (on `claude/docs-cleanup`, main working tree — the spike lives entirely in a separate worktree and never touched this branch) → `M docs/audit/PROOF_ALIGNMENT_LOG.md`, `M docs/vettrack-2.0-roadmap.md`, `?? docs/plans/2.0/case-spine-spike-findings.md` (only these 3 paths).
+
+**Verdict:** VERIFIED
+
+## 2026-07-19 — VetTrack 2.0 Task 0.3 (Autopilot shadow spike) completed (uncommitted)
+
+**Claim:** Ran a TDD spike (Sonnet 5, isolated git worktree per the roadmap's model-routing policy) proving the Shift Autopilot propose→approve loop — `action_proposal` staging, citation grounding, and approve/edit/reject with labeled-data capture — for one proposal type (auto-composed shift-handover draft). Wrote `docs/plans/2.0/autopilot-spike-findings.md` and flipped the 0.3 box in the roadmap's scope tracker.
+
+**Evidence:**
+- Spike built via TDD in worktree `/Users/dan/vettrack/.claude/worktrees/agent-a64779cdd0617e6ff`, branch `worktree-agent-a64779cdd0617e6ff`, commit `951aa8f9e`, branched from `a428cba42`. **Not merged, not pushed.**
+- **Critical discovery surfaced before dispatch** (my own grounding research, not the spike's): this repo already ships a live production feature, R-SH-F1 (`server/lib/shift-handover-generator.ts` + `shift-handover-scheduler.ts`), that auto-generates and auto-publishes a shift handover with no approval gate — directly overlapping the 2.0 vision's "human-approved draft" proposal type. The spike was scoped to read-only reuse of R-SH-F1's window/delta logic (one `export` keyword added to `aggregateDeltas`) and explicitly never touches the live auto-publish path. The resulting product question (does Autopilot's proposal replace, run alongside, or supersede R-SH-F1's auto-publish) is deliberately left open in the findings doc for Task 1.1 + the product owner to resolve — not silently decided.
+- New: `server/schema/ops.ts` additions (`actionProposal`, `actionProposalDecisionLog` — both `clinicId`-scoped), `server/lib/autopilot/{action-proposal-types,shift-delta-reader.port,action-proposal-writer.port,handover-draft-composer,action-proposal-service,action-proposal-citation-validator}.ts`, `server/workers/autopilotHandoverDraftWorker.ts`, `server/queues/autopilotHandoverDraft.queue.ts`, `server/routes/action-proposals.ts` (typechecks, deliberately unmounted), `tests/autopilot-spike.test.ts` (9 tests). 4 new `AuditActionType` union members added (`action_proposal_{staged,approved,edited,rejected}`).
+- Independent fresh-context review (Agent, re-ran every command itself against the actual worktree, did not trust the report): **PASS** on all 9 checked claims, with 2 corrections carried into the findings doc — (1) `audit.ts` diff is +6/−1 not the originally-reported +7/−1 (immaterial, corrected); (2) the spike deviated from the literal instruction to reuse `citation-validator.ts`/`ai-safety-validator.ts` and instead built a structurally parallel validator — independently investigated and found the underlying cause real (`CitationType` union has no outbox/audit member; `EvidenceGraph` is single-equipment-scoped, not shift-window-scoped) and the engineering call defensible for a spike, but flagged that the new validator's docstring overstates its authority by calling the citation-type union "FROZEN" when it isn't one of CLAUDE.md's actual frozen surfaces — corrected in the findings doc, left as an open decision for Task 1.1 rather than a forbidden option. Independently re-verified: typecheck 0/0 errors (both tsconfigs), 9/9 tests pass, diff-stat matches (14 files, 1650+/2-), zero diffs on all frozen-surface files (`shift-handover-scheduler.ts`, `realtime-outbox.ts`, `event-publisher.ts`, `package.json`, Code Blue, `vt_appointments`, and the `eventOutbox` table block inside `ops.ts` confirmed byte-identical), every query in the new server files `clinicId`-scoped, decision-transition guard is a real enforced check (not a happy-path-only test).
+- `docs/plans/2.0/autopilot-spike-findings.md` created with 10 sections (critical R-SH-F1 discovery, card anatomy, schema, union additions, server mechanism, citation-grounding proof + flagged deviation, approve/edit/reject proof, seams for Task 1.1, design-review note, verification evidence, spike branch).
+- Scope gate: `scripts/vettrack-2.0-scope-gate.sh` → expected `3/18 shipped` after this commit (verified below).
+- Command: `git status --porcelain` (on `claude/docs-cleanup`; the spike lives entirely in a separate worktree and never touched this branch) → `M docs/audit/PROOF_ALIGNMENT_LOG.md`, `M docs/vettrack-2.0-roadmap.md`, `?? docs/plans/2.0/autopilot-spike-findings.md` (only these 3 paths).
+
+**Verdict:** VERIFIED
+
+## 2026-07-19 — VetTrack 2.0 Task 0.4 (per-org policy layer design) completed (uncommitted)
+
+**Claim:** Wrote `docs/design/autopilot-policy-layer.md` (Opus 4.8, per the roadmap's model-routing policy — no code touched, design-only) — how an explicit org-approved policy sits above the existing `off | shadow | enforce` enforcement envelope as a ceiling clamp, gating `enforce` per proposal-kind per org. Flipped the 0.4 box in the roadmap's scope tracker.
+
+**Evidence:**
+- 8-item RED checklist at the doc's head (storage shape, resolution order, who approves, revocation, audit trail, failure default, admin UX, explicit off/throw-degrades statement) — all checked.
+- Architecture: policy storage reuses the real `vt_server_config` key-embedding convention (clinicId in the key string, not a column — confirmed the `getServerConfigValue` first parameter is genuinely unused in `server/lib/server-config.ts`); resolution is a ceiling clamp evaluated AFTER the base `off|shadow|enforce` mode resolver — `off` short-circuits before the policy layer is ever consulted, `shadow` passes through unaffected, only `enforce` gets clamped down to `shadow` if the org hasn't approved (never promotes upward). Fail-default = `shadow`, reasoned explicitly as the mirror-image of the existing evaluators' fail-open-to-`off` (both "fail toward least-irreversible state," pointed opposite directions because the two systems' default risk profiles are opposite).
+- Independent fresh-context review (Agent, re-derived every citation against the real source rather than trusting the doc): **PASS on all 7 checked claims, zero inaccuracies found.** Confirmed real: `server-config.ts`'s unused-clinicId-param pattern, `clinical-invariant.config.ts`'s exact resolution chain/TTL/cache-map convention the design reuses, the ceiling-clamp architecture as literally specified in the doc (quoted), the fail-open-to-allow precedent in `code-blue-log-drug-shock.ts` (`FAULT_OPEN_INTERNAL`) and `clinical-invariant.metrics.ts`'s fail-open metric, that `server/lib/audit.ts`'s closed `AuditActionType` union was NOT touched (design doc only names prospective future members), that the audit-vs-metrics split mirrors a real existing pattern (`clinical_invariant_fail_open_total` in `server/lib/metrics.ts`), and the explicit non-weakening statements in the doc's §0/§8 (quoted directly).
+- Command: `git status --porcelain` → exactly `?? docs/design/autopilot-policy-layer.md` before this commit's staging — no code/schema/config file touched by this task.
+- Scope gate: `scripts/vettrack-2.0-scope-gate.sh` → expected `4/18 shipped` after this commit (verified below).
+
+**Verdict:** VERIFIED
+
+## 2026-07-19 — VetTrack 2.0 Task 0.5 (operations-memory backtest) completed (uncommitted)
+
+**Claim:** Built `scripts/analysis/autopilot-backtest.ts` + `docs/plans/2.0/autopilot-backtest.md` (Sonnet 5, no worktree isolation — permanent deliverables written directly on `claude/docs-cleanup`) per the roadmap's model-routing policy. **Owner-approved deviation from the literal task spec:** no prod-copy/real clinic history was reachable in this environment (dev DB is empty/seed-scale, no dump files, no prior backtest artifact existed), so the harness was built on deterministic SYNTHETIC data instead, with the deviation disclosed loudly rather than presented as real. Flipped the 0.5 box in the roadmap's scope tracker.
+
+**Evidence:**
+- Script models all 4 roadmap proposal kinds (`shift_handover_draft`, `coordinator-reassign-when-off-roster`, `restock-PO-on-burn`, `crash-cart-drift`) over a synthetic 1-clinic-month (90 shift-windows/kind), using a fixed-literal-seeded `mulberry32` PRNG (`0x5eed_c0de`) — no `Math.random()`, no `Date.now()`, no DB import, no `server/schema/*` import. Prints an unmissable "SYNTHETIC DATA — NOT real clinic history" banner before the precision/recall/F1 table.
+- RED confirmed first: `pnpm exec tsx scripts/analysis/autopilot-backtest.ts` failed with `ERR_MODULE_NOT_FOUND` before the file existed. GREEN: script exits 0, table shows realistic noise per kind (none at trivial 1.0/1.0) — `shift_handover_draft` 0.853/0.935, `coordinator-reassign-when-off-roster` 0.400/0.556, `restock-PO-on-burn` 0.571/0.762, `crash-cart-drift` 0.211/0.667 (precision/recall).
+- Independent fresh-context review (Agent, re-ran every command itself, did not trust the implementer's report): **PASS on all 8 checked claims, zero discrepancies.** Independently re-ran the script twice into separate output files and diffed them byte-for-byte identical (proves determinism, not just claimed); independently grepped the script for `Math.random`/`Date.now`/DB imports (none, only disclaiming comments); independently confirmed no kind hits trivial 1.0/1.0; independently confirmed the report's SYNTHETIC disclosure sits in the first blockquote (not buried) and the Task-2.5 prohibition appears in substantive terms both near the top and restated at the bottom with a re-run procedure; independently diffed the report's printed table against its own freshly-captured run output, character-for-character identical; independently grepped both `tsconfig.json` and `tsconfig.server.json` `include` arrays and confirmed `scripts/**` is in neither (the "outside both typecheck surfaces" claim is accurate, not assumed) while still running both typechecks directly (0 errors each); independently read the script's `synthesizeConfusion` function and confirmed the report's prose methodology matches the actual generation logic line-for-line, no prose/code divergence.
+- Command: `git status --short` → exactly `docs/plans/2.0/autopilot-backtest.md` + `scripts/analysis/autopilot-backtest.ts` as new untracked paths before this commit's staging — nothing else in the tree touched, no frozen-surface file, no `server/lib/autopilot/*`, no `server/schema/ops.ts` touched.
+- Scope gate: `scripts/vettrack-2.0-scope-gate.sh` → expected `5/18 shipped` after this commit (verified below).
+
+**Verdict:** VERIFIED
