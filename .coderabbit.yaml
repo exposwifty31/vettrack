@@ -11,6 +11,9 @@ reviews:
     enabled: true
 
   path_filters:
+    # Explicit include overrides CodeRabbit's default lockfile exclusion so
+    # Dependabot pnpm-lock-only PRs still get a real review.
+    - "**/pnpm-lock.yaml"
     - "!**/.pnpm-store/**"
     - "!**/node_modules/**"
     - "!**/dist/**"
