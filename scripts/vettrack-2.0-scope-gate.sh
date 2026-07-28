@@ -7,9 +7,11 @@
 # silently passing — a gate that can't verify anything must not report success.
 set -u
 
-# Canonical set of the 19 tracker task IDs. Comparing against this exact set (not
-# just a count) catches a duplicated or substituted ID even when the total stays 19.
-CANONICAL_IDS="0.1 0.2 0.3 0.4 0.5 0.6 0.7 1.1 1.2 1.3 1.4 2.1 2.2 2.3 2.4 2.5 3.1 3.2 3.3"
+# Canonical set of the 18 tracker task IDs (1.3 transferred to the pilot→public
+# distribution program 2026-07-28 — the Play ship is owned there, not in this roadmap).
+# Comparing against this exact set (not just a count) catches a duplicated or
+# substituted ID even when the total stays 18.
+CANONICAL_IDS="0.1 0.2 0.3 0.4 0.5 0.6 0.7 1.1 1.2 1.4 2.1 2.2 2.3 2.4 2.5 3.1 3.2 3.3"
 
 if ! cd "$(dirname "$0")/.."; then
   echo "[2.0-gate] BLOCKED: could not cd to repo root — cannot verify scope, refusing to report success." >&2
@@ -74,14 +76,14 @@ for id in $actual_ids; do
 done
 
 if [ -n "$missing" ] || [ -n "$extra" ]; then
-  echo "[2.0-gate] BLOCKED: tracker ID set doesn't match the canonical 19 — tracker was edited structurally." >&2
+  echo "[2.0-gate] BLOCKED: tracker ID set doesn't match the canonical 18 — tracker was edited structurally." >&2
   [ -n "$missing" ] && echo "[2.0-gate]   missing:$missing" >&2
   [ -n "$extra" ] && echo "[2.0-gate]   unexpected:$extra" >&2
   exit 2
 fi
 
-if [ "$total" -ne 19 ]; then
-  echo "[2.0-gate] BLOCKED: scope tracker has $total items, expected 19 — tracker was edited structurally." >&2
+if [ "$total" -ne 18 ]; then
+  echo "[2.0-gate] BLOCKED: scope tracker has $total items, expected 18 — tracker was edited structurally." >&2
   exit 2
 fi
 
@@ -89,8 +91,8 @@ fi
 # over the whole file — the earlier version's separate `grep -c '^- \[x\] '` would
 # have silently counted any auxiliary checkbox line elsewhere in the doc too.
 done_count=$(echo "$records" | grep -cE '^[0-9]+:- \[x\] ')
-echo "[2.0-gate] VetTrack 2.0 scope: $done_count/19 shipped."
-if [ "$done_count" -lt 19 ]; then
+echo "[2.0-gate] VetTrack 2.0 scope: $done_count/18 shipped."
+if [ "$done_count" -lt 18 ]; then
   echo "[2.0-gate] Open items:"
   echo "$records" | grep -E '^[0-9]+:- \[ \] ' | sed -E 's/^[0-9]+:- \[ \] /[2.0-gate]   - /'
 fi

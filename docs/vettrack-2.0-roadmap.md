@@ -27,8 +27,8 @@
    feature- or phase-tier.
 5. Before flipping a tracker box: independent fresh-context review (diff + this task's Verify block only),
    visual evidence for UI scope, PROOF_ALIGNMENT_LOG entry.
-6. The Stop hook (`scripts/vettrack-2.0-scope-gate.sh`) prints `X/19 shipped` every session — the goal is
-   19/19.
+6. The Stop hook (`scripts/vettrack-2.0-scope-gate.sh`) prints `X/18 shipped` every session — the goal is
+   18/18.
 
 ## Working agreement — Claude Code ↔ Claude Design sync (before any build)
 
@@ -58,10 +58,9 @@ Stop hook prints the shipped count at every session end.
 - [x] 0.4 Per-org policy layer design
 - [x] 0.5 Operations-memory backtest (synthetic harness — owner-approved deviation, real data unreachable)
 - [ ] 0.6 Pricing-model decision
-- [x] 0.7 Native shell & plugin hygiene (haptics dev-diagnostic + dead-code removed + docs law; on-device physical confirmation still OPEN — needs real hardware)
+- [x] 0.7 Native shell & plugin hygiene (box covers the accepted CODE-LAYER scope only: haptics dev-diagnostic + dead-code removed + docs law; the on-device physical confirmation is explicitly carved OUT of this task's acceptance and owned by the distribution program's H5 physical-device gate — still open there)
 - [x] 1.1 Shift Autopilot — shadow mode
 - [ ] 1.2 The Case Spine
-- [ ] 1.3 Ship the Android app (Google Play)
 - [ ] 1.4 Consumable-usage capture (reconnect dispense → patient → billing)
 - [ ] 2.1 One-tap "attach to case" pin
 - [ ] 2.2 The Live Floor + The Baton
@@ -72,7 +71,7 @@ Stop hook prints the shipped count at every session end.
 - [ ] 3.2 Controlled-substance compliance module
 - [ ] 3.3 Reception War-Room
 
-## Program state & artifact map (2026-07-22)
+## Program state & artifact map (updated 2026-07-28)
 
 **This roadmap is the single authoritative 2.0 plan.** Everything else in the program layers under it
 by reference — nothing is duplicated into it, and the referenced documents are never rewritten here:
@@ -85,37 +84,47 @@ by reference — nothing is duplicated into it, and the referenced documents are
 - `docs/design/program-plan.md` — experience direction (per-role UX, management console, board).
 - `docs/plans/2.0/` — per-task execution plans (breakdown-first deliverables of Phase 1+ tasks).
 
-**Artifact map.** Where each completed task's deliverable actually lives. Branch-side rows were
-verified locally 2026-07-22 (`git show --stat` per commit); `claude/task-1.1-autopilot-shadow` is
-**on origin since 2026-07-22** (pushed at `c745707ac`, owner-authorized) — unmerged, so branch-side
-paths resolve via `origin/claude/task-1.1-autopilot-shadow:<path>`, not `main`. Each Phase-0 task
-also has a PROOF_ALIGNMENT_LOG entry in the branch's copy of the log.
+**Scope transfer + freeze status (owner-decided 2026-07-28).** Task 1.3 (Ship the Android app) is
+**transferred out of this roadmap**: both store submissions (Apple resubmission + first-time Google
+Play) are owned end-to-end by the pilot→public **distribution program** (its Phases 0–1 shipped
+2026-07-28 — see `docs/audit/pre-pilot-qa-harness.md` and the 2026-07-28 PROOF_ALIGNMENT_LOG entries).
+The tracker above now counts **18** tasks; `scripts/vettrack-2.0-scope-gate.sh` is updated in the same
+commit (its canonical-ID contract requires lockstep edits). Task 0.7's open on-device residual rides
+the same program (its Phase-3 H5 physical-device gate). The Android **FCM push path stays 2.0-side** —
+deliberately not part of the store ship (the native iOS app ships without push today, and the store
+privacy answers say exactly that); it is UNTRACKED today — outside the 18/18 completion contract —
+and becomes a real tracker row (+ lockstep scope-gate update) only if the owner prioritizes it. **2.0 execution
+freeze (owner-resolved 2026-07-28):** 2.0 build work stays frozen while the distribution program is in
+flight and resumes — next task: **1.2 The Case Spine** — once BOTH store submissions are in review,
+under one guardrail: no changes on native-shell build paths while a store review is open.
+
+**Artifact map.** Where each completed task's deliverable actually lives. Re-verified 2026-07-28:
+the Task-1.1 slice stack (`feat/2.0-task-1.1-s1…s6`) is **merged — every artifact below now lives on
+`main`** (file existence checked on `origin/main` at `b7e221cff`). The historical
+`claude/task-1.1-autopilot-shadow` branch (pushed `c745707ac`) is superseded by the merged slice
+stack and is reference-only.
 
 | Task | Artifact | Lives on | Caveat carried forward |
 |---|---|---|---|
-| 0.1 | `docs/design/case-spine-allowlist.md` | branch (5b18a691e) | — |
-| 0.2 | `docs/plans/2.0/case-spine-spike-findings.md` | branch (6c5699653) | spike code on local branch `worktree-agent-ad05bf556984d8f59` |
-| 0.3 | `docs/plans/2.0/autopilot-spike-findings.md` | branch (8f52e1257) | spike code on local branch `worktree-agent-a64779cdd0617e6ff` |
-| 0.4 | `docs/design/autopilot-policy-layer.md` | branch (18c9def43) | — |
-| 0.5 | `docs/plans/2.0/autopilot-backtest.md` + `scripts/analysis/autopilot-backtest.ts` | branch (179e5aeb1) | **SYNTHETIC harness — never cite for real thresholds** |
-| 0.7 | code + `docs/capacitor-native-app.md` hygiene law | branch (9766e548f) | on-device physical confirmation still OPEN |
-| 1.1 plan | `docs/plans/2.0/task-1.1-autopilot-shadow.md` | branch (45d429a85, c745707ac); **now also on the slice stack with an execution-status header** | ACTIVE task |
-| 1.1 slices §1/§3/§4 | code + tests + PROOF entries; plan's execution-status header is the index | **local stacked branches** `feat/2.0-task-1.1-s{1,3,4}-*` (s4 tip carries all three; unpushed, no PRs — owner gate) | §5, §2, §6/§1.5 outstanding; tracker box stays unflipped until all four kinds staged in shadow + visual evidence |
+| 0.1 | `docs/design/case-spine-allowlist.md` | **main** | — |
+| 0.2 | `docs/plans/2.0/case-spine-spike-findings.md` | **main** | spike code on local branch `worktree-agent-ad05bf556984d8f59` |
+| 0.3 | `docs/plans/2.0/autopilot-spike-findings.md` | **main** | spike code on local branch `worktree-agent-a64779cdd0617e6ff` |
+| 0.4 | `docs/design/autopilot-policy-layer.md` | **main** | — |
+| 0.5 | `docs/plans/2.0/autopilot-backtest.md` + `scripts/analysis/autopilot-backtest.ts` | **main** | **SYNTHETIC harness — never cite for real thresholds** |
+| 0.7 | code + `docs/capacitor-native-app.md` hygiene law | **main** | on-device residual → distribution program (H5) |
+| 1.1 plan + slices | `docs/plans/2.0/task-1.1-autopilot-shadow.md` (execution-status header = index) + code/tests/PROOF entries | **main** (slice stack s1–s6 merged) | shipped; tracker box [x] |
 | 2.3 plan | `docs/plans/2.0/task-2.3-who-on-floor.md` | **main** | — |
 | Binding decisions | `.claude/docs/ai/vettrack/10x/session-2.md` | **main** | reference-only, never rewritten |
-
-("branch" = `claude/task-1.1-autopilot-shadow`, on origin, unmerged.)
 
 **Resolved decisions surfaced.** Task 1.1 §0 is owner-resolved (recorded in branch commit
 c745707ac): **per-org policy gate** + **auto-publish-on-timeout fallback**. These bind Task 1.1's
 execution and are reused by Task 1.4's billing auto-publish policy.
 
-**Merge-reconciliation rule** (for the branch's eventual PR — the push precondition was satisfied
-2026-07-22, `c745707ac` on origin). The branch carries
-**stale 18-task copies** of this roadmap and `scripts/vettrack-2.0-scope-gate.sh` (pre-1.4, pre-strict
-parser). At merge time, add/add conflicts on those two files resolve toward **main's** 19-task /
-strict-gate versions — main's tracker is strictly ahead and the branch holds no tracker state main
-lacks. Branch-side PROOF_ALIGNMENT_LOG entries append to main's log, never replace it.
+**Merge-reconciliation rule (now historical).** `claude/task-1.1-autopilot-shadow`'s content reached
+`main` through the merged slice stack, so that branch should never be PR'd. If it ever is, its stale
+roadmap/scope-gate copies (pre-1.4, pre-strict-parser — coincidentally also 18 tasks, but a
+DIFFERENT 18: it lacks 1.4, while main's 18 lacks the transferred 1.3) resolve toward **main's**
+current versions, and branch-side PROOF_ALIGNMENT_LOG entries append to main's log, never replace it.
 
 ## Delivery methodology (binding on every task)
 
@@ -270,7 +279,10 @@ lacks. Branch-side PROOF_ALIGNMENT_LOG entries append to main's log, never repla
   build only via `scripts/build-native-shell.sh` → verify on REAL device (Simulator has no Taptic Engine).
 - **Verify:** On-device checklist green both platforms (visual/physical evidence per methodology #2);
   typecheck 0; no orphan adapter left half-wired.
-- **Done when:** Reviewed; tracker flips. **Gates 1.3; should precede Phase-1 surfaces.**
+- **Done when:** Reviewed; tracker flips on the code-layer scope (accepted 2026-07-28; the on-device
+  checklist above is the carved-out residual — it lives on as the distribution program's H5 device
+  gate, which the Android ship must still pass). **Gates the Android ship (distribution-program
+  Phase 3, ex-Task 1.3); should precede Phase-1 surfaces.**
 
 ---
 
@@ -314,25 +326,24 @@ lacks. Branch-side PROOF_ALIGNMENT_LOG entries append to main's log, never repla
 - **Done when:** All six event paths attach; timeline renders from real events; review passes.
   **Depends 0.1, 0.2. Parallel with 1.1; Autopilot becomes patient-aware when this lands.**
 
-### Task 1.3 — Ship the Android app (Google Play) · **P0 · M · Sonnet 5**
-- **Objective:** The existing Capacitor Android shell becomes a shipped Play Store app.
-- **Scope (technical):** build via `scripts/build-native-shell.sh --android` (`pnpm
-  cap:build:native:android`); targetSdk 35 + edge-to-edge (0.7); release signing (upload keystore + Play
-  App Signing); Clerk OAuth redirect + deep links on Android (bundled-shell Option-B lesson — no thin web
-  wrapper); FCM push path for `notification.worker`; NFC/haptics/camera verified on real Android hardware;
-  Play Console: listing, Data-safety form (operational data only — mirrors the PHI denylist), content
-  rating, internal-testing track → production.
-- **Scope (design):** mobile design stays source of truth — no fork: system back-button audit on every
-  flow (sheets, scanner, Code Blue); adaptive icon + splash; edge-to-edge safe-areas; Play listing assets
-  (screenshots/feature graphic, Hebrew-first + English, RTL-correct).
-- **Execute:** (1) Write `docs/plans/2.0/task-1.3-android-ship.md` (signing steps, Play Console
-  checklist, device test matrix). (2) Execute: internal track first; real-device matrix; then production.
-- **Verify:** Internal-track install works end-to-end (sign-in → scan → Code Blue view) on ≥2 real
-  devices; back-button audit checklist green; store listing screenshots match app.
-- **Done when:** App live on Play in **production** (internal track is a verification gate on the way
-  there, not an alternate completion state — `docs/plans/master-plan-2026-07.md`'s Terminal State section
-  is authoritative: the program's definition of done requires a real Play Console production release);
-  review passes. **Depends 0.7 (hard). Independent of 1.1/1.2 — ships with current feature set.**
+### Task 1.3 — Ship the Android app (Google Play) · **TRANSFERRED to the distribution program (2026-07-28)**
+> Owner decision 2026-07-28: the Android/Play ship is owned end-to-end by the pilot→public
+> distribution program (its Phase 3), which carries the current, evidence-grounded checklist:
+> Play account confirmed personal-post-2023 (→ 12 opted-in testers × 14 continuous days of closed
+> testing before production access), upload keystore + Play App Signing, versionCode/versionName
+> alignment to the 1.2.0 line, targetSdk 36 (verified compliant), Data-safety form + the public web
+> deletion URL, he+en listing assets, and physical-device QA (NFC / haptics / camera / RTL /
+> predictive back — absorbing Task 0.7's open on-device residual). Absorbed from this task's original
+> scope on transfer: adaptive icon + splash, Clerk OAuth redirect / deep-link verification on Android,
+> and the full system-back audit (sheets, scanner, Code Blue). Deliberately NOT transferred: the FCM
+> push path — not a store requirement (the native iOS app ships without push, and the store privacy
+> answers say so); it stays a future 2.0 capability **outside the tracked 18-task completion scope** —
+> `18/18` asserts the tracker rows only, and if FCM is ever prioritized it enters as a NEW tracker row
+> (with a lockstep `CANONICAL_IDS` update in the scope gate), never silently. Terminal state unchanged
+> and still binding:
+> **live on Play in production** (`docs/plans/master-plan-2026-07.md`'s Terminal State). Capacitor
+> remains the vehicle for this ship (Platform research addendum §1 — the bare-RN decision applies
+> post-ship, master-plan Layers 4–5).
 
 ### Task 1.4 — Consumable-usage capture (reconnect dispense → patient → billing) · **P0 · L · Opus 4.8 (breakdown + review) / Sonnet 5 (execution)** 🔥 ⚠️
 > Added 2026-07-21 from an owner-provided spec (code-recon-verified, not session-2-derived) — do not
@@ -518,12 +529,13 @@ FKs — resolve explicitly before either starts its own Phase 0, don't let two c
 1. **~~Shell strategy confirmed — Capacitor stays.~~ SUPERSEDED 2026-07-22 as the *long-term* shell
    strategy** by the owner's binding decision to migrate to a bare React Native CLI app (see
    `docs/plans/master-plan-2026-07.md` Layers 3–5; ADR-008, pending, is where this supersession becomes
-   formal). **This does not change Task 1.3 (Android ship, above): Capacitor remains the vehicle for that
-   near-term release** — Layer 2 (Android via Capacitor) happens *before* Layer 5 (the bare-RN migration)
-   in the master plan's own sequencing, so Capacitor is a deliberate bridge, not a contradiction of the
-   later decision. Task 1.3's Capacitor-specific steps (`scripts/build-native-shell.sh --android`, Play
-   Console signing) stay as written and should execute on schedule; only the *terminal* shell (post-Layer
-   5) is bare RN. The analysis below (RN New Architecture vs. the one-web-bundle/4-platform-seam/
+   formal). **This does not change the Android ship (ex-Task 1.3, transferred 2026-07-28 to the distribution
+   program's Phase 3): Capacitor remains the vehicle for that near-term release** — the Android-via-
+   Capacitor ship happens *before* Layer 5 (the bare-RN migration) in the master plan's own sequencing,
+   so Capacitor is a deliberate bridge, not a contradiction of the later decision. The ship's
+   Capacitor-specific steps (`scripts/build-native-shell.sh --android`, Play Console signing) stay as
+   written in the distribution program and should execute on schedule; only the *terminal* shell
+   (post-Layer 5) is bare RN. The analysis below (RN New Architecture vs. the one-web-bundle/4-platform-seam/
    offline-PWA strategy) is kept as historical context for *why* Capacitor was originally chosen.
    ~~RN New Architecture (JSI/Fabric/TurboModules, default since 0.76) optimizes native-widget
    rendering — orthogonal to the one-web-bundle / 4-platform-seam / offline-PWA strategy. Migration = UI
@@ -534,7 +546,7 @@ FKs — resolve explicitly before either starts its own Phase 0, don't let two c
    hand-roll those (`prefers-reduced-motion`, `prefers-contrast`, reduced-transparency fallback).
    Glass-OFF-on-Code-Blue/board matches Apple's own hierarchy rule.
 3. **Android:** targetSdk 35 / Android 15+ enforces edge-to-edge → insets/safe-area work in Task 0.7
-   gates Android shipping (1.3).
+   gates Android shipping (distribution-program Phase 3, ex-1.3).
 4. **Plugin law (github.com/ionic-team/capacitor-plugins):** same-major is a shortcut, not the rule —
    the published mapping has real exceptions (e.g. Capacitor 3 uses 1.x plugins); pin to the exact
    plugin versions verified against the current Capacitor core version in `package.json` at bump time
@@ -552,7 +564,8 @@ FKs — resolve explicitly before either starts its own Phase 0, don't let two c
 
 Every session-2 opportunity is accounted for: Massive 1→1.2, 2→1.1, 3→2.5(b), 4→Phase 4, 5→3.1 ·
 Medium 1→2.2, 2→2.4, 3→3.3, 4→3.2 · Small gems 1→0.3/1.1, 2→2.1, 3→2.3 · all four Backlog items→Phase 4 ·
-all six owner decisions + six product principles→Binding constraints. Tasks 0.7 and 1.3, the working
+all six owner decisions + six product principles→Binding constraints. Task 0.7, the Android-ship task
+(ex-1.3 — transferred to the distribution program 2026-07-28), the working
 agreement, goal & scope tracker, delivery methodology (incl. model routing), and the research addendum
 derive from the 2026-07-19 platform-doc validation + owner amendments, not session-2. Task 1.4
 (consumable-usage capture) derives from a separate 2026-07-21 owner-provided, code-recon-verified spec —
