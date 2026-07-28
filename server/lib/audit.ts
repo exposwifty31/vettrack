@@ -219,6 +219,7 @@ export type AuditActionType =
   | "clinical_invariant_orphan_dispense_denied"
   | "clinical_invariant_emergency_bypass"
   | "clinical_invariant_fail_open"
+  | "jit_clinic_mint_blocked"
   | "pilot_config_updated"
   // Equipment Operational State V1
   | "equipment_dock_return"

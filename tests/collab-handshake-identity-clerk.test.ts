@@ -70,7 +70,10 @@ vi.mock("../server/db.js", () => {
   chain.select = () => chain;
   chain.from = () => chain;
   chain.where = () => chain;
-  chain.limit = () => Promise.resolve([]);
+  // C-6 hardening: the jit-clinic-policy guard SELECTs clinic + existing-user
+  // before the upsert; resolving a row keeps this scenario on the
+  // proceed-existing path (guard matrix: tests/jit-clinic-policy.test.ts).
+  chain.limit = () => Promise.resolve([{ id: "clinic-A" }]);
   return { db: chain, clinics: {}, users: {}, displayDevices: {}, shifts: {}, shiftAdjustments: {} };
 });
 
