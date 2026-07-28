@@ -1,4 +1,23 @@
 {
+  "permissions": {
+    "allow": [
+      "Bash(pnpm test)",
+      "Bash(pnpm test -- *)",
+      "Bash(pnpm typecheck)",
+      "Bash(pnpm typecheck:server)",
+      "Bash(git fetch origin)",
+      "Bash(npx tsc --noEmit)",
+      "Bash(npx tsc -p tsconfig.server.json --noEmit)",
+      "Bash(pnpm architecture:gates)",
+      "Bash(pnpm i18n:check)",
+      "Bash(pnpm knip)",
+      "mcp__railway__list_services",
+      "mcp__railway__list_projects",
+      "mcp__context7__query-docs",
+      "mcp__context7__resolve-library-id",
+      "mcp__github__pull_request_read"
+    ]
+  },
   "hooks": {
     "SessionStart": [
       {
