@@ -39,7 +39,7 @@ the patient; it is a fact about hospital *operations around* the patient.
 | Allowlist field / concept | Source event table | Why it's operational |
 |---|---|---|
 | Equipment usage (checkout/return/scan tied to this case) | `vt_scan_logs` (`server/schema/equipment.ts:553`, `scanLogs`) | Custody event, not a clinical fact |
-| Room / location assignment | `vt_rooms` (`server/schema/equipment.ts:26`, `rooms`) | Physical placement, operational |
+| Room / location — **current** assignment | `vt_rooms` (`server/schema/equipment.ts:26`, `rooms`) is the room **entity/current-state** table, not a move-event log | Physical placement, operational. NOTE: `vt_rooms` yields only the *current* room; a room-**move timeline** with per-move timestamps needs a dedicated assignment-history source (derivable from `vt_scan_logs` room references, or a future move-event table) — Task 1.2 must identify that source before the timeline renders historical moves. Until then the contract exposes current room only. |
 | Operational task linkage | `vt_appointments` (`server/schema/tasks.ts:6`, `appointments` — the unified task model) | Task/workflow state, not diagnosis |
 | Code Blue session reference | `vt_code_blue_sessions` (`server/schema/er.ts:34`, `codeBlueSessions`) | Emergency *event* linkage (session id, timing) — not clinical notes entered during it |
 | Inventory / dispense activity | `vt_dispense_events` (`server/schema/inventory.ts:213`, `dispenseEvents`) | What was dispensed and when — quantity/item, not why clinically |
@@ -67,8 +67,11 @@ owner info."*
 | Any other medico-legally sensitive record (treatment notes, consent forms, clinical narrative) | owner decision #1 | Falls under "anything medically/legally sensitive stays in the PMS" |
 
 **Rule of thumb for rejecting a proposed field:** if it describes the patient's clinical state, the
-clinical reasoning behind an action, or personally identifies the client outside an operational contact
-need, it is denylisted — full stop, regardless of how operationally convenient it would be to cache it.
+clinical reasoning behind an action, or personally identifies the client (owner/client name, phone,
+email, address), it is denylisted — full stop, regardless of how operationally convenient it would be
+to cache it. Client-contact PII is **unconditionally** denylisted here: there is no "operational contact
+need" exception — any genuine future need would require a separately defined, narrowly scoped, explicitly
+approved field, never a blanket carve-out in this rule.
 
 ## Design review — what must an operationally-useful case card show?
 
@@ -83,10 +86,14 @@ minimum it should show:
 2. **Timeline of attached events**, each rendered from its allowlisted source table: scans (equipment +
    timestamp), room moves, task references, Code Blue session references (link out to the session, not an
    inline clinical summary), dispense events (item + quantity, no clinical rationale), damage/condition
-   events, RFID location trace.
+   events, RFID location trace. (Room shows **current** placement; a historical room-move timeline is
+   gated on identifying a move-event source — see the Allowlist room-assignment note above.)
 3. **No free-text clinical field anywhere on the card.** Any note-taking surface attached to a case must
-   be operational (e.g., "coordinator flagged room swap"), never clinical narrative — this is a UI
-   enforcement of the denylist, not just a schema one.
+   be operational (e.g., "coordinator flagged room swap"), never clinical narrative. This must be
+   enforced **server-side** — a constrained operational-note schema plus server-side validation that
+   rejects clinical narrative before persistence, regardless of whether the write arrives via UI, API,
+   or an offline-sync payload. A UI-only rule is insufficient (it is bypassable) and does not by itself
+   satisfy the denylist.
 4. **Explicit "view in PMS" affordance** for anything clinical — the card should make it obvious that
    deeper clinical detail lives elsewhere, reinforcing integrate-never-replace (owner decision #5).
 

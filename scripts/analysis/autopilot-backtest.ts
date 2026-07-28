@@ -135,6 +135,11 @@ function synthesizeConfusion(config: KindConfig): ConfusionCounts {
   };
 
   for (let window = 0; window < WINDOWS_PER_KIND; window++) {
+    // SYNTHETIC for EVERY kind: both draws come from rng(). No production
+    // classifier or real event history is consulted here — not even for kinds
+    // whose config.hasRealLogic is true (that flag only records that production
+    // logic exists elsewhere; it seeded the chosen noise level, it is NOT
+    // evaluated in this harness). All resulting metrics are synthetic.
     const groundTruthPositive = rng() < config.pPositive;
     const detectorThreshold = groundTruthPositive ? config.sensitivity : config.fpr;
     const signalFires = rng() < detectorThreshold;

@@ -5001,6 +5001,22 @@ a 10x plan library, and ~54 doc deletions). Files landed: `docs/design/case-spin
 for the audit record; their internal "X/18 shipped" scope-gate references are historical (the old 18-task
 tracker) and describe the state at authoring time.
 
+**Evidence (this landing, verified on branch `claude/refine-local-plan-d4pfl0` off current `main`):**
+- Landed file set = exactly the six files named above + this PROOF append. `git diff --name-only main..HEAD`
+  shows only those seven paths; **no** `docs/vettrack-2.0-roadmap.md` and **no**
+  `scripts/vettrack-2.0-scope-gate.sh` in the diff (main's strict 19-task versions untouched).
+- Scope-gate unchanged: `bash scripts/vettrack-2.0-scope-gate.sh` → `VetTrack 2.0 scope: 7/19 shipped.`
+  (identical to `main` before this branch — the six docs add no `- [ ] N.N` tracker rows).
+- `npx tsc -p tsconfig.server.json --noEmit` and `npx tsc --noEmit` → 0 errors (the backtest script is in
+  neither tsconfig `include`, so it is not typechecked; it is a standalone `tsx`-run harness).
+- `pnpm exec tsx scripts/analysis/autopilot-backtest.ts` runs deterministically and prints its
+  "SYNTHETIC DATA — NOT real clinic history" banner.
+- **Scope caveat carried forward (CodeRabbit #141):** the reproduced Task 0.5 "Verdict: VERIFIED" below
+  covers the **harness + synthetic smoke-test only** (owner-approved deviation). The roadmap's **real-data**
+  Task 0.5 gate — a real clinic-month backtest with precision/recall/threshold evidence — **remains
+  outstanding** and must be run before Task 2.5 sets any `enforce` threshold. The autopilot-backtest doc and
+  script were updated in this same landing to state that all four signal streams are synthetic.
+
 ---
 
 ## 2026-07-19 — VetTrack 2.0 Task 0.1 (Case allowlist/denylist spec) completed (uncommitted)

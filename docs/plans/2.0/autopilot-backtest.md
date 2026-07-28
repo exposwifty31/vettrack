@@ -72,7 +72,7 @@ or critique against the script itself, not an idealized summary.
 
 4. **Per shift-window, two independent Bernoulli draws off the shared PRNG stream**, in this exact
    order (kind outer loop, window inner loop — top to bottom of `KIND_CONFIGS`, then
-   `0..WINDOWS_PER_KIND`):
+   `0..WINDOWS_PER_KIND - 1`):
    - `groundTruthPositive = rng() < pPositive` — "would an equivalent action genuinely have been
      the correct move here, per what staff actually ended up doing?" (the ground-truth label).
    - `signalFires = rng() < (groundTruthPositive ? sensitivity : fpr)` — "would Autopilot's
@@ -111,18 +111,25 @@ crash-cart-drift                      90  4   15  2   0.211      0.667   0.320
 hasRealLogic per kind: shift_handover_draft=true, coordinator-reassign-when-off-roster=false, restock-PO-on-burn=false, crash-cart-drift=false
 ```
 
-n = 90 shift-windows per kind = 1 synthetic clinic-month, per the task's Verify criteria (n≥1
-clinic-month) — synthetic, not real, per the banner above.
+n = 90 shift-windows per kind = 1 **synthetic** clinic-month. **Scope:** this synthetic run satisfies only
+the **harness smoke test** (the machinery runs deterministically and produces a well-formed confusion
+matrix / metrics table). It does **NOT** satisfy the roadmap's real-data Task 0.5 gate: no real clinic
+history was available in this environment (owner-approved deviation, disclosed in the banner). The real
+clinic-month backtest — and any precision/recall/threshold evidence usable for enforce decisions —
+**remains outstanding** and must be run before Task 2.5 sets any enforce threshold.
 
 Re-running the script reproduces this table exactly (two consecutive runs were diffed byte-for-byte
 identical as part of verifying this doc).
 
 ## Reading the numbers (and why they must not be used for real thresholds)
 
-`shift_handover_draft` scores highest because it was deliberately configured with the least noise,
-modeling that it has real production logic behind it (Task 0.3). The other three kinds score lower
-because they were deliberately configured with more noise, modeling that no classifier exists for
-them yet. **None of these relative rankings are evidence about real-world Autopilot quality** —
+**All four signal streams are synthetic.** `signalFires` is drawn from `rng()` against a configured
+threshold for *every* kind — no production classifier or real event history is consulted for any of them,
+`shift_handover_draft` included. The per-kind `hasRealLogic` flag only records that production logic
+*exists elsewhere* (it seeded the noise level chosen for that kind); it does **not** mean that logic was
+evaluated here. `shift_handover_draft` scores highest only because it was deliberately configured with the
+least noise (Task 0.3); the other three were configured with more noise, modeling that no classifier
+exists for them yet. **None of these relative rankings are evidence about real-world Autopilot quality** —
 they are an artifact of parameters this script's author chose. A different, equally defensible
 choice of `pPositive`/`sensitivity`/`fpr` would produce different numbers.
 

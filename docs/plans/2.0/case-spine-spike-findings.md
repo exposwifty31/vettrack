@@ -81,7 +81,11 @@ Files:
 
 **What the reconcile test proves** (`tests/case-attach-offline-reconcile.test.ts`, mirroring the existing
 OFF-05 pattern in `tests/offline-phase-5-sync-engine-state.test.ts` — `offline-db` mocked, `isOnline`
-toggled, `processQueue` driven directly):
+toggled, `processQueue` driven directly). **Scope caveat:** this is **mocked-harness** coverage of the
+queue/reconcile shape only — it does **not** exercise the live enqueue path. In production `addPendingSync`
+goes through the offline-mutation registry, which currently **throws `UnknownOfflineMutationError`** for
+the unregistered `case_attach` type (see §5 item 3); registering the producer + real end-to-end
+reconciliation is Task 1.2 work, not proven here.
 - Test 1: while `isOnline() === false`, `queueCaseAttachIfOffline` enqueues exactly one `case_attach` row
   with the correct endpoint/method/body, and nothing hits the wire (`fetch` not called).
 - Test 2: after flipping online, `processQueue` reconciles the queued row exactly once — `fetch` called
@@ -147,9 +151,10 @@ actual worktree** (not taken on trust — a separate reviewer agent re-ran every
   `tests/case-spine-spike.test.ts`, `tests/case-attach-offline-reconcile.test.ts`. Confirmed
   independently — exact match on files and line counts. (The spike work is now a single committed commit
   on its branch, so `git status --porcelain` on that branch is clean — no outstanding untracked files.)
-- **Frozen-surface check** — grepped every changed/new file for `realtime-outbox`, `event-publisher`,
-  `vt_event_outbox`, `code-blue`/`code_blue`/`codeBlue`, `vt_appointments`, `appointmentsPage`: **zero
-  hits.** `git diff --stat` scoped to the frozen-surface file list (`realtime-outbox.ts`,
+- **Frozen-surface check** — grepped every **implementation file changed/added by the spike** (the
+  `server/`+`src/`+`tests/` files listed above; this findings document itself is excluded, since it
+  names those surfaces descriptively) for `realtime-outbox`, `event-publisher`, `vt_event_outbox`,
+  `code-blue`/`code_blue`/`codeBlue`, `vt_appointments`, `appointmentsPage`: **zero hits.** `git diff --stat` scoped to the frozen-surface file list (`realtime-outbox.ts`,
   `event-publisher.ts`, `schema/ops.ts`, `routes/code-blue*`, `code-blue-one-tap.ts`, `package.json`):
   **empty** — none touched, `dexie` version line untouched. Confirmed independently.
 - **Multi-tenancy check** — every read/write path in `cases.ts`, `case-spine.ts`, and
@@ -161,7 +166,8 @@ actual worktree** (not taken on trust — a separate reviewer agent re-ran every
 
 `worktree-agent-ad05bf556984d8f59`, commit `961378e55`
 (`spike(2.0): Case Spine physical×clinical join + offline reconcile (task 0.2)`), branched from
-`a428cba42`. Built in an isolated git worktree at
-`/Users/dan/vettrack/.claude/worktrees/agent-ad05bf556984d8f59`. Not pushed, no PR opened. This branch is
+`a428cba42`. Built in an isolated git worktree under the repo-local
+`.claude/worktrees/agent-ad05bf556984d8f59` (absolute machine path elided — environment-specific).
+Not pushed, no PR opened. This branch is
 a learning artifact only — Task 1.2 reads this findings document, it does not build on top of the spike
 branch's commits.

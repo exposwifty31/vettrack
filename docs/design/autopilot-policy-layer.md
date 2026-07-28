@@ -159,6 +159,13 @@ grant should have. A future console convenience ("apply to all my clinics") is a
 writes **N independent policy rows and emits N independent audit entries** — one deliberate org decision
 per clinic. There is never a single row that covers multiple clinics.
 
+> **⚠️ Review-flagged (2026-07-28, CodeRabbit #141) — resolve at implementation (Task 0.4→enforce):**
+> a global `admin` role is necessary but **not sufficient** to write a clinic-scoped policy key. The
+> implementing route must also **authorize the target clinic** — derive `clinicId` from the acting
+> admin's own authorized membership/management context (or an explicit clinic-management permission),
+> and **never** trust a request-supplied `clinicId`. Otherwise an admin of Clinic A could approve/revoke
+> Clinic B's Autopilot policy. This authorization check gates both approve and revoke.
+
 ---
 
 ## 4. Revocation
@@ -186,6 +193,13 @@ history is the audit trail (§5).
 
 So the guarantee is precise: **after revocation, no new action of that kind auto-executes for that
 clinic; already-completed actions are untouched.**
+
+> **⚠️ Review-flagged (2026-07-28, CodeRabbit #141) — resolve at implementation:** "re-resolve both
+> switches at execution time" is necessary but does not by itself close the **check-to-execute race** —
+> a revocation landing *after* the resolve read but *before* the side-effect commit could still let one
+> action through. The implementing execution path must couple the final authorization check and the
+> irreversible mutation **atomically** (same DB transaction / conditional write / last-moment gate
+> immediately before the side effect), so the guarantee above holds even under a concurrent revoke.
 
 ---
 
@@ -220,10 +234,13 @@ no high-cardinality labels, per the telemetry doctrine.
 
 ## 6. Failure default = `shadow`
 
-**On any policy-resolver failure — throw, timeout, unreadable value, or a missing policy row on the
-`enforce` path — the effective mode defaults to `shadow`. The layer never silently promotes to
-`enforce`.** (Missing row / non-`approved` value is the *normal* not-approved case and also lands on
-`shadow`; a throw is caught and lands on the same `shadow` — one safe target for both.)
+**On any policy-resolver outcome that is not an explicit `approved` — a missing/`non-approved` policy row
+(the *normal* not-approved case) OR a genuine resolver failure (throw, timeout, unreadable value) — the
+effective mode defaults to `shadow`. The layer never silently promotes to `enforce`.** Both land on the
+same safe target, but they are **distinct states and must be metered distinctly:** a **missing/not-approved
+row is NOT an infrastructure failure** and must be excluded from the policy-resolver **failure** metric —
+that counter counts only throw/timeout/unreadable-storage errors. (Conflating the two would report every
+ordinary unapproved clinic as an infra failure. Review-flagged 2026-07-28, CodeRabbit #141.)
 
 **Why this is `shadow` here, when the existing authority evaluators fail open to `off`:** both systems
 obey the *same* underlying principle — **fail toward the least-harmful, least-irreversible state** — but
