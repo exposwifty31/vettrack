@@ -28,7 +28,9 @@ describe("haptics DEV diagnostic", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.resetModules();
-    // Default: native shell, haptics enabled, both native cues reject.
+    // Shared baseline so each test overrides only the axis it exercises: a
+    // native shell with haptics on, and both native cues failing so the
+    // failure-diagnostic path is what gets tested.
     mockIsCapacitorNative.mockReturnValue(true);
     mockSafeStorageGetItem.mockReturnValue(null);
     mockTriggerVibration.mockReturnValue(true);
@@ -49,6 +51,10 @@ describe("haptics DEV diagnostic", () => {
     expect(() => haptics.error()).not.toThrow();
     await flush();
 
+    // Prove the cue routed to the notification path — not just that *some*
+    // native call warned (both mocks reject with the same error).
+    expect(mockNotification).toHaveBeenCalledTimes(1);
+    expect(mockImpact).not.toHaveBeenCalled();
     expect(warnSpy).toHaveBeenCalledTimes(1);
     expect(warnSpy).toHaveBeenCalledWith(
       "[haptics] native Haptics call failed:",
@@ -72,11 +78,12 @@ describe("haptics DEV diagnostic", () => {
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
     const { haptics } = await import("@/lib/haptics");
 
-    // tap() takes the Haptics.impact branch of the native cue.
+    // Covers the impact branch (the notification cases exercise the other one).
     haptics.tap();
     await flush();
 
     expect(mockImpact).toHaveBeenCalledTimes(1);
+    expect(mockNotification).not.toHaveBeenCalled();
     expect(warnSpy).toHaveBeenCalledTimes(1);
   });
 
@@ -91,6 +98,7 @@ describe("haptics DEV diagnostic", () => {
 
     expect(mockNotification).not.toHaveBeenCalled();
     expect(mockImpact).not.toHaveBeenCalled();
+    expect(mockTriggerVibration).not.toHaveBeenCalled();
     expect(warnSpy).not.toHaveBeenCalled();
   });
 
