@@ -104,24 +104,33 @@ export async function runRestockBurnScan(
   let staged = 0;
 
   for (const clinicId of clinicIds) {
-    const result = await deps.reader.read(clinicId);
-    const flaggedItems = result.items.filter((item) => item.flagged);
-    if (flaggedItems.length === 0) continue;
+    // Per-clinic isolation: one clinic's read/compose/stage failure must not
+    // abort the scan for the remaining clinics.
+    try {
+      const result = await deps.reader.read(clinicId);
+      const flaggedItems = result.items.filter((item) => item.flagged);
+      if (flaggedItems.length === 0) continue;
 
-    const input = composeRestockPoProposal({ clinicId, scanDate, flaggedItems, locale: INITIAL_LOCALE });
+      const input = composeRestockPoProposal({ clinicId, scanDate, flaggedItems, locale: INITIAL_LOCALE });
 
-    const outcome = await stageProposal(
-      { writer: deps.writer },
-      {
-        input,
-        groundTruthFacts: input.citedFacts,
-        stagedBy: { performedBy: SYSTEM_USER_ID, performedByEmail: SYSTEM_USER_EMAIL },
-      },
-    );
+      const outcome = await stageProposal(
+        { writer: deps.writer },
+        {
+          input,
+          groundTruthFacts: input.citedFacts,
+          stagedBy: { performedBy: SYSTEM_USER_ID, performedByEmail: SYSTEM_USER_EMAIL },
+        },
+      );
 
-    if (outcome.created) {
-      staged++;
-      notifyProposalQueueChanged(clinicId); // Task 1.1 §1.5 — advisory, fire-and-forget
+      if (outcome.created) {
+        staged++;
+        notifyProposalQueueChanged(clinicId); // Task 1.1 §1.5 — advisory, fire-and-forget
+      }
+    } catch (e) {
+      console.error("[autopilot-restock-burn] clinic scan failed", {
+        clinicId,
+        message: e instanceof Error ? e.message : String(e),
+      });
     }
   }
 
@@ -161,6 +170,10 @@ export function startAutopilotRestockBurnWorker(): void {
       const workerConnection = await createRedisConnection();
 
       if (!queueConnection || !workerConnection) {
+        // Close whichever connection did open before falling back, so a
+        // half-open pair doesn't leak a live Redis socket.
+        await queueConnection?.quit().catch(() => {});
+        await workerConnection?.quit().catch(() => {});
         console.log("[autopilot-restock-burn] queue disabled (Redis unavailable) — falling back to setInterval");
         setInterval(() => {
           runRestockBurnScan(realScanDeps()).catch((e) => console.error("[autopilot-restock-burn] failed:", e));
@@ -172,6 +185,12 @@ export function startAutopilotRestockBurnWorker(): void {
       }
 
       queue = new Queue(AUTOPILOT_RESTOCK_BURN_QUEUE_NAME, { connection: queueConnection });
+      // Queue/Worker are EventEmitters: an emitted "error" with no listener
+      // throws and can crash the process (the underlying ioredis connection has
+      // its own error observer; this covers BullMQ-level errors additively).
+      queue.on("error", (error) => {
+        console.error("[autopilot-restock-burn] queue error", { message: error.message });
+      });
       worker = new Worker(
         AUTOPILOT_RESTOCK_BURN_QUEUE_NAME,
         async (job) => {
@@ -180,6 +199,10 @@ export function startAutopilotRestockBurnWorker(): void {
         },
         { connection: workerConnection, concurrency: 1 },
       );
+
+      worker.on("error", (error) => {
+        console.error("[autopilot-restock-burn] worker error", { message: error.message });
+      });
 
       worker.on("failed", (job, error) => {
         console.error("[autopilot-restock-burn] job failed", {

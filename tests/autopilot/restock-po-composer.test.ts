@@ -38,6 +38,15 @@ describe("computeSuggestedQuantity (top-up-to-par rule)", () => {
   it("falls back to reorderPoint when parLevel is null", () => {
     expect(computeSuggestedQuantity(buildFlaggedItem({ parLevel: null, reorderPoint: 10, onHand: 8 }))).toBe(10);
   });
+
+  it("always returns a positive integer — fractional inputs are rounded UP (PO quantities must be whole units)", () => {
+    // parLevel - onHand fractional → ceil
+    expect(computeSuggestedQuantity(buildFlaggedItem({ parLevel: 20, onHand: 8.4 }))).toBe(12);
+    expect(computeSuggestedQuantity(buildFlaggedItem({ parLevel: 20.5, onHand: 8 }))).toBe(13);
+    // reorderPoint fallback fractional → ceil, floored at 1
+    expect(computeSuggestedQuantity(buildFlaggedItem({ parLevel: null, reorderPoint: 2.1, onHand: 0 }))).toBe(3);
+    expect(computeSuggestedQuantity(buildFlaggedItem({ parLevel: null, reorderPoint: 0.2, onHand: 0 }))).toBe(1);
+  });
 });
 
 describe("composeRestockPoProposal", () => {

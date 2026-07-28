@@ -109,7 +109,8 @@ export class InMemoryRestockBurnReader implements RestockBurnReader {
 
   async read(clinicId: string): Promise<RestockBurnReadResult> {
     const candidateItems = (this.seed.items ?? []).filter(
-      (item) => item.clinicId === clinicId && item.isActive && item.reorderPoint != null,
+      (item): item is (typeof item) & { reorderPoint: number } =>
+        item.clinicId === clinicId && item.isActive && item.reorderPoint != null,
     );
 
     const items: RestockItemReadResult[] = candidateItems.map((item) => {
@@ -117,7 +118,7 @@ export class InMemoryRestockBurnReader implements RestockBurnReader {
         .filter((row) => row.clinicId === clinicId && row.itemId === item.id)
         .map((row) => ({ id: row.id, containerId: row.containerId, quantity: row.quantity, updatedAt: row.updatedAt }));
       const onHand = containerRows.reduce((sum, row) => sum + row.quantity, 0);
-      const reorderPoint = item.reorderPoint as number;
+      const reorderPoint = item.reorderPoint;
       return {
         itemId: item.id,
         inventoryItemRowId: item.id,

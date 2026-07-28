@@ -215,6 +215,17 @@ export function startAutopilotCoordinatorReassignWorker(): void {
         });
       });
 
+      // Queue/Worker are EventEmitters: an emitted "error" with no listener
+      // throws and can crash the process. The underlying ioredis connection
+      // already has its own error observer (createRedisConnection), so this
+      // covers BullMQ-level errors (lock/stall/command failures) additively.
+      queue.on("error", (error) => {
+        console.error("[autopilot-coordinator-reassign] queue error", { message: error.message });
+      });
+      worker.on("error", (error) => {
+        console.error("[autopilot-coordinator-reassign] worker error", { message: error.message });
+      });
+
       await queue.add(
         AUTOPILOT_COORDINATOR_REASSIGN_JOB_NAME,
         {},
