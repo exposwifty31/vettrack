@@ -23,6 +23,14 @@ export function pctColor(pct: number): string {
   return "rgb(var(--sys-red))";
 }
 
+/** Text-on-light variant of {@link pctColor} — AA-safe for large numerals
+ * (green/orange darkened; --sys-red already clears 3:1 for large text). */
+export function pctTextColor(pct: number): string {
+  if (pct >= 80) return "rgb(var(--sys-green-text))";
+  if (pct >= 40) return "rgb(var(--sys-orange-text))";
+  return "rgb(var(--sys-red))";
+}
+
 /**
  * Room readiness % — present-vs-expected (design §6.4): at_home / expected_fill.
  * `expectedFill` is items homed to the room WITH a category; a room with

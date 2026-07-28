@@ -144,7 +144,8 @@ export function NativeHeader({ showWordmark = true, ownSafeArea = true }: Props 
               <button
                 type="button"
                 onClick={() => navigate("/home")}
-                aria-label={t.nav.today}
+                // WCAG 2.5.3 label-in-name: accessible name must contain the visible "VetTrack"
+                aria-label={`VetTrack — ${t.nav.today}`}
                 dir="ltr"
                 style={{
                   display: "flex",

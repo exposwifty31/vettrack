@@ -44,6 +44,8 @@
     --sys-red:    255 59 48;
     --sys-orange: 255 149 0;
     --sys-green:  52 199 89;
+    --sys-green-text: 36 138 61;   /* #248A3D — AA text-on-light variant (4.4:1); additive, graphics/badges keep --sys-green */
+    --sys-orange-text: 193 95 0;   /* #C15F00 — AA large-text-on-light variant (4.3:1); graphics keep --sys-orange */
     --sys-blue:   0 122 255;
     --sys-gray:   142 142 147;
     --radius: 14px;              /* base (Tailwind rounded-lg) — cards, buttons */
@@ -103,7 +105,7 @@
     --ivory-borderMd: 174 174 178;  /* #AEAEB2 — mid-weight separator */
     --ivory-text:     28 28 30;     /* #1C1C1E — iOS label */
     --ivory-text2:    99 99 102;    /* #636366 — secondary label (AA) */
-    --ivory-text3:    142 142 147;  /* #8E8E93 — tertiary label */
+    --ivory-text3:    108 108 112;  /* #6C6C70 — tertiary label (darkened for WCAG AA: 5.25:1 on surface, 4.68:1 on bg; was #8E8E93 ≈3.0:1) */
     --ivory-navy:     11 16 33;     /* #0b1021 — brand navy (chrome) */
     --ivory-green:    79 70 229;    /* indigo-600 — active nav (brand, kept) */
     --ivory-greenMid: 67 56 202;    /* indigo-700 */
@@ -354,7 +356,7 @@
     --ivory-borderMd: 174 174 178;
     --ivory-text:     28 28 30;
     --ivory-text2:    99 99 102;
-    --ivory-text3:    142 142 147;
+    --ivory-text3:    108 108 112;  /* AA-darkened, matches base light theme */
     --ivory-navy:     11 16 33;
     --ivory-green:    79 70 229;
     --ivory-greenMid: 67 56 202;

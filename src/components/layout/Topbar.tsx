@@ -164,8 +164,10 @@ function UserAvatar({ name, enabled }: { name: string | null; enabled: boolean }
     staleTime: 30_000,
     refetchOnWindowFocus: false,
   });
+  // WCAG 2.5.3: name computed from subtree (sr-only title + visible initials) so the
+  // accessible name always CONTAINS the visible text — aria-label alone failed axe.
   return (
-    <Link href="/my-profile" aria-label={t.profile.title}>
+    <Link href="/my-profile">
       {me?.avatarUrl ? (
         <img
           src={me.avatarUrl}
@@ -175,10 +177,14 @@ function UserAvatar({ name, enabled }: { name: string | null; enabled: boolean }
           className="w-7 h-7 rounded-full object-cover select-none shrink-0 cursor-pointer hover:opacity-80 transition-opacity"
         />
       ) : (
-        <div className="w-7 h-7 rounded-full bg-ivory-green flex items-center justify-center text-xs font-bold text-white select-none shrink-0 cursor-pointer hover:opacity-80 transition-opacity">
+        <div
+          aria-hidden="true"
+          className="w-7 h-7 rounded-full bg-ivory-green flex items-center justify-center text-xs font-bold text-white select-none shrink-0 cursor-pointer hover:opacity-80 transition-opacity"
+        >
           {getInitials(name)}
         </div>
       )}
+      <span className="sr-only">{t.profile.title}</span>
     </Link>
   );
 }
