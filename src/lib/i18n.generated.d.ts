@@ -4097,6 +4097,34 @@ export interface TStructure {
     backToSignIn: string;
     lastUpdatedLabel: string;
   };
+  accountDeletionPage: {
+    title: string;
+    pageTitle: string;
+    metaDescription: string;
+    lastUpdatedDate: string;
+    sections: {
+      overview: {
+        title: string;
+        body: string;
+      };
+      inApp: {
+        title: string;
+        body: string;
+      };
+      byRequest: {
+        title: string;
+        body: string;
+      };
+      whatHappens: {
+        title: string;
+        body: string;
+      };
+      subscriptions: {
+        title: string;
+        body: string;
+      };
+    };
+  };
   privacyPage: {
     title: string;
     pageTitle: string;

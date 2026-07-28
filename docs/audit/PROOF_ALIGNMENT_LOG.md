@@ -5413,6 +5413,30 @@ no-native-shell-build-path-changes guardrail while a review is open.
 **Verdict:** VERIFIED (scope: the 18-task tracker contract + the transfer wiring itself — not a claim
 that untracked future items, e.g. the FCM push path, are covered by 18/18).
 
+## 2026-07-28 — Android-phase Lane-A wave 1: T0 de-number + T1 H4 version align + T2 H3 deletion page — PRs #151/#152/#153
+
+**Claim:** First three tasks of the approved Android-phase plan executed RED-first: (T0) five stale
+"Phase 3" doc references de-numbered; (T1) android versionCode/versionName aligned to the 1.2.0 line
+with a permanent alignment guard; (T2) public web deletion page `/account-deletion` added (Play
+Data-safety URL), marketing-path routed, he+en.
+
+**Evidence (one wave entry per the append-conflict mitigation):**
+- T0 RED: grep over roadmap+master-plan → exactly 5 hits (`93,331,549` / `1317,1330`); GREEN: 0 hits;
+  `scripts/vettrack-2.0-scope-gate.sh` → `7/18 shipped`, exit 0. PR #151.
+- T1 RED: `tests/android-version-alignment.test.ts` written BEFORE the gradle change → 2 failed / 1
+  passed against `versionCode 1 / "1.0"`; GREEN after the two-line change to `10200 / "1.2.0"` → 3/3.
+  Guard binds gradle ↔ iOS MARKETING_VERSION (pbxproj single-value check) ↔ monotonic scheme. PR #152.
+- T2 RED: two new `tests/platform-target.test.ts` cases (`/account-deletion` → marketing, sync +
+  reactive) failed against the untouched resolver (2 failed / 10 passed); GREEN after
+  `MARKETING_PATHS` + routes + page + locales + accessor + `pnpm i18n:generate-types` →
+  `tests/{platform-target,i18n-parity,i18n-no-hebrew-in-source}` 18/18, `pnpm i18n:check` deep parity
+  ✓, `npx tsc --noEmit` exit 0. In-app deletion path already live (5.1.1(v) proof, session 2026-07-28)
+  — both Play deletion requirements satisfied once this deploys. PR #153.
+- Visual pass for T2 (3 breakpoints × he/en) recorded on the PR before merge (screenshots in the PR
+  thread; page reuses the LegalDocumentShell used by /privacy‚ /terms‚ /support).
+
+**Verdict:** VERIFIED (code + test evidence in-session; T2 visual evidence attached at PR review).
+
 ## 2026-07-28 — Phase 3.5 NFC sticker E2E audit spec committed (branch claude/nfc-sticker-e2e-spec-d1mb2k)
 
 **Claim:** Recreated the owner-approved NFC sticker E2E audit spec as `docs/design/nfc-sticker-e2e-audit.md` (the prior session's local branch `docs/nfc-sticker-e2e-spec` @ `dd25b8e62` was never pushed), plus the two owner-approved additions from this session's decision gate: a "Custody-model fit" section and audit-matrix rows 8–9 (success criteria numeral 7→9). Original wording kept by explicit owner choice — no status resync.

@@ -90,7 +90,7 @@ Play) are owned end-to-end by the pilot→public **distribution program** (its P
 2026-07-28 — see `docs/audit/pre-pilot-qa-harness.md` and the 2026-07-28 PROOF_ALIGNMENT_LOG entries).
 The tracker above now counts **18** tasks; `scripts/vettrack-2.0-scope-gate.sh` is updated in the same
 commit (its canonical-ID contract requires lockstep edits). Task 0.7's open on-device residual rides
-the same program (its Phase-3 H5 physical-device gate). The Android **FCM push path stays 2.0-side** —
+the same program (its H5 physical-device gate). The Android **FCM push path stays 2.0-side** —
 deliberately not part of the store ship (the native iOS app ships without push today, and the store
 privacy answers say exactly that); it is UNTRACKED today — outside the 18/18 completion contract —
 and becomes a real tracker row (+ lockstep scope-gate update) only if the owner prioritizes it. **2.0 execution
@@ -281,8 +281,8 @@ current versions, and branch-side PROOF_ALIGNMENT_LOG entries append to main's l
   typecheck 0; no orphan adapter left half-wired.
 - **Done when:** Reviewed; tracker flips on the code-layer scope (accepted 2026-07-28; the on-device
   checklist above is the carved-out residual — it lives on as the distribution program's H5 device
-  gate, which the Android ship must still pass). **Gates the Android ship (distribution-program
-  Phase 3, ex-Task 1.3); should precede Phase-1 surfaces.**
+  gate, which the Android ship must still pass). **Gates the Android ship (the distribution
+  program's Android phase, ex-Task 1.3); should precede Phase-1 surfaces.**
 
 ---
 
@@ -328,7 +328,7 @@ current versions, and branch-side PROOF_ALIGNMENT_LOG entries append to main's l
 
 ### Task 1.3 — Ship the Android app (Google Play) · **TRANSFERRED to the distribution program (2026-07-28)**
 > Owner decision 2026-07-28: the Android/Play ship is owned end-to-end by the pilot→public
-> distribution program (its Phase 3), which carries the current, evidence-grounded checklist:
+> distribution program (its Android phase), which carries the current, evidence-grounded checklist:
 > Play account confirmed personal-post-2023 (→ 12 opted-in testers × 14 continuous days of closed
 > testing before production access), upload keystore + Play App Signing, versionCode/versionName
 > alignment to the 1.2.0 line, targetSdk 36 (verified compliant), Data-safety form + the public web
@@ -529,8 +529,8 @@ FKs — resolve explicitly before either starts its own Phase 0, don't let two c
 1. **~~Shell strategy confirmed — Capacitor stays.~~ SUPERSEDED 2026-07-22 as the *long-term* shell
    strategy** by the owner's binding decision to migrate to a bare React Native CLI app (see
    `docs/plans/master-plan-2026-07.md` Layers 3–5; ADR-008, pending, is where this supersession becomes
-   formal). **This does not change the Android ship (ex-Task 1.3, transferred 2026-07-28 to the distribution
-   program's Phase 3): Capacitor remains the vehicle for that near-term release** — the Android-via-
+   formal). **This does not change the Android ship (ex-Task 1.3, transferred 2026-07-28 to the
+   distribution program's Android phase): Capacitor remains the vehicle for that near-term release** — the Android-via-
    Capacitor ship happens *before* Layer 5 (the bare-RN migration) in the master plan's own sequencing,
    so Capacitor is a deliberate bridge, not a contradiction of the later decision. The ship's
    Capacitor-specific steps (`scripts/build-native-shell.sh --android`, Play Console signing) stay as
@@ -546,7 +546,7 @@ FKs — resolve explicitly before either starts its own Phase 0, don't let two c
    hand-roll those (`prefers-reduced-motion`, `prefers-contrast`, reduced-transparency fallback).
    Glass-OFF-on-Code-Blue/board matches Apple's own hierarchy rule.
 3. **Android:** targetSdk 35 / Android 15+ enforces edge-to-edge → insets/safe-area work in Task 0.7
-   gates Android shipping (distribution-program Phase 3, ex-1.3).
+   gates Android shipping (the distribution program's Android phase, ex-1.3).
 4. **Plugin law (github.com/ionic-team/capacitor-plugins):** same-major is a shortcut, not the rule —
    the published mapping has real exceptions (e.g. Capacitor 3 uses 1.x plugins); pin to the exact
    plugin versions verified against the current Capacitor core version in `package.json` at bump time
