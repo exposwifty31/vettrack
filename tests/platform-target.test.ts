@@ -119,3 +119,17 @@ describe("usePlatformTarget — board ordering (reactive)", () => {
     expect(result.current).toBe("desktop");
   });
 });
+
+describe("marketing paths — public account-deletion page (H3)", () => {
+  it("browser at /account-deletion resolves marketing (sync)", () => {
+    setPath("/account-deletion");
+    expect(resolvePlatformTarget()).toBe("marketing");
+  });
+
+  it("browser at /account-deletion resolves marketing (reactive)", () => {
+    const { result } = renderHook(() => usePlatformTarget(), {
+      wrapper: wrapperAt("/account-deletion"),
+    });
+    expect(result.current).toBe("marketing");
+  });
+});
