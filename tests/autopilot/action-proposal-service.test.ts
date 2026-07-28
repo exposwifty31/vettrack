@@ -380,6 +380,74 @@ describe("action-proposal-service", () => {
       );
       expect(edited.status).toBe("edited");
     });
+
+    it("rejects an edit for crash_cart_drift whose editedContent does not match the per-kind schema (bad driftType)", async () => {
+      const { proposal: staged } = await stageProposal(
+        { writer },
+        {
+          input: buildInput({
+            kind: "crash_cart_drift",
+            sourceSessionId: "crash-cart-edit-invalid",
+            draftContent: { driftType: "missing_items", scanDate: "2026-07-22", lastCheckId: "check-1", lastCheckPerformedAt: "2026-07-22T10:00:00.000Z", failedItems: [], title: "t" },
+          }),
+          groundTruthFacts: buildFacts(),
+          stagedBy: STAGED_BY,
+        },
+      );
+
+      await expect(
+        editProposal(
+          { writer },
+          { clinicId: CLINIC_A, proposalId: staged.id, ...ACTOR, editedContent: { driftType: "not_a_real_type" } },
+        ),
+      ).rejects.toThrow(ActionProposalEditValidationError);
+
+      const stillStaged = await writer.get(CLINIC_A, staged.id);
+      expect(stillStaged?.status).toBe("staged");
+    });
+
+    it("accepts an edit for crash_cart_drift whose editedContent matches the per-kind schema (driftType + note + acknowledgedItemKeys)", async () => {
+      const { proposal: staged } = await stageProposal(
+        { writer },
+        {
+          input: buildInput({
+            kind: "crash_cart_drift",
+            sourceSessionId: "crash-cart-edit-valid",
+            draftContent: { driftType: "missing_items", scanDate: "2026-07-22", lastCheckId: "check-1", lastCheckPerformedAt: "2026-07-22T10:00:00.000Z", failedItems: [], title: "t" },
+          }),
+          groundTruthFacts: buildFacts(),
+          stagedBy: STAGED_BY,
+        },
+      );
+
+      const edited = await editProposal(
+        { writer },
+        {
+          clinicId: CLINIC_A,
+          proposalId: staged.id,
+          ...ACTOR,
+          editedContent: { driftType: "missing_items", note: "Restocked epinephrine manually", acknowledgedItemKeys: ["epinephrine"] },
+        },
+      );
+      expect(edited.status).toBe("edited");
+    });
+
+    it("crash_cart_drift has no approve side effect — approve stays a generic status flip", async () => {
+      const { proposal: staged } = await stageProposal(
+        { writer },
+        {
+          input: buildInput({
+            kind: "crash_cart_drift",
+            sourceSessionId: "crash-cart-approve-no-side-effect",
+            draftContent: { driftType: "stale_check", scanDate: "2026-07-22", hasNeverBeenChecked: false, lastCheckPerformedAt: "2026-07-20T00:00:00.000Z", hoursSinceLastCheck: 48, thresholdHours: 24, title: "t" },
+          }),
+          groundTruthFacts: buildFacts(),
+          stagedBy: STAGED_BY,
+        },
+      );
+      const approved = await approveProposal({ writer }, { clinicId: CLINIC_A, proposalId: staged.id, ...ACTOR });
+      expect(approved.status).toBe("approved");
+    });
   });
 });
 

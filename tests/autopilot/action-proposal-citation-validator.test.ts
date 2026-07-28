@@ -113,4 +113,34 @@ describe("action-proposal citation validator", () => {
       });
     });
   });
+
+  describe("crash_cart_drift kind (§5)", () => {
+    const crashCartGroundTruth: ActionProposalCitedFact[] = [
+      { sourceId: "check-1", sourceTable: "vt_crash_cart_checks", kind: "check_missing_items", at: "2026-07-22T10:00:00.000Z" },
+      { sourceId: "item-epi", sourceTable: "vt_crash_cart_items", kind: "missing_item", at: "2026-07-22T10:00:00.000Z" },
+    ];
+
+    it("validates true when the crash-cart kind's real citations (checked against its own reader's ground truth) are used", () => {
+      const result = validateActionProposalCitations(crashCartGroundTruth, crashCartGroundTruth);
+      expect(result.valid).toBe(true);
+      expect(result.checks).toEqual([
+        { sourceId: "check-1", valid: true },
+        { sourceId: "item-epi", valid: true },
+      ]);
+    });
+
+    it("flags a fabricated sourceId for the crash-cart kind as citation_not_grounded", () => {
+      const tampered: ActionProposalCitedFact[] = [
+        ...crashCartGroundTruth,
+        { sourceId: "fabricated-cart-99", sourceTable: "vt_crash_cart_items", kind: "missing_item", at: "2026-07-22T10:05:00.000Z" },
+      ];
+      const result = validateActionProposalCitations(tampered, crashCartGroundTruth);
+      expect(result.valid).toBe(false);
+      expect(result.checks).toContainEqual({
+        sourceId: "fabricated-cart-99",
+        valid: false,
+        flag: "citation_not_grounded:fabricated-cart-99",
+      });
+    });
+  });
 });

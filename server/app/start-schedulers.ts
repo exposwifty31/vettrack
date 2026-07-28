@@ -28,6 +28,7 @@ import { startStaleReturnedSweepWorker } from "../workers/stale-returned-sweep.w
 import { startSweepEscalationWorker } from "../workers/sweep-escalation.worker.js";
 import { startAutopilotCoordinatorReassignWorker } from "../workers/autopilotCoordinatorReassignWorker.js";
 import { startAutopilotRestockBurnWorker } from "../workers/autopilotRestockBurnWorker.js";
+import { startAutopilotCrashCartDriftWorker } from "../workers/autopilotCrashCartDriftWorker.js";
 import { startShiftHandoverScheduler } from "../lib/shift-handover-scheduler.js";
 import { startRfidReaderOfflineSweep } from "../lib/rfid/reader-offline-sweep.js";
 import { startRfidFinalizingSweep } from "../lib/rfid/finalizing-sweep.js";
@@ -89,6 +90,15 @@ export async function startBackgroundSchedulers() {
   // (reorder-point threshold detection; daily cadence — see the worker
   // file's header comment).
   startAutopilotRestockBurnWorker();
+
+  // VetTrack 2.0, Task 1.1 §5 — Shift Autopilot `crash_cart_drift` scan
+  // (missing-item + staleness detection over vt_crash_cart_checks /
+  // vt_crash_cart_items; daily cadence, ahead of the restock scan's 07:00
+  // slot — see the worker file's header comment). Read-only against
+  // server/routes/crash-cart.ts; never touches Code Blue paths and never
+  // pages/pushes/notifies anyone — it only stages a shadow approval-queue
+  // proposal.
+  startAutopilotCrashCartDriftWorker();
 
   // R-SH-F1.2 — shift-end handover generator (in-process; no public generate route).
   startShiftHandoverScheduler();

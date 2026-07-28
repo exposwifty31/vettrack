@@ -4498,6 +4498,11 @@
         "title": "נדרשת השלמת מלאי — פריטים בנקודת ההזמנה החוזרת או מתחתיה",
         "summaryTemplate": "{itemCount, plural, one {פריט אחד נמצא בנקודת ההזמנה החוזרת או מתחתיה} other {# פריטים נמצאים בנקודת ההזמנה החוזרת או מתחתיה}} נכון לתאריך {scanDate} — מוצעת הזמנת רכש טיוטה בהמשך.",
         "suggestedQuantityLabel": "כמות מוצעת להזמנה"
+      },
+      "crashCartDrift": {
+        "title": "עגלת ההחייאה דורשת תשומת לב",
+        "missingItemSummaryTemplate": "{itemCount, plural, one {פריט אחד בעגלת ההחייאה סומן כלא מוכן} other {# פריטים בעגלת ההחייאה סומנו כלא מוכנים}} בבדיקה האחרונה בתאריך {scanDate}.",
+        "staleSummaryTemplate": "{neverChecked, select, yes {עגלת ההחייאה מעולם לא נבדקה} other {עגלת ההחייאה לא נבדקה כבר {hours} שעות}} — נדרשת בדיקה (סף: {thresholdHours} שעות)."
       }
     }
   }

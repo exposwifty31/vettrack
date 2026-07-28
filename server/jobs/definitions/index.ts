@@ -41,6 +41,10 @@ import {
   AUTOPILOT_COORDINATOR_REASSIGN_QUEUE_NAME,
 } from "../../workers/autopilotCoordinatorReassignWorker.js";
 import {
+  AUTOPILOT_CRASH_CART_DRIFT_JOB_NAME,
+  AUTOPILOT_CRASH_CART_DRIFT_QUEUE_NAME,
+} from "../../workers/autopilotCrashCartDriftWorker.js";
+import {
   resolveBullmqJobName,
   type AnyJobDefinition,
   type JobDefinition,
@@ -68,6 +72,8 @@ export type SweepEscalationJobPayload = Record<string, never>;
 /** VetTrack 2.0, Task 1.1 §4 — `autopilotRestockBurnWorker.ts`'s scan job. */
 export type RestockBurnScanJobPayload = Record<string, never>;
 export type CoordinatorReassignScanJobPayload = Record<string, never>;
+/** VetTrack 2.0, Task 1.1 §5 — `autopilotCrashCartDriftWorker.ts`'s scan job. */
+export type CrashCartDriftScanJobPayload = Record<string, never>;
 
 export type PayloadForStaticKind = {
   "check-plug": ChargeAlertJobPayload;
@@ -80,6 +86,7 @@ export type PayloadForStaticKind = {
   "sweep-room-escalation": SweepEscalationJobPayload;
   "scan-restock-burn": RestockBurnScanJobPayload;
   "scan-coordinator-reassign": CoordinatorReassignScanJobPayload;
+  "scan-crash-cart-drift": CrashCartDriftScanJobPayload;
 };
 
 /** Producer uses per-add opts only (no queue defaultJobOptions); attempts follow BullMQ default (1). */
@@ -202,6 +209,18 @@ const restockBurnScanDefinition: JobDefinition<RestockBurnScanJobPayload> = {
   removeOnFail: 100,
 };
 
+/** VetTrack 2.0, Task 1.1 §5 — registers `autopilotCrashCartDriftWorker.ts`'s scan job for the E3 job-registry/enqueue-parity tripwire, mirroring `restockBurnScanDefinition`'s pattern. */
+const crashCartDriftScanDefinition: JobDefinition<CrashCartDriftScanJobPayload> = {
+  kind: AUTOPILOT_CRASH_CART_DRIFT_JOB_NAME,
+  queue: AUTOPILOT_CRASH_CART_DRIFT_QUEUE_NAME,
+  bullmqJobName: AUTOPILOT_CRASH_CART_DRIFT_JOB_NAME,
+  workerConcurrency: 1,
+  attempts: 3,
+  backoff: { type: "exponential", delay: 2000 },
+  removeOnComplete: 50,
+  removeOnFail: 100,
+};
+
 export const staticJobDefinitions = [
   chargeAlertDefinition,
   taskOwnershipBackfillDefinition,
@@ -213,6 +232,7 @@ export const staticJobDefinitions = [
   sweepEscalationDefinition,
   restockBurnScanDefinition,
   coordinatorReassignScanDefinition,
+  crashCartDriftScanDefinition,
 ] as const;
 
 /** Integration enqueue metadata (dynamic job.name, shard queue per clinic). */
