@@ -472,41 +472,47 @@ export async function resolveAuthUser(req: Request): Promise<ResolveResult> {
   // an unknown org with an existing user proceeds on their DB clinic; an
   // unknown org with an unknown user is treated as clinic-less so the
   // join-code screen (ADR-007) takes over.
+  // Common case (known clinic): ONE indexed SELECT and no mint call at all —
+  // cheaper than the previous unconditional insert-on-conflict. The extra
+  // existing-user SELECT and any mint run only on the rare unknown-org path.
   const [knownClinic] = await db
     .select({ id: clinics.id })
     .from(clinics)
     .where(eq(clinics.id, clerkOrgId))
     .limit(1);
-  const [preexistingUser] = await db
-    .select({ id: users.id })
-    .from(users)
-    .where(and(eq(users.clerkId, clerkUserId), isNull(users.deletedAt)))
-    .limit(1);
-  const jitDecision = decideJitClinicPolicy({
-    clinicExists: Boolean(knownClinic),
-    adminEmail,
-    hasExistingUser: Boolean(preexistingUser),
-  });
-  if (jitDecision === "block-clinicless") {
-    logAudit({
-      actorRole: null,
-      clinicId: clerkOrgId,
-      actionType: "jit_clinic_mint_blocked",
-      performedBy: clerkUserId,
-      performedByEmail: clerkEmail || "unknown",
-      targetType: "clinic",
-      targetId: clerkOrgId,
-      metadata: { reason: "unknown_session_org_unknown_user" },
+  if (!knownClinic) {
+    const [preexistingUser] = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(and(eq(users.clerkId, clerkUserId), isNull(users.deletedAt)))
+      .limit(1);
+    const jitDecision = decideJitClinicPolicy({
+      clinicExists: false,
+      adminEmail,
+      hasExistingUser: Boolean(preexistingUser),
     });
-    return {
-      ok: false,
-      status: 403,
-      body: buildAccessDeniedBody("MISSING_CLINIC_ID", "User is not assigned to a clinic"),
-    };
-  }
-  if (jitDecision !== "proceed-existing") {
-    // "proceed" is a no-op mint; "proceed-mint" is the admin bootstrap.
-    await ensureClinicExistsForOrg(clerkOrgId);
+    if (jitDecision === "block-clinicless") {
+      logAudit({
+        actorRole: null,
+        clinicId: clerkOrgId,
+        actionType: "jit_clinic_mint_blocked",
+        performedBy: clerkUserId,
+        performedByEmail: clerkEmail || "unknown",
+        targetType: "clinic",
+        targetId: clerkOrgId,
+        metadata: { reason: "unknown_session_org_unknown_user" },
+      });
+      return {
+        ok: false,
+        status: 403,
+        body: buildAccessDeniedBody("MISSING_CLINIC_ID", "User is not assigned to a clinic"),
+      };
+    }
+    if (jitDecision === "proceed-mint") {
+      // Deliberate ADMIN_EMAILS new-clinic bootstrap — the one sanctioned mint.
+      await ensureClinicExistsForOrg(clerkOrgId);
+    }
+    // "proceed-existing": no mint — the upsert keeps the user's DB clinic.
   }
 
   // SECURITY: Role is ALWAYS resolved from the database record.

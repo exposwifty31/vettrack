@@ -205,9 +205,7 @@ describe("resolveAuthUser — ADMIN_EMAILS promotion runtime", () => {
     // Model a KNOWN clinic ("proceed") so these lifecycle scenarios keep their
     // original semantics; the guard's own matrix lives in
     // tests/jit-clinic-policy.test.ts.
-    dbResolves.push([{ id: "clinic-prod-1" }]); // guard: clinic-exists
-    dbResolves.push([]); // guard: preexisting user (none — insert path)
-    dbResolves.push(undefined); // ensureClinicExistsForOrg insert
+    dbResolves.push([{ id: "clinic-prod-1" }]); // guard: clinic-exists (known → short-circuit, no mint)
     dbResolves.push([userRow]); // user upsert .returning()
   }
 
