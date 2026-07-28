@@ -12,7 +12,12 @@ describe("account-deletion tombstone strips all PII (CROSS-FLOW-3 lock)", () => 
     "utf-8",
   );
 
-  const anonymizeBlock = src.slice(src.indexOf("async function anonymizeUser"));
+  // Bounded at the next top-level function/export so later code can never
+  // satisfy the assertions (review finding on the original EOF slice).
+  const anonymizeStart = src.indexOf("async function anonymizeUser");
+  const rest = src.slice(anonymizeStart);
+  const nextBoundary = rest.slice(1).search(/\n(?:export |async function |function )/);
+  const anonymizeBlock = nextBoundary === -1 ? rest : rest.slice(0, nextBoundary + 1);
 
   it("anonymizeUser exists", () => {
     expect(src).toContain("async function anonymizeUser");
