@@ -5436,3 +5436,14 @@ Data-safety URL), marketing-path routed, he+en.
   thread; page reuses the LegalDocumentShell used by /privacy‚ /terms‚ /support).
 
 **Verdict:** VERIFIED (code + test evidence in-session; T2 visual evidence attached at PR review).
+
+## 2026-07-28 — Phase 3.5 NFC sticker E2E audit spec committed (branch claude/nfc-sticker-e2e-spec-d1mb2k)
+
+**Claim:** Recreated the owner-approved NFC sticker E2E audit spec as `docs/design/nfc-sticker-e2e-audit.md` (the prior session's local branch `docs/nfc-sticker-e2e-spec` @ `dd25b8e62` was never pushed), plus the two owner-approved additions from this session's decision gate: a "Custody-model fit" section and audit-matrix rows 8–9 (success criteria numeral 7→9). Original wording kept by explicit owner choice — no status resync.
+
+**Evidence:**
+- `docs/design/nfc-sticker-e2e-audit.md` — written this session; 15 sections in canonical order, 9-row audit matrix, success criteria says "nine".
+- Repo-recon reads backing the spec's factual anchors (and the deliberate keep-original-wording decision): `src/lib/deep-link-router.ts:77-84` (https vettrack.uk → `/equipment/<id>?nfcAction=toggle&nfcTs=` already implemented), `src/lib/equipment-id.ts` (`UNIVERSAL_LINK_HOST = "vettrack.uk"`), `ios/App/App/App.entitlements:17` (`applinks:vettrack.uk` present), `server/index.ts:318` (AASA route serving appID `87F5G378M6.uk.vettrack.app`, `/equipment/*`), `android/app/src/main/AndroidManifest.xml` (MAIN/LAUNCHER only — https intent-filter + assetlinks.json genuinely still open), `git log -- src/lib/deep-link-router.ts` → landed via PR #86 merge `b6856f9`.
+- Owner decisions this session (AskUserQuestion): include both custody additions; keep original wording; push + open PR — all three recorded in the session plan file.
+
+**Verdict:** VERIFIED (docs-only change; the spec's "code gap" sections intentionally describe the approved design, parts of which PR #86 has since landed — disclosed above, not an error of this entry).
