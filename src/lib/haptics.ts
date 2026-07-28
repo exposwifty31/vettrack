@@ -38,8 +38,13 @@ function vibrate(pattern: VibratePattern, native: NativeCue) {
       native.kind === "impact"
         ? Haptics.impact({ style: native.style })
         : Haptics.notification({ type: native.type });
-    fire.catch(() => {
-      // Haptic failure must never surface to the user.
+    fire.catch((err: unknown) => {
+      // Haptic failure must never surface to the user — this is dev-only
+      // diagnostics so a misregistered/missing native plugin is observable
+      // during development instead of failing completely silently.
+      if (import.meta.env.DEV) {
+        console.warn("[haptics] native Haptics call failed:", err);
+      }
     });
     return;
   }
