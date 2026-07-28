@@ -5243,3 +5243,11 @@ unrelated to this change).
 - Hardening tracked (not yet done): delete-account sole-org-admin handling + server-side guard on JIT clinic-minting from unknown session orgs.
 
 **Verdict:** VERIFIED (C-6 + C-7 closed with prod evidence; harness updated on PR #145).
+
+## 2026-07-28 — H2 push-activation bug: closed (works on prod)
+
+**Claim:** The "push notifications error on activation" production bug no longer exists.
+
+**Evidence:** Owner activated push on prod web (vettrack.uk/settings) → success toast "התראות Push הופעלו"; device-notifications control active. Consistent with the audit finding: the suspected missing `VAPID_PRIVATE_KEY` was disproven (keys valid in `vt_server_config`, health `vapid:ok`, no env keys by design), and the actual historical cause — CROSS-FLOW-4 build-time public-key precedence mismatch — was fixed in PR #116 and has been deployed since. No configuration change was needed; env-promotion hardening skipped as unnecessary.
+
+**Verdict:** VERIFIED (prod, owner-run activation).
