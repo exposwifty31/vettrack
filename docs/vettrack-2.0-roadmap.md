@@ -58,7 +58,7 @@ Stop hook prints the shipped count at every session end.
 - [x] 0.4 Per-org policy layer design
 - [x] 0.5 Operations-memory backtest (synthetic harness — owner-approved deviation, real data unreachable)
 - [ ] 0.6 Pricing-model decision
-- [x] 0.7 Native shell & plugin hygiene (box covers the accepted CODE-LAYER scope only: haptics dev-diagnostic + dead-code removed + docs law; the on-device physical confirmation is explicitly carved OUT of 0.7's acceptance and owned by the distribution program's Phase-3 H5 physical-device gate — still open there)
+- [x] 0.7 Native shell & plugin hygiene (box covers the accepted CODE-LAYER scope only: haptics dev-diagnostic + dead-code removed + docs law; the on-device physical confirmation is explicitly carved OUT of this task's acceptance and owned by the distribution program's H5 physical-device gate — still open there)
 - [x] 1.1 Shift Autopilot — shadow mode
 - [ ] 1.2 The Case Spine
 - [ ] 1.4 Consumable-usage capture (reconnect dispense → patient → billing)
