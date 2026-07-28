@@ -5009,6 +5009,14 @@ tracker) and describe the state at authoring time.
   (identical to `main` before this branch — the six docs add no `- [ ] N.N` tracker rows).
 - `npx tsc -p tsconfig.server.json --noEmit` and `npx tsc --noEmit` → 0 errors (the backtest script is in
   neither tsconfig `include`, so it is not typechecked; it is a standalone `tsx`-run harness).
+- `pnpm test` (full vitest suite, run 2026-07-28 on this branch) → **5839 passed, 255 skipped, 20 failed
+  across 16 files**. Every one of the 16 failing files is a DB-backed test (`*.integration.test.ts` plus
+  the `shift-handover-*` suites) and every failure signature is `connect ECONNREFUSED 127.0.0.1:5432` —
+  i.e., no local Postgres in this ephemeral environment, **not** an assertion/logic failure. These are
+  pre-existing environment failures that reproduce identically on `main` (they need `DATABASE_URL` + a
+  running Postgres, per CLAUDE.md's DB-integration test notes); this PR changes **zero** compiled code
+  (six Markdown docs + one standalone `tsx` script in neither tsconfig + this PROOF append), so it cannot
+  introduce a test regression. All non-DB tests pass.
 - `pnpm exec tsx scripts/analysis/autopilot-backtest.ts` runs deterministically and prints its
   "SYNTHETIC DATA — NOT real clinic history" banner.
 - **Scope caveat carried forward (CodeRabbit #141):** the reproduced Task 0.5 "Verdict: VERIFIED" below

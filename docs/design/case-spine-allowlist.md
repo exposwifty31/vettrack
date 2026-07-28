@@ -7,7 +7,12 @@
 
 ## Review checklist (must be fully checked before this spec is usable by 0.2/1.2)
 
-- [x] Every allowlist field names its source event table (existing, real, `clinicId`-scoped).
+- [x] Every allowlist field names its source event table (existing, real, `clinicId`-scoped), with two
+  explicitly-labeled exceptions that are **not** event streams and are called out as such in the table:
+  the **current-state** room entity (`vt_rooms` — placement, not a move-event log) and the case's own
+  **intrinsic lifecycle** field (the new `vt_cases` status column). Both are operational and neither
+  carries a clinical fact; the checklist is satisfied because these two exceptions are declared, not
+  because they name an event table.
 - [x] Every denylist category cites owner decision #1 as its authority.
 - [x] PMS-key linkage (how a `vt_cases` row finds its patient) is defined.
 - [x] No denylisted category appears inside the Allowlist section.
@@ -83,6 +88,12 @@ minimum it should show:
 
 1. **Case identity strip** — PMS patient display name (from `CanonicalPatientV1`, read-only pass-through,
    not stored redundantly beyond what's needed to render) + `patientExternalId` + case open/closed state.
+   **Unresolved-PMS state (required):** because a case may exist before PMS resolution (`patientExternalId
+   = null`, per PMS-key linkage above), the strip must render an explicit **pending/unresolved** identity
+   — show whatever display name the integration has already surfaced (or "PMS patient not yet linked" if
+   none) and mark the external ID visibly as *unresolved/pending*, never blank-as-if-final. It must
+   **never** substitute a placeholder, inferred, or locally-invented identity for the missing external
+   ID; the pending badge stays until the real join back-fills.
 2. **Timeline of attached events**, each rendered from its allowlisted source table: scans (equipment +
    timestamp), room moves, task references, Code Blue session references (link out to the session, not an
    inline clinical summary), dispense events (item + quantity, no clinical rationale), damage/condition

@@ -197,9 +197,16 @@ clinic; already-completed actions are untouched.**
 > **⚠️ Review-flagged (2026-07-28, CodeRabbit #141) — resolve at implementation:** "re-resolve both
 > switches at execution time" is necessary but does not by itself close the **check-to-execute race** —
 > a revocation landing *after* the resolve read but *before* the side-effect commit could still let one
-> action through. The implementing execution path must couple the final authorization check and the
-> irreversible mutation **atomically** (same DB transaction / conditional write / last-moment gate
-> immediately before the side effect), so the guarantee above holds even under a concurrent revoke.
+> action through. Worse, the base-mode and policy resolvers both cache their result for up to one TTL
+> window (≤10s, §4/§6), so even a final check placed immediately before the side effect can read a
+> **stale-cached `approved`** for up to that window after a revoke has landed. The implementing execution
+> path must therefore (a) make the final revoke gate **bypass the TTL cache** — an uncached, current-
+> version read of the policy value, not the cached `effectiveMode` — and (b) couple that uncached check
+> and the irreversible mutation **atomically** (same DB transaction / conditional write keyed on the
+> current policy version, or a transactional-outbox / state-transition for external side effects), so a
+> concurrent revoke cannot authorize the action after the check. The ≤10s TTL is acceptable for *raising*
+> the floor (a newly-approved `enforce` may take one window to take effect); it is **not** acceptable for
+> the revoke direction, where the post-revocation guarantee must hold immediately.
 
 ---
 
