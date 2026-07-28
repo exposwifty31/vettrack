@@ -6,6 +6,7 @@ import {
   editProposal,
   rejectProposal,
   ActionProposalNotFoundError,
+  ActionProposalEditValidationError,
 } from "../../server/lib/autopilot/action-proposal-service.js";
 import { ActionProposalAlreadyDecidedError } from "../../server/lib/autopilot/action-proposal-writer.port.js";
 import type { ActionProposalCitedFact, NewActionProposalInput } from "../../server/lib/autopilot/action-proposal-types.js";
@@ -15,6 +16,9 @@ vi.mock("../../server/lib/audit.js", () => ({
 }));
 vi.mock("../../server/lib/metrics.js", () => ({
   incrementMetric: vi.fn(),
+}));
+vi.mock("../../server/lib/autopilot/restock-po-approve-side-effect.js", () => ({
+  buildRestockPoApproveSideEffect: vi.fn(() => undefined),
 }));
 
 const CLINIC_A = "clinic-a";
@@ -176,6 +180,206 @@ describe("action-proposal-service", () => {
 
     const finalRow = await writer.get(CLINIC_A, staged.id);
     expect(finalRow?.status).toBe("approved");
+  });
+
+  describe("restock_po_on_burn approve side effect (Task 1.1 §4)", () => {
+    function buildRestockInput(overrides: Partial<NewActionProposalInput> = {}): NewActionProposalInput {
+      return buildInput({
+        kind: "restock_po_on_burn",
+        sourceSessionId: "restock-session-1",
+        draftContent: { supplierName: "Autopilot", lines: [{ itemId: "item-1", quantitySuggested: 5 }] },
+        sourceRef: { clinicId: CLINIC_A, scanDate: "2026-07-22" },
+        ...overrides,
+      });
+    }
+
+    it("executes the kind-dispatched side effect exactly once across approve + a retried approve (retry throws AlreadyDecided before the side effect runs)", async () => {
+      const { buildRestockPoApproveSideEffect } = await import(
+        "../../server/lib/autopilot/restock-po-approve-side-effect.js"
+      );
+      const sideEffectSpy = vi.fn().mockResolvedValue(undefined);
+      vi.mocked(buildRestockPoApproveSideEffect).mockReturnValue(sideEffectSpy);
+
+      const { proposal: staged } = await stageProposal(
+        { writer },
+        { input: buildRestockInput(), groundTruthFacts: buildFacts(), stagedBy: STAGED_BY },
+      );
+
+      const approved = await approveProposal({ writer }, { clinicId: CLINIC_A, proposalId: staged.id, ...ACTOR });
+      expect(approved.status).toBe("approved");
+      expect(sideEffectSpy).toHaveBeenCalledTimes(1);
+
+      // Retry: the writer's staged-status guard fires before the side effect
+      // ever runs again — proves "exactly one PO" would exist in the real
+      // Drizzle path (a real PO insert only happens inside the same
+      // transaction as a successful transition).
+      await expect(
+        approveProposal({ writer }, { clinicId: CLINIC_A, proposalId: staged.id, ...ACTOR }),
+      ).rejects.toThrow(ActionProposalAlreadyDecidedError);
+      expect(sideEffectSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it("rolls back the decision when the side effect fails: proposal stays staged, no decision-log row is appended", async () => {
+      const { buildRestockPoApproveSideEffect } = await import(
+        "../../server/lib/autopilot/restock-po-approve-side-effect.js"
+      );
+      const failingSideEffect = vi.fn().mockRejectedValue(new Error("PO insert failed"));
+      vi.mocked(buildRestockPoApproveSideEffect).mockReturnValue(failingSideEffect);
+
+      const { proposal: staged } = await stageProposal(
+        { writer },
+        { input: buildRestockInput({ sourceSessionId: "restock-session-rollback" }), groundTruthFacts: buildFacts(), stagedBy: STAGED_BY },
+      );
+
+      await expect(
+        approveProposal({ writer }, { clinicId: CLINIC_A, proposalId: staged.id, ...ACTOR }),
+      ).rejects.toThrow("PO insert failed");
+
+      const stillStaged = await writer.get(CLINIC_A, staged.id);
+      expect(stillStaged?.status).toBe("staged");
+      expect(writer.allDecisions().filter((d) => d.proposalId === staged.id)).toHaveLength(0);
+    });
+
+    it("edit = fix-then-execute (owner decision 2026-07-22): editing a restock proposal executes the side effect exactly once with the EDITED content", async () => {
+      const { buildRestockPoApproveSideEffect } = await import(
+        "../../server/lib/autopilot/restock-po-approve-side-effect.js"
+      );
+      const sideEffectSpy = vi.fn().mockResolvedValue(undefined);
+      vi.mocked(buildRestockPoApproveSideEffect).mockReturnValue(sideEffectSpy);
+
+      const editedContent = { supplierName: "Real Supplier Ltd", lines: [{ itemId: "item-1", quantitySuggested: 3 }] };
+      const { proposal: staged } = await stageProposal(
+        { writer },
+        { input: buildRestockInput({ sourceSessionId: "restock-session-edit-executes" }), groundTruthFacts: buildFacts(), stagedBy: STAGED_BY },
+      );
+
+      const edited = await editProposal(
+        { writer },
+        { clinicId: CLINIC_A, proposalId: staged.id, ...ACTOR, editedContent },
+      );
+      expect(edited.status).toBe("edited");
+      expect(sideEffectSpy).toHaveBeenCalledTimes(1);
+      expect(vi.mocked(buildRestockPoApproveSideEffect)).toHaveBeenLastCalledWith(
+        expect.objectContaining({ id: staged.id }),
+        ACTOR.actorUserId,
+        editedContent,
+      );
+
+      // Still single-decision: edited is terminal, a later approve throws
+      // before any second execution.
+      await expect(
+        approveProposal({ writer }, { clinicId: CLINIC_A, proposalId: staged.id, ...ACTOR }),
+      ).rejects.toThrow(ActionProposalAlreadyDecidedError);
+      expect(sideEffectSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it("a failing side effect on the edit path rolls back: proposal stays staged, no decision-log row", async () => {
+      const { buildRestockPoApproveSideEffect } = await import(
+        "../../server/lib/autopilot/restock-po-approve-side-effect.js"
+      );
+      const failingSideEffect = vi.fn().mockRejectedValue(new Error("PO insert failed on edit"));
+      vi.mocked(buildRestockPoApproveSideEffect).mockReturnValue(failingSideEffect);
+
+      const { proposal: staged } = await stageProposal(
+        { writer },
+        { input: buildRestockInput({ sourceSessionId: "restock-session-edit-rollback" }), groundTruthFacts: buildFacts(), stagedBy: STAGED_BY },
+      );
+
+      await expect(
+        editProposal(
+          { writer },
+          {
+            clinicId: CLINIC_A,
+            proposalId: staged.id,
+            ...ACTOR,
+            editedContent: { supplierName: "Real Supplier Ltd", lines: [{ itemId: "item-1", quantitySuggested: 3 }] },
+          },
+        ),
+      ).rejects.toThrow("PO insert failed on edit");
+
+      const stillStaged = await writer.get(CLINIC_A, staged.id);
+      expect(stillStaged?.status).toBe("staged");
+      expect(writer.allDecisions().filter((d) => d.proposalId === staged.id)).toHaveLength(0);
+    });
+
+    it("does not dispatch a side effect for other kinds (e.g. shift_handover_draft) — approve stays a generic status flip", async () => {
+      const { buildRestockPoApproveSideEffect } = await import(
+        "../../server/lib/autopilot/restock-po-approve-side-effect.js"
+      );
+      vi.mocked(buildRestockPoApproveSideEffect).mockReturnValue(undefined);
+
+      const { proposal: staged } = await stageProposal(
+        { writer },
+        { input: buildInput({ sourceSessionId: "session-non-restock" }), groundTruthFacts: buildFacts(), stagedBy: STAGED_BY },
+      );
+      const approved = await approveProposal({ writer }, { clinicId: CLINIC_A, proposalId: staged.id, ...ACTOR });
+      expect(approved.status).toBe("approved");
+    });
+  });
+
+  describe("per-kind edit-body validation (Task 1.1 §4, deliverable E)", () => {
+    it("rejects an edit for restock_po_on_burn whose editedContent does not match the per-kind schema", async () => {
+      const { proposal: staged } = await stageProposal(
+        { writer },
+        {
+          input: buildInput({
+            kind: "restock_po_on_burn",
+            sourceSessionId: "restock-edit-invalid",
+            draftContent: { supplierName: "Autopilot", lines: [{ itemId: "item-1", quantitySuggested: 5 }] },
+          }),
+          groundTruthFacts: buildFacts(),
+          stagedBy: STAGED_BY,
+        },
+      );
+
+      await expect(
+        editProposal(
+          { writer },
+          { clinicId: CLINIC_A, proposalId: staged.id, ...ACTOR, editedContent: { supplierName: "", lines: [] } },
+        ),
+      ).rejects.toThrow(ActionProposalEditValidationError);
+
+      const stillStaged = await writer.get(CLINIC_A, staged.id);
+      expect(stillStaged?.status).toBe("staged");
+    });
+
+    it("accepts an edit for restock_po_on_burn whose editedContent matches the per-kind schema", async () => {
+      const { proposal: staged } = await stageProposal(
+        { writer },
+        {
+          input: buildInput({
+            kind: "restock_po_on_burn",
+            sourceSessionId: "restock-edit-valid",
+            draftContent: { supplierName: "Autopilot", lines: [{ itemId: "item-1", quantitySuggested: 5 }] },
+          }),
+          groundTruthFacts: buildFacts(),
+          stagedBy: STAGED_BY,
+        },
+      );
+
+      const edited = await editProposal(
+        { writer },
+        {
+          clinicId: CLINIC_A,
+          proposalId: staged.id,
+          ...ACTOR,
+          editedContent: { supplierName: "Real Supplier Inc.", lines: [{ itemId: "item-1", quantitySuggested: 7 }] },
+        },
+      );
+      expect(edited.status).toBe("edited");
+    });
+
+    it("does not apply the restock schema to other kinds — a shift_handover_draft edit with an arbitrary shape still succeeds", async () => {
+      const { proposal: staged } = await stageProposal(
+        { writer },
+        { input: buildInput({ sourceSessionId: "session-edit-other-kind" }), groundTruthFacts: buildFacts(), stagedBy: STAGED_BY },
+      );
+      const edited = await editProposal(
+        { writer },
+        { clinicId: CLINIC_A, proposalId: staged.id, ...ACTOR, editedContent: { anything: "goes" } },
+      );
+      expect(edited.status).toBe("edited");
+    });
   });
 });
 

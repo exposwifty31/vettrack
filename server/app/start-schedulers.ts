@@ -27,6 +27,7 @@ import { startStaleCheckoutSweepWorker } from "../workers/staleCheckoutSweepWork
 import { startStaleReturnedSweepWorker } from "../workers/stale-returned-sweep.worker.js";
 import { startSweepEscalationWorker } from "../workers/sweep-escalation.worker.js";
 import { startAutopilotCoordinatorReassignWorker } from "../workers/autopilotCoordinatorReassignWorker.js";
+import { startAutopilotRestockBurnWorker } from "../workers/autopilotRestockBurnWorker.js";
 import { startShiftHandoverScheduler } from "../lib/shift-handover-scheduler.js";
 import { startRfidReaderOfflineSweep } from "../lib/rfid/reader-offline-sweep.js";
 import { startRfidFinalizingSweep } from "../lib/rfid/finalizing-sweep.js";
@@ -83,6 +84,11 @@ export async function startBackgroundSchedulers() {
   // scan (roster-drift detection; a different mechanism from the sweep-escalation
   // ladder above — see the worker file's header comment).
   startAutopilotCoordinatorReassignWorker();
+
+  // VetTrack 2.0, Task 1.1 §4 — Shift Autopilot `restock_po_on_burn` scan
+  // (reorder-point threshold detection; daily cadence — see the worker
+  // file's header comment).
+  startAutopilotRestockBurnWorker();
 
   // R-SH-F1.2 — shift-end handover generator (in-process; no public generate route).
   startShiftHandoverScheduler();

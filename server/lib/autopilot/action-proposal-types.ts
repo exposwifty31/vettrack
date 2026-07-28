@@ -26,7 +26,10 @@ export type ActionProposalStatus = (typeof ACTION_PROPOSAL_STATUSES)[number];
  * autocompleting the known members. `vt_shift_equipment_coordinator` /
  * `vt_shifts` (§3, `coordinator_reassign_off_roster`) added explicitly per
  * the plan's instruction to extend this union, not rely on the open idiom
- * alone.
+ * alone. `vt_container_items` / `vt_items` (§4, `restock_po_on_burn`) added
+ * the same way — both literal DB table names (`vt_items` is the real name
+ * behind `server/schema/inventory.ts`'s `inventoryItems` export), keeping
+ * the "citation label == real table name" pattern every member follows.
  */
 export interface ActionProposalCitedFact {
   sourceId: string;
@@ -35,6 +38,8 @@ export interface ActionProposalCitedFact {
     | "vt_event_outbox"
     | "vt_shift_equipment_coordinator"
     | "vt_shifts"
+    | "vt_container_items"
+    | "vt_items"
     | (string & {});
   kind: string;
   at: string;
@@ -70,3 +75,47 @@ export const rejectActionProposalBodySchema = z
   })
   .strict();
 export type RejectActionProposalBody = z.infer<typeof rejectActionProposalBodySchema>;
+
+/**
+ * VetTrack 2.0, Task 1.1 §4 (deliverable E, §1.6's carried-forward
+ * per-kind-edit-validation note) — per-kind Zod validation of an edit
+ * route's `editedContent` body, keyed by `ActionProposalKind`. Only kinds
+ * with a registered schema are checked; a kind with no entry passes
+ * through unchecked (matches the other 3 kinds' current unbuilt state —
+ * this plan does not retroactively build validation for kinds outside its
+ * own scope).
+ */
+export const restockPoOnBurnEditedContentSchema = z
+  .object({
+    supplierName: z.string().min(1),
+    lines: z
+      .array(
+        z.object({
+          itemId: z.string().min(1),
+          quantitySuggested: z.number().int().positive(),
+        }),
+      )
+      .min(1),
+  })
+  .strict();
+export type RestockPoOnBurnEditedContent = z.infer<typeof restockPoOnBurnEditedContentSchema>;
+
+const PER_KIND_EDITED_CONTENT_SCHEMAS: Partial<Record<ActionProposalKind, z.ZodTypeAny>> = {
+  restock_po_on_burn: restockPoOnBurnEditedContentSchema,
+};
+
+export interface EditedContentValidationResult {
+  valid: boolean;
+  message?: string;
+}
+
+export function validateEditedContentForKind(
+  kind: ActionProposalKind,
+  editedContent: unknown,
+): EditedContentValidationResult {
+  const schema = PER_KIND_EDITED_CONTENT_SCHEMAS[kind];
+  if (!schema) return { valid: true };
+  const result = schema.safeParse(editedContent);
+  if (result.success) return { valid: true };
+  return { valid: false, message: result.error.issues.map((issue) => issue.message).join("; ") };
+}
