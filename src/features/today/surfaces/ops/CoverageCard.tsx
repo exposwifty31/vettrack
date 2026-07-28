@@ -1,6 +1,6 @@
 import { Skeleton } from "@/components/ui/skeleton";
 import { t } from "@/lib/i18n";
-import { pctColor } from "./ops-tile-helpers";
+import { pctColor, pctTextColor } from "./ops-tile-helpers";
 
 /**
  * Ops command card — the surface hero. The dominant availability % numeral and the
@@ -27,6 +27,7 @@ export function CoverageCard({
   // skeleton state (like HomeTabletDashboard) rather than a misleading "0 ready" flash.
   const loading = isLoading && availabilityPct === null;
   const tier = availabilityPct === null ? "var(--ivory-text3)" : pctColor(availabilityPct);
+  const tierText = availabilityPct === null ? "rgb(var(--ivory-text3))" : pctTextColor(availabilityPct);
 
   return (
     <section
@@ -45,7 +46,7 @@ export function CoverageCard({
         <span
           dir="ltr"
           className="font-num text-[2.75rem] font-bold leading-none tracking-[-0.03em] tabular-nums"
-          style={{ color: tier }}
+          style={{ color: tierText }}
         >
           {availabilityPct === null ? "—" : `${availabilityPct}%`}
         </span>

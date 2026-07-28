@@ -33,6 +33,12 @@ function pctColor(pct: number): string {
   return "rgb(var(--sys-red))";
 }
 
+function pctTextColor(pct: number): string {
+  if (pct >= 80) return "rgb(var(--sys-green-text))";
+  if (pct >= 40) return "rgb(var(--sys-orange-text))";
+  return "rgb(var(--sys-red))";
+}
+
 const tileStyle: React.CSSProperties = {
   borderRadius: 20,
   border: "1px solid hsl(var(--border))",
@@ -492,7 +498,7 @@ export function HomeTabletDashboard() {
                     fontFamily: "var(--font-num)",
                     fontSize: "var(--text-sm)",
                     fontWeight: 700,
-                    color: pctColor(pct),
+                    color: pctTextColor(pct),
                     flexShrink: 0,
                   }}
                 >

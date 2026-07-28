@@ -41,7 +41,7 @@ export function PwaInstallPrompt() {
         className="fixed bottom-0 inset-x-0 z-50"
         style={{ paddingBottom: "max(env(safe-area-inset-bottom), 0px)" }}
       >
-        <div className="mx-4 mb-4 rounded-2xl border border-border bg-background/95 shadow-xl backdrop-blur-md p-4 flex items-start gap-3">
+        <div className="ms-4 me-[4.75rem] mb-4 rounded-2xl border border-border bg-background/95 shadow-xl backdrop-blur-md p-4 flex items-start gap-3">
           <img
             src="/icons/icon-192.png"
             alt=""
@@ -79,7 +79,7 @@ export function PwaInstallPrompt() {
             type="button"
             onClick={() => dismissAndroidBanner()}
             aria-label={t.common.close}
-            className="flex items-center justify-center min-w-[44px] min-h-[44px] -mt-2 -me-2 text-muted-foreground hover:text-foreground shrink-0"
+            className="flex items-center justify-center min-w-[44px] min-h-[44px] text-muted-foreground hover:text-foreground shrink-0"
           >
             <X className="w-5 h-5" />
           </button>
@@ -118,7 +118,7 @@ export function PwaInstallPrompt() {
               type="button"
               onClick={dismissIosGuidance}
               aria-label={t.common.close}
-              className="flex items-center justify-center min-w-[44px] min-h-[44px] -mt-2 -me-2 text-muted-foreground hover:text-foreground shrink-0"
+              className="flex items-center justify-center min-w-[44px] min-h-[44px] text-muted-foreground hover:text-foreground shrink-0"
             >
               <X className="w-5 h-5" />
             </button>
