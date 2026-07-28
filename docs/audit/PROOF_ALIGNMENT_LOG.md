@@ -5242,7 +5242,7 @@ unrelated to this change).
 - **Exit-bar signup test #2 PASSED end-to-end:** no org page → JoinClinicScreen → code → visible in Pending → **account self-deleted successfully** — a live prod proof of the Guideline 5.1.1(v) deletion path for a fresh pending account (post-#116 behavior).
 - Hardening tracked (not yet done): delete-account sole-org-admin handling + server-side guard on JIT clinic-minting from unknown session orgs.
 
-**Verdict:** VERIFIED (C-6 + C-7 closed with prod evidence; harness updated on PR #145).
+**Verdict:** VERIFIED — configuration fix + exit-bar retest (C-6 operational bar met) and C-7 closed, with prod evidence; **incident hardening OUTSTANDING and tracked** (server-side JIT clinic-minting guard + sole-org-admin deletion handling) — defense-in-depth closure is NOT claimed until that lands.
 
 ## 2026-07-28 — H2 push-activation bug: closed (works on prod)
 

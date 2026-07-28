@@ -16,14 +16,14 @@ _Phase-0A cards below are COMPLETE (2026-07-12) — see banner and Completed. Do
 
 ---
 
-## Ready to Start — Phase 0A
+## Phase 0A cards (COMPLETED 2026-07-12 — reference only, do NOT execute)
 
 > **⚠ 2026-07-28:** T-05 · T-01 · T-02 · T-03 · T-04 all COMPLETED 2026-07-12 (commits `b79f0819a`,
 > `bb148cb3`→`b3c1f2e66`, `364d21cfd`→`78c94841c`, `4a1a75cc3`→`e451f0743`, `332c311d2`→`9edf4845d`;
 > batch gate 492 files / 4552 tests, 0 fail — PROOF-logged). Cards retained for card-contract reference only.
 
-> Execution order: **T-05 first**, then T-01…T-04 in any order.
-> Full cards: `docs/plans/consolidated-audit-10x/phase-0-1.plan.md`
+> All five cards COMPLETED 2026-07-12 (commits in the banner below).
+> Full cards remain in `docs/plans/consolidated-audit-10x/phase-0-1.plan.md` for reference.
 > After GREEN: `pnpm test -- <RED file> && pnpm typecheck` → log `docs/audit/PROOF_ALIGNMENT_LOG.md` → commit per card.
 
 ### T-05: Pass QueryClient into `initSyncEngine()` (R-SY-01)

@@ -95,11 +95,11 @@ Agents execute **plan cards**, not free-form interpretations of this file. Card 
 
 ---
 
-## Active Work Areas
+## Active Work Areas (COMPLETED 2026-07-12 — historical reference only; see status banner)
 
 ### Phase 0A — HIGH fixes (code, TDD)
 
-Execution order in `phase-0-1.plan.md`: **T-05 first**, then T-01…T-04 in any order.
+All five cards below shipped 2026-07-12 (see banner + PROOF log). Retained for card-contract reference — do NOT re-execute.
 
 | ID | Summary | Tier |
 |---|---|---|
