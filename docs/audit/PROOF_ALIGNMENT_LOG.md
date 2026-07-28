@@ -5375,3 +5375,14 @@ before commit; the audit's actionable findings are now harness rows with baselin
 - **Security spot-checks (1.4):** limiters present on push (`authSensitiveLimiter`/`pushTestLimiter`), action-proposal decisions, clinic-join; live-secret grep over src/server/scripts clean (only prefix-validation code); tenancy refs present in newest routes.
 
 **Verdict:** VERIFIED (RED→GREEN evidence above; full suite green; typecheck 0).
+
+## 2026-07-28 — Phase 1: L1 matrix + M1 verification + M2 privacy-copy fix
+
+**Claims:** (1) L1 browser matrix run; (2) M1 (tombstone PII) verified already fixed — no change needed; (3) M2 privacy copy corrected.
+
+**Evidence:**
+- L1 matrix (local, dev-bypass + built server): flow-walk **6/6 passed, "no broken rows across all roles"** (2.0m; baseline 2026-07-16 held). playwright:ci vs the CI recipe (build → migrate → start:playwright-api → seed:dev:e2e) → **42 passed / 1 skipped / 7 failed** — all 7 SW-class (root: P04 service-worker activation predicate timeout locally); the identical suite is green in CI on main (Playwright Tests @ 7772e3305), so the delta is local-env, logged as a low-pri residual, CI remains the canonical gate. ui-smoke is Clerk-credential-gated (global setup requires PLAYWRIGHT_EMAIL/PASSWORD, throws without) → scheduled for the Phase-2 window with reviewer credentials, not a dev-bypass citizen.
+- M1: `server/services/account-deletion.service.ts` anonymizeUser `.set()` ALREADY nulls `vetLicenseNumber` + `avatarUrl` (read in-file on main; landed with PR #116) — the 2026-07-18 CROSS-FLOW-3 finding was stale. Added `tests/account-deletion-tombstone-pii.test.ts` as a regression lock (guard-test convention; passes green by design — disclosed, not RED-first, since the behavior already exists).
+- M2: `privacyPage.sections.collect.body` (+ device-permissions clause) claimed "device push notification tokens"; the native shell registers no push at all (IPHONE-6). Copy now states web-only subscriptions explicitly, en+he, keys unchanged. `pnpm i18n:check` parity ✓.
+
+**Verdict:** VERIFIED (matrix logged; M1 no-change-needed with lock; M2 fixed en+he).
