@@ -5162,3 +5162,50 @@ reconciliation, the unresolved-PMS identity-strip rule, and the §4 revoke-gate 
   must run before Task 2.5 sets any `enforce` threshold.
 
 **Verdict:** VERIFIED (close-out — stack + Phase-0 docs landed on `main` and deployed green).
+
+## 2026-07-28 — Task 0.7 haptics dead-code cleanup + DEV diagnostic (branch `claude/task-0.7-haptics-cleanup-fkfilp`)
+
+**Claim:** (A) `src/lib/haptics.ts` now surfaces native Haptics failures via a `import.meta.env.DEV`-gated
+`console.warn` instead of a fully silent catch (prod behavior byte-identical). (B) The unused
+`HapticsAdapter` hexagonal leftover — adapter, `IHapticsProvider` port, barrel exports, and adapter-only
+tests — is removed. No production consumer existed.
+
+**Evidence (Part A — TDD):**
+- Pre-change source read `src/lib/haptics.ts:41-43` — catch was `fire.catch(() => { /* silent */ })`.
+- RED: `pnpm exec vitest run tests/haptics-dev-diagnostic.test.ts` → `2 failed | 3 passed` — the two
+  "warns in DEV" cases (notification path + impact path) failed with `expected "warn" to be called 1
+  times, but got 0 times`; the DEV-off, disabled-short-circuit, and web-path cases already passed.
+- Applied fix `src/lib/haptics.ts:41-48` — `fire.catch((err: unknown) => { if (import.meta.env.DEV)
+  console.warn("[haptics] native Haptics call failed:", err); })`.
+- GREEN: `pnpm exec vitest run tests/haptics-dev-diagnostic.test.ts` → `5 passed`.
+- Diagnostic is native-only by design: web path is `triggerVibration(pattern, { silent: true })`
+  (`src/lib/safe-browser.ts:107`), which returns a boolean and never rejects — Case 5 asserts it never warns.
+
+**Evidence (Part B — verify-then-delete):**
+- Precondition re-checked on `origin/main`: `git grep -n 'from "@/infrastructure"' -- src/` → no matches
+  (exit 1); no `src/` consumer of `HapticsAdapter`.
+- Deleted `src/infrastructure/platform/HapticsAdapter.ts` (59 lines) and
+  `tests/infrastructure-haptics-adapter.test.ts` (46 lines); removed `IHapticsProvider` from
+  `src/core/ports/index.ts`; dropped the `haptics` re-export from `src/infrastructure/platform/index.ts`
+  and `src/infrastructure/index.ts`; removed the `IHapticsProvider contract` describe block (2 tests) and
+  the type import from `tests/core-ports-contracts.test.ts`.
+- `git grep -n HapticsAdapter -- src/ tests/` → clean (exit 1); `git grep -n IHapticsProvider -- src/ tests/`
+  → clean (exit 1).
+
+**Evidence (full verification):**
+- `pnpm typecheck` → 0 errors (frontend + `tsconfig.server.json`).
+- Targeted: `pnpm exec vitest run tests/haptics-dev-diagnostic.test.ts tests/core-ports-contracts.test.ts`
+  → `2 files, 13 passed`.
+- `pnpm knip` → **131 unused files before and after** the removal (measured by stash/compare); neither
+  `HapticsAdapter` nor `IHapticsProvider` was independently flagged either way (the `@/infrastructure`
+  barrels were already the unused files). No new findings introduced.
+- Broad sanity `pnpm test` → `Test Files 16 failed | 652 passed | 19 skipped`, `Tests 20 failed | 5838
+  passed | 255 skipped`. All 20 failures are `ECONNREFUSED 127.0.0.1:5432` (no Postgres in this sandbox) —
+  the same DB-integration baseline recorded in the Task 1.1 close-out entry above (5839 passed there). The
+  passed count moved by exactly **−1** (removed 6 haptics tests, added 5 diagnostic tests), and neither
+  `tests/haptics-dev-diagnostic` nor `tests/core-ports-contracts` appears among the failures.
+- Clinical Safety Officer: PASS — public `@/lib/haptics` API unchanged, prod behavior identical, no
+  emergency logic/transport/cache/frozen-surface touched. Security: not triggered (no auth/tenancy/secrets).
+
+**Verdict:** VERIFIED (both parts; the only test failures are the pre-existing DB-unavailable baseline,
+unrelated to this change).

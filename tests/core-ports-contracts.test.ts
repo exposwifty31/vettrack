@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type {
-  IHapticsProvider,
   INfcProvider,
   IDeepLinkProvider,
   IEquipmentCache,
@@ -10,29 +9,6 @@ import type {
 function hasMethod(obj: object, name: string): boolean {
   return typeof (obj as Record<string, unknown>)[name] === "function";
 }
-
-describe("IHapticsProvider contract", () => {
-  beforeEach(() => vi.resetModules());
-
-  it("HapticsAdapter satisfies the interface", async () => {
-    const { haptics } = await import("../src/infrastructure/platform/HapticsAdapter");
-    const adapter = haptics as IHapticsProvider;
-    expect(hasMethod(adapter, "impact")).toBe(true);
-    expect(hasMethod(adapter, "selectionChanged")).toBe(true);
-    expect(hasMethod(adapter, "notification")).toBe(true);
-  });
-
-  it("rethrows unexpected errors from impact", async () => {
-    vi.doMock("@capacitor/haptics", () => ({
-      Haptics: {
-        impact: vi.fn().mockRejectedValue(new Error("network failure")),
-      },
-      ImpactStyle: { Light: "LIGHT", Medium: "MEDIUM", Heavy: "HEAVY" },
-    }));
-    const { haptics } = await import("../src/infrastructure/platform/HapticsAdapter");
-    await expect(haptics.impact("light")).rejects.toThrow("network failure");
-  });
-});
 
 describe("INfcProvider contract", () => {
   beforeEach(() => vi.resetModules());
