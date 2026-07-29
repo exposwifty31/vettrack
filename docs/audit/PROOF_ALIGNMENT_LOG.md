@@ -5489,9 +5489,17 @@ emulator + pre-launch report + tester-fleet checklist per the plan).
 - T7 AAB: `./gradlew bundleRelease` EXIT 0 → `app/build/outputs/bundle/release/app-release.aab`
   (17.6 MB). Verified: (1) `keytool -printcert -jarfile` SHA-256 =
   `93:34:4C:4B:9F:2D:22:CC:61:DA:0C:35:71:CF:98:E5:85:22:A3:0A:CA:B8:98:17:2A:28:E7:FC:9F:82:5C:83`
-  (matches the upload key — also the future assetlinks.json cert); (2) `bundletool dump manifest` →
-  `versionCode="10200"`, `versionName="1.2.0"`, `android:scheme="vettrack"` present (T4 survived to
-  the bundle); (3) **zero AD_ID permissions** (grep count 0 — feeds Data-safety Advertising-ID=No).
+  (matches THIS build's **upload key** — the cert of the locally-installed/testing artifact. NOT the
+  production assetlinks.json fingerprint: Play-delivered installs are re-signed with Google's App
+  Signing key, which does not exist until the first AAB upload. assetlinks.json therefore stays
+  **PENDING the Play App Signing SHA-256** [App integrity, post-upload]; the upload cert here is
+  useful only for verifying local upload-signed installs during the pre-launch audit); (2) `bundletool
+  dump manifest` → `versionCode="10200"`, `versionName="1.2.0"`, `android:scheme="vettrack"` present
+  (T4 survived to the bundle); (3) **Advertising-ID=No, multi-evidenced:** zero `AD_ID` permission in
+  the dumped manifest (grep 0 — and on API 33+ reading the Advertising ID is *impossible* without the
+  `com.google.android.gms.permission.AD_ID` permission, so absence = no runtime access) AND zero
+  ad-SDK dependencies (`grep 'play-services-ads' android/*/build.gradle` → none; no admob/ad SDK in
+  package.json). This is the evidence backing the Play Data-safety "Advertising ID: not collected".
 - T5/T8a: universal APK via `bundletool build-apks --mode=universal` (signed with the upload key) →
   `install-apks` on Pixel_API_36 (API 36). Launch → MainActivity foregrounds; **zero FATAL/ANR** in
   logcat. Screenshots (`docs/audit/screenshots/android-t8a/`): 01 loading skeleton "המערכת בטעינה…"
