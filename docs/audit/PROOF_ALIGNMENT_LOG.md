@@ -5474,3 +5474,34 @@ no eval loop.
 **Verdict:** VERIFIED (packaging fidelity is condensed-but-complete: dual-DSL duplicate snippets
 collapsed to Groovy-first, marketing/nav fragments dropped; all tables, rule syntax, and code
 patterns retained; AGP-9.3+-only DSL marked as not applicable on 8.13).
+
+## 2026-07-29 — Android phase T6/T7 + T5/T8a: signed release AAB built & verified on emulator — local (unpushed AAB)
+
+**Claim:** The upload keystore was generated, release signing wired (#156), and a **signed release
+AAB** produced and verified three ways; then the production build was installed on an emulator and
+the T5/T8a pre-upload QA matrix run green (no physical device — owner has none; H5 restructured to
+emulator + pre-launch report + tester-fleet checklist per the plan).
+
+**Evidence:**
+- Keystore: `~/keystores/vettrack-upload.jks` (PKCS12, RSA-4096, 30y), password generated locally
+  and stored in Apple Passwords; `android/keystore.properties` wired (gitignored, never committed).
+  `./gradlew :app:validateSigningRelease` after a mismatch was corrected → BUILD SUCCESSFUL.
+- T7 AAB: `./gradlew bundleRelease` EXIT 0 → `app/build/outputs/bundle/release/app-release.aab`
+  (17.6 MB). Verified: (1) `keytool -printcert -jarfile` SHA-256 =
+  `93:34:4C:4B:9F:2D:22:CC:61:DA:0C:35:71:CF:98:E5:85:22:A3:0A:CA:B8:98:17:2A:28:E7:FC:9F:82:5C:83`
+  (matches the upload key — also the future assetlinks.json cert); (2) `bundletool dump manifest` →
+  `versionCode="10200"`, `versionName="1.2.0"`, `android:scheme="vettrack"` present (T4 survived to
+  the bundle); (3) **zero AD_ID permissions** (grep count 0 — feeds Data-safety Advertising-ID=No).
+- T5/T8a: universal APK via `bundletool build-apks --mode=universal` (signed with the upload key) →
+  `install-apks` on Pixel_API_36 (API 36). Launch → MainActivity foregrounds; **zero FATAL/ANR** in
+  logcat. Screenshots (`docs/audit/screenshots/android-t8a/`): 01 loading skeleton "המערכת בטעינה…"
+  RTL-correct; 02 full Clerk sign-in — real Clerk key baked (NOT dev-bypass), he-RTL correct, Apple
+  + Google OAuth buttons present, edge-to-edge under status bar clean; 03 T4 deep-link
+  (`adb am start vettrack://oauth-callback…`) foregrounds MainActivity from the launcher home.
+  Back from the root screen stays in-app (no crash-out).
+
+**Not done (disclosed):** on-device NFC/haptics (owner has no Android hardware) → tester-fleet
+checklist days 1–2 (T8c) + Google pre-launch report (T8b, auto on upload). The AAB is NOT committed
+(build artifact, gitignored) and NOT yet uploaded — awaits owner's Play Console + tester recruitment.
+
+**Verdict:** VERIFIED (signed AAB + emulator QA; NFC/haptics deferred to the tester fleet by hardware necessity).
