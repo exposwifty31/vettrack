@@ -117,3 +117,8 @@ locales/*.zip
 
 # Wetcheck simulation run artifacts (timestamped output — never commit)
 scripts/wetcheck/results-*.json
+
+# Android release signing (T6) — secrets never enter git
+android/keystore.properties
+*.jks
+*.keystore
