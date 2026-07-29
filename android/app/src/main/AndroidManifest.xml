@@ -34,6 +34,18 @@
                 <data android:scheme="vettrack" />
             </intent-filter>
 
+            <!-- App Links (Phase 3.5): https://vettrack.uk/equipment/* — a QR/NFC
+                 sticker scanned outside the app opens the app after Android verifies
+                 /.well-known/assetlinks.json. Scoped to /equipment/ so other
+                 vettrack.uk links keep opening in the browser. autoVerify makes it
+                 silent (no chooser) once the domain is verified. -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="vettrack.uk" android:pathPrefix="/equipment/" />
+            </intent-filter>
+
         </activity>
 
         <provider

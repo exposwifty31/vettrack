@@ -9,6 +9,7 @@ import { getEquipmentDisplayName } from "@/lib/equipment-display";
 import { getStoredLocale, t } from "@/lib/i18n";
 import { formatUserDate, formatUserDateTime } from "@/lib/user-datetime-format";
 import { INACTIVE_THRESHOLD_DAYS } from "../../shared/constants";
+import { UNIVERSAL_LINK_ORIGIN } from "@/lib/equipment-id";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -214,9 +215,13 @@ export function buildWhatsAppUrl(
 }
 
 export function generateQrUrl(equipmentId: string): string {
-  const origin =
-    typeof window !== "undefined" ? window.location.origin : "https://vettrack.app";
-  return `${origin}/equipment/${equipmentId}`;
+  // Physical QR stickers must encode the production universal-link origin — NOT
+  // window.location.origin (which is capacitor://localhost in the native app, or a
+  // preview host on staging), so a sticker scanned by the phone's native camera
+  // fires Android App Links / iOS Universal Links and opens the app. This is the
+  // same rule the NFC tag writer already follows (equipment-detail.tsx uses
+  // UNIVERSAL_LINK_ORIGIN); QR and NFC stickers now resolve identically.
+  return `${UNIVERSAL_LINK_ORIGIN}/equipment/${equipmentId}`;
 }
 
 export function truncate(str: string, maxLen: number): string {
