@@ -38,10 +38,15 @@ Then: **Test and release → Managed publishing → ON** (before filling anythin
 
 ## 1. App access (App content → App access) — REQUIRED
 
-Select **"All or some functionality is restricted"**. Add one instruction set:
+Select **"All or some functionality is restricted"**. Add one instruction set.
+**Use a dedicated, least-privileged demo account seeded with SYNTHETIC data** (the same one used in
+App Store Connect review notes) — NOT a real admin or a staff member's personal account. The reviewer
+and the automatic pre-launch crawler will sign in and exercise the app; the account should hold no
+real clinic/patient data and only the role needed to demonstrate the flows (e.g. `technician`, not
+`admin`). Rotate this account's password after review.
 
 - **Name:** `Reviewer / staff login`
-- **Username:** *(the same demo reviewer email used in App Store Connect review notes)*
+- **Username:** *(the dedicated synthetic-data demo reviewer email — same as ASC review notes)*
 - **Password:** *(the same REVIEWER_PASSWORD)*
 - **Any other instructions:**
 ```
@@ -78,15 +83,16 @@ Hebrew is the default UI language; English is available in Settings.
 |---|---|
 | Email (published to IARC) | *(real support/contact email)* |
 | Category | **Utility, Productivity, Communication, or Other** (NOT a game category) |
-| Violence / does the app contain violence? | **No** (user-uploaded clinical photos are user content, not app-provided) |
+| Violence / does the app contain violence? | **No** — the app ships no violent content; any staff-uploaded photo is handled under the UGC row below, not here |
 | Sexuality / nudity | No |
 | Language (profanity) | No |
 | Controlled substances — does the app reference/depict illegal drugs, alcohol, tobacco? | **No** — professional veterinary dosing references are not depictions of illegal drug use |
 | Gambling | No |
-| User-generated content / user interaction / shares location | **No** — closed clinic data, no public sharing, no social feed |
+| User-generated content / user interaction / shares location | **⚠️ OWNER DECISION — do not blind-answer "No".** Google defines UGC as user-contributed content accessible to ANY subset of users, so "private/closed-clinic" does NOT auto-exempt it. VetTrack lets staff upload equipment **issue photos** visible to other clinic staff → that likely **counts as UGC**. If so, answer **Yes**, which triggers Google's UGC obligations: a **content policy / terms**, an **in-app report/flag mechanism**, and a **moderation/takedown flow** for the photos. Confirm the actual visibility scope of issue photos, then answer accordingly. Location sharing → No (no location collected). |
 | Miscellaneous | No |
 
-→ Yields an IARC "Everyone / PEGI 3" style rating. Re-certify only if functionality changes.
+→ If UGC=No, expect an "Everyone / PEGI 3" style rating. **If UGC=Yes, the rating and the required
+UGC controls change** — reassess before publishing; re-certify whenever functionality changes.
 
 ---
 
@@ -112,7 +118,8 @@ processed ephemerally where a real account record exists):**
 **Security & deletion:**
 - Data is encrypted in transit → **Yes**.
 - Users can request data deletion → **Yes** — provide the deletion URL: `https://vettrack.uk/account-deletion` (and note in-app: Settings → Danger zone → Delete account).
-- Independent security review / follows Families policy → No (not a Families app).
+- **Independent security review** (the "has your app been independently reviewed against a security standard, e.g. MASA?") → **No** (separate question — answer honestly; we have not undergone a MASA/OWASP MASVS review).
+- **Families policy** → **Not applicable** (target audience is 18+, §2 — the app is not in the Families/Designed-for-Families program; this is a distinct declaration from the security-review one above).
 
 ---
 
@@ -254,7 +261,8 @@ Localize each into he + en, or mark reusable. Agent can drive the capture on req
 
 ## 7. Closed testing track (Test and release → Testing → Closed testing)
 
-1. Create track (the default **"Alpha"** is fine).
+1. Create a closed-testing track (current Play Console lets you name it — e.g. `closed-testing`; the
+   legacy fixed "Alpha/Beta" names are gone, so use whatever the console offers).
 2. **Testers:** add an email list of the 12–16 Google accounts (or a Google Group). List cap 2000.
 3. Upload `app-release.aab`; write release notes (he + en, see §8); roll out.
 4. First release passes **app review — budget up to ~7 days for a brand-new app/account.**
@@ -284,9 +292,9 @@ Localize each into he + en, or mark reusable. Agent can drive the capture on req
 
 ## 9. Post-upload checklist
 
-- [ ] Pre-launch report (Test and release → Pre-launch report): runs automatically on upload; review the **crashes** + **security** tabs (advisory, non-blocking). Confirm it can sign in (reuses §1 credentials).
-- [ ] After the first AAB is processed: Play auto-enrolls **Play App Signing** — accept the Google-generated app-signing key (do NOT supply your own). Record its SHA-256 from **App integrity** (needed later for the NFC assetlinks.json).
-- [ ] **Rotate the upload key** once the first upload is accepted — the current upload-key password was displayed in this session's transcript. (App integrity → Upload key → request reset; the app is safe either way because Google holds the signing key.)
+- [ ] Pre-launch report (Test and release → Pre-launch report): runs automatically when an AAB reaches a testing track; review the **crashes/ANRs**, **security & trust**, **accessibility**, and **performance** tabs (advisory, non-blocking). Ensure the crawler can sign in — set the credentials under **Pre-launch report → Settings → Credentials** (the §1 App-access account); without them the crawler only sees the login wall.
+- [ ] After the first AAB is processed: Play auto-enrolls **Play App Signing** — accept the Google-generated app-signing key (do NOT supply your own). Copy its **SHA-256** from **App integrity → App signing**, and **append it to `server/lib/well-known-assetlinks.ts`** (the NFC/QR App Links). Keep BOTH fingerprints in the array: the **Play app-signing key** (Play-delivered installs — the one that actually verifies in production) AND the **upload key** (sideloaded/testing installs). `sha256_cert_fingerprints` accepts multiple; then redeploy so `/.well-known/assetlinks.json` serves both.
+- [ ] **Rotate the upload key — MANDATORY, treat as compromised.** The current upload-key password was displayed in this session's transcript, so the key must be considered exposed. Do this before relying on the app in production: App integrity → Upload key → **request upload key reset** (generate a fresh keystore + password stored ONLY in the password manager, update `android/keystore.properties`). The app itself stays safe because Google holds the app-signing key, but a leaked upload key lets someone submit builds as you until it's reset.
 - [ ] When ≥12 testers have been opted in continuously for 14 days → submit the **production access application** (a reviewed form about who the testers were, recruitment, feedback — answer substantively; thin answers get rejected).
 
 ---
