@@ -9,6 +9,16 @@
 > **Account gate:** personal account created after 2023-11-13 → **12 opted-in testers × 14 continuous
 > days closed testing before production**. Confirm developer-identity verification shows complete
 > BEFORE filling forms (it can block publishing and take days).
+>
+> **⚠️ Three account-verification gates block publishing (all required, do them first):**
+> 1. **Identity** — upload a government document. **Takes several days** — start it TODAY, it's the
+>    slowest gate.
+> 2. **Android device access** — install the **"Google Play Console"** app on a **PHYSICAL, non-rooted,
+>    Android 10+ device** (emulators are explicitly NOT accepted — Google policy, verified 2026-07-29),
+>    sign in, confirm. Takes <1 minute; the same device can verify multiple accounts. Owner has no
+>    Android device → **borrow one for one minute** (a tester's phone during recruitment is ideal),
+>    then remove the account and hand it back.
+> 3. **Contact phone number** — SMS/verification.
 
 ---
 
