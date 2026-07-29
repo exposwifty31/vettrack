@@ -5513,3 +5513,46 @@ checklist days 1–2 (T8c) + Google pre-launch report (T8b, auto on upload). The
 (build artifact, gitignored) and NOT yet uploaded — awaits owner's Play Console + tester recruitment.
 
 **Verdict:** VERIFIED (signed AAB + emulator QA; NFC/haptics deferred to the tester fleet by hardware necessity).
+
+## 2026-07-29 — Phase 3.5 NFC+QR sticker chain closed + E2E audited — branch feat/nfc-android-applink-assetlinks
+
+**Claim:** The physical sticker chain now resolves the app end-to-end on Android, QR and NFC stickers
+behave identically, and a real QR bug the audit surfaced is fixed — all RED-first, emulator-verified.
+
+**Evidence:**
+- Recon corrected an earlier stale claim: the deep-link-router https→`/equipment?nfcAction=toggle`
+  mapping (`src/lib/deep-link-router.ts:76-80`), `UNIVERSAL_LINK_ORIGIN` (`src/lib/equipment-id.ts`),
+  the iOS `applinks:vettrack.uk` entitlement (`ios/App/App/App.entitlements:17`), and the server AASA
+  route (`server/index.ts:318`, appID `87F5G378M6.uk.vettrack.app`) ALL already exist on main. Real
+  gaps were Android-only.
+- **QR bug (found by this audit):** `generateQrUrl` (`src/lib/utils.ts:216`) used
+  `window.location.origin` (→ `capacitor://localhost` in the native app; a preview host on staging;
+  fallback `https://vettrack.app` — wrong TLD). A QR sticker printed from the native app encoded a
+  non-universal-link URL → the phone's native camera opened nothing / a dead browser tab, while the
+  NFC sticker for the same item opened the app. Fixed to `UNIVERSAL_LINK_ORIGIN` (identical to the
+  NFC writer). RED first: `tests/nfc-qr-sticker-chain.test.ts` (origin-independence + round-trip +
+  QR↔NFC host parity) failed to load pre-fix, 8/8 green post-fix.
+- **Android App Links:** second MainActivity intent-filter — `autoVerify` https, host `vettrack.uk`,
+  `pathPrefix=/equipment/` — separate from the T4 `vettrack://` OAuth filter and MAIN/LAUNCHER. RED:
+  `tests/android-applink.test.ts` 2 failed pre-fix → 3/3 green.
+- **assetlinks.json:** `/.well-known/assetlinks.json` route (`server/index.ts`) mirroring the AASA
+  route; pure builder `server/lib/well-known-assetlinks.ts` (package `uk.vettrack.app`, upload-key
+  SHA-256; Play App Signing cert TODO'd for post-first-upload). Builder unit-tested.
+- typecheck 0 both tsconfigs.
+- **Emulator E2E (Pixel_API_36, API 36, debug build w/ the new manifest):**
+  (1) `pm get-app-links uk.vettrack.app` → `vettrack.uk` registered as an App Link domain (state
+  1024 = not-yet-verified-against-live-file, expected locally). (2)
+  `cmd package query-activities -a VIEW -d https://vettrack.uk/equipment/eq1` → resolves to
+  `uk.vettrack.app.MainActivity` (the filter matches). (3) after a local domain-approval
+  (`pm set-app-links … 2 all`, simulating post-assetlinks-verify), `am start` the https URL →
+  `topResumedActivity = uk.vettrack.app/.MainActivity`; screenshot
+  `docs/audit/screenshots/nfc-qr-e2e/applink-https-opens-app.png` shows the app (not a browser)
+  handling the link.
+
+**Not done (disclosed, correctly out of local scope):** silent autoVerify against the LIVE domain
+needs assetlinks.json deployed to vettrack.uk carrying the **Play App Signing** cert (exists only
+post-first-AAB-upload) — the two `/.well-known/` "endpoints return 200" audit-matrix rows are
+post-deploy checks. iOS Universal-Link background-scan behavior needs a physical iPhone (owner's).
+
+**Verdict:** VERIFIED (code + 8 tests + emulator App-Link proof; live-domain autoVerify is a
+documented post-deploy/post-upload step).

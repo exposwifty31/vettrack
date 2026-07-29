@@ -33,6 +33,7 @@ import clerkWebhookRoutes from "./routes/webhooks.js";
 import inboundIntegrationWebhooks from "./integrations/webhooks/inbound.router.js";
 import rfidRoutes from "./routes/rfid.js";
 import { mountRfidRoutes } from "./lib/mount-rfid-routes.js";
+import { buildAndroidAssetLinks } from "./lib/well-known-assetlinks.js";
 import { startBackgroundSchedulers } from "./app/start-schedulers.js";
 import { ensureClinicPhase2Defaults } from "./lib/ensure-clinic-phase2-defaults.js";
 import healthRoutes from "./routes/health.js";
@@ -328,6 +329,16 @@ app.get("/.well-known/apple-app-site-association", (_req, res) => {
       ],
     },
   });
+});
+
+// Android App Links Digital Asset Links (Phase 3.5) — the Android counterpart to
+// the AASA above. Same rules: application/json, no redirect (Android fetches
+// /.well-known/assetlinks.json directly over HTTPS at install time), registered
+// before the SPA catch-all. Fingerprints live in server/lib/well-known-assetlinks.ts.
+app.get("/.well-known/assetlinks.json", (_req, res) => {
+  res.setHeader("Content-Type", "application/json; charset=UTF-8");
+  res.setHeader("Cache-Control", "no-cache");
+  res.json(buildAndroidAssetLinks());
 });
 
 if (process.env.NODE_ENV === "production" || process.env.PLAYWRIGHT_E2E === "true") {
