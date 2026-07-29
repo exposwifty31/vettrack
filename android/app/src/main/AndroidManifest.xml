@@ -22,6 +22,18 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
+            <!-- Clerk OAuth callback (T4): vettrack://oauth-callback must reach the
+                 app. Scheme-only on purpose (parity with iOS CFBundleURLSchemes;
+                 clerk-capacitor-config allowlists bare vettrack:// too). Kept as a
+                 separate filter — merging into MAIN/LAUNCHER breaks launcher
+                 matching. No autoVerify: meaningless on a custom scheme. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="vettrack" />
+            </intent-filter>
+
         </activity>
 
         <provider
