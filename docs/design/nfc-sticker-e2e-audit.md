@@ -4,6 +4,17 @@
 > owner-supplied NFC research report (operative digest kept program-side) + in-repo recon. This spec
 > feeds the Phase-3.5 implementation plan. Companion plan doc: the distribution program's Phase 3.5
 > section (program-side).
+>
+> **Implementation status (2026-07-29).** The "one real code gap" below (deep-link-router https
+> mapping) was **already closed on main** (via #86) before this phase executed — recon confirmed it.
+> The genuine remaining gaps were Android-side, now shipped: (1) the Android https App Link
+> intent-filter for `/equipment/*`, (2) `/.well-known/assetlinks.json`, and (3) **a QR bug the E2E
+> audit surfaced** — `generateQrUrl` used `window.location.origin` (capacitor://localhost in the
+> native app / a preview host on staging) instead of the universal-link origin the NFC writer already
+> uses, so QR and NFC stickers for the same equipment did NOT resolve identically. All three landed
+> with 8 tests + emulator App-Link proof; the iOS half (applinks entitlement + AASA route) was
+> already present. Remaining before fielding: append the Play App Signing cert to assetlinks.json
+> after the first AAB upload, and deploy so the two `/.well-known/` endpoints go live.
 
 ## Context & goal
 
