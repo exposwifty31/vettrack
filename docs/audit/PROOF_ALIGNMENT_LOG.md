@@ -5447,3 +5447,30 @@ Data-safety URL), marketing-path routed, he+en.
 - Owner decisions this session (AskUserQuestion): include both custody additions; keep original wording; push + open PR — all three recorded in the session plan file.
 
 **Verdict:** VERIFIED (docs-only change; the spec's "code gap" sections intentionally describe the approved design, parts of which PR #86 has since landed — disclosed above, not an error of this entry).
+## 2026-07-29 — android-gradle-build skill pack added (docs-only) — branch feat/2.0-task-1.1-s6-queue-ui
+
+**Claim:** Owner-supplied official Android/Gradle documentation dump (developer.android.com: build
+system, dependencies, app config/variants/manifest merging, R8 + keep rules, Baseline/Startup
+Profiles, app startup analysis, modularization, resources) packaged as a repo skill at
+`.claude/skills/android-gradle-build/` — SKILL.md router with VetTrack-specific context + 7
+reference files. Plan-mode decisions by owner: repo install, full docs kept + VetTrack tailoring,
+no eval loop.
+
+**Evidence:**
+- Files exist: `SKILL.md` (45 lines, valid name+description frontmatter) + 7 files under
+  `references/` (1509 lines total): build-system, dependencies, app-config-and-variants,
+  r8-optimization, keep-rules, baseline-startup-profiles, startup-modularization-resources.
+- Spot checks: keep-rule syntax present (12 `keepclassmembers` hits in keep-rules.md), AGP
+  version-behavior content present (15 `AGP` hits in baseline-startup-profiles.md), manifest merge
+  markers section present in app-config-and-variants.md; zero escaped-`\!` conversion artifacts.
+- VetTrack anchors in SKILL.md verified against the repo before writing: AGP 8.13.0
+  (`android/build.gradle`), Groovy DSL + `minifyEnabled false` + legacy `proguard-android.txt`
+  (`android/app/build.gradle`), minSdk 24 / SDK 36 (`android/variables.gradle`),
+  build-native-shell.sh-only build rule (CLAUDE.md), no-build-path-changes-during-open-review
+  guardrail (2026-07-28 scope-cut entry above).
+- Docs-only change: no .ts/.tsx touched → typecheck/i18n gates unaffected (Hebrew-in-source test
+  covers .ts/.tsx only; skill files are English markdown).
+
+**Verdict:** VERIFIED (packaging fidelity is condensed-but-complete: dual-DSL duplicate snippets
+collapsed to Groovy-first, marketing/nav fragments dropped; all tables, rule syntax, and code
+patterns retained; AGP-9.3+-only DSL marked as not applicable on 8.13).
