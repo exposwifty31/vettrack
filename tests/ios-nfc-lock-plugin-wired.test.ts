@@ -47,6 +47,24 @@ describe("NfcLockPlugin is wired into the iOS App target", () => {
   });
 });
 
+describe("project.pbxproj object ids are unique", () => {
+  /**
+   * A duplicated object id does not fail loudly — Xcode resolves the reference to
+   * whichever definition it saw, so a Sources entry can silently become a copy of
+   * some other target's file. That is exactly how NfcLockPlugin's first wiring
+   * reused FE17C0…0013 (VetTrackControl's Info.plist) and broke the build with
+   * "Multiple commands produce App.app/Info.plist". Hand-edits to this file are
+   * routine here, so the invariant is guarded rather than remembered.
+   */
+  it("defines every object id exactly once", () => {
+    const pbxproj = repoFile("ios/App/App.xcodeproj/project.pbxproj");
+    // Xcode mints 24-hex ids; the hand-authored VetTrackControl/plugin entries use 22.
+    const ids = [...pbxproj.matchAll(/^\t\t([0-9A-F]{22,24}) \/\* .* \*\/ = \{/gm)].map((m) => m[1]);
+    const duplicates = ids.filter((id, i) => ids.indexOf(id) !== i);
+    expect([...new Set(duplicates)]).toEqual([]);
+  });
+});
+
 describe("the NFC entitlement covers the session types the app actually opens", () => {
   const entitlements = repoFile("ios/App/App/App.entitlements");
 
