@@ -13,8 +13,15 @@
 > native app / a preview host on staging) instead of the universal-link origin the NFC writer already
 > uses, so QR and NFC stickers for the same equipment did NOT resolve identically. All three landed
 > with 8 tests + emulator App-Link proof; the iOS half (applinks entitlement + AASA route) was
-> already present. Remaining before fielding: append the Play App Signing cert to assetlinks.json
-> after the first AAB upload, and deploy so the two `/.well-known/` endpoints go live.
+> already present.
+>
+> **Row 7 verified live 2026-07-30.** Both `/.well-known/` endpoints are deployed and correct:
+> AASA returns `HTTP/2 200`, `content-type: application/json; charset=utf-8`, no redirect,
+> `cache-control: no-cache`, with `appIDs: ["87F5G378M6.uk.vettrack.app"]` and
+> `components: [{"/": "/equipment/*"}]`; assetlinks.json returns the delegate statement for
+> `uk.vettrack.app`. Remaining before fielding: append the **Play App Signing** cert to
+> assetlinks.json after the first AAB upload — the fingerprint served today is the upload key, so
+> Play-delivered installs will not autoVerify until then.
 
 ## Context & goal
 

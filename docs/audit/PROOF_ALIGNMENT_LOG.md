@@ -5614,3 +5614,50 @@ the Web NFC external-record branch stay deferred — no Android hardware. ADR ch
 `TRIGGERS.md`: none of the nine triggers apply.
 
 **Verdict:** VERIFIED for the code+unit scope; device rows explicitly DEFERRED, not claimed.
+
+## 2026-07-30 — device-session evidence: row 7 live, Swift compiles, pbxproj collision fixed
+
+**Claim:** Two rows the previous entry recorded as UNVERIFIED/post-deploy are now evidenced, and one
+self-inflicted defect was found and fixed on the way. Owner ran these on a physical Mac
+(`/Users/dan/vettrack`, branch `claude/apple-ios-question-7x1fft`); this container has neither macOS
+nor a network route to vettrack.uk.
+
+**Evidence:**
+- **Row 7 — AASA.** `curl -sSI https://vettrack.uk/.well-known/apple-app-site-association` →
+  `HTTP/2 200`, `content-type: application/json; charset=utf-8`, `cache-control: no-cache`, no
+  redirect. Body: `{"applinks":{"details":[{"appIDs":["87F5G378M6.uk.vettrack.app"],
+  "components":[{"/":"/equipment/*",...}]}]}}`. PASS.
+- **Row 7 — assetlinks.** `curl -sS https://vettrack.uk/.well-known/assetlinks.json` →
+  `[{"relation":["delegate_permission/common.handle_all_urls"],"target":{"namespace":"android_app",
+  "package_name":"uk.vettrack.app","sha256_cert_fingerprints":["93:34:4C:…:5C:83"]}}]`. PASS as an
+  endpoint. The fingerprint is the UPLOAD key — Play-delivered installs are re-signed, so production
+  autoVerify stays open until the Play App Signing cert is appended post-first-upload.
+- **Branch reproduces off-container.** `pnpm typecheck` clean both tsconfigs;
+  `tests/nfc-sticker-management.test.ts` + `tests/ios-nfc-lock-plugin-wired.test.ts` → 25/25.
+- **Native build.** `pnpm cap:build:native` → `CAPACITOR_SERVER_URL (unset — bundled shell)`,
+  `pk_live_…` + `VITE_API_ORIGIN=https://vettrack.uk` baked from `.env`; `cap sync ios` found 8
+  plugins incl. `@capgo/capacitor-nfc@8.0.28`. The wiring guard re-run AFTER sync still passed —
+  `cap sync` does not drop `NfcLockPlugin.swift` from Compile Sources.
+- **DEFECT FOUND AND FIXED (mine).** First ⌘B failed in *Prepare build*:
+  `error: Multiple commands produce '…/App.app/Info.plist'` — one `ProcessInfoPlistFile` from
+  `App/Info.plist`, one *copy* of `VetTrackControl/Info.plist`. Cause: the plugin's pbxproj object id
+  `FE17C00000000000000013` was already VetTrackControl's `Info.plist` PBXFileReference, so two
+  objects shared an id and Xcode resolved the Sources entry to the widget's plist. A duplicate id
+  never fails loudly. Moved to `…0015`/`…0024`. RED-first guard added
+  (`defines every object id exactly once`), which reported exactly
+  `['FE17C00000000000000013']` against the broken project → green after (8/8). Note: the guard's
+  first regex used `[0-9A-F]{24}` and matched nothing — the hand-authored ids here are 22 chars — so
+  it PASSED against a broken file until corrected to `{22,24}`.
+- **M9 partial — Swift compiles.** After the fix, Xcode `Build Succeeded` for scheme App /
+  `Any iOS Device (arm64)`. `NfcLockPlugin.swift` was authored in a Linux container with no compiler;
+  `NFCNDEFTag.writeLock`, `CAPBridgedPlugin` conformance and the `NFCNDEFReaderSessionDelegate`
+  signatures are therefore now verified as valid, on iOS deployment target 15.0.
+
+**Not done (disclosed):** the lock itself (M9), write → read-back → `nfc_tag_id` (M10), and
+background scan all require an **NTAG215 tag**, which the owner does not have — that single item is
+now the only blocker for the remaining iOS rows. Also open: on-device code signing against the
+amended `App.entitlements` (the only proof the App ID carries the NFC + Associated Domains
+capabilities), and **F5** — whether the in-app NFC sheet opens now that `NDEF` was added. Android
+rows and the Web NFC external-record branch stay deferred: no Android hardware.
+
+**Verdict:** VERIFIED for row 7 and for Swift compilation. M9/M10 remain DEFERRED, not claimed.

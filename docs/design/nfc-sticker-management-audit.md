@@ -46,8 +46,8 @@ which needs hardware this session did not have.
 | M6 | Replace/retire: a new sticker rebinds cleanly | **PASS** | rebind is the same bind call; locked tags are replaced, not rewritten |
 | M7 | Bind lands in the audit log | **PASS** | existing `equipment_updated` row carries `changes.nfcTagId` — no new union member needed |
 | M8 | Written sticker reads back to the same equipment | **PASS** (unit) | round-trip through the scanner's own decoder; device leg is M10 |
-| M9 | Lock available from the app | **WAS IMPOSSIBLE → CODE COMPLETE, UNVERIFIED** | `NfcLockPlugin.swift` + pbxproj wiring; needs a device |
-| M10 | iPhone pass: write → read back → background scan | **DEFERRED** | needs iPhone + NTAG215 stickers |
+| M9 | Lock available from the app | **WAS IMPOSSIBLE → COMPILES, LOCK UNVERIFIED** | `NfcLockPlugin.swift` builds clean in Xcode (2026-07-30); the lock itself needs a real tag |
+| M10 | iPhone pass: write → read back → background scan | **DEFERRED — blocked only on a tag** | Mac + iPhone now in hand; no NTAG215 |
 | M11 | ADR-006 posture intact — tag is never custody authority | **PASS** | payload module is pure encoding; the write handler performs no custody mutation |
 
 `tests/nfc-sticker-management.test.ts` (18) and `tests/ios-nfc-lock-plugin-wired.test.ts` (7)
@@ -114,12 +114,29 @@ exercised — no Android hardware. It fails loudly rather than writing a partial
 - **Frozen surfaces:** untouched. No realtime, Code Blue, PWA cache, or `appointmentsPage.*`
   change; `scripts/build-native-shell.sh` not modified.
 
-## What the device session must close
+## Device session — status 2026-07-30
 
-1. **F5 first** — does in-app NFC scan/write work on the iPhone at all now?
-2. M10: write a sticker → read it back → confirm `nfc_tag_id` populated server-side.
-3. M9: the lock action against a real NTAG215, then confirm a re-write is refused.
-4. Background scan from the home screen (the `nfc-sticker-e2e-audit.md` row 1 leg).
+Closed with a Mac and iPhone in hand:
+
+- **Row 7 (both `/.well-known/` endpoints)** — live and correct, headers included. See the fielding
+  spec's status note.
+- **Swift compiles.** `NfcLockPlugin.swift` builds clean for `Any iOS Device (arm64)`. It was
+  written without a compiler in a Linux container, so this was a genuine unknown.
+- One self-inflicted failure on the way: the plugin's first pbxproj wiring reused an object id
+  already held by VetTrackControl's `Info.plist`, which surfaced as
+  "Multiple commands produce App.app/Info.plist" before any Swift compiled. Fixed, and now guarded
+  by a duplicate-id check in `tests/ios-nfc-lock-plugin-wired.test.ts`.
+
+Still open, in order:
+
+1. **F5 first** — does the in-app NFC sheet open on the iPhone now that `NDEF` is in the entitlement?
+   Answerable without a tag: the session either starts or it does not.
+2. Code signing on device — the only thing that can prove the App ID carries the NFC and
+   Associated Domains capabilities.
+3. Universal Link from a pasted `https://vettrack.uk/equipment/<id>?nfcAction=toggle` — no sticker
+   needed; a sticker is only a carrier for that URL.
+4. **Blocked on one missing item, an NTAG215 tag** — M9 (real lock + refused re-write), M10
+   (write → read back → `nfc_tag_id` populated), and background scan. Nothing else is blocked.
 5. Android rows and the Web NFC branch stay deferred to the tester fleet.
 
 Screenshots per the house format (Screenshot → Expected → Actual → Pass/Fail) into
