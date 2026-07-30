@@ -646,6 +646,8 @@ const translations = {
     writeSuccess: d.equipmentNfc.writeSuccess,
     writeFailed: d.equipmentNfc.writeFailed,
     writeUnsupported: d.equipmentNfc.writeUnsupported,
+    bindConflict: d.equipmentNfc.bindConflict,
+    bindFailed: d.equipmentNfc.bindFailed,
     writeTag: d.equipmentNfc.writeTag,
     alreadyToggledRecently: d.equipmentNfc.alreadyToggledRecently,
     toggling: (name: string) => tr(d.equipmentNfc.toggling, { name }),

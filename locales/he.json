@@ -3469,6 +3469,8 @@
     "writeSuccess": "תגית NFC נכתבה",
     "writeFailed": "כתיבת תגית NFC נכשלה",
     "writeUnsupported": "כתיבת NFC אינה נתמכת במכשיר זה",
+    "bindConflict": "תגית ה-NFC הזו כבר משויכת לציוד אחר",
+    "bindFailed": "התגית נכתבה, אך שיוכה לציוד זה נכשל",
     "writeTag": "כתוב תגית NFC ל-checkout",
     "alreadyToggledRecently": "בוצעה פעולה לאחרונה — המתן רגע.",
     "toggling": "מעביר {{name}}…",

@@ -99,8 +99,8 @@ import {
 } from "@/lib/equipment-waitlist-ui";
 import { useSettings } from "@/hooks/use-settings";
 import { useNfcSupported } from "@/hooks/use-nfc-supported";
-import { writeNfcUrl } from "@/lib/nfc-platform";
-import { UNIVERSAL_LINK_ORIGIN } from "@/lib/equipment-id";
+import { writeEquipmentStickerTag } from "@/lib/nfc-platform";
+import { ApiError } from "@/lib/request-core";
 import { playCriticalAlertTone } from "@/lib/sounds";
 import { haptics } from "@/lib/haptics";
 import { safeStorageSetItem } from "@/lib/safe-browser";
@@ -920,17 +920,33 @@ function EquipmentDetailPageDesktop() {
       toast.error(t.equipmentNfc.writeUnsupported);
       return;
     }
-    // MANDATORY hardcode (D5): the native WebView origin is capacitor://localhost (bundled app),
-    // so window.location.origin would write a non-Universal-Link URL. UNIVERSAL_LINK_ORIGIN is the
-    // single source of truth shared with the deep-link router's hostname check.
-    const url = `${UNIVERSAL_LINK_ORIGIN}/equipment/${equipmentId}?nfcAction=toggle&source=nfc`;
+    let tagId: string | null;
     try {
-      await writeNfcUrl(url);
-      haptics.scanSuccess();
-      toast.success(t.equipmentNfc.writeSuccess);
+      // Payload (URL + AAR record) is owned by nfc-sticker-payload.ts — it must never be
+      // rebuilt from window.location.origin, which is capacitor://localhost in the shell.
+      tagId = await writeEquipmentStickerTag(equipmentId);
     } catch {
       haptics.error();
       toast.error(t.equipmentNfc.writeFailed);
+      return;
+    }
+
+    // The sticker is programmed; binding its UID is a second, independently
+    // failable step — a bind failure must not read as a write failure.
+    if (!tagId) {
+      haptics.scanSuccess();
+      toast.success(t.equipmentNfc.writeSuccess);
+      return;
+    }
+    try {
+      await api.equipment.update(equipmentId, { nfcTagId: tagId });
+      haptics.scanSuccess();
+      toast.success(t.equipmentNfc.writeSuccess);
+      invalidateAll();
+    } catch (err) {
+      haptics.error();
+      const conflict = err instanceof ApiError && err.payload.reason === "NFC_TAG_ALREADY_BOUND";
+      toast.error(conflict ? t.equipmentNfc.bindConflict : t.equipmentNfc.bindFailed);
     }
   }
 

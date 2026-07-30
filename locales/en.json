@@ -3469,6 +3469,8 @@
     "writeSuccess": "NFC tag programmed",
     "writeFailed": "Could not write NFC tag",
     "writeUnsupported": "NFC write is not supported on this device",
+    "bindConflict": "This NFC tag is already bound to other equipment",
+    "bindFailed": "Tag written, but linking it to this equipment failed",
     "writeTag": "Write NFC checkout tag",
     "alreadyToggledRecently": "Already toggled recently — please wait a moment.",
     "toggling": "Toggling {{name}}…",

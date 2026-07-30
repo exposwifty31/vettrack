@@ -3472,6 +3472,8 @@ export interface TStructure {
     writeSuccess: string;
     writeFailed: string;
     writeUnsupported: string;
+    bindConflict: string;
+    bindFailed: string;
     writeTag: string;
     alreadyToggledRecently: string;
     toggling: string;
