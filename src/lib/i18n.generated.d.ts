@@ -3475,6 +3475,14 @@ export interface TStructure {
     bindConflict: string;
     bindFailed: string;
     writeTag: string;
+    lockTag: string;
+    lockConfirmTitle: string;
+    lockConfirmBody: string;
+    lockConfirmAction: string;
+    lockSuccess: string;
+    lockAlreadyLocked: string;
+    lockFailed: string;
+    lockUnsupported: string;
     alreadyToggledRecently: string;
     toggling: string;
     confirmTakeTitle: string;

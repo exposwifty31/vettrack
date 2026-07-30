@@ -100,6 +100,7 @@ import {
 import { useSettings } from "@/hooks/use-settings";
 import { useNfcSupported } from "@/hooks/use-nfc-supported";
 import { writeEquipmentStickerTag } from "@/lib/nfc-platform";
+import { lockNfcTag } from "@/lib/nfc-lock";
 import { ApiError } from "@/lib/request-core";
 import { playCriticalAlertTone } from "@/lib/sounds";
 import { haptics } from "@/lib/haptics";
@@ -197,6 +198,7 @@ function EquipmentDetailPageDesktop() {
   const [scanHistoryRange, setScanHistoryRange] = useState<"today" | "7d" | "all">("today");
   const [detailTab, setDetailTab] = useState("details");
   const [toolsSheetOpen, setToolsSheetOpen] = useState(false);
+  const [lockTagDialogOpen, setLockTagDialogOpen] = useState(false);
   const [isNfcToggling, setIsNfcToggling] = useState(false);
 
   const [moveRoomOpen, setMoveRoomOpen] = useState(false);
@@ -947,6 +949,20 @@ function EquipmentDetailPageDesktop() {
       haptics.error();
       const conflict = err instanceof ApiError && err.payload.reason === "NFC_TAG_ALREADY_BOUND";
       toast.error(conflict ? t.equipmentNfc.bindConflict : t.equipmentNfc.bindFailed);
+    }
+  }
+
+  /** Irreversible: an NTAG215 lock can never be undone, hence the confirm gate. */
+  async function lockEquipmentNfcTag() {
+    setLockTagDialogOpen(false);
+    try {
+      const { alreadyLocked } = await lockNfcTag(t.equipmentNfc.lockTag);
+      haptics.scanSuccess();
+      toast.success(alreadyLocked ? t.equipmentNfc.lockAlreadyLocked : t.equipmentNfc.lockSuccess);
+    } catch (err) {
+      haptics.error();
+      const unsupported = err instanceof Error && err.message === "nfc_lock_unsupported";
+      toast.error(unsupported ? t.equipmentNfc.lockUnsupported : t.equipmentNfc.lockFailed);
     }
   }
 
@@ -1948,10 +1964,29 @@ function EquipmentDetailPageDesktop() {
           onOpenChange={setToolsSheetOpen}
           onPrintQr={handlePrintQr}
           onWriteNfc={showWriteNfc ? () => void writeEquipmentNfcTag(id) : undefined}
+          onLockNfc={showWriteNfc ? () => setLockTagDialogOpen(true) : undefined}
           showWhatsApp={showWhatsAppTools}
           showWriteNfc={showWriteNfc}
+          showLockNfc={showWriteNfc}
         />
       )}
+
+      <Dialog open={lockTagDialogOpen} onOpenChange={setLockTagDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t.equipmentNfc.lockConfirmTitle}</DialogTitle>
+            <DialogDescription>{t.equipmentNfc.lockConfirmBody}</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setLockTagDialogOpen(false)}>
+              {t.common.cancel}
+            </Button>
+            <Button variant="destructive" onClick={() => void lockEquipmentNfcTag()}>
+              {t.equipmentNfc.lockConfirmAction}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Move to Room bottom sheet */}
       {equipment && (
