@@ -5556,3 +5556,61 @@ post-deploy checks. iOS Universal-Link background-scan behavior needs a physical
 
 **Verdict:** VERIFIED (code + 8 tests + emulator App-Link proof; live-domain autoVerify is a
 documented post-deploy/post-upload step).
+
+## 2026-07-30 — NFC sticker MANAGEMENT audit (lifecycle half) + 3 gap closures — branch claude/apple-ios-question-7x1fft
+
+**Claim:** "Most of in-app sticker management already exists in code" was partly true. The
+write path, admin gate, read path and `nfc_tag_id` column existed; the payload was half the
+spec, the tag UID was discarded, and there was no lock path at all. All three closed here.
+
+**Evidence:**
+- **RED first:** `pnpm test -- tests/nfc-sticker-management.test.ts` → `Failed to resolve
+  import "../server/lib/pg-errors"` (the audit's new modules did not exist). After
+  implementation: **18/18 passed**. `tests/ios-nfc-lock-plugin-wired.test.ts` **7/7**.
+- **F1 payload (fixed):** `writeNfcUrl` wrote ONE record; spec
+  (`docs/design/nfc-sticker-e2e-audit.md:44-48`) requires URI + AAR. New pure module
+  `src/lib/nfc-sticker-payload.ts`; `encodeCapgoNdefAarRecord` (TNF 0x04, type
+  `android.com:pkg`) in `nfc-capgo-decode.ts`. Byte-exact assertions: URI payload
+  `[0x04, "vettrack.uk/equipment/eq1?nfcAction=toggle"]`, AAR payload `uk.vettrack.app`.
+  Package name unified as `ANDROID_APP_PACKAGE` (`shared/constants.ts`), asserted equal to
+  the assetlinks.json `ANDROID_PACKAGE`. Dropped the unread `&source=nfc` param (grep: zero
+  readers in `src/`).
+- **F2 UID binding (fixed):** `writeEquipmentStickerTag` returns the UID hex; the call site
+  binds it via the EXISTING `PATCH /api/equipment/:id` (`handlers/patch-equipment.ts:102`
+  already accepted `nfcTagId`) — no new route, type, or migration. Write and bind fail
+  independently.
+- **F3 duplicate bind (fixed):** was an uncaught unique violation → 500 `INTERNAL_ERROR`.
+  Now `server/lib/pg-errors.ts` classifies SQLSTATE 23505 on
+  `vt_equipment_nfc_tag_id_unique` → 409 `NFC_TAG_ALREADY_BOUND`.
+- **F4 tenancy (accepted, not changed):** `migrations/018_asset_radar_nfc.sql:33` —
+  `ADD CONSTRAINT vt_equipment_nfc_tag_id_unique UNIQUE (nfc_tag_id)`, no `clinic_id`.
+  Global index. Mitigated by a 409 message that names nothing about the owning row rather
+  than by rewriting a UNIQUE constraint on a live clinical table.
+- **F5 iOS entitlement (fixed):** `App.entitlements` declared only `TAG`, but
+  `NfcPlugin.swift:131` opens `NFCNDEFReaderSession` on the default path, which Apple gates
+  on the `NDEF` format — in-app NFC on iOS was likely non-functional and there is no device
+  evidence either way. `NDEF` added alongside `TAG`.
+- **F6 dead Swift (reported, not fixed):** `grep -c "DynamicTypePlugin"
+  ios/App/App.xcodeproj/project.pbxproj` → **0**. The file was never added to Compile
+  Sources, so its JS bridge resolves null. Left alone (wiring it would change text-scaling
+  behavior); `tests/ios-nfc-lock-plugin-wired.test.ts` guards the NFC plugin against the
+  same drift.
+- **F3.5 lock path (built, unverified):** `ios/App/App/NfcLockPlugin.swift` (CoreNFC
+  `NFCNDEFTag.writeLock`) + full pbxproj wiring (PBXFileReference, PBXBuildFile, App group,
+  App-target Sources phase). `src/lib/nfc-lock.ts` fronts both platforms; the Android branch
+  runs the scan session first because `makeReadOnly()` acts on the last-discovered tag.
+  UI is a separately-confirmed irreversible action, never a side effect of writing.
+- typecheck **0 errors** both tsconfigs. `pnpm i18n:check` deep parity ✓ (10 new keys ×
+  he/en). Adjacent suites green: `nfc-qr-sticker-chain`, `nfc-capgo-decode`,
+  `android-applink`, `equipment-detail-*-nfc-*`, `infrastructure-nfc-adapter`,
+  `nfc-quick-toggle-client`, `i18n-*` — **64 tests**.
+- Full suite: 16 files fail with `connect ECONNREFUSED 127.0.0.1:5432` (DB-backed suites, no
+  Postgres in this container) — pre-existing environmental, unrelated to this diff.
+
+**Not done (disclosed):** Swift is NOT compiled — no macOS in this environment. On-device
+rows are open: does in-app NFC work on iPhone at all now (F5), write → read-back →
+`nfc_tag_id` populated (M10), and the real lock against an NTAG215 (M9). Android rows and
+the Web NFC external-record branch stay deferred — no Android hardware. ADR checked against
+`TRIGGERS.md`: none of the nine triggers apply.
+
+**Verdict:** VERIFIED for the code+unit scope; device rows explicitly DEFERRED, not claimed.
