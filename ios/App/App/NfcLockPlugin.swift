@@ -32,9 +32,18 @@ public class NfcLockPlugin: CAPPlugin, CAPBridgedPlugin {
     private var session: NFCNDEFReaderSession?
     private var pendingCall: CAPPluginCall?
 
+    deinit {
+        session?.invalidate()
+    }
+
     @objc func lockTag(_ call: CAPPluginCall) {
         guard NFCNDEFReaderSession.readingAvailable else {
             call.reject("NFC is not available on this device.", "NO_NFC")
+            return
+        }
+
+        guard pendingCall == nil else {
+            call.reject("A lock operation is already in progress.", "BUSY")
             return
         }
 

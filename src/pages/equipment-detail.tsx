@@ -199,6 +199,7 @@ function EquipmentDetailPageDesktop() {
   const [detailTab, setDetailTab] = useState("details");
   const [toolsSheetOpen, setToolsSheetOpen] = useState(false);
   const [lockTagDialogOpen, setLockTagDialogOpen] = useState(false);
+  const [isLockingTag, setIsLockingTag] = useState(false);
   const [isNfcToggling, setIsNfcToggling] = useState(false);
 
   const [moveRoomOpen, setMoveRoomOpen] = useState(false);
@@ -927,9 +928,9 @@ function EquipmentDetailPageDesktop() {
       // Payload (URL + AAR record) is owned by nfc-sticker-payload.ts — it must never be
       // rebuilt from window.location.origin, which is capacitor://localhost in the shell.
       tagId = await writeEquipmentStickerTag(equipmentId);
-    } catch {
+    } catch (err) {
       haptics.error();
-      toast.error(t.equipmentNfc.writeFailed);
+      toast.error(t.equipmentNfc.writeFailed(err instanceof Error ? err.message : undefined));
       return;
     }
 
@@ -948,13 +949,18 @@ function EquipmentDetailPageDesktop() {
     } catch (err) {
       haptics.error();
       const conflict = err instanceof ApiError && err.payload.reason === "NFC_TAG_ALREADY_BOUND";
-      toast.error(conflict ? t.equipmentNfc.bindConflict : t.equipmentNfc.bindFailed);
+      toast.error(
+        conflict
+          ? t.equipmentNfc.bindConflict
+          : t.equipmentNfc.bindFailed(err instanceof Error ? err.message : undefined),
+      );
     }
   }
 
   /** Irreversible: an NTAG215 lock can never be undone, hence the confirm gate. */
   async function lockEquipmentNfcTag() {
     setLockTagDialogOpen(false);
+    setIsLockingTag(true);
     try {
       const { alreadyLocked } = await lockNfcTag(t.equipmentNfc.lockTag);
       haptics.scanSuccess();
@@ -963,6 +969,8 @@ function EquipmentDetailPageDesktop() {
       haptics.error();
       const unsupported = err instanceof Error && err.message === "nfc_lock_unsupported";
       toast.error(unsupported ? t.equipmentNfc.lockUnsupported : t.equipmentNfc.lockFailed);
+    } finally {
+      setIsLockingTag(false);
     }
   }
 
@@ -1968,6 +1976,7 @@ function EquipmentDetailPageDesktop() {
           showWhatsApp={showWhatsAppTools}
           showWriteNfc={showWriteNfc}
           showLockNfc={showWriteNfc}
+          lockNfcPending={isLockingTag}
         />
       )}
 
@@ -1978,10 +1987,15 @@ function EquipmentDetailPageDesktop() {
             <DialogDescription>{t.equipmentNfc.lockConfirmBody}</DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setLockTagDialogOpen(false)}>
+            <Button variant="ghost" onClick={() => setLockTagDialogOpen(false)} disabled={isLockingTag}>
               {t.common.cancel}
             </Button>
-            <Button variant="destructive" onClick={() => void lockEquipmentNfcTag()}>
+            <Button
+              variant="destructive"
+              onClick={() => void lockEquipmentNfcTag()}
+              disabled={isLockingTag}
+            >
+              {isLockingTag && <Loader2 className="w-4 h-4 me-2 animate-spin" />}
               {t.equipmentNfc.lockConfirmAction}
             </Button>
           </DialogFooter>

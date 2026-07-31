@@ -20,6 +20,11 @@ const NfcLock = registerPlugin<NfcLockPlugin>("NfcLock");
 
 export type NfcLockResult = { alreadyLocked: boolean };
 
+// Longer than the general read timeout (nfc-platform.ts uses 15s) — locking is a
+// deliberate second tap after an explicit confirm dialog, so the operator gets
+// more time to present the sticker before the attempt is abandoned.
+const ANDROID_LOCK_TIMEOUT_MS = 30_000;
+
 /**
  * Permanently lock the sticker the operator is about to present. Rejects when
  * the platform cannot lock or the tag refuses — never resolves on a failed lock,
@@ -40,22 +45,43 @@ export async function lockNfcTag(alertMessage?: string): Promise<NfcLockResult> 
   // session end to end.
   await CapacitorNfc.startScanning({ invalidateAfterFirstRead: false, alertMessage });
   return new Promise((resolve, reject) => {
+    let settled = false;
     let listenerHandle: { remove: () => Promise<void> } | null = null;
+
+    // `@capgo/capacitor-nfc` exposes no Android scan timeout, cancel, or error
+    // event — without a bounded wait here, a scan with no tag presented leaves
+    // this Promise pending forever and Android reader mode enabled.
+    const finish = (fn: () => void) => {
+      if (settled) return;
+      settled = true;
+      window.clearTimeout(timeout);
+      void (async () => {
+        try {
+          await listenerHandle?.remove();
+          await CapacitorNfc.stopScanning();
+        } catch {
+          /* ignore — best-effort cleanup */
+        }
+        fn();
+      })();
+    };
+
+    const timeout = window.setTimeout(() => {
+      finish(() => reject(new Error("nfc_lock_timeout")));
+    }, ANDROID_LOCK_TIMEOUT_MS);
+
     void (async () => {
       try {
         listenerHandle = await CapacitorNfc.addListener("nfcEvent", async () => {
           try {
             await CapacitorNfc.makeReadOnly();
-            resolve({ alreadyLocked: false });
+            finish(() => resolve({ alreadyLocked: false }));
           } catch (err) {
-            reject(err);
-          } finally {
-            await listenerHandle?.remove();
-            await CapacitorNfc.stopScanning();
+            finish(() => reject(err));
           }
         });
       } catch (err) {
-        reject(err);
+        finish(() => reject(err instanceof Error ? err : new Error(String(err))));
       }
     })();
   });
