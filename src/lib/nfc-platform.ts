@@ -1,11 +1,16 @@
 import { CapacitorNfc as CapacitorNfcNative } from "@capgo/capacitor-nfc";
 import { isCapacitorNative } from "@/lib/capacitor-runtime";
 import {
+  AAR_RECORD_TYPE,
   decodeCapgoNdefRecords,
-  encodeCapgoNdefUrlRecord,
   tagIdHexFromCapgoId,
   type NfcReadPayload,
 } from "@/lib/nfc-capgo-decode";
+import {
+  buildEquipmentStickerRecords,
+  buildEquipmentStickerUrl,
+} from "@/lib/nfc-sticker-payload";
+import { ANDROID_APP_PACKAGE } from "../../shared/constants";
 import {
   decodeNdefTextFromReadingEvent,
   decodeNdefUrlFromReadingEvent,
@@ -248,18 +253,32 @@ async function startNfcScanSessionNative(options: {
   return { stop };
 }
 
-/** Write URL NDEF record to a tag (tap tag when prompted). */
-export async function writeNfcUrl(url: string): Promise<void> {
+/**
+ * Program an equipment sticker (tap tag when prompted) and resolve with the tag's
+ * physical UID as hex, so the caller can bind it to the equipment row. Resolves
+ * `null` on the Web NFC path, which exposes no UID on write.
+ *
+ * Both spec records are written together — a tag carrying only the URI record is a
+ * non-compliant sticker, so a browser that rejects the AAR fails the whole write
+ * rather than silently fielding half a sticker.
+ */
+export async function writeEquipmentStickerTag(equipmentId: string): Promise<string | null> {
+  const records = buildEquipmentStickerRecords(equipmentId);
+
   if (hasWebNfc()) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const ndef = new (window as any).NDEFReader();
-    await ndef.write({ records: [{ recordType: "url", data: url }] });
-    return;
+    await ndef.write({
+      records: [
+        { recordType: "url", data: buildEquipmentStickerUrl(equipmentId) },
+        { recordType: AAR_RECORD_TYPE, data: new TextEncoder().encode(ANDROID_APP_PACKAGE) },
+      ],
+    });
+    return null;
   }
   if (!isCapacitorNative()) throw new Error("nfc_unsupported");
 
   const CapacitorNfc = loadCapgoNfc();
-  const record = encodeCapgoNdefUrlRecord(url);
   await CapacitorNfc.startScanning({
     invalidateAfterFirstRead: false,
     alertMessage: t.equipmentNfc.writeTag,
@@ -269,22 +288,20 @@ export async function writeNfcUrl(url: string): Promise<void> {
     let listenerHandle: { remove: () => Promise<void> } | null = null;
     void (async () => {
       try {
-        listenerHandle = await CapacitorNfc.addListener("nfcEvent", async () => {
+        listenerHandle = await CapacitorNfc.addListener("nfcEvent", async (event) => {
           try {
             await CapacitorNfc.write({
               allowFormat: true,
-              records: [
-                {
-                  tnf: record.tnf ?? 0x01,
-                  type: record.type ?? [],
-                  id: record.id ?? [],
-                  payload: record.payload ?? [],
-                },
-              ],
+              records: records.map((record) => ({
+                tnf: record.tnf ?? 0x01,
+                type: record.type ?? [],
+                id: record.id ?? [],
+                payload: record.payload ?? [],
+              })),
             });
             await listenerHandle?.remove();
             await CapacitorNfc.stopScanning();
-            resolve();
+            resolve(tagIdHexFromCapgoId(event.tag?.id));
           } catch (err) {
             await listenerHandle?.remove();
             await CapacitorNfc.stopScanning();

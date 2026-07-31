@@ -9,7 +9,7 @@ import { isCapacitorNative } from "@/lib/capacitor-runtime";
 import { t } from "@/lib/i18n";
 import type { Equipment, EquipmentStatus } from "@/types";
 import { buildWhatsAppUrl } from "@/lib/utils";
-import { MessageCircle, QrCode, Nfc } from "lucide-react";
+import { MessageCircle, QrCode, Nfc, Lock, Loader2 } from "lucide-react";
 
 interface EquipmentDetailToolsSheetProps {
   equipment: Equipment;
@@ -18,8 +18,16 @@ interface EquipmentDetailToolsSheetProps {
   onOpenChange: (open: boolean) => void;
   onPrintQr: () => void;
   onWriteNfc?: () => void;
+  onLockNfc?: () => void;
   showWhatsApp: boolean;
   showWriteNfc: boolean;
+  showLockNfc: boolean;
+  /** True while a write scan is in flight — disables the trigger so a second,
+   * concurrent write + bind attempt can't be started mid-scan. */
+  writeNfcPending?: boolean;
+  /** True while a lock scan is in flight — disables the trigger so a second,
+   * concurrent (irreversible) lock attempt can't be started mid-scan. */
+  lockNfcPending?: boolean;
 }
 
 export function EquipmentDetailToolsSheet({
@@ -28,8 +36,12 @@ export function EquipmentDetailToolsSheet({
   onOpenChange,
   onPrintQr,
   onWriteNfc,
+  onLockNfc,
   showWhatsApp,
   showWriteNfc,
+  showLockNfc,
+  writeNfcPending = false,
+  lockNfcPending = false,
 }: EquipmentDetailToolsSheetProps) {
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -45,9 +57,33 @@ export function EquipmentDetailToolsSheet({
             </Button>
           )}
           {showWriteNfc && onWriteNfc && (
-            <Button variant="outline" className="h-12 justify-start" onClick={onWriteNfc}>
-              <Nfc className="w-4 h-4 me-2" />
+            <Button
+              variant="outline"
+              className="h-12 justify-start"
+              onClick={onWriteNfc}
+              disabled={writeNfcPending}
+            >
+              {writeNfcPending ? (
+                <Loader2 className="w-4 h-4 me-2 animate-spin" />
+              ) : (
+                <Nfc className="w-4 h-4 me-2" />
+              )}
               {t.equipmentNfc.writeTag}
+            </Button>
+          )}
+          {showLockNfc && onLockNfc && (
+            <Button
+              variant="outline"
+              className="h-12 justify-start"
+              onClick={onLockNfc}
+              disabled={lockNfcPending}
+            >
+              {lockNfcPending ? (
+                <Loader2 className="w-4 h-4 me-2 animate-spin" />
+              ) : (
+                <Lock className="w-4 h-4 me-2" />
+              )}
+              {t.equipmentNfc.lockTag}
             </Button>
           )}
           {showWhatsApp && (

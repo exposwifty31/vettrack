@@ -5556,3 +5556,161 @@ post-deploy checks. iOS Universal-Link background-scan behavior needs a physical
 
 **Verdict:** VERIFIED (code + 8 tests + emulator App-Link proof; live-domain autoVerify is a
 documented post-deploy/post-upload step).
+
+## 2026-07-30 — NFC sticker MANAGEMENT audit (lifecycle half) + 3 gap closures — branch claude/apple-ios-question-7x1fft
+
+**Claim:** "Most of in-app sticker management already exists in code" was partly true. The
+write path, admin gate, read path and `nfc_tag_id` column existed; the payload was half the
+spec, the tag UID was discarded, and there was no lock path at all. All three closed here.
+
+**Evidence:**
+- **RED first:** `pnpm test -- tests/nfc-sticker-management.test.ts` → `Failed to resolve
+  import "../server/lib/pg-errors"` (the audit's new modules did not exist). After
+  implementation: **18/18 passed**. `tests/ios-nfc-lock-plugin-wired.test.ts` **7/7**.
+- **F1 payload (fixed):** `writeNfcUrl` wrote ONE record; spec
+  (`docs/design/nfc-sticker-e2e-audit.md:44-48`) requires URI + AAR. New pure module
+  `src/lib/nfc-sticker-payload.ts`; `encodeCapgoNdefAarRecord` (TNF 0x04, type
+  `android.com:pkg`) in `nfc-capgo-decode.ts`. Byte-exact assertions: URI payload
+  `[0x04, "vettrack.uk/equipment/eq1?nfcAction=toggle"]`, AAR payload `uk.vettrack.app`.
+  Package name unified as `ANDROID_APP_PACKAGE` (`shared/constants.ts`), asserted equal to
+  the assetlinks.json `ANDROID_PACKAGE`. Dropped the unread `&source=nfc` param (grep: zero
+  readers in `src/`).
+- **F2 UID binding (fixed):** `writeEquipmentStickerTag` returns the UID hex; the call site
+  binds it via the EXISTING `PATCH /api/equipment/:id` (`handlers/patch-equipment.ts:102`
+  already accepted `nfcTagId`) — no new route, type, or migration. Write and bind fail
+  independently.
+- **F3 duplicate bind (fixed):** was an uncaught unique violation → 500 `INTERNAL_ERROR`.
+  Now `server/lib/pg-errors.ts` classifies SQLSTATE 23505 on
+  `vt_equipment_nfc_tag_id_unique` → 409 `NFC_TAG_ALREADY_BOUND`.
+- **F4 tenancy (accepted, not changed):** `migrations/018_asset_radar_nfc.sql:33` —
+  `ADD CONSTRAINT vt_equipment_nfc_tag_id_unique UNIQUE (nfc_tag_id)`, no `clinic_id`.
+  Global index. Mitigated by a 409 message that names nothing about the owning row rather
+  than by rewriting a UNIQUE constraint on a live clinical table.
+- **F5 iOS entitlement (fixed):** `App.entitlements` declared only `TAG`, but
+  `NfcPlugin.swift:131` opens `NFCNDEFReaderSession` on the default path, which Apple gates
+  on the `NDEF` format — in-app NFC on iOS was likely non-functional and there is no device
+  evidence either way. `NDEF` added alongside `TAG`.
+- **F6 dead Swift (reported, not fixed):** `grep -c "DynamicTypePlugin"
+  ios/App/App.xcodeproj/project.pbxproj` → **0**. The file was never added to Compile
+  Sources, so its JS bridge resolves null. Left alone (wiring it would change text-scaling
+  behavior); `tests/ios-nfc-lock-plugin-wired.test.ts` guards the NFC plugin against the
+  same drift.
+- **F3.5 lock path (built, unverified):** `ios/App/App/NfcLockPlugin.swift` (CoreNFC
+  `NFCNDEFTag.writeLock`) + full pbxproj wiring (PBXFileReference, PBXBuildFile, App group,
+  App-target Sources phase). `src/lib/nfc-lock.ts` fronts both platforms; the Android branch
+  runs the scan session first because `makeReadOnly()` acts on the last-discovered tag.
+  UI is a separately-confirmed irreversible action, never a side effect of writing.
+- typecheck **0 errors** both tsconfigs. `pnpm i18n:check` deep parity ✓ (10 new keys ×
+  he/en). Adjacent suites green: `nfc-qr-sticker-chain`, `nfc-capgo-decode`,
+  `android-applink`, `equipment-detail-*-nfc-*`, `infrastructure-nfc-adapter`,
+  `nfc-quick-toggle-client`, `i18n-*` — **64 tests**.
+- Full suite: 16 files fail with `connect ECONNREFUSED 127.0.0.1:5432` (DB-backed suites, no
+  Postgres in this container) — pre-existing environmental, unrelated to this diff.
+
+**Not done (disclosed):** Swift is NOT compiled — no macOS in this environment. On-device
+rows are open: does in-app NFC work on iPhone at all now (F5), write → read-back →
+`nfc_tag_id` populated (M10), and the real lock against an NTAG215 (M9). Android rows and
+the Web NFC external-record branch stay deferred — no Android hardware. ADR checked against
+`TRIGGERS.md`: none of the nine triggers apply.
+
+**Verdict:** VERIFIED for the code+unit scope; device rows explicitly DEFERRED, not claimed.
+
+## 2026-07-30 — device-session evidence: row 7 live, Swift compiles, pbxproj collision fixed
+
+**Claim:** Two rows the previous entry recorded as UNVERIFIED/post-deploy are now evidenced, and one
+self-inflicted defect was found and fixed on the way. Owner ran these on a physical Mac
+(`/Users/dan/vettrack`, branch `claude/apple-ios-question-7x1fft`); this container has neither macOS
+nor a network route to vettrack.uk.
+
+**Evidence:**
+- **Row 7 — AASA.** `curl -sSI https://vettrack.uk/.well-known/apple-app-site-association` →
+  `HTTP/2 200`, `content-type: application/json; charset=utf-8`, `cache-control: no-cache`, no
+  redirect. Body: `{"applinks":{"details":[{"appIDs":["87F5G378M6.uk.vettrack.app"],
+  "components":[{"/":"/equipment/*",...}]}]}}`. PASS.
+- **Row 7 — assetlinks.** `curl -sS https://vettrack.uk/.well-known/assetlinks.json` →
+  `[{"relation":["delegate_permission/common.handle_all_urls"],"target":{"namespace":"android_app",
+  "package_name":"uk.vettrack.app","sha256_cert_fingerprints":["93:34:4C:…:5C:83"]}}]`. PASS as an
+  endpoint. The fingerprint is the UPLOAD key — Play-delivered installs are re-signed, so production
+  autoVerify stays open until the Play App Signing cert is appended post-first-upload.
+- **Branch reproduces off-container.** `pnpm typecheck` clean both tsconfigs;
+  `tests/nfc-sticker-management.test.ts` + `tests/ios-nfc-lock-plugin-wired.test.ts` → 25/25.
+- **Native build.** `pnpm cap:build:native` → `CAPACITOR_SERVER_URL (unset — bundled shell)`,
+  `pk_live_…` + `VITE_API_ORIGIN=https://vettrack.uk` baked from `.env`; `cap sync ios` found 8
+  plugins incl. `@capgo/capacitor-nfc@8.0.28`. The wiring guard re-run AFTER sync still passed —
+  `cap sync` does not drop `NfcLockPlugin.swift` from Compile Sources.
+- **DEFECT FOUND AND FIXED (mine).** First ⌘B failed in *Prepare build*:
+  `error: Multiple commands produce '…/App.app/Info.plist'` — one `ProcessInfoPlistFile` from
+  `App/Info.plist`, one *copy* of `VetTrackControl/Info.plist`. Cause: the plugin's pbxproj object id
+  `FE17C00000000000000013` was already VetTrackControl's `Info.plist` PBXFileReference, so two
+  objects shared an id and Xcode resolved the Sources entry to the widget's plist. A duplicate id
+  never fails loudly. Moved to `…0015`/`…0024`. RED-first guard added
+  (`defines every object id exactly once`), which reported exactly
+  `['FE17C00000000000000013']` against the broken project → green after (8/8). Note: the guard's
+  first regex used `[0-9A-F]{24}` and matched nothing — the hand-authored ids here are 22 chars — so
+  it PASSED against a broken file until corrected to `{22,24}`.
+- **M9 partial — Swift compiles.** After the fix, Xcode `Build Succeeded` for scheme App /
+  `Any iOS Device (arm64)`. `NfcLockPlugin.swift` was authored in a Linux container with no compiler;
+  `NFCNDEFTag.writeLock`, `CAPBridgedPlugin` conformance and the `NFCNDEFReaderSessionDelegate`
+  signatures are therefore now verified as valid, on iOS deployment target 15.0.
+
+**Not done (disclosed):** the lock itself (M9), write → read-back → `nfc_tag_id` (M10), and
+background scan all require an **NTAG215 tag**, which the owner does not have — that is the only
+*hardware*-dependent blocker for the remaining iOS rows. Two more release gates stay open,
+independently of the tag: on-device code signing against the amended `App.entitlements` (the only
+proof the App ID carries the NFC + Associated Domains capabilities), and **F5** — whether the
+in-app NFC sheet opens now that `NDEF` was added. Android rows and the Web NFC external-record
+branch stay deferred: no Android hardware.
+
+**Verdict:** VERIFIED for row 7 and for Swift compilation. M9/M10 remain DEFERRED, not claimed.
+
+## 2026-07-31 — PR #166 CodeRabbit round 1: 8 findings addressed (0ad102f15, c79d5277f)
+
+**Claim:** Drove PR #166 to a genuine CodeRabbit review by triggering `@coderabbitai review`, then
+investigated and fixed all 8 findings from the resulting CHANGES_REQUESTED review (6 inline + 2
+outside-diff), and confirmed a clean incremental re-review with no new comments.
+
+**Evidence:**
+- CodeRabbit review `4826964184` (commit `a1b1ac4b4`, 2026-07-31T08:57:24Z) — `CHANGES_REQUESTED`,
+  6 inline comments fetched via `gh api repos/exposwifty31/vettrack/pulls/166/comments`.
+- Fixes applied and verified against real files (not the diff summary alone):
+  - `docs/design/nfc-sticker-management-audit.md:23-24,138-139` — past-tensed the stale
+    Android-only wording and disambiguated "NTAG215 is the only hardware blocker" from the
+    still-open F5/code-signing gates; mirrored in `docs/audit/PROOF_ALIGNMENT_LOG.md:5656-5661`.
+  - `docs/design/nfc-sticker-e2e-audit.md:59-61,81-84` — added closed-status notes to the client
+    routing and iOS sections so they read as historical rationale, not pending work.
+  - `ios/App/App/NfcLockPlugin.swift:32-46` — added `deinit { session?.invalidate() }` (SwiftLint
+    `required_deinit`) and a `pendingCall == nil` reentrancy guard rejecting overlapping `lockTag`
+    calls with `BUSY`, applied as CodeRabbit's own suggested diff.
+  - `src/lib/nfc-lock.ts:23-88` — added a 30s Android scan timeout with shared `finish()` cleanup
+    (listener remove + `stopScanning()`) on timeout, lock failure, and listener-registration
+    failure, mirroring `nfc-platform.ts`'s existing timeout convention.
+  - `src/pages/equipment-detail.tsx:920-999`, `src/lib/i18n.ts:647,650` — write/bind catch blocks
+    now interpolate `err.message` into the toast (`writeFailed`/`bindFailed` became message-taking
+    functions, matching the existing `scanFailed`/`checkoutFailed` convention, no locale JSON
+    changes); added `isLockingTag` busy state disabling the Lock NFC trigger + dialog confirm
+    button with a spinner while the irreversible lock scan is in flight.
+  - `src/components/equipment/EquipmentDetailToolsSheet.tsx` — added `lockNfcPending` prop wired
+    to the new busy state.
+- Test: `pnpm vitest run tests/nfc-lock-android-timeout.test.ts` → 3/3 passed (new test covering
+  timeout rejection + cleanup, successful lock clears the timer, listener-registration failure
+  cleans up).
+- Command: `npx tsc --noEmit` → clean (0 errors). `npx tsc -p tsconfig.server.json --noEmit` →
+  clean (0 errors).
+- Command: `pnpm test` (full vitest suite) → `698 passed (698 files) / 6162 passed | 11 skipped`.
+- Command: `pnpm i18n:check` → `✓ locales/en.json and locales/he.json are in deep key parity.`
+- Command: `gh api repos/exposwifty31/vettrack/pulls/166/reviews` after pushing `c79d5277f` →
+  second CodeRabbit review `4827267523`, `state: APPROVED`, `commit_id: c79d5277f8524ed…` (the
+  exact pushed commit) — confirms the incremental re-review covered the fix delta, not a skip.
+  Zero new inline comments (still 6 total, all `created_at` from the first round).
+- Command: `gh api graphql` — `reviewDecision: APPROVED`, `mergeable: MERGEABLE`,
+  `mergeStateStatus: CLEAN`.
+- Command: `gh pr checks 166` → all checks `pass` (Merge gate, Typecheck, both Playwright shards,
+  all 4 test shards, Frontend build, Architecture gates, Integration ops, Static resubmission
+  gates, Vercel, CodeRabbit), `🚢 Deploy to Railway` = `skipping` (expected, not on `main`).
+- Not verified this session: the Swift change was not compiled locally (no Xcode/macOS toolchain
+  in this environment; CI runs no iOS build step) — it rides on CodeRabbit's own suggested diff
+  plus the owner's next on-device build, same as the rest of `NfcLockPlugin.swift` in this PR.
+
+**Verdict:** VERIFIED (docs wording, TS/i18n fixes, full test suite, CI green, genuine CodeRabbit
+re-review). PARTIAL for the Swift `deinit`/reentrancy-guard edit specifically — logically applied
+from CodeRabbit's own suggested diff, not locally compiled.

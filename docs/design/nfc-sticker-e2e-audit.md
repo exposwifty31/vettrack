@@ -13,8 +13,15 @@
 > native app / a preview host on staging) instead of the universal-link origin the NFC writer already
 > uses, so QR and NFC stickers for the same equipment did NOT resolve identically. All three landed
 > with 8 tests + emulator App-Link proof; the iOS half (applinks entitlement + AASA route) was
-> already present. Remaining before fielding: append the Play App Signing cert to assetlinks.json
-> after the first AAB upload, and deploy so the two `/.well-known/` endpoints go live.
+> already present.
+>
+> **Row 7 verified live 2026-07-30.** Both `/.well-known/` endpoints are deployed and correct:
+> AASA returns `HTTP/2 200`, `content-type: application/json; charset=utf-8`, no redirect,
+> `cache-control: no-cache`, with `appIDs: ["87F5G378M6.uk.vettrack.app"]` and
+> `components: [{"/": "/equipment/*"}]`; assetlinks.json returns the delegate statement for
+> `uk.vettrack.app`. Remaining before fielding: append the **Play App Signing** cert to
+> assetlinks.json after the first AAB upload — the fingerprint served today is the upload key, so
+> Play-delivered installs will not autoVerify until then.
 
 ## Context & goal
 
@@ -51,6 +58,9 @@ cache-buster the client adds; a static timestamp on a locked tag would be meanin
 
 ## Client routing (the one real code gap)
 
+> **Status: closed** (see "Implementation status" above — landed via #86 before this phase
+> executed). Kept below as the original design rationale, not a pending instruction.
+
 `deep-link-router.ts` today handles `vettrack://` hosts only. Universal/App Links arrive through the
 same `@capacitor/app` `appUrlOpen` event but as `https://vettrack.uk/...` URLs. Change: extend the
 router to map `https://vettrack.uk/equipment/<id>` (+ params passthrough) to the exact same
@@ -72,6 +82,10 @@ params as the custom-scheme equivalent; unknown hosts/paths untouched. The equip
   endpoints return 200, correct content-type, no redirect.
 
 ## iOS (build 27)
+
+> **Status: closed** — the applinks entitlement + AASA route were already present (see
+> "Implementation status" above). Kept below as the original design rationale, not a pending
+> instruction.
 
 Add the Associated Domains capability with `applinks:vettrack.uk` to the app target (entitlements
 file + App ID capability in the developer portal). Background-reading constraints acknowledged and

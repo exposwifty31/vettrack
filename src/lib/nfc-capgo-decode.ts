@@ -106,3 +106,23 @@ export function encodeCapgoNdefUrlRecord(url: string): CapgoNdefRecord {
     payload: [prefixCode, ...restBytes],
   };
 }
+
+/** NFC Forum TNF for an external (domain-namespaced) record type. */
+const TNF_EXTERNAL_TYPE = 0x04;
+export const AAR_RECORD_TYPE = "android.com:pkg";
+
+/**
+ * Build an Android Application Record for Capgo `write()`. On a phone without the
+ * app installed the AAR sends the tap to the Play listing instead of a browser;
+ * with the app installed it removes the app-chooser. iOS ignores it — background
+ * tag reading parses the first (URI) record only.
+ */
+export function encodeCapgoNdefAarRecord(packageName: string): CapgoNdefRecord {
+  const encoder = new TextEncoder();
+  return {
+    tnf: TNF_EXTERNAL_TYPE,
+    type: Array.from(encoder.encode(AAR_RECORD_TYPE)),
+    id: [],
+    payload: Array.from(encoder.encode(packageName)),
+  };
+}

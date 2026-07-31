@@ -99,8 +99,9 @@ import {
 } from "@/lib/equipment-waitlist-ui";
 import { useSettings } from "@/hooks/use-settings";
 import { useNfcSupported } from "@/hooks/use-nfc-supported";
-import { writeNfcUrl } from "@/lib/nfc-platform";
-import { UNIVERSAL_LINK_ORIGIN } from "@/lib/equipment-id";
+import { writeEquipmentStickerTag } from "@/lib/nfc-platform";
+import { lockNfcTag } from "@/lib/nfc-lock";
+import { ApiError } from "@/lib/request-core";
 import { playCriticalAlertTone } from "@/lib/sounds";
 import { haptics } from "@/lib/haptics";
 import { safeStorageSetItem } from "@/lib/safe-browser";
@@ -197,6 +198,9 @@ function EquipmentDetailPageDesktop() {
   const [scanHistoryRange, setScanHistoryRange] = useState<"today" | "7d" | "all">("today");
   const [detailTab, setDetailTab] = useState("details");
   const [toolsSheetOpen, setToolsSheetOpen] = useState(false);
+  const [lockTagDialogOpen, setLockTagDialogOpen] = useState(false);
+  const [isLockingTag, setIsLockingTag] = useState(false);
+  const [isWritingTag, setIsWritingTag] = useState(false);
   const [isNfcToggling, setIsNfcToggling] = useState(false);
 
   const [moveRoomOpen, setMoveRoomOpen] = useState(false);
@@ -920,17 +924,66 @@ function EquipmentDetailPageDesktop() {
       toast.error(t.equipmentNfc.writeUnsupported);
       return;
     }
-    // MANDATORY hardcode (D5): the native WebView origin is capacitor://localhost (bundled app),
-    // so window.location.origin would write a non-Universal-Link URL. UNIVERSAL_LINK_ORIGIN is the
-    // single source of truth shared with the deep-link router's hostname check.
-    const url = `${UNIVERSAL_LINK_ORIGIN}/equipment/${equipmentId}?nfcAction=toggle&source=nfc`;
+    setIsWritingTag(true);
     try {
-      await writeNfcUrl(url);
+      let tagId: string | null;
+      try {
+        // Payload (URL + AAR record) is owned by nfc-sticker-payload.ts — it must never be
+        // rebuilt from window.location.origin, which is capacitor://localhost in the shell.
+        tagId = await writeEquipmentStickerTag(equipmentId);
+      } catch (err) {
+        haptics.error();
+        toast.error(t.equipmentNfc.writeFailed(err instanceof Error ? err.message : undefined));
+        return;
+      }
+
+      // The sticker is programmed; binding its UID is a second, independently
+      // failable step — a bind failure must not read as a write failure.
+      if (!tagId) {
+        haptics.scanSuccess();
+        toast.success(t.equipmentNfc.writeSuccess);
+        return;
+      }
+      try {
+        await api.equipment.update(equipmentId, { nfcTagId: tagId });
+        haptics.scanSuccess();
+        toast.success(t.equipmentNfc.writeSuccess);
+        invalidateAll();
+      } catch (err) {
+        haptics.error();
+        const conflict = err instanceof ApiError && err.payload.reason === "NFC_TAG_ALREADY_BOUND";
+        toast.error(
+          conflict
+            ? t.equipmentNfc.bindConflict
+            : t.equipmentNfc.bindFailed(err instanceof Error ? err.message : undefined),
+        );
+      }
+    } finally {
+      setIsWritingTag(false);
+    }
+  }
+
+  /** Irreversible: an NTAG215 lock can never be undone, hence the confirm gate. */
+  async function lockEquipmentNfcTag() {
+    setLockTagDialogOpen(false);
+    setIsLockingTag(true);
+    try {
+      const { alreadyLocked } = await lockNfcTag(t.equipmentNfc.lockTag);
       haptics.scanSuccess();
-      toast.success(t.equipmentNfc.writeSuccess);
-    } catch {
+      toast.success(alreadyLocked ? t.equipmentNfc.lockAlreadyLocked : t.equipmentNfc.lockSuccess);
+    } catch (err) {
       haptics.error();
-      toast.error(t.equipmentNfc.writeFailed);
+      const unsupported = err instanceof Error && err.message === "nfc_lock_unsupported";
+      const timedOut = err instanceof Error && err.message === "nfc_lock_timeout";
+      toast.error(
+        unsupported
+          ? t.equipmentNfc.lockUnsupported
+          : timedOut
+            ? t.equipmentNfc.lockTimeout
+            : t.equipmentNfc.lockFailed,
+      );
+    } finally {
+      setIsLockingTag(false);
     }
   }
 
@@ -1932,10 +1985,36 @@ function EquipmentDetailPageDesktop() {
           onOpenChange={setToolsSheetOpen}
           onPrintQr={handlePrintQr}
           onWriteNfc={showWriteNfc ? () => void writeEquipmentNfcTag(id) : undefined}
+          onLockNfc={showWriteNfc ? () => setLockTagDialogOpen(true) : undefined}
           showWhatsApp={showWhatsAppTools}
           showWriteNfc={showWriteNfc}
+          showLockNfc={showWriteNfc}
+          writeNfcPending={isWritingTag}
+          lockNfcPending={isLockingTag}
         />
       )}
+
+      <Dialog open={lockTagDialogOpen} onOpenChange={setLockTagDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t.equipmentNfc.lockConfirmTitle}</DialogTitle>
+            <DialogDescription>{t.equipmentNfc.lockConfirmBody}</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setLockTagDialogOpen(false)} disabled={isLockingTag}>
+              {t.common.cancel}
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => void lockEquipmentNfcTag()}
+              disabled={isLockingTag}
+            >
+              {isLockingTag && <Loader2 className="w-4 h-4 me-2 animate-spin" />}
+              {t.equipmentNfc.lockConfirmAction}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Move to Room bottom sheet */}
       {equipment && (

@@ -3,7 +3,9 @@
 // deep links (from a QR/NFC sticker scanned outside the app) open the installed
 // app after Android verifies this file over HTTPS at install time.
 
-export const ANDROID_PACKAGE = "uk.vettrack.app";
+import { ANDROID_APP_PACKAGE } from "../../shared/constants.js";
+
+export const ANDROID_PACKAGE = ANDROID_APP_PACKAGE;
 
 // SHA-256 signing-cert fingerprints Android checks against the installed build.
 //

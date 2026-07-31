@@ -6,6 +6,7 @@ import { checkDedupe, sendPushToAll, shouldSendPilotEnglishEquipmentPush } from 
 import { invalidateAnalyticsCache } from "../../../lib/analytics-cache.js";
 import { logAudit, resolveAuditActorRole } from "../../../lib/audit.js";
 import { apiError, resolveRequestId } from "../equipment-route-utils.js";
+import { EQUIPMENT_NFC_TAG_UNIQUE_CONSTRAINT, isUniqueViolation } from "../../../lib/pg-errors.js";
 
 type EquipmentRow = typeof equipment.$inferSelect;
 
@@ -194,6 +195,19 @@ export const patchEquipmentHandler: RequestHandler = async (req, res) => {
     invalidateAnalyticsCache(clinicId);
     res.json(result);
   } catch (err) {
+    // Binding a sticker whose UID is already on another equipment row. The unique
+    // index is global (no clinicId), so the owning row may belong to another tenant —
+    // the message deliberately names nothing about it.
+    if (isUniqueViolation(err, EQUIPMENT_NFC_TAG_UNIQUE_CONSTRAINT)) {
+      return res.status(409).json(
+        apiError({
+          code: "CONFLICT",
+          reason: "NFC_TAG_ALREADY_BOUND",
+          message: "This NFC tag is already bound to other equipment",
+          requestId,
+        }),
+      );
+    }
     console.error(err);
     res.status(500).json(
       apiError({
