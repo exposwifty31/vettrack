@@ -1,0 +1,39 @@
+name: 🍏 iOS resubmission — static gates
+
+# Lane A of the App Store resubmission ripcord: the Linux-runnable subset of
+# scripts/verify-resubmission.sh (icon 1024/no-alpha, build > last shipped, no literal
+# CFBundleVersion in source plists, Control-widget files, applinks entitlement).
+# Making these OBSERVABLE on every push/PR is the whole point — the ripcord used to be
+# a single-machine Mac ritual that rotted silently between runs (plan R4 / correction #10).
+#
+# The Mac/network/build-output remainder (demo login, Clerk admin config, API CORS,
+# bundled-shell auth checks, live AASA fetch) stays in verify-resubmission.sh and is NOT
+# runnable here — it needs macOS tooling, prod secrets, and cap:build:native output.
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+permissions:
+  contents: read
+
+jobs:
+  static-gates:
+    name: 🍏 Static resubmission gates
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: ⬇️ Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: 🍏 verify-resubmission-static.sh
+        run: bash scripts/verify-resubmission-static.sh
