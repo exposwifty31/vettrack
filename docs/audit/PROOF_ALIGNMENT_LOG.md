@@ -5662,3 +5662,55 @@ in-app NFC sheet opens now that `NDEF` was added. Android rows and the Web NFC e
 branch stay deferred: no Android hardware.
 
 **Verdict:** VERIFIED for row 7 and for Swift compilation. M9/M10 remain DEFERRED, not claimed.
+
+## 2026-07-31 — PR #166 CodeRabbit round 1: 8 findings addressed (0ad102f15, c79d5277f)
+
+**Claim:** Drove PR #166 to a genuine CodeRabbit review by triggering `@coderabbitai review`, then
+investigated and fixed all 8 findings from the resulting CHANGES_REQUESTED review (6 inline + 2
+outside-diff), and confirmed a clean incremental re-review with no new comments.
+
+**Evidence:**
+- CodeRabbit review `4826964184` (commit `a1b1ac4b4`, 2026-07-31T08:57:24Z) — `CHANGES_REQUESTED`,
+  6 inline comments fetched via `gh api repos/exposwifty31/vettrack/pulls/166/comments`.
+- Fixes applied and verified against real files (not the diff summary alone):
+  - `docs/design/nfc-sticker-management-audit.md:23-24,138-139` — past-tensed the stale
+    Android-only wording and disambiguated "NTAG215 is the only hardware blocker" from the
+    still-open F5/code-signing gates; mirrored in `docs/audit/PROOF_ALIGNMENT_LOG.md:5656-5661`.
+  - `docs/design/nfc-sticker-e2e-audit.md:59-61,81-84` — added closed-status notes to the client
+    routing and iOS sections so they read as historical rationale, not pending work.
+  - `ios/App/App/NfcLockPlugin.swift:32-46` — added `deinit { session?.invalidate() }` (SwiftLint
+    `required_deinit`) and a `pendingCall == nil` reentrancy guard rejecting overlapping `lockTag`
+    calls with `BUSY`, applied as CodeRabbit's own suggested diff.
+  - `src/lib/nfc-lock.ts:23-88` — added a 30s Android scan timeout with shared `finish()` cleanup
+    (listener remove + `stopScanning()`) on timeout, lock failure, and listener-registration
+    failure, mirroring `nfc-platform.ts`'s existing timeout convention.
+  - `src/pages/equipment-detail.tsx:920-999`, `src/lib/i18n.ts:647,650` — write/bind catch blocks
+    now interpolate `err.message` into the toast (`writeFailed`/`bindFailed` became message-taking
+    functions, matching the existing `scanFailed`/`checkoutFailed` convention, no locale JSON
+    changes); added `isLockingTag` busy state disabling the Lock NFC trigger + dialog confirm
+    button with a spinner while the irreversible lock scan is in flight.
+  - `src/components/equipment/EquipmentDetailToolsSheet.tsx` — added `lockNfcPending` prop wired
+    to the new busy state.
+- Test: `pnpm vitest run tests/nfc-lock-android-timeout.test.ts` → 3/3 passed (new test covering
+  timeout rejection + cleanup, successful lock clears the timer, listener-registration failure
+  cleans up).
+- Command: `npx tsc --noEmit` → clean (0 errors). `npx tsc -p tsconfig.server.json --noEmit` →
+  clean (0 errors).
+- Command: `pnpm test` (full vitest suite) → `698 passed (698 files) / 6162 passed | 11 skipped`.
+- Command: `pnpm i18n:check` → `✓ locales/en.json and locales/he.json are in deep key parity.`
+- Command: `gh api repos/exposwifty31/vettrack/pulls/166/reviews` after pushing `c79d5277f` →
+  second CodeRabbit review `4827267523`, `state: APPROVED`, `commit_id: c79d5277f8524ed…` (the
+  exact pushed commit) — confirms the incremental re-review covered the fix delta, not a skip.
+  Zero new inline comments (still 6 total, all `created_at` from the first round).
+- Command: `gh api graphql` — `reviewDecision: APPROVED`, `mergeable: MERGEABLE`,
+  `mergeStateStatus: CLEAN`.
+- Command: `gh pr checks 166` → all checks `pass` (Merge gate, Typecheck, both Playwright shards,
+  all 4 test shards, Frontend build, Architecture gates, Integration ops, Static resubmission
+  gates, Vercel, CodeRabbit), `🚢 Deploy to Railway` = `skipping` (expected, not on `main`).
+- Not verified this session: the Swift change was not compiled locally (no Xcode/macOS toolchain
+  in this environment; CI runs no iOS build step) — it rides on CodeRabbit's own suggested diff
+  plus the owner's next on-device build, same as the rest of `NfcLockPlugin.swift` in this PR.
+
+**Verdict:** VERIFIED (docs wording, TS/i18n fixes, full test suite, CI green, genuine CodeRabbit
+re-review). PARTIAL for the Swift `deinit`/reentrancy-guard edit specifically — logically applied
+from CodeRabbit's own suggested diff, not locally compiled.
