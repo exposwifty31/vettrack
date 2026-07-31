@@ -2,8 +2,8 @@
 # VetTrack — pre-archive resubmission verification: STATIC subset (Lane A).
 #
 # The Linux-CI-runnable half of scripts/verify-resubmission.sh. Every gate here
-# reads only git-TRACKED files with portable tools (bash + grep + git + python3) —
-# NO macOS-only tools (sips), NO network, NO secrets, NO build output. It therefore
+# reads only git-TRACKED files with portable tools (bash + git + python3) — NO
+# macOS-only tools (sips), NO network, NO secrets, NO build output. It therefore
 # runs unchanged on an ubuntu CI runner, so the ripcord's static invariants are
 # OBSERVABLE on every push/PR instead of rotting between manual Mac runs (R4).
 #
@@ -26,35 +26,47 @@ ok(){ echo "  PASS  $1"; PASS=$((PASS+1)); }
 no(){ echo "  FAIL  $1"; FAIL=$((FAIL+1)); }
 hdr(){ echo; echo "== $1 =="; }
 
-# --- [2.3.8] icon: alpha-stripped, 1024 (portable — no macOS `sips`) ----------
-# Parse the PNG IHDR directly: width/height (big-endian uint32 at bytes 16/20) and
-# color type (byte 25). Color type 4/6 carry an alpha channel; Apple rejects an
-# icon with alpha. Pure stdlib so it runs on a Linux runner identically to the Mac.
+# --- [2.3.8] icon: 1024², fully opaque (no macOS `sips`) ----------------------
+# Apple rejects an icon with ANY transparency. Parse the PNG: IHDR gives dimensions
+# (bytes 16/20) + color type (byte 25); color types 4/6 carry an alpha channel, AND
+# a `tRNS` chunk adds transparency to color types 0/2/3 — reject either. Pure stdlib
+# so it runs identically on Linux and Mac.
 hdr "[2.3.8] App icon"
 ICON="ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-512@2x.png"
 if [ -f "$ICON" ]; then
   ICON_RESULT=$(python3 - "$ICON" <<'PY'
 import struct, sys
-p = sys.argv[1]
-with open(p, "rb") as f:
-    sig = f.read(8)
-    if sig != b"\x89PNG\r\n\x1a\n":
+with open(sys.argv[1], "rb") as f:
+    if f.read(8) != b"\x89PNG\r\n\x1a\n":
         print("ERR not-a-png"); sys.exit(0)
-    f.read(4)                       # IHDR length
+    ihdr_len = struct.unpack(">I", f.read(4))[0]
     if f.read(4) != b"IHDR":
         print("ERR no-ihdr"); sys.exit(0)
     w, h = struct.unpack(">II", f.read(8))
-    bit_depth = f.read(1)
+    f.read(1)                       # bit depth
     color_type = f.read(1)[0]
-has_alpha = "yes" if color_type in (4, 6) else "no"
-print(f"{w} {h} {has_alpha}")
+    f.seek((ihdr_len - 10) + 4, 1)  # rest of IHDR data + CRC
+    has_trns = False
+    while True:
+        chunk_hdr = f.read(8)
+        if len(chunk_hdr) < 8:
+            break
+        clen = struct.unpack(">I", chunk_hdr[:4])[0]
+        ctype = chunk_hdr[4:8]
+        if ctype == b"tRNS":
+            has_trns = True
+        if ctype == b"IEND":
+            break
+        f.seek(clen + 4, 1)         # chunk data + CRC
+transparent = "yes" if (color_type in (4, 6) or has_trns) else "no"
+print(f"{w} {h} {transparent}")
 PY
 )
-  read -r IW IH IA <<<"$ICON_RESULT"
-  if [ "$IW" = "1024" ] && [ "$IH" = "1024" ] && [ "$IA" = "no" ]; then
-    ok "icon ${IW}x${IH}px, hasAlpha=$IA"
+  read -r IW IH IT <<<"$ICON_RESULT"
+  if [ "$IW" = "1024" ] && [ "$IH" = "1024" ] && [ "$IT" = "no" ]; then
+    ok "icon ${IW}x${IH}px, transparent=$IT"
   else
-    no "icon ${IW:-?}x${IH:-?} hasAlpha=${IA:-?} (want 1024x1024 / no) [$ICON_RESULT]"
+    no "icon ${IW:-?}x${IH:-?} transparent=${IT:-?} (want 1024x1024 / no; alpha channel OR tRNS rejected) [$ICON_RESULT]"
   fi
 else
   no "icon file missing"
@@ -86,23 +98,36 @@ else
   no "build ${BN} must be > last shipped $LAST — bump first: pnpm resubmit  (then update ios/.last-shipped-build after upload)"
 fi
 
-# --- no literal CFBundleVersion in any SOURCE bundle plist (app + extensions) ----
-# Every app/extension Info.plist must derive CFBundleVersion from $(CURRENT_PROJECT_VERSION).
-# A literal integer desyncs from the app the moment resubmit's global build bump runs
-# → ITMS-90473. Scoped to git-TRACKED plists so gitignored build output is never flagged.
-hdr "[no literal CFBundleVersion in source bundle plists]"
-LITERAL_PLISTS=""
-while IFS= read -r plist; do
-  [ -f "$plist" ] || continue
-  val=$(grep -A1 '<key>CFBundleVersion</key>' "$plist" 2>/dev/null | sed -n '2p' | tr -d '[:space:]')
-  case "$val" in
-    *'<string>'[0-9]*) LITERAL_PLISTS="$LITERAL_PLISTS ${plist}=${val}" ;;
-  esac
-done < <(git ls-files ios/App 2>/dev/null | grep -E '/Info\.plist$')
-if [ -z "$LITERAL_PLISTS" ]; then
-  ok "all source bundle Info.plist CFBundleVersion values reference \$(CURRENT_PROJECT_VERSION)"
+# --- every source bundle Info.plist CFBundleVersion == $(CURRENT_PROJECT_VERSION) ---
+# A literal integer — or any OTHER build setting — desyncs from the app the moment
+# the global build bump runs → ITMS-90473. Parse each tracked Info.plist with plistlib
+# (not grep, which passes on a missing key or a value buried in a comment) and require
+# the exact `$(CURRENT_PROJECT_VERSION)` reference.
+hdr "[CFBundleVersion == \$(CURRENT_PROJECT_VERSION) in source bundle plists]"
+BAD_PLISTS=$(python3 - <<'PY'
+import plistlib, subprocess
+WANT = "$(CURRENT_PROJECT_VERSION)"
+tracked = subprocess.run(["git", "ls-files", "ios/App"], capture_output=True, text=True).stdout.split()
+bad = []
+for p in tracked:
+    if not p.endswith("/Info.plist"):
+        continue
+    try:
+        with open(p, "rb") as fh:
+            d = plistlib.load(fh)
+    except Exception as e:
+        bad.append(f"{p}=UNREADABLE({e})")
+        continue
+    v = d.get("CFBundleVersion")
+    if v != WANT:
+        bad.append(f"{p}={v!r}")
+print("\n".join(bad))
+PY
+)
+if [ -z "$BAD_PLISTS" ]; then
+  ok "every source bundle Info.plist CFBundleVersion == \$(CURRENT_PROJECT_VERSION)"
 else
-  no "literal CFBundleVersion in:$LITERAL_PLISTS — set to \$(CURRENT_PROJECT_VERSION) so the build bump can't desync an extension"
+  no "CFBundleVersion not \$(CURRENT_PROJECT_VERSION) (or key missing) in: $(echo $BAD_PLISTS) — set it to the build-setting reference so the build bump can't desync an extension"
 fi
 
 # --- Control widget files ---------------------------------------------------
@@ -114,11 +139,21 @@ for f in ios/App/VetTrackControl/VetTrackScanControl.swift \
 done
 
 # --- entitlements (static half of the AASA gate) ----------------------------
-# The live AASA fetch stays in the Mac/network script; the entitlement is a tracked
-# file, so its check belongs here.
+# Parse the entitlement plist and require applinks:vettrack.uk as an actual member of
+# the associated-domains array — not a substring match that a comment could satisfy.
+# The live AASA fetch stays in the Mac/network script.
 hdr "[entitlements]"
-grep -q 'applinks:vettrack.uk' ios/App/App/App.entitlements \
-  && ok "entitlements applinks:vettrack.uk" || no "entitlements missing applinks:vettrack.uk"
+ENT_OK=$(python3 -c "
+import plistlib
+d = plistlib.load(open('ios/App/App/App.entitlements', 'rb'))
+domains = d.get('com.apple.developer.associated-domains') or []
+print('yes' if 'applinks:vettrack.uk' in domains else 'no|' + repr(domains))
+" 2>/dev/null)
+if [ "$ENT_OK" = "yes" ]; then
+  ok "entitlements associated-domains contains applinks:vettrack.uk"
+else
+  no "entitlements associated-domains missing applinks:vettrack.uk (${ENT_OK#no|})"
+fi
 
 # --- summary ----------------------------------------------------------------
 echo; echo "============================================"
