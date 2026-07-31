@@ -19,11 +19,10 @@
     "paths": {
       "*": ["./*"],
       "@/*": ["./src/*"],
-      "@assets/*": ["./docs/archive/2026/attached_assets/*"],
-      "@contracts/*": ["./shared-contracts/*"]
+      "@assets/*": ["./docs/archive/2026/attached_assets/*"]
     }
   },
-  "include": ["src", "lib", "shared-contracts"],
+  "include": ["src", "lib"],
   "exclude": ["src/design-system-entry.ts"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }

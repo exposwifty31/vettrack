@@ -1,5 +1,5 @@
 {
-  "//": "Isolated tsconfig for the native (Appium/WDIO) flow walk. The root tsconfig only includes src/lib/shared-contracts, so these files are never seen by `pnpm typecheck`; this config is what ts-node/WDIO uses when the native walk runs.",
+  "//": "Isolated tsconfig for the native (Appium/WDIO) flow walk. The root tsconfig only includes src/lib, so these files are never seen by `pnpm typecheck`; this config is what ts-node/WDIO uses when the native walk runs.",
   "compilerOptions": {
     "target": "ES2022",
     "module": "ESNext",
