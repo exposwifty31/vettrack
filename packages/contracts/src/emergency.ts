@@ -1,6 +1,13 @@
 /**
- * Ported verbatim from shared/emergency-surfaces.manifest.ts
- * Source of truth for offline block list, SW cache bypass, and server route allowlist.
+ * CANONICAL source of truth for the emergency offline-block list, SW cache-bypass
+ * paths, and the base server-route allowlist.
+ *
+ * Direction of truth (do not re-sync the wrong way): this @vettrack/contracts module
+ * is the source. `shared/emergency-surfaces.manifest.ts` RE-EXPORTS from here and only
+ * appends repo-local, explicitly NON-emergency routes (the Phase-9 display-pairing
+ * catalogue). Add real emergency surfaces HERE so RN and every contracts consumer see
+ * them; the OFF-07 parity gate (tests/offline-phase-7-emergency-surface-parity.test.ts)
+ * ratchets the manifest against public/sw.js and the classifier.
  */
 
 // ─── A. Offline block mutations ───────────────────────────────────────────────
