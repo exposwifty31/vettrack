@@ -43,6 +43,21 @@ ok(){ echo "  PASS  $1"; PASS=$((PASS+1)); }
 no(){ echo "  FAIL  $1"; FAIL=$((FAIL+1)); }
 hdr(){ echo; echo "== $1 =="; }
 
+# --- static gates (Lane A) — delegated to ONE shared source ------------------
+# The Linux-CI-runnable subset (icon, build number, source-plist literals, widget
+# files, entitlements) lives in scripts/verify-resubmission-static.sh so CI and this
+# Mac run cannot silently diverge (R4). Fold its PASS/FAIL into this run's totals.
+hdr "[static gates → scripts/verify-resubmission-static.sh]"
+STATIC_OUT="$(REPO="$REPO" bash "$SCRIPT_DIR/verify-resubmission-static.sh")"
+echo "$STATIC_OUT"
+SP=$(printf '%s\n' "$STATIC_OUT" | sed -n 's/.*STATIC_RESULT PASS=\([0-9]*\) FAIL=\([0-9]*\).*/\1/p' | tail -1)
+SF=$(printf '%s\n' "$STATIC_OUT" | sed -n 's/.*STATIC_RESULT PASS=\([0-9]*\) FAIL=\([0-9]*\).*/\2/p' | tail -1)
+if [ -n "$SP" ] && [ -n "$SF" ]; then
+  PASS=$((PASS + SP)); FAIL=$((FAIL + SF))
+else
+  no "static-gate script did not report a STATIC_RESULT line (missing or unrunnable)"
+fi
+
 # --- demo-reviewer credential (NEVER hardcoded) ------------------------------
 # The password comes from the REVIEWER_PASSWORD env — keep it in your password
 # manager (it also goes into the App Store Connect review notes), never in the repo.
@@ -98,77 +113,6 @@ else
   no "/api/version ACAO = '${ACAO:-<missing>}' (deploy server fix: /api/version after CORS middleware)"
 fi
 
-# --- [2.3.8] icon: alpha-stripped, 1024 -------------------------------------
-hdr "[2.3.8] App icon"
-ICON="ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-512@2x.png"
-if [ -f "$ICON" ]; then
-  A=$(sips -g hasAlpha "$ICON" | awk '/hasAlpha/{print $2}')
-  W=$(sips -g pixelWidth "$ICON" | awk '/pixelWidth/{print $2}')
-  [ "$A" = "no" ] && [ "$W" = "1024" ] && ok "icon $W px, hasAlpha=$A" || no "icon W=$W hasAlpha=$A (want 1024 / no)"
-else no "icon file missing"; fi
-
-# --- build number must exceed the last shipped build ------------------------
-# The app is LIVE, so the old fixed ">=4" floor is meaningless (always passes).
-# App Store Connect rejects a duplicate CFBundleVersion within a marketing
-# version, so each submission MUST be strictly greater than the last one shipped.
-# Source of truth: ios/.last-shipped-build (the owner updates it after a
-# successful upload; `resubmit.sh` prints the reminder). Override via
-# LAST_SHIPPED_BUILD env for a one-off check.
-hdr "[build number — must exceed last shipped]"
-BN=$(grep -m1 'CURRENT_PROJECT_VERSION = ' ios/App/App.xcodeproj/project.pbxproj | grep -oE '[0-9]+' | head -1)
-# Read the WHOLE baseline file (stripping surrounding whitespace) — do NOT grep out
-# the first digit run. A malformed file like "build-25-old" must fail the `^[0-9]+$`
-# check below (fail closed), not silently parse to "25".
-if [ -f ios/.last-shipped-build ]; then
-  # Strip ONLY surrounding whitespace, never internal — a malformed "2 6" / "2\n6"
-  # must fail the ^[0-9]+$ check below (fail closed), not silently parse to "26".
-  FILE_LAST=$(<ios/.last-shipped-build)
-  FILE_LAST="${FILE_LAST#"${FILE_LAST%%[![:space:]]*}"}"
-  FILE_LAST="${FILE_LAST%"${FILE_LAST##*[![:space:]]}"}"
-else
-  FILE_LAST=""
-fi
-LAST="${LAST_SHIPPED_BUILD:-${FILE_LAST:-}}"
-# Validate both integers before the numeric compare. BN comes from a parsed
-# pbxproj; LAST can come from a hand-set LAST_SHIPPED_BUILD env or a garbled
-# baseline file. A non-numeric value must FAIL the gate — not skew `-gt` (which
-# errors/misbehaves on non-ints) or slip through a `${x:-0}` default.
-if ! [[ "${BN:-}" =~ ^[0-9]+$ ]]; then
-  no "could not parse a numeric CURRENT_PROJECT_VERSION from pbxproj (got '${BN:-<empty>}')"
-elif [ -z "${LAST:-}" ]; then
-  # Fail CLOSED. The app is LIVE, so a missing baseline is a misconfiguration,
-  # not a first submission — without it the "must exceed last shipped" rule can't
-  # be evaluated, and passing anyway could wave a duplicate CFBundleVersion through.
-  no "no last-shipped baseline (ios/.last-shipped-build absent and LAST_SHIPPED_BUILD unset) — record the last build uploaded to App Store Connect there before archiving"
-elif ! [[ "$LAST" =~ ^[0-9]+$ ]]; then
-  no "last-shipped baseline is not a number (got '$LAST') — fix ios/.last-shipped-build or the LAST_SHIPPED_BUILD env"
-elif [ "$BN" -gt "$LAST" ]; then
-  ok "build $BN > last shipped $LAST"
-else
-  no "build ${BN} must be > last shipped $LAST — bump first: pnpm resubmit  (then update ios/.last-shipped-build after upload)"
-fi
-
-# --- no literal CFBundleVersion in any SOURCE bundle plist (app + extensions) ----
-# Every app/extension Info.plist must derive CFBundleVersion from $(CURRENT_PROJECT_VERSION).
-# A literal integer (e.g. the VetTrackControl widget) desyncs from the app the moment
-# resubmit.sh's global build bump runs → ITMS-90473 upload rejection. Scoped to
-# git-TRACKED plists so build output (xcarchive / DerivedData / vendored frameworks,
-# all gitignored — their literal versions are correct and not ours) is never flagged.
-hdr "[no literal CFBundleVersion in source bundle plists]"
-LITERAL_PLISTS=""
-while IFS= read -r plist; do
-  [ -f "$plist" ] || continue
-  val=$(grep -A1 '<key>CFBundleVersion</key>' "$plist" 2>/dev/null | sed -n '2p' | tr -d '[:space:]')
-  case "$val" in
-    *'<string>'[0-9]*) LITERAL_PLISTS="$LITERAL_PLISTS ${plist}=${val}" ;;
-  esac
-done < <(git ls-files ios/App 2>/dev/null | grep -E '/Info\.plist$')
-if [ -z "$LITERAL_PLISTS" ]; then
-  ok "all source bundle Info.plist CFBundleVersion values reference \$(CURRENT_PROJECT_VERSION)"
-else
-  no "literal CFBundleVersion in:$LITERAL_PLISTS — set to \$(CURRENT_PROJECT_VERSION) so the build bump can't desync an extension"
-fi
-
 # --- bundled shell + native clerk chunk -------------------------------------
 hdr "[bundled shell]"
 B=$(python3 -c "import json;c=json.load(open('ios/App/App/capacitor.config.json'));print('server' not in c or not c.get('server',{}).get('url'))" 2>/dev/null)
@@ -203,15 +147,7 @@ else
   no "bundled assets dir missing — run ./scripts/build-native-shell.sh"
 fi
 
-# --- Control widget files ---------------------------------------------------
-hdr "[Control widget]"
-for f in ios/App/VetTrackControl/VetTrackScanControl.swift \
-         ios/App/VetTrackControl/AppIntent+OpenScan.swift \
-         ios/App/VetTrackControl/VetTrackControl.swift; do
-  [ -f "$f" ] && ok "$(basename "$f") present" || no "$(basename "$f") MISSING"
-done
-
-# --- AASA live + entitlements -----------------------------------------------
+# --- AASA live (entitlements check moved to verify-resubmission-static.sh) ---
 hdr "[AASA + entitlements]"
 if curl -sS https://vettrack.uk/.well-known/apple-app-site-association -o "$TMP/aasa.json" 2>/dev/null; then
   python3 -c "
@@ -227,8 +163,6 @@ sys.exit(0 if has_app and has_path else 1)
 else
   no "AASA curl failed"
 fi
-grep -q 'applinks:vettrack.uk' ios/App/App/App.entitlements \
-  && ok "entitlements applinks:vettrack.uk" || no "entitlements missing applinks:vettrack.uk"
 
 # --- summary ----------------------------------------------------------------
 echo; echo "============================================"
