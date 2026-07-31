@@ -5654,10 +5654,11 @@ nor a network route to vettrack.uk.
   signatures are therefore now verified as valid, on iOS deployment target 15.0.
 
 **Not done (disclosed):** the lock itself (M9), write → read-back → `nfc_tag_id` (M10), and
-background scan all require an **NTAG215 tag**, which the owner does not have — that single item is
-now the only blocker for the remaining iOS rows. Also open: on-device code signing against the
-amended `App.entitlements` (the only proof the App ID carries the NFC + Associated Domains
-capabilities), and **F5** — whether the in-app NFC sheet opens now that `NDEF` was added. Android
-rows and the Web NFC external-record branch stay deferred: no Android hardware.
+background scan all require an **NTAG215 tag**, which the owner does not have — that is the only
+*hardware*-dependent blocker for the remaining iOS rows. Two more release gates stay open,
+independently of the tag: on-device code signing against the amended `App.entitlements` (the only
+proof the App ID carries the NFC + Associated Domains capabilities), and **F5** — whether the
+in-app NFC sheet opens now that `NDEF` was added. Android rows and the Web NFC external-record
+branch stay deferred: no Android hardware.
 
 **Verdict:** VERIFIED for row 7 and for Swift compilation. M9/M10 remain DEFERRED, not claimed.

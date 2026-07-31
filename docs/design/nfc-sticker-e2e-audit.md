@@ -58,6 +58,9 @@ cache-buster the client adds; a static timestamp on a locked tag would be meanin
 
 ## Client routing (the one real code gap)
 
+> **Status: closed** (see "Implementation status" above — landed via #86 before this phase
+> executed). Kept below as the original design rationale, not a pending instruction.
+
 `deep-link-router.ts` today handles `vettrack://` hosts only. Universal/App Links arrive through the
 same `@capacitor/app` `appUrlOpen` event but as `https://vettrack.uk/...` URLs. Change: extend the
 router to map `https://vettrack.uk/equipment/<id>` (+ params passthrough) to the exact same
@@ -79,6 +82,10 @@ params as the custom-scheme equivalent; unknown hosts/paths untouched. The equip
   endpoints return 200, correct content-type, no redirect.
 
 ## iOS (build 27)
+
+> **Status: closed** — the applinks entitlement + AASA route were already present (see
+> "Implementation status" above). Kept below as the original design rationale, not a pending
+> instruction.
 
 Add the Associated Domains capability with `applinks:vettrack.uk` to the app target (entitlements
 file + App ID capability in the developer portal). Background-reading constraints acknowledged and

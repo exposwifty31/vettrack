@@ -20,8 +20,8 @@ which needs hardware this session did not have.
 
 - Owner decisions (2026-07-30): audit **and** close the gaps; hardware available is a
   **physical iPhone only** — no Android device, no NTAG215 stickers confirmed in hand.
-- That constraint is why the iOS lock was mandatory rather than optional: the plugin
-  implements locking on Android only, so an iPhone-only operator had no path at all.
+- That constraint is why the iOS lock was mandatory rather than optional: before this wave
+  the plugin implemented locking on Android only, so an iPhone-only operator had no path at all.
 
 ## What existed before this wave (verified first-hand)
 
@@ -136,7 +136,8 @@ Still open, in order:
 3. Universal Link from a pasted `https://vettrack.uk/equipment/<id>?nfcAction=toggle` — no sticker
    needed; a sticker is only a carrier for that URL.
 4. **Blocked on one missing item, an NTAG215 tag** — M9 (real lock + refused re-write), M10
-   (write → read back → `nfc_tag_id` populated), and background scan. Nothing else is blocked.
+   (write → read back → `nfc_tag_id` populated), and background scan. NTAG215 is the only
+   *hardware* blocker; F5 and code signing above are separate, still-open release gates.
 5. Android rows and the Web NFC branch stay deferred to the tester fleet.
 
 Screenshots per the house format (Screenshot → Expected → Actual → Pass/Fail) into
