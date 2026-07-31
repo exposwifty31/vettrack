@@ -656,6 +656,7 @@ const translations = {
     lockSuccess: d.equipmentNfc.lockSuccess,
     lockAlreadyLocked: d.equipmentNfc.lockAlreadyLocked,
     lockFailed: d.equipmentNfc.lockFailed,
+    lockTimeout: d.equipmentNfc.lockTimeout,
     lockUnsupported: d.equipmentNfc.lockUnsupported,
     alreadyToggledRecently: d.equipmentNfc.alreadyToggledRecently,
     toggling: (name: string) => tr(d.equipmentNfc.toggling, { name }),

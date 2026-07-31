@@ -22,6 +22,9 @@ interface EquipmentDetailToolsSheetProps {
   showWhatsApp: boolean;
   showWriteNfc: boolean;
   showLockNfc: boolean;
+  /** True while a write scan is in flight — disables the trigger so a second,
+   * concurrent write + bind attempt can't be started mid-scan. */
+  writeNfcPending?: boolean;
   /** True while a lock scan is in flight — disables the trigger so a second,
    * concurrent (irreversible) lock attempt can't be started mid-scan. */
   lockNfcPending?: boolean;
@@ -37,6 +40,7 @@ export function EquipmentDetailToolsSheet({
   showWhatsApp,
   showWriteNfc,
   showLockNfc,
+  writeNfcPending = false,
   lockNfcPending = false,
 }: EquipmentDetailToolsSheetProps) {
   return (
@@ -53,8 +57,17 @@ export function EquipmentDetailToolsSheet({
             </Button>
           )}
           {showWriteNfc && onWriteNfc && (
-            <Button variant="outline" className="h-12 justify-start" onClick={onWriteNfc}>
-              <Nfc className="w-4 h-4 me-2" />
+            <Button
+              variant="outline"
+              className="h-12 justify-start"
+              onClick={onWriteNfc}
+              disabled={writeNfcPending}
+            >
+              {writeNfcPending ? (
+                <Loader2 className="w-4 h-4 me-2 animate-spin" />
+              ) : (
+                <Nfc className="w-4 h-4 me-2" />
+              )}
               {t.equipmentNfc.writeTag}
             </Button>
           )}

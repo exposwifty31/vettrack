@@ -3479,6 +3479,7 @@
     "lockSuccess": "המדבקה ננעלה לצמיתות",
     "lockAlreadyLocked": "המדבקה כבר הייתה נעולה",
     "lockFailed": "נעילת המדבקה נכשלה",
+    "lockTimeout": "לא זוהתה מדבקה — הצמידו את המדבקה לטלפון ונסו שוב",
     "lockUnsupported": "נעילה אינה נתמכת במכשיר זה",
     "alreadyToggledRecently": "בוצעה פעולה לאחרונה — המתן רגע.",
     "toggling": "מעביר {{name}}…",

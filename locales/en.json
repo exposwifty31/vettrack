@@ -3479,6 +3479,7 @@
     "lockSuccess": "Sticker locked permanently",
     "lockAlreadyLocked": "This sticker was already locked",
     "lockFailed": "Could not lock the sticker",
+    "lockTimeout": "No tag detected — hold the sticker to the phone and try again",
     "lockUnsupported": "Locking is not supported on this device",
     "alreadyToggledRecently": "Already toggled recently — please wait a moment.",
     "toggling": "Toggling {{name}}…",

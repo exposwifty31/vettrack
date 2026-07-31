@@ -93,4 +93,29 @@ describe("lockNfcTag — Android scan timeout + cleanup", () => {
     await expect(pending).rejects.toThrow("listener_registration_failed");
     expect(mockStopScanning).toHaveBeenCalledTimes(1);
   });
+
+  it("rejects a second concurrent call while a scan is already in flight, and allows a new one after cleanup", async () => {
+    let fireTag: (() => void) | undefined;
+    const removeListener = vi.fn().mockResolvedValue(undefined);
+    mockAddListener.mockImplementation(async (_event: string, cb: () => void) => {
+      fireTag = cb;
+      return { remove: removeListener };
+    });
+
+    const first = lockNfcTag();
+    await vi.waitFor(() => expect(mockStartScanning).toHaveBeenCalledTimes(1));
+
+    await expect(lockNfcTag()).rejects.toThrow("nfc_lock_busy");
+    // The second call never touched the native layer.
+    expect(mockStartScanning).toHaveBeenCalledTimes(1);
+
+    fireTag?.();
+    await expect(first).resolves.toEqual({ alreadyLocked: false });
+
+    // Once the first call's cleanup has run, the guard is released.
+    const second = lockNfcTag();
+    await vi.waitFor(() => expect(mockStartScanning).toHaveBeenCalledTimes(2));
+    fireTag?.();
+    await expect(second).resolves.toEqual({ alreadyLocked: false });
+  });
 });

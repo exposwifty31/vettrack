@@ -200,6 +200,7 @@ function EquipmentDetailPageDesktop() {
   const [toolsSheetOpen, setToolsSheetOpen] = useState(false);
   const [lockTagDialogOpen, setLockTagDialogOpen] = useState(false);
   const [isLockingTag, setIsLockingTag] = useState(false);
+  const [isWritingTag, setIsWritingTag] = useState(false);
   const [isNfcToggling, setIsNfcToggling] = useState(false);
 
   const [moveRoomOpen, setMoveRoomOpen] = useState(false);
@@ -923,37 +924,42 @@ function EquipmentDetailPageDesktop() {
       toast.error(t.equipmentNfc.writeUnsupported);
       return;
     }
-    let tagId: string | null;
+    setIsWritingTag(true);
     try {
-      // Payload (URL + AAR record) is owned by nfc-sticker-payload.ts — it must never be
-      // rebuilt from window.location.origin, which is capacitor://localhost in the shell.
-      tagId = await writeEquipmentStickerTag(equipmentId);
-    } catch (err) {
-      haptics.error();
-      toast.error(t.equipmentNfc.writeFailed(err instanceof Error ? err.message : undefined));
-      return;
-    }
+      let tagId: string | null;
+      try {
+        // Payload (URL + AAR record) is owned by nfc-sticker-payload.ts — it must never be
+        // rebuilt from window.location.origin, which is capacitor://localhost in the shell.
+        tagId = await writeEquipmentStickerTag(equipmentId);
+      } catch (err) {
+        haptics.error();
+        toast.error(t.equipmentNfc.writeFailed(err instanceof Error ? err.message : undefined));
+        return;
+      }
 
-    // The sticker is programmed; binding its UID is a second, independently
-    // failable step — a bind failure must not read as a write failure.
-    if (!tagId) {
-      haptics.scanSuccess();
-      toast.success(t.equipmentNfc.writeSuccess);
-      return;
-    }
-    try {
-      await api.equipment.update(equipmentId, { nfcTagId: tagId });
-      haptics.scanSuccess();
-      toast.success(t.equipmentNfc.writeSuccess);
-      invalidateAll();
-    } catch (err) {
-      haptics.error();
-      const conflict = err instanceof ApiError && err.payload.reason === "NFC_TAG_ALREADY_BOUND";
-      toast.error(
-        conflict
-          ? t.equipmentNfc.bindConflict
-          : t.equipmentNfc.bindFailed(err instanceof Error ? err.message : undefined),
-      );
+      // The sticker is programmed; binding its UID is a second, independently
+      // failable step — a bind failure must not read as a write failure.
+      if (!tagId) {
+        haptics.scanSuccess();
+        toast.success(t.equipmentNfc.writeSuccess);
+        return;
+      }
+      try {
+        await api.equipment.update(equipmentId, { nfcTagId: tagId });
+        haptics.scanSuccess();
+        toast.success(t.equipmentNfc.writeSuccess);
+        invalidateAll();
+      } catch (err) {
+        haptics.error();
+        const conflict = err instanceof ApiError && err.payload.reason === "NFC_TAG_ALREADY_BOUND";
+        toast.error(
+          conflict
+            ? t.equipmentNfc.bindConflict
+            : t.equipmentNfc.bindFailed(err instanceof Error ? err.message : undefined),
+        );
+      }
+    } finally {
+      setIsWritingTag(false);
     }
   }
 
@@ -968,7 +974,14 @@ function EquipmentDetailPageDesktop() {
     } catch (err) {
       haptics.error();
       const unsupported = err instanceof Error && err.message === "nfc_lock_unsupported";
-      toast.error(unsupported ? t.equipmentNfc.lockUnsupported : t.equipmentNfc.lockFailed);
+      const timedOut = err instanceof Error && err.message === "nfc_lock_timeout";
+      toast.error(
+        unsupported
+          ? t.equipmentNfc.lockUnsupported
+          : timedOut
+            ? t.equipmentNfc.lockTimeout
+            : t.equipmentNfc.lockFailed,
+      );
     } finally {
       setIsLockingTag(false);
     }
@@ -1976,6 +1989,7 @@ function EquipmentDetailPageDesktop() {
           showWhatsApp={showWhatsAppTools}
           showWriteNfc={showWriteNfc}
           showLockNfc={showWriteNfc}
+          writeNfcPending={isWritingTag}
           lockNfcPending={isLockingTag}
         />
       )}
