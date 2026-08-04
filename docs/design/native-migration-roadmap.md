@@ -1,8 +1,8 @@
 # Native Migration Roadmap (Phase 10 close-out · serves I.2)
 
-> **Purpose.** The North-Star destination is **three distinct apps** — a website (management console), a TV/big-screen app (the Command Center board), and a **full-native mobile/tablet app that is NOT a wrapped PWA** (program-plan I.2). This repo (`exposwifty31/vettrack`) is the production monolith (React web + Express + Capacitor shell). The native mobile implementation lives in the sibling repo **[`exposwifty31/literate-dollop`](https://github.com/exposwifty31/literate-dollop)** (Expo/React-Native app + `@vettrack/contracts` at `packages/contracts`, per `docs/MAINTENANCE_MODE.md`). This roadmap records **what the per-role-UX program deliberately made portable**, and a staged path (with cost/risk) for the downstream repo to consume it — not a greenfield rewrite.
+> **Purpose.** The North-Star destination is **three distinct apps** — a website (management console), a TV/big-screen app (the Command Center board), and a **full-native mobile/tablet app that is NOT a wrapped PWA** (program-plan I.2). This repo (`exposwifty31/vettrack`) is the production monolith (React web + Express + Capacitor shell). The native mobile implementation lives in the sibling repo **[`exposwifty31/VetTrack---RN-Migration-`](https://github.com/exposwifty31/VetTrack---RN-Migration-)** (Expo SDK 57 / React-Native app); `@vettrack/contracts` is authored **in-repo** at `packages/contracts/` (per `docs/MAINTENANCE_MODE.md`). This roadmap records **what the per-role-UX program deliberately made portable**, and a staged path (with cost/risk) for the downstream repo to consume it — not a greenfield rewrite.
 >
-> **Porting rule (from MAINTENANCE_MODE):** copy reference code from this repo into `literate-dollop`; do **not** delete the production Capacitor paths here until a future kill-switch decision. `@vettrack/contracts` is *consumed* here via a `github:` path dependency — authored there, parity-tested here.
+> **Porting rule (from MAINTENANCE_MODE):** copy reference code from this repo into `VetTrack---RN-Migration-`; do **not** delete the production Capacitor paths here until a future kill-switch decision. `@vettrack/contracts` is authored **in-repo** at `packages/contracts/` (pnpm `workspace:*`); the RN app consumes it and parity is tested here.
 
 ## Why this program lowered the native cost
 
@@ -17,7 +17,7 @@ The expensive part of going native is **re-deriving product logic that's tangled
 | **Offline/emergency doctrine** | `src/lib/offline-emergency-block.ts`, `sync-engine.ts`, offline-first invariants | The rules (Code Blue never queues offline; bounded telemetry; server-confirmed session end) are documented + tested, so the RN app re-implements against a spec, not a guess. |
 | **i18n contract** | `locales/{en,he}.json` + typed `t` + parity check | he-default + RTL is a data contract; the RN app reuses the locale files and the parity discipline. |
 
-## Staged path (downstream: `literate-dollop`)
+## Staged path (downstream: `VetTrack---RN-Migration-`)
 
 Each stage is independently valuable; stop at any point with a shippable result. Cost is rough engineer-weeks for the downstream agent, risk is the dominant unknown.
 

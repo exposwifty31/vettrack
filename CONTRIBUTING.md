@@ -7,7 +7,7 @@ configuration that is easy to get wrong.
 
 ## Development workflow
 
-**Maintenance mode:** see [`docs/MAINTENANCE_MODE.md`](docs/MAINTENANCE_MODE.md). Expo/RN work belongs in [`exposwifty31/literate-dollop`](https://github.com/exposwifty31/literate-dollop).
+**Maintenance mode:** see [`docs/MAINTENANCE_MODE.md`](docs/MAINTENANCE_MODE.md). Expo/RN work belongs in [`exposwifty31/VetTrack---RN-Migration-`](https://github.com/exposwifty31/VetTrack---RN-Migration-).
 
 **Git remote:** `origin` → GitHub (`github.com/exposwifty31/vettrack`). Push PRs to `origin` only. Setup: [`docs/devops/github-setup.md`](docs/devops/github-setup.md).
 

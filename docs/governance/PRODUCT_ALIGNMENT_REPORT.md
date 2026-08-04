@@ -1,5 +1,7 @@
 # VetTrack — Product Alignment Report
 
+> ⚠️ **Superseded (Expo/RN row) — describes the retired cross-repo model.** The `Expo/RN (literate-dollop)` line reflects the old model where `@vettrack/contracts` was authored in a separate repo and "only consumed here." That model is gone: `@vettrack/contracts` is now **authored in-repo** at [`packages/contracts/`](../../packages/contracts) (pnpm `workspace:*`, since 2026-07-11), and the RN successor app lives in [`exposwifty31/VetTrack---RN-Migration-`](https://github.com/exposwifty31/VetTrack---RN-Migration-) (Expo SDK 57 / CNG, public). Kept as a historical record.
+
 **Phase:** 2 — Product Alignment Audit  
 **Generated:** 2026-06-18  
 **Governor:** Product Engineering Governor  

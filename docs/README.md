@@ -15,7 +15,7 @@ Entry point for engineers, operators, and agents. **Canonical remote:** GitHub `
 | [../TASKS.md](../TASKS.md) | Task queue and acceptance criteria |
 | [CONVENTIONS.md](./CONVENTIONS.md) | Naming, patterns, error handling |
 | [**scope-change-2026.md**](./scope-change-2026.md) | **Required** — removed features (migrations 142–143), redirects |
-| [MAINTENANCE_MODE.md](./MAINTENANCE_MODE.md) | Repo vs literate-dollop; ship lane; Capacitor 1.0.1 |
+| [MAINTENANCE_MODE.md](./MAINTENANCE_MODE.md) | Repo vs the RN successor repo; ship lane; Capacitor 1.0.1 |
 | [testing-guide.md](./testing-guide.md) | Test suites, exclusions, when to run what |
 | [../BUG_REGISTER.md](../BUG_REGISTER.md) | Known defects |
 
@@ -132,7 +132,7 @@ Consult before extending existing surfaces. Update in phase PRs.
 | [legal-pages.md](./legal-pages.md) | Privacy / terms / support |
 | [account-deletion.md](./account-deletion.md) | In-app account deletion (5.1.1(v)) |
 
-Expo/RN work: [`exposwifty31/literate-dollop`](https://github.com/exposwifty31/literate-dollop) — see [governance/LITERATE_DOLLOP_PARITY_REPORT.md](./governance/LITERATE_DOLLOP_PARITY_REPORT.md).
+Expo/RN work: [`exposwifty31/VetTrack---RN-Migration-`](https://github.com/exposwifty31/VetTrack---RN-Migration-). (Historical cross-repo parity audit of the retired `literate-dollop`: [governance/LITERATE_DOLLOP_PARITY_REPORT.md](./governance/LITERATE_DOLLOP_PARITY_REPORT.md).)
 
 ---
 
@@ -144,7 +144,7 @@ Expo/RN work: [`exposwifty31/literate-dollop`](https://github.com/exposwifty31/l
 | [governance/PRODUCT_ALIGNMENT_REPORT.md](./governance/PRODUCT_ALIGNMENT_REPORT.md) | Product/engineering alignment audit |
 | [governance/PRODUCT_DRIVEN_IMPROVEMENT_PLAN.md](./governance/PRODUCT_DRIVEN_IMPROVEMENT_PLAN.md) | Prioritized improvement plan (⚠️ some rows pre–GitHub-only cleanup) |
 | [governance/ENGINEERING_FRICTION_REPORT.md](./governance/ENGINEERING_FRICTION_REPORT.md) | Engineering friction inventory |
-| [governance/EXPO_AGENT_BRIEF.md](./governance/EXPO_AGENT_BRIEF.md) | Cross-repo brief for literate-dollop agents |
+| [governance/EXPO_AGENT_BRIEF.md](./governance/EXPO_AGENT_BRIEF.md) | Cross-repo mobile brief (superseded — describes the retired `literate-dollop` model) |
 | [governance/REPO_CLEANUP_MANIFEST.md](./governance/REPO_CLEANUP_MANIFEST.md) | Repo hygiene (KEEP / UPDATE / DELETE) |
 | [engineering-rules-rollout.md](./engineering-rules-rollout.md) | Cursor rules rollout summary |
 

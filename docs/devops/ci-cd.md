@@ -42,10 +42,10 @@ Maintenance scope: [`docs/MAINTENANCE_MODE.md`](../MAINTENANCE_MODE.md)
 
 `scripts/ci/contracts-gate.sh`:
 
-- `pnpm run contracts:typecheck` (`@vettrack/contracts` from literate-dollop)
+- `pnpm run contracts:typecheck` (`@vettrack/contracts`, authored in-repo at `packages/contracts/`)
 - `tests/offline-phase-7-emergency-surface-parity.test.ts`
 
-Shared types are authored in [`exposwifty31/literate-dollop`](https://github.com/exposwifty31/literate-dollop); this repo consumes and validates parity only.
+Shared types are authored **in-repo** at [`packages/contracts/`](../../packages/contracts) (pnpm `workspace:*`); CI type-checks them and validates emergency-surface parity here. The RN successor app ([`exposwifty31/VetTrack---RN-Migration-`](https://github.com/exposwifty31/VetTrack---RN-Migration-)) consumes them.
 
 ---
 
