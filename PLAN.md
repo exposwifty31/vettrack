@@ -73,7 +73,7 @@ Agents execute **plan cards**, not free-form interpretations of this file. Card 
 - WebSockets or polling as a realtime transport (SSE is frozen)
 - Offline queueing of Code Blue / emergency mutations
 - Appointment → task renames of internal surfaces (only copy changed)
-- Any work in the external RN mobile repo (separate **public** repo `exposwifty31/VetTrack---RN-Migration-`; the old `literate-dollop` was retired/deleted — verified 2026-07-28)
+- Any work in the external RN mobile repo (separate **public** repo `exposwifty31/VetTrack---RN-Migration-`; `literate-dollop` is retired as the active target, while its physical delete-versus-archive decision remains open — see `docs/plans/master-plan-2026-07.md` Layer 4)
 - Phase 4 parked items until entry conditions clear: **massive-03** (clinic network), **medium-04** (copilot/voice)
 - Starting Phase 1+ before Phase 0 exit drill (T-16) passes
 
