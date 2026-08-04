@@ -144,7 +144,7 @@ Expo/RN work: [`exposwifty31/VetTrack---RN-Migration-`](https://github.com/expos
 | [governance/PRODUCT_ALIGNMENT_REPORT.md](./governance/PRODUCT_ALIGNMENT_REPORT.md) | Product/engineering alignment audit |
 | [governance/PRODUCT_DRIVEN_IMPROVEMENT_PLAN.md](./governance/PRODUCT_DRIVEN_IMPROVEMENT_PLAN.md) | Prioritized improvement plan (⚠️ some rows pre–GitHub-only cleanup) |
 | [governance/ENGINEERING_FRICTION_REPORT.md](./governance/ENGINEERING_FRICTION_REPORT.md) | Engineering friction inventory |
-| [governance/EXPO_AGENT_BRIEF.md](./governance/EXPO_AGENT_BRIEF.md) | Cross-repo brief for literate-dollop agents |
+| [governance/EXPO_AGENT_BRIEF.md](./governance/EXPO_AGENT_BRIEF.md) | Cross-repo mobile brief (superseded — describes the retired `literate-dollop` model) |
 | [governance/REPO_CLEANUP_MANIFEST.md](./governance/REPO_CLEANUP_MANIFEST.md) | Repo hygiene (KEEP / UPDATE / DELETE) |
 | [engineering-rules-rollout.md](./engineering-rules-rollout.md) | Cursor rules rollout summary |
 

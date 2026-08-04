@@ -1,5 +1,7 @@
 # VetTrack — Product-Driven Improvement Plan
 
+> ⚠️ **Superseded (mobile / cross-repo sections) — describe the retired cross-repo model.** Written when `@vettrack/contracts` was authored in a **separate** repo (`literate-dollop`) and flowed to `vettrack` via a `github:` path dependency plus cross-repo bump discipline. That model is gone: `@vettrack/contracts` is now **authored in-repo** at [`packages/contracts/`](../../packages/contracts) (pnpm `workspace:*`, since 2026-07-11), and the RN successor app lives in [`exposwifty31/VetTrack---RN-Migration-`](https://github.com/exposwifty31/VetTrack---RN-Migration-) (Expo SDK 57 / CNG, public). The `literate-dollop` / Horizon H1–H7 content below is kept as a historical record — do not follow its cross-repo routing as active guidance.
+
 > **Obsolete GitLab references (2026-07-07):** P0-1 (GitLab sync) and P0-3 (GitLab CI) are closed — GitHub is canonical. `GITHUB_GOVERNANCE.md` and `GITLAB_DEVELOPMENT.md` removed. Ignore GitLab items below.
 
 **Phase:** 6 — Prioritized Improvement Plan  
