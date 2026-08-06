@@ -110,10 +110,23 @@ describe("use-auth session bootstrap wiring", () => {
 
 describe("clerkMiddleware authorized parties", () => {
   const serverIndex = fs.readFileSync(path.join(ROOT, "server/index.ts"), "utf8");
+  const clerkSessionAuth = fs.readFileSync(
+    path.join(ROOT, "server/lib/clerk-session-auth.ts"),
+    "utf8",
+  );
 
-  it("allows Capacitor shell origins during Clerk JWT verification", () => {
-    expect(serverIndex).toContain("authorizedParties: resolveClerkAuthorizedParties(isProduction)");
-    expect(serverIndex).toContain('from "./lib/clerk-authorized-parties.js"');
+  it("does NOT pass authorizedParties to clerkMiddleware (backend 3.x rejects absent azp — kills native tokens)", () => {
+    // The azp allowlist moved app-side (PR #169): @clerk/backend 3.x throws
+    // token-invalid-authorized-parties when azp is ABSENT and the option is set,
+    // which 401s every native Expo/RN session token (they carry no azp).
+    expect(serverIndex).not.toContain("authorizedParties: resolveClerkAuthorizedParties");
+    expect(serverIndex).toContain("app.use(clerkMiddleware())");
+  });
+
+  it("enforces the azp allowlist app-side with skip-if-absent semantics (Capacitor origins still guarded)", () => {
+    expect(clerkSessionAuth).toContain("isAzpAllowed");
+    expect(clerkSessionAuth).toContain("resolveClerkAuthorizedParties");
+    expect(clerkSessionAuth).toContain("CLERK_AZP_REJECTED");
   });
 
   it("mounts clerkMiddleware via shouldMountClerkMiddleware (Railway production safety)", () => {
