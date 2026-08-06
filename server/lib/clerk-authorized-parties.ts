@@ -65,3 +65,20 @@ export function resolveClerkAuthorizedParties(isProduction: boolean): string[] {
 
   return Array.from(parties);
 }
+
+/**
+ * App-level `azp` gate that restores @clerk/backend 1.x semantics.
+ *
+ * Native Expo/RN session tokens are minted with NO `azp` claim (there is no
+ * browser origin to attest). @clerk/backend 3.x rejects an absent `azp` when
+ * `authorizedParties` is passed to `clerkMiddleware`, which 401s every native
+ * token. Enforcement therefore moved here: an ABSENT azp is allowed (the token
+ * signature is already verified against the instance JWKS); a PRESENT azp must
+ * be in the allowlist — browser/WebView tokens always carry one, so the
+ * cross-origin token-reuse defence is unchanged for them.
+ */
+export function isAzpAllowed(azp: unknown, authorizedParties: readonly string[]): boolean {
+  if (authorizedParties.length === 0) return true;
+  if (!azp) return true;
+  return typeof azp === "string" && authorizedParties.includes(azp);
+}
