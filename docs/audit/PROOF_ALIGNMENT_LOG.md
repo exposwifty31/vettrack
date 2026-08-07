@@ -5714,3 +5714,39 @@ outside-diff), and confirmed a clean incremental re-review with no new comments.
 **Verdict:** VERIFIED (docs wording, TS/i18n fixes, full test suite, CI green, genuine CodeRabbit
 re-review). PARTIAL for the Swift `deinit`/reentrancy-guard edit specifically — logically applied
 from CodeRabbit's own suggested diff, not locally compiled.
+
+---
+
+## 2026-08-07 — fix(auth): native Clerk tokens 401'd — azp skip-if-absent restored (PR #169)
+
+**Claim:** every native (Expo/RN) Clerk session token gets 401 `MISSING_AUTH_USER` from prod
+`/api/users/me`; root cause is a @clerk/backend 1.x→3.x behavior change in `authorizedParties`
+enforcement (absent `azp` went from skipped to rejected); fix = enforce app-side with
+skip-if-absent semantics.
+
+**Evidence (all commands run this session):**
+- Repro on-device: RN release build on physical Pixel 7 signed in via Clerk (the App-Review test account,
+  SignInScreen showed `מחובר` + "azp absent"), yet ApiSmokeScreen `GET /api/users/me` rendered
+  `UNAUTHORIZED` (screenshot captured via adb).
+- Repro off-device (deterministic): `POST https://clerk.vettrack.uk/v1/client/sign_ins?_is_native=1`
+  → `status: complete`; minted session JWT via `/v1/client/sessions/<id>/tokens?_is_native=1` —
+  decoded claims: `azp` ABSENT, `iss https://clerk.vettrack.uk`, `v: 2` (also observed
+  `org_id: "{{org_…}}"` template-literal artifact — reported to owner separately).
+  `curl https://vettrack.uk/api/users/me -H "Authorization: Bearer <jwt>"` → HTTP 401
+  `{"error":"UNAUTHORIZED","reason":"MISSING_AUTH_USER"}`.
+- Bisect with the server's EXACT dependency (`@clerk/express@2.1.41` resolves
+  `@clerk/backend@3.11.5` in pnpm store): local `verifyToken(jwt, { jwtKey: <JWKS pem> })` →
+  `VERIFY OK`; same call + `authorizedParties: […]` → `VERIFY FAILED —
+  token-invalid-authorized-parties | Invalid JWT Authorized party claim (azp) undefined`.
+- Source check `@clerk/backend@3.11.5` `dist/chunk-7MALS3EJ.mjs:189-199`:
+  `if (!azp || !authorizedParties.includes(azp)) throw` — vs 1.x semantics (skip when absent).
+  This INVALIDATES the G1 "azp deflation" (based on 1.34.0).
+- Fix verified: `pnpm test -- tests/clerk-authorized-parties.test.ts` RED first (5 failed —
+  helper absent) → GREEN after implementation (8 passed). `pnpm typecheck:server` clean.
+- PR #169 opened (`fix/native-token-azp-absent`, commit fc4cf0696).
+
+**Not verified yet:** post-merge prod behavior (the same curl repro must return 200 after the
+Railway deploy) — gated on owner merge.
+
+**Verdict:** VERIFIED (root cause + fix, deterministic repro at every layer); prod confirmation
+pending deploy.
