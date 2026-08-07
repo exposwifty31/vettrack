@@ -1,6 +1,9 @@
 FROM node:22-alpine
 
-RUN npm install -g pnpm
+# Pin to package.json's `packageManager` — an unpinned install grabs the latest
+# pnpm (10.x), which rejects the v9 lockfile ("Cannot verify the identity of the
+# @pnpm/exe.linux-x64 native binary") and has broken every main deploy since 2026-08-04.
+RUN npm install -g pnpm@9.15.9
 
 WORKDIR /app
 
