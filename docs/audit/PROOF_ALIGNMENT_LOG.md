@@ -5750,3 +5750,49 @@ Railway deploy) — gated on owner merge.
 
 **Verdict:** VERIFIED (root cause + fix, deterministic repro at every layer); prod confirmation
 pending deploy.
+
+## 2026-08-07 — fix(tasks): hierarchical task RBAC in canPerformTaskAction (branch fix/task-rbac-hierarchy)
+
+**Claim:** Fixed the hierarchy-broken task RBAC table: vet/senior_technician/lead_technician now hold
+all 7 task actions (previously vet/senior lacked start/complete; lead_technician had NOTHING),
+vet_tech aligned to its tier-20 peer technician (read+start+complete; previously NOTHING), student
+and unknown/legacy roles unchanged (deny all). Only the role table changed — no ownership invariants,
+no enforcement files, no queries, no audit kinds.
+
+**Evidence (all observed this session, in worktree /Users/dan/vettrack-wt-task-rbac @ base f6e68f9f7):**
+- `server/lib/task-rbac.ts:21-51` — table now grants all 7 actions to vet|senior_technician|lead_technician,
+  read/start/complete to technician|vet_tech; explicit action enumeration kept (deny-by-default for future actions).
+- RED: `pnpm vitest run tests/task-rbac.test.ts` BEFORE the change → `18 failed | 37 passed (55)`
+  (failing exactly on the new-policy cells). GREEN after → `55 passed (55)`.
+- All 13 task-assignment/appointments suites → 1 expected casualty
+  (`tests/authority-task-assignment-wiring-enforce.test.ts` vet-acknowledge case, which asserted the
+  OLD table as rationale for the startTask bypass guard); updated to assert new policy + added a
+  student-target case preserving the wiring-level TARGET_ROLE_NOT_PERMITTED path → rerun `136 passed`
+  → final combined run `2 passed (2) / 64 passed (64)`.
+- `pnpm typecheck` (tsc frontend + tsconfig.server.json) → clean exit, 0 errors.
+- Full `pnpm test` → `Tests 20 failed | 6206 passed | 11 skipped (6237)`, `Test Files 4 failed | 695 passed (699)`.
+  All 20 failures in tests/shift-handover-{generator,observed,patient-worklist,surface} with
+  `Caused by: error: column "signup_join_code" of relation "vt_clinics" does not exist` (Postgres 42703,
+  stale local DB missing the ADR-007 migration). Causality proven: `git stash -u` → rerun of those 4 files
+  on the CLEAN base → `20 failed | 22 passed (42)` with the identical error → `git stash pop` (changes restored,
+  verified via git status). Zero failures attributable to this change.
+- Frozen-surface check: `grep -rn canPerformTaskAction server/` → only task routes + task-assignment.evaluator
+  import it; `stale-task-ownership.evaluator.ts` does NOT (read directly — no task-rbac import; isolation header
+  confirms sibling isolation). Nothing under server/lib/authority/enforcement/ modified
+  (`git status --porcelain` → only server/lib/task-rbac.ts + 2 test files).
+- Ownership gates intact: `server/services/appointments.service.ts:1176,1292` — canBypassOwnership still
+  admin|vet|senior_technician (read this session, untouched).
+- Alias-role runtime path verified: `server/lib/role-resolution.ts:317-322` returns raw secondaryRole
+  (e.g. lead_technician/vet_tech) as effectiveRole when it outranks primary; `server/middleware/auth.ts:50-59`
+  ROLE_HIERARCHY carries lead_technician:22 / vet_tech:20.
+- Web-client check: `src/pages/Tasks.tsx:395` redirects students to /equipment (no student task UI → no read
+  grant needed); `src/pages/tasks/task-utils.tsx:294` canStartTask + `:314` completeButtonState already render
+  Start/Complete for vet/admin/self-assigned — server 403s they hit today are fixed by this widening, no client change.
+- CCG gates: verify-security on server/lib/task-rbac.ts → pass, 0 findings (dir-wide scan: findings only in
+  unrelated pre-existing files); verify-change → pass (3 files, INFO-only); verify-quality → pass, no
+  task-rbac findings. (Session deviation: skills registered under the ccg: plugin namespace here — bare
+  `verify-security` returned Unknown skill; ran ccg:verify-security etc.)
+
+**Verdict:** VERIFIED (RED→GREEN matrix, typecheck, full suite with base-comparison triage of the 20
+pre-existing environmental failures). Not verified: live-server/DB-integration excluded groups (no local
+DB at current schema; failures above are that same environmental gap, present on base).

@@ -199,19 +199,45 @@ describe("PR 3.4 wiring — enforce mode", () => {
     ).resolves.toBeUndefined();
   });
 
-  it("vet acknowledging non-medication task: the helper itself WOULD deny (proves the startTask bypass guard is correct)", async () => {
-    // This documents the rationale for the canBypassOwnership guard in
-    // startTask: if vet/senior_tech are subjected to the evaluator on a
-    // non-medication task, the evaluator's target-role check uses
-    // canPerformTaskAction(role, "task.start"), which returns false for vet
-    // (only technician + admin). This would regress the pre-PR-3.4 path
-    // where vet/senior_tech could start non-medication tasks via
-    // canBypassOwnership. The startTask wiring therefore exempts bypass
-    // roles entirely. This test asserts the regression case the bypass
-    // guard prevents.
+  it("vet acknowledging non-medication task: allowed under hierarchical RBAC (2026-08-07 policy)", async () => {
+    // HISTORY: before the 2026-08-07 hierarchical-RBAC fix,
+    // canPerformTaskAction("vet", "task.start") returned false, so this
+    // exact context was the regression case that justified the
+    // canBypassOwnership guard in startTask (supervisors had to be exempted
+    // from the evaluator or vet startTask would 403 in enforce mode).
+    // Under the hierarchical policy vets can task.start, so the evaluator's
+    // target-role check now permits a vet target. The bypass guard in
+    // startTask REMAINS (unchanged) for its ownership-override semantics:
+    // supervisors override ownership rather than acquiring it.
     targetRows.next = {
       id: "vet-1",
       role: "vet",
+      clinicId: "clinic-1",
+      status: "active",
+      deletedAt: null,
+    };
+    await expect(
+      applyTaskAssignmentEvaluator({
+        clinicId: "clinic-1",
+        actor: { userId: "vet-1", email: "v@e", role: "vet" },
+        targetUserId: "vet-1",
+        transition: "acknowledge",
+        taskType: "maintenance", // non-medication
+        currentAcknowledgedUserId: null,
+        currentStatus: "approved",
+      }),
+    ).resolves.toBeUndefined();
+  });
+
+  it("student self-acknowledge: the helper still denies TARGET_ROLE_NOT_PERMITTED through the wiring", async () => {
+    // Preserves the wiring-level coverage the old vet-target test provided:
+    // the evaluator's target-role check (canPerformTaskAction(role,
+    // "task.start")) still fires through applyTaskAssignmentEvaluator for a
+    // role with no task.start grant. Students hold no task permissions under
+    // the hierarchical policy.
+    targetRows.next = {
+      id: "student-1",
+      role: "student",
       clinicId: "clinic-1",
       status: "active",
       deletedAt: null,
@@ -220,8 +246,8 @@ describe("PR 3.4 wiring — enforce mode", () => {
     try {
       await applyTaskAssignmentEvaluator({
         clinicId: "clinic-1",
-        actor: { userId: "vet-1", email: "v@e", role: "vet" },
-        targetUserId: "vet-1",
+        actor: { userId: "student-1", email: "s@e", role: "student" },
+        targetUserId: "student-1",
         transition: "acknowledge",
         taskType: "maintenance", // non-medication
         currentAcknowledgedUserId: null,
