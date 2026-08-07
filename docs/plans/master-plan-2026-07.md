@@ -1342,6 +1342,10 @@ recommendation) before The Architect writes the actual ADR. ADR-008 must also fo
 the owner's later decision) — respecting the scope-gate script's grep contract when editing that file. The
 literate-dollop delete-vs-archive decision and the "lessons learned" note remain flagged as needing their
 own explicit confirmation at execution time — not bundled into any other approval.
+**Status (2026-08-04):** the *documentation* reconciliation of stale `literate-dollop` references (routing
+them to the successor `exposwifty31/VetTrack---RN-Migration-` and to the in-repo `packages/contracts/`) is
+**done — owner sign-off given** — via a dedicated docs PR. The physical delete-vs-archive of the
+`literate-dollop` repo itself remains the still-open, separately-confirmed decision.
 
 **Layer 5 — Bare-RN migration (new repo), reshaped as a staged, deployment-terminated migration program.**
 This is the owner's core directive for this layer: it is an actual migration ending in shipped software,

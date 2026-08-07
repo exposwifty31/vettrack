@@ -18,11 +18,11 @@ This repository is the **production monolith**: React web app, Express API, Post
 | Work | Where |
 |------|--------|
 | Expo / React Native app | [`exposwifty31/VetTrack---RN-Migration-`](https://github.com/exposwifty31/VetTrack---RN-Migration-) |
-| Horizon 1+ mobile implementation | the successor-repo agent runbook |
+| Horizon 1+ mobile implementation | `VetTrack---RN-Migration-` agent runbook |
 
 `@vettrack/contracts` is now authored **in this repo** at [`packages/contracts/`](../packages/contracts) — see [Contracts package](#contracts-package) below.
 
-**Porting rule:** copy reference code from this repo into VetTrack---RN-Migration-; do not delete production Capacitor paths here until Phase 6 kill-switch (future product decision).
+**Porting rule:** copy reference code from this repo into `VetTrack---RN-Migration-`; do not delete production Capacitor paths here until Phase 6 kill-switch (future product decision).
 
 **Product scope:** ER/patient, medication tasks, and formulary were removed June 2026 — [`docs/scope-change-2026.md`](scope-change-2026.md).
 

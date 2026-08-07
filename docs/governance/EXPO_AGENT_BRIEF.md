@@ -1,5 +1,7 @@
 # Expo Agent Brief — VetTrack Governance → literate-dollop
 
+> ⚠️ **Superseded — describes the retired cross-repo model.** Written when `@vettrack/contracts` was authored in a **separate** repo (`literate-dollop`) and flowed to `vettrack` via a `github:` path dependency plus cross-repo bump discipline. That model is gone: `@vettrack/contracts` is now **authored in-repo** at [`packages/contracts/`](../../packages/contracts) (pnpm `workspace:*`, since 2026-07-11), and the RN successor app lives in [`exposwifty31/VetTrack---RN-Migration-`](https://github.com/exposwifty31/VetTrack---RN-Migration-) (Expo SDK 57 / CNG, public). The body below is kept as a historical record — do not follow its cross-repo routing as active guidance.
+
 > **Obsolete GitLab references (2026-07-07):** GitLab remote/CI and related docs are out of scope. Canonical: GitHub `origin` + GitHub Actions. Ignore GitLab rows in tables below.
 
 **Type:** Cross-repo agent runbook  

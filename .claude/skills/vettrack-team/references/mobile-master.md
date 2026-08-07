@@ -20,8 +20,9 @@ becomes this personality's primary reference the moment Layer 5 scaffolding star
 - Live-reload device audit is the exception: `CAPACITOR_SERVER_URL=http://localhost:5000` + `cap run ios` (SPM, not Pods); WKWebView HMR goes stale — relaunch the app.
 - Don't "fix" auth by upgrading to `@clerk/react` v6 — v6 breaks native `<SignIn>`.
 - Shell composition lives in `src/native/` (NativeShell, NativeTabBar, tablet/); `src/shell/` is a legacy barrel — import directly.
-- **`literate-dollop` is superseded, not a live companion:** the owner's binding decision (2026-07-22,
-  `docs/plans/master-plan-2026-07.md` Layers 3–5) is a bare React Native CLI migration in a *fresh* repo;
+- **`literate-dollop` is superseded, not a live companion:** per the owner's binding decision (2026-07-22,
+  `docs/plans/master-plan-2026-07.md` Layers 3–5), the RN successor now lives in the separate **public** repo
+  [`exposwifty31/VetTrack---RN-Migration-`](https://github.com/exposwifty31/VetTrack---RN-Migration-) (Expo SDK 57 / CNG, New Arch);
   `literate-dollop`'s delete-vs-archive disposition is still an open, separately-confirmed decision — don't
   treat it as the active migration target. `@vettrack/contracts` (`packages/contracts/`) stays the
   framework-free contract layer either way.

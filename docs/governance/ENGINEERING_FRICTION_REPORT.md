@@ -1,5 +1,7 @@
 # VetTrack — Engineering Friction Report
 
+> ⚠️ **Superseded (contracts-drift / cross-repo friction rows) — describe the retired cross-repo model.** The `@vettrack/contracts` in `literate-dollop` and "F8 contracts drift vs literate-dollop" items reflect the old cross-repo dependency. That model is gone: `@vettrack/contracts` is now **authored in-repo** at [`packages/contracts/`](../../packages/contracts) (pnpm `workspace:*`, since 2026-07-11) — the cross-repo bump/drift friction no longer applies. The RN successor app lives in [`exposwifty31/VetTrack---RN-Migration-`](https://github.com/exposwifty31/VetTrack---RN-Migration-) (Expo SDK 57 / CNG, public). Kept as a historical record.
+
 **Phase:** 5 — Engineering Friction Analysis  
 **Generated:** 2026-06-18  
 **Governor:** Product Engineering Governor  

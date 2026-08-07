@@ -43,7 +43,6 @@ import {
   isProductionRuntime,
   shouldMountClerkMiddleware,
 } from "./lib/auth-mode.js";
-import { resolveClerkAuthorizedParties } from "./lib/clerk-authorized-parties.js";
 import {
   loadBuildInfo,
   resolveBackendPilotMode,
@@ -297,11 +296,12 @@ if (mountClerkMiddleware) {
   if (!process.env.CLERK_PUBLISHABLE_KEY?.trim() && process.env.VITE_CLERK_PUBLISHABLE_KEY?.trim()) {
     process.env.CLERK_PUBLISHABLE_KEY = process.env.VITE_CLERK_PUBLISHABLE_KEY;
   }
-  app.use(
-    clerkMiddleware({
-      authorizedParties: resolveClerkAuthorizedParties(isProduction),
-    }),
-  );
+  // NOTE: `authorizedParties` is deliberately NOT passed here. @clerk/backend 3.x
+  // rejects tokens with an ABSENT `azp` claim when that option is set, which 401s
+  // every native Expo/RN session token (minted with no browser origin). The azp
+  // allowlist is enforced app-side in `readClerkUserSession` via `isAzpAllowed`
+  // (1.x semantics: absent azp passes, present azp must be allowlisted).
+  app.use(clerkMiddleware());
 }
 
 // Global API limiter runs before route-specific limiters.

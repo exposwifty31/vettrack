@@ -1,5 +1,7 @@
 # VetTrack — Native Mobile + Desktop Implementation Manual
 
+> ⚠️ **Superseded (Horizon 1+ / Expo sections) — describe the retired cross-repo model.** Written when `@vettrack/contracts` was authored in a **separate** repo (`literate-dollop`) and flowed to `vettrack` via a `github:` path dependency plus cross-repo bump discipline. That model is gone: `@vettrack/contracts` is now **authored in-repo** at [`packages/contracts/`](../../packages/contracts) (pnpm `workspace:*`, since 2026-07-11), and the RN successor app lives in [`exposwifty31/VetTrack---RN-Migration-`](https://github.com/exposwifty31/VetTrack---RN-Migration-) (Expo SDK 57 / CNG, public). The `literate-dollop` Horizon content below is kept as a historical record — do not follow its cross-repo routing as active guidance.
+
 **Purpose:** Step-by-step operator guide for implementing the locked design and PRP plan, with **which skills to invoke when**.
 
 **Canonical sources (read first):**
