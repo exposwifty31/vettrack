@@ -5759,7 +5759,7 @@ vet_tech aligned to its tier-20 peer technician (read+start+complete; previously
 and unknown/legacy roles unchanged (deny all). Only the role table changed — no ownership invariants,
 no enforcement files, no queries, no audit kinds.
 
-**Evidence (all observed this session, in worktree /Users/dan/vettrack-wt-task-rbac @ base f6e68f9f7):**
+**Evidence (all observed this session, in a local worktree of this repo @ base f6e68f9f7):**
 - `server/lib/task-rbac.ts:21-51` — table now grants all 7 actions to vet|senior_technician|lead_technician,
   read/start/complete to technician|vet_tech; explicit action enumeration kept (deny-by-default for future actions).
 - RED: `pnpm vitest run tests/task-rbac.test.ts` BEFORE the change → `18 failed | 37 passed (55)`

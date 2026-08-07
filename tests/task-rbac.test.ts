@@ -1,16 +1,10 @@
 /**
- * Task RBAC policy matrix — full role × action contract for
- * `canPerformTaskAction` (server/lib/task-rbac.ts).
- *
- * Policy (owner-approved hierarchical superset, 2026-08-07):
- *   - admin: all actions
- *   - vet, senior_technician, lead_technician: all actions
- *     (seniors inherit the lifecycle actions start/complete; lead_technician
- *     is the senior_technician alias tier — see ROLE_HIERARCHY lead=22)
- *   - technician, vet_tech: read + start + complete (tier-20 peers)
- *   - student: nothing (web client redirects students away from task UI —
- *     src/pages/Tasks.tsx — so no read grant is needed)
- *   - unknown / null / legacy "viewer": nothing (deny-by-default)
+ * Full role × action contract for `canPerformTaskAction` — pins the
+ * owner-approved hierarchical policy (2026-08-07): senior roles are a strict
+ * superset of the technician tier, and the alias tiers (lead_technician,
+ * vet_tech — see ROLE_HIERARCHY) are no longer denied everything. Students
+ * stay fully denied: the web client routes them away from task UI
+ * (src/pages/Tasks.tsx), so not even read is granted.
  */
 
 import { describe, expect, it } from "vitest";
@@ -69,7 +63,7 @@ const ROLE_MATRIX: Record<string, Record<TaskAction, boolean>> = {
 describe("canPerformTaskAction — full role × action matrix", () => {
   for (const [role, expected] of Object.entries(ROLE_MATRIX)) {
     for (const action of ALL_ACTIONS) {
-      it(`${role} × ${action} → ${expected[action] ? "allow" : "deny"}`, () => {
+      it(`${role} ${expected[action] ? "allows" : "denies"} ${action}`, () => {
         expect(canPerformTaskAction(role, action)).toBe(expected[action]);
       });
     }
