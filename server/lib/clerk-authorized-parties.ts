@@ -79,6 +79,8 @@ export function resolveClerkAuthorizedParties(isProduction: boolean): string[] {
  */
 export function isAzpAllowed(azp: unknown, authorizedParties: readonly string[]): boolean {
   if (authorizedParties.length === 0) return true;
-  if (!azp) return true;
-  return typeof azp === "string" && authorizedParties.includes(azp);
+  // ONLY a truly absent claim (missing key → undefined) may skip. A PRESENT
+  // falsy value (null, "", false, 0) is a malformed claim and must fail.
+  if (azp === undefined) return true;
+  return typeof azp === "string" && azp.length > 0 && authorizedParties.includes(azp);
 }

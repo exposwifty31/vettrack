@@ -5725,7 +5725,7 @@ enforcement (absent `azp` went from skipped to rejected); fix = enforce app-side
 skip-if-absent semantics.
 
 **Evidence (all commands run this session):**
-- Repro on-device: RN release build on physical Pixel 7 signed in via Clerk (`reviewer@vettrack.uk`,
+- Repro on-device: RN release build on physical Pixel 7 signed in via Clerk (the App-Review test account,
   SignInScreen showed `מחובר` + "azp absent"), yet ApiSmokeScreen `GET /api/users/me` rendered
   `UNAUTHORIZED` (screenshot captured via adb).
 - Repro off-device (deterministic): `POST https://clerk.vettrack.uk/v1/client/sign_ins?_is_native=1`

@@ -39,12 +39,18 @@ describe("resolveClerkAuthorizedParties", () => {
 describe("isAzpAllowed (restores @clerk/backend 1.x azp semantics)", () => {
   const parties = ["https://vettrack.uk", "capacitor://localhost"];
 
-  it("allows an ABSENT azp — native Expo/RN tokens are minted without one", () => {
+  it("allows an ABSENT azp (undefined only) — native Expo/RN tokens are minted without one", () => {
     // @clerk/backend 3.x rejects absent azp at the middleware layer; the app-level
-    // gate must skip instead (1.x semantics), or every native session token 401s.
+    // gate must skip instead, or every native session token 401s. Only a truly
+    // missing key (undefined) counts as absent.
     expect(isAzpAllowed(undefined, parties)).toBe(true);
-    expect(isAzpAllowed(null, parties)).toBe(true);
-    expect(isAzpAllowed("", parties)).toBe(true);
+  });
+
+  it("rejects a PRESENT-but-falsy azp — a malformed claim is not an absent claim", () => {
+    expect(isAzpAllowed(null, parties)).toBe(false);
+    expect(isAzpAllowed("", parties)).toBe(false);
+    expect(isAzpAllowed(false, parties)).toBe(false);
+    expect(isAzpAllowed(0, parties)).toBe(false);
   });
 
   it("allows a PRESENT azp that is in the allowlist (browser/WebView tokens)", () => {
