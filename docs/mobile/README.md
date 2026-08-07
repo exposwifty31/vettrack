@@ -2,7 +2,7 @@
 
 Capacitor v8 shell for iOS and Android. Production ships a **bundled** web asset (Option B) with Clerk auth — not a remote URL wrapper.
 
-**Repo scope:** this tree is **maintenance-only** for Capacitor. Expo/RN and `@vettrack/contracts` authoring live in [`exposwifty31/literate-dollop`](https://github.com/exposwifty31/literate-dollop). See [`../MAINTENANCE_MODE.md`](../MAINTENANCE_MODE.md).
+**Repo scope:** this tree is **maintenance-only** for Capacitor. Expo/RN and `@vettrack/contracts` authoring live in [`exposwifty31/VetTrack---RN-Migration-`](https://github.com/exposwifty31/VetTrack---RN-Migration-). See [`../MAINTENANCE_MODE.md`](../MAINTENANCE_MODE.md).
 
 ## Ship path (current)
 
