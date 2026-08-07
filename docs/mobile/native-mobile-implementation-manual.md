@@ -69,7 +69,7 @@
 |-------|------|----------|------------|
 | **publish-mobile-app** | `.agents/skills/publish-mobile-app/SKILL.md` | [logesh-kumar/publish-mobile-app](https://github.com/logesh-kumar/publish-mobile-app) | Task 0.3 App Review / `fix-rejection` |
 
-**Expo / RN (Horizon 1+):** use [`exposwifty31/literate-dollop`](https://github.com/exposwifty31/literate-dollop) — `.agents/skills/expo/` lives there, not in this maintenance repo.
+**Expo / RN (Horizon 1+):** use [`exposwifty31/VetTrack---RN-Migration-`](https://github.com/exposwifty31/VetTrack---RN-Migration-) — `.agents/skills/expo/` lives there, not in this maintenance repo.
 
 **Forked (2026-06-15):** `.agents/skills/publish-mobile-app/` — see `FORK.md` for security review. Do not edit marketplace originals in place.
 
@@ -178,36 +178,36 @@ See [capacitor-native-app.md](../capacitor-native-app.md) for env split and simu
 
 ---
 
-## Horizon 1 — Expo monorepo (literate-dollop only)
+## Horizon 1 — Expo monorepo (successor repo only)
 
 **Do not** block Capacitor checklist for this. **Do not** start Horizon 2+ until Capacitor approved.
 
-All Horizon 1+ work runs in [`exposwifty31/literate-dollop`](https://github.com/exposwifty31/literate-dollop) (`packages/contracts`, `apps/expo`, `.agents/skills/expo/`). This repo does not host `packages/mobile`.
+All Horizon 1+ work runs in [`exposwifty31/VetTrack---RN-Migration-`](https://github.com/exposwifty31/VetTrack---RN-Migration-) (`packages/contracts`, `apps/expo`, `.agents/skills/expo/`). This repo does not host `packages/mobile`.
 
 | Task | Work | Where |
 |------|------|--------|
-| 1.1 | pnpm workspace, `packages/contracts`, `apps/expo` | literate-dollop |
-| 1.2 | Expo Router, `expo-dev-client`, bundle `uk.vettrack.expo` | literate-dollop |
-| 1.3 | `@vettrack/contracts` wired into Expo app | literate-dollop |
-| 1.4 | NFC config plugin spike (Phase 2+) | literate-dollop |
+| 1.1 | pnpm workspace, `packages/contracts`, `apps/expo` | VetTrack---RN-Migration- |
+| 1.2 | Expo Router, `expo-dev-client`, bundle `uk.vettrack.expo` | VetTrack---RN-Migration- |
+| 1.3 | `@vettrack/contracts` wired into Expo app | VetTrack---RN-Migration- |
+| 1.4 | NFC config plugin spike (Phase 2+) | VetTrack---RN-Migration- |
 
-**Validation (in literate-dollop clone):**
+**Validation (in a VetTrack---RN-Migration- clone):**
 
 ```bash
-cd ~/literate-dollop
+cd ~/VetTrack-RN-Migration
 pnpm install
 bash scripts/ci/contracts-gate.sh   # after CI scaffold
 ```
 
 ---
 
-## Horizon 2 — RN auth + API (literate-dollop)
+## Horizon 2 — RN auth + API (successor repo)
 
 | Task | Work | Where |
 |------|------|--------|
-| 2.1 | `@clerk/clerk-expo`, `vettrack://`, production Clerk | literate-dollop |
-| 2.2 | API client + `EXPO_PUBLIC_API_ORIGIN`; test clinic only | literate-dollop |
-| 2.3 | Auth gates (pending/blocked); role from `/api/users/me` | literate-dollop |
+| 2.1 | `@clerk/clerk-expo`, `vettrack://`, production Clerk | VetTrack---RN-Migration- |
+| 2.2 | API client + `EXPO_PUBLIC_API_ORIGIN`; test clinic only | VetTrack---RN-Migration- |
+| 2.3 | Auth gates (pending/blocked); role from `/api/users/me` | VetTrack---RN-Migration- |
 
 **RN dev rule:** production API + production Clerk + **dedicated test clinic/user** — no dev-bypass on RN.
 
