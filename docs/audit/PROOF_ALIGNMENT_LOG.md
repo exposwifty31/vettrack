@@ -6047,3 +6047,65 @@ already-existing pure function (`isForbiddenProductionClinicId`) — no behavior
 root cause reproduced with raw SQL before and after the fix, typecheck clean across 3 iterations, cleanup
 confirmed via psql, unrelated pre-existing DB-integration failures triaged out of scope). Not run against
 production — that is the owner's explicit next step per `docs/runbooks/reviewer-demo-account.md`.
+
+## 2026-08-10 — CodeRabbit PR #175 round-1: hijack guard, shift staleness, bounds (feat/g3c1-reviewer-demo-seed)
+
+**Claim:** Addressed all 8 CodeRabbit findings on PR #175 (`scripts/seed-reviewer-demo.ts`,
+`tests/seed-reviewer-demo.integration.test.ts`, `docs/runbooks/reviewer-demo-account.md`) — 2 Major
+data-integrity fixes with RED→GREEN regression tests, plus 6 hardening/hygiene/doc-accuracy fixes.
+
+**Evidence (all observed this session against local Postgres `postgres://vettrack:vettrack@localhost:5432/vettrack`):**
+- RED confirmed for all 5 new/changed behavioral tests before implementing fixes:
+  `DATABASE_URL=… npx vitest run --config vitest.db-integration.config.ts tests/seed-reviewer-demo.integration.test.ts`
+  → `Tests 5 failed | 5 passed (10)`. Failure reasons verified correct, not typos:
+  `refuses to hijack an existing user…` and `updates the roster employeeName…` both failed with
+  "promise resolved … instead of rejecting" (the guard/upsert didn't exist yet); the three
+  `shiftSpanDays` tests failed the same way (no validation yet).
+- Finding 1 (Major) fixed: `scripts/seed-reviewer-demo.ts` now SELECTs the existing `vt_users` row by
+  `clerkId` before the upsert; throws `"…is already assigned to clinic…refusing to hijack…"` when that
+  row's `clinicId` differs from the target. Regression test seeds a "real operator" row directly
+  (`clinicId=reviewer-demo-other-clinic-test`, `role=vet`) then asserts `seedReviewerDemo()` rejects and
+  the operator row is untouched (`clinicId`/`role`/`status` all unchanged after the rejected call).
+- Finding 2 (Major) fixed: the shift-roster insert changed from `.onConflictDoNothing()` to
+  `.onConflictDoUpdate({ target: shifts.id, set: { employeeName: displayName, role: "technician" } })`.
+  Regression test runs the seed twice for the same clinic/clerkId with two different `displayName`
+  values and asserts every seeded `vt_shifts` row's `employee_name` matches the SECOND (latest) value.
+- Finding 3 fixed: `shiftSpanDays` validated via `Number.isSafeInteger(x) && x > 0 && x <= 90`, error
+  message includes the received value (verbatim requirement). `Infinity` itself is deliberately NOT
+  executed in a test (would hang the pre-fix loop) — verified instead via
+  `node -e "console.log(Number.isSafeInteger(Infinity))"` → `false`, same rejection path as the finite
+  cases (`0`, `-3`, `1.5`, `NaN`, `10000`) which ARE exercised and pass.
+- Finding 4 fixed: CLI main-guard's `pool.end().catch(() => {})` → now logs the error and sets
+  `process.exitCode = 1`.
+- Finding 5 fixed: test's `userRow!.displayName` / `userRow!.role` (`!` assertions) replaced with an
+  explicit `if (!userRow) throw …` guard before use.
+- Finding 6 fixed: the corrected-clerkId regression test now calls `seedReviewerDemo({ clinicId: CLINIC_ID,
+  clerkId: CLERK_ID })` itself at the top instead of relying on test-file ordering.
+- Finding 7 fixed: run-book Step 3 rewritten — a re-run is explicitly NOT a no-op; documents that the
+  user upsert re-applies clinicId/email/name/displayName/role/status and the shift upsert now
+  keeps `employee_name` in sync (matches the finding-2 fix).
+- Finding 8 fixed: run-book verification section rewritten to state the test operates at the
+  Drizzle/data-access layer only (`resolveAuthority()` + direct table queries), does NOT start the
+  Express app or call `GET /api/equipment`/`GET /api/appointments` over HTTP; the route-guard claims
+  (`task.read`, no extra equipment-route gate) are now explicitly labeled as verified by reading the
+  route code, not by this test.
+- GREEN after all fixes: same command → `Test Files 1 passed (1)`, `Tests 10 passed (10)`.
+- `pnpm typecheck` (frontend + server, re-run after each round of edits) → **exit 0**, zero `error TS`
+  lines, every time.
+- Manual end-to-end sanity via the CLI alias (`pnpm seed:reviewer-demo`) against a fresh throwaway
+  clinic (`reviewer-demo-clinic-alias-check2`): ran twice back-to-back (idempotency + hijack-guard
+  non-interference confirmed — same clinicId both times, no rejection), then cleaned up via `psql`.
+- Post-suite `psql` check: `SELECT id FROM vt_clinics WHERE id LIKE 'reviewer-demo%' OR id LIKE
+  'reviewer-override%'` → `0 rows` (afterAll cleanup, now covering 4 demo clinics, verified working).
+- Out-of-scope regression sweep: `tests/role-resolution-adjustments.test.ts`, `tests/shift-gate.test.ts`,
+  `tests/auth-hardening.test.ts`, `tests/auth-mode-resolution.test.ts` (38 tests) → all green, unaffected.
+- Pushed: `git push origin feat/g3c1-reviewer-demo-seed` → `2522ce22a..e6fef4aed`. PR #175 updated, not
+  merged.
+
+**Multi-tenancy / frozen surfaces:** no change from the prior entry — the hijack-guard SELECT and the
+shift upsert are both still `clinicId`-scoped reads/writes; no frozen surface touched.
+
+**Verdict:** VERIFIED (RED→GREEN on both Major findings with the exact pre-fix failure mode captured,
+all 8 findings addressed with a concrete code/doc change each, typecheck clean across iterations,
+cleanup confirmed via psql, unrelated auth/shift suites unaffected). Pushed to the open PR for
+CodeRabbit re-review; not merged.
