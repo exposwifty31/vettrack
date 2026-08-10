@@ -23,6 +23,7 @@ import { readFileSync } from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import { runMigrations } from "./migrate.js";
+import { beginPushInitialization, markPushInitialized } from "./lib/push.js";
 import { globalApiLimiter } from "./middleware/rate-limiters.js";
 import { JSON_BODY_LIMIT, terminalErrorHandler } from "./lib/body-parser-errors.js";
 import { i18nMiddleware } from "../lib/i18n/middleware.js";
@@ -453,6 +454,14 @@ const httpServer = app.listen(PORT, "0.0.0.0", () => {
   }
 });
 
+// Arm the push init gate synchronously (before the async migration chain) so a
+// /api/push request that arrives in the listen→init window waits for the real
+// readiness state instead of racing a not-yet-initialized transport. Released by
+// startBackgroundSchedulers after the init sequence, or here on migration failure.
+if (!isTestMode) {
+  beginPushInitialization();
+}
+
 runMigrations()
   .then(async () => {
     // ensureClinicPhase2Defaults always runs — test suites that touch the DB
@@ -477,4 +486,7 @@ runMigrations()
   })
   .catch((err) => {
     console.error("💥 Migration failed, aborting scheduler start", err);
+    // The init sequence never ran — release the gate so /api/push handlers fall
+    // through to their readiness check instead of hanging on whenPushInitialized().
+    markPushInitialized();
   });

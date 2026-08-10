@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router, type Request, type Response } from "express";
 import { randomUUID } from "crypto";
 import { z } from "zod";
 import { db, pushSubscriptions } from "../db.js";
@@ -6,8 +6,16 @@ import { eq, and } from "drizzle-orm";
 import { requireAuth } from "../middleware/auth.js";
 import { validateBody } from "../middleware/validate.js";
 import { authSensitiveLimiter, pushTestLimiter } from "../middleware/rate-limiters.js";
-import { sendPushToUser, getVapidPublicKey, isVapidReady } from "../lib/push.js";
+import {
+  sendPushToUser,
+  getVapidPublicKey,
+  isVapidReady,
+  isPushReady,
+  whenPushInitialized,
+} from "../lib/push.js";
+import { subscribeSchema, isNativeSubscribeBody, type SubscribeBody } from "../lib/push-subscription-schema.js";
 import { resolveRequestId, apiError } from "../lib/route-utils.js";
+import { logAudit, resolveAuditActorRole } from "../lib/audit.js";
 
 /*
  * PERMISSIONS MATRIX — /api/push
@@ -22,38 +30,47 @@ import { resolveRequestId, apiError } from "../lib/route-utils.js";
 
 const router = Router();
 
+// Resolve the refine-guaranteed endpoint|token into a discriminated identifier so
+// the handler builds the row predicate by switching on `by` — no nullable branch,
+// no `!` assertion. `?? ""` is an unreachable typesafe fallback for the token arm
+// (the refine above rejects a body carrying neither, so it never runs).
+function toIdentifier(v: { endpoint?: string; token?: string }) {
+  return v.endpoint
+    ? ({ by: "endpoint", value: v.endpoint } as const)
+    : ({ by: "token", value: v.token ?? "" } as const);
+}
 
+const patchSubscribeSchema = z
+  .object({
+    endpoint: z.string().url("endpoint must be a valid URL").optional(),
+    token: z.string().min(1).optional(),
+    soundEnabled: z.boolean().optional(),
+    alertsEnabled: z.boolean().optional(),
+    technicianReturnRemindersEnabled: z.boolean().optional(),
+    seniorOwnReturnRemindersEnabled: z.boolean().optional(),
+    seniorTeamOverdueAlertsEnabled: z.boolean().optional(),
+    adminHourlySummaryEnabled: z.boolean().optional(),
+  })
+  .refine((v) => Boolean(v.endpoint) || Boolean(v.token), {
+    message: "endpoint or token is required",
+  })
+  .transform((v) => ({ ...v, identifier: toIdentifier(v) }));
 
-const subscribeSchema = z.object({
-  endpoint: z.string().url("endpoint must be a valid URL"),
-  keys: z.object({
-    p256dh: z.string().min(1, "p256dh is required"),
-    auth: z.string().min(1, "auth is required"),
-  }),
-  soundEnabled: z.boolean().optional(),
-  alertsEnabled: z.boolean().optional(),
-  technicianReturnRemindersEnabled: z.boolean().optional(),
-  seniorOwnReturnRemindersEnabled: z.boolean().optional(),
-  seniorTeamOverdueAlertsEnabled: z.boolean().optional(),
-  adminHourlySummaryEnabled: z.boolean().optional(),
-});
-
-const patchSubscribeSchema = z.object({
-  endpoint: z.string().url("endpoint must be a valid URL"),
-  soundEnabled: z.boolean().optional(),
-  alertsEnabled: z.boolean().optional(),
-  technicianReturnRemindersEnabled: z.boolean().optional(),
-  seniorOwnReturnRemindersEnabled: z.boolean().optional(),
-  seniorTeamOverdueAlertsEnabled: z.boolean().optional(),
-  adminHourlySummaryEnabled: z.boolean().optional(),
-});
-
-const deleteSubscribeSchema = z.object({
-  endpoint: z.string().min(1, "endpoint is required"),
-});
+const deleteSubscribeSchema = z
+  .object({
+    endpoint: z.string().min(1).optional(),
+    token: z.string().min(1).optional(),
+  })
+  .refine((v) => Boolean(v.endpoint) || Boolean(v.token), {
+    message: "endpoint or token is required",
+  })
+  .transform((v) => ({ ...v, identifier: toIdentifier(v) }));
 
 router.get("/vapid-public-key", async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
+  // Wait out the startup init window so a configured server does not hand a
+  // web client a false PUSH_NOT_CONFIGURED before initVapid has run.
+  await whenPushInitialized();
   const key = await getVapidPublicKey();
   if (!key) {
     return res.status(503).json(
@@ -68,115 +85,41 @@ router.get("/vapid-public-key", async (req, res) => {
   res.json({ publicKey: key });
 });
 
-router.post("/subscribe", requireAuth, authSensitiveLimiter, validateBody(subscribeSchema), async (req, res) => {
-  const requestId = resolveRequestId(res, req.headers["x-request-id"]);
-  if (!req.authUser?.id) {
-    console.error("SUBSCRIBE: missing req.authUser.id");
-    return res.status(401).json(
-      apiError({
-        code: "UNAUTHORIZED",
-        reason: "MISSING_AUTH_USER",
-        message: "Unauthorized",
-        requestId,
-      }),
-    );
-  }
+router.post(
+  "/subscribe",
+  requireAuth,
+  authSensitiveLimiter,
+  validateBody(subscribeSchema),
+  async (req: Request<Record<string, never>, unknown, SubscribeBody>, res: Response) => {
+    const requestId = resolveRequestId(res, req.headers["x-request-id"]);
 
-  if (!isVapidReady()) {
-    console.error("SUBSCRIBE: VAPID not initialized (keys missing or init failed)");
-    return res.status(503).json(
-      apiError({
-        code: "SERVICE_UNAVAILABLE",
-        reason: "PUSH_NOT_CONFIGURED",
-        message: "Push notifications not configured",
-        requestId,
-      }),
-    );
-  }
+    // Explicit guards (not `!`/`as`): validateBody already parsed the body, and
+    // requireAuth populates authUser — narrow both to non-null before any query.
+    const userId = req.authUser?.id;
+    if (!userId) {
+      console.error("SUBSCRIBE: missing req.authUser.id");
+      return res.status(401).json(
+        apiError({ code: "UNAUTHORIZED", reason: "MISSING_AUTH_USER", message: "Unauthorized", requestId }),
+      );
+    }
+    const clinicId = req.clinicId;
+    if (!clinicId) {
+      return res.status(400).json(
+        apiError({ code: "VALIDATION_FAILED", reason: "MISSING_CLINIC_ID", message: "Missing clinic context", requestId }),
+      );
+    }
 
-  const body = req.body as z.infer<typeof subscribeSchema>;
-  const clinicId = req.clinicId!;
-  const {
-    endpoint,
-    keys,
-    soundEnabled,
-    alertsEnabled,
-    technicianReturnRemindersEnabled,
-    seniorOwnReturnRemindersEnabled,
-    seniorTeamOverdueAlertsEnabled,
-    adminHourlySummaryEnabled,
-  } = body;
-
-  if (!endpoint || typeof endpoint !== "string") {
-    return res.status(400).json(
-      apiError({
-        code: "VALIDATION_FAILED",
-        reason: "ENDPOINT_REQUIRED",
-        message: "endpoint is required",
-        requestId,
-      }),
-    );
-  }
-  if (!keys?.p256dh || typeof keys.p256dh !== "string" || !keys.p256dh.trim()) {
-    return res.status(400).json(
-      apiError({
-        code: "VALIDATION_FAILED",
-        reason: "P256DH_REQUIRED",
-        message: "keys.p256dh is required",
-        requestId,
-      }),
-    );
-  }
-  if (!keys?.auth || typeof keys.auth !== "string" || !keys.auth.trim()) {
-    return res.status(400).json(
-      apiError({
-        code: "VALIDATION_FAILED",
-        reason: "AUTH_KEY_REQUIRED",
-        message: "keys.auth is required",
-        requestId,
-      }),
-    );
-  }
-
-  // Insert targets Drizzle columns (server/db.ts pushSubscriptions) — migration 023 aligns DB if needed.
-  try {
-    await db
-      .delete(pushSubscriptions)
-      .where(eq(pushSubscriptions.endpoint, endpoint));
-  } catch (err) {
-    console.error("SUBSCRIBE DB delete failed:", err);
-    return res.status(500).json(
-      apiError({
-        code: "INTERNAL_ERROR",
-        reason: "PUSH_SUBSCRIBE_SAVE_FAILED",
-        message: "Failed to save subscription",
-        requestId,
-      }),
-    );
-  }
-
-  try {
-    const [sub] = await db
-      .insert(pushSubscriptions)
-      .values({
-        id: randomUUID(),
-        clinicId,
-        userId: req.authUser.id,
-        endpoint,
-        p256dh: keys.p256dh,
-        auth: keys.auth,
-        soundEnabled: soundEnabled !== false,
-        alertsEnabled: alertsEnabled !== false,
-        technicianReturnRemindersEnabled: technicianReturnRemindersEnabled !== false,
-        seniorOwnReturnRemindersEnabled: seniorOwnReturnRemindersEnabled !== false,
-        seniorTeamOverdueAlertsEnabled: seniorTeamOverdueAlertsEnabled !== false,
-        adminHourlySummaryEnabled: adminHourlySummaryEnabled !== false,
-      })
-      .returning();
-
-    if (!sub) {
-      console.error("SUBSCRIBE DB insert returned no row");
-      return res.status(500).json(
+    const body = req.body;
+    const settings = {
+      soundEnabled: body.soundEnabled !== false,
+      alertsEnabled: body.alertsEnabled !== false,
+      technicianReturnRemindersEnabled: body.technicianReturnRemindersEnabled !== false,
+      seniorOwnReturnRemindersEnabled: body.seniorOwnReturnRemindersEnabled !== false,
+      seniorTeamOverdueAlertsEnabled: body.seniorTeamOverdueAlertsEnabled !== false,
+      adminHourlySummaryEnabled: body.adminHourlySummaryEnabled !== false,
+    };
+    const saveFailed = () =>
+      res.status(500).json(
         apiError({
           code: "INTERNAL_ERROR",
           reason: "PUSH_SUBSCRIBE_SAVE_FAILED",
@@ -184,28 +127,143 @@ router.post("/subscribe", requireAuth, authSensitiveLimiter, validateBody(subscr
           requestId,
         }),
       );
+
+    if (isNativeSubscribeBody(body)) {
+      // Native (APNs/FCM/Expo): store the device token. No VAPID gate — storing a
+      // token needs no web-push signing pair, and the native transport's
+      // credentials may arrive from the owner later.
+      //
+      // Replace-then-insert atomically. The delete is scoped to (clinicId, token)
+      // — matching the (clinic_id, token) partial unique index — so a same-clinic
+      // device re-register replaces the prior row without ever reaching another
+      // clinic's subscription. (userId is deliberately NOT in the predicate: the
+      // uniqueness key is (clinicId, token), so a shared device re-registered by a
+      // different user in the same clinic must replace the row, not 500 on the
+      // unique index. Ownership scoping stays on PATCH/DELETE.)
+      try {
+        // Detect an ownership transfer INSIDE the tx (SELECT the current owner of
+        // this (clinicId, token) before the delete). The audit itself fires AFTER
+        // the tx commits — fire-and-forget, never on the tx client — so it honors
+        // the "don't await logAudit in a transaction path" convention and never
+        // audits a rolled-back write.
+        let priorUserId: string | null = null;
+        const [sub] = await db.transaction(async (tx) => {
+          const existing = await tx
+            .select({ userId: pushSubscriptions.userId })
+            .from(pushSubscriptions)
+            .where(and(eq(pushSubscriptions.clinicId, clinicId), eq(pushSubscriptions.token, body.token)));
+          if (existing[0] && existing[0].userId !== userId) {
+            priorUserId = existing[0].userId;
+          }
+          await tx
+            .delete(pushSubscriptions)
+            .where(and(eq(pushSubscriptions.clinicId, clinicId), eq(pushSubscriptions.token, body.token)));
+          return tx
+            .insert(pushSubscriptions)
+            .values({ id: randomUUID(), clinicId, userId, platform: body.platform, token: body.token, ...settings })
+            .returning();
+        });
+        if (!sub) {
+          console.error("SUBSCRIBE (native) DB insert returned no row");
+          return saveFailed();
+        }
+        if (priorUserId) {
+          // Fire-and-forget (NOT awaited, NOT on the tx client). Metadata carries
+          // platform + previousUserId only — never the token (a device secret).
+          logAudit({
+            clinicId,
+            actionType: "push_token_reassigned",
+            performedBy: userId,
+            performedByEmail: req.authUser?.email ?? "",
+            targetId: sub.id,
+            targetType: "push_subscription",
+            metadata: { platform: body.platform, previousUserId: priorUserId },
+            actorRole: resolveAuditActorRole(req),
+          });
+        }
+        return res.json({ success: true });
+      } catch (err) {
+        console.error("SUBSCRIBE (native) DB write failed:", err);
+        return saveFailed();
+      }
     }
 
-    return res.json({ success: true });
-  } catch (err) {
-    console.error("SUBSCRIBE DB insert failed:", err);
-    return res.status(500).json(
-      apiError({
-        code: "INTERNAL_ERROR",
-        reason: "PUSH_SUBSCRIBE_SAVE_FAILED",
-        message: "Failed to save subscription",
-        requestId,
-      }),
-    );
-  }
-});
+    // Web-push path — requires the VAPID signing pair (unchanged behavior). Wait
+    // out the startup init window first so a configured server does not 503 a
+    // legitimate subscribe before initVapid has run.
+    await whenPushInitialized();
+    if (!isVapidReady()) {
+      console.error("SUBSCRIBE: VAPID not initialized (keys missing or init failed)");
+      return res.status(503).json(
+        apiError({
+          code: "SERVICE_UNAVAILABLE",
+          reason: "PUSH_NOT_CONFIGURED",
+          message: "Push notifications not configured",
+          requestId,
+        }),
+      );
+    }
+
+    // `endpoint` is guaranteed here: the schema's web branch is `endpoint:
+    // z.string().url()`, so reaching this point (not a native body) means it is a
+    // valid URL string — the old `!endpoint` guard was dead. p256dh/auth keep
+    // their defensive checks: `z.string().min(1)` admits a whitespace-only string,
+    // which `.trim()` still rejects below.
+    const { endpoint, keys } = body;
+    if (!keys?.p256dh || typeof keys.p256dh !== "string" || !keys.p256dh.trim()) {
+      return res.status(400).json(
+        apiError({ code: "VALIDATION_FAILED", reason: "P256DH_REQUIRED", message: "keys.p256dh is required", requestId }),
+      );
+    }
+    if (!keys?.auth || typeof keys.auth !== "string" || !keys.auth.trim()) {
+      return res.status(400).json(
+        apiError({ code: "VALIDATION_FAILED", reason: "AUTH_KEY_REQUIRED", message: "keys.auth is required", requestId }),
+      );
+    }
+
+    // Replace-then-insert atomically. The delete is scoped to (clinicId, endpoint)
+    // — endpoint is globally unique, so this replaces this browser's prior row
+    // within the tenant. (userId is deliberately NOT in the predicate: the unique
+    // key is the endpoint, so a same-device re-subscribe by a different user must
+    // still replace the row rather than 500 on the unique index.)
+    try {
+      const [sub] = await db.transaction(async (tx) => {
+        await tx
+          .delete(pushSubscriptions)
+          .where(and(eq(pushSubscriptions.clinicId, clinicId), eq(pushSubscriptions.endpoint, endpoint)));
+        return tx
+          .insert(pushSubscriptions)
+          .values({
+            id: randomUUID(),
+            clinicId,
+            userId,
+            platform: "web",
+            endpoint,
+            p256dh: keys.p256dh,
+            auth: keys.auth,
+            ...settings,
+          })
+          .returning();
+      });
+
+      if (!sub) {
+        console.error("SUBSCRIBE DB insert returned no row");
+        return saveFailed();
+      }
+      return res.json({ success: true });
+    } catch (err) {
+      console.error("SUBSCRIBE DB write failed:", err);
+      return saveFailed();
+    }
+  },
+);
 
 router.patch("/subscribe", requireAuth, validateBody(patchSubscribeSchema), async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
   try {
     const clinicId = req.clinicId!;
     const {
-      endpoint,
+      identifier,
       soundEnabled,
       alertsEnabled,
       technicianReturnRemindersEnabled,
@@ -213,6 +271,13 @@ router.patch("/subscribe", requireAuth, validateBody(patchSubscribeSchema), asyn
       seniorTeamOverdueAlertsEnabled,
       adminHourlySummaryEnabled,
     } = req.body as z.infer<typeof patchSubscribeSchema>;
+
+    // The schema's transform resolved the guaranteed endpoint|token into a
+    // discriminated identifier, so the row predicate is built with no null branch.
+    const idMatch =
+      identifier.by === "endpoint"
+        ? eq(pushSubscriptions.endpoint, identifier.value)
+        : eq(pushSubscriptions.token, identifier.value);
 
     await db
       .update(pushSubscriptions)
@@ -227,7 +292,7 @@ router.patch("/subscribe", requireAuth, validateBody(patchSubscribeSchema), asyn
       .where(
         and(
           eq(pushSubscriptions.clinicId, clinicId),
-          eq(pushSubscriptions.endpoint, endpoint),
+          idMatch,
           eq(pushSubscriptions.userId, req.authUser!.id)
         )
       );
@@ -250,14 +315,21 @@ router.delete("/subscribe", requireAuth, validateBody(deleteSubscribeSchema), as
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
   try {
     const clinicId = req.clinicId!;
-    const { endpoint } = req.body as z.infer<typeof deleteSubscribeSchema>;
+    const { identifier } = req.body as z.infer<typeof deleteSubscribeSchema>;
+
+    // The schema's transform resolved the guaranteed endpoint|token into a
+    // discriminated identifier, so the row predicate is built with no null branch.
+    const idMatch =
+      identifier.by === "endpoint"
+        ? eq(pushSubscriptions.endpoint, identifier.value)
+        : eq(pushSubscriptions.token, identifier.value);
 
     await db
       .delete(pushSubscriptions)
       .where(
         and(
           eq(pushSubscriptions.clinicId, clinicId),
-          eq(pushSubscriptions.endpoint, endpoint),
+          idMatch,
           eq(pushSubscriptions.userId, req.authUser!.id)
         )
       );
@@ -279,12 +351,19 @@ router.delete("/subscribe", requireAuth, validateBody(deleteSubscribeSchema), as
 router.post("/test", requireAuth, pushTestLimiter, async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
   try {
-    if (!isVapidReady()) {
+    // Wait out the startup init window: app.listen() accepts requests before the
+    // runMigrations() chain runs initVapid/initApns/initFcm, so a /test that lands
+    // in that window would read isPushReady() === false on a configured server.
+    await whenPushInitialized();
+    // Transport-neutral: a test push can go over ANY configured transport
+    // (web-push VAPID, APNs, or FCM), so an APNs-only or FCM-only deployment is
+    // accepted here — the per-subscription dispatcher still routes by platform.
+    if (!isPushReady()) {
       return res.status(503).json(
         apiError({
           code: "SERVICE_UNAVAILABLE",
           reason: "PUSH_NOT_CONFIGURED",
-          message: "Push is not configured on the server (VAPID keys missing or init failed).",
+          message: "Push is not configured on the server (no transport ready).",
           requestId,
         }),
       );

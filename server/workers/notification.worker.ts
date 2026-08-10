@@ -28,6 +28,8 @@ import { incrementMetric } from "../lib/metrics.js";
 import { checkIdempotentAsync, markIdempotentAsync } from "../lib/idempotency.js";
 import { isCircuitOpen } from "../lib/circuit-breaker.js";
 import { checkDedupe, initVapid, sendPushToAll, sendPushToRole, sendPushToUser } from "../lib/push.js";
+import { initApns } from "../lib/push-apns.js";
+import { initFcm } from "../lib/push-fcm.js";
 import { withTimeout } from "../lib/timeout.js";
 import { BROADCAST_TEMPLATES } from "../routes/shift-chat.js";
 import { safeRedisSetex } from "../lib/redis.js";
@@ -423,6 +425,8 @@ async function main(): Promise<void> {
   }
 
   await initVapid();
+  await initApns();
+  await initFcm();
 
   const connection = await createRedisConnection();
   if (!connection) {

@@ -1,4 +1,6 @@
-import { initVapid, startPushCleanupScheduler } from "../lib/push.js";
+import { initVapid, markPushInitialized, startPushCleanupScheduler } from "../lib/push.js";
+import { initApns } from "../lib/push-apns.js";
+import { initFcm } from "../lib/push-fcm.js";
 import { startCleanupScheduler } from "../lib/cleanup-scheduler.js";
 import {
   startScheduledNotificationProcessor,
@@ -39,7 +41,15 @@ export async function startBackgroundSchedulers() {
     console.log("[test-mode] startBackgroundSchedulers: no-op");
     return;
   }
-  await initVapid();
+  try {
+    await initVapid();
+    await initApns();
+    await initFcm();
+  } finally {
+    // Release the startup init gate once every transport has been attempted,
+    // even if one init threw — a request in the listen→init window must not hang.
+    markPushInitialized();
+  }
   startEventOutboxPublisher();
   startOutboxJanitor();
   startAlertReminderScheduler();

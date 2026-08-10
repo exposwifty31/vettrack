@@ -2,8 +2,8 @@
 
 | Field | Value |
 |-------|--------|
-| **Date** | 2026-07-31 |
-| **Status** | proposed |
+| **Date** | 2026-07-31 (accepted 2026-08-10) |
+| **Status** | accepted |
 | **Tags** | `#clinical-safety` `#integrations` `#worker` `#frontend-state` |
 | **Supersedes** | — |
 | **Superseded by** | — |
@@ -91,12 +91,21 @@ native must not break the web PWA path.
 
 ## Compliance
 
-- [ ] **Owner action:** submit the iOS **Critical Alerts** entitlement request (G0 item 3).
-- [ ] Schema migration for the platform-tagged push-token model + `pnpm db:migrate` (G4).
-- [ ] `npx tsc --noEmit` and `pnpm architecture:gates` (touches `server/`).
-- [ ] Security review: `clinicId` on every token query + a **cross-tenant negative test**; APNs/FCM
-      secrets in the secret manager, not source.
+- [ ] **Owner action:** submit the iOS **Critical Alerts** entitlement request (G0 item 3). *(Owner tail — outside this PR.)*
+- [x] Schema migration for the platform-tagged push-token model + `pnpm db:migrate` (G4).
+      → `migrations/180_vt_push_subscriptions_native_tokens.sql`; verified against Postgres in a
+      rolled-back transaction (native NULL-endpoint row valid, `platform` DEFAULT 'web' backfill, CHECK
+      rejects unknown platform, partial UNIQUE(token) rejects dup). DB-gated regression:
+      `tests/migrations/push-native-tokens.test.ts`.
+- [x] `npx tsc --noEmit` and `pnpm architecture:gates` (touches `server/`). → `pnpm typecheck:server` +
+      `pnpm contracts:typecheck` clean; architecture gates run in the implementing PR.
+- [x] Security review: `clinicId` on every token query + a **cross-tenant negative test**; APNs/FCM
+      secrets in the secret manager, not source. → subscribe/patch/delete + every `sendPush*` stay
+      clinic-scoped; cross-tenant negative case in the DB-gated migration test; APNs `.p8` and FCM
+      service-account creds read from env only (`push-apns.ts` / `push-fcm.ts`), never hardcoded.
 - [ ] i18n parity for the new honest-limitation UX copy (`locales/en.json` + `locales/he.json`).
+      *(G4-3 client work — no user-facing copy in this server PR.)*
 - [ ] Device/browser verification of the alert on both platforms (Playwright drills where applicable);
       Code Blue frozen-guarantee regression check (server-confirmed end, no offline queueing).
-- [ ] Move this ADR **proposed → accepted** in the implementing G4 PR.
+      *(Needs real APNs/FCM creds + devices — owner tail.)*
+- [x] Move this ADR **proposed → accepted** in the implementing G4 PR (this PR).
