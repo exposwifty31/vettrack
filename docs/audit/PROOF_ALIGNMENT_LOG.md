@@ -5841,3 +5841,39 @@ and tightened three tests. Multi-tenancy and the SSE/outbox frozen surface untou
 Postgres, typecheck + i18n parity clean, knip net-improved). Frozen surfaces intact: SSE transport
 unchanged (new event `type` only), every emit/query clinic-scoped, `equipment_missing_alerted` remains a
 closed-union audit kind.
+
+---
+
+### 2026-08-10 — PR #172 CodeRabbit round 2 (Lead inline fix): rolling-dedup lifetime-uniqueness bug
+
+**Task:** CodeRabbit (ASSERTIVE, run `3b742ea4`) posted a Major/Heavy-lift finding on the fresh commit
+`ff4dad004`: `server/services/equipment-missing-alert.service.ts` inserts a fresh `vt_alert_acks` row per
+(re-)alert, but `vt_alert_acks` carries a lifetime `UNIQUE(equipment_id, alert_type)` — verified in
+`migrations/001_initial_schema.sql:78` (the Drizzle model at `server/schema/equipment.ts:612` drifted to a
+plain `index(...)`, so the constraint was invisible from the schema). Once the DEDUPE window expires, the
+re-alert INSERT raises `23505`, the whole transaction (incl. the outbox event) rolls back, and
+`server/routes/docking.ts`'s `.catch` swallows it → the proactive re-alert is silently lost. The feature
+fired exactly once per equipment item, ever.
+
+**Verified (not asserted):**
+- Bug reproduced LIVE. Reverted the service to branch-HEAD (plain insert), ran the new re-alert test:
+  RED with `AssertionError: expected 1 to be 2` and stderr
+  `[docking] equipment-missing alert failed (non-fatal): Failed query: insert into "vt_alert_acks" …` —
+  the swallowed 23505, outbox count stuck at 1.
+- **Fix:** the per-id insert is now `.onConflictDoUpdate({ target: [alertAcks.equipmentId,
+  alertAcks.alertType], set: { acknowledgedAt: now, … } })` — reclaims the expired claim in place inside the
+  same transaction. The window filter guarantees any conflicting row is already expired, so it can never
+  clobber a still-valid ack. `clinicId` deliberately omitted from the `set` (equipment_id is a global UUID;
+  the row's clinic never changes on reclaim → no cross-tenant write).
+- **Coverage added** (`tests/equipment-missing-alert.integration.test.ts`): case (e) re-alert-after-window
+  (RED→GREEN: outbox 1→2, ack reclaimed in place = still 1); case (f) two concurrent same-room sweeps →
+  both 200, exactly one ack row, no 23505 (the upsert serializes the loser on the row lock).
+- **Nit:** `tests/equipment-missing-alert.service.test.ts:115` comment rewritten to explain awaiting
+  `pushSettled` gates the assertions on the detached fan-out (not restate the push). The unit-test tx mock
+  now returns `values().onConflictDoUpdate()` to match the upsert chain.
+- **Gates:** `pnpm exec vitest run` on the three affected files → `Test Files 3 passed`, `Tests 24 passed`.
+  `pnpm typecheck` (frontend + server) → exit 0.
+
+**Verdict:** VERIFIED (RED→GREEN on the exact 23505 path, all three affected suites green vs local Postgres,
+full typecheck clean). Frozen surfaces intact: SSE transport untouched (no new type), every query/emit
+clinic-scoped, `equipment_missing_alerted` stays a closed-union audit kind, no schema/migration change.

@@ -176,16 +176,34 @@ export async function alertMissingEquipmentAfterSweep(
       occurredAt: now,
     });
     for (const equipmentId of toAlert) {
-      await tx.insert(alertAcks).values({
-        id: randomUUID(),
-        clinicId,
-        equipmentId,
-        alertType: MISSING_ALERT_TYPE,
-        acknowledgedById: SYSTEM_USER_ID,
-        acknowledgedByEmail: SYSTEM_USER_EMAIL,
-        acknowledgedAt: now,
-        ackStatus: "SEEN",
-      });
+      // Reclaim an EXPIRED prior claim atomically (or create a fresh one). vt_alert_acks carries a
+      // lifetime UNIQUE(equipment_id, alert_type) (migration 001) and its rows are never deleted —
+      // so a plain insert on re-alert (after DEDUPE_WINDOW_MS, once a row already exists) would raise
+      // 23505, roll THIS transaction (including the outbox event above) back, and the route's catch
+      // would silently drop the alert. The window filter that produced `toAlert` guarantees any
+      // conflicting row here is already expired, so refreshing acknowledgedAt cannot clobber a
+      // still-valid ack. Concurrent same-room sweeps serialize on the row lock; the loser updates.
+      await tx
+        .insert(alertAcks)
+        .values({
+          id: randomUUID(),
+          clinicId,
+          equipmentId,
+          alertType: MISSING_ALERT_TYPE,
+          acknowledgedById: SYSTEM_USER_ID,
+          acknowledgedByEmail: SYSTEM_USER_EMAIL,
+          acknowledgedAt: now,
+          ackStatus: "SEEN",
+        })
+        .onConflictDoUpdate({
+          target: [alertAcks.equipmentId, alertAcks.alertType],
+          set: {
+            acknowledgedById: SYSTEM_USER_ID,
+            acknowledgedByEmail: SYSTEM_USER_EMAIL,
+            acknowledgedAt: now,
+            ackStatus: "SEEN",
+          },
+        });
     }
   });
 

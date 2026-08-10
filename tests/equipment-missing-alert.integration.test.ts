@@ -293,6 +293,66 @@ describe.skipIf(!DATABASE_URL)("room-sweep missing-equipment alert (Part B P1) i
     expect(sendPushToRole).not.toHaveBeenCalled();
   });
 
+  it("(e) re-alerts once the dedupe window expires (reclaims the expired ack, not a swallowed 23505)", async () => {
+    const missingId = randomUUID();
+    await seedEquipment(missingId, ctx.clinicId, ctx.roomId, ctx.assetTypeId);
+
+    // First sweep → one alert, one durable ack.
+    await api(`/api/docking/rooms/${ctx.roomId}/sweep`, "POST", { confirmedEquipmentIds: [] });
+    expect((await missingAlertOutboxRows(ctx.clinicId)).length).toBe(1);
+    expect(await alertAckCount(ctx.clinicId)).toBe(1);
+    await vi.waitFor(() => {
+      expect(sendPushToRole).toHaveBeenCalledWith(ctx.clinicId, "admin", expect.anything());
+    });
+    sendPushToRole.mockClear();
+
+    // Age the ack far past the dedupe window (default 4h) so the next sweep must RE-alert. Before the
+    // upsert fix, this second alert's insert hit the lifetime UNIQUE(equipment_id, alert_type) → 23505
+    // → the whole transaction (including the outbox event) rolled back → the route swallowed it → the
+    // re-alert was silently lost. This is the regression guard: without the fix, the outbox count
+    // below stays 1. (Same 23505 path that would break concurrent same-room sweeps — see case f.)
+    await requireProbePool().query(
+      `UPDATE vt_alert_acks SET acknowledged_at = now() - interval '30 hours'
+       WHERE clinic_id = $1 AND alert_type = 'sweep_missing_alert'`,
+      [ctx.clinicId],
+    );
+
+    // Second sweep — item still missing, prior ack now expired → a NEW alert must fire.
+    const res2 = await api(`/api/docking/rooms/${ctx.roomId}/sweep`, "POST", { confirmedEquipmentIds: [] });
+    expect(res2.status).toBe(200);
+    if (!isRecord(res2.json)) throw new Error("Expected response object");
+    expect(res2.json.missingCount).toBe(1);
+
+    // A SECOND outbox alert row appears (re-alert), and the ack row is reclaimed IN PLACE (still 1 —
+    // never deleted, timestamp refreshed), proving the transaction committed rather than rolling back.
+    expect((await missingAlertOutboxRows(ctx.clinicId)).length).toBe(2);
+    expect(await alertAckCount(ctx.clinicId)).toBe(1);
+    await vi.waitFor(() => {
+      expect(sendPushToRole).toHaveBeenCalledWith(ctx.clinicId, "admin", expect.anything());
+      expect(sendPushToRole).toHaveBeenCalledWith(ctx.clinicId, "vet", expect.anything());
+    });
+  });
+
+  it("(f) two concurrent sweeps of the same room never 23505 and leave exactly one ack row", async () => {
+    const missingId = randomUUID();
+    await seedEquipment(missingId, ctx.clinicId, ctx.roomId, ctx.assetTypeId);
+
+    // Both sweeps read "no ack yet", both compute the same missing id, and both race to write its ack.
+    // The upsert makes the loser reclaim rather than 23505-crash: both succeed, and the lifetime
+    // UNIQUE(equipment_id, alert_type) yields exactly one ledger row (no duplicate, no swallowed error).
+    const [res1, res2] = await Promise.all([
+      api(`/api/docking/rooms/${ctx.roomId}/sweep`, "POST", { confirmedEquipmentIds: [] }),
+      api(`/api/docking/rooms/${ctx.roomId}/sweep`, "POST", { confirmedEquipmentIds: [] }),
+    ]);
+    expect(res1.status).toBe(200);
+    expect(res2.status).toBe(200);
+
+    expect(await alertAckCount(ctx.clinicId)).toBe(1);
+    const outboxCount = (await missingAlertOutboxRows(ctx.clinicId)).length;
+    expect(outboxCount).toBeGreaterThanOrEqual(1);
+    expect(outboxCount).toBeLessThanOrEqual(2);
+  });
+
   it("a clean sweep (a confirmed expected item, nothing missing) raises no alert", async () => {
     // Seed an item EXPECTED to rest in the room, then confirm it in the sweep so the confirmed
     // path is actually exercised. missingCount stays 0, so no alert/outbox/push is raised.

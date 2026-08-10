@@ -54,12 +54,17 @@ function makeSelectChain(rows: unknown[]) {
   return chain;
 }
 
-/** Mocks db.transaction with a tx exposing insert().values() (for the alertAcks writes). */
+/**
+ * Mocks db.transaction with a tx exposing insert().values().onConflictDoUpdate() — the alertAcks
+ * writes upsert on the lifetime UNIQUE(equipment_id, alert_type) so an expired prior claim is
+ * reclaimed in place rather than raising 23505 and rolling the transaction back.
+ */
 function setupTransactionMock() {
-  const values = vi.fn().mockResolvedValue(undefined);
+  const onConflictDoUpdate = vi.fn().mockResolvedValue(undefined);
+  const values = vi.fn().mockReturnValue({ onConflictDoUpdate });
   const tx = { insert: vi.fn().mockReturnValue({ values }) };
   vi.mocked(db.transaction).mockImplementation((async (cb: (t: unknown) => unknown) => cb(tx)) as never);
-  return { tx, values };
+  return { tx, values, onConflictDoUpdate };
 }
 
 beforeEach(() => {
@@ -112,7 +117,9 @@ describe("alertMissingEquipmentAfterSweep", () => {
       }),
     );
 
-    // (b) manager-tier push (admin + vet) with a per-sweep coalescing tag — fires in the background.
+    // (b) manager-tier push (admin + vet) with a per-sweep coalescing tag. The push is detached
+    // post-commit, so awaiting pushSettled gates the assertions below on the background fan-out
+    // actually having completed — without it they could run before sendPushToRole was called.
     await result.pushSettled;
     expect(sendPushToRole).toHaveBeenCalledWith("clinic-1", "admin", expect.objectContaining({ tag: "equipment-missing:room-1" }));
     expect(sendPushToRole).toHaveBeenCalledWith("clinic-1", "vet", expect.objectContaining({ tag: "equipment-missing:room-1" }));
