@@ -75,9 +75,9 @@ const { logAudit } = (await import("../server/lib/audit.js")) as unknown as { lo
 const { sendPushToRole } = (await import("../server/lib/push.js")) as unknown as {
   sendPushToRole: ReturnType<typeof vi.fn>;
 };
-const { alertMissingEquipmentAfterSweep } = (await import(
+const { alertMissingEquipmentAfterSweep } = await import(
   "../server/services/equipment-missing-alert.service.js"
-)) as unknown as { alertMissingEquipmentAfterSweep: ReturnType<typeof vi.fn> };
+);
 const { createAnchor, getCurrentAnchor } = await import("../server/services/equipment-anchor.service.js");
 const { db } = await import("../server/db.js");
 
@@ -497,13 +497,13 @@ describe.skipIf(!DATABASE_URL)("room-sweep missing-equipment alert (Part B P1) i
 
       // The spy is shared across the file (call-through by default); clear its
       // accumulated call count, then force this one call to reject.
-      alertMissingEquipmentAfterSweep.mockClear();
-      alertMissingEquipmentAfterSweep.mockRejectedValueOnce(new Error("alert transport down"));
+      vi.mocked(alertMissingEquipmentAfterSweep).mockClear();
+      vi.mocked(alertMissingEquipmentAfterSweep).mockRejectedValueOnce(new Error("alert transport down"));
 
       const res = await api(`/api/docking/equipment/${eqId}/not-found-here`, "POST");
       // The route's non-fatal .catch swallows the alert failure — the report still succeeds.
       expect(res.status).toBe(200);
-      expect(alertMissingEquipmentAfterSweep).toHaveBeenCalledTimes(1);
+      expect(vi.mocked(alertMissingEquipmentAfterSweep)).toHaveBeenCalledTimes(1);
 
       // The real work (anchor contradiction) happened before the alert call, so it stuck.
       expect(await getCurrentAnchor(ctx.clinicId, eqId)).toBeNull();
