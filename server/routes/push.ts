@@ -6,9 +6,16 @@ import { eq, and } from "drizzle-orm";
 import { requireAuth } from "../middleware/auth.js";
 import { validateBody } from "../middleware/validate.js";
 import { authSensitiveLimiter, pushTestLimiter } from "../middleware/rate-limiters.js";
-import { sendPushToUser, getVapidPublicKey, isVapidReady, isPushReady } from "../lib/push.js";
+import {
+  sendPushToUser,
+  getVapidPublicKey,
+  isVapidReady,
+  isPushReady,
+  whenPushInitialized,
+} from "../lib/push.js";
 import { subscribeSchema, isNativeSubscribeBody, type SubscribeBody } from "../lib/push-subscription-schema.js";
 import { resolveRequestId, apiError } from "../lib/route-utils.js";
+import { logAudit, resolveAuditActorRole } from "../lib/audit.js";
 
 /*
  * PERMISSIONS MATRIX — /api/push
@@ -49,6 +56,9 @@ const deleteSubscribeSchema = z
 
 router.get("/vapid-public-key", async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
+  // Wait out the startup init window so a configured server does not hand a
+  // web client a false PUSH_NOT_CONFIGURED before initVapid has run.
+  await whenPushInitialized();
   const key = await getVapidPublicKey();
   if (!key) {
     return res.status(503).json(
@@ -119,7 +129,20 @@ router.post(
       // different user in the same clinic must replace the row, not 500 on the
       // unique index. Ownership scoping stays on PATCH/DELETE.)
       try {
+        // Detect an ownership transfer INSIDE the tx (SELECT the current owner of
+        // this (clinicId, token) before the delete). The audit itself fires AFTER
+        // the tx commits — fire-and-forget, never on the tx client — so it honors
+        // the "don't await logAudit in a transaction path" convention and never
+        // audits a rolled-back write.
+        let priorUserId: string | null = null;
         const [sub] = await db.transaction(async (tx) => {
+          const existing = await tx
+            .select({ userId: pushSubscriptions.userId })
+            .from(pushSubscriptions)
+            .where(and(eq(pushSubscriptions.clinicId, clinicId), eq(pushSubscriptions.token, body.token)));
+          if (existing[0] && existing[0].userId !== userId) {
+            priorUserId = existing[0].userId;
+          }
           await tx
             .delete(pushSubscriptions)
             .where(and(eq(pushSubscriptions.clinicId, clinicId), eq(pushSubscriptions.token, body.token)));
@@ -132,6 +155,20 @@ router.post(
           console.error("SUBSCRIBE (native) DB insert returned no row");
           return saveFailed();
         }
+        if (priorUserId) {
+          // Fire-and-forget (NOT awaited, NOT on the tx client). Metadata carries
+          // platform + previousUserId only — never the token (a device secret).
+          logAudit({
+            clinicId,
+            actionType: "push_token_reassigned",
+            performedBy: userId,
+            performedByEmail: req.authUser?.email ?? "",
+            targetId: sub.id,
+            targetType: "push_subscription",
+            metadata: { platform: body.platform, previousUserId: priorUserId },
+            actorRole: resolveAuditActorRole(req),
+          });
+        }
         return res.json({ success: true });
       } catch (err) {
         console.error("SUBSCRIBE (native) DB write failed:", err);
@@ -139,7 +176,10 @@ router.post(
       }
     }
 
-    // Web-push path — requires the VAPID signing pair (unchanged behavior).
+    // Web-push path — requires the VAPID signing pair (unchanged behavior). Wait
+    // out the startup init window first so a configured server does not 503 a
+    // legitimate subscribe before initVapid has run.
+    await whenPushInitialized();
     if (!isVapidReady()) {
       console.error("SUBSCRIBE: VAPID not initialized (keys missing or init failed)");
       return res.status(503).json(
@@ -152,14 +192,12 @@ router.post(
       );
     }
 
+    // `endpoint` is guaranteed here: the schema's web branch is `endpoint:
+    // z.string().url()`, so reaching this point (not a native body) means it is a
+    // valid URL string — the old `!endpoint` guard was dead. p256dh/auth keep
+    // their defensive checks: `z.string().min(1)` admits a whitespace-only string,
+    // which `.trim()` still rejects below.
     const { endpoint, keys } = body;
-    // Defensive re-validation (the Zod validator already enforces these) — keeps the
-    // stable Phase-5 error-contract reason codes on the web path.
-    if (!endpoint || typeof endpoint !== "string") {
-      return res.status(400).json(
-        apiError({ code: "VALIDATION_FAILED", reason: "ENDPOINT_REQUIRED", message: "endpoint is required", requestId }),
-      );
-    }
     if (!keys?.p256dh || typeof keys.p256dh !== "string" || !keys.p256dh.trim()) {
       return res.status(400).json(
         apiError({ code: "VALIDATION_FAILED", reason: "P256DH_REQUIRED", message: "keys.p256dh is required", requestId }),
@@ -223,9 +261,23 @@ router.patch("/subscribe", requireAuth, validateBody(patchSubscribeSchema), asyn
       adminHourlySummaryEnabled,
     } = req.body as z.infer<typeof patchSubscribeSchema>;
 
+    // The schema's refine guarantees one of endpoint/token; the null branch is
+    // defensive-only (400 rather than a `!` assertion).
     const idMatch = endpoint
       ? eq(pushSubscriptions.endpoint, endpoint)
-      : eq(pushSubscriptions.token, token!);
+      : token
+        ? eq(pushSubscriptions.token, token)
+        : null;
+    if (!idMatch) {
+      return res.status(400).json(
+        apiError({
+          code: "VALIDATION_FAILED",
+          reason: "IDENTIFIER_REQUIRED",
+          message: "endpoint or token is required",
+          requestId,
+        }),
+      );
+    }
 
     await db
       .update(pushSubscriptions)
@@ -265,9 +317,23 @@ router.delete("/subscribe", requireAuth, validateBody(deleteSubscribeSchema), as
     const clinicId = req.clinicId!;
     const { endpoint, token } = req.body as z.infer<typeof deleteSubscribeSchema>;
 
+    // The schema's refine guarantees one of endpoint/token; the null branch is
+    // defensive-only (400 rather than a `!` assertion).
     const idMatch = endpoint
       ? eq(pushSubscriptions.endpoint, endpoint)
-      : eq(pushSubscriptions.token, token!);
+      : token
+        ? eq(pushSubscriptions.token, token)
+        : null;
+    if (!idMatch) {
+      return res.status(400).json(
+        apiError({
+          code: "VALIDATION_FAILED",
+          reason: "IDENTIFIER_REQUIRED",
+          message: "endpoint or token is required",
+          requestId,
+        }),
+      );
+    }
 
     await db
       .delete(pushSubscriptions)
@@ -296,6 +362,10 @@ router.delete("/subscribe", requireAuth, validateBody(deleteSubscribeSchema), as
 router.post("/test", requireAuth, pushTestLimiter, async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
   try {
+    // Wait out the startup init window: app.listen() accepts requests before the
+    // runMigrations() chain runs initVapid/initApns/initFcm, so a /test that lands
+    // in that window would read isPushReady() === false on a configured server.
+    await whenPushInitialized();
     // Transport-neutral: a test push can go over ANY configured transport
     // (web-push VAPID, APNs, or FCM), so an APNs-only or FCM-only deployment is
     // accepted here — the per-subscription dispatcher still routes by platform.

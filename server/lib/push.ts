@@ -23,6 +23,42 @@ export function isPushReady(): boolean {
   return isVapidReady() || isApnsReady() || isFcmReady();
 }
 
+// Startup init gate. app.listen() accepts requests before the runMigrations()
+// chain runs initVapid/initApns/initFcm, so a readiness check that lands in that
+// window would falsely report a configured server as NOT_CONFIGURED. Handlers
+// await whenPushInitialized() before checking isPushReady(). The gate is armed
+// synchronously at startup (beginPushInitialization) so a request in the window
+// waits, and released once the init sequence is attempted (markPushInitialized).
+let pushInitResolve: (() => void) | null = null;
+let pushInitPromise: Promise<void> | null = null;
+
+/**
+ * Arm the startup init gate. Called once, synchronously, before the async init
+ * sequence runs so a request that arrives in the listen→init window blocks on
+ * whenPushInitialized() instead of racing a not-yet-ready transport check.
+ * Idempotent.
+ */
+export function beginPushInitialization(): void {
+  if (pushInitPromise) return;
+  pushInitPromise = new Promise<void>((resolve) => {
+    pushInitResolve = resolve;
+  });
+}
+
+/** Release the gate once every transport init has been attempted. Idempotent. */
+export function markPushInitialized(): void {
+  pushInitResolve?.();
+}
+
+/**
+ * Resolves once startup push-transport init has been attempted. If init was
+ * never begun — test mode, where startBackgroundSchedulers is a no-op — this
+ * resolves immediately so a handler never hangs.
+ */
+export function whenPushInitialized(): Promise<void> {
+  return pushInitPromise ?? Promise.resolve();
+}
+
 export async function initVapid(): Promise<void> {
   try {
     let publicKey = process.env.VAPID_PUBLIC_KEY ?? "";

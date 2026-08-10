@@ -91,10 +91,8 @@ export async function initApns(): Promise<void> {
 }
 
 /**
- * APNs `sound` for one alert. A silent payload (the subscription disabled sound)
- * gets NO sound key at all — even when critical sound is configured — so APNs
- * stays silent for a user who turned sound off. Non-silent: critical-sound
- * object when configured, else the default sound.
+ * APNs `sound` for one alert. Safety policy: disabling sound keeps the
+ * notification silent even when a critical sound is configured.
  */
 export function apnsSoundForPayload(
   silent: boolean | undefined,

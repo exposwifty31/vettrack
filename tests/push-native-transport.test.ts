@@ -1,14 +1,9 @@
 /**
- * G4-2 — native transport classification + APNs sound selection (ADR-009).
+ * G4-2 — native transport safety decisions (ADR-009).
  *
- * Pure-function coverage for two safety-relevant decisions in the native
- * transports:
- *   - classifyFcmError: which FCM error codes delete a subscription vs. retry.
- *     A credential misconfig (`messaging/mismatched-credential`) must NOT be
- *     treated as a dead token — deleting the subscription over a server-side
- *     misconfiguration would silently unsubscribe healthy devices.
- *   - apnsSoundForPayload: a subscription that disabled sound (silent) must get
- *     NO APNs sound at all, even when critical-sound is configured.
+ * Guards two safety guarantees: a server-side credential misconfig must never be
+ * mistaken for a dead token (which would silently unsubscribe healthy devices),
+ * and a subscription that disabled sound must stay silent.
  *
  * Pure — no db, no transports, no network.
  */

@@ -116,6 +116,17 @@ async function main() {
       "23514",
       "web row missing p256dh must violate the platform-columns CHECK",
     );
+    // web carrying a native token — web rows must have token NULL (columns are
+    // mutually exclusive), even with the full web-push triple present
+    await expectReject(
+      () =>
+        pool.query(
+          `insert into vt_push_subscriptions (id, clinic_id, user_id, platform, endpoint, p256dh, auth, token) values ($1,$2,$3,'web',$4,'p','a',$5)`,
+          [uid(), clinicId, "u-web-tok", `https://push.example/${uid()}`, `TOK-${uid()}`],
+        ),
+      "23514",
+      "web row carrying a token must violate the platform-columns CHECK",
+    );
     // native (ios) without a token
     await expectReject(
       () =>
