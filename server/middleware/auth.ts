@@ -186,7 +186,7 @@ function authRequestDebugCookieMeta(req: Request): { cookieHeaderLength: number;
   };
 }
 
-function isForbiddenProductionClinicId(clinicId: string | null | undefined): boolean {
+export function isForbiddenProductionClinicId(clinicId: string | null | undefined): boolean {
   const c = clinicId?.trim() ?? "";
   if (!c) return true;
   return c === LEGACY_CLINIC_ID;

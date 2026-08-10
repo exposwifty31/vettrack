@@ -18,7 +18,10 @@ export default defineConfig({
   test: {
     environment: "node",
     setupFiles: ["./tests/vitest-setup.ts"],
-    include: ["tests/equipment-operational-state.integration.test.ts"],
+    include: [
+      "tests/equipment-operational-state.integration.test.ts",
+      "tests/seed-reviewer-demo.integration.test.ts",
+    ],
     exclude: ["**/node_modules/**"],
     hookTimeout: 60_000,
     testTimeout: 60_000,
