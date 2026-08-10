@@ -62,12 +62,23 @@ vi.mock("../server/middleware/auth.js", () => ({
   requireEffectiveRole: () => (_req: unknown, _res: unknown, next: () => void) => next(),
 }));
 
+// Partial mock: keep the real alert service (the other cases assert its real
+// outbox/ack rows) but wrap alertMissingEquipmentAfterSweep so case (j) can
+// force it to reject and prove the route's non-fatal .catch keeps the 200.
+vi.mock("../server/services/equipment-missing-alert.service.js", async (importActual) => {
+  const actual = await importActual<typeof import("../server/services/equipment-missing-alert.service.js")>();
+  return { ...actual, alertMissingEquipmentAfterSweep: vi.fn(actual.alertMissingEquipmentAfterSweep) };
+});
+
 const dockingRoutes = (await import("../server/routes/docking.js")).default;
 const { logAudit } = (await import("../server/lib/audit.js")) as unknown as { logAudit: ReturnType<typeof vi.fn> };
 const { sendPushToRole } = (await import("../server/lib/push.js")) as unknown as {
   sendPushToRole: ReturnType<typeof vi.fn>;
 };
-const { createAnchor } = await import("../server/services/equipment-anchor.service.js");
+const { alertMissingEquipmentAfterSweep } = (await import(
+  "../server/services/equipment-missing-alert.service.js"
+)) as unknown as { alertMissingEquipmentAfterSweep: ReturnType<typeof vi.fn> };
+const { createAnchor, getCurrentAnchor } = await import("../server/services/equipment-anchor.service.js");
 const { db } = await import("../server/db.js");
 
 function buildApp() {
@@ -471,6 +482,31 @@ describe.skipIf(!DATABASE_URL)("room-sweep missing-equipment alert (Part B P1) i
       expect((await missingAlertOutboxRows(ctx.clinicId)).length).toBe(0);
       expect(await alertAckCount(ctx.clinicId)).toBe(0);
       expect(sendPushToRole).not.toHaveBeenCalled();
+    });
+
+    it("(j) a rejected alert is non-fatal — the route still returns 200 and the anchor is still contradicted", async () => {
+      const eqId = randomUUID();
+      await seedEquipment(eqId, ctx.clinicId, ctx.roomId, ctx.assetTypeId);
+      await createAnchor(db, {
+        clinicId: ctx.clinicId,
+        equipmentId: eqId,
+        dockId: ctx.dockId,
+        roomId: ctx.roomId,
+        source: "citizen",
+      });
+
+      // The spy is shared across the file (call-through by default); clear its
+      // accumulated call count, then force this one call to reject.
+      alertMissingEquipmentAfterSweep.mockClear();
+      alertMissingEquipmentAfterSweep.mockRejectedValueOnce(new Error("alert transport down"));
+
+      const res = await api(`/api/docking/equipment/${eqId}/not-found-here`, "POST");
+      // The route's non-fatal .catch swallows the alert failure — the report still succeeds.
+      expect(res.status).toBe(200);
+      expect(alertMissingEquipmentAfterSweep).toHaveBeenCalledTimes(1);
+
+      // The real work (anchor contradiction) happened before the alert call, so it stuck.
+      expect(await getCurrentAnchor(ctx.clinicId, eqId)).toBeNull();
     });
   });
 });
