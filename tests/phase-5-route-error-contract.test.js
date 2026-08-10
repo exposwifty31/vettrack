@@ -229,10 +229,15 @@ describe("Phase 5 route error contract checks (static)", () => {
   });
 
   it("Push route emits standardized subscription and test errors", () => {
+    // ENDPOINT_REQUIRED removed: the web branch schema (`endpoint:
+    // z.string().url()`) guarantees a valid URL, so that guard was dead code.
+    // P256DH_REQUIRED / AUTH_KEY_REQUIRED stay reachable (`.min(1)` admits a
+    // whitespace-only string, which the `.trim()` guard still rejects).
     expect(
       push.includes("resolveRequestId") &&
         push.includes("reason: \"PUSH_NOT_CONFIGURED\"") &&
-        push.includes("reason: \"ENDPOINT_REQUIRED\"") &&
+        push.includes("reason: \"P256DH_REQUIRED\"") &&
+        push.includes("reason: \"AUTH_KEY_REQUIRED\"") &&
         push.includes("reason: \"PUSH_SUBSCRIBE_SAVE_FAILED\"") &&
         push.includes("reason: \"PUSH_SUBSCRIPTION_NOT_FOUND\"") &&
         push.includes("reason: \"PUSH_TEST_FAILED\""),

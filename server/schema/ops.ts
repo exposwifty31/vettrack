@@ -3,6 +3,7 @@ import {
   text, timestamp, integer, boolean, varchar, jsonb,
   date, time, uuid, index, uniqueIndex, primaryKey, bigserial, pgEnum,
 } from "drizzle-orm/pg-core";
+import type { PushPlatform } from "@vettrack/contracts";
 import { vtTable } from "./helpers.js";
 import { clinics, users } from "./core.js";
 import { appointments } from "./tasks.js";
@@ -205,9 +206,13 @@ export const pushSubscriptions = vtTable("vt_push_subscriptions", {
   id: text("id").primaryKey(),
   clinicId: text("clinic_id").notNull().references(() => clinics.id, { onDelete: "restrict" }),
   userId: text("user_id").notNull(),
-  endpoint: text("endpoint").notNull().unique(),
-  p256dh: text("p256dh").notNull(),
-  auth: text("auth").notNull(),
+  // ADR-009: web | ios | android | expo. Web-push rows keep endpoint/p256dh/auth;
+  // native rows carry `token` instead. The web columns are nullable so native rows validate.
+  platform: text("platform").notNull().default("web").$type<PushPlatform>(),
+  endpoint: text("endpoint").unique(),
+  p256dh: text("p256dh"),
+  auth: text("auth"),
+  token: text("token"),
   soundEnabled: boolean("sound_enabled").notNull().default(true),
   alertsEnabled: boolean("alerts_enabled").notNull().default(true),
   technicianReturnRemindersEnabled: boolean("technician_return_reminders_enabled").notNull().default(true),

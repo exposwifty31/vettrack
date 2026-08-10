@@ -116,6 +116,9 @@ export type AuditActionType =
   | "push_subscription_created"
   | "push_subscription_updated"
   | "push_subscription_deleted"
+  // Native (APNs/FCM/Expo) device-token ownership transfer: a shared device's
+  // (clinicId, token) row moved from one user to another on re-register.
+  | "push_token_reassigned"
   | "shift_chat_message_posted"
   | "shift_chat_broadcast_ack"
   | "shift_chat_message_pinned"
