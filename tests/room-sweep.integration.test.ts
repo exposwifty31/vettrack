@@ -45,6 +45,13 @@ vi.mock("../server/lib/audit.js", () => ({
   resolveAuditActorRole: () => "admin",
 }));
 
+// The post-commit missing-equipment alert broadcasts to the manager tier. Stub push so the
+// equipment_missing_alerted assertions below depend on the durable outbox/audit path, not on real
+// web-push delivery (the alert's own suite covers the push fan-out).
+vi.mock("../server/lib/push.js", () => ({
+  sendPushToRole: vi.fn().mockResolvedValue({ deliveredAny: true, transientFailures: 0, invalidOrGoneCount: 0 }),
+}));
+
 vi.mock("../server/middleware/auth.js", () => ({
   requireAuth: (req: Record<string, unknown>, _res: unknown, next: () => void) => {
     req.authUser = { id: currentUserId, email: "test@ops.local", role: currentUserRole };
@@ -192,6 +199,10 @@ async function lastInvalidatedReason(equipmentId: string): Promise<string | null
 
 async function purgeClinic(clinicId: string) {
   const P = requireProbePool();
+  // vt_alert_acks.clinic_id is ON DELETE RESTRICT — the sweep's missing-equipment alert now
+  // writes ack rows, so they must be cleared before the clinic delete. (vt_event_outbox is
+  // ON DELETE CASCADE, so its EQUIPMENT_MISSING_ALERT rows are purged by the clinic delete.)
+  await P.query(`DELETE FROM vt_alert_acks WHERE clinic_id = $1`, [clinicId]);
   await P.query(`DELETE FROM vt_equipment_anchors WHERE clinic_id = $1`, [clinicId]);
   await P.query(`DELETE FROM vt_equipment WHERE clinic_id = $1`, [clinicId]);
   await P.query(`DELETE FROM vt_docks WHERE clinic_id = $1`, [clinicId]);
@@ -438,7 +449,9 @@ describe.skipIf(!DATABASE_URL)("docking room sweep (T3.2a) integration", () => {
       // Checked-out item is never touched — no anchor rows at all.
       expect(await anchorCount(checkedOutId)).toBe(0);
 
-      expect(logAudit).toHaveBeenCalledTimes(1);
+      // Two audits now: room_swept (first), then equipment_missing_alerted from the
+      // post-commit missing-equipment alert (missingCount=1 here).
+      expect(logAudit).toHaveBeenCalledTimes(2);
       const call = logAudit.mock.calls[0]?.[0] as unknown;
       expect(isRecord(call)).toBe(true);
       if (!isRecord(call)) throw new Error("Expected logAudit call arg to be an object");
@@ -446,6 +459,8 @@ describe.skipIf(!DATABASE_URL)("docking room sweep (T3.2a) integration", () => {
       expect(call.targetId).toBe(ctx.roomId);
       expect(isRecord(call.metadata) && (call.metadata as Record<string, unknown>).confirmed).toBe(2);
       expect(isRecord(call.metadata) && (call.metadata as Record<string, unknown>).missing).toBe(1);
+      const alertCall = logAudit.mock.calls[1]?.[0] as unknown;
+      expect(isRecord(alertCall) && (alertCall as Record<string, unknown>).actionType).toBe("equipment_missing_alerted");
     });
 
     it("A1-1 (CodeRabbit): an unconfirmed NEVER-anchored homed item gets a durable sweep_missing marker row → reconciliation buckets it `missing`, not `returned_unverified`", async () => {

@@ -28,6 +28,7 @@ import {
   type ReconciliationBucket,
 } from "../services/docking.service.js";
 import { createAnchor, invalidateCurrentAnchor } from "../services/equipment-anchor.service.js";
+import { alertMissingEquipmentAfterSweep } from "../services/equipment-missing-alert.service.js";
 import { resolveShiftCoordinator, confirmShiftCoordinator } from "../services/equipment-coordinator.service.js";
 import { mapLegacyRoleToClinicalRole } from "../lib/authority-roles.js";
 
@@ -501,6 +502,9 @@ router.post(
     let confirmedCount = 0;
     let missingCount = 0;
     let skippedNoStationCount = 0;
+    // Ids the sweep leaves in the `missing` state this run (both missing branches below).
+    // Collected for the post-commit proactive alert — the route only counted before.
+    const missingEquipmentIds: string[] = [];
 
     await db.transaction(async (tx) => {
       const [clinicDocks, expectedResting] = await Promise.all([
@@ -572,6 +576,7 @@ router.post(
         } else if (hasOpenAnchor.has(item.id)) {
           await invalidateCurrentAnchor(tx, { clinicId, equipmentId: item.id, reason: "sweep_missing" });
           missingCount++;
+          missingEquipmentIds.push(item.id);
         } else {
           // Never-anchored (or already-contradicted) unconfirmed item — write a
           // durable, already-invalidated sweep_missing marker so the sweep
@@ -588,6 +593,7 @@ router.post(
             invalidatedReason: "sweep_missing",
           });
           missingCount++;
+          missingEquipmentIds.push(item.id);
         }
       }
     });
@@ -602,6 +608,20 @@ router.post(
       targetId: roomId,
       metadata: { confirmed: confirmedCount, missing: missingCount },
     });
+
+    // Proactive alert for items the sweep left `missing` (Part B Phase 1), AFTER the sweep
+    // transaction commits. The awaited call resolves once the durable outbox row + acks commit
+    // atomically inside the service; the manager push is DETACHED there and fans out in the
+    // background, so it never blocks this response. This `.catch` guards a durable-commit failure
+    // only — a notification failure must never fail the sweep.
+    if (missingEquipmentIds.length > 0) {
+      await alertMissingEquipmentAfterSweep({ clinicId, roomId, missingEquipmentIds }).catch((err) => {
+        console.error(
+          "[docking] equipment-missing alert failed (non-fatal):",
+          err instanceof Error ? err.message : err,
+        );
+      });
+    }
 
     res.json({ roomId, confirmedCount, missingCount, skippedNoStationCount, sweptById: userId, sweptAt });
   },

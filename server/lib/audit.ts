@@ -255,6 +255,13 @@ export type AuditActionType =
   | "equipment_stale_checkout_nudged"
   // T3.5 — staleReturnedSweep nudge worker (returned-unverified → nudge managers).
   | "equipment_stale_returned_nudged"
+  // Part B Phase 1 — proactive room-sweep missing-equipment alert. Emitted once
+  // per sweep that leaves item(s) in the `missing` state (sweep_missing marker),
+  // after the sweep transaction commits, alongside an EQUIPMENT_MISSING_ALERT
+  // realtime event + a manager-tier push. targetId = the swept roomId; metadata
+  // carries the alerted equipmentIds + count. Idempotent per item within a window
+  // (vt_alert_acks, alertType "sweep_missing_alert").
+  | "equipment_missing_alerted"
   // Sprint 1.7 — inference engine fires when no location signal exists for a device.
   | "equipment_location_unknown"
   // T-24b — damage report flips conditionStatus to a non-"ok" value (R-EQ-F3).

@@ -5797,6 +5797,148 @@ no enforcement files, no queries, no audit kinds.
 pre-existing environmental failures). Not verified: live-server/DB-integration excluded groups (no local
 DB at current schema; failures above are that same environmental gap, present on base).
 
+## 2026-08-10 — PR #172 CodeRabbit round 1: 5 findings + push-mock addressed (branch feat/equipment-missing-alert)
+
+Addressed CodeRabbit's 5 review comments on the room-sweep missing-equipment alert, plus the "Also"
+request. Detached the manager push from the durable path, hardened the audit, dropped a dead export,
+and tightened three tests. Multi-tenancy and the SSE/outbox frozen surface untouched (new realtime
+`type` only; no transport change).
+
+**Evidence (all observed this session against local Postgres `postgres://vettrack:vettrack@localhost:5432/vettrack`):**
+- **#2/#5 (RED→GREEN anchor):** added `tests/equipment-missing-alert.service.test.ts` "still writes the
+  outbox event and audit when the manager push rejects". RED on HEAD → test errored with `Error: push
+  transport down` (function rejected before `logAudit` — the exact bug). GREEN after the service fix →
+  `pnpm test tests/equipment-missing-alert.service.test.ts` = `9 passed (9)`.
+- **#2 fix:** `server/services/equipment-missing-alert.service.ts` — push extracted into self-contained
+  `deliverManagerPushForMissing()` (own try/catch → `console.error`, never throws); `logAudit` now called
+  unconditionally right after kicking it off, so a push failure can never skip the audit.
+- **#1 fix:** durable outbox/ack `db.transaction` still awaited; the manager push is DETACHED
+  (`const pushSettled = deliverManagerPushForMissing(...)`, not awaited) and returned as `pushSettled` so it
+  never blocks the sweep HTTP response. `server/routes/docking.ts:612-626` awaited call now resolves at the
+  durable commit; its `.catch` guards a durable-commit failure only (comment updated to say so). Integration
+  test `tests/equipment-missing-alert.integration.test.ts` now `vi.waitFor`s the background push in test 1
+  and before the mockClear in test (d), rather than treating the HTTP 200 as the push's completion signal.
+- **#3 fix:** removed `export const __test = {...}`. No importer (`grep -rn "__test" tests/` → none reference
+  this module). Real named exports `EQUIPMENT_MISSING_ALERT_EVENT` + `MISSING_ALERT_TYPE` preserved. knip
+  base-comparison (`git stash` HEAD vs working): HEAD flagged 3 (both consts + `__test`); after change 2
+  (the two consts, which #3 says to keep) — net **−1** finding, no regression.
+- **#4 fix:** clean-sweep integration test now seeds an expected item and confirms it
+  (`confirmedEquipmentIds: [confirmedId]`), asserting `confirmedCount === 1` / `missingCount === 0` / empty
+  outbox / no push — the confirmed path is actually exercised. Verbose run confirmed it ran:
+  `✓ a clean sweep (a confirmed expected item, nothing missing) raises no alert`.
+- **Also:** `tests/room-sweep.integration.test.ts` now `vi.mock`s `../server/lib/push.js` so its
+  `equipment_missing_alerted` (times(2)) assertions no longer depend on real web-push delivery.
+- **Suites:** `DATABASE_URL=… pnpm test tests/equipment-missing-alert.integration.test.ts
+  tests/room-sweep.integration.test.ts` → `Test Files 2 passed (2)`, `Tests 13 passed (13)` (verified not
+  skipped via `--reporter=verbose`; only stderr = pre-existing `[i18n] Invalid locale "*"` middleware log,
+  present even in the no-push clean-sweep test).
+- **Gates:** `pnpm typecheck` (frontend + server tsconfig) → clean, 0 errors. `pnpm i18n:check` → deep key
+  parity OK. `pnpm tenant:lint:touched` → 3 warn-only findings, all pre-existing false positives (docking.ts
+  338/687 in untouched code; the alertAcks SELECT at service.ts:156 IS clinic-scoped via
+  `eq(alertAcks.clinicId, clinicId)` — heuristic can't see it; no new DB query added). No ESLint config in repo.
+
+**Verdict:** VERIFIED (RED→GREEN for the new test, both DB-gated integration files green against local
+Postgres, typecheck + i18n parity clean, knip net-improved). Frozen surfaces intact: SSE transport
+unchanged (new event `type` only), every emit/query clinic-scoped, `equipment_missing_alerted` remains a
+closed-union audit kind.
+
+---
+
+### 2026-08-10 — PR #172 CodeRabbit round 2 (Lead inline fix): rolling-dedup lifetime-uniqueness bug
+
+**Task:** CodeRabbit (ASSERTIVE, run `3b742ea4`) posted a Major/Heavy-lift finding on the fresh commit
+`ff4dad004`: `server/services/equipment-missing-alert.service.ts` inserts a fresh `vt_alert_acks` row per
+(re-)alert, but `vt_alert_acks` carries a lifetime `UNIQUE(equipment_id, alert_type)` — verified in
+`migrations/001_initial_schema.sql:78` (the Drizzle model at `server/schema/equipment.ts:612` drifted to a
+plain `index(...)`, so the constraint was invisible from the schema). Once the DEDUPE window expires, the
+re-alert INSERT raises `23505`, the whole transaction (incl. the outbox event) rolls back, and
+`server/routes/docking.ts`'s `.catch` swallows it → the proactive re-alert is silently lost. The feature
+fired exactly once per equipment item, ever.
+
+**Verified (not asserted):**
+- Bug reproduced LIVE. Reverted the service to branch-HEAD (plain insert), ran the new re-alert test:
+  RED with `AssertionError: expected 1 to be 2` and stderr
+  `[docking] equipment-missing alert failed (non-fatal): Failed query: insert into "vt_alert_acks" …` —
+  the swallowed 23505, outbox count stuck at 1.
+- **Fix:** the per-id insert is now `.onConflictDoUpdate({ target: [alertAcks.equipmentId,
+  alertAcks.alertType], set: { acknowledgedAt: now, … } })` — reclaims the expired claim in place inside the
+  same transaction. The window filter guarantees any conflicting row is already expired, so it can never
+  clobber a still-valid ack. `clinicId` deliberately omitted from the `set` (equipment_id is a global UUID;
+  the row's clinic never changes on reclaim → no cross-tenant write).
+- **Coverage added** (`tests/equipment-missing-alert.integration.test.ts`): case (e) re-alert-after-window
+  (RED→GREEN: outbox 1→2, ack reclaimed in place = still 1); case (f) two concurrent same-room sweeps →
+  both 200, exactly one ack row, no 23505 (the upsert serializes the loser on the row lock).
+- **Nit:** `tests/equipment-missing-alert.service.test.ts:115` comment rewritten to explain awaiting
+  `pushSettled` gates the assertions on the detached fan-out (not restate the push). The unit-test tx mock
+  now returns `values().onConflictDoUpdate()` to match the upsert chain.
+- **Gates:** `pnpm exec vitest run` on the three affected files → `Test Files 3 passed`, `Tests 24 passed`.
+  `pnpm typecheck` (frontend + server) → exit 0.
+
+**Verdict:** VERIFIED (RED→GREEN on the exact 23505 path, all three affected suites green vs local Postgres,
+full typecheck clean). Frozen surfaces intact: SSE transport untouched (no new type), every query/emit
+clinic-scoped, `equipment_missing_alerted` stays a closed-union audit kind, no schema/migration change.
+
+---
+
+### 2026-08-10 — PR #172 CodeRabbit round 3 (Lead inline fix): make the ack the atomic claim gate
+
+**Task:** CodeRabbit round 3 on head `17f6b7fe3` raised three comments on
+`server/services/equipment-missing-alert.service.ts` + its tests.
+
+**Comment 1 — FIXED (concurrency: exactly-one alert).** The round-2 code emitted the outbox event FIRST
+(unconditionally) inside the tx, then upserted acks. Two truly-concurrent sweeps of the same room both
+pass the pre-tx `recentAcks` read (neither has committed) → both emit → a DUPLICATE WARNING. Fix: the
+per-id upsert is now the atomic claim gate —
+`onConflictDoUpdate({ target:[equipmentId,alertType], set:{…}, setWhere: lt(acknowledgedAt, cutoff) }).returning({ equipmentId })`
+(same `setWhere`+`RETURNING` mechanism already in production at `server/routes/procurement.ts:349`). The
+loop runs FIRST, collects `claimed` (ids whose upsert returned a row), and the outbox event is emitted
+ONLY IF `claimed.length > 0`, carrying `equipmentIds: claimed`. Push + audit + `return {alerted: claimed}`
+are gated on `claimed.length > 0`; the audit `metadata` now reads `claimed` (not `toAlert`). Both the
+outbox payload AND the audit metadata were switched.
+- **The losing concurrent sweep neither duplicates the alert nor hides a 23505:** a fresh insert returns
+  its row (claim); an expired prior claim (`acknowledgedAt < cutoff`) is reclaimed and returns its row; a
+  still-fresh row (a concurrent sweep just claimed it, `acknowledgedAt >= cutoff`) fails `setWhere` → the
+  DO UPDATE matches nothing → `RETURNING` is empty → the loser claims nothing → emits no outbox. The
+  conditional upsert never conflicts-to-error, so there is no 23505 to swallow. Outcome is deterministic:
+  exactly one alert regardless of interleaving.
+- **RED→GREEN (verified, not asserted):** tightened integration case (f) to `toBe(1)` outbox + `toBe(1)`
+  ack. Against the round-2 service (outbox-first) case (f) failed **3/3 runs**: `AssertionError: expected 2
+  to be 1`. After the fix, case (f) passes **4/4** runs (deterministic). Case (e) re-alert-after-window
+  (aged ack `< cutoff` → conditional update fires, outbox 1→2, ack reclaimed in place = 1) stays green.
+- Unit-test mock (`tests/equipment-missing-alert.service.test.ts` `setupTransactionMock`) updated to the
+  new `insert().values().onConflictDoUpdate().returning()` chain; `returning` echoes the inserted
+  `equipmentId` so the fresh-insert claim path is exercised and `result.alerted` preserves order. Existing
+  assertions (outbox called with claimed ids, audit, `values` per id) stay green — 9/9 unit tests pass.
+
+**Comment 2 — SKIPPED (clinic-scoped uniqueness).** Deliberately NOT changing the migration, the Drizzle
+unique constraint, or the `onConflictDoUpdate` target. Reason: `equipment_id` is a globally-unique
+`randomUUID()` per equipment row, so the existing lifetime `UNIQUE(equipment_id, alert_type)` cannot
+produce a cross-tenant collision — it is already effectively per-clinic. `vt_alert_acks` is a migration-001
+table shared by other alert_types (reminders etc.); dropping+recreating its UNIQUE constraint is an
+app-wide production migration whose blast radius is disproportionate to a UUID-impossible collision, and
+out of scope for this feature PR. The `onConflictDoUpdate` target MUST match the actual DB constraint
+`(equipment_id, alert_type)`; adding `clinicId` without the (skipped) migration would break the upsert.
+Tenancy is otherwise preserved: the pre-tx read is `eq(clinicId)`-scoped, `.values({ clinicId, … })`, and
+the outbox/audit/push are all clinic-scoped.
+
+**Comment 3 — FIXED (trivial).** Added an inline comment at `setupTransactionMock` explaining the
+pre-existing `as never` cast: Drizzle's `transaction` carries heavily-overloaded generic signatures a
+hand-rolled callback mock cannot satisfy structurally, so the cast is required to substitute the mock; a
+properly-typed alternative is not practical. Cast retained.
+
+**Gates:** `pnpm typecheck` (frontend + server) → **exit 0**, zero `error TS` lines.
+`DATABASE_URL=… pnpm exec vitest run tests/equipment-missing-alert.service.test.ts
+tests/equipment-missing-alert.integration.test.ts` → **Test Files 2 passed, Tests 14 passed** (DB-gated
+integration confirmed NOT skipped — `DATABASE_URL set: yes`). Out-of-scope regression check:
+`tests/room-sweep.integration.test.ts` → **10 passed** (its `equipment_missing_alerted times(2)` assertion
+holds because the missing item there is freshly claimed, so audit still fires under the new
+`claimed.length > 0` gate).
+
+**Verdict:** VERIFIED (RED→GREEN on the concurrency duplicate-alert path with the RED reproduced against the
+old service, deterministic GREEN over 4 runs, all affected + adjacent suites green vs local Postgres,
+typecheck clean). Frozen surfaces intact: SSE transport untouched (no new event type), every query/emit
+clinic-scoped, `equipment_missing_alerted` stays a closed-union audit kind, no schema/migration change.
+
 ## 2026-08-10 — PR #173 CodeRabbit round-3 fixes: native push server (G4-2) (worktree @ base 5e96e2a6e)
 
 **Claim:** Resolved 4 CodeRabbit comments on `feat/native-push-server`: (1) model the guaranteed

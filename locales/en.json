@@ -3500,6 +3500,10 @@
     "pushTitle": "Returned equipment needs verification",
     "pushBody": "An item was returned but hasn't been re-verified at its station yet. Please check it in."
   },
+  "equipmentMissing": {
+    "pushTitle": "Equipment missing after room sweep",
+    "pushBody": "A room sweep found equipment that isn't at its station. Please locate and re-verify it."
+  },
   "sweepEscalation": {
     "stage1Title": "Room Sweep due soon",
     "stage1Body": "Your shift ends in about an hour and the Room Sweep isn't done yet.",
