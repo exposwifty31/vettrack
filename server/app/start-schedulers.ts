@@ -1,4 +1,6 @@
 import { initVapid, startPushCleanupScheduler } from "../lib/push.js";
+import { initApns } from "../lib/push-apns.js";
+import { initFcm } from "../lib/push-fcm.js";
 import { startCleanupScheduler } from "../lib/cleanup-scheduler.js";
 import {
   startScheduledNotificationProcessor,
@@ -40,6 +42,8 @@ export async function startBackgroundSchedulers() {
     return;
   }
   await initVapid();
+  await initApns();
+  await initFcm();
   startEventOutboxPublisher();
   startOutboxJanitor();
   startAlertReminderScheduler();

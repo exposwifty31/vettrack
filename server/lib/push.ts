@@ -2,10 +2,14 @@ import webpush from "web-push";
 import { db, pool, pushSubscriptions, serverConfig, users } from "../db.js";
 import { and, eq, isNull } from "drizzle-orm";
 import * as Sentry from "@sentry/node";
+import { buildPushAlertEnvelope, type PushAlertEnvelope } from "@vettrack/contracts";
 import { isCircuitOpen, recordFailure, recordSuccess } from "./circuit-breaker.js";
 import { incrementMetric } from "./metrics.js";
 import { insertRealtimeDomainEvent } from "./realtime-outbox.js";
 import { withTimeout } from "./timeout.js";
+import type { PushDispatchOutcome } from "./push-types.js";
+import { sendApnsPush, isApnsReady } from "./push-apns.js";
+import { sendFcmPush, isFcmReady } from "./push-fcm.js";
 
 let vapidReady = false;
 
@@ -91,6 +95,8 @@ export interface PushPayload {
   tag?: string;
   url?: string;
   silent?: boolean;
+  /** Opaque pointer (e.g. code-blue sessionId) — ADR-009: reference, NOT state. */
+  referenceId?: string;
 }
 
 /** Correlates Web Push delivery with a `NOTIFICATION_REQUESTED` outbox row (`vt_event_outbox.id`). */
@@ -235,12 +241,84 @@ async function dispatchToSub(
   return "error";
 }
 
-async function cleanupExpiredEndpoints(endpoints: string[]): Promise<void> {
-  for (const endpoint of endpoints) {
-    await db
-      .delete(pushSubscriptions)
-      .where(eq(pushSubscriptions.endpoint, endpoint))
-      .catch(() => {});
+/** Row shape the platform dispatcher needs — a superset of every sendPush* select. */
+interface DispatchableSubscription {
+  platform?: string | null;
+  endpoint?: string | null;
+  p256dh?: string | null;
+  auth?: string | null;
+  token?: string | null;
+  soundEnabled?: boolean | null;
+}
+
+/** Compute the per-subscription silent flag and whitelist-build the alert envelope. */
+function buildEnvelopeForSub(sub: DispatchableSubscription, payload: PushPayload): PushAlertEnvelope {
+  const effectiveSilent = !sub.soundEnabled ? true : (payload.silent ?? false);
+  return buildPushAlertEnvelope({
+    title: payload.title,
+    body: payload.body,
+    tag: payload.tag,
+    url: payload.url,
+    silent: effectiveSilent,
+    referenceId: payload.referenceId,
+  });
+}
+
+/**
+ * Platform-aware dispatch (ADR-009 §1). Routes ONE subscription row to the
+ * correct transport: web → web-push (unchanged), ios → APNs, android|expo → FCM.
+ * A transport with no credentials returns "skipped" (graceful degradation, like
+ * Redis-optional) so it neither delivers nor counts as a failure. The public
+ * sendPush* signatures stay stable — the fan-out lives here.
+ */
+export async function dispatchToSubscription(
+  sub: DispatchableSubscription,
+  envelope: PushAlertEnvelope,
+): Promise<PushDispatchOutcome> {
+  const platform = sub.platform ?? "web";
+  if (platform === "ios") {
+    if (!isApnsReady()) return "skipped";
+    if (!sub.token) return "invalid";
+    return recordTransportOutcome(await sendApnsPush(sub.token, envelope));
+  }
+  if (platform === "android" || platform === "expo") {
+    if (!isFcmReady()) return "skipped";
+    if (!sub.token) return "invalid";
+    return recordTransportOutcome(await sendFcmPush(sub.token, envelope));
+  }
+  // web (default) — the existing web-push path, payload serialized as before.
+  // (dispatchToSub increments notifications_sent/failed internally, so the web
+  // branch is NOT wrapped in recordTransportOutcome — that would double-count.)
+  if (!isVapidReady()) return "skipped";
+  if (!sub.endpoint || !sub.p256dh || !sub.auth) return "invalid";
+  return dispatchToSub(
+    { endpoint: sub.endpoint, p256dh: sub.p256dh, auth: sub.auth },
+    JSON.stringify(envelope),
+  );
+}
+
+/** Feed native (APNs/FCM) send outcomes into the same counters the web path uses. */
+function recordTransportOutcome(outcome: PushDispatchOutcome): PushDispatchOutcome {
+  if (outcome === "ok") incrementMetric("notifications_sent");
+  else if (outcome === "expired" || outcome === "invalid" || outcome === "error") {
+    incrementMetric("notifications_failed");
+  }
+  return outcome;
+}
+
+/** Reference to a subscription that failed permanently — cleaned up by whichever id it carries. */
+interface ExpiredSubscriptionRef {
+  endpoint?: string | null;
+  token?: string | null;
+}
+
+async function cleanupExpiredSubscriptions(refs: ExpiredSubscriptionRef[]): Promise<void> {
+  for (const ref of refs) {
+    if (ref.token) {
+      await db.delete(pushSubscriptions).where(eq(pushSubscriptions.token, ref.token)).catch(() => {});
+    } else if (ref.endpoint) {
+      await db.delete(pushSubscriptions).where(eq(pushSubscriptions.endpoint, ref.endpoint)).catch(() => {});
+    }
   }
 }
 
@@ -308,7 +386,7 @@ export async function sendPushToAll(
   delivery?: PushDeliveryContext,
 ): Promise<PushSendResult> {
   assertClinicId(clinicId);
-  if (!vapidReady) {
+  if (!vapidReady && !isApnsReady() && !isFcmReady()) {
     return { deliveredAny: false, transientFailures: 0, invalidOrGoneCount: 0 };
   }
 
@@ -329,7 +407,7 @@ export async function sendPushToAll(
     return { deliveredAny: false, transientFailures: 0, invalidOrGoneCount: 0 };
   }
 
-  const expired: string[] = [];
+  const expired: ExpiredSubscriptionRef[] = [];
   let deliveredAny = false;
   let transientFailures = 0;
   let invalidOrGoneCount = 0;
@@ -338,26 +416,17 @@ export async function sendPushToAll(
     subs.map(async (sub) => {
       if (!sub.alertsEnabled) return;
 
-      const effectiveSilent = !sub.soundEnabled ? true : (payload.silent ?? false);
-      const notificationPayload = JSON.stringify({
-        title: payload.title,
-        body: payload.body,
-        tag: payload.tag,
-        url: payload.url,
-        silent: effectiveSilent,
-      });
-
-      const result = await dispatchToSub(sub, notificationPayload);
+      const result = await dispatchToSubscription(sub, buildEnvelopeForSub(sub, payload));
       if (result === "ok") deliveredAny = true;
       if (result === "expired" || result === "invalid") {
-        expired.push(sub.endpoint);
+        expired.push({ endpoint: sub.endpoint, token: sub.token });
         invalidOrGoneCount += 1;
       }
       if (result === "error") transientFailures += 1;
     }),
   );
 
-  if (expired.length > 0) await cleanupExpiredEndpoints(expired);
+  if (expired.length > 0) await cleanupExpiredSubscriptions(expired);
 
   const attemptedAny = subs.some((s) => s.alertsEnabled);
   const defer = delivery?.deferTerminalOutbox === true;
@@ -402,9 +471,11 @@ export async function sendPushToRole(
   assertClinicId(clinicId);
 
   const allSubs = await db.select({
+    platform: pushSubscriptions.platform,
     endpoint: pushSubscriptions.endpoint,
     p256dh: pushSubscriptions.p256dh,
     auth: pushSubscriptions.auth,
+    token: pushSubscriptions.token,
     alertsEnabled: pushSubscriptions.alertsEnabled,
     soundEnabled: pushSubscriptions.soundEnabled,
     userId: pushSubscriptions.userId,
@@ -437,24 +508,16 @@ export async function sendPushToRole(
     return { deliveredAny: false, transientFailures: 0, invalidOrGoneCount: 0 };
   }
 
-  const expired: string[] = [];
+  const expired: ExpiredSubscriptionRef[] = [];
   let transientFailures = 0;
   let invalidOrGoneCount = 0;
   let deliveredRoleCount = 0;
 
   await Promise.all(
     subs.map(async (sub) => {
-      const effectiveSilent = !sub.soundEnabled ? true : (payload.silent ?? false);
-      const notificationPayload = JSON.stringify({
-        title: payload.title,
-        body: payload.body,
-        tag: payload.tag,
-        url: payload.url,
-        silent: effectiveSilent,
-      });
-      const result = await dispatchToSub(sub, notificationPayload);
+      const result = await dispatchToSubscription(sub, buildEnvelopeForSub(sub, payload));
       if (result === "expired" || result === "invalid") {
-        expired.push(sub.endpoint);
+        expired.push({ endpoint: sub.endpoint, token: sub.token });
         invalidOrGoneCount += 1;
       }
       if (result === "error") transientFailures += 1;
@@ -480,7 +543,7 @@ export async function sendPushToRole(
     }),
   );
 
-  if (expired.length > 0) await cleanupExpiredEndpoints(expired);
+  if (expired.length > 0) await cleanupExpiredSubscriptions(expired);
 
   if (
     !defer &&
@@ -517,7 +580,7 @@ export async function sendPushToOthers(
   delivery?: PushDeliveryContext,
 ): Promise<PushSendResult> {
   assertClinicId(clinicId);
-  if (!vapidReady) {
+  if (!vapidReady && !isApnsReady() && !isFcmReady()) {
     return { deliveredAny: false, transientFailures: 0, invalidOrGoneCount: 0 };
   }
 
@@ -540,7 +603,7 @@ export async function sendPushToOthers(
     return { deliveredAny: false, transientFailures: 0, invalidOrGoneCount: 0 };
   }
 
-  const expired: string[] = [];
+  const expired: ExpiredSubscriptionRef[] = [];
   let deliveredAny = false;
   let transientFailures = 0;
   let invalidOrGoneCount = 0;
@@ -550,26 +613,17 @@ export async function sendPushToOthers(
     subs.map(async (sub) => {
       if (!sub.alertsEnabled) return;
 
-      const effectiveSilent = !sub.soundEnabled ? true : (payload.silent ?? false);
-      const notificationPayload = JSON.stringify({
-        title: payload.title,
-        body: payload.body,
-        tag: payload.tag,
-        url: payload.url,
-        silent: effectiveSilent,
-      });
-
-      const result = await dispatchToSub(sub, notificationPayload);
+      const result = await dispatchToSubscription(sub, buildEnvelopeForSub(sub, payload));
       if (result === "ok") deliveredAny = true;
       if (result === "expired" || result === "invalid") {
-        expired.push(sub.endpoint);
+        expired.push({ endpoint: sub.endpoint, token: sub.token });
         invalidOrGoneCount += 1;
       }
       if (result === "error") transientFailures += 1;
     }),
   );
 
-  if (expired.length > 0) await cleanupExpiredEndpoints(expired);
+  if (expired.length > 0) await cleanupExpiredSubscriptions(expired);
 
   const attemptedAny = subs.some((s) => s.alertsEnabled);
   if (!defer && attemptedAny && !deliveredAny && (transientFailures > 0 || invalidOrGoneCount > 0)) {
@@ -613,7 +667,7 @@ export async function sendPushToUser(
   delivery?: PushDeliveryContext,
 ): Promise<PushSendResult> {
   assertClinicId(clinicId);
-  if (!vapidReady) {
+  if (!vapidReady && !isApnsReady() && !isFcmReady()) {
     return { deliveredAny: false, transientFailures: 0, invalidOrGoneCount: 0 };
   }
 
@@ -638,27 +692,18 @@ export async function sendPushToUser(
     return { deliveredAny: false, transientFailures: 0, invalidOrGoneCount: 0 };
   }
 
-  const expired: string[] = [];
+  const expired: ExpiredSubscriptionRef[] = [];
   let deliveredCount = 0;
   let transientFailures = 0;
   let invalidOrGoneCount = 0;
 
   await Promise.all(
     subs.map(async (sub) => {
-      const effectiveSilent = !sub.soundEnabled ? true : (payload.silent ?? false);
-      const notificationPayload = JSON.stringify({
-        title: payload.title,
-        body: payload.body,
-        tag: payload.tag,
-        url: payload.url,
-        silent: effectiveSilent,
-      });
-
-      const result = await dispatchToSub(sub, notificationPayload);
+      const result = await dispatchToSubscription(sub, buildEnvelopeForSub(sub, payload));
       if (result === "ok") deliveredCount += 1;
       if (result === "error") transientFailures += 1;
       if (result === "expired" || result === "invalid") {
-        expired.push(sub.endpoint);
+        expired.push({ endpoint: sub.endpoint, token: sub.token });
         invalidOrGoneCount += 1;
       }
       if (result === "ok" && !defer) {
@@ -679,7 +724,7 @@ export async function sendPushToUser(
     }),
   );
 
-  if (expired.length > 0) await cleanupExpiredEndpoints(expired);
+  if (expired.length > 0) await cleanupExpiredSubscriptions(expired);
 
   if (
     !defer &&
