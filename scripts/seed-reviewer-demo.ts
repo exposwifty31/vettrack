@@ -25,8 +25,8 @@
  * `onConflictDoNothing` / `onConflictDoUpdate` — safe to re-run.
  *
  * Usage:
- *   DATABASE_URL=... pnpm tsx scripts/seed-reviewer-demo.ts
- *   DATABASE_URL=... REVIEWER_DEMO_CLERK_ID=user_xxx pnpm tsx scripts/seed-reviewer-demo.ts
+ *   DATABASE_URL=... pnpm seed:reviewer-demo
+ *   DATABASE_URL=... REVIEWER_DEMO_CLERK_ID=user_xxx pnpm seed:reviewer-demo
  */
 import "dotenv/config";
 import {

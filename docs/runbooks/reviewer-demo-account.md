@@ -55,7 +55,7 @@ Record the returned Clerk **user ID** (`user_xxxxxxxx`) — Step 2 needs it.
 DATABASE_URL='<production DATABASE_URL>' \
 REVIEWER_DEMO_CLERK_ID='user_xxxxxxxx' \
 REVIEWER_DEMO_EMAIL='reviewer-demo@vettrack.app' \
-pnpm tsx scripts/seed-reviewer-demo.ts
+pnpm seed:reviewer-demo
 ```
 
 This is idempotent — safe to re-run. It will:

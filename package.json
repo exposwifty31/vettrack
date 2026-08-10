@@ -75,6 +75,7 @@
     "test:staging:walkthrough": "playwright test --config=playwright.staging.config.ts tests/staging-walkthrough.spec.ts --reporter=list",
     "docs:audit": "node scripts/docs/generate-audit-inventories.mjs",
     "deck:seed": "tsx scripts/seed-investor-deck-demo.ts",
+    "seed:reviewer-demo": "tsx scripts/seed-reviewer-demo.ts",
     "deck:capture": "tsx scripts/capture-investor-deck-screenshots.ts",
     "deck:verify-assets": "tsx scripts/verify-investor-deck-assets.ts"
   },
