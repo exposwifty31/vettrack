@@ -28,6 +28,88 @@ Append-only log of implementation claims backed by verified evidence. Purpose: p
 
 <!-- Entries start below this line. -->
 
+## 2026-08-10 — Part B residual: extend missing-equipment alert to not_found_here (feat/partb-not-found-here-alert)
+
+**Claim:** The single-item "not here" report path (`POST /api/docking/equipment/:id/not-found-here`)
+now routes through the same proactive missing-equipment alert as the room-sweep path
+(`alertMissingEquipmentAfterSweep`), reusing its outbox event, manager push, audit kind
+(`equipment_missing_alerted`), and — critically — its `vt_alert_acks` de-dupe key, so a
+not-found-here report and a recent sweep_missing alert for the same item never double-alert.
+No parallel path was built.
+
+**Evidence:**
+- `server/services/equipment-anchor.service.ts:93-119` — `invalidateCurrentAnchor` changed from
+  `Promise<void>` to `Promise<EquipmentAnchor | null>` via `.returning()`, so callers can tell a
+  real contradiction (an OPEN anchor existed and got invalidated) from the pre-existing no-op
+  branch (nothing was open — D-13 idempotent no-op, unchanged). Its other two callers
+  (`server/lib/rfid-ingest.ts:271`, `server/services/equipment-custody-toggle.service.ts:348`)
+  already discard the return value — confirmed by grep and by their test suites staying green.
+- `server/routes/docking.ts:376-431` — the not-found-here route captures the returned
+  `invalidated` row; when `invalidated?.roomId` is truthy (a genuine contradiction with a
+  resolvable room — mirroring the sweep's own room-scoped alert), it calls
+  `alertMissingEquipmentAfterSweep({ clinicId, roomId: invalidated.roomId, missingEquipmentIds: [id] })`
+  after the invalidation, non-fatally (`.catch` + `console.error`, same pattern as the sweep call
+  site at `docking.ts:642-654`). No new alert function, no new outbox event type, no new audit
+  kind — `MISSING_ALERT_TYPE = "sweep_missing_alert"` (equipment-missing-alert.service.ts:39) is
+  reused verbatim, and its de-dupe is scoped by `(equipmentId, alertType)` only — not by
+  contradiction reason — so it naturally covers both `sweep_missing` and `not_found_here` under
+  one key without any code change to the service.
+- RED confirmed first: `DATABASE_URL=postgres://vettrack:vettrack@localhost:5432/vettrack pnpm
+  exec vitest run tests/equipment-missing-alert.integration.test.ts` before the route change →
+  `AssertionError: expected +0 to be 1` on the new not-found-here test (g) — outbox row never
+  created, proving the alert truly wasn't wired yet. Tests (h)/(i) (de-dupe / no-op) already held
+  trivially pre-fix since no alert ever fired from that route.
+- GREEN after implementing: same command → `Test Files 1 passed (1)`, `Tests 8 passed (8)`
+  (5 pre-existing sweep-path tests + 3 new not-found-here tests: (g) alert fires with outbox +
+  push + audit + one ack row, (h) shares the sweep's ack window so an immediate not-found-here
+  report after a sweep_missing alert for the same item raises no second alert, (i) a
+  not-found-here report on an item with no open anchor stays a true no-op — zero outbox rows,
+  zero acks, no push).
+- Regression found and fixed: `tests/docking-citizen-anchor.integration.test.ts` — a pre-existing
+  test asserted `logAudit` called exactly once for a genuine not-found-here contradiction; now
+  correctly asserts 2 calls (`equipment_anchor_contradicted` then `equipment_missing_alerted`),
+  and `purgeClinic` now also deletes `vt_event_outbox` and `vt_alert_acks` rows (the alert path
+  writes both) to avoid an FK-restrict failure on clinic cleanup. Verified via
+  `DATABASE_URL=... pnpm exec vitest run tests/docking-citizen-anchor.integration.test.ts` →
+  `Test Files 1 passed (1)`, `Tests 8 passed (8)`.
+- Full regression sweep: `DATABASE_URL=... pnpm exec vitest run
+  tests/docking-anchor-contradictions.integration.test.ts tests/docking-route.integration.test.ts
+  tests/docking-citizen-anchor.integration.test.ts tests/docking-service.unit.test.ts
+  tests/docking-home-assign.integration.test.ts tests/equipment-missing-alert.integration.test.ts
+  tests/equipment-missing-alert.service.test.ts tests/rfid-ingest.test.ts` →
+  `Test Files 8 passed (8)`, `Tests 65 passed (65)`.
+- `pnpm typecheck` → exit 0, no output (both frontend and server tsconfigs), confirming the
+  `invalidateCurrentAnchor` signature change didn't break any caller.
+- Dispatched `database-reviewer` agent for the mandated tenancy/query review of the diff
+  (`server/routes/docking.ts`, `server/services/equipment-anchor.service.ts`): **PASS** on all
+  checks — every reachable read/write is clinicId-scoped (equipment SELECT, the invalidate
+  UPDATE's WHERE clause, and transitively `alertMissingEquipmentAfterSweep`'s ack SELECT/INSERT,
+  outbox insert, audit, and push); the `.returning()` addition is a single round trip with no
+  index-usage change (backed by the existing partial unique index on
+  `(clinic_id, equipment_id) WHERE invalidated_at IS NULL`); no cross-tenant leak via the anchor's
+  `roomId` (the returned row is provably filtered by the same `clinicId` in the UPDATE's own WHERE
+  clause); transaction boundaries acceptable and consistent with the pre-existing sweep call site.
+  One pre-existing, unrelated note surfaced: `vt_alert_acks` has a global (not clinic-scoped)
+  `UNIQUE(equipment_id, alert_type)` constraint — inherited from PR #172, unchanged and not
+  worsened by this diff, flagged for owner awareness only, not a blocker.
+
+**Open question for the owner:** the reconciliation-bucket classifier
+(`server/services/docking.service.ts:64-79`) buckets an item `missing` only when, in addition to
+the contradiction reason, there's no open anchor AND no RFID/room presence signal placing it
+elsewhere (the `returned_away` branch takes precedence). The alert service itself doesn't consult
+that classifier — it trusts the caller that a contradiction happened — so the alert can fire on a
+not-found-here report even in a case where the reconciliation GET would later bucket the item
+`returned_away` rather than `missing`. This mirrors the sweep's own behavior (which also alerts
+without re-deriving the bucket) and is judged acceptable, but is a real nuance worth owner
+awareness rather than silently assuming full bucket parity.
+
+**Multi-tenancy:** every touched/newly-reachable query is clinicId-scoped — verified directly
+above and by the independent `database-reviewer` pass.
+
+**Verdict:** VERIFIED (RED→GREEN captured with the correct pre-fix failure mode, full regression
+sweep + typecheck green, independent tenancy/query review PASS). Committed locally on
+`feat/partb-not-found-here-alert`; not pushed, no PR opened (out of scope per task instructions).
+
 ## 2026-07-01 — Establish proof alignment log convention (uncommitted)
 
 **Claim:** Added a Working Convention bullet to CLAUDE.md requiring evidence-backed verification before reporting tasks done, and created this log file to hold entries.

@@ -372,6 +372,17 @@ router.post("/equipment/:id/citizen-anchor", requireAuth, writeLimiter, async (r
  * contradiction that invalidates the item's current open anchor
  * (T2.2 invalidateCurrentAnchor, reason "not_found_here"). Idempotent — a
  * no-op (still 200) when no anchor is currently open.
+ *
+ * Part B residual — when this contradiction actually invalidates an OPEN
+ * anchor (a real state change, not the no-op branch), it routes through the
+ * same proactive missing-equipment alert as a room sweep's "sweep_missing"
+ * branch (alertMissingEquipmentAfterSweep), reusing its outbox event, push
+ * fan-out, audit kind (equipment_missing_alerted), and — critically — its
+ * vt_alert_acks de-dupe key (alertType "sweep_missing_alert", scoped by
+ * equipmentId only, not by contradiction reason) so a not-found-here report
+ * for an item already alerted by a recent sweep does not double-alert, and
+ * vice versa. Fired AFTER the invalidation commits, non-fatal (never fails
+ * the report if the alert path errors).
  */
 router.post("/equipment/:id/not-found-here", requireAuth, writeLimiter, async (req, res) => {
   const clinicId = req.clinicId!;
@@ -385,7 +396,7 @@ router.post("/equipment/:id/not-found-here", requireAuth, writeLimiter, async (r
 
   if (!item) return apiError(req, res, "errors.notFound", undefined, 404);
 
-  await invalidateCurrentAnchor(db, { clinicId, equipmentId: id, reason: "not_found_here" });
+  const invalidated = await invalidateCurrentAnchor(db, { clinicId, equipmentId: id, reason: "not_found_here" });
 
   logAudit({
     clinicId,
@@ -395,6 +406,25 @@ router.post("/equipment/:id/not-found-here", requireAuth, writeLimiter, async (r
     targetId: id,
     metadata: { reason: "not_found_here" },
   });
+
+  // Only a genuine contradiction (an OPEN anchor actually got invalidated) leaves the item in a
+  // "missing" state worth alerting on — the no-op branch (nothing was open) changed nothing, so
+  // there is nothing to proactively notify anyone about. The invalidated anchor's own roomId
+  // (where the item was last confirmed to be) is the room reported in the alert, mirroring the
+  // sweep's use of the swept room. An anchor with no roomId (unresolvable) has nothing sensible
+  // to alert on, so it's skipped defensively.
+  if (invalidated?.roomId) {
+    await alertMissingEquipmentAfterSweep({
+      clinicId,
+      roomId: invalidated.roomId,
+      missingEquipmentIds: [id],
+    }).catch((err) => {
+      console.error(
+        "[docking] equipment-missing alert failed (non-fatal):",
+        err instanceof Error ? err.message : err,
+      );
+    });
+  }
 
   res.json({ ok: true });
 });

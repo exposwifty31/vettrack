@@ -89,12 +89,18 @@ export type InvalidateCurrentAnchorInput = {
  * Contradicts the current open anchor for this item. Idempotent: a no-op
  * when no open anchor exists (D-13 — time never invalidates, so this must
  * be called explicitly and must tolerate being called with nothing open).
+ *
+ * Returns the invalidated row, or null when there was nothing open to
+ * invalidate (a true no-op — no state changed). Callers that need to know
+ * whether a contradiction actually happened (e.g. to raise a proactive
+ * alert) should branch on this return value rather than assuming the call
+ * always did something.
  */
 export async function invalidateCurrentAnchor(
   tx: Tx | typeof db,
   input: InvalidateCurrentAnchorInput,
-): Promise<void> {
-  await tx
+): Promise<EquipmentAnchor | null> {
+  const [invalidated] = await tx
     .update(equipmentAnchors)
     .set({ invalidatedAt: new Date(), invalidatedReason: input.reason })
     .where(
@@ -103,7 +109,9 @@ export async function invalidateCurrentAnchor(
         eq(equipmentAnchors.equipmentId, input.equipmentId),
         isNull(equipmentAnchors.invalidatedAt),
       ),
-    );
+    )
+    .returning();
+  return invalidated ?? null;
 }
 
 /** The current open anchor for this item (or null). Clinic-scoped. */
