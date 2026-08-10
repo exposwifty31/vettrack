@@ -9,6 +9,17 @@
  *  (c) an equipment_missing_alerted audit.
  *  (d) idempotency — a second identical sweep within the window does NOT double-alert.
  *
+ * Part B residual — extends the same coverage to POST
+ * /api/docking/equipment/:id/not-found-here (the single-item "not here" report path),
+ * which previously invalidated the anchor but never alerted:
+ *  (g) a not-found-here report on an anchored item raises the same alert path
+ *      (outbox + push + audit + ack), reusing alertMissingEquipmentAfterSweep verbatim.
+ *  (h) it shares the sweep's de-dupe key (alertType "sweep_missing_alert",
+ *      equipmentId-scoped, not reason-scoped) — a not-found-here report right after a
+ *      sweep_missing alert for the same item does NOT double-alert.
+ *  (i) a not-found-here report with no open anchor is a true no-op (invalidateCurrentAnchor
+ *      is idempotent) — no alert, since nothing actually changed.
+ *
  * Requires DATABASE_URL + migrations (vt_event_outbox, vt_alert_acks, vt_equipment_anchors).
  * Run: pnpm test tests/equipment-missing-alert.integration.test.ts
  */
@@ -51,11 +62,24 @@ vi.mock("../server/middleware/auth.js", () => ({
   requireEffectiveRole: () => (_req: unknown, _res: unknown, next: () => void) => next(),
 }));
 
+// Partial mock: keep the real alert service (the other cases assert its real
+// outbox/ack rows) but wrap alertMissingEquipmentAfterSweep so case (j) can
+// force it to reject and prove the route's non-fatal .catch keeps the 200.
+vi.mock("../server/services/equipment-missing-alert.service.js", async (importActual) => {
+  const actual = await importActual<typeof import("../server/services/equipment-missing-alert.service.js")>();
+  return { ...actual, alertMissingEquipmentAfterSweep: vi.fn(actual.alertMissingEquipmentAfterSweep) };
+});
+
 const dockingRoutes = (await import("../server/routes/docking.js")).default;
 const { logAudit } = (await import("../server/lib/audit.js")) as unknown as { logAudit: ReturnType<typeof vi.fn> };
 const { sendPushToRole } = (await import("../server/lib/push.js")) as unknown as {
   sendPushToRole: ReturnType<typeof vi.fn>;
 };
+const { alertMissingEquipmentAfterSweep } = await import(
+  "../server/services/equipment-missing-alert.service.js"
+);
+const { createAnchor, getCurrentAnchor } = await import("../server/services/equipment-anchor.service.js");
+const { db } = await import("../server/db.js");
 
 function buildApp() {
   const app = express();
@@ -372,5 +396,117 @@ describe.skipIf(!DATABASE_URL)("room-sweep missing-equipment alert (Part B P1) i
 
     expect((await missingAlertOutboxRows(ctx.clinicId)).length).toBe(0);
     expect(sendPushToRole).not.toHaveBeenCalled();
+  });
+
+  describe("not-found-here report (Part B residual)", () => {
+    it("(g) a not-found-here report on an anchored item raises the same ALERT/WARNING outbox event, pushes managers, and audits", async () => {
+      const eqId = randomUUID();
+      await seedEquipment(eqId, ctx.clinicId, ctx.roomId, ctx.assetTypeId);
+      const anchor = await createAnchor(db, {
+        clinicId: ctx.clinicId,
+        equipmentId: eqId,
+        dockId: ctx.dockId,
+        roomId: ctx.roomId,
+        source: "citizen",
+      });
+      expect(anchor.invalidatedAt).toBeNull();
+
+      const res = await api(`/api/docking/equipment/${eqId}/not-found-here`, "POST");
+      expect(res.status).toBe(200);
+
+      // (a) exactly one EQUIPMENT_MISSING_ALERT outbox row — same shape as the sweep path.
+      const rows = await missingAlertOutboxRows(ctx.clinicId);
+      expect(rows.length).toBe(1);
+      expect(rows[0].level).toBe("WARNING");
+      expect(rows[0].category).toBe("ALERT");
+      expect(rows[0].clinic_id).toBe(ctx.clinicId);
+      expect(rows[0].payload.roomId).toBe(ctx.roomId);
+      expect(rows[0].payload.equipmentIds).toEqual([eqId]);
+
+      // (b) manager-tier push, detached post-commit.
+      await vi.waitFor(() => {
+        expect(sendPushToRole).toHaveBeenCalledWith(ctx.clinicId, "admin", expect.objectContaining({ tag: `equipment-missing:${ctx.roomId}` }));
+        expect(sendPushToRole).toHaveBeenCalledWith(ctx.clinicId, "vet", expect.objectContaining({ tag: `equipment-missing:${ctx.roomId}` }));
+      });
+
+      // (c) equipment_missing_alerted audit — reused verbatim from the sweep path
+      // (equipment_anchor_contradicted is the route's own pre-existing audit call).
+      const alerted = logAudit.mock.calls.some(
+        (c) => isRecord(c[0]) && (c[0] as Record<string, unknown>).actionType === "equipment_missing_alerted",
+      );
+      expect(alerted).toBe(true);
+
+      // one durable ack row, same alertType as the sweep path — proves shared de-dupe key.
+      expect(await alertAckCount(ctx.clinicId)).toBe(1);
+    });
+
+    it("(h) shares the sweep's de-dupe key — a not-found-here report right after a sweep_missing alert for the same item does NOT double-alert", async () => {
+      const eqId = randomUUID();
+      await seedEquipment(eqId, ctx.clinicId, ctx.roomId, ctx.assetTypeId);
+
+      // First: a sweep leaves the item missing and alerts it.
+      await api(`/api/docking/rooms/${ctx.roomId}/sweep`, "POST", { confirmedEquipmentIds: [] });
+      expect((await missingAlertOutboxRows(ctx.clinicId)).length).toBe(1);
+      expect(await alertAckCount(ctx.clinicId)).toBe(1);
+      await vi.waitFor(() => {
+        expect(sendPushToRole).toHaveBeenCalledWith(ctx.clinicId, "admin", expect.anything());
+      });
+      sendPushToRole.mockClear();
+
+      // Second: re-anchor the item (as if a citizen just confirmed it), then immediately report
+      // it not-found-here. The anchor gets contradicted (a real state change), but the ack from
+      // the sweep is still within the window — so no NEW alert should fire.
+      await createAnchor(db, {
+        clinicId: ctx.clinicId,
+        equipmentId: eqId,
+        dockId: ctx.dockId,
+        roomId: ctx.roomId,
+        source: "citizen",
+      });
+      const res = await api(`/api/docking/equipment/${eqId}/not-found-here`, "POST");
+      expect(res.status).toBe(200);
+
+      expect((await missingAlertOutboxRows(ctx.clinicId)).length).toBe(1);
+      expect(await alertAckCount(ctx.clinicId)).toBe(1);
+      expect(sendPushToRole).not.toHaveBeenCalled();
+    });
+
+    it("(i) a not-found-here report with no open anchor is a true no-op — no alert", async () => {
+      const eqId = randomUUID();
+      await seedEquipment(eqId, ctx.clinicId, ctx.roomId, ctx.assetTypeId);
+      // No anchor created — invalidateCurrentAnchor is idempotent, nothing changes.
+
+      const res = await api(`/api/docking/equipment/${eqId}/not-found-here`, "POST");
+      expect(res.status).toBe(200);
+
+      expect((await missingAlertOutboxRows(ctx.clinicId)).length).toBe(0);
+      expect(await alertAckCount(ctx.clinicId)).toBe(0);
+      expect(sendPushToRole).not.toHaveBeenCalled();
+    });
+
+    it("(j) a rejected alert is non-fatal — the route still returns 200 and the anchor is still contradicted", async () => {
+      const eqId = randomUUID();
+      await seedEquipment(eqId, ctx.clinicId, ctx.roomId, ctx.assetTypeId);
+      await createAnchor(db, {
+        clinicId: ctx.clinicId,
+        equipmentId: eqId,
+        dockId: ctx.dockId,
+        roomId: ctx.roomId,
+        source: "citizen",
+      });
+
+      // The spy is shared across the file (call-through by default); clear its
+      // accumulated call count, then force this one call to reject.
+      vi.mocked(alertMissingEquipmentAfterSweep).mockClear();
+      vi.mocked(alertMissingEquipmentAfterSweep).mockRejectedValueOnce(new Error("alert transport down"));
+
+      const res = await api(`/api/docking/equipment/${eqId}/not-found-here`, "POST");
+      // The route's non-fatal .catch swallows the alert failure — the report still succeeds.
+      expect(res.status).toBe(200);
+      expect(vi.mocked(alertMissingEquipmentAfterSweep)).toHaveBeenCalledTimes(1);
+
+      // The real work (anchor contradiction) happened before the alert call, so it stuck.
+      expect(await getCurrentAnchor(ctx.clinicId, eqId)).toBeNull();
+    });
   });
 });

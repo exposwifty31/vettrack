@@ -153,6 +153,8 @@ async function seedEquipment(
 
 async function purgeClinic(clinicId: string) {
   const P = probePool!;
+  await P.query(`DELETE FROM vt_event_outbox WHERE clinic_id = $1`, [clinicId]);
+  await P.query(`DELETE FROM vt_alert_acks WHERE clinic_id = $1`, [clinicId]);
   await P.query(`DELETE FROM vt_equipment_anchors WHERE clinic_id = $1`, [clinicId]);
   await P.query(`DELETE FROM vt_equipment WHERE clinic_id = $1`, [clinicId]);
   await P.query(`DELETE FROM vt_docks WHERE clinic_id = $1`, [clinicId]);
@@ -363,12 +365,22 @@ describe.skipIf(!DATABASE_URL)("docking citizen-anchor + not-found-here (T2.5) i
       );
       expect(rows[0]?.invalidated_reason).toBe("not_found_here");
 
-      expect(logAudit).toHaveBeenCalledTimes(1);
+      // Two audit calls: the route's own equipment_anchor_contradicted, PLUS Part B's
+      // equipment_missing_alerted (this contradiction invalidated a real OPEN anchor with a
+      // resolvable roomId, so it routes through the same proactive missing-equipment alert as a
+      // room sweep's sweep_missing branch — see equipment-missing-alert.integration.test.ts for
+      // full coverage of that path).
+      expect(logAudit).toHaveBeenCalledTimes(2);
       const call = logAudit.mock.calls[0]?.[0] as unknown;
       expect(isRecord(call)).toBe(true);
       if (!isRecord(call)) throw new Error("Expected logAudit call arg to be an object");
       expect(call.actionType).toBe("equipment_anchor_contradicted");
       expect(call.targetId).toBe(eqId);
+
+      const alertCall = logAudit.mock.calls[1]?.[0] as unknown;
+      expect(isRecord(alertCall)).toBe(true);
+      if (!isRecord(alertCall)) throw new Error("Expected logAudit call arg to be an object");
+      expect(alertCall.actionType).toBe("equipment_missing_alerted");
     });
 
     it("is idempotent — a no-op 200 when there is no open anchor", async () => {

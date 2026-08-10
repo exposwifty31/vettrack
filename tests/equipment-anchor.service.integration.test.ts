@@ -201,7 +201,7 @@ describe.skipIf(!DATABASE_URL)("equipment-anchor.service integration", () => {
         equipmentId: ctx.equipmentId,
         reason: "rfid_elsewhere",
       }),
-    ).resolves.toBeUndefined();
+    ).resolves.toBeNull();
 
     const current = await getCurrentAnchor(ctx.clinicId, ctx.equipmentId);
     expect(current).toBeNull();
