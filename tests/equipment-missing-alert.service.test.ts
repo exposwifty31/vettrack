@@ -55,16 +55,44 @@ function makeSelectChain(rows: unknown[]) {
 }
 
 /**
- * Mocks db.transaction with a tx exposing insert().values().onConflictDoUpdate() — the alertAcks
- * writes upsert on the lifetime UNIQUE(equipment_id, alert_type) so an expired prior claim is
- * reclaimed in place rather than raising 23505 and rolling the transaction back.
+ * Mocks db.transaction with a tx exposing the alertAcks claim chain
+ * insert().values().onConflictDoUpdate().returning(). The upsert is the atomic claim gate: setWhere
+ * restricts the DO UPDATE to an expired prior ack, and RETURNING yields the row IFF this call claimed
+ * the id. The mock echoes the inserted equipmentId back through `returning` so the service collects it
+ * into `claimed` — the fresh-insert claim path taken when no prior ack exists (a suppressed conditional
+ * update would instead resolve []).
  */
 function setupTransactionMock() {
-  const onConflictDoUpdate = vi.fn().mockResolvedValue(undefined);
-  const values = vi.fn().mockReturnValue({ onConflictDoUpdate });
-  const tx = { insert: vi.fn().mockReturnValue({ values }) };
+  const values = vi.fn();
+  const onConflictDoUpdate = vi.fn();
+  const returning = vi.fn();
+  const tx = {
+    insert: vi.fn(() => {
+      let claimedId: string | undefined;
+      return {
+        values: (row: { equipmentId?: string }) => {
+          claimedId = row?.equipmentId;
+          values(row);
+          return {
+            onConflictDoUpdate: (cfg: unknown) => {
+              onConflictDoUpdate(cfg);
+              return {
+                returning: () => {
+                  returning();
+                  return Promise.resolve(claimedId ? [{ equipmentId: claimedId }] : []);
+                },
+              };
+            },
+          };
+        },
+      };
+    }),
+  };
+  // Drizzle's `transaction` carries heavily-overloaded generic signatures that a hand-rolled callback
+  // mock cannot satisfy structurally, so the `as never` cast is required to substitute the mock; a
+  // properly-typed alternative is not practical for those overloads.
   vi.mocked(db.transaction).mockImplementation((async (cb: (t: unknown) => unknown) => cb(tx)) as never);
-  return { tx, values, onConflictDoUpdate };
+  return { tx, values, onConflictDoUpdate, returning };
 }
 
 beforeEach(() => {

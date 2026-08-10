@@ -333,24 +333,29 @@ describe.skipIf(!DATABASE_URL)("room-sweep missing-equipment alert (Part B P1) i
     });
   });
 
-  it("(f) two concurrent sweeps of the same room never 23505 and leave exactly one ack row", async () => {
+  it("(f) two concurrent sweeps of the same room emit exactly one alert and one ack (no swallowed 23505)", async () => {
     const missingId = randomUUID();
     await seedEquipment(missingId, ctx.clinicId, ctx.roomId, ctx.assetTypeId);
 
-    // Both sweeps read "no ack yet", both compute the same missing id, and both race to write its ack.
-    // The upsert makes the loser reclaim rather than 23505-crash: both succeed, and the lifetime
-    // UNIQUE(equipment_id, alert_type) yields exactly one ledger row (no duplicate, no swallowed error).
+    // Both sweeps read "no ack yet" pre-transaction and race to claim the same missing id. The ack
+    // upsert is the atomic claim gate: onConflictDoUpdate(... setWhere: acknowledgedAt < cutoff)
+    // RETURNING. The winner inserts a fresh row and claims it; the loser's conflict finds a row the
+    // winner just made fresh (>= cutoff), so the conditional update matches nothing, RETURNING is
+    // empty, and the loser claims nothing → it emits NO outbox event. The outcome is deterministic:
+    // exactly one alert regardless of interleaving, and never a conflict-to-error (23505).
     const [res1, res2] = await Promise.all([
       api(`/api/docking/rooms/${ctx.roomId}/sweep`, "POST", { confirmedEquipmentIds: [] }),
       api(`/api/docking/rooms/${ctx.roomId}/sweep`, "POST", { confirmedEquipmentIds: [] }),
     ]);
+    // Both requests succeed. (A swallowed 23505 rollback would still 200 at the route, so the real
+    // proof is the exactly-one alert + exactly-one ack below, not the status codes alone.)
     expect(res1.status).toBe(200);
     expect(res2.status).toBe(200);
 
+    // Exactly one ack row (the lifetime UNIQUE(equipment_id, alert_type)) AND exactly one outbox
+    // alert — the losing sweep neither duplicated the WARNING nor hid a 23505.
     expect(await alertAckCount(ctx.clinicId)).toBe(1);
-    const outboxCount = (await missingAlertOutboxRows(ctx.clinicId)).length;
-    expect(outboxCount).toBeGreaterThanOrEqual(1);
-    expect(outboxCount).toBeLessThanOrEqual(2);
+    expect((await missingAlertOutboxRows(ctx.clinicId)).length).toBe(1);
   });
 
   it("a clean sweep (a confirmed expected item, nothing missing) raises no alert", async () => {

@@ -5877,3 +5877,64 @@ fired exactly once per equipment item, ever.
 **Verdict:** VERIFIED (RED→GREEN on the exact 23505 path, all three affected suites green vs local Postgres,
 full typecheck clean). Frozen surfaces intact: SSE transport untouched (no new type), every query/emit
 clinic-scoped, `equipment_missing_alerted` stays a closed-union audit kind, no schema/migration change.
+
+---
+
+### 2026-08-10 — PR #172 CodeRabbit round 3 (Lead inline fix): make the ack the atomic claim gate
+
+**Task:** CodeRabbit round 3 on head `17f6b7fe3` raised three comments on
+`server/services/equipment-missing-alert.service.ts` + its tests.
+
+**Comment 1 — FIXED (concurrency: exactly-one alert).** The round-2 code emitted the outbox event FIRST
+(unconditionally) inside the tx, then upserted acks. Two truly-concurrent sweeps of the same room both
+pass the pre-tx `recentAcks` read (neither has committed) → both emit → a DUPLICATE WARNING. Fix: the
+per-id upsert is now the atomic claim gate —
+`onConflictDoUpdate({ target:[equipmentId,alertType], set:{…}, setWhere: lt(acknowledgedAt, cutoff) }).returning({ equipmentId })`
+(same `setWhere`+`RETURNING` mechanism already in production at `server/routes/procurement.ts:349`). The
+loop runs FIRST, collects `claimed` (ids whose upsert returned a row), and the outbox event is emitted
+ONLY IF `claimed.length > 0`, carrying `equipmentIds: claimed`. Push + audit + `return {alerted: claimed}`
+are gated on `claimed.length > 0`; the audit `metadata` now reads `claimed` (not `toAlert`). Both the
+outbox payload AND the audit metadata were switched.
+- **The losing concurrent sweep neither duplicates the alert nor hides a 23505:** a fresh insert returns
+  its row (claim); an expired prior claim (`acknowledgedAt < cutoff`) is reclaimed and returns its row; a
+  still-fresh row (a concurrent sweep just claimed it, `acknowledgedAt >= cutoff`) fails `setWhere` → the
+  DO UPDATE matches nothing → `RETURNING` is empty → the loser claims nothing → emits no outbox. The
+  conditional upsert never conflicts-to-error, so there is no 23505 to swallow. Outcome is deterministic:
+  exactly one alert regardless of interleaving.
+- **RED→GREEN (verified, not asserted):** tightened integration case (f) to `toBe(1)` outbox + `toBe(1)`
+  ack. Against the round-2 service (outbox-first) case (f) failed **3/3 runs**: `AssertionError: expected 2
+  to be 1`. After the fix, case (f) passes **4/4** runs (deterministic). Case (e) re-alert-after-window
+  (aged ack `< cutoff` → conditional update fires, outbox 1→2, ack reclaimed in place = 1) stays green.
+- Unit-test mock (`tests/equipment-missing-alert.service.test.ts` `setupTransactionMock`) updated to the
+  new `insert().values().onConflictDoUpdate().returning()` chain; `returning` echoes the inserted
+  `equipmentId` so the fresh-insert claim path is exercised and `result.alerted` preserves order. Existing
+  assertions (outbox called with claimed ids, audit, `values` per id) stay green — 9/9 unit tests pass.
+
+**Comment 2 — SKIPPED (clinic-scoped uniqueness).** Deliberately NOT changing the migration, the Drizzle
+unique constraint, or the `onConflictDoUpdate` target. Reason: `equipment_id` is a globally-unique
+`randomUUID()` per equipment row, so the existing lifetime `UNIQUE(equipment_id, alert_type)` cannot
+produce a cross-tenant collision — it is already effectively per-clinic. `vt_alert_acks` is a migration-001
+table shared by other alert_types (reminders etc.); dropping+recreating its UNIQUE constraint is an
+app-wide production migration whose blast radius is disproportionate to a UUID-impossible collision, and
+out of scope for this feature PR. The `onConflictDoUpdate` target MUST match the actual DB constraint
+`(equipment_id, alert_type)`; adding `clinicId` without the (skipped) migration would break the upsert.
+Tenancy is otherwise preserved: the pre-tx read is `eq(clinicId)`-scoped, `.values({ clinicId, … })`, and
+the outbox/audit/push are all clinic-scoped.
+
+**Comment 3 — FIXED (trivial).** Added an inline comment at `setupTransactionMock` explaining the
+pre-existing `as never` cast: Drizzle's `transaction` carries heavily-overloaded generic signatures a
+hand-rolled callback mock cannot satisfy structurally, so the cast is required to substitute the mock; a
+properly-typed alternative is not practical. Cast retained.
+
+**Gates:** `pnpm typecheck` (frontend + server) → **exit 0**, zero `error TS` lines.
+`DATABASE_URL=… pnpm exec vitest run tests/equipment-missing-alert.service.test.ts
+tests/equipment-missing-alert.integration.test.ts` → **Test Files 2 passed, Tests 14 passed** (DB-gated
+integration confirmed NOT skipped — `DATABASE_URL set: yes`). Out-of-scope regression check:
+`tests/room-sweep.integration.test.ts` → **10 passed** (its `equipment_missing_alerted times(2)` assertion
+holds because the missing item there is freshly claimed, so audit still fires under the new
+`claimed.length > 0` gate).
+
+**Verdict:** VERIFIED (RED→GREEN on the concurrency duplicate-alert path with the RED reproduced against the
+old service, deterministic GREEN over 4 runs, all affected + adjacent suites green vs local Postgres,
+typecheck clean). Frozen surfaces intact: SSE transport untouched (no new event type), every query/emit
+clinic-scoped, `equipment_missing_alerted` stays a closed-union audit kind, no schema/migration change.
