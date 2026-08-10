@@ -17,9 +17,102 @@
  */
 import "dotenv/config";
 import assert from "node:assert";
+import { readFileSync } from "node:fs";
 import { randomUUID } from "crypto";
+import type { Pool } from "pg";
 
 const uid = () => randomUUID();
+
+/**
+ * Migration-TRANSITION coverage: run migration 180 against an ISOLATED pre-180
+ * schema (the web-only shape vt_push_subscriptions had before 180) and assert it
+ * applies AND backfills a pre-existing web row — before the post-migration
+ * assertions below exercise the already-migrated live table.
+ *
+ * The repo has no reusable pre-migration harness (the other migration tests are
+ * static SQL text-matchers), so this builds a minimal FAITHFUL SUBSET — only the
+ * columns migration 180 touches — in a uniquely named schema on its own pooled
+ * client, and tears it down fully here (search_path reset + DROP SCHEMA CASCADE)
+ * so it never touches the shared public-schema fixtures. No rollback is executed.
+ */
+async function assertMigrationAppliesToPreMigrationSchema(pool: Pool): Promise<void> {
+  const migrationSql = readFileSync(
+    new URL("../../migrations/180_vt_push_subscriptions_native_tokens.sql", import.meta.url),
+    "utf8",
+  );
+  const schema = `push_mig_${uid().replace(/-/g, "")}`;
+  const client = await pool.connect();
+  try {
+    // Isolated schema, search_path set to it ALONE (no public): migration 180's
+    // unqualified `DROP INDEX IF EXISTS ux_vt_push_subscriptions_token` would
+    // otherwise fall through to public and drop the real index. Built-in types
+    // resolve via pg_catalog (always implicitly on the path); nothing in 180 needs
+    // public, and the pre-migration table uses plain text (no FK to public).
+    await client.query(`CREATE SCHEMA "${schema}"`);
+    await client.query(`SET search_path TO "${schema}"`);
+
+    // Pre-180 web-only shape: endpoint/p256dh/auth NOT NULL, no platform, no token.
+    await client.query(
+      `CREATE TABLE vt_push_subscriptions (
+         id text PRIMARY KEY,
+         clinic_id text NOT NULL,
+         user_id text NOT NULL,
+         endpoint text NOT NULL,
+         p256dh text NOT NULL,
+         auth text NOT NULL
+       )`,
+    );
+
+    // A pre-existing web row that must survive the migration and backfill to 'web'.
+    const webRowId = uid();
+    await client.query(
+      `INSERT INTO vt_push_subscriptions (id, clinic_id, user_id, endpoint, p256dh, auth)
+         VALUES ($1,$2,$3,$4,'p','a')`,
+      [webRowId, uid(), "u-pre", `https://push.example/${webRowId}`],
+    );
+
+    // Apply migration 180 (multi-statement, no params — same path as server/migrate.ts).
+    await client.query(migrationSql);
+
+    // platform + token added; the web-push triple relaxed to nullable.
+    const cols = await client.query(
+      `select column_name, is_nullable from information_schema.columns
+        where table_schema=$1 and table_name='vt_push_subscriptions'`,
+      [schema],
+    );
+    const nullable = new Map<string, string>(
+      cols.rows.map((r: { column_name: string; is_nullable: string }) => [r.column_name, r.is_nullable]),
+    );
+    assert.ok(nullable.has("platform"), "migration must add the platform column");
+    assert.ok(nullable.has("token"), "migration must add the token column");
+    assert.strictEqual(nullable.get("endpoint"), "YES", "endpoint must become nullable");
+    assert.strictEqual(nullable.get("p256dh"), "YES", "p256dh must become nullable");
+    assert.strictEqual(nullable.get("auth"), "YES", "auth must become nullable");
+
+    // The pre-existing web row backfilled to platform='web' and still satisfies the
+    // new platform-columns CHECK (endpoint/p256dh/auth set, token NULL).
+    const backfilled = await client.query(`select platform from vt_push_subscriptions where id=$1`, [webRowId]);
+    assert.strictEqual(backfilled.rows[0].platform, "web", "pre-existing web row must backfill to platform=web");
+
+    // Post-migration the table now ACCEPTS a native row (token only, web cols NULL).
+    const nativeId = uid();
+    await client.query(
+      `insert into vt_push_subscriptions (id, clinic_id, user_id, platform, token) values ($1,$2,$3,'ios',$4)`,
+      [nativeId, uid(), "u-native-pre", `IOS-${nativeId}`],
+    );
+    const native = await client.query(`select platform, endpoint from vt_push_subscriptions where id=$1`, [nativeId]);
+    assert.strictEqual(native.rows[0].platform, "ios", "native row must insert post-migration");
+    assert.strictEqual(native.rows[0].endpoint, null, "native row endpoint must be NULL");
+
+    console.log("✅ migration 180 applies to an isolated pre-migration schema (web row backfilled)");
+  } finally {
+    // Restore session state before returning the connection to the pool, then drop
+    // the isolated schema so nothing leaks into the shared public-schema fixtures.
+    await client.query(`RESET search_path`).catch(() => {});
+    await client.query(`DROP SCHEMA IF EXISTS "${schema}" CASCADE`).catch(() => {});
+    client.release();
+  }
+}
 
 async function expectReject(fn: () => Promise<unknown>, sqlstatePrefix: string, message: string): Promise<void> {
   let caught: unknown;
@@ -47,6 +140,9 @@ async function main() {
   const otherClinicId = uid();
 
   try {
+    // --- migration applies to an isolated PRE-migration schema (runs first) ---
+    await assertMigrationAppliesToPreMigrationSchema(pool);
+
     // --- columns + nullability ---
     const cols = await pool.query(
       `select column_name, is_nullable from information_schema.columns where table_name = 'vt_push_subscriptions'`,

@@ -5796,3 +5796,48 @@ no enforcement files, no queries, no audit kinds.
 **Verdict:** VERIFIED (RED→GREEN matrix, typecheck, full suite with base-comparison triage of the 20
 pre-existing environmental failures). Not verified: live-server/DB-integration excluded groups (no local
 DB at current schema; failures above are that same environmental gap, present on base).
+
+## 2026-08-10 — PR #173 CodeRabbit round-3 fixes: native push server (G4-2) (worktree @ base 5e96e2a6e)
+
+**Claim:** Resolved 4 CodeRabbit comments on `feat/native-push-server`: (1) model the guaranteed
+endpoint|token identifier in the PATCH/DELETE schemas via `.transform` and delete the unreachable
+`idMatch === null` 400; (2) split the module-scoped push-init gate test into 3 isolated cases;
+(3) add a persistence-failure test to the token-reassignment suite; (4) add an isolated
+pre-migration-schema execution to the migration-180 test.
+
+**Evidence (all observed this session in worktree `agent-a9f91a094061e0650`):**
+- Comment 1 — `server/routes/push.ts:34-42` new `toIdentifier()` returns discriminated
+  `{ by:"endpoint", value } | { by:"token", value }` (`?? ""` typesafe fallback, no `!`);
+  `:56,:67` both schemas gain `.transform((v)=>({...v, identifier: toIdentifier(v)}))` after the existing
+  `.refine`; `:275-279,:322-326` handlers build `idMatch` by switching on `identifier.by` — the
+  `IDENTIFIER_REQUIRED` 400 blocks are gone (`git diff` shows both removed). `grep -rn IDENTIFIER_REQUIRED`
+  → 0 hits repo-wide after edit (no test referenced it).
+- Comment 2 — `tests/push-init-gate.test.ts`: `beforeEach(vi.resetModules)` + per-case `await import`;
+  timer-free `hasResolved()` via double-microtask flush; 3 `it` cases (never-begun→resolves,
+  begun→blocks, marked→releases). Test: `npx vitest run tests/push-init-gate.test.ts` → `3 passed (3)`, exit 0.
+- Comment 3 — `tests/push-token-reassignment.test.ts`: `transactionRejects` flag on the db.transaction
+  mock (reset in `beforeEach`); new case asserts `body.reason === "PUSH_SUBSCRIBE_SAVE_FAILED"` AND
+  `logAudit` NOT called on tx reject. Characterization test (handler already catches → `saveFailed()`,
+  audit fires only post-commit — `push.ts:173-176` catch, `:158-171` audit inside try after tx). Test:
+  `npx vitest run tests/push-token-reassignment.test.ts` → `4 passed (4)`, exit 0.
+- Comment 4 — `tests/migrations/push-native-tokens.test.ts`: new
+  `assertMigrationAppliesToPreMigrationSchema(pool)` runs first in `main()` — dedicated pooled client,
+  unique `push_mig_<uuid>` schema, `SET search_path TO "<schema>"` (schema ALONE, no public — so 180's
+  unqualified `DROP INDEX IF EXISTS` cannot fall through to the real public index), minimal pre-180 web-only
+  table, inserts a web row, executes `migrations/180_*.sql` (readFileSync via `import.meta.url`), asserts
+  platform/token added + endpoint/p256dh/auth nullable + web row backfilled to `platform='web'` + native
+  insert accepted; `finally` RESET search_path + `DROP SCHEMA CASCADE` + release. No rollback executed.
+  Test: `DATABASE_URL=… pnpm exec tsx tests/migrations/push-native-tokens.test.ts` →
+  `✅ migration 180 applies to an isolated pre-migration schema (web row backfilled)` +
+  `✅ push-native-tokens migration test passed`, exit 0 (not skipped). Cleanup verified: `psql` →
+  0 `push_mig_%` schemas, 0 `u-pre`/`u-native-pre` rows in the real `vt_push_subscriptions`.
+- Gates: `tsc -p tsconfig.server-check.json --noEmit` (node16, round-1 CI failure surface) → exit 0;
+  `tsc -p tsconfig.server.json --noEmit` → exit 0; `pnpm contracts:typecheck` → exit 0. Full push vitest
+  suite (9 files) → `48 passed (48)`, exit 0 (was 45; +2 gate split, +1 persistence test).
+- Invariants: `clinicId` still in every PATCH/DELETE `where` (`push.ts` and(eq clinicId, idMatch, eq userId));
+  `push_token_reassigned` already in the `AuditActionType` union (`server/lib/audit.ts:121`); no frozen
+  surface touched. `git status --short` → only the 4 target files + this log.
+
+**Verdict:** VERIFIED (all 4 comments fixed, RED/characterization tests green, 3 typecheck gates + migration
+test green not-skipped, isolation cleanup confirmed via psql). Pre-existing ~20 shift-handover DB failures
+(missing migration 178 `signup_join_code`) are unrelated and out of scope.

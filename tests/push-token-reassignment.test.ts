@@ -61,8 +61,12 @@ vi.mock("../server/lib/audit.js", () => ({
 }));
 
 // db.transaction runs the callback against a tx whose SELECT returns the
-// configured existing row for (clinicId, token); delete + insert resolve.
+// configured existing row for (clinicId, token); delete + insert resolve. When
+// `transactionRejects` is set, the transaction REJECTS — modelling a persistence
+// failure so the handler's catch path (500 PUSH_SUBSCRIBE_SAVE_FAILED, no audit)
+// can be exercised.
 let existingRows: Array<{ userId: string }> = [];
+let transactionRejects = false;
 vi.mock("../server/db.js", () => {
   const tx = {
     select: () => ({ from: () => ({ where: () => Promise.resolve(existingRows) }) }),
@@ -70,7 +74,10 @@ vi.mock("../server/db.js", () => {
     insert: () => ({ values: () => ({ returning: () => Promise.resolve([{ id: "new-sub-id" }]) }) }),
   };
   return {
-    db: { transaction: (cb: (t: typeof tx) => unknown) => Promise.resolve(cb(tx)) },
+    db: {
+      transaction: (cb: (t: typeof tx) => unknown) =>
+        transactionRejects ? Promise.reject(new Error("db write failed")) : Promise.resolve(cb(tx)),
+    },
     pool: {},
     pushSubscriptions: new Proxy({}, { get: (_t, p) => ({ _column: String(p) }) }),
   };
@@ -144,6 +151,7 @@ describe("POST /api/push/subscribe — native-token ownership transfer audit", (
   beforeEach(() => {
     logAudit.mockClear();
     existingRows = [];
+    transactionRejects = false;
     currentAuthUser = { id: "user-new", email: "new@clinic.test", clinicId: "clinic-1", role: "vet" };
   });
 
@@ -172,6 +180,18 @@ describe("POST /api/push/subscribe — native-token ownership transfer audit", (
     existingRows = [];
     const body = await dispatchSubscribe(NATIVE_BODY);
     expect(body).toEqual({ success: true });
+    expect(logAudit).not.toHaveBeenCalled();
+  });
+
+  it("returns PUSH_SUBSCRIBE_SAVE_FAILED and does NOT audit when persistence fails", async () => {
+    // A prior owner IS present, so a successful commit WOULD audit the transfer —
+    // but the transaction rejects. The ownership-transfer audit fires only after a
+    // committed write, so a failed persist must skip it: no audit, 500 with the
+    // save-failed reason code.
+    existingRows = [{ userId: "user-old" }];
+    transactionRejects = true;
+    const body = await dispatchSubscribe(NATIVE_BODY);
+    expect(body.reason).toBe("PUSH_SUBSCRIBE_SAVE_FAILED");
     expect(logAudit).not.toHaveBeenCalled();
   });
 });

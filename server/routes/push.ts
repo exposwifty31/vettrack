@@ -30,6 +30,16 @@ import { logAudit, resolveAuditActorRole } from "../lib/audit.js";
 
 const router = Router();
 
+// Resolve the refine-guaranteed endpoint|token into a discriminated identifier so
+// the handler builds the row predicate by switching on `by` — no nullable branch,
+// no `!` assertion. `?? ""` is an unreachable typesafe fallback for the token arm
+// (the refine above rejects a body carrying neither, so it never runs).
+function toIdentifier(v: { endpoint?: string; token?: string }) {
+  return v.endpoint
+    ? ({ by: "endpoint", value: v.endpoint } as const)
+    : ({ by: "token", value: v.token ?? "" } as const);
+}
+
 const patchSubscribeSchema = z
   .object({
     endpoint: z.string().url("endpoint must be a valid URL").optional(),
@@ -43,7 +53,8 @@ const patchSubscribeSchema = z
   })
   .refine((v) => Boolean(v.endpoint) || Boolean(v.token), {
     message: "endpoint or token is required",
-  });
+  })
+  .transform((v) => ({ ...v, identifier: toIdentifier(v) }));
 
 const deleteSubscribeSchema = z
   .object({
@@ -52,7 +63,8 @@ const deleteSubscribeSchema = z
   })
   .refine((v) => Boolean(v.endpoint) || Boolean(v.token), {
     message: "endpoint or token is required",
-  });
+  })
+  .transform((v) => ({ ...v, identifier: toIdentifier(v) }));
 
 router.get("/vapid-public-key", async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
@@ -251,8 +263,7 @@ router.patch("/subscribe", requireAuth, validateBody(patchSubscribeSchema), asyn
   try {
     const clinicId = req.clinicId!;
     const {
-      endpoint,
-      token,
+      identifier,
       soundEnabled,
       alertsEnabled,
       technicianReturnRemindersEnabled,
@@ -261,23 +272,12 @@ router.patch("/subscribe", requireAuth, validateBody(patchSubscribeSchema), asyn
       adminHourlySummaryEnabled,
     } = req.body as z.infer<typeof patchSubscribeSchema>;
 
-    // The schema's refine guarantees one of endpoint/token; the null branch is
-    // defensive-only (400 rather than a `!` assertion).
-    const idMatch = endpoint
-      ? eq(pushSubscriptions.endpoint, endpoint)
-      : token
-        ? eq(pushSubscriptions.token, token)
-        : null;
-    if (!idMatch) {
-      return res.status(400).json(
-        apiError({
-          code: "VALIDATION_FAILED",
-          reason: "IDENTIFIER_REQUIRED",
-          message: "endpoint or token is required",
-          requestId,
-        }),
-      );
-    }
+    // The schema's transform resolved the guaranteed endpoint|token into a
+    // discriminated identifier, so the row predicate is built with no null branch.
+    const idMatch =
+      identifier.by === "endpoint"
+        ? eq(pushSubscriptions.endpoint, identifier.value)
+        : eq(pushSubscriptions.token, identifier.value);
 
     await db
       .update(pushSubscriptions)
@@ -315,25 +315,14 @@ router.delete("/subscribe", requireAuth, validateBody(deleteSubscribeSchema), as
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
   try {
     const clinicId = req.clinicId!;
-    const { endpoint, token } = req.body as z.infer<typeof deleteSubscribeSchema>;
+    const { identifier } = req.body as z.infer<typeof deleteSubscribeSchema>;
 
-    // The schema's refine guarantees one of endpoint/token; the null branch is
-    // defensive-only (400 rather than a `!` assertion).
-    const idMatch = endpoint
-      ? eq(pushSubscriptions.endpoint, endpoint)
-      : token
-        ? eq(pushSubscriptions.token, token)
-        : null;
-    if (!idMatch) {
-      return res.status(400).json(
-        apiError({
-          code: "VALIDATION_FAILED",
-          reason: "IDENTIFIER_REQUIRED",
-          message: "endpoint or token is required",
-          requestId,
-        }),
-      );
-    }
+    // The schema's transform resolved the guaranteed endpoint|token into a
+    // discriminated identifier, so the row predicate is built with no null branch.
+    const idMatch =
+      identifier.by === "endpoint"
+        ? eq(pushSubscriptions.endpoint, identifier.value)
+        : eq(pushSubscriptions.token, identifier.value);
 
     await db
       .delete(pushSubscriptions)
