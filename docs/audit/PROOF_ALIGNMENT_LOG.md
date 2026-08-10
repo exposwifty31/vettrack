@@ -5983,3 +5983,67 @@ pre-migration-schema execution to the migration-180 test.
 **Verdict:** VERIFIED (all 4 comments fixed, RED/characterization tests green, 3 typecheck gates + migration
 test green not-skipped, isolation cleanup confirmed via psql). Pre-existing ~20 shift-handover DB failures
 (missing migration 178 `signup_join_code`) are unrelated and out of scope.
+
+## 2026-08-10 — G3C-1: reviewer/demo account + synthetic live-shift seed (feat/g3c1-reviewer-demo-seed)
+
+**Claim:** `scripts/seed-reviewer-demo.ts` provisions a least-privilege `technician` demo account
+(keyed by `clerkId`) with an open clinical shift and non-empty clinic data, so an App Store / Play
+reviewer session on a fresh account sees populated screens instead of empty lists — code + run-book
+only, nothing run against production.
+
+**Evidence (all observed this session against local Postgres `postgres://vettrack:vettrack@localhost:5432/vettrack`):**
+- Mechanism traced first, not assumed: `server/lib/authority.ts:resolveAuthority` → (check-in path
+  off by default) → `server/lib/role-resolution.ts:resolveCurrentRole` — "Strategy A" — matches
+  `vt_shifts.employee_name` (normalized) against the user's `displayName || name` for `today`/`yesterday`
+  covering `now`. `server/routes/users.ts:/me` surfaces `activeShift` from the same resolver. Read the
+  full `resolveAuthority` (370 lines) and `resolveCurrentRole` (340 lines) before writing any seed code.
+- RED confirmed before implementation: `DATABASE_URL=… npx vitest run tests/seed-reviewer-demo.integration.test.ts`
+  (before `scripts/seed-reviewer-demo.ts` existed) → `2 failed`, `Cannot find module '../scripts/seed-reviewer-demo.js'`
+  — correct failure reason, not a typo.
+- GREEN after implementation: same command → `Test Files 1 passed (1)`, `Tests 2 passed (2)`.
+- `database-reviewer` agent dispatched (tenancy/schema/FK/onConflict review) found 2 HIGH: (1) `vt_users.id`
+  derived from `clinicId` while the `onConflictDoUpdate` arbiter is `clerkId` — a re-run with a corrected/
+  different `clerkId` for the same demo clinic falls through the arbiter and crashes on the `vt_users_pkey`;
+  (2) no guard against a typo'd `REVIEWER_DEMO_CLINIC_ID` silently seeding fake data into a real clinic
+  (`onConflictDoNothing` on the clinic insert would not error).
+- Finding (1) reproduced directly via raw SQL against the same local DB before fixing:
+  `INSERT … ON CONFLICT (clerk_id) DO UPDATE` with a clinicId-derived id and two different `clerk_id`
+  values → `ERROR: duplicate key value violates unique constraint "vt_users_pkey"` (verbatim). Confirmed
+  the fixed id scheme (`reviewer-demo-user-${clerkId}`) does not hit this via the same raw-SQL repro.
+  Then added a real regression test (`re-running with a different clerkId for the same clinic does not
+  collide on the users PK`) and RED→GREEN'd it against the actual `seedReviewerDemo()`: reverted the fix,
+  deleted the test clinic's rows for a true fresh state, re-ran → **1 failed** with the exact
+  `duplicate key value violates unique constraint "vt_users_pkey"` / code `23505` from the same query the
+  script issues; restored the fix, reset DB state, re-ran → **5 passed (5)**.
+- Finding (2) fixed by exporting `isForbiddenProductionClinicId` from `server/middleware/auth.ts` (reused,
+  not duplicated) plus a `clinicId` must-contain-"demo" guard (`{ allowAnyClinicId: true }` override);
+  covered by 2 new tests (`refuses to seed a clinicId that doesn't look like a demo clinic`,
+  `allows a non-demo-named clinicId when explicitly overridden`).
+- Final suite: `DATABASE_URL=… npx vitest run --config vitest.db-integration.config.ts tests/seed-reviewer-demo.integration.test.ts`
+  → `Test Files 1 passed (1)`, `Tests 5 passed (5)`. Post-run `psql` check: `SELECT count(*) FROM vt_clinics
+  WHERE id IN ('reviewer-demo-clinic-test','reviewer-override-clinic-test')` → `0` (afterAll cleanup verified).
+- `pnpm typecheck` (frontend + server, run 3× across the fix iterations) → **exit 0**, zero `error TS` lines,
+  each time.
+- Out-of-scope regression check: `pnpm test:db-integration` also runs the pre-existing
+  `tests/equipment-operational-state.integration.test.ts`; 10 pre-existing failures there (operational-metrics
+  workers, unrelated to this change — confirmed via `git diff --stat` showing zero touched files in that
+  suite's dependency graph) are unchanged by this work. Also ran `tests/role-resolution-adjustments.test.ts`,
+  `tests/shift-gate.test.ts`, `tests/auth-hardening.test.ts`, `tests/auth-mode-resolution.test.ts` (38 tests
+  total) as a targeted sanity sweep around the touched `server/middleware/auth.ts` export → all green.
+- Server-side gate verification (not RN-side — different repo, out of scope): grepped
+  `server/lib/task-rbac.ts:canPerformTaskAction("technician", "task.read")` → `true`; confirmed
+  `GET /api/equipment` (`server/routes/equipment.ts:266`) carries no role gate beyond `requireAuth`. Both
+  are the server contracts the seeded `technician` role needs to clear for equipment/task screens.
+
+**Multi-tenancy:** every insert in `seedReviewerDemo()` carries the resolved `clinicId`; child row IDs
+embed `clinicId` (equipment/rooms/docks/folder/tasks) or `clerkId` (user), so distinct demo clinics cannot
+collide on IDs (`database-reviewer` confirmed this explicitly).
+
+**Frozen surfaces:** none touched. `resolveAuthority`/`resolveCurrentRole`/the `off|shadow|enforce` envelope
+are read-only dependencies of this seed, not modified. The only production-code edit is exporting an
+already-existing pure function (`isForbiddenProductionClinicId`) — no behavior change.
+
+**Verdict:** VERIFIED (RED→GREEN on the seed itself and on both HIGH database-reviewer findings, PK-collision
+root cause reproduced with raw SQL before and after the fix, typecheck clean across 3 iterations, cleanup
+confirmed via psql, unrelated pre-existing DB-integration failures triaged out of scope). Not run against
+production — that is the owner's explicit next step per `docs/runbooks/reviewer-demo-account.md`.
