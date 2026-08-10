@@ -106,11 +106,26 @@ async function assertMigrationAppliesToPreMigrationSchema(pool: Pool): Promise<v
 
     console.log("✅ migration 180 applies to an isolated pre-migration schema (web row backfilled)");
   } finally {
-    // Restore session state before returning the connection to the pool, then drop
-    // the isolated schema so nothing leaks into the shared public-schema fixtures.
-    await client.query(`RESET search_path`).catch(() => {});
-    await client.query(`DROP SCHEMA IF EXISTS "${schema}" CASCADE`).catch(() => {});
+    // Restore session state and drop the isolated schema so nothing leaks into the shared
+    // public-schema fixtures. Attempt BOTH ops independently (a failed RESET must not skip the
+    // DROP), capture any failure instead of swallowing it, always release the client so the pool
+    // isn't starved, then fail the test if either op errored — a silently-leaked schema would
+    // otherwise pass unnoticed.
+    const cleanupErrors: string[] = [];
+    try {
+      await client.query(`RESET search_path`);
+    } catch (err) {
+      cleanupErrors.push(`RESET search_path: ${err instanceof Error ? err.message : String(err)}`);
+    }
+    try {
+      await client.query(`DROP SCHEMA IF EXISTS "${schema}" CASCADE`);
+    } catch (err) {
+      cleanupErrors.push(`DROP SCHEMA "${schema}": ${err instanceof Error ? err.message : String(err)}`);
+    }
     client.release();
+    if (cleanupErrors.length > 0) {
+      throw new Error(`push_mig isolated-schema cleanup failed (possible leak): ${cleanupErrors.join("; ")}`);
+    }
   }
 }
 
