@@ -247,9 +247,13 @@ describe.skipIf(!DATABASE_URL)("room-sweep missing-equipment alert (Part B P1) i
     expect(rows[0].payload.equipmentIds).toEqual([missingId]);
     expect(rows[0].payload.count).toBe(1);
 
-    // (b) manager-tier push with a per-sweep tag.
-    expect(sendPushToRole).toHaveBeenCalledWith(ctx.clinicId, "admin", expect.objectContaining({ tag: `equipment-missing:${ctx.roomId}` }));
-    expect(sendPushToRole).toHaveBeenCalledWith(ctx.clinicId, "vet", expect.objectContaining({ tag: `equipment-missing:${ctx.roomId}` }));
+    // (b) manager-tier push with a per-sweep tag. The push fans out in the BACKGROUND after the
+    // sweep response returns, so poll until both manager-role calls land rather than treating the
+    // HTTP response as the push's completion signal.
+    await vi.waitFor(() => {
+      expect(sendPushToRole).toHaveBeenCalledWith(ctx.clinicId, "admin", expect.objectContaining({ tag: `equipment-missing:${ctx.roomId}` }));
+      expect(sendPushToRole).toHaveBeenCalledWith(ctx.clinicId, "vet", expect.objectContaining({ tag: `equipment-missing:${ctx.roomId}` }));
+    });
 
     // (c) equipment_missing_alerted audit (room_swept is the first call).
     const alerted = logAudit.mock.calls.some(
@@ -269,6 +273,12 @@ describe.skipIf(!DATABASE_URL)("room-sweep missing-equipment alert (Part B P1) i
     expect((await missingAlertOutboxRows(ctx.clinicId)).length).toBe(1);
     expect(await alertAckCount(ctx.clinicId)).toBe(1);
 
+    // The first sweep's push is detached — let both manager-role calls land before clearing, so a
+    // late background call can't bleed past the reset and pollute the second-sweep assertion.
+    await vi.waitFor(() => {
+      expect(sendPushToRole).toHaveBeenCalledWith(ctx.clinicId, "admin", expect.anything());
+      expect(sendPushToRole).toHaveBeenCalledWith(ctx.clinicId, "vet", expect.anything());
+    });
     sendPushToRole.mockClear();
 
     // Second sweep — item is still missing, but it was alerted within the window.
@@ -283,10 +293,16 @@ describe.skipIf(!DATABASE_URL)("room-sweep missing-equipment alert (Part B P1) i
     expect(sendPushToRole).not.toHaveBeenCalled();
   });
 
-  it("a clean sweep (nothing missing) raises no alert", async () => {
-    const res = await api(`/api/docking/rooms/${ctx.roomId}/sweep`, "POST", { confirmedEquipmentIds: [] });
+  it("a clean sweep (a confirmed expected item, nothing missing) raises no alert", async () => {
+    // Seed an item EXPECTED to rest in the room, then confirm it in the sweep so the confirmed
+    // path is actually exercised. missingCount stays 0, so no alert/outbox/push is raised.
+    const confirmedId = randomUUID();
+    await seedEquipment(confirmedId, ctx.clinicId, ctx.roomId, ctx.assetTypeId);
+
+    const res = await api(`/api/docking/rooms/${ctx.roomId}/sweep`, "POST", { confirmedEquipmentIds: [confirmedId] });
     expect(res.status).toBe(200);
     if (!isRecord(res.json)) throw new Error("Expected response object");
+    expect(res.json.confirmedCount).toBe(1);
     expect(res.json.missingCount).toBe(0);
 
     expect((await missingAlertOutboxRows(ctx.clinicId)).length).toBe(0);

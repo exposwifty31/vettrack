@@ -92,6 +92,29 @@ async function notifyManagersMissing(clinicId: string, payload: PushPayload): Pr
   return result;
 }
 
+/**
+ * Detached post-commit manager push. Fully self-contained: resolves the broadcast copy, fans out
+ * to the manager tier, and swallows any failure via console.error — it NEVER throws into its caller.
+ * Kicked off without `await` so a slow or failed push neither blocks the sweep HTTP response nor
+ * endangers the already-committed durable alert.
+ */
+async function deliverManagerPushForMissing(clinicId: string, roomId: string): Promise<void> {
+  try {
+    const { title, body } = equipmentMissingPushCopy(INITIAL_LOCALE);
+    await notifyManagersMissing(clinicId, {
+      title,
+      body,
+      tag: `equipment-missing:${roomId}`,
+      url: "/docking",
+    });
+  } catch (err) {
+    console.error(
+      "[equipment-missing-alert] manager push failed (non-fatal):",
+      err instanceof Error ? err.message : err,
+    );
+  }
+}
+
 export interface AlertMissingParams {
   clinicId: string;
   roomId: string;
@@ -107,16 +130,21 @@ export interface AlertMissingParams {
  * The outbox ALERT event + the alertAcks rows commit ATOMICALLY (reader-offline-sweep pattern):
  * if the outbox insert failed after the acks were written, every future sweep would skip these
  * ids (already acked) and the alert would be lost forever — so both roll back together on failure.
- * The manager push runs AFTER commit (its own retry/backoff must not hold a DB transaction open).
+ * The manager push is DETACHED after commit: it runs in the background so a slow/failed push never
+ * blocks the sweep response, and a push failure never rolls back the durable alert nor skips audit.
+ * The returned `pushSettled` promise resolves once that background push has finished (it never
+ * rejects — its own catch logs and swallows failures); callers may await it, or ignore it.
  *
  * Ack-vs-delivery note: unlike stale-returned (which acks only after `deliveredAny`, push being its
  * only channel), the ack here commits with the outbox BEFORE push — the SSE/outbox event is the
  * primary channel and always reaches connected clients, so "we alerted" is true once it commits.
  */
-export async function alertMissingEquipmentAfterSweep(params: AlertMissingParams): Promise<{ alerted: string[] }> {
+export async function alertMissingEquipmentAfterSweep(
+  params: AlertMissingParams,
+): Promise<{ alerted: string[]; pushSettled: Promise<void> }> {
   const { clinicId, roomId } = params;
   const now = params.now ?? new Date();
-  if (!clinicId || params.missingEquipmentIds.length === 0) return { alerted: [] };
+  if (!clinicId || params.missingEquipmentIds.length === 0) return { alerted: [], pushSettled: Promise.resolve() };
 
   const uniqueMissing = Array.from(new Set(params.missingEquipmentIds));
   const cutoff = new Date(now.getTime() - DEDUPE_WINDOW_MS);
@@ -136,7 +164,7 @@ export async function alertMissingEquipmentAfterSweep(params: AlertMissingParams
     );
   const recentlyAlerted = new Set(recentAcks.map((r) => r.equipmentId));
   const toAlert = selectUnalertedMissing(uniqueMissing, recentlyAlerted);
-  if (toAlert.length === 0) return { alerted: [] };
+  if (toAlert.length === 0) return { alerted: [], pushSettled: Promise.resolve() };
 
   await db.transaction(async (tx) => {
     await insertRealtimeDomainEvent(tx, {
@@ -161,17 +189,13 @@ export async function alertMissingEquipmentAfterSweep(params: AlertMissingParams
     }
   });
 
-  // Post-commit: broadcast to the manager tier. Per-sweep tag coalesces device notifications for
-  // the same room so a repeated sweep replaces rather than stacks.
-  const { title, body } = equipmentMissingPushCopy(INITIAL_LOCALE);
-  await notifyManagersMissing(clinicId, {
-    title,
-    body,
-    tag: `equipment-missing:${roomId}`,
-    url: "/docking",
-  });
+  // Detached post-commit broadcast to the manager tier — must NOT block the sweep response and must
+  // never throw into it (the helper owns its own try/catch). The per-sweep tag coalesces device
+  // notifications for the same room so a repeated sweep replaces rather than stacks.
+  const pushSettled = deliverManagerPushForMissing(clinicId, roomId);
 
-  // Fire-and-forget audit (append-only; deliberately outside the state-change transaction).
+  // Fire-and-forget audit (append-only; deliberately outside the state-change transaction). Called
+  // right after kicking off the detached push, so a push failure can never skip it.
   logAudit({
     clinicId,
     actionType: "equipment_missing_alerted",
@@ -182,7 +206,5 @@ export async function alertMissingEquipmentAfterSweep(params: AlertMissingParams
     metadata: { roomId, count: toAlert.length, equipmentIds: toAlert },
   });
 
-  return { alerted: toAlert };
+  return { alerted: toAlert, pushSettled };
 }
-
-export const __test = { DEDUPE_WINDOW_MS, MISSING_ALERT_TYPE, EQUIPMENT_MISSING_ALERT_EVENT };

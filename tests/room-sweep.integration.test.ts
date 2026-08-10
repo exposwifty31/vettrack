@@ -45,6 +45,13 @@ vi.mock("../server/lib/audit.js", () => ({
   resolveAuditActorRole: () => "admin",
 }));
 
+// The post-commit missing-equipment alert broadcasts to the manager tier. Stub push so the
+// equipment_missing_alerted assertions below depend on the durable outbox/audit path, not on real
+// web-push delivery (the alert's own suite covers the push fan-out).
+vi.mock("../server/lib/push.js", () => ({
+  sendPushToRole: vi.fn().mockResolvedValue({ deliveredAny: true, transientFailures: 0, invalidOrGoneCount: 0 }),
+}));
+
 vi.mock("../server/middleware/auth.js", () => ({
   requireAuth: (req: Record<string, unknown>, _res: unknown, next: () => void) => {
     req.authUser = { id: currentUserId, email: "test@ops.local", role: currentUserRole };

@@ -5796,3 +5796,48 @@ no enforcement files, no queries, no audit kinds.
 **Verdict:** VERIFIED (RED→GREEN matrix, typecheck, full suite with base-comparison triage of the 20
 pre-existing environmental failures). Not verified: live-server/DB-integration excluded groups (no local
 DB at current schema; failures above are that same environmental gap, present on base).
+
+## 2026-08-10 — PR #172 CodeRabbit round 1: 5 findings + push-mock addressed (branch feat/equipment-missing-alert)
+
+Addressed CodeRabbit's 5 review comments on the room-sweep missing-equipment alert, plus the "Also"
+request. Detached the manager push from the durable path, hardened the audit, dropped a dead export,
+and tightened three tests. Multi-tenancy and the SSE/outbox frozen surface untouched (new realtime
+`type` only; no transport change).
+
+**Evidence (all observed this session against local Postgres `postgres://vettrack:vettrack@localhost:5432/vettrack`):**
+- **#2/#5 (RED→GREEN anchor):** added `tests/equipment-missing-alert.service.test.ts` "still writes the
+  outbox event and audit when the manager push rejects". RED on HEAD → test errored with `Error: push
+  transport down` (function rejected before `logAudit` — the exact bug). GREEN after the service fix →
+  `pnpm test tests/equipment-missing-alert.service.test.ts` = `9 passed (9)`.
+- **#2 fix:** `server/services/equipment-missing-alert.service.ts` — push extracted into self-contained
+  `deliverManagerPushForMissing()` (own try/catch → `console.error`, never throws); `logAudit` now called
+  unconditionally right after kicking it off, so a push failure can never skip the audit.
+- **#1 fix:** durable outbox/ack `db.transaction` still awaited; the manager push is DETACHED
+  (`const pushSettled = deliverManagerPushForMissing(...)`, not awaited) and returned as `pushSettled` so it
+  never blocks the sweep HTTP response. `server/routes/docking.ts:612-626` awaited call now resolves at the
+  durable commit; its `.catch` guards a durable-commit failure only (comment updated to say so). Integration
+  test `tests/equipment-missing-alert.integration.test.ts` now `vi.waitFor`s the background push in test 1
+  and before the mockClear in test (d), rather than treating the HTTP 200 as the push's completion signal.
+- **#3 fix:** removed `export const __test = {...}`. No importer (`grep -rn "__test" tests/` → none reference
+  this module). Real named exports `EQUIPMENT_MISSING_ALERT_EVENT` + `MISSING_ALERT_TYPE` preserved. knip
+  base-comparison (`git stash` HEAD vs working): HEAD flagged 3 (both consts + `__test`); after change 2
+  (the two consts, which #3 says to keep) — net **−1** finding, no regression.
+- **#4 fix:** clean-sweep integration test now seeds an expected item and confirms it
+  (`confirmedEquipmentIds: [confirmedId]`), asserting `confirmedCount === 1` / `missingCount === 0` / empty
+  outbox / no push — the confirmed path is actually exercised. Verbose run confirmed it ran:
+  `✓ a clean sweep (a confirmed expected item, nothing missing) raises no alert`.
+- **Also:** `tests/room-sweep.integration.test.ts` now `vi.mock`s `../server/lib/push.js` so its
+  `equipment_missing_alerted` (times(2)) assertions no longer depend on real web-push delivery.
+- **Suites:** `DATABASE_URL=… pnpm test tests/equipment-missing-alert.integration.test.ts
+  tests/room-sweep.integration.test.ts` → `Test Files 2 passed (2)`, `Tests 13 passed (13)` (verified not
+  skipped via `--reporter=verbose`; only stderr = pre-existing `[i18n] Invalid locale "*"` middleware log,
+  present even in the no-push clean-sweep test).
+- **Gates:** `pnpm typecheck` (frontend + server tsconfig) → clean, 0 errors. `pnpm i18n:check` → deep key
+  parity OK. `pnpm tenant:lint:touched` → 3 warn-only findings, all pre-existing false positives (docking.ts
+  338/687 in untouched code; the alertAcks SELECT at service.ts:156 IS clinic-scoped via
+  `eq(alertAcks.clinicId, clinicId)` — heuristic can't see it; no new DB query added). No ESLint config in repo.
+
+**Verdict:** VERIFIED (RED→GREEN for the new test, both DB-gated integration files green against local
+Postgres, typecheck + i18n parity clean, knip net-improved). Frozen surfaces intact: SSE transport
+unchanged (new event `type` only), every emit/query clinic-scoped, `equipment_missing_alerted` remains a
+closed-union audit kind.

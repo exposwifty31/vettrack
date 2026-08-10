@@ -609,9 +609,11 @@ router.post(
       metadata: { confirmed: confirmedCount, missing: missingCount },
     });
 
-    // Proactive alert for items the sweep left `missing` (Part B Phase 1). Best-effort and
-    // AFTER the sweep transaction commits — a notification failure must never fail the sweep,
-    // and the alert's own outbox row + acks commit atomically inside the service.
+    // Proactive alert for items the sweep left `missing` (Part B Phase 1), AFTER the sweep
+    // transaction commits. The awaited call resolves once the durable outbox row + acks commit
+    // atomically inside the service; the manager push is DETACHED there and fans out in the
+    // background, so it never blocks this response. This `.catch` guards a durable-commit failure
+    // only — a notification failure must never fail the sweep.
     if (missingEquipmentIds.length > 0) {
       await alertMissingEquipmentAfterSweep({ clinicId, roomId, missingEquipmentIds }).catch((err) => {
         console.error(

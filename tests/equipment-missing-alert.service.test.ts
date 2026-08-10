@@ -98,7 +98,7 @@ describe("alertMissingEquipmentAfterSweep", () => {
       now: NOW,
     });
 
-    expect(result).toEqual({ alerted: ["eq-1", "eq-2"] });
+    expect(result.alerted).toEqual(["eq-1", "eq-2"]);
 
     // (a) new realtime type on the existing outbox, clinic-scoped, ALERT/WARNING, carrying ids + count.
     expect(insertRealtimeDomainEvent).toHaveBeenCalledWith(
@@ -112,7 +112,8 @@ describe("alertMissingEquipmentAfterSweep", () => {
       }),
     );
 
-    // (b) manager-tier push (admin + vet) with a per-sweep coalescing tag.
+    // (b) manager-tier push (admin + vet) with a per-sweep coalescing tag — fires in the background.
+    await result.pushSettled;
     expect(sendPushToRole).toHaveBeenCalledWith("clinic-1", "admin", expect.objectContaining({ tag: "equipment-missing:room-1" }));
     expect(sendPushToRole).toHaveBeenCalledWith("clinic-1", "vet", expect.objectContaining({ tag: "equipment-missing:room-1" }));
 
@@ -140,7 +141,7 @@ describe("alertMissingEquipmentAfterSweep", () => {
       now: NOW,
     });
 
-    expect(result).toEqual({ alerted: [] });
+    expect(result.alerted).toEqual([]);
     expect(db.transaction).not.toHaveBeenCalled();
     expect(insertRealtimeDomainEvent).not.toHaveBeenCalled();
     expect(sendPushToRole).not.toHaveBeenCalled();
@@ -158,11 +159,13 @@ describe("alertMissingEquipmentAfterSweep", () => {
       now: NOW,
     });
 
-    expect(result).toEqual({ alerted: ["eq-2"] });
+    expect(result.alerted).toEqual(["eq-2"]);
     expect(insertRealtimeDomainEvent).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({ payload: expect.objectContaining({ equipmentIds: ["eq-2"], count: 1 }) }),
     );
+    // Let the detached push settle so it can't bleed into the next test's mock assertions.
+    await result.pushSettled;
   });
 
   it("is a no-op with no missing ids (no DB read, no emit)", async () => {
@@ -172,9 +175,49 @@ describe("alertMissingEquipmentAfterSweep", () => {
       missingEquipmentIds: [],
     });
 
-    expect(result).toEqual({ alerted: [] });
+    expect(result.alerted).toEqual([]);
     expect(db.select).not.toHaveBeenCalled();
     expect(db.transaction).not.toHaveBeenCalled();
     expect(sendPushToRole).not.toHaveBeenCalled();
+  });
+
+  it("still writes the outbox event and audit when the manager push rejects", async () => {
+    vi.mocked(db.select).mockReturnValue(makeSelectChain([]) as never); // no prior acks
+    const { tx } = setupTransactionMock();
+    vi.mocked(sendPushToRole).mockRejectedValue(new Error("push transport down"));
+
+    const result = await alertMissingEquipmentAfterSweep({
+      clinicId: "clinic-1",
+      roomId: "room-1",
+      missingEquipmentIds: ["eq-1", "eq-2"],
+      now: NOW,
+    });
+
+    // The detached push settles without throwing into the caller (its own catch swallows the rejection).
+    await result.pushSettled;
+
+    expect(result.alerted).toEqual(["eq-1", "eq-2"]);
+
+    // The durable outbox event still committed despite the push failure.
+    expect(insertRealtimeDomainEvent).toHaveBeenCalledWith(
+      tx,
+      expect.objectContaining({
+        clinicId: "clinic-1",
+        type: "EQUIPMENT_MISSING_ALERT",
+        category: "ALERT",
+        level: "WARNING",
+        payload: expect.objectContaining({ roomId: "room-1", equipmentIds: ["eq-1", "eq-2"], count: 2 }),
+      }),
+    );
+
+    // And the audit still ran — a push failure must never skip it.
+    expect(logAudit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        clinicId: "clinic-1",
+        actionType: "equipment_missing_alerted",
+        targetId: "room-1",
+        metadata: expect.objectContaining({ count: 2, equipmentIds: ["eq-1", "eq-2"] }),
+      }),
+    );
   });
 });
