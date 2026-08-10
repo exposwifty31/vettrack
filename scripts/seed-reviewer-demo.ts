@@ -29,6 +29,7 @@
  *   DATABASE_URL=... REVIEWER_DEMO_CLERK_ID=user_xxx pnpm seed:reviewer-demo
  */
 import "dotenv/config";
+import { eq } from "drizzle-orm";
 import {
   appointments,
   clinics,
@@ -48,6 +49,12 @@ const DEFAULT_CLERK_ID = "reviewer-demo-clerk-dev";
 const DEFAULT_EMAIL = "reviewer-demo@vettrack.app";
 const DEFAULT_DISPLAY_NAME = "App Review Demo";
 const DEFAULT_SHIFT_SPAN_DAYS = 14;
+/** Documented sane upper bound for shiftSpanDays — generous enough to cover
+ * any realistic App Review cycle (see run-book Step 3) while keeping the
+ * roster-row batch insert bounded. Number.isSafeInteger also rejects
+ * Infinity/NaN/non-integers, which would otherwise loop forever building
+ * shiftRows (see G3C-1 CodeRabbit PR #175 finding #3). */
+const MAX_SHIFT_SPAN_DAYS = 90;
 /** Guards against a typo'd/stale REVIEWER_DEMO_CLINIC_ID silently writing a
  * fake technician + roster + equipment into a REAL clinic (see G3C-1 review:
  * onConflictDoNothing on the clinic insert means a real clinicId would not
@@ -109,6 +116,16 @@ export async function seedReviewerDemo(
   const displayName = opts.displayName?.trim() || DEFAULT_DISPLAY_NAME;
   const now = opts.now ?? new Date();
   const shiftSpanDays = opts.shiftSpanDays ?? DEFAULT_SHIFT_SPAN_DAYS;
+  if (
+    !Number.isSafeInteger(shiftSpanDays) ||
+    shiftSpanDays <= 0 ||
+    shiftSpanDays > MAX_SHIFT_SPAN_DAYS
+  ) {
+    throw new Error(
+      `seedReviewerDemo: shiftSpanDays must be a positive safe integer <= ${MAX_SHIFT_SPAN_DAYS} ` +
+        `(received ${shiftSpanDays}).`,
+    );
+  }
 
   // 1. Clinic.
   await db.insert(clinics).values({ id: clinicId }).onConflictDoNothing();
@@ -122,6 +139,29 @@ export async function seedReviewerDemo(
   //    ON CONFLICT target wouldn't match, so Postgres falls through to the
   //    insert, which then hits the id PK) instead of routing through the
   //    update — see G3C-1 database-reviewer finding.
+  //
+  //    HIJACK GUARD (CodeRabbit PR #175 Major #1): `users.clerkId` is
+  //    globally unique, so a blind onConflictDoUpdate on clerkId would
+  //    silently reassign an EXISTING operator's account into the demo
+  //    clinic and downgrade role/status to technician/active if this seed
+  //    is ever run with a clerkId that collides with a real user (typo,
+  //    stale env var, copy-paste error). Read the existing row first and
+  //    refuse to write unless it's absent or already the demo account for
+  //    THIS clinic.
+  const [existingByClerkId] = await db
+    .select({ id: users.id, clinicId: users.clinicId })
+    .from(users)
+    .where(eq(users.clerkId, clerkId))
+    .limit(1);
+  if (existingByClerkId && existingByClerkId.clinicId !== clinicId) {
+    throw new Error(
+      `seedReviewerDemo: clerkId "${clerkId}" is already assigned to clinic ` +
+        `"${existingByClerkId.clinicId}" (user id ${existingByClerkId.id}) — refusing to hijack an ` +
+        `existing account into "${clinicId}". If this really is the demo account being reassigned, ` +
+        `update its clinicId manually first.`,
+    );
+  }
+
   const userId = `reviewer-demo-user-${clerkId}`;
   const [userRow] = await db
     .insert(users)
@@ -162,11 +202,11 @@ export async function seedReviewerDemo(
   //    and this seed's own re-run re-asserts it — so `displayName` is the
   //    only field guaranteed stable across the reviewer's first real login.
   //    Dormant risk: shift rows are keyed on clinicId+date only, so
-  //    onConflictDoNothing means an already-seeded day's `employeeName` will
-  //    NOT update if `displayName` changes on a later call. Not reachable via
-  //    the documented run-book flow (displayName isn't varied there); if you
-  //    ever do change it, delete the existing `reviewer-demo-shift-*` rows
-  //    for the demo clinic first.
+  //    FIXED (CodeRabbit PR #175 Major #2): shift rows are keyed on
+  //    clinicId+date, so a plain onConflictDoNothing would leave an
+  //    already-seeded day's `employeeName` stale if `displayName` changes on
+  //    a later run — desyncing the roster-name match resolveAuthority relies
+  //    on. Upsert on conflict instead so employeeName/role stay in sync.
   const shiftIds: string[] = [];
   const shiftRows: (typeof shifts.$inferInsert)[] = [];
   for (let i = 0; i < shiftSpanDays; i++) {
@@ -186,7 +226,13 @@ export async function seedReviewerDemo(
     });
   }
   if (shiftRows.length > 0) {
-    await db.insert(shifts).values(shiftRows).onConflictDoNothing();
+    await db
+      .insert(shifts)
+      .values(shiftRows)
+      .onConflictDoUpdate({
+        target: shifts.id,
+        set: { employeeName: displayName, role: "technician" },
+      });
   }
 
   // 4. Clinic furniture.
@@ -302,6 +348,9 @@ if (isMainModule) {
       process.exitCode = 1;
     })
     .finally(() => {
-      pool.end().catch(() => {});
+      pool.end().catch((err) => {
+        console.error("[seed-reviewer-demo] pool shutdown failed:", err);
+        process.exitCode = 1;
+      });
     });
 }

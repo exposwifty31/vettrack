@@ -36,11 +36,13 @@ describe.skipIf(!dbReachable)("seed-reviewer-demo integration", () => {
   const CLERK_ID = "reviewer-demo-clerk-test";
 
   const OVERRIDE_CLINIC_ID = "reviewer-override-clinic-test";
+  const OTHER_CLINIC_ID = "reviewer-demo-other-clinic-test";
+  const STALENESS_CLINIC_ID = "reviewer-demo-staleness-clinic-test";
 
   afterAll(async () => {
     // Best-effort cleanup — leaves no cruft in the local dev DB across runs.
     // Deletion order respects FK dependencies (children before the clinic).
-    for (const clinicId of [CLINIC_ID, OVERRIDE_CLINIC_ID]) {
+    for (const clinicId of [CLINIC_ID, OVERRIDE_CLINIC_ID, OTHER_CLINIC_ID, STALENESS_CLINIC_ID]) {
       try {
         await probePool?.query(`DELETE FROM vt_appointments WHERE clinic_id = $1`, [clinicId]);
         await probePool?.query(`DELETE FROM vt_equipment WHERE clinic_id = $1`, [clinicId]);
@@ -66,14 +68,17 @@ describe.skipIf(!dbReachable)("seed-reviewer-demo integration", () => {
 
     // 1. User row: least-privilege technician, active, scoped to the demo clinic.
     const [userRow] = await db.select().from(users).where(eq(users.id, result.userId)).limit(1);
-    expect(userRow?.role).toBe("technician");
-    expect(userRow?.status).toBe("active");
-    expect(userRow?.clinicId).toBe(CLINIC_ID);
+    if (!userRow) {
+      throw new Error(`Expected seedReviewerDemo to have created a user row for id ${result.userId}`);
+    }
+    expect(userRow.role).toBe("technician");
+    expect(userRow.status).toBe("active");
+    expect(userRow.clinicId).toBe(CLINIC_ID);
 
     // 2. Authority resolves an open shift — the real gate that decides whether
     //    shift-gated screens render populated vs empty.
     const authority = await resolveAuthority({
-      authUser: { id: result.userId, name: userRow!.displayName, role: userRow!.role },
+      authUser: { id: result.userId, name: userRow.displayName, role: userRow.role },
       clinicId: CLINIC_ID,
     });
     expect(authority.effectiveClinicalRole).toBe("technician");
@@ -115,6 +120,11 @@ describe.skipIf(!dbReachable)("seed-reviewer-demo integration", () => {
     const { seedReviewerDemo } = await import("../scripts/seed-reviewer-demo.js");
     const { db, users } = await import("../server/db.js");
 
+    // Self-contained: seed the original clerkId here rather than relying on
+    // an earlier test in this file having already created it (test order
+    // should never be load-bearing).
+    await seedReviewerDemo({ clinicId: CLINIC_ID, clerkId: CLERK_ID });
+
     const otherClerkId = `${CLERK_ID}-corrected`;
     await expect(
       seedReviewerDemo({ clinicId: CLINIC_ID, clerkId: otherClerkId }),
@@ -149,5 +159,108 @@ describe.skipIf(!dbReachable)("seed-reviewer-demo integration", () => {
         allowAnyClinicId: true,
       }),
     ).resolves.toBeTruthy();
+  });
+
+  // Regression for CodeRabbit PR #175 Major finding #1: `users.clerkId` is
+  // globally unique, so a blind onConflictDoUpdate on clerkId would hijack
+  // an EXISTING operator's account (wrong clinic, real role) into the demo
+  // clinic and downgrade it to technician/active if the seed is ever run
+  // with a clerkId that collides with a real user. The seed must read the
+  // existing row by clerkId first and refuse to write when that row is
+  // already assigned to a DIFFERENT clinic.
+  it("refuses to hijack an existing user whose clerkId is already assigned to a different clinic", async () => {
+    const { seedReviewerDemo } = await import("../scripts/seed-reviewer-demo.js");
+    const { db, clinics, users } = await import("../server/db.js");
+
+    const hijackClerkId = "reviewer-demo-hijack-clerk-test";
+    await db.insert(clinics).values({ id: OTHER_CLINIC_ID }).onConflictDoNothing();
+    await db
+      .insert(users)
+      .values({
+        id: "reviewer-demo-existing-operator-test",
+        clinicId: OTHER_CLINIC_ID,
+        clerkId: hijackClerkId,
+        email: "real-operator@example.com",
+        name: "Real Operator",
+        displayName: "Real Operator",
+        role: "vet",
+        status: "active",
+      })
+      .onConflictDoNothing();
+
+    await expect(
+      seedReviewerDemo({ clinicId: CLINIC_ID, clerkId: hijackClerkId }),
+    ).rejects.toThrow(/already assigned/);
+
+    // The real operator's row must be untouched — not reassigned, not
+    // downgraded.
+    const [row] = await db.select().from(users).where(eq(users.clerkId, hijackClerkId)).limit(1);
+    expect(row?.clinicId).toBe(OTHER_CLINIC_ID);
+    expect(row?.role).toBe("vet");
+    expect(row?.status).toBe("active");
+  });
+
+  // Regression for CodeRabbit PR #175 Major finding #2: the deterministic
+  // shift rows used onConflictDoNothing, so a later run with a different
+  // `displayName` updated the user row but left the roster `employeeName`
+  // stale — desyncing the roster-name match resolveAuthority relies on.
+  it("updates the roster employeeName when displayName changes on a later run (no stale shift rows)", async () => {
+    const { seedReviewerDemo } = await import("../scripts/seed-reviewer-demo.js");
+    const { db, shifts } = await import("../server/db.js");
+
+    const clerkId = "reviewer-demo-staleness-clerk-test";
+    await seedReviewerDemo({
+      clinicId: STALENESS_CLINIC_ID,
+      clerkId,
+      displayName: "Original Demo Name",
+      shiftSpanDays: 2,
+    });
+    await seedReviewerDemo({
+      clinicId: STALENESS_CLINIC_ID,
+      clerkId,
+      displayName: "Updated Demo Name",
+      shiftSpanDays: 2,
+    });
+
+    const rows = await db.select().from(shifts).where(eq(shifts.clinicId, STALENESS_CLINIC_ID));
+    expect(rows.length).toBeGreaterThan(0);
+    for (const row of rows) {
+      expect(row.employeeName).toBe("Updated Demo Name");
+    }
+  });
+
+  // Regression for CodeRabbit PR #175 finding #3: shiftSpanDays must be
+  // bounded — an unvalidated Infinity would loop forever building shiftRows.
+  // Infinity itself is deliberately NOT exercised here (it would hang the
+  // test process pre-fix); Number.isSafeInteger(Infinity) === false gives
+  // the same rejection path as the finite cases below without the risk.
+  it("rejects a non-positive shiftSpanDays", async () => {
+    const { seedReviewerDemo } = await import("../scripts/seed-reviewer-demo.js");
+
+    await expect(
+      seedReviewerDemo({ clinicId: CLINIC_ID, clerkId: CLERK_ID, shiftSpanDays: 0 }),
+    ).rejects.toThrow(/shiftSpanDays/);
+    await expect(
+      seedReviewerDemo({ clinicId: CLINIC_ID, clerkId: CLERK_ID, shiftSpanDays: -3 }),
+    ).rejects.toThrow(/shiftSpanDays/);
+  });
+
+  it("rejects a non-integer or unsafe shiftSpanDays", async () => {
+    const { seedReviewerDemo } = await import("../scripts/seed-reviewer-demo.js");
+
+    await expect(
+      seedReviewerDemo({ clinicId: CLINIC_ID, clerkId: CLERK_ID, shiftSpanDays: 1.5 }),
+    ).rejects.toThrow(/shiftSpanDays/);
+    await expect(
+      seedReviewerDemo({ clinicId: CLINIC_ID, clerkId: CLERK_ID, shiftSpanDays: NaN }),
+    ).rejects.toThrow(/shiftSpanDays/);
+  });
+
+  it("rejects a shiftSpanDays above the documented upper bound, including the received value in the error", async () => {
+    const { seedReviewerDemo } = await import("../scripts/seed-reviewer-demo.js");
+
+    await expect(
+      seedReviewerDemo({ clinicId: CLINIC_ID, clerkId: CLERK_ID, shiftSpanDays: 10_000 }),
+    ).rejects.toThrow(/shiftSpanDays.*10000/s);
   });
 });

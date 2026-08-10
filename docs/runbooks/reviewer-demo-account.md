@@ -95,9 +95,17 @@ clinic).
 `vt_shifts` has no recurring-shift concept — each row is a single calendar
 day. The seed lays down 14 days from whenever it's run, comfortably covering
 a typical review cycle, but if a review drags past that window, **re-run
-Step 2** (same command) to extend coverage. Re-running is a no-op for
-everything except the shift-window extension (`onConflictDoNothing` on all
-other tables).
+Step 2** (same command) to extend coverage.
+
+A re-run is **not a no-op**. The `vt_users` row is re-upserted on every run —
+`clinicId`, `email`, `name`, `displayName`, `role`, and `status` are all
+re-applied to their configured values (restoring the technician/active demo
+state even if something else changed them in between). The shift-roster rows
+are also upserted (not just inserted): if you pass a different `displayName`
+on a later run, the roster `employee_name` for every already-seeded day is
+updated to match, so the roster-name match never goes stale. Only the
+clinic-furniture / equipment / task rows are pure `onConflictDoNothing` — they
+seed once and are then left alone across re-runs.
 
 ## Step 4 — Point the reviewer at the right build
 
@@ -122,23 +130,30 @@ Or the full DB-integration suite: `pnpm test:db-integration` (also runs
 change).
 
 This test seeds a throwaway clinic (`reviewer-demo-clinic-test`) against your
-local dev DB, then calls the real `resolveAuthority()` and asserts:
-`effectiveClinicalRole === "technician"`, `source === "shift"`, and that
-equipment/rooms/docks/tasks rows exist for the clinic. It does **not** touch
-Clerk or production.
+local dev DB, then — entirely at the Drizzle/data-access layer, **not** over
+HTTP — calls the real `resolveAuthority()` and asserts
+`effectiveClinicalRole === "technician"` / `source === "shift"`, queries
+`vt_equipment` / `vt_rooms` / `vt_docks` / `vt_appointments` directly and
+asserts non-empty rows for the clinic, and exercises the seed's own
+data-integrity guards (refuses to hijack an existing user assigned to a
+different clinic, keeps roster `employee_name` in sync when `displayName`
+changes, rejects an invalid `shiftSpanDays`). It does **not** start the
+Express app, does **not** call `GET /api/equipment` or `GET /api/appointments`
+over HTTP, and does **not** touch Clerk or production.
 
-**What this proves vs. what it doesn't.** The test — and this seed — verify
-the *server-side* contract every shift-gated screen depends on: the account
-authenticates, clears `role >= student`, resolves an open shift via
-`resolveAuthority`, and every list endpoint it hits returns non-empty,
-clinic-scoped rows. Confirmed server-side gates a `technician` clears:
-`GET /api/equipment` (no extra role check beyond `requireAuth`) and
-`GET /api/appointments` (`requireEffectiveRole("technician")` +
-`canPerformTaskAction("technician", "task.read")` — verified `true` in
-`server/lib/task-rbac.ts`). What this does **not** verify is how the RN
-client (a separate repo) renders once it receives that data — this runbook
-and its test stop at the server boundary the RN client's `BootstrapGate` and
-shift-gated screens read from.
+**What this proves vs. what it doesn't.** The test proves the seed produces
+a `resolveAuthority`-visible open shift and non-empty, clinic-scoped rows in
+the tables those routes read from — the data-layer half of the contract
+shift-gated screens depend on. It does **not** exercise the HTTP route
+guards themselves. Separately, by reading the route code (not by running
+it): `GET /api/equipment` (`server/routes/equipment.ts`) carries no role
+check beyond `requireAuth`, and `GET /api/appointments`
+(`server/routes/appointments.ts`) requires `requireEffectiveRole("technician")`
+plus `canPerformTaskAction("technician", "task.read")` — confirmed `true` in
+`server/lib/task-rbac.ts`. Neither the route-gate reading nor the data-layer
+test says anything about how the RN client (a separate repo) renders once it
+receives that data — this runbook and its test stop at the server boundary
+the RN client's `BootstrapGate` and shift-gated screens read from.
 
 ## Rollback
 
