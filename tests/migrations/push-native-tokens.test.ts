@@ -42,6 +42,7 @@ async function assertMigrationAppliesToPreMigrationSchema(pool: Pool): Promise<v
   );
   const schema = `push_mig_${uid().replace(/-/g, "")}`;
   const client = await pool.connect();
+  let bodyError: unknown;
   try {
     // Isolated schema, search_path set to it ALONE (no public): migration 180's
     // unqualified `DROP INDEX IF EXISTS ux_vt_push_subscriptions_token` would
@@ -105,12 +106,13 @@ async function assertMigrationAppliesToPreMigrationSchema(pool: Pool): Promise<v
     assert.strictEqual(native.rows[0].endpoint, null, "native row endpoint must be NULL");
 
     console.log("✅ migration 180 applies to an isolated pre-migration schema (web row backfilled)");
+  } catch (err) {
+    // Retain the migration-body error so a cleanup failure below can never mask it.
+    bodyError = err;
   } finally {
-    // Restore session state and drop the isolated schema so nothing leaks into the shared
-    // public-schema fixtures. Attempt BOTH ops independently (a failed RESET must not skip the
-    // DROP), capture any failure instead of swallowing it, always release the client so the pool
-    // isn't starved, then fail the test if either op errored — a silently-leaked schema would
-    // otherwise pass unnoticed.
+    // Attempt BOTH cleanup ops independently (a failed RESET must not skip the DROP), capturing any
+    // failure. If either fails the session/schema state is suspect, so DESTROY the client
+    // (release(true)) rather than returning a dirty connection to the pool.
     const cleanupErrors: string[] = [];
     try {
       await client.query(`RESET search_path`);
@@ -122,11 +124,19 @@ async function assertMigrationAppliesToPreMigrationSchema(pool: Pool): Promise<v
     } catch (err) {
       cleanupErrors.push(`DROP SCHEMA "${schema}": ${err instanceof Error ? err.message : String(err)}`);
     }
-    client.release();
+    client.release(cleanupErrors.length > 0);
     if (cleanupErrors.length > 0) {
-      throw new Error(`push_mig isolated-schema cleanup failed (possible leak): ${cleanupErrors.join("; ")}`);
+      const cleanupMsg = `push_mig isolated-schema cleanup failed (possible leak): ${cleanupErrors.join("; ")}`;
+      if (bodyError === undefined) {
+        // Migration body succeeded → the cleanup failure IS the test failure.
+        bodyError = new Error(cleanupMsg);
+      } else {
+        // Body already failed → that is the primary error; report cleanup as secondary, never mask.
+        console.error(`[push-native-tokens] ${cleanupMsg}`);
+      }
     }
   }
+  if (bodyError !== undefined) throw bodyError;
 }
 
 async function expectReject(fn: () => Promise<unknown>, sqlstatePrefix: string, message: string): Promise<void> {
