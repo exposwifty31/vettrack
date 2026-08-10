@@ -18,6 +18,11 @@ export function isVapidReady(): boolean {
   return vapidReady;
 }
 
+/** True when ANY push transport can deliver — web-push (VAPID) OR APNs OR FCM. */
+export function isPushReady(): boolean {
+  return isVapidReady() || isApnsReady() || isFcmReady();
+}
+
 export async function initVapid(): Promise<void> {
   try {
     let publicKey = process.env.VAPID_PUBLIC_KEY ?? "";
@@ -312,12 +317,21 @@ interface ExpiredSubscriptionRef {
   token?: string | null;
 }
 
-async function cleanupExpiredSubscriptions(refs: ExpiredSubscriptionRef[]): Promise<void> {
+async function cleanupExpiredSubscriptions(clinicId: string, refs: ExpiredSubscriptionRef[]): Promise<void> {
   for (const ref of refs) {
-    if (ref.token) {
-      await db.delete(pushSubscriptions).where(eq(pushSubscriptions.token, ref.token)).catch(() => {});
-    } else if (ref.endpoint) {
-      await db.delete(pushSubscriptions).where(eq(pushSubscriptions.endpoint, ref.endpoint)).catch(() => {});
+    try {
+      if (ref.token) {
+        await db
+          .delete(pushSubscriptions)
+          .where(and(eq(pushSubscriptions.clinicId, clinicId), eq(pushSubscriptions.token, ref.token)));
+      } else if (ref.endpoint) {
+        await db
+          .delete(pushSubscriptions)
+          .where(and(eq(pushSubscriptions.clinicId, clinicId), eq(pushSubscriptions.endpoint, ref.endpoint)));
+      }
+    } catch (err) {
+      // Contextual operational error only — never log the token/endpoint (device secret).
+      console.error("[push] expired-subscription cleanup failed:", err instanceof Error ? err.message : err);
     }
   }
 }
@@ -426,7 +440,7 @@ export async function sendPushToAll(
     }),
   );
 
-  if (expired.length > 0) await cleanupExpiredSubscriptions(expired);
+  if (expired.length > 0) await cleanupExpiredSubscriptions(clinicId, expired);
 
   const attemptedAny = subs.some((s) => s.alertsEnabled);
   const defer = delivery?.deferTerminalOutbox === true;
@@ -543,7 +557,7 @@ export async function sendPushToRole(
     }),
   );
 
-  if (expired.length > 0) await cleanupExpiredSubscriptions(expired);
+  if (expired.length > 0) await cleanupExpiredSubscriptions(clinicId, expired);
 
   if (
     !defer &&
@@ -623,7 +637,7 @@ export async function sendPushToOthers(
     }),
   );
 
-  if (expired.length > 0) await cleanupExpiredSubscriptions(expired);
+  if (expired.length > 0) await cleanupExpiredSubscriptions(clinicId, expired);
 
   const attemptedAny = subs.some((s) => s.alertsEnabled);
   if (!defer && attemptedAny && !deliveredAny && (transientFailures > 0 || invalidOrGoneCount > 0)) {
@@ -724,7 +738,7 @@ export async function sendPushToUser(
     }),
   );
 
-  if (expired.length > 0) await cleanupExpiredSubscriptions(expired);
+  if (expired.length > 0) await cleanupExpiredSubscriptions(clinicId, expired);
 
   if (
     !defer &&

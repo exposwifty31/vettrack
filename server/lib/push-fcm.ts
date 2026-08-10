@@ -82,15 +82,13 @@ export async function initFcm(): Promise<void> {
   }
 }
 
-function classifyFcmError(code: string | undefined): PushDispatchOutcome {
+export function classifyFcmError(code: string | undefined): PushDispatchOutcome {
   if (code === "messaging/registration-token-not-registered") return "expired";
-  if (
-    code === "messaging/invalid-registration-token" ||
-    code === "messaging/invalid-argument" ||
-    code === "messaging/mismatched-credential"
-  ) {
+  if (code === "messaging/invalid-registration-token" || code === "messaging/invalid-argument") {
     return "invalid";
   }
+  // messaging/mismatched-credential is a SERVER credential misconfig, not a dead
+  // token — classify as error so the subscription is retried, never deleted.
   return "error";
 }
 

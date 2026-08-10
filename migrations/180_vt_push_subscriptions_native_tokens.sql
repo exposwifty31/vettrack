@@ -34,10 +34,33 @@ ALTER TABLE vt_push_subscriptions ALTER COLUMN endpoint DROP NOT NULL;
 ALTER TABLE vt_push_subscriptions ALTER COLUMN p256dh DROP NOT NULL;
 ALTER TABLE vt_push_subscriptions ALTER COLUMN auth DROP NOT NULL;
 
--- 4. one row per native device token. Partial: web rows have token NULL and are
---    excluded (Postgres permits many NULLs), so native and web rows coexist.
---    Mirrors the existing endpoint UNIQUE for the web path and backs the
---    delete-by-token dedup on device re-register.
-CREATE UNIQUE INDEX IF NOT EXISTS ux_vt_push_subscriptions_token
-  ON vt_push_subscriptions (token)
+-- 3b. per-platform column validity (added AFTER the web columns become nullable).
+--     Route validation only guards the API surface — this CHECK protects direct
+--     DB writers and future code paths. Web rows must carry the web-push triple
+--     (endpoint/p256dh/auth) and NO token; native rows (ios/android/expo) must
+--     carry a token and NONE of the web columns. Existing web rows (triple set,
+--     token NULL) and route-inserted native rows (token only) both satisfy it.
+ALTER TABLE vt_push_subscriptions
+  DROP CONSTRAINT IF EXISTS vt_push_subscriptions_platform_columns_check;
+ALTER TABLE vt_push_subscriptions
+  ADD CONSTRAINT vt_push_subscriptions_platform_columns_check
+  CHECK (
+    (platform = 'web'
+      AND endpoint IS NOT NULL AND p256dh IS NOT NULL AND auth IS NOT NULL
+      AND token IS NULL)
+    OR
+    (platform IN ('ios', 'android', 'expo')
+      AND token IS NOT NULL
+      AND endpoint IS NULL AND p256dh IS NULL AND auth IS NULL)
+  );
+
+-- 4. one row per (clinic, native device token). Partial + CLINIC-SCOPED: native
+--    token ownership is per-tenant, so the same physical device token can register
+--    in two clinics without one clinic's re-register deleting the other clinic's
+--    row (the route's delete-by-token dedup is likewise scoped by clinic_id). Web
+--    rows have token NULL and are excluded (Postgres permits many NULLs). Drop the
+--    earlier global single-column index if a prior version of this migration ran.
+DROP INDEX IF EXISTS ux_vt_push_subscriptions_token;
+CREATE UNIQUE INDEX IF NOT EXISTS ux_vt_push_subscriptions_clinic_token
+  ON vt_push_subscriptions (clinic_id, token)
   WHERE token IS NOT NULL;

@@ -9,11 +9,15 @@
  * token → subscription row → sendPushToUser → dispatcher → sendApnsPush.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import type { PushDispatchOutcome } from "../server/lib/push-types.js";
 
-const sendApnsPush = vi.fn(async () => "ok" as const);
-const sendFcmPush = vi.fn(async () => "ok" as const);
+// Typed to the full outcome union so a test can drive a failure path
+// (mockResolvedValueOnce("expired" | "error")), not only the "ok" happy path.
+const sendApnsPush = vi.fn(async (_token: string, _payload: unknown): Promise<PushDispatchOutcome> => "ok");
+const sendFcmPush = vi.fn(async (_token: string, _payload: unknown): Promise<PushDispatchOutcome> => "ok");
 const webpushSend = vi.fn(async () => undefined);
 const incrementMetric = vi.fn();
+const dbDelete = vi.fn(() => ({ where: () => Promise.resolve(undefined) }));
 
 let userSubs: Array<Record<string, unknown>> = [];
 
@@ -26,7 +30,7 @@ vi.mock("../server/db.js", () => {
     db: {
       select: () => selectResult,
       transaction: async (cb: (tx: unknown) => unknown) => cb({}),
-      delete: () => ({ where: () => Promise.resolve(undefined) }),
+      delete: dbDelete,
     },
     pool: {},
     pushSubscriptions: { clinicId: "clinic_col", userId: "user_col", endpoint: "endpoint_col", token: "token_col" },
@@ -146,5 +150,52 @@ describe("push dispatcher — platform routing", () => {
     expect(sendApnsPush).toHaveBeenCalledTimes(1);
     expect(sendApnsPush.mock.calls[0][0]).toBe("IOSTOKEN");
     expect(res.deliveredAny).toBe(true);
+  });
+
+  it("returns 'expired' and counts a failure when the APNs transport reports an expired token", async () => {
+    sendApnsPush.mockResolvedValueOnce("expired");
+    const push = await import("../server/lib/push.js");
+    const result = await push.dispatchToSubscription(
+      { platform: "ios", token: "DEADTOKEN", endpoint: null, p256dh: null, auth: null },
+      ENVELOPE,
+    );
+    expect(result).toBe("expired");
+    expect(incrementMetric).toHaveBeenCalledWith("notifications_failed");
+    expect(incrementMetric).not.toHaveBeenCalledWith("notifications_sent");
+  });
+
+  it("returns 'error' when the FCM transport reports a non-fatal error (credential misconfig — not a dead token)", async () => {
+    sendFcmPush.mockResolvedValueOnce("error");
+    const push = await import("../server/lib/push.js");
+    const result = await push.dispatchToSubscription(
+      { platform: "android", token: "FCMTOKEN", endpoint: null, p256dh: null, auth: null },
+      ENVELOPE,
+    );
+    expect(result).toBe("error");
+    expect(incrementMetric).toHaveBeenCalledWith("notifications_failed");
+  });
+
+  it("cleans up an expired native subscription and reports it through sendPushToUser", async () => {
+    sendApnsPush.mockResolvedValueOnce("expired");
+    userSubs = [
+      {
+        platform: "ios",
+        token: "DEADTOKEN",
+        endpoint: null,
+        p256dh: null,
+        auth: null,
+        alertsEnabled: true,
+        soundEnabled: true,
+        userId: "user-1",
+      },
+    ];
+    const push = await import("../server/lib/push.js");
+    const res = await push.sendPushToUser("clinic-1", "user-1", { title: "Code Blue", body: "Room 3" });
+    expect(sendApnsPush).toHaveBeenCalledTimes(1);
+    expect(res.deliveredAny).toBe(false);
+    expect(res.invalidOrGoneCount).toBe(1);
+    // The expired subscription must be cleaned up (deleted).
+    expect(dbDelete).toHaveBeenCalled();
+    expect(incrementMetric).toHaveBeenCalledWith("notifications_failed");
   });
 });

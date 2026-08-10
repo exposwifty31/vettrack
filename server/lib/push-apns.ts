@@ -90,6 +90,20 @@ export async function initApns(): Promise<void> {
   }
 }
 
+/**
+ * APNs `sound` for one alert. A silent payload (the subscription disabled sound)
+ * gets NO sound key at all — even when critical sound is configured — so APNs
+ * stays silent for a user who turned sound off. Non-silent: critical-sound
+ * object when configured, else the default sound.
+ */
+export function apnsSoundForPayload(
+  silent: boolean | undefined,
+  criticalSound: boolean,
+): { critical: 1; name: string; volume: number } | string | undefined {
+  if (silent) return undefined;
+  return criticalSound ? { critical: 1, name: "default", volume: 1 } : "default";
+}
+
 function classifyApnsFailure(status: string | number | undefined, reason: string | undefined): PushDispatchOutcome {
   const code = typeof status === "string" ? parseInt(status, 10) : status;
   if (code === 410) return "expired"; // Unregistered — token no longer valid
@@ -117,9 +131,8 @@ export async function sendApnsPush(token: string, payload: PushAlertEnvelope): P
     note.priority = 10;
     note.alert = { title: payload.title, body: payload.body };
     note.interruptionLevel = config.interruptionLevel;
-    note.sound = config.criticalSound
-      ? { critical: 1, name: "default", volume: 1 }
-      : "default";
+    const sound = apnsSoundForPayload(payload.silent, config.criticalSound);
+    if (sound !== undefined) note.sound = sound;
     // Opaque reference only (ADR-009 §2) — NOT authoritative state.
     if (payload.referenceId) note.payload = { referenceId: payload.referenceId };
 

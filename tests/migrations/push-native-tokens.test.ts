@@ -95,7 +95,49 @@ async function main() {
       "unknown platform must violate the CHECK constraint",
     );
 
-    // --- partial UNIQUE(token) rejects a duplicate native token ---
+    // --- platform-columns CHECK rejects each invalid platform/column combination (23514) ---
+    // web without the web-push triple
+    await expectReject(
+      () =>
+        pool.query(
+          `insert into vt_push_subscriptions (id, clinic_id, user_id, platform) values ($1,$2,$3,'web')`,
+          [uid(), clinicId, "u-web-notriple"],
+        ),
+      "23514",
+      "web row without endpoint/p256dh/auth must violate the platform-columns CHECK",
+    );
+    // web missing p256dh (endpoint + auth present)
+    await expectReject(
+      () =>
+        pool.query(
+          `insert into vt_push_subscriptions (id, clinic_id, user_id, platform, endpoint, auth) values ($1,$2,$3,'web',$4,'a')`,
+          [uid(), clinicId, "u-web-nop256", `https://push.example/${uid()}`],
+        ),
+      "23514",
+      "web row missing p256dh must violate the platform-columns CHECK",
+    );
+    // native (ios) without a token
+    await expectReject(
+      () =>
+        pool.query(
+          `insert into vt_push_subscriptions (id, clinic_id, user_id, platform) values ($1,$2,$3,'ios')`,
+          [uid(), clinicId, "u-ios-notok"],
+        ),
+      "23514",
+      "ios row without a token must violate the platform-columns CHECK",
+    );
+    // native (android) carrying a web endpoint — columns must be mutually exclusive
+    await expectReject(
+      () =>
+        pool.query(
+          `insert into vt_push_subscriptions (id, clinic_id, user_id, platform, token, endpoint) values ($1,$2,$3,'android',$4,$5)`,
+          [uid(), clinicId, "u-and-ep", `TOK-${uid()}`, `https://push.example/${uid()}`],
+        ),
+      "23514",
+      "native row carrying a web endpoint must violate the platform-columns CHECK",
+    );
+
+    // --- partial UNIQUE(clinic_id, token) rejects a duplicate native token IN THE SAME CLINIC ---
     const dupToken = `DUP-${uid()}`;
     await pool.query(
       `insert into vt_push_subscriptions (id, clinic_id, user_id, platform, token) values ($1,$2,$3,'android',$4)`,
@@ -108,11 +150,26 @@ async function main() {
           [uid(), clinicId, "u-dup-2", dupToken],
         ),
       "23505",
-      "duplicate native token must violate the partial UNIQUE index",
+      "duplicate native token in the same clinic must violate the partial UNIQUE index",
     );
 
-    // --- multi-tenancy: a clinic-scoped delete must NOT reach another clinic's row ---
     await pool.query(`insert into vt_clinics (id) values ($1)`, [otherClinicId]);
+
+    // --- clinic-scoped uniqueness: the SAME native token is allowed in a DIFFERENT clinic ---
+    const sharedToken = `SHARED-${uid()}`;
+    await pool.query(
+      `insert into vt_push_subscriptions (id, clinic_id, user_id, platform, token) values ($1,$2,$3,'ios',$4)`,
+      [uid(), clinicId, "u-shared-a", sharedToken],
+    );
+    // identical token, different clinic → accepted (composite (clinic_id, token) unique index)
+    await pool.query(
+      `insert into vt_push_subscriptions (id, clinic_id, user_id, platform, token) values ($1,$2,$3,'ios',$4)`,
+      [uid(), otherClinicId, "u-shared-b", sharedToken],
+    );
+    const shared = await pool.query(`select clinic_id from vt_push_subscriptions where token=$1`, [sharedToken]);
+    assert.strictEqual(shared.rowCount, 2, "identical native token must be allowed across two different clinics");
+
+    // --- multi-tenancy: a clinic-scoped delete must NOT reach another clinic's row ---
     const isolatedToken = `ISO-${uid()}`;
     const isolatedId = uid();
     await pool.query(
