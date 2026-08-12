@@ -213,7 +213,19 @@ Code Blue screens once it receives 201/403 is out of scope (separate repo).
 
 The demo clinic and its rows are namespaced (`code-blue-demo-clinic`,
 `reviewer-demo-*` / random check-in IDs) and never referenced by real clinic
-data. To remove: delete the open `vt_clinical_check_ins` row(s) for the demo
-users **first** (FKs are `ON DELETE RESTRICT` to both users and clinics), then the
-`vt_users` rows for the two demo `clerkId`s, then the demo clinic — or just leave
-the clinic in place; it costs nothing and is unreachable by any real user.
+data. The seed writes to nine tables, all `ON DELETE RESTRICT`, so removal must
+delete every dependent row before its parent — children first:
+
+1. `vt_clinical_check_ins` (references users + clinic)
+2. `vt_appointments` (references users + equipment)
+3. `vt_equipment` (references folders/docks/rooms)
+4. `vt_docks`, then `vt_folders`, then `vt_rooms`
+5. `vt_shifts` (references users)
+6. `vt_users` (the two demo `clerkId`s)
+7. `vt_clinics` (the demo clinic row)
+
+All deletes filter by the demo `clinicId`. Or just leave the clinic in place; it
+costs nothing and is unreachable by any real user. (Note: if anything has since
+written `vt_audit_logs` rows for this clinic, the clinic row itself is
+effectively undeletable — audit logs are append-only by design — so
+leave-in-place is then the only option.)

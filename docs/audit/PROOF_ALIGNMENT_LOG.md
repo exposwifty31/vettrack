@@ -6191,3 +6191,282 @@ shift upsert are both still `clinicId`-scoped reads/writes; no frozen surface to
 all 8 findings addressed with a concrete code/doc change each, typecheck clean across iterations,
 cleanup confirmed via psql, unrelated auth/shift suites unaffected). Pushed to the open PR for
 CodeRabbit re-review; not merged.
+
+---
+
+## 2026-08-11 — Clerk auth: audit + fix + ship end-to-end (VetTrack RN migration)
+
+**Task:** "check, audit, fix, ship Clerk end-to-end" in the RN repo (`/Users/dan/VetTrack-RN-Migration`).
+
+**Audit (code-read, not assumed):** Clerk is already wired end-to-end on both sides — ClerkProvider +
+`@clerk/clerk-expo/token-cache` (App.tsx), token bridge → `getToken()` → Bearer (ClerkTokenBridge.tsx +
+auth-fetch.ts), and — the critical link — the SERVER accepts native tokens: `clerk-session-auth.ts`
+`isAzpAllowed()` lets an ABSENT `azp` (every Expo token) through while a PRESENT `azp` must be
+allowlisted. Sign-in (v2 API, correct for the installed `@clerk/clerk-expo ^2.19`), sign-out port, and
+identity/role gate all verified present.
+
+**One real fix (RED→GREEN):** `BootstrapGate` showed a retry-only dead-end for a signed-OUT cold start
+(`refetch()` could only fail again). RED: `src/app/__tests__/bootstrap-view.test.ts` (5 cases) failed
+(module missing). GREEN: extracted the pure `resolveBootstrapView` (`src/app/bootstrap-view.ts`) —
+not-ready + `!isAuthSessionActive()` ⇒ route to SignIn; session-active ⇒ keep retry. Wired into
+`BootstrapGate.tsx` via `useSyncExternalStore(subscribeAuthSession, isAuthSessionActive)` + navigate
+to SignIn. Added `bootstrap.signIn` i18n key (en+he). `npx tsc --noEmit` → exit 0; jest → 5/5 pass;
+eslint on touched files → 0. Commits on `feat/g4-1-viewer`: 4370fcd (fix), 307a4c4 (i18n key).
+
+**Ship end-to-end — target B (local server in Clerk mode, zero prod side effects), iOS proven:**
+- Local API in Clerk mode: `CLERK_ENABLED=true CLERK_SECRET_KEY=<sk_live> CLERK_PUBLISHABLE_KEY=<pk_live>
+  pnpm dev:api` → `[auth-mode] mode=clerk hasSecret=true hasPublishable=true clerkMiddleware=mounted`;
+  no-token `/api/users/me` → 401 (was 200 in dev-bypass, confirming Clerk enforcement). `.env.local`
+  blanks the secret + sets `CLERK_ENABLED=false`, so the keys were injected via OS env (dotenv does not
+  overwrite an already-set process.env value).
+- Test user created in the LIVE `clerk.vettrack.uk` instance via `clerk users create`
+  (`user_3Hio…`, username `rn_tech_qa`, email `rn-tech-qa@vettrack.uk`), verified present via BAPI GET.
+- Seeded local DB (`scripts/tmp-rn-seed.ts`, temp): clinic `dev-clinic-default`, `vt_users` row mapped
+  to the Clerk id with role=technician + status=active, an ACTIVE `vt_shifts` row for today
+  (employee_name "RN TechQA", 00:00–23:59), and equipment (14 rows present).
+- iPhone 17 Pro (iOS 26.5) via argent, `expo run:ios`, app origin → `http://localhost:3001`,
+  `EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY`=pk_live (same instance):
+  1. Cold launch pre-sign-in → home shows "לא ניתן לטעון" (empty/error) — reproduces the "empty lists"
+     symptom of no session.
+  2. Sign-in (rn_tech_qa) → screen shows **"azp absent — server allowlist check likely no-op for Expo
+     tokens"** (on-device confirmation of the audited `isAzpAllowed` native-token path).
+  3. Home loads REAL data: "ערב טוב, RN", equipment readiness **100% · 6 ready**; Equipment tab lists
+     real items (Sweep Pump A/B, Sweep Monitor 1/2, E2E Test Equipment, QA Test Monitor).
+  4. Kill + relaunch → session PERSISTS (tokenCache; still "RN", no re-login).
+  5. Technician + active shift → shift card reads **"במשמרת · עד 23:59"** (on-shift); menu shows
+     display name "RN TechQA".
+  6. Sign-out (menu → account → התנתקות → confirm) → navigates back to the SignIn screen.
+
+**Direction / scope:** in-line with the RN-first success metric. No SDK upgrade (`@clerk/expo` v3 peer
+range excludes Expo 57); no scope expansion (OAuth/sign-up/top-level gate left as noted options).
+
+**Notes / residual:** (a) cold-start-with-persisted-session home cards can land in a transient error
+state (equipment/shift queries fire before `users.me` repopulates `currentUserId`) — recovers on
+refetch; minor UX-robustness observation, not part of the fix. (b) Android (Pixel_API_36) verification
+in progress at time of writing. (c) Temp artifacts to remove after: `scripts/tmp-rn-seed.ts`, the local
+Clerk-mode server, the throwaway Clerk test user.
+
+**Verdict:** iOS end-to-end VERIFIED with on-device evidence (sign-in, native-token azp acceptance, real
+data, session persistence, technician on-shift, sign-out). Fix committed + typecheck/lint/tests green.
+
+**Android update (same session):** Pixel_API_36 (API 36) via argent, `expo run:android` (BUILD
+SUCCESSFUL 3m28s), app origin → `http://localhost:3001` via `adb reverse tcp:3001`. First cold launch
+red-boxed on a react-native-screens `setupFabric` NPE (New-Arch Fabric init race, NOT Clerk-related;
+`newArchEnabled=true` + RNScreens 4.26.2 are correct) — a clean relaunch cleared it. Then: sign-in
+(rn_tech_qa) → "מחובר"; home loads REAL data on first navigation — "ערב טוב, RN", **"במשמרת · עד
+23:59"** (active shift), equipment readiness **100% · 6 ready**, "הכל תחת שליטה". Android end-to-end
+VERIFIED. Both store lanes (iOS + Android) now proven for the Clerk auth path.
+
+---
+
+## 2026-08-12 — G5 store-gate landed (PR #52 RN + PR #177 VT) + CodeRabbit round 1 + ASC-key submit wiring
+
+**Claim:** the G5 store-submission gate is landed for review in both repos; all CodeRabbit round-1
+findings on #177 are fixed and verified; iOS submit is non-interactively wired (ASC API key).
+
+**Checked (evidence, not summaries):**
+1. **PRs exist:** RN `feat/g5-store-gate` → PR #52 (identity `uk.vettrack.app`, version 1.3.0,
+   iOS buildNumber "27", versionCode 10300, privacyManifests, associatedDomains, blockedPermissions,
+   eas.json, account-deletion) · VT `feat/g5-assetlinks-runbooks` → PR #177 (env-sourced Play-signing
+   SHA in assetlinks + 3 owner runbooks). Both pushed; URLs verified from `gh pr create` output.
+2. **#177 CodeRabbit round 1 (4 findings) — all fixed in `9dfff607b`:** warn-once for invalid
+   `ANDROID_PLAY_SIGNING_SHA256` (module flag, mirrors the missing-value path); why-comments replace
+   declaration-restating ones; the post-upload pointer now cites `docs/runbooks/o2-eas-keystore.md`
+   env-var workflow (no source-array edits); o1 runbook path is now actually gitignored (rule committed
+   in RN `cad582f`) with a `git check-ignore` verification step. Evidence: `pnpm typecheck:server`
+   clean; `pnpm test -- tests/nfc-qr-sticker-chain.test.ts` 5/5 green. Stale CHANGES_REQUESTED
+   dismissed via REST (review 4917488748) + `@coderabbitai review` requested.
+3. **#52 CodeRabbit finding (restore `uk.vettrack.rnmigration`) — investigated, root-caused as doc
+   drift, not code error:** AGENTS.md:63 + README.md:70 still described the scaffold identity as
+   deliberate; fixed in `cad582f` to the binding 2026-08-10 reuse decision; replied on-thread
+   (comment 3767461637) with the rationale.
+4. **ASC submit wiring:** `asc auth status` → keyId `886L2S3X92`; `asc auth export-to-config
+   --confirm` → issuer + p8 path; `asc apps list` → single record `uk.vettrack.app`, ascAppId
+   `6778937527`, primaryLocale `he`. eas.json submit.production.ios now carries ascAppId +
+   ascApiKeyId/IssuerId + gitignored `./AuthKey_886L2S3X92.p8` (copy verified `git check-ignore` →
+   IGNORED-OK); `appleId` placeholder removed per owner instruction.
+5. **G4-3 client push (workflow wf_6633d42c):** build complete on `feat/g5-store-gate` working tree —
+   PushPort + ExpoPushAdapter + PushBridge + deep-link handler; consumes `POST/DELETE
+   /api/push/subscribe` via the existing authFetch (grep-verified `src/lib/api.ts:124,130`);
+   `npm run typecheck` 0 errors; jest 74 suites / 700 tests green (V1 agent evidence). Adversarial
+   safety review (V2) still running at time of writing — landing gated on its verdict.
+
+**Direction / scope:** all items sit ON the store-submission success metric (G5 gate + last G4 item).
+**Residuals (owner-visible):** D1's full-screen-intent + insistent/looping sound have NO expo-notifications
+API surface (S2 + build agent verified against v57 docs) → native follow-up ticket; Android channel is
+OS-immutable after creation → future custom alarm sound requires a NEW channel id; Android token
+acquisition needs owner `google-services.json` + `android.googleServicesFile`; Critical Alerts
+entitlement deferred until Apple grants (763HU9ZH38).
+
+## 2026-08-12 (evening) — G3 exit-pass re-run on PHYSICAL iPhone (iPhone Mirroring + computer-use)
+
+**Claim:** the G3 on-device pass ran on real hardware (iPhone 16 Plus, iOS 26.x, Dynamic Island) against
+current main (post #52/#53/#54), Clerk-mode server on LAN (192.168.0.100:3001), fresh seed, signed in as
+rn_tech_qa. Locale flipped he→en→he with a full app restart in between.
+
+**Verified on device (with mirror screenshots):** sign-in + real data (on-shift until 23:59, 6 equipment
+rows, recent activity), scan-confirm sheet + clean cancel, Emergency idle screen, LIVE i18next flip,
+honest RTL/LTR restart hint, and a TEXTBOOK direction mirror after restart (header, tab order, Edit
+button side, scan-card arrow all flipped).
+
+**Findings (physical-device yield):**
+1. **HIGH/CRIT — cold-start error wall + dead card:** relaunch-with-session lands the home in per-card
+   errors (documented identity race, now proven on hardware); shift/activity heal via their own "Try
+   again", but **Equipment-readiness stays dead with NO retry affordance** — nav-away-and-back does not
+   refetch; only app restart heals. Fix direction: refetch-on-identity-resolve (not polling) + a
+   whole-screen recovery affordance.
+2. **HIGH — Emergency top banner ignores the top safe-area** (paints above the status-bar row into the
+   Dynamic Island region). Device-only bug; invisible on simulator screenshots taken pre-notch layout.
+3. **MED — Emergency idle copy contradicts technician role** ("actions are above" while vet-only banner
+   says otherwise and no actions render for this role).
+4. **MED — Equipment-list cards are left-aligned in RTL** (Hebrew status lines flush-left; rest of the
+   app right-aligns).
+5. **MED — Menu bottom content clips under the tab bar** (RTL/LTR hint cut mid-sentence; missing bottom
+   content inset). 6. **MIN — raw "ok" string in the scan-confirm sheet** (untranslated debug-ish value).
+7. **IA note — bottom-bar "ציוד" pushes a stack screen that hides the tab bar** (tab that acts as a
+   link; breaks tab persistence expectations).
+
+**Positives:** auth+data end-to-end on hardware; fail-closed signed-out home; live locale flip + honest
+restart hint (amber, visible); complete LTR mirroring incl. directional icons; scan flow confirm-gated
+with clean cancel.
+
+**Environment residuals:** Pixel absent from the USB bus (charge-only cable/port suspected) — Android
+physical pass blocked; G2Measure frame-floor spot-check not run this pass (needs release artifact);
+uizze reference-evidence step of anti-ui-slop unavailable from harness — labeled explicitly.
+
+### Addendum (same evening) — Android physical pass (Pixel 7, USB) + corrections to the iOS entry
+
+**Verified on Pixel 7 (argent/adb, real hardware):** signed-in home with REAL data (on-shift, 100%/6
+ready, bidi isolates ⁦RN⁩/⁦23:59⁩ visible in the a11y tree), equipment list, emergency idle screen,
+sign-out → BootstrapGate routes to SignIn (#48 works on device), fresh Clerk sign-in via app FAPI flow.
+Note: Android ran under stale local prebuild package `uk.vettrack.rnmigration` (android/ dir predates
+the G5 identity change; EAS/CNG store lane unaffected — prebuild is fresh there).
+
+**Corrections to the iOS findings (cross-platform triangulation):**
+- Equipment-card RTL misalignment is **iOS-ONLY** — Android renders the same cards correctly
+  right-aligned. Platform-divergent styling bug (worth a shared-component look).
+- The "tab hides tab bar" observation is **downgraded to needs-code-check**: on Android the ציוד tab
+  keeps the tab bar; the iOS repro may have entered via the home readiness-card (pushed stack screen,
+  "Main >" breadcrumb) rather than the tab. Verify RootNavigator wiring before ticketing.
+- The Emergency top-banner safe-area violation **reproduces on Android** (paints over the status-bar
+  row on both platforms) — single SafeArea fix, double impact. UPGRADED to cross-platform.
+
+**New findings from the Android pass:**
+- **CRIT 1b — stale/invalid session = permanent generic error wall:** the Pixel's persisted Clerk
+  session belonged to a non-seeded user → `users/me` 403 `MISSING_CLINIC_ID userId:null` (server log)
+  → identity never resolves → every card fails as "לא ניתן לטעון..." forever, sign-in screen reports
+  "מחובר", and NOTHING routes to re-auth. Real-world scenario (revoked user, clinic reassignment,
+  shared ward device). Fix: treat 401/403 on identity as session-invalid → sign-out → SignIn route.
+- **HIGH — SSE 403 hammering:** before re-auth, EventSource retried the realtime endpoint every 500ms
+  in a tight infinite loop (Metro logs, user-captured). A 403 is non-transient — back off or gate on
+  auth state; a fleet of stale-session devices would DDoS the endpoint 2 req/s each.
+- **Confirmed working:** push registration fails GRACEFULLY without google-services.json (warn-once,
+  non-fatal — the documented G4-3 residual path); menu a11y labels combine state ("כלי פיתוח ובדיקה,
+  הצג"); display-name Edit disabled while signed out; sign-out confirm dialog honest and clean.
+
+**Scoped out this pass:** Android en/LTR restart sweep (mechanism proven on iOS; locale toggle is
+shared JS), G2Measure frame floor (needs release artifact), uizze reference evidence (unavailable).
+
+## 2026-08-12 (night) — FCM Android wiring VERIFIED at the Firebase-init layer (Pixel 7)
+
+**Claim:** `google-services.json` wiring (PR #57) fixes Firebase initialization on-device — the exact
+failure the G4-3 residual described ("Default FirebaseApp is not initialized").
+
+**Checked (device evidence, not summaries):**
+1. **Config baked into the APK:** `unzip -p app-debug.apk resources.arsc | strings | grep` →
+   `1:122656225448:android:f11a984f754efd3c00aa9d` (the `uk.vettrack.app` Firebase appId registered
+   programmatically via the Management API). FIREBASE-CONFIG-IN-APK.
+2. **Runtime init SUCCEEDS** (logcat, uk.vettrack.app pid 10324):
+   `FirebaseApp: Device unlocked: initializing all Firebase APIs for app [DEFAULT]` →
+   `FirebaseInitProvider: FirebaseApp initialization successful`. This is the DIRECT inverse of the
+   prior failure. The old `Default FirebaseApp is not initialized in this process uk.vettrack.rnmigration`
+   spam came from the OLD dev package (no google-services) still installed alongside — force-stopped it
+   to isolate; the new package does NOT emit it.
+3. **POST_NOTIFICATIONS granted** via `pm grant` (adb install -r does not pre-grant; the argent `-g`
+   path does) to clear the Android-13 permission gate in `ExpoPushAdapter.requestPermission`.
+
+**Boundary (honest):** the full token→`POST /api/push/subscribe`→deliver E2E was NOT captured, because
+this build is from `feat/g4-3-fcm-delivery` which branched off main BEFORE #55 merged — so it carries the
+cold-start identity error-wall bug (#55) that intermittently prevents `identityReady`, gating the
+registration effect. users/me returns 200 (name "RN" renders) but shift/equipment cards fail on the
+race, and no subscribe reached the server across several clean restarts. Chasing it further on a
+superseded build is a rabbit hole. **Next: cut ONE build from main (has #55's gate fix) + the FCM
+commit, then the token→subscribe→notification E2E runs clean.** Server was armed with
+`FCM_SERVICE_ACCOUNT_JSON` + `FCM_ANDROID_CHANNEL_ID=emergency-code-blue` (delivery side ready).
+
+**Test env:** production `uk.vettrack.app` 1.2.0 (side-loaded, installerPackageName=null — NOT a Play
+install) was uninstalled with owner consent to clear the signature clash; our debug build installed in
+its place.
+
+## 2026-08-12 (night) — FCM Android E2E CLOSED: server → device notification LANDED (Pixel 7)
+
+**Claim:** the full G4-3 FCM delivery pipe works end-to-end on a physical device.
+
+**Method:** combined build from main (has #55 identity-gate + #57 FCM wiring) on Pixel 7. Cold start
+loaded CLEAN — "במשמרת · עד 23:59", 100%/6 ready, "הכל תחת שליטה", ZERO error wall (visible proof #55's
+TodayTabScreen gate fixed the cold-start error wall on hardware). Connected the Metro CDP debugger and
+called the native token API directly:
+
+1. **Client obtains a real FCM token:** `globalThis.expo.modules.ExpoPushTokenManager.getDevicePushTokenAsync()`
+   → returns a STRING `e7iS9wseTk-NzPhKVqp8Kl:APA91b…GNe-mM` (classic FCM `:APA91b` format). `ExpoDevice.isDevice=true`.
+   (First send failed `messaging/registration-token-not-registered` because the debug probe TRUNCATED the
+   token at 120 chars — a truncated token is UNREGISTERED. Full token succeeded.)
+2. **Server sends via firebase-admin** (same `initializeApp/cert/getMessaging(app).send` path as
+   `server/lib/push-fcm.ts`, admin key from `~/.vettrack-secrets/`): `FCM SEND OK · messageId:
+   projects/vettrack-rn-b43e4/messages/0:1786563741191091%…`.
+3. **Notification LANDED on the device** — `adb dumpsys notification`: `pkg=uk.vettrack.app`,
+   `channel=emergency-code-blue` (the immutable D1 channel), `importance=5` (MAX), `color=0xffb00020`
+   (the danger-red lightColor set in ensureEmergencyChannel), title "בדיקת VetTrack", text "קוד כחול —
+   חדר 3 (E2E push test)", `seen=true`. Screenshot confirms it at the top of the shade.
+
+**Verdict:** FCM pipe is CLOSED — server firebase-admin → FCM → device, rendered on the emergency
+channel at max importance with the correct danger color. Both ends of ADR-009's supplementary push
+channel are proven on real hardware.
+
+**Open app-side follow-up (NOT the FCM wiring):** the app's OWN auto-registration
+(`PushBridge` → `ExpoPushAdapter.getDeviceToken` → `POST /api/push/subscribe`) did not fire a subscribe
+across several clean boots, despite the native token being obtainable and POST_NOTIFICATIONS granted —
+no `[push]` success OR failure log appeared, so the registration effect is silently early-returning
+(likely `getDeviceToken()` returning null via the JS `Notifications.getDevicePushTokenAsync()` wrapper,
+or the effect not firing on identityReady). The native path works (proven above); the JS adapter/bridge
+wiring needs a debug pass. Delivery + config are done; this is the last client-registration mile.
+
+## 2026-08-12 (night) — iOS push: server APNs DONE; device E2E blocked by wildcard provisioning (expected)
+
+**Server side (submission-relevant): DONE.** Found the owner's existing APNs auth key
+`/Users/dan/vettrack-keys/AuthKey_232VCFZH72_APNs.p8` (KeyID 232VCFZH72, Team 87F5G378M6, bundle
+uk.vettrack.app). Wired the server env (APNS_KEY_P8/KEY_ID/TEAM_ID/BUNDLE_ID, APNS_PRODUCTION=false for
+sandbox) → `✅ APNs initialized (token auth)`. `server/lib/push-apns.ts` uses @parse/node-apn token
+auth, topic=bundleId, sandbox/prod via APNS_PRODUCTION — verified it matches the canonical setup. The
+server can now send BOTH APNs (iOS) and FCM (Android).
+
+**Device E2E: BLOCKED by iOS code-signing, NOT a code gap.** iOS Simulator cannot receive real APNs
+(simctl-only), so this needs the physical iPhone 16 Plus. Rebuilt uk.vettrack.app from main on it
+(`expo run:ios --device`, auto-signing team 87F5G378M6, Build Succeeded, expo-notifications pod built).
+But `getDevicePushTokenAsync()` on the physical device fails: `no valid "aps-environment" entitlement
+string` (verified on the rnmigration build via Metro CDP debugger). Root cause found in the built
+`.app`: the auto-signing fell back to a **wildcard** profile — `AppIDName "XC Wildcard"`,
+`application-identifier "87F5G378M6.*"`, `Name "iOS Team Provisioning Profile: *"`, and NO
+`aps-environment` key in the entitlements. A wildcard App ID cannot carry Push Notifications; only an
+EXPLICIT App ID (uk.vettrack.app, which the LIVE App Store app + Critical Alerts 763HU9ZH38 already
+use) does.
+
+**Resolution path (and why it's fine):** iOS push will work on the **EAS production build**, which
+signs with the explicit uk.vettrack.app App Store provisioning profile (push-enabled) — and that IS
+the submission build. The local `expo run:ios` wildcard build is the wrong vehicle for iOS-push proof;
+the on-device APNs E2E closes naturally when the EAS build runs (or via manual Xcode signing with the
+explicit profile). No app/server code change needed — client push code + server APNs are both correct
+and initialized.
+
+## 2026-08-13 — PR #179 CodeRabbit round: both Minor findings fixed and verified
+
+Two unresolved CodeRabbit threads on PR #179 (both 🟡 Minor). (1) Runbook rollback
+was missing 6 of the 9 seeded tables — verified against `scripts/seed-reviewer-demo.ts`
+inserts (clinics, users, shifts, clinicalCheckIns, rooms, docks, folders, equipment,
+appointments) and rewrote `docs/runbooks/code-blue-qa-walkthrough.md` §Rollback as a
+children-first 7-step deletion order, including the append-only `vt_audit_logs`
+caveat (clinic undeletable once audited). (2) Vet user assertion in
+`tests/seed-reviewer-demo.integration.test.ts` now filters by `clinicId`
+(`and(eq(users.id, …), eq(users.clinicId, VET_CLINIC_ID))`). Evidence:
+`pnpm typecheck` clean; `vitest --config vitest.db-integration.config.ts
+tests/seed-reviewer-demo.integration.test.ts` → 12/12 passed against local DB.

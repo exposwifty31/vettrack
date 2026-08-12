@@ -292,7 +292,11 @@ describe.skipIf(!dbReachable)("seed-reviewer-demo integration", () => {
     });
 
     // 1. User row: vet, active, scoped to the demo clinic.
-    const [userRow] = await db.select().from(users).where(eq(users.id, result.userId)).limit(1);
+    const [userRow] = await db
+      .select()
+      .from(users)
+      .where(and(eq(users.id, result.userId), eq(users.clinicId, VET_CLINIC_ID)))
+      .limit(1);
     if (!userRow) {
       throw new Error(`Expected seedReviewerDemo to have created a user row for id ${result.userId}`);
     }
