@@ -30,10 +30,10 @@
    > שים לב: יש שם **שני** אישורים — "App signing key" ו-"Upload key". אתה צריך את זה של **App signing key** (זה שגוגל חותם בו את מה שיוצא לחנות).
 3. מסור לי את הערך (או הדבק אותו ישירות — ראה חלק ג').
 
-### חלק ג' — היכן זה מוזן (רקע; ה-wiring הוא צד-סוכן, פריט A4)
-- הפינגרפרינטים חיים ב-`server/lib/well-known-assetlinks.ts`, במערך `ANDROID_CERT_FINGERPRINTS`. הערך הראשון (upload/testing key) כבר שם; ה-SHA-256 של Play App Signing הוא הרשומה עם ה-`TODO(post-first-upload)` שממתינה למילוי.
-- הכוונה היא לחווט את הערך לתוך משתנה-סביבה **`ANDROID_PLAY_SIGNING_SHA256`** על Railway ולעשות redeploy לשרת (זהו פריט A4 של הסוכן). **אתה** רק שולף את ה-SHA-256 ומוסר; ה-redeploy והקוד שלי.
-> הבהרה עובדתית: כרגע הקובץ מקודד את הפינגרפרינטים בקוד עם placeholder-TODO ואינו קורא עדיין מ-`ANDROID_PLAY_SIGNING_SHA256`. חיווט משתנה-הסביבה נעשה כחלק מ-A4 באותה נשימה שבה מוזן הערך שתמסור.
+### חלק ג' — היכן זה מוזן (רקע; צד-סוכן, כבר מחווט)
+- השרת קורא את ה-SHA-256 של Play App Signing ממשתנה-הסביבה **`ANDROID_PLAY_SIGNING_SHA256`** בזמן-ריצה (`server/lib/well-known-assetlinks.ts`) ומגיש אותו **בנוסף** ל-fingerprint הקבוע של מפתח-ההעלאה. אין מערך לעריכה ואין TODO בקוד — משתנה-הסביבה הוא המנגנון היחיד.
+- הזרימה: אתה שולף ומוסר את ה-SHA-256 → אני קובע את `ANDROID_PLAY_SIGNING_SHA256` על Railway ועושה redeploy → אימות: `curl https://vettrack.uk/.well-known/assetlinks.json` מציג **שני** fingerprints.
+- עד שהמשתנה מוגדר, השרת מגיש את מפתח-ההעלאה בלבד ורושם אזהרה חד-פעמית בלוג — התקנות מהחנות לא יאמתו App Links עד ההזנה.
 
 ---
 

@@ -46,8 +46,8 @@
 ```
 /Users/dan/VetTrack-RN-Migration/google-service-account.json
 ```
-זהו הנתיב ש-`eas.json` כבר מצפה לו (`submit.production.android.serviceAccountKeyPath`).
-> ⚠️ נתיב זה **עדיין לא ב-.gitignore** של repo ה-RN. לפני שאתה שם את הקובץ שם — הודע לי ואוסיף `google-service-account.json` ל-`.gitignore` (הוא מכיל סוד; אסור שייכנס ל-git).
+זהו הנתיב ש-`eas.json` כבר מצפה לו (`submit.production.android.serviceAccountKeyPath`), והוא **כבר ב-`.gitignore`** של repo ה-RN (הכלל נוסף ב-PR #52) — הקובץ לא ייכנס ל-git.
+> אימות מהיר לפני ההנחה: `git check-ignore google-service-account.json` מתוך תיקיית ה-repo צריך להדפיס את שם הקובץ.
 
 ---
 
