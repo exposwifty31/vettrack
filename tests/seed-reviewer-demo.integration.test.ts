@@ -15,7 +15,7 @@
 import "dotenv/config";
 import { afterAll, describe, expect, it } from "vitest";
 import { Pool } from "pg";
-import { eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 
 const DATABASE_URL = process.env.DATABASE_URL ?? "";
 let probePool: Pool | null = null;
@@ -38,11 +38,19 @@ describe.skipIf(!dbReachable)("seed-reviewer-demo integration", () => {
   const OVERRIDE_CLINIC_ID = "reviewer-override-clinic-test";
   const OTHER_CLINIC_ID = "reviewer-demo-other-clinic-test";
   const STALENESS_CLINIC_ID = "reviewer-demo-staleness-clinic-test";
+  const VET_CLINIC_ID = "reviewer-demo-vet-clinic-test";
+  const VET_CLERK_ID = "reviewer-demo-vet-clerk-test";
 
   afterAll(async () => {
     // Best-effort cleanup — leaves no cruft in the local dev DB across runs.
     // Deletion order respects FK dependencies (children before the clinic).
-    for (const clinicId of [CLINIC_ID, OVERRIDE_CLINIC_ID, OTHER_CLINIC_ID, STALENESS_CLINIC_ID]) {
+    for (const clinicId of [
+      CLINIC_ID,
+      OVERRIDE_CLINIC_ID,
+      OTHER_CLINIC_ID,
+      STALENESS_CLINIC_ID,
+      VET_CLINIC_ID,
+    ]) {
       try {
         await probePool?.query(`DELETE FROM vt_appointments WHERE clinic_id = $1`, [clinicId]);
         await probePool?.query(`DELETE FROM vt_equipment WHERE clinic_id = $1`, [clinicId]);
@@ -50,6 +58,9 @@ describe.skipIf(!dbReachable)("seed-reviewer-demo integration", () => {
         await probePool?.query(`DELETE FROM vt_rooms WHERE clinic_id = $1`, [clinicId]);
         await probePool?.query(`DELETE FROM vt_folders WHERE clinic_id = $1`, [clinicId]);
         await probePool?.query(`DELETE FROM vt_shifts WHERE clinic_id = $1`, [clinicId]);
+        // vt_clinical_check_ins has ON DELETE RESTRICT FKs to BOTH vt_users and
+        // vt_clinics — it must be deleted before either, or teardown throws.
+        await probePool?.query(`DELETE FROM vt_clinical_check_ins WHERE clinic_id = $1`, [clinicId]);
         await probePool?.query(`DELETE FROM vt_users WHERE clinic_id = $1`, [clinicId]);
         await probePool?.query(`DELETE FROM vt_clinics WHERE id = $1`, [clinicId]);
       } catch (err) {
@@ -262,5 +273,104 @@ describe.skipIf(!dbReachable)("seed-reviewer-demo integration", () => {
     await expect(
       seedReviewerDemo({ clinicId: CLINIC_ID, clerkId: CLERK_ID, shiftSpanDays: 10_000 }),
     ).rejects.toThrow(/shiftSpanDays.*10000/s);
+  });
+
+  // G5 Code Blue QA — the vet persona. A `vet` gets NO roster shift (vet is not
+  // a vt_shift_role enum value), so its ONLY path to clinical authority is an
+  // open vt_clinical_check_ins row. Without it, resolveAuthority returns
+  // EZSHIFT_NONE and the vet is 403-blocked at the Code Blue Log gate
+  // (POST /api/code-blue/sessions/:id/logs — no break-glass, unlike Start).
+  it("seeds a vet with an OPEN clinical check-in that grants Code Blue Log authority", async () => {
+    const { seedReviewerDemo } = await import("../scripts/seed-reviewer-demo.js");
+    const { db, users, clinicalCheckIns } = await import("../server/db.js");
+    const { resolveAuthority } = await import("../server/lib/authority.js");
+
+    const result = await seedReviewerDemo({
+      clinicId: VET_CLINIC_ID,
+      clerkId: VET_CLERK_ID,
+      role: "vet",
+    });
+
+    // 1. User row: vet, active, scoped to the demo clinic.
+    const [userRow] = await db.select().from(users).where(eq(users.id, result.userId)).limit(1);
+    if (!userRow) {
+      throw new Error(`Expected seedReviewerDemo to have created a user row for id ${result.userId}`);
+    }
+    expect(userRow.role).toBe("vet");
+    expect(userRow.status).toBe("active");
+
+    // 2. A vet gets NO roster shift — the check-in below is its only authority path.
+    expect(result.shiftIds).toHaveLength(0);
+
+    // 3. PRIMARY (cache-independent): exactly one OPEN vt_clinical_check_ins row
+    //    for (clinicId, userId) with the vet role snapshot. This is the exact
+    //    seed logic under test.
+    const openCheckIns = await db
+      .select()
+      .from(clinicalCheckIns)
+      .where(
+        and(
+          eq(clinicalCheckIns.clinicId, VET_CLINIC_ID),
+          eq(clinicalCheckIns.userId, result.userId),
+          isNull(clinicalCheckIns.checkedOutAt),
+        ),
+      );
+    expect(openCheckIns).toHaveLength(1);
+    expect(openCheckIns[0].clinicalRoleAtCheckIn).toBe("vet");
+    expect(openCheckIns[0].operationalRole).toBe("vet");
+    expect(openCheckIns[0].checkedOutAt).toBeNull();
+    expect(result.checkInId).toBe(openCheckIns[0].id);
+
+    // 4. SECONDARY (integration): resolveAuthority behaviour is gated on the
+    //    request-time flag AUTHORITY_USE_CHECKIN_PATH. Env is scoped + restored
+    //    so it cannot leak into the shift-based technician tests above.
+    const prev = process.env.AUTHORITY_USE_CHECKIN_PATH;
+    try {
+      // 4a. Flag ON → the open check-in grants effectiveClinicalRole "vet"
+      //     (source "check_in"): the value the Code Blue Log gate requires.
+      process.env.AUTHORITY_USE_CHECKIN_PATH = "true";
+      const withFlag = await resolveAuthority({
+        authUser: { id: result.userId, name: userRow.displayName, role: userRow.role },
+        clinicId: VET_CLINIC_ID,
+      });
+      expect(withFlag.effectiveClinicalRole).toBe("vet");
+      expect(withFlag.source).toBe("check_in");
+
+      // 4b. Flag OFF → the check-in is ignored, Strategy A applies, and the
+      //     shiftless vet resolves to NO clinical authority (EZSHIFT_NONE) — the
+      //     caveat the QA runbook calls out prominently.
+      process.env.AUTHORITY_USE_CHECKIN_PATH = "false";
+      const withoutFlag = await resolveAuthority({
+        authUser: { id: result.userId, name: userRow.displayName, role: userRow.role },
+        clinicId: VET_CLINIC_ID,
+      });
+      expect(withoutFlag.effectiveClinicalRole).toBeNull();
+      expect(withoutFlag.reason).toBe("EZSHIFT_NONE");
+    } finally {
+      if (prev === undefined) delete process.env.AUTHORITY_USE_CHECKIN_PATH;
+      else process.env.AUTHORITY_USE_CHECKIN_PATH = prev;
+    }
+  });
+
+  it("is idempotent on the vet path — re-running keeps exactly one open check-in", async () => {
+    const { seedReviewerDemo } = await import("../scripts/seed-reviewer-demo.js");
+    const { db, clinicalCheckIns } = await import("../server/db.js");
+
+    // Self-contained: seed the vet again here rather than relying on the prior
+    // test having run — the open-row invariant holds after any number of runs.
+    await expect(
+      seedReviewerDemo({ clinicId: VET_CLINIC_ID, clerkId: VET_CLERK_ID, role: "vet" }),
+    ).resolves.toBeTruthy();
+
+    const openCheckIns = await db
+      .select()
+      .from(clinicalCheckIns)
+      .where(
+        and(
+          eq(clinicalCheckIns.clinicId, VET_CLINIC_ID),
+          isNull(clinicalCheckIns.checkedOutAt),
+        ),
+      );
+    expect(openCheckIns).toHaveLength(1);
   });
 });
