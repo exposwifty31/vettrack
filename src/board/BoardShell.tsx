@@ -6,6 +6,7 @@ import { useBoardAutoReload } from "./useBoardAutoReload";
 import { useBoardCoPresence } from "./useBoardCoPresence";
 import { BoardCoPresenceOverlay } from "./BoardCoPresenceOverlay";
 import { BoardCoPresenceProvider } from "./board-copresence-context";
+import { useTvModeFromUrl } from "@/features/command-board/use-tv-mode-from-url";
 
 type Props = { children: ReactNode };
 
@@ -48,6 +49,11 @@ export function BoardShell({ children }: Props) {
   // socket on mount, degrades to a static board when unavailable, and NEVER gates
   // board rendering on the socket.
   const coPresence = useBoardCoPresence();
+
+  // ?tv=1 — 10-foot presentation. Here it only drives the overscan-safe frame
+  // (chrome concern); the type scale + D-pad focus layer live in the board content.
+  // Read independently of CommandBoardScreen (same URL contract), not threaded.
+  const tvMode = useTvModeFromUrl();
 
   // Fullscreen on the first user gesture (Fullscreen API requires one). First of
   // either pointerdown/keydown fires it, then removes both listeners.
@@ -97,7 +103,10 @@ export function BoardShell({ children }: Props) {
           peerSelections={coPresence.peerSelections}
           presentMembers={coPresence.presentMembers}
         >
-          {children}
+          {/* Overscan title-safe inner frame — TV bezels crop ~3–5%. tvMode-gated so
+              desktop /board stays full-bleed to the pixel edge; the black backdrop
+              above shows through the inset. */}
+          {tvMode ? <div className="board-tv-overscan">{children}</div> : children}
         </BoardCoPresenceProvider>
       </BoardErrorBoundary>
       <BoardCoPresenceOverlay

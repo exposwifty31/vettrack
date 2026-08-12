@@ -1133,3 +1133,69 @@ nav,
     to   { opacity: 1; }
   }
 }
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Command Center board — 10-foot / TV mode (?tv=1), scoped to [data-board-tv].
+   Strictly ADDITIVE + presentation-only. Desktop /board (no attribute) is
+   byte-unchanged. See src/features/command-board/use-tv-mode-from-url.ts.
+   ───────────────────────────────────────────────────────────────────────────── */
+
+/* 10-foot type ramp. Re-declares the --text-* ramp ON the board-TV scope so every
+   .vt-text-* utility below it scales by ONE tuned constant. Declared on the scope
+   element itself (not relying on a --type-scale override cascading through nested
+   var()s) and left UNLAYERED so it beats the @layer base :root ramp and inherits
+   to every descendant. */
+[data-board-tv] {
+  --tv-type-scale: 1.75;   /* ← the single tuned constant. Baseline 1080p @ ~3 m; range 1.6–2.0. */
+  --text-2xs:  calc(0.647rem * var(--tv-type-scale));
+  --text-xs:   calc(0.765rem * var(--tv-type-scale));
+  --text-sm:   calc(0.882rem * var(--tv-type-scale));
+  --text-base: calc(1rem     * var(--tv-type-scale));
+  --text-lg:   calc(1.176rem * var(--tv-type-scale));
+  --text-xl:   calc(1.294rem * var(--tv-type-scale));
+  --text-2xl:  calc(2rem     * var(--tv-type-scale));
+  --text-3xl:  calc(2.353rem * var(--tv-type-scale));
+}
+
+/* Overscan title-safe frame for the BoardShell kiosk host. Insets content off the
+   ~3–5% TV bezel dead-zone while keeping the black backdrop behind it. tvMode-gated
+   in BoardShell, so desktop /board stays edge-to-edge. Flex column so the board
+   fills the safe area exactly (no page scroll; only <main> scrolls internally). */
+.board-tv-overscan {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-sizing: border-box;
+  padding:
+    max(env(safe-area-inset-top), 3.5vh)
+    max(env(safe-area-inset-right), 4vw)
+    max(env(safe-area-inset-bottom), 3.5vh)
+    max(env(safe-area-inset-left), 4vw);
+}
+
+/* Distance-legible focus ring for the D-pad layer. Bright sky cyan — deliberately
+   NOT a status hue (red danger / green ready / amber maintenance) so focus never
+   reads as a status. Solid ring + dark separator (legible on any surface) + soft
+   outer glow (a designed state, not the default 1px outline). */
+[data-board-tv] {
+  --tv-focus: 56 189 248;   /* #38BDF8 sky-400 */
+}
+[data-board-tv] [data-tv-focusable] {
+  border-radius: var(--radius-xl);
+  scroll-margin: 14vh 6vw;   /* reveal keeps the focused item clear of the overscan edge */
+  transition:
+    outline-offset 140ms cubic-bezier(0.2, 0, 0, 1),
+    box-shadow 140ms cubic-bezier(0.2, 0, 0, 1);
+}
+[data-board-tv] [data-tv-focusable]:focus {
+  outline: 0.3rem solid rgb(var(--tv-focus));
+  outline-offset: 0.3rem;
+  box-shadow:
+    0 0 0 0.15rem rgb(0 0 0 / 0.9),
+    0 0 2.75rem -0.5rem rgb(var(--tv-focus) / 0.95);
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-board-tv] [data-tv-focusable] { transition: none; }
+}

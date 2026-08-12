@@ -34,6 +34,7 @@ import { STATUS_BG } from "./status-tokens";
 import { CommandBoard } from "./components/CommandBoard";
 import { CodeBlueOverlay } from "./components/CodeBlueOverlay";
 import { useKioskModeFromUrl } from "./use-kiosk-mode-from-url";
+import { useTvModeFromUrl } from "./use-tv-mode-from-url";
 import { useDirection } from "@/hooks/useDirection";
 import { boardProposalCountQueryOptions, proposalQueueQueryKey } from "@/features/autopilot/proposal-queue-keys";
 
@@ -86,6 +87,10 @@ function CommandBoardScreen({ kioskMode: kioskModeProp }: CommandBoardScreenProp
   // here only feeds the operational heartbeat + the board's exit-button guard.
   const kioskModeFromUrl = useKioskModeFromUrl();
   const kioskMode = kioskModeProp ?? kioskModeFromUrl;
+
+  // `?tv=1` — 10-foot TV presentation + D-pad focus layer. URL-driven (same
+  // contract as kiosk), orthogonal to kioskMode: a wall TV typically sets both.
+  const tvMode = useTvModeFromUrl();
 
   // Phase 9 PR 9.3 — visibility / pageshow / online / resume reconciliation.
   // Centralized so display, ER, and other realtime-consuming pages share one
@@ -237,12 +242,16 @@ function CommandBoardScreen({ kioskMode: kioskModeProp }: CommandBoardScreenProp
   }
 
   return (
-    <div className="dark">
+    // In tvMode the wrapper joins the BoardShell overscan flex column so the board
+    // fills the title-safe area exactly (header/footer pinned, only <main> scrolls).
+    // Desktop /board keeps the bare `dark` wrapper — byte-unchanged.
+    <div className={cn("dark", tvMode && "flex min-h-0 flex-1 flex-col")}>
       <CommandBoard
         board={board}
         currentTime={snapshot.currentTime}
         currentShift={snapshot.currentShift}
         kioskMode={kioskMode}
+        tvMode={tvMode}
         proposalCount={autopilotQueueCount}
       />
     </div>
