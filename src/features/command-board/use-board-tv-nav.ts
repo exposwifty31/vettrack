@@ -93,8 +93,12 @@ export function useBoardTvNav({
 
     const targets = Array.from(container.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR));
     for (const el of targets) {
-      // -1: reachable via .focus() (remote-driven), out of the Tab order.
-      if (el.tabIndex !== -1) el.tabIndex = -1;
+      // A plain <div> reports `tabIndex === -1` yet is NOT programmatically
+      // focusable until the tabindex ATTRIBUTE actually exists — so guard on the
+      // attribute, not the IDL property (which is already -1 and would skip the
+      // assignment, leaving every div region unfocusable). -1 = reachable via
+      // .focus() (remote-driven), out of the Tab order.
+      if (!el.hasAttribute("tabindex")) el.setAttribute("tabindex", "-1");
     }
 
     const active = document.activeElement;
@@ -102,11 +106,15 @@ export function useBoardTvNav({
       active instanceof HTMLElement && container.contains(active) && active.matches(FOCUSABLE_SELECTOR);
     if (focusInside) return;
 
-    const survivor = lastFocusedId.current
-      ? targets.find((el) => el.getAttribute("data-tv-id") === lastFocusedId.current)
-      : undefined;
-    const anchor =
-      survivor ?? container.querySelector<HTMLElement>(INITIAL_SELECTOR) ?? targets[0] ?? null;
+    // Stay PASSIVE until the remote is actually used. Never grab focus on mount —
+    // otherwise a remote-less wall board would light up the focus ring with zero
+    // interaction (breaks "a remote-less board still glances fine"). Only RE-HOME
+    // focus once nav has engaged (lastFocusedId set) and the focused node was
+    // unmounted by a reconcile or the calm↔pressure <main> swap. The first arrow
+    // press engages nav via move()'s no-current-focus branch.
+    if (!lastFocusedId.current) return;
+    const survivor = targets.find((el) => el.getAttribute("data-tv-id") === lastFocusedId.current);
+    const anchor = survivor ?? container.querySelector<HTMLElement>(INITIAL_SELECTOR) ?? targets[0] ?? null;
     anchor?.focus({ preventScroll: true });
   });
 
