@@ -6322,7 +6322,8 @@ button side, scan-card arrow all flipped).
 4. **MED — Equipment-list cards are left-aligned in RTL** (Hebrew status lines flush-left; rest of the
    app right-aligns).
 5. **MED — Menu bottom content clips under the tab bar** (RTL/LTR hint cut mid-sentence; missing bottom
-   content inset). 6. **MIN — raw "ok" string in the scan-confirm sheet** (untranslated debug-ish value).
+   content inset).
+6. **MIN — raw "ok" string in the scan-confirm sheet** (untranslated debug-ish value).
 7. **IA note — bottom-bar "ציוד" pushes a stack screen that hides the tab bar** (tab that acts as a
    link; breaks tab persistence expectations).
 
@@ -6458,7 +6459,7 @@ the on-device APNs E2E closes naturally when the EAS build runs (or via manual X
 explicit profile). No app/server code change needed — client push code + server APNs are both correct
 and initialized.
 
-## 2026-08-13 — PR #179 CodeRabbit round: both Minor findings fixed and verified
+## 2026-08-13 02:00 IDT (2026-08-12 23:00 UTC) — PR #179 CodeRabbit round: both Minor findings fixed and verified
 
 Two unresolved CodeRabbit threads on PR #179 (both 🟡 Minor). (1) Runbook rollback
 was missing 6 of the 9 seeded tables — verified against `scripts/seed-reviewer-demo.ts`
