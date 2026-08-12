@@ -255,6 +255,7 @@ Pass both through to `openCheckIn`; add `isSenior: row.isSenior` to `serializeCh
 
 - [ ] **Step 1: Failing test** — admin sets flag true → row updated (clinic-scoped `WHERE`), audit called with `senior_doctor_eligible_set`; non-admin → 403; cross-clinic id → 404.
 - [ ] **Step 2: Implement** by copying the equipment-coordinator handler shape verbatim (zod `{ seniorDoctorEligible: z.boolean() }` strict, `.where(and(eq(users.id, id), eq(users.clinicId, clinicId)))`). Add the union member.
+- [ ] **Step 2b: `/api/users/me` must return `seniorDoctorEligible`** — the RN gate reads it from the identity payload. Check the `me` serializer in `server/routes/users.ts`; if it whitelists fields, add the flag (test: me response includes `seniorDoctorEligible: false` for a fresh vet).
 - [ ] **Step 3: Tests green → Commit** — `git commit -m "feat(users): admin toggle for senior_doctor_eligible + audit"`
 
 ---
