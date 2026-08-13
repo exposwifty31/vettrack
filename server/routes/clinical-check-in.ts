@@ -26,6 +26,8 @@ const router = Router();
 const checkInBodySchema = z
   .object({
     operationalRole: z.string().min(1).optional(),
+    isSenior: z.boolean().optional(),
+    replaceSenior: z.boolean().optional(),
   })
   .strict();
 
@@ -52,6 +54,7 @@ function serializeCheckIn(row: ClinicalCheckIn) {
     clinicId: row.clinicId,
     userId: row.userId,
     operationalRole: row.operationalRole,
+    isSenior: row.isSenior,
     clinicalRoleAtCheckIn: row.clinicalRoleAtCheckIn,
     checkedInAt: row.checkedInAt.toISOString(),
     checkedOutAt: row.checkedOutAt ? row.checkedOutAt.toISOString() : null,
@@ -84,9 +87,19 @@ function resolveIdempotencyKey(
 
 function handleServiceError(err: unknown, res: Response, requestId: string): void {
   if (err instanceof ClinicalCheckInError) {
-    res
-      .status(err.status)
-      .json(apiError({ code: err.code, reason: err.reason, message: err.message, requestId }));
+    // Status/code passthrough covers the doctor-gate errors too
+    // (SENIOR_NOT_ELIGIBLE 403, SENIOR_REQUIRES_TEAM_ROLE 422,
+    // SENIOR_ALREADY_ASSIGNED 409); metadata (e.g. currentSeniorName)
+    // surfaces as the envelope's `details`.
+    res.status(err.status).json(
+      apiError({
+        code: err.code,
+        reason: err.reason,
+        message: err.message,
+        requestId,
+        details: err.metadata,
+      }),
+    );
     return;
   }
   console.error("[clinical-check-in] internal error", err);
@@ -134,6 +147,8 @@ router.post(
       const result = await openCheckIn({
         actor: actorFromRequest(req.authUser!),
         operationalRole: parsed.data.operationalRole,
+        isSenior: parsed.data.isSenior,
+        replaceSenior: parsed.data.replaceSenior,
         idempotencyKey: keyResult.value,
       });
       res.status(200).json(serializeCheckIn(result.row));
