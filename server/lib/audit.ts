@@ -162,6 +162,9 @@ export type AuditActionType =
   | "patient_handoff_cancelled"
   | "clinical_check_in"
   | "clinical_check_out"
+  // Doctor shift gate (spec 2026-08-13) — a senior doctor claimed a team whose
+  // previous open senior row was demoted (isSenior=false, row stays open).
+  | "doctor_senior_replaced"
   | "operational_roles_updated"
   | "authority_cache_invalidated"
   | "code_blue_replay_authority_denied"

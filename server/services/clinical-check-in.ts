@@ -15,10 +15,24 @@ export const OPERATIONAL_ROLES = [
   "senior_lead",
   "night_admission_only",
   "night_senior_no_admission",
+  "icu",
+  "internal_medicine",
 ] as const;
 export type OperationalRole = (typeof OPERATIONAL_ROLES)[number];
 
 const OPERATIONAL_ROLE_SET = new Set<string>(OPERATIONAL_ROLES);
+
+/**
+ * Doctor shift gate (spec 2026-08-13): the three doctor team roles are
+ * universally allowed for vets — no `allowedOperationalRoles` membership
+ * required (zero admin upkeep). Legacy roles keep allowlist semantics.
+ */
+export const DOCTOR_TEAM_ROLES = ["icu", "admission", "internal_medicine"] as const;
+export type DoctorTeamRole = (typeof DOCTOR_TEAM_ROLES)[number];
+const DOCTOR_TEAM_ROLE_SET = new Set<string>(DOCTOR_TEAM_ROLES);
+export function isDoctorTeamRole(v: string): v is DoctorTeamRole {
+  return DOCTOR_TEAM_ROLE_SET.has(v);
+}
 
 export type CheckInSource = "self" | "session_close" | "admin_force";
 
@@ -44,6 +58,8 @@ export type CheckInActor = {
 export type CheckInInput = {
   actor: CheckInActor;
   operationalRole?: unknown;
+  isSenior?: unknown;
+  replaceSenior?: unknown;
   idempotencyKey?: string | null;
 };
 
@@ -53,11 +69,20 @@ export class ClinicalCheckInError extends Error {
   status: number;
   code: string;
   reason: string;
-  constructor(status: number, code: string, message: string, reason: string = code) {
+  /** Optional structured context for the client (e.g. `{ currentSeniorName }` on SENIOR_ALREADY_ASSIGNED). */
+  metadata?: Record<string, unknown>;
+  constructor(
+    status: number,
+    code: string,
+    message: string,
+    reason: string = code,
+    metadata?: Record<string, unknown>,
+  ) {
     super(message);
     this.status = status;
     this.code = code;
     this.reason = reason;
+    this.metadata = metadata;
     this.name = "ClinicalCheckInError";
   }
 }
@@ -151,20 +176,24 @@ export async function openCheckIn(input: CheckInInput): Promise<CheckInResult> {
           "operationalRole is not a recognised role",
         );
       }
-      const allowed = await getAllowedOperationalRoles(actor.userId, actor.clinicId);
-      if (allowed.length === 0) {
-        throw new ClinicalCheckInError(
-          403,
-          "NO_ALLOWED_OPERATIONAL_ROLES",
-          "User has no allowed operational roles configured",
-        );
-      }
-      if (!allowed.includes(operationalRoleInput as OperationalRole)) {
-        throw new ClinicalCheckInError(
-          403,
-          "OPERATIONAL_ROLE_NOT_ALLOWED",
-          "Requested operational role is not in the user's allowlist",
-        );
+      if (!isDoctorTeamRole(operationalRoleInput)) {
+        // Legacy roles keep the pre-existing allowlist path byte-for-byte;
+        // doctor team roles are universally allowed for vets (no allowlist).
+        const allowed = await getAllowedOperationalRoles(actor.userId, actor.clinicId);
+        if (allowed.length === 0) {
+          throw new ClinicalCheckInError(
+            403,
+            "NO_ALLOWED_OPERATIONAL_ROLES",
+            "User has no allowed operational roles configured",
+          );
+        }
+        if (!allowed.includes(operationalRoleInput as OperationalRole)) {
+          throw new ClinicalCheckInError(
+            403,
+            "OPERATIONAL_ROLE_NOT_ALLOWED",
+            "Requested operational role is not in the user's allowlist",
+          );
+        }
       }
       storedOperationalRole = operationalRoleInput as OperationalRole;
       break;
@@ -190,6 +219,90 @@ export async function openCheckIn(input: CheckInInput): Promise<CheckInResult> {
       );
   }
 
+  // Doctor shift gate: server-validated senior semantics. `isSenior=true`
+  // requires a doctor team role AND the admin-set `seniorDoctorEligible`
+  // flag; at most one open senior per team, replaced only with explicit
+  // `replaceSenior=true` (the previous row stays open, demoted).
+  const wantsSenior = input.isSenior === true;
+  if (wantsSenior) {
+    if (storedOperationalRole === null || !isDoctorTeamRole(storedOperationalRole)) {
+      throw new ClinicalCheckInError(
+        422,
+        "SENIOR_REQUIRES_TEAM_ROLE",
+        "isSenior requires a doctor team operational role",
+      );
+    }
+    const [u] = await db
+      .select({ eligible: users.seniorDoctorEligible })
+      .from(users)
+      .where(and(eq(users.id, actor.userId), eq(users.clinicId, actor.clinicId)))
+      .limit(1);
+    if (!u?.eligible) {
+      throw new ClinicalCheckInError(
+        403,
+        "SENIOR_NOT_ELIGIBLE",
+        "User is not eligible to be a senior doctor",
+      );
+    }
+    const [existing] = await db
+      .select({
+        id: clinicalCheckIns.id,
+        userId: clinicalCheckIns.userId,
+        name: users.name,
+        displayName: users.displayName,
+      })
+      .from(clinicalCheckIns)
+      .leftJoin(users, eq(clinicalCheckIns.userId, users.id))
+      .where(
+        and(
+          eq(clinicalCheckIns.clinicId, actor.clinicId),
+          eq(clinicalCheckIns.operationalRole, storedOperationalRole),
+          eq(clinicalCheckIns.isSenior, true),
+          isNull(clinicalCheckIns.checkedOutAt),
+        ),
+      )
+      .limit(1);
+    if (existing && input.replaceSenior !== true) {
+      const currentSeniorName =
+        (existing.displayName && existing.displayName.length > 0
+          ? existing.displayName
+          : existing.name) ?? null;
+      throw new ClinicalCheckInError(
+        409,
+        "SENIOR_ALREADY_ASSIGNED",
+        "The team already has an open senior check-in",
+        "SENIOR_ALREADY_ASSIGNED",
+        { currentSeniorName },
+      );
+    }
+    if (existing) {
+      await db
+        .update(clinicalCheckIns)
+        .set({ isSenior: false })
+        .where(
+          and(
+            eq(clinicalCheckIns.id, existing.id),
+            eq(clinicalCheckIns.clinicId, actor.clinicId),
+          ),
+        );
+      // Fire-and-forget, mirrors the check-in audit below.
+      logAudit({
+        clinicId: actor.clinicId,
+        actionType: "doctor_senior_replaced",
+        performedBy: actor.userId,
+        performedByEmail: actor.email,
+        targetId: existing.id,
+        targetType: "clinical_check_in",
+        metadata: {
+          team: storedOperationalRole,
+          previousCheckInId: existing.id,
+          previousUserId: existing.userId,
+        },
+      });
+      invalidateForUser(actor.clinicId, existing.userId);
+    }
+  }
+
   const id = randomUUID();
   const clinicalRoleAtCheckIn = actor.role;
 
@@ -201,6 +314,7 @@ export async function openCheckIn(input: CheckInInput): Promise<CheckInResult> {
         clinicId: actor.clinicId,
         userId: actor.userId,
         operationalRole: storedOperationalRole,
+        isSenior: wantsSenior,
         clinicalRoleAtCheckIn,
         activeShiftId: null,
         shiftSessionId: null,
