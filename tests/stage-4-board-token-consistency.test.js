@@ -83,8 +83,9 @@ describe("Stage 4 board — additive skeleton + footer", () => {
     expect(/<footer/.test(boardSrc)).toBe(false);
     expect(boardSrc.includes("t.board.live")).toBe(false);
     expect(boardSrc.includes("BoardTopBand")).toBe(true);
-    // Match the prop name loosely — a Prettier line break or a local rename must not
-    // break this behaviour-free source guard.
-    expect(boardSrc).toMatch(/<BoardTopBand[\s\S]*?connection=\{/);
+    // Tolerant of formatting, but scoped to BoardTopBand's OPENING tag ([^>]* can't
+    // cross the `>`), so a removed prop can't be satisfied by a later connection={
+    // usage (StaleTakeover also receives connection in this file).
+    expect(boardSrc).toMatch(/<BoardTopBand\b[^>]*\bconnection=\{/);
   });
 });
