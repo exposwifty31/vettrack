@@ -37,11 +37,13 @@ function AnomalyCard({
   rank,
   emphasis,
   motion,
+  tvMode,
 }: {
   anomaly: BoardAnomaly;
   rank: number;
   emphasis: CardEmphasis;
   motion: CardMotion;
+  tvMode?: boolean;
 }) {
   const escalated = emphasis === "escalated";
   const since = sinceLabel(anomaly.since);
@@ -54,11 +56,16 @@ function AnomalyCard({
       data-anomaly-rank={rank}
       data-anomaly-emphasis={emphasis}
       data-anomaly-motion={motion}
+      // tvMode: reachable by the D-pad layer for reading. Still inert on activation
+      // (no action invented) — Enter is a no-op, the card just scrolls into view.
+      data-tv-focusable={tvMode ? "" : undefined}
+      data-tv-id={tvMode ? `anomaly-${anomaly.type}-${anomaly.unitId}` : undefined}
       className={cn(
         "rounded-xl border flex flex-col gap-0.5",
         escalated
-          ? "p-4 border-[var(--status-issue-border)] bg-[var(--status-issue-bg)]"
-          : "p-2.5 border-ivory-border bg-[rgb(var(--ivory-surface))]",
+          ? "border-[var(--status-issue-border)] bg-[var(--status-issue-bg)]"
+          : "border-ivory-border bg-[rgb(var(--ivory-surface))]",
+        escalated ? (tvMode ? "p-5" : "p-4") : tvMode ? "p-3.5" : "p-2.5",
         // Motion clarifies, never alarms: single-shot entrance only, and only when
         // the JS gate (reduced-motion / held) allows it. motion-safe is a CSS backstop.
         motion === "escalate" && "motion-safe:animate-[pulse_600ms_ease-out_1]",
@@ -93,10 +100,13 @@ export function BoardAttentionSection({
   reducedMotion,
   onAnomalyActivated,
   proposalCount,
+  tvMode,
 }: {
   anomalies: readonly BoardAnomaly[];
   mode: BoardMode;
   reducedMotion: boolean;
+  /** `?tv=1` — invert card density (fewer/larger) + make cards D-pad focusable. */
+  tvMode?: boolean;
   /** R-BDF-1.3 telemetry seam — fires once per `(type,unitId)` activation. */
   onAnomalyActivated?: (anomaly: BoardAnomaly) => void;
   /**
@@ -146,7 +156,12 @@ export function BoardAttentionSection({
         </p>
       )}
       {ranked.length > 0 && (
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+      <div
+        className={cn(
+          "grid",
+          tvMode ? "grid-cols-1 xl:grid-cols-2 gap-3" : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2",
+        )}
+      >
         {ranked.map((anomaly, rank) => {
           const emphasis: CardEmphasis =
             mode === "pressure" && anomaly.severity === "pressure" ? "escalated" : "quiet";
@@ -162,6 +177,7 @@ export function BoardAttentionSection({
               rank={rank}
               emphasis={emphasis}
               motion={motion}
+              tvMode={tvMode}
             />
           );
         })}

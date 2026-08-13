@@ -6632,3 +6632,68 @@ invalidation + audit already fired).
 - `DATABASE_URL=<.env> npx vitest run --config vitest.db-integration.config.ts tests/doctor-shift-gate.integration.test.ts` → `Test Files  1 passed (1) · Tests  3 passed (3)`.
 
 **Verdict:** VERIFIED
+
+## 2026-08-13 — PR #178 (feat/tv-board-redesign): merge origin/main + CodeRabbit round 1 (9 findings)
+
+**Claim:** Branch merged with origin/main (merge commit, not rebase) and all 9
+open CodeRabbit findings addressed. Merge reconciliation: the only conflicted
+file was `src/features/command-board/components/CommandBoard.tsx` — all four
+hunks were keep-both compositions of the branch's TV mode (`tvMode` prop +
+D-pad layer) with main's ResponsiblesPanel (PR #180): PressureMain now accepts
+BOTH `tvMode` and `responsibles` (panel stays as the compact `max-h-56` block
+below the ticker), CommandBoard carries both prop docs, and the pressure-mode
+call site passes both. Calm-mode ResponsiblesPanel mount and
+CommandBoardScreen's `responsibles={snapshot.responsibles}` wiring survived
+untouched. Findings: (1) linked emergency equipment cards in PressureMain now
+carry `data-tv-focusable`/`data-tv-id="linked-<id>"` when tvMode; (2)
+`isVisible` adds computed-style `visibility`/`display` checks; (3) hook props
+extracted to `interface BoardTvNavOptions`; (4) `reveal()` no longer
+overwrites `lastFocusedId` with null — falls back to previous id then a ""
+sentinel, and the restoration guard distinguishes null (never engaged) from ""
+(engaged, id-less target) so re-homing stays alive; (5) both
+`document.activeElement` casts replaced with `instanceof HTMLElement`
+narrows; (6) window keydown handler now ignores `defaultPrevented` events and
+events originating in editable fields (`input/textarea/select/
+contenteditable`) or open dialogs (`[role=dialog]/[role=alertdialog]`); (7)
+`useTvModeFromUrl` subscribes to wouter's `useSearch()` so query-only
+`?tv=1` transitions recompute while /board stays mounted; (8) type-ramp
+constants single-sourced as `--text-*-raw` tokens — base ramp and
+`[data-board-tv]` TV ramp both derive from them (stage-1 lock test updated to
+pin the raws, same drift protection); (9) `border-radius: var(--radius-xl)`
+removed from `[data-board-tv] [data-tv-focusable]` so component radii win.
+New tests `tests/board-tv-nav.test.tsx` (3): arrows in editable field
+ignored, Escape inside dialog does not click exit (positive control: outside
+does), id-less-target focus restoration survives a reconcile unmount.
+
+**Evidence (actual command outputs this session):**
+- `pnpm typecheck` → exited clean, zero errors (both tsconfigs).
+- `pnpm test` → `Test Files  716 passed (716) · Tests  6418 passed | 11 skipped (6429) · Duration 98.25s` (+1 file / +3 tests: board-tv-nav).
+- `pnpm test -- tests/board-responsibles-panel.test.tsx` → `Test Files  1 passed (1) · Tests  8 passed (8)` (run post-merge, before the merge commit).
+- `pnpm i18n:check` → `✓ locales/en.json and locales/he.json are in deep key parity.`
+- `pnpm architecture:gates` → `[architecture-gates] All G1 checks passed.` (madge `OK — server: 0 cycle(s), src: 0 cycle(s) (matches baseline)`).
+
+**Verdict:** VERIFIED
+
+## 2026-08-13 — PR #178 CodeRabbit round 2: 4 findings (test hygiene + TV ramp lock)
+
+**Claim:** All 4 round-2 findings fixed on feat/tv-board-redesign (a93a201c5).
+(1) `tests/board-tv-nav.test.tsx` drops the unnecessary type assertions —
+`this.getAttribute` called directly on `Element`, the rect mock returned
+structurally without `as DOMRect`, `getByTestId`'s `HTMLElement` used without
+`as HTMLInputElement`. (2) The `Element.prototype.scrollIntoView` stub (a
+direct assignment `vi.restoreAllMocks()` cannot undo) is now reverted in
+`afterEach` by restoring the pre-captured property descriptor (or deleting the
+own property when the environment never had one). (3) The combined Escape test
+split into two single-behavior AAA tests: dialog-origin suppression, and
+body-origin exit activation. (4) `tests/stage-1-token-values.test.js` now pins
+the `[data-board-tv]` ramp block directly: the scoped block is extracted by
+regex and asserted to contain `--tv-type-scale: 1.75` plus all eight
+`--text-*: calc(var(--text-*-raw) * var(--tv-type-scale))` declarations, so
+deleting/renaming the TV ramp fails the lock. PR body also updated to the full
+repo template (gh pr edit).
+
+**Evidence (actual command outputs this session):**
+- `pnpm test -- tests/board-tv-nav.test.tsx tests/stage-1-token-values.test.js` → `Test Files  2 passed (2) · Tests  22 passed (22)`.
+- `pnpm typecheck` → exited clean, zero errors (both tsconfigs).
+
+**Verdict:** VERIFIED

@@ -3,6 +3,7 @@
 // behavioral change is an additive optional `kioskMode` prop: when provided
 // (the /board route) it wins over the internal ?kiosk=1 URL read; when omitted
 // (/equipment/board) the URL read is byte-identical to the pre-move behavior.
+import { useRef } from "react";
 import { useLocation } from "wouter";
 import { Settings2, X } from "lucide-react";
 import { t } from "@/lib/i18n";
@@ -15,6 +16,8 @@ import type { BoardResponsibles, EquipmentCommandBoardSnapshot } from "@/types/s
 import type { EquipmentBoardUnitRow, EquipmentReadinessStatus } from "../../../../shared/equipment-board";
 import { STATUS_BG, STATUS_BAR_COLOR, statusLabel } from "../status-tokens";
 import { useKioskModeFromUrl } from "../use-kiosk-mode-from-url";
+import { useTvModeFromUrl } from "../use-tv-mode-from-url";
+import { useBoardTvNav } from "../use-board-tv-nav";
 import { countCriticalAlerts, useBoardMode } from "../use-board-mode";
 import { BoardAttentionSection } from "./BoardAttentionSection";
 import {
@@ -196,16 +199,25 @@ function TypeRow({ row }: { row: EquipmentCommandBoardSnapshot["byType"][number]
 
 // ── LocationCard ─────────────────────────────────────────────────────────────
 
-function LocationCard({ row }: { row: EquipmentCommandBoardSnapshot["byLocation"][number] }) {
+function LocationCard({
+  row,
+  tvMode,
+}: {
+  row: EquipmentCommandBoardSnapshot["byLocation"][number];
+  tvMode?: boolean;
+}) {
   const hasIssues = row.totalCritical > row.ready;
   return (
     <div
       className={cn(
-        "rounded-xl border p-3 flex flex-col gap-1",
+        "rounded-xl border flex flex-col gap-1",
+        tvMode ? "p-4" : "p-3",
         hasIssues
           ? "bg-[var(--status-issue-bg)] border-[var(--status-issue-border)]"
           : "bg-[rgb(var(--ivory-surface))] border-ivory-border",
       )}
+      data-tv-focusable={tvMode ? "" : undefined}
+      data-tv-id={tvMode ? `loc-${row.locationId ?? row.locationName}` : undefined}
     >
       <div className="vt-text-xs font-bold text-ivory-text truncate">{row.locationName || t.board.unassigned}</div>
       <div className="flex gap-2 flex-wrap">
@@ -263,7 +275,7 @@ function RfidChip({ unit }: { unit: EquipmentBoardUnitRow }) {
 
 // ── UnitRow ───────────────────────────────────────────────────────────────────
 
-function UnitRow({ unit }: { unit: EquipmentBoardUnitRow }) {
+function UnitRow({ unit, tvMode }: { unit: EquipmentBoardUnitRow; tvMode?: boolean }) {
   const blocking = unit.blockingReasons[0] ?? unit.nextAction ?? null;
   // R-RTC-1.3 · Feature 2 — advisory co-presence. Hovering/focusing a unit reports
   // it as the locally-highlighted entity (producer); when a remote peer has it
@@ -273,13 +285,18 @@ function UnitRow({ unit }: { unit: EquipmentBoardUnitRow }) {
   return (
     <div
       className={cn(
-        "flex items-start gap-3 py-2.5 border-b border-ivory-border last:border-0",
+        "flex items-start gap-3 border-b border-ivory-border last:border-0",
+        tvMode ? "py-3.5" : "py-2.5",
         isPeerSelected &&
           "rounded-lg border-b-transparent ring-2 ring-[hsl(var(--status-ok))] ring-offset-1 ring-offset-[rgb(var(--ivory-surface))]",
       )}
       data-testid={`board-unit-row-${unit.equipmentId}`}
       data-board-entity-id={unit.equipmentId}
       data-board-peer-selected={isPeerSelected ? "true" : undefined}
+      // tvMode: reachable by the D-pad layer; focusing it fires the SAME ephemeral
+      // co-presence onFocus below (no new writes). Absent on desktop/board.
+      data-tv-focusable={tvMode ? "" : undefined}
+      data-tv-id={tvMode ? `unit-${unit.equipmentId}` : undefined}
       onPointerEnter={onSelect}
       onPointerLeave={onClear}
       onFocus={onSelect}
@@ -349,10 +366,12 @@ function TickerStat({ label, value }: { label: string; value: string }) {
 function PressureMain({
   board,
   needAttention,
+  tvMode,
   responsibles,
 }: {
   board: EquipmentCommandBoardSnapshot;
   needAttention: EquipmentBoardUnitRow[];
+  tvMode?: boolean;
   responsibles?: BoardResponsibles | null;
 }) {
   const dir = useDirection();
@@ -370,11 +389,16 @@ function PressureMain({
           </span>
         </div>
         {linked.length > 0 ? (
-          <div className="grid grid-cols-2 lg:grid-cols-3 gap-2">
+          <div className={cn("grid", tvMode ? "grid-cols-2 gap-4" : "grid-cols-2 lg:grid-cols-3 gap-2")}>
             {linked.map((eq) => (
               <div
                 key={eq.equipmentId}
-                className="rounded-lg border border-[var(--status-issue-border)] bg-[rgb(var(--ivory-surface))] px-3 py-2"
+                data-tv-focusable={tvMode ? "" : undefined}
+                data-tv-id={tvMode ? `linked-${eq.equipmentId}` : undefined}
+                className={cn(
+                  "rounded-lg border border-[var(--status-issue-border)] bg-[rgb(var(--ivory-surface))]",
+                  tvMode ? "px-4 py-3" : "px-3 py-2",
+                )}
               >
                 <div className="vt-text-sm font-bold text-ivory-text truncate">{eq.displayName}</div>
                 {eq.locationName && <div className="vt-text-xs text-ivory-text3">{eq.locationName}</div>}
@@ -382,9 +406,9 @@ function PressureMain({
             ))}
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4">
+          <div className={cn("grid gap-x-4", tvMode ? "grid-cols-1 xl:grid-cols-2 gap-x-6" : "grid-cols-1 sm:grid-cols-2")}>
             {needAttention.map((u) => (
-              <UnitRow key={u.equipmentId} unit={u} />
+              <UnitRow key={u.equipmentId} unit={u} tvMode={tvMode} />
             ))}
           </div>
         )}
@@ -417,6 +441,7 @@ export function CommandBoard({
   currentTime,
   currentShift,
   kioskMode: kioskModeProp,
+  tvMode: tvModeProp,
   proposalCount,
   responsibles,
 }: {
@@ -424,6 +449,13 @@ export function CommandBoard({
   currentTime: string;
   currentShift: Array<{ employeeName: string; role: string }>;
   kioskMode?: boolean;
+  /**
+   * `?tv=1` — 10-foot presentation: board-scoped type scale (via `data-board-tv`),
+   * inverted density (fewer/larger cells), and the D-pad focus/spatial-nav layer.
+   * Resolved prop ?? URL, mirroring kioskMode. Purely presentation + input —
+   * no data/transport change.
+   */
+  tvMode?: boolean;
   /**
    * Doctor shift gate (spec 2026-08-13) — snapshot `responsibles` section
    * (doctor teams + senior technician + equipment coordinator). Optional and
@@ -448,8 +480,16 @@ export function CommandBoard({
   // The /board route passes kioskMode explicitly; it wins over the URL read.
   const kioskModeFromUrl = useKioskModeFromUrl();
   const kioskMode = kioskModeProp ?? kioskModeFromUrl;
+  // Same prop ?? URL contract for ?tv=1 (10-foot presentation + D-pad nav).
+  const tvModeFromUrl = useTvModeFromUrl();
+  const tvMode = tvModeProp ?? tvModeFromUrl;
   const mode = useBoardMode(board);
   const reducedMotion = usePrefersReducedMotion();
+
+  // D-pad / TV-remote spatial navigation over the board content. Inert unless
+  // tvMode; degrades to plain glance + pointer when a remote never arrives.
+  const rootRef = useRef<HTMLDivElement>(null);
+  useBoardTvNav({ enabled: tvMode, containerRef: rootRef, reducedMotion });
   const anomalies = board.anomalies ?? [];
   const now = new Date(currentTime);
   const timeStr = now.toLocaleTimeString("he-IL", {
@@ -467,11 +507,27 @@ export function CommandBoard({
   );
 
   return (
-    <div className="flex flex-col min-h-screen bg-[rgb(var(--ivory-bg))] text-ivory-text" dir={dir}>
+    <div
+      ref={rootRef}
+      // Scopes the 10-foot type ramp + focus-ring CSS ([data-board-tv] in index.css).
+      // In tvMode the board fills the overscan flex column instead of min-h-screen,
+      // so it fits the title-safe area exactly. Desktop /board is byte-unchanged.
+      data-board-tv={tvMode ? "" : undefined}
+      className={cn(
+        "flex flex-col bg-[rgb(var(--ivory-bg))] text-ivory-text",
+        tvMode ? "min-h-0 flex-1 overflow-hidden" : "min-h-screen",
+      )}
+      dir={dir}
+    >
 
       {/* Header */}
       <header className="bg-[var(--brand-navy)] flex items-center gap-4 px-5 py-3 shrink-0 flex-wrap">
-        <span className="font-mono text-xl font-black tabular-nums text-white min-w-[52px]">
+        <span
+          className={cn(
+            "font-mono font-black tabular-nums text-white min-w-[52px]",
+            tvMode ? "text-4xl" : "text-xl",
+          )}
+        >
           {timeStr}
         </span>
         <div className="w-px h-5 bg-white/20 shrink-0" />
@@ -510,9 +566,14 @@ export function CommandBoard({
             }}
             aria-label={t.common.back}
             data-testid="board-exit"
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-white/20 bg-white/10 text-white/85 transition-colors hover:bg-white/20 motion-safe:active:scale-95"
+            data-tv-focusable={tvMode ? "" : undefined}
+            data-tv-id={tvMode ? "exit" : undefined}
+            className={cn(
+              "flex shrink-0 items-center justify-center rounded-full border border-white/20 bg-white/10 text-white/85 transition-colors hover:bg-white/20 motion-safe:active:scale-95",
+              tvMode ? "h-14 w-14" : "h-11 w-11",
+            )}
           >
-            <X className="h-4 w-4" aria-hidden />
+            <X className={tvMode ? "h-6 w-6" : "h-4 w-4"} aria-hidden />
           </button>
         )}
       </header>
@@ -525,18 +586,38 @@ export function CommandBoard({
           reducedMotion={reducedMotion}
           onAnomalyActivated={reportBoardAnomalyActivated}
           proposalCount={proposalCount}
+          tvMode={tvMode}
         />
       )}
 
       {/* Body */}
       {mode === "pressure" && (
-        <PressureMain board={board} needAttention={needAttention} responsibles={responsibles} />
+        <PressureMain
+          board={board}
+          needAttention={needAttention}
+          tvMode={tvMode}
+          responsibles={responsibles}
+        />
       )}
       {mode === "calm" && (
-      <main id="main-content" className="flex-1 overflow-auto p-4 grid grid-cols-1 lg:grid-cols-[auto_1fr] gap-4">
+      <main
+        id="main-content"
+        className={cn(
+          "flex-1 overflow-auto p-4 grid grid-cols-1 lg:grid-cols-[auto_1fr]",
+          tvMode ? "gap-6" : "gap-4",
+        )}
+      >
 
-        {/* Left: ADRing + ReadinessMix */}
-        <div className="flex flex-col gap-4 items-center lg:w-64 shrink-0">
+        {/* Left: ADRing + ReadinessMix — one D-pad region (initial focus) in tvMode */}
+        <div
+          className={cn(
+            "flex flex-col items-center shrink-0",
+            tvMode ? "gap-6 lg:w-[22rem]" : "gap-4 lg:w-64",
+          )}
+          data-tv-focusable={tvMode ? "" : undefined}
+          data-tv-id={tvMode ? "overview" : undefined}
+          data-tv-focus-initial={tvMode ? "" : undefined}
+        >
           <ADRing pct={pct} ready={board.overview.ready} total={board.overview.totalCritical} />
           <ReadinessMix overview={board.overview} />
 
@@ -568,7 +649,11 @@ export function CommandBoard({
 
           {/* By Type */}
           {board.byType.length > 0 && (
-            <section className="rounded-xl border border-ivory-border bg-[rgb(var(--ivory-surface))] p-4">
+            <section
+              className="rounded-xl border border-ivory-border bg-[rgb(var(--ivory-surface))] p-4"
+              data-tv-focusable={tvMode ? "" : undefined}
+              data-tv-id={tvMode ? "bytype" : undefined}
+            >
               <h2 className="vt-text-2xs font-bold uppercase tracking-widest text-ivory-text3 mb-2">
                 {t.board.byType}
               </h2>
@@ -586,9 +671,14 @@ export function CommandBoard({
               <h2 className="vt-text-2xs font-bold uppercase tracking-widest text-ivory-text3 mb-2">
                 {t.board.whereTitle}
               </h2>
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+              <div
+                className={cn(
+                  "grid",
+                  tvMode ? "grid-cols-2 xl:grid-cols-3 gap-4" : "grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2",
+                )}
+              >
                 {board.byLocation.map((row) => (
-                  <LocationCard key={row.locationId ?? row.locationName} row={row} />
+                  <LocationCard key={row.locationId ?? row.locationName} row={row} tvMode={tvMode} />
                 ))}
               </div>
             </section>
@@ -606,7 +696,7 @@ export function CommandBoard({
               </h2>
               <div>
                 {needAttention.map((u) => (
-                  <UnitRow key={u.equipmentId} unit={u} />
+                  <UnitRow key={u.equipmentId} unit={u} tvMode={tvMode} />
                 ))}
               </div>
             </section>

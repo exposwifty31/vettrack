@@ -71,20 +71,43 @@ describe("Stage 1 token foundation — radius ramp", () => {
 
 describe("Stage 1 token foundation — type ramp on a 17px root", () => {
   it("rem type scale + display / largetitle aliases", () => {
-    // Type ramp is now Dynamic-Type-aware: each base rem value is wrapped in
-    // calc(<value> * var(--type-scale, 1)). The canonical values are unchanged
-    // (drift protection preserved) — only the scale-multiplier wrapper was added.
-    expect(has("--text-2xs: calc(0.647rem *")).toBe(true);
-    expect(has("--text-xs: calc(0.765rem *")).toBe(true);
-    expect(has("--text-sm: calc(0.882rem *")).toBe(true);
-    expect(has("--text-base: calc(1rem *")).toBe(true);
-    expect(has("--text-lg: calc(1.176rem *")).toBe(true);
-    expect(has("--text-xl: calc(1.294rem *")).toBe(true);
-    expect(has("--text-2xl: calc(2rem *")).toBe(true);
-    expect(has("--text-3xl: calc(2.353rem *")).toBe(true);
+    // Type ramp is Dynamic-Type-aware AND single-sourced (PR #178): the canonical
+    // rem values live in --text-*-raw tokens, and both the base ramp and the
+    // [data-board-tv] TV ramp derive from them via calc(var(--text-*-raw) * scale).
+    // Drift protection preserved — the canonical values are pinned on the raws.
+    expect(has("--text-2xs-raw: 0.647rem")).toBe(true);
+    expect(has("--text-xs-raw: 0.765rem")).toBe(true);
+    expect(has("--text-sm-raw: 0.882rem")).toBe(true);
+    expect(has("--text-base-raw: 1rem")).toBe(true);
+    expect(has("--text-lg-raw: 1.176rem")).toBe(true);
+    expect(has("--text-xl-raw: 1.294rem")).toBe(true);
+    expect(has("--text-2xl-raw: 2rem")).toBe(true);
+    expect(has("--text-3xl-raw: 2.353rem")).toBe(true);
+    expect(has("--text-2xs: calc(var(--text-2xs-raw) *")).toBe(true);
+    expect(has("--text-xs: calc(var(--text-xs-raw) *")).toBe(true);
+    expect(has("--text-sm: calc(var(--text-sm-raw) *")).toBe(true);
+    expect(has("--text-base: calc(var(--text-base-raw) *")).toBe(true);
+    expect(has("--text-lg: calc(var(--text-lg-raw) *")).toBe(true);
+    expect(has("--text-xl: calc(var(--text-xl-raw) *")).toBe(true);
+    expect(has("--text-2xl: calc(var(--text-2xl-raw) *")).toBe(true);
+    expect(has("--text-3xl: calc(var(--text-3xl-raw) *")).toBe(true);
     expect(has("--display: var(--text-3xl)")).toBe(true);
     expect(has("--text-largetitle: var(--text-2xl)")).toBe(true);
     expect(has("font-size: 17px")).toBe(true); // html root
+  });
+
+  it("board TV ramp ([data-board-tv]) derives all eight sizes from the raw tokens", () => {
+    // Assert INSIDE the scoped block (not anywhere in the stylesheet), so deleting
+    // or renaming the [data-board-tv] ramp block cannot silently pass.
+    const match = css.match(/\[data-board-tv\] \{[^}]*--tv-type-scale:[^}]*\}/);
+    expect(match).not.toBeNull();
+    const block = match[0];
+    expect(block.includes("--tv-type-scale: 1.75")).toBe(true);
+    for (const name of ["2xs", "xs", "sm", "base", "lg", "xl", "2xl", "3xl"]) {
+      expect(
+        block.includes(`--text-${name}: calc(var(--text-${name}-raw) * var(--tv-type-scale))`),
+      ).toBe(true);
+    }
   });
 });
 
