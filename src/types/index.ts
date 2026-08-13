@@ -16,3 +16,4 @@ export * from "./locate.js";
 export * from "./nudges.js";
 export * from "./readiness-forecast.js";
 export * from "./clinic-join.js";
+export * from "./check-in.js";

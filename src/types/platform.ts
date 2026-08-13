@@ -29,6 +29,8 @@ export interface User {
   secondaryRole?: string | null;
   /** Equipment Coordinator eligibility (docking P3 T3.4-i-a) — static, manager-set. */
   isEquipmentCoordinator?: boolean;
+  /** Doctor shift gate: admin-set eligibility to claim the per-team senior tag at check-in. */
+  seniorDoctorEligible?: boolean;
   /**
    * Role the user requested at sign-up (staging column). Auto-applied on admin
    * approval (C3); vet is gated on `vetLicenseNumber`.

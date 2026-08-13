@@ -16,6 +16,8 @@ import type {
   AnalyticsSummary,
   ReadinessForecast,
   User,
+  CheckInRow,
+  DoctorTeamRole,
   UploadUrlRequest,
   UploadUrlResponse,
   AlertAcknowledgment,
@@ -508,6 +510,11 @@ export const api = {
         method: "PATCH",
         body: JSON.stringify({ isEquipmentCoordinator }),
       }),
+    setSeniorDoctorEligible: (id: string, seniorDoctorEligible: boolean) =>
+      request<User>(`/api/users/${id}/senior-doctor-eligible`, {
+        method: "PATCH",
+        body: JSON.stringify({ seniorDoctorEligible }),
+      }),
     updateStatus: (
       id: string,
       status: "pending" | "active" | "blocked",
@@ -543,6 +550,20 @@ export const api = {
       });
       return { url: result.url };
     },
+  },
+  checkIn: {
+    active: () => request<{ active: CheckInRow | null }>("/api/clinical-check-in/me/active"),
+    open: (data: { operationalRole: DoctorTeamRole; isSenior?: boolean; replaceSenior?: boolean }) =>
+      request<CheckInRow>("/api/clinical-check-in/check-in", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+    switch: (data: { operationalRole: DoctorTeamRole; isSenior?: boolean; replaceSenior?: boolean }) =>
+      request<CheckInRow>("/api/clinical-check-in/switch", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+    close: () => request<CheckInRow>("/api/clinical-check-in/check-out", { method: "POST" }),
   },
   storage: {
     requestUploadUrl: (data: UploadUrlRequest) =>
