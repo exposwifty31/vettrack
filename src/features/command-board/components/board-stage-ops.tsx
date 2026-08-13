@@ -16,6 +16,10 @@ import { UnknownBlock } from "./board-panels";
 
 /** Localized role label — falls back to the raw role for unknown values. */
 function roleLabel(role: string): string {
+  // The typed `t.profile.roles` dictionary has a fixed key set, but `role` is a
+  // free runtime string from the snapshot; widen to an index signature so an
+  // unrecognised role misses the lookup (→ `undefined`) and falls back to the raw
+  // value instead of failing to type-check.
   const roles = t.profile.roles as Record<string, string | undefined>;
   return roles[role] ?? role;
 }
@@ -23,12 +27,15 @@ function roleLabel(role: string): string {
 /** One queue as 10-foot evidence: big tabular number, or the explicit empty phrase. */
 function OpsQueuePanel({
   title,
+  queueKey,
   depth,
   emptyPhrase,
   icon,
   tvMode,
 }: {
   title: string;
+  /** Stable, locale-independent id for the test hook — `title` is translated copy. */
+  queueKey: string;
   depth: number;
   emptyPhrase: string;
   icon: JSX.Element;
@@ -40,7 +47,7 @@ function OpsQueuePanel({
         "flex-1 rounded-2xl border border-ivory-border bg-[rgb(var(--ivory-surface))] flex flex-col gap-2",
         tvMode ? "p-6" : "p-4",
       )}
-      data-testid={`board-ops-queue-${title}`}
+      data-testid={`board-ops-queue-${queueKey}`}
     >
       <div className="flex items-center gap-2 vt-text-2xs font-bold uppercase tracking-widest text-ivory-text3">
         {icon}
@@ -87,6 +94,7 @@ export function OpsStage({
         {board.waitlist ? (
           <OpsQueuePanel
             title={t.board.waitlist}
+            queueKey="waitlist"
             depth={board.waitlist.depth}
             emptyPhrase={t.board.opsEmptyWaitlist}
             icon={<Hourglass className="h-4 w-4" aria-hidden />}
@@ -100,6 +108,7 @@ export function OpsStage({
         {board.staging ? (
           <OpsQueuePanel
             title={t.board.staging}
+            queueKey="staging"
             depth={board.staging.depth}
             emptyPhrase={t.board.opsEmptyStaging}
             icon={<PackageCheck className="h-4 w-4" aria-hidden />}
@@ -133,10 +142,16 @@ export function OpsStage({
                 tvMode ? "px-5 py-2" : "px-3 py-1",
               )}
             >
-              <span className={cn("font-bold text-ivory-text", tvMode ? "vt-text-lg" : "vt-text-sm")}>
+              <span
+                className={cn("font-bold text-ivory-text", tvMode ? "vt-text-lg" : "vt-text-sm")}
+                dir="auto"
+              >
                 {s.employeeName}
               </span>
-              <span className={cn("text-ivory-text3", tvMode ? "vt-text-sm" : "vt-text-xs")}>
+              <span
+                className={cn("text-ivory-text3", tvMode ? "vt-text-sm" : "vt-text-xs")}
+                dir="auto"
+              >
                 {roleLabel(s.role)}
               </span>
             </span>

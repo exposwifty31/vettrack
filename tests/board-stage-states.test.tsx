@@ -248,7 +248,11 @@ describe("alert stage — locked exception cards", () => {
     expect(getByTestId("board-unit-row-u-dated").textContent).toContain(t.board.downFor(12));
     const undated = getByTestId("board-unit-row-u-undated").textContent ?? "";
     expect(undated).not.toContain("NaN");
-    expect(undated).not.toMatch(/\d+\s*(דק׳|min)/);
+    // Derive the minutes unit from i18n rather than embedding a Hebrew literal in
+    // source (forbidden by tests/i18n-no-hebrew-in-source.test.ts): the undated card
+    // must carry no downtime figure at all.
+    const minutesUnit = t.board.downFor(0).replace(/[\d\s]/g, "");
+    expect(undated).not.toContain(minutesUnit);
   });
 });
 

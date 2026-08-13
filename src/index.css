@@ -1309,7 +1309,7 @@ nav,
   width: 0.875rem;
   height: 0.875rem;
   border-radius: 9999px;
-  background: currentColor;
+  background: currentcolor;
   opacity: 0.45;
   animation: board-heartbeat-pulse 300ms ease-out 1;
 }

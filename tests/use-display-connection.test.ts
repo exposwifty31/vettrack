@@ -25,7 +25,7 @@ import {
 } from "@tanstack/react-query";
 import type { DisplaySnapshot } from "@/types";
 
-const mockQueryResult = vi.fn<[], Partial<UseQueryResult<DisplaySnapshot>>>();
+const mockQueryResult = vi.fn<() => Partial<UseQueryResult<DisplaySnapshot>>>();
 
 vi.mock("@/hooks/useDisplaySnapshot", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/hooks/useDisplaySnapshot")>();

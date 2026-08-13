@@ -238,10 +238,20 @@ export function CommandBoard({
         )}
       </main>
 
+      {/* During a stale/offline takeover the bottom band keeps its LAST-KNOWN
+          power/docks/responsibles (spec: stale retains last-known values) — label
+          it so a glance never reads the retained figures as live. */}
+      {state === "stale" && (
+        <div className="shrink-0 px-4 pb-1 text-center vt-text-2xs font-bold uppercase tracking-widest text-[color:var(--state-tint-warn)]">
+          {t.board.lastKnown}
+        </div>
+      )}
+
       {/* Bottom band (fixed): responsibles + power + docks. Absent ≠ zero —
           an undefined block renders the muted-unknown card, never zeros. */}
       <div
         data-testid="board-bottom-band"
+        data-stale={state === "stale" ? "" : undefined}
         className={cn(
           // Responsibles carries up to five named people at the 10-foot type floor,
           // so it gets the wider column and lays them out in two columns (below) —

@@ -120,7 +120,7 @@ function makeSnapshot(over: Partial<DisplaySnapshot> = {}): DisplaySnapshot {
   };
 }
 
-/** Serve the fixture snapshot for every poll; return the page-side teardown. */
+/** Serve the fixture snapshot for every poll via route interception (no teardown). */
 async function serveSnapshot(page: Page, snapshot: DisplaySnapshot): Promise<void> {
   await page.route("**/api/display/snapshot", (route) =>
     route.fulfill({
@@ -138,6 +138,9 @@ async function serveSnapshot(page: Page, snapshot: DisplaySnapshot): Promise<voi
  */
 async function gotoBoardOrSkip(page: Page): Promise<boolean> {
   await page.goto(`${BASE_URL}/board?tv=1`);
+  // domcontentloaded may already have fired, or the SPA may redirect before it — the
+  // pathname / #root checks below are what decide onBoard, so a late or aborted
+  // load-state is not itself a failure worth propagating.
   await page.waitForLoadState("domcontentloaded").catch(() => {});
   const pathname = new URL(page.url()).pathname;
   if (pathname.startsWith("/signin") || pathname.startsWith("/signup")) return false;
@@ -231,15 +234,17 @@ test.describe("TV board phase 1 — visual board states", () => {
     await expect(takeover).toBeVisible();
     await expect(takeover).toHaveAttribute("data-kind", "unconfigured");
     // Absent ≠ zero: the bottom band renders muted-unknown cards, never zeros.
-    expect(await page.getByTestId("board-block-unknown").count()).toBeGreaterThan(0);
+    // Web-first (polls until the band renders) — never a one-shot count read.
+    await expect(page.getByTestId("board-block-unknown").first()).toBeVisible();
     await expect(page.getByTestId("board-allclear")).toHaveCount(0);
     await expect(page).toHaveScreenshot("board-unconfigured.png", { maxDiffPixelRatio: 0.02 });
   });
 
   test("stale — connection loss escalates to the last-known takeover", async ({ page }) => {
-    // 24 consecutive missed polls (retry:2 → 3 attempts per 5 s cycle) ≈ 8
-    // cycles of failed refetches after the first good snapshot — slow by
-    // design (the tracker is cadence-aware, exit-only). Budget accordingly.
+    // The tracker flips to `stale` after STALE_AFTER_MISSED_POLLS (15) consecutive
+    // missed poll cycles (pinned in tests/use-display-connection.test.ts) — ≈2 min at
+    // the ~8 s failed-cycle cadence. Slow by design (cadence-aware, exit-only); the
+    // 180 s test budget + 150 s assertion timeout leave margin over the ~2 min floor.
     test.setTimeout(180_000);
     let served = false;
     await page.route("**/api/display/snapshot", (route) => {

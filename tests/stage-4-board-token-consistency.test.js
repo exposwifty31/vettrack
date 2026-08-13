@@ -83,6 +83,8 @@ describe("Stage 4 board — additive skeleton + footer", () => {
     expect(/<footer/.test(boardSrc)).toBe(false);
     expect(boardSrc.includes("t.board.live")).toBe(false);
     expect(boardSrc.includes("BoardTopBand")).toBe(true);
-    expect(boardSrc.includes("connection={connection}")).toBe(true);
+    // Match the prop name loosely — a Prettier line break or a local rename must not
+    // break this behaviour-free source guard.
+    expect(boardSrc).toMatch(/<BoardTopBand[\s\S]*?connection=\{/);
   });
 });

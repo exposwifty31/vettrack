@@ -10,7 +10,8 @@
  *   - no board module references the approvals queue (poller cut).
  */
 import { describe, it, expect, afterEach } from "vitest";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
+import { join } from "node:path";
 import { render, screen, cleanup } from "@testing-library/react";
 import { BoardAttentionSection } from "@/features/command-board/components/BoardAttentionSection";
 import type { BoardAnomaly } from "../shared/equipment-board";
@@ -56,11 +57,13 @@ describe("BoardAttentionSection — approvals banner cut (Task 12)", () => {
   });
 
   it("board modules no longer reference the approvals queue (poller cut by owner decision)", () => {
-    const files = [
-      "src/features/command-board/CommandBoardScreen.tsx",
-      "src/features/command-board/components/CommandBoard.tsx",
-      "src/features/command-board/components/BoardAttentionSection.tsx",
-    ];
+    // Scan the WHOLE command-board module surface, not a hardcoded trio — a
+    // reference re-added in any other board file must fail this guard too.
+    const dir = "src/features/command-board";
+    const files = readdirSync(dir, { recursive: true })
+      .map(String)
+      .filter((f) => f.endsWith(".ts") || f.endsWith(".tsx"))
+      .map((f) => join(dir, f));
     for (const file of files) {
       const src = readFileSync(file, "utf8");
       expect(src, `${file} must not poll the proposals queue`).not.toContain("actionProposals");

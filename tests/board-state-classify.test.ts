@@ -209,8 +209,11 @@ describe("classifyBoardState priority order", () => {
     expect(classifyBoardState({ snapshot: s, connection: "live" })).toBe("all_clear");
   });
 
-  it("all_clear otherwise; undefined snapshot with live connection is loading → treated stale-safe", () => {
+  it("an all-ready board on a live connection is all_clear", () => {
     expect(classifyBoardState({ snapshot: makeSnapshot(), connection: "live" })).toBe("all_clear");
+  });
+
+  it("an undefined snapshot (no board at all) is unconfigured, never a false all_clear", () => {
     expect(classifyBoardState({ snapshot: undefined, connection: "live" })).toBe("unconfigured");
   });
 });

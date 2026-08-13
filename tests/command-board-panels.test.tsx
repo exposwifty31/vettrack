@@ -123,7 +123,7 @@ describe("CommandBoard enrichment panels — tolerant reader", () => {
     const powerUnknown = unknowns.find((el) => el.textContent?.includes(t.board.power));
     expect(powerUnknown).toBeTruthy();
     expect(powerUnknown!.textContent).toContain(t.board.blockUnavailable);
-    expect(powerUnknown!.textContent).not.toContain("0");
+    expect(powerUnknown!.textContent).not.toMatch(/\d/); // muted-unknown carries no figure at all
   });
 
   it("renders the docks card as muted-unknown when docks is absent — never zeros", () => {
@@ -134,7 +134,7 @@ describe("CommandBoard enrichment panels — tolerant reader", () => {
     const docksUnknown = unknowns.find((el) => el.textContent?.includes(t.board.docks));
     expect(docksUnknown).toBeTruthy();
     expect(docksUnknown!.textContent).toContain(t.board.blockUnavailable);
-    expect(docksUnknown!.textContent).not.toContain("0");
+    expect(docksUnknown!.textContent).not.toMatch(/\d/); // muted-unknown carries no figure at all
   });
 
   it("renders the responsibles card as unavailable (NOT the 0/5 aggregate) when responsibles is null", () => {

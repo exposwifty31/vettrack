@@ -306,6 +306,11 @@ const EXCEPTION_SEVERITY_RANK: Record<EquipmentReadinessStatus, number> = {
   in_use: 9,
 };
 
+// Elapsed time an exception unit has gone WITHOUT fresh proof of readiness —
+// anchored at the last evidence or human confirmation. It is deliberately the
+// "how long since we last knew this critical unit was OK" metric, not a distinct
+// went-down timestamp (the snapshot carries no such field); the rendered figure is
+// bare minutes with no "downtime" claim in the copy.
 function downSinceMs(unit: EquipmentBoardUnitRow): number | null {
   const iso = unit.lastEvidenceAt ?? unit.lastHumanConfirmationAt;
   if (!iso) return null;

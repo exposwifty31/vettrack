@@ -203,7 +203,11 @@ function PersonSlot({
         >
           {name}
         </div>
-      ) : null}
+      ) : (
+        // A flagged slot (e.g. a coordinator needing confirmation) can arrive with no
+        // resolved name; show a muted amber dash so the slot is not a blank filled row.
+        <div className="board-slot-name vt-text-sm font-bold text-[color:var(--ivory-warn)]">—</div>
+      )}
     </SlotShell>
   );
 }
