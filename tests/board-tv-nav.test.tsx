@@ -56,11 +56,18 @@ const RECTS: Record<string, { top: number; height: number }> = {
   "dialog-button": { top: 80, height: 10 },
 };
 
+// vi.restoreAllMocks() only restores vi.spyOn spies — a direct prototype
+// assignment must be reverted by hand, so keep the original descriptor.
+const originalScrollIntoView = Object.getOwnPropertyDescriptor(
+  Element.prototype,
+  "scrollIntoView",
+);
+
 beforeEach(() => {
   vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(function (
     this: Element,
   ) {
-    const key = (this as HTMLElement).getAttribute?.("data-testid") ?? "";
+    const key = this.getAttribute("data-testid") ?? "";
     const r = RECTS[key] ?? { top: 0, height: 0 };
     return {
       x: 0,
@@ -72,7 +79,7 @@ beforeEach(() => {
       width: r.height > 0 ? 100 : 0,
       height: r.height,
       toJSON: () => ({}),
-    } as DOMRect;
+    };
   });
   // happy-dom has no scrollIntoView; reveal() calls it on every focus move.
   Element.prototype.scrollIntoView = vi.fn();
@@ -81,12 +88,17 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
+  if (originalScrollIntoView) {
+    Object.defineProperty(Element.prototype, "scrollIntoView", originalScrollIntoView);
+  } else {
+    delete (Element.prototype as Partial<Element>).scrollIntoView;
+  }
 });
 
 describe("useBoardTvNav keydown guards", () => {
   it("ignores arrow keys originating inside an editable field", () => {
     const { getByTestId } = render(<Harness />);
-    const field = getByTestId("field") as HTMLInputElement;
+    const field = getByTestId("field");
     field.focus();
 
     // fireEvent returns false when preventDefault() was called by a handler.
@@ -101,10 +113,16 @@ describe("useBoardTvNav keydown guards", () => {
     const { getByTestId } = render(<Harness showDialog onExit={onExit} />);
 
     fireEvent.keyDown(getByTestId("dialog-button"), { key: "Escape" });
-    expect(onExit).not.toHaveBeenCalled();
 
-    // Positive control: Escape from outside any dialog reaches the exit control.
+    expect(onExit).not.toHaveBeenCalled();
+  });
+
+  it("routes Escape from outside any dialog to the exit control", () => {
+    const onExit = vi.fn();
+    render(<Harness onExit={onExit} />);
+
     fireEvent.keyDown(document.body, { key: "Escape" });
+
     expect(onExit).toHaveBeenCalledTimes(1);
   });
 });

@@ -95,6 +95,20 @@ describe("Stage 1 token foundation — type ramp on a 17px root", () => {
     expect(has("--text-largetitle: var(--text-2xl)")).toBe(true);
     expect(has("font-size: 17px")).toBe(true); // html root
   });
+
+  it("board TV ramp ([data-board-tv]) derives all eight sizes from the raw tokens", () => {
+    // Assert INSIDE the scoped block (not anywhere in the stylesheet), so deleting
+    // or renaming the [data-board-tv] ramp block cannot silently pass.
+    const match = css.match(/\[data-board-tv\] \{[^}]*--tv-type-scale:[^}]*\}/);
+    expect(match).not.toBeNull();
+    const block = match[0];
+    expect(block.includes("--tv-type-scale: 1.75")).toBe(true);
+    for (const name of ["2xs", "xs", "sm", "base", "lg", "xl", "2xl", "3xl"]) {
+      expect(
+        block.includes(`--text-${name}: calc(var(--text-${name}-raw) * var(--tv-type-scale))`),
+      ).toBe(true);
+    }
+  });
 });
 
 describe("Stage 1 token foundation — elevation + spacing", () => {
