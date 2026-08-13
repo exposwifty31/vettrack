@@ -2,7 +2,7 @@
 // State-driven: the container (CommandBoardScreen) computes `state` via
 // useBoardState/useDisplayConnection and passes it down — this component stays
 // presentational and testable with plain props. The old calm/pressure mode
-// machine (useBoardMode) is replaced by the BoardStateKind stage switch:
+// machine (deleted in Task 14) is replaced by the BoardStateKind stage switch:
 //   stale        → StaleTakeover (last-known state, clearly labeled)
 //   unconfigured → UnconfiguredTakeover (configuration hole, never good news)
 //   alert        → EquipmentStage locked on exception cards

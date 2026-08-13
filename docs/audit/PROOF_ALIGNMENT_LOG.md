@@ -6697,3 +6697,55 @@ repo template (gh pr edit).
 - `pnpm typecheck` → exited clean, zero errors (both tsconfigs).
 
 **Verdict:** VERIFIED
+
+## 2026-08-13 — TV board phase 1, Task 14: frozen-surface guard, board-states Playwright drill, use-board-mode retirement, full gates
+
+**Claim:** Task 14 of the phase-1 plan complete on feat/tv-board-phase1.
+(1) `tests/board-frozen-surface-guard.test.ts` — vitest source-scan guard
+(repo has no lint infra; matches the i18n-no-hebrew guard convention):
+Code Blue early-return renders before any board-state-driven render (the
+plan's literal `codeBlueIdx < useBoardState(` ordering was watched RED and
+then corrected — React's rules of hooks force the hook CALL before the
+conditional return; the frozen invariant is render order, asserted as the
+early-return regex preceding `state={boardState}`), the 5 s/2 s snapshot poll
+contract, and no `actionProposals` import in any board module.
+(2) `tests/board-states.spec.ts` + `playwright.shared.ts` wiring (`board` +
+`ci` suites): all five states driven through route-fulfilled snapshot
+fixtures at 1920×1080 with service workers blocked; `toHaveScreenshot`
+comparisons gated by `PW_VISUAL=1` via `ignoreSnapshots` (baselines are
+platform-specific; darwin-chromium baselines committed under
+`tests/board-states.spec.ts-snapshots/`, CI runs the functional assertions).
+(3) The drill found a REAL bug: TanStack query-core resets `fetchFailureCount`
+to 0 on every fetch dispatch (`fetchState()`, verified in query-core 5.99.0
+source), so `useDisplayConnection`'s failureCount-based derivation could
+never exceed 3 — `delayed`/`stale`/`offline` were unreachable and the stale
+takeover was dead code. Fixed by anchoring the never-resetting
+`errorUpdateCount` at the last success (render-phase derived-state
+adjustment); thresholds recalibrated from attempt-counts to failed-cycle
+counts preserving the documented wall-times (3 ≈ 25 s, 15 ≈ 2 min,
+37 ≈ 5 min at the ~8 s failed-cycle cadence). Contract locked by a real
+TanStack test in `tests/use-display-connection.test.ts`.
+(4) `use-board-mode.ts` deleted (BoardMode inlined as
+BoardAttentionSection's local emphasis vocabulary; zero references remain —
+`grep -rn "useBoardMode\|use-board-mode" src/ tests/` exits 1).
+
+**Evidence (actual command outputs this session):**
+- `pnpm test -- tests/board-frozen-surface-guard.test.ts` → RED first
+  (`AssertionError: expected 8063 to be less than 4434`), GREEN after the
+  honest-invariant rewrite (`Tests  3 passed (3)`).
+- `tests/use-display-connection.test.ts` rewrite → RED against the old hook
+  (`8 failed | 2 passed`), GREEN after the fix (`Tests  10 passed (10)`).
+- `PW_SUITE=board PW_VISUAL=1 playwright test --project=chromium
+  board-states` against a dev-bypass `PLAYWRIGHT_E2E=true` server on :3101
+  (isolated; the running :3001 dev server untouched) → `5 passed (2.0m)` —
+  stale escalated live→stale in ~2 min exactly as recalibrated; re-run
+  without `--update-snapshots` → `4 passed` (baseline comparison clean).
+- `pnpm typecheck` → exited clean, zero errors (both tsconfigs).
+- `pnpm test` → `Test Files  726 passed (726) · Tests  6515 passed |
+  11 skipped (6526) · Duration 93.77s`.
+- `pnpm i18n:check` → `✓ locales/en.json and locales/he.json are in deep key
+  parity.`
+- `pnpm architecture:gates` → `[architecture-gates] All G1 checks passed.`
+  (madge `OK — server: 0 cycle(s), src: 0 cycle(s) (matches baseline)`).
+
+**Verdict:** VERIFIED

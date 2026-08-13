@@ -5,8 +5,8 @@ import { classifyBoardState, type BoardStateInput, type BoardStateKind } from ".
 export const ALERT_EXIT_HOLD_MS = 30_000;
 
 /**
- * Board state with exit-only hysteresis on "alert" (same doctrine as the old
- * useBoardMode pressure hold): enter "alert" on the very render the classifier
+ * Board state with exit-only hysteresis on "alert" (same doctrine as the
+ * retired calm/pressure hold it replaced): enter "alert" on the very render the classifier
  * says so; leave it only after ALERT_EXIT_HOLD_MS of continuously-non-alert
  * classification. A re-alert inside the window cancels the pending exit and the
  * next clear restarts the full hold — flapping equipment never strobes the wall.

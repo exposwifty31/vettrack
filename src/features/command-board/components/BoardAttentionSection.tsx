@@ -8,12 +8,18 @@
 import { t } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import type { BoardAnomaly, BoardAnomalyType } from "../../../../shared/equipment-board";
-import type { BoardMode } from "../use-board-mode";
 import { rankBoardAnomalies } from "../board-anomaly-ranking";
 import { boardAnomalyKey, useBoardAnomalyStateMachine } from "../use-board-anomaly-state-machine";
 
 type CardMotion = "static" | "cross-fade" | "escalate";
 type CardEmphasis = "quiet" | "escalated";
+
+/**
+ * Emphasis contract (predates the board state machine, kept as this section's
+ * local vocabulary): "pressure" escalates card color/size; CommandBoard maps
+ * BoardStateKind "alert" → "pressure", everything else → "calm".
+ */
+type BoardMode = "calm" | "pressure";
 
 function anomalyTypeLabel(type: BoardAnomalyType): string {
   switch (type) {
