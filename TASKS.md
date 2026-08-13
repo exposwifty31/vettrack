@@ -12,7 +12,22 @@
 
 ## In Progress
 
-_Phase-0A cards below are COMPLETE (2026-07-12) — see banner and Completed. Do not re-execute._
+> **⚠ 2026-08-13 — this file's card program is CLOSED. See the PLAN.md banner before using anything below.**
+>
+> The active program is the **RN store push** (get the React Native successor into review on both
+> stores), tracked in `~/.claude/plans/store-submission-runbook.md`. It is not card-shaped and does
+> not live here. The Phase-0/1/2/3 cards below are historical.
+>
+> **This repo's open items for that program** (verified 2026-08-13):
+>
+> | Item | Owner | State |
+> |---|---|---|
+> | Run `pnpm seed:reviewer-demo` against **production** so the store reviewer sees real data (not empty lists) | Owner | not done — needs prod `DATABASE_URL` + a Clerk identity |
+> | Play App Signing SHA-256 → `server/lib/well-known-assetlinks.ts` + redeploy | Agent | blocked until the first AAB is uploaded |
+> | `pnpm test:db-integration` runs in **zero** CI workflows, and its files are excluded from `pnpm test` — incl. the doctor-gate integration test that asserts the `source:"doctor_gate"` contract the RN app depends on | Agent | open |
+> | `tenant:lint` is `--warn-only` + `--touched` + `continue-on-error`, emitting ~208 findings of which ~197 are false positives (the heuristic never inspects the `.where()` chain) — a real `clinicId` leak would be indistinguishable from noise | Agent | open |
+>
+> _Phase-0A cards below are COMPLETE (2026-07-12) — see banner and Completed. Do not re-execute._
 
 ---
 
@@ -126,7 +141,11 @@ Return sets `busyRef=true` then only opens dialog; Cancel never runs `returnMut.
 
 ---
 
-## Queued — Phase 1+ (do not start until T-16 passes)
+## Queued — Phase 1+ (⚠ the "do not start until T-16 passes" gate is VOID as of 2026-08-13)
+
+> These cards were written in July. Much of this list either shipped under a different name
+> (equipment fixes, shift/home, web admin-gate, Code Blue races, board features) or was
+> superseded by the RN migration. **Re-verify against `git log` before executing any card here.**
 
 Full cards in the plan library. Summary only:
 
@@ -154,6 +173,11 @@ Full cards in the plan library. Summary only:
 
 ## Completed
 
+- 2026-08-13 — **The nine-blocker push + TV board** (PRs #167–#181 to `main`): native push +
+  RFID readers, reviewer-demo seed (#175), Code Blue vet-QA persona + click-path runbook (#179),
+  doctor shift gate + migrations 181–184 (#180, RN companion #59), TV Command Center board
+  10-foot mode (#178) and the state-driven Phase-1 redesign (#181). All CI-green and
+  proof-logged; deployed to production the same day (three Railway releases).
 - 2026-07-12 — **Phase 0A: T-05, T-01, T-02, T-03, T-04** (HIGH fixes; RED→GREEN, batch gate green) — PROOF_ALIGNMENT_LOG entries "2026-07-12 — Consolidated Audit × 10x".
 
 _Archive completed tasks here with date and notes._

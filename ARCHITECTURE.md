@@ -296,7 +296,11 @@ and **knip** (dead code). Run via `pnpm architecture:gates`.
 - **Root-level scratch/planning docs:** the historical planning artifacts
   (`INFRA_CLEANUP_PLAN.md`, `TEST_AUDIT.md`, `STRUCTURE_PLAN.md`, `IMPLEMENTATION_PLAN.md`,
   `ARTIFACTS.md`, `DEV_DB.md`) now live in `docs/archive/2026/root-docs/`. `FLOW_MATRIX.md`
-  remains at root — it is actively maintained by the resubmission track.
+  remains at root — **⚠ but it is NOT maintained** (this line previously claimed it was; corrected
+  2026-08-13). It is dated 2026-05-21 against the `staging` base and still documents Medications,
+  Billing and ER-mode as live flow surfaces whose APIs are mounted nowhere in
+  `server/app/routes.ts` — those domains were removed in migrations 142–143. Treat it as a
+  historical artifact, and verify any flow against the code before relying on it.
 - **`vt_xxx` / `vendor-x` placeholders** appear in test/sandbox fixtures, not production tables.
 - **Emerging hexagonal layer** (`src/core`, `src/infrastructure`, `server/domain`) coexists
   with the older `src/lib` / `server/services` style — migration is partial.
