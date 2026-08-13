@@ -12,7 +12,36 @@
 
 ## In Progress
 
-_Phase-0A cards below are COMPLETE (2026-07-12) — see banner and Completed. Do not re-execute._
+> **⚠ 2026-08-13 — this file's card program is CLOSED. See the PLAN.md banner before using anything below.**
+>
+> The active program is the **RN store push** (get the React Native successor into review on both
+> stores), tracked in `~/.claude/plans/store-submission-runbook.md`. It is not card-shaped and does
+> not live here. The Phase-0/1/2/3 cards below are historical.
+>
+> **This repo's open items for that program** (verified 2026-08-13):
+>
+> | Item | Owner | State |
+> |---|---|---|
+> | Run `pnpm seed:reviewer-demo` against **production** so the store reviewer sees real data (not empty lists) — ⚠ **read the safety note below first** | Owner | not done — needs prod `DATABASE_URL` + a Clerk identity |
+> | Play App Signing SHA-256 → `server/lib/well-known-assetlinks.ts` + redeploy | Agent | blocked until the first AAB is uploaded |
+> | `pnpm test:db-integration` runs in **zero** CI workflows, and its files are excluded from `pnpm test` — incl. the doctor-gate integration test that asserts the `source:"doctor_gate"` contract the RN app depends on | Agent | open |
+> | `tenant:lint` is `--warn-only` + `--touched` + `continue-on-error`, emitting ~208 findings of which ~197 are false positives (the heuristic never inspects the `.where()` chain) — a real `clinicId` leak would be indistinguishable from noise | Agent | open |
+>
+> **⚠ Safety note — writing seed data to a production database.** Verified against
+> `scripts/seed-reviewer-demo.ts` on 2026-08-13, not assumed:
+>
+> | Property | State |
+> |---|---|
+> | **Tenant isolation** | ✅ writes only to its own namespaced clinic (`reviewer-demo-clinic` by default, or `REVIEWER_DEMO_CLINIC_ID`). The script carries an explicit guard against a typo'd/stale clinic id silently writing into a real clinic (`scripts/seed-reviewer-demo.ts:60-62`) |
+> | **Idempotency** | ✅ every insert uses `onConflictDoNothing` / `onConflictDoUpdate` — safe to re-run |
+> | **Synthetic data only** | ✅ demo persona + demo equipment; no real patient, staff, or clinic data is created or modified |
+> | **Cleanup** | ⚠ **partial.** Rollback order is documented in `docs/runbooks/code-blue-qa-walkthrough.md` (children-first, all FKs are `ON DELETE RESTRICT`). But `vt_audit_logs` is append-only — once anything writes an audit row for the demo clinic, the clinic row itself becomes undeletable and leave-in-place is the only option |
+>
+> **Before running:** confirm `REVIEWER_DEMO_CLINIC_ID` is the demo clinic and not a real one,
+> and take the routine production DB backup first. Accept that the demo clinic is effectively
+> permanent once audited — it is unreachable by real users, so the cost is a stray row, not a risk.
+>
+> _Phase-0A cards below are COMPLETE (2026-07-12) — see banner and Completed. Do not re-execute._
 
 ---
 
@@ -122,11 +151,15 @@ Return sets `busyRef=true` then only opens dialog; Cancel never runs `returnMut.
 | T-13 | AASA + entitlements live | ready (Owner) |
 | T-14 | `auth:preflight` + `validate:prod` + `verify:resubmission` | ready (Owner) |
 | T-15 | App Review notes framing | ready (Owner) |
-| **T-16** | **Phase 0 exit on-device drill** (blocks Phase 1) | blocked on T-01 + relevant 0B |
+| ~~**T-16**~~ | ~~Phase 0 exit on-device drill (blocks Phase 1)~~ | **historical — void 2026-08-13**; survives only as store-lane **O8** (G3 on-device verdict) in the store-submission runbook |
 
 ---
 
-## Queued — Phase 1+ (do not start until T-16 passes)
+## Queued — Phase 1+ (⚠ the "do not start until T-16 passes" gate is VOID as of 2026-08-13)
+
+> These cards were written in July. Much of this list either shipped under a different name
+> (equipment fixes, shift/home, web admin-gate, Code Blue races, board features) or was
+> superseded by the RN migration. **Re-verify against `git log` before executing any card here.**
 
 Full cards in the plan library. Summary only:
 
@@ -147,13 +180,20 @@ Full cards in the plan library. Summary only:
 
 ## Blocked
 
-- **T-16 / Phase 1+** — blocked until Phase 0A HIGH fixes + Owner 0B checks needed for the exit drill are done
+- ~~**T-16 / Phase 1+** — blocked until Phase 0A HIGH fixes + Owner 0B checks needed for the exit drill are done~~
+  **Historical — no longer blocked (void 2026-08-13).** Phase 0A landed 2026-07-12; Phase 1+ either
+  shipped or was superseded by the RN migration. The only live on-device gate is store-lane **O8**.
 - **Phase 4 massive-03 / medium-04** — owner entry conditions (see `phase-4.plan.md`)
 
 ---
 
 ## Completed
 
+- 2026-08-13 — **The nine-blocker push + TV board** (PRs #167–#181 to `main`): native push +
+  RFID readers, reviewer-demo seed (#175), Code Blue vet-QA persona + click-path runbook (#179),
+  doctor shift gate + migrations 181–184 (#180, RN companion #59), TV Command Center board
+  10-foot mode (#178) and the state-driven Phase-1 redesign (#181). All CI-green and
+  proof-logged; deployed to production the same day (three Railway releases).
 - 2026-07-12 — **Phase 0A: T-05, T-01, T-02, T-03, T-04** (HIGH fixes; RED→GREEN, batch gate green) — PROOF_ALIGNMENT_LOG entries "2026-07-12 — Consolidated Audit × 10x".
 
 _Archive completed tasks here with date and notes._
