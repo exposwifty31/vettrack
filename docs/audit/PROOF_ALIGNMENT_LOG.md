@@ -6673,3 +6673,27 @@ does), id-less-target focus restoration survives a reconcile unmount.
 - `pnpm architecture:gates` → `[architecture-gates] All G1 checks passed.` (madge `OK — server: 0 cycle(s), src: 0 cycle(s) (matches baseline)`).
 
 **Verdict:** VERIFIED
+
+## 2026-08-13 — PR #178 CodeRabbit round 2: 4 findings (test hygiene + TV ramp lock)
+
+**Claim:** All 4 round-2 findings fixed on feat/tv-board-redesign (a93a201c5).
+(1) `tests/board-tv-nav.test.tsx` drops the unnecessary type assertions —
+`this.getAttribute` called directly on `Element`, the rect mock returned
+structurally without `as DOMRect`, `getByTestId`'s `HTMLElement` used without
+`as HTMLInputElement`. (2) The `Element.prototype.scrollIntoView` stub (a
+direct assignment `vi.restoreAllMocks()` cannot undo) is now reverted in
+`afterEach` by restoring the pre-captured property descriptor (or deleting the
+own property when the environment never had one). (3) The combined Escape test
+split into two single-behavior AAA tests: dialog-origin suppression, and
+body-origin exit activation. (4) `tests/stage-1-token-values.test.js` now pins
+the `[data-board-tv]` ramp block directly: the scoped block is extracted by
+regex and asserted to contain `--tv-type-scale: 1.75` plus all eight
+`--text-*: calc(var(--text-*-raw) * var(--tv-type-scale))` declarations, so
+deleting/renaming the TV ramp fails the lock. PR body also updated to the full
+repo template (gh pr edit).
+
+**Evidence (actual command outputs this session):**
+- `pnpm test -- tests/board-tv-nav.test.tsx tests/stage-1-token-values.test.js` → `Test Files  2 passed (2) · Tests  22 passed (22)`.
+- `pnpm typecheck` → exited clean, zero errors (both tsconfigs).
+
+**Verdict:** VERIFIED
