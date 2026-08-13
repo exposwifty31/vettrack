@@ -1210,6 +1210,16 @@ const translations = {
   board: {
     ...d.board,
     sincePrefix: (time: string) => tr(d.board.sincePrefix, { time }),
+    lastGoodAt: (time: string) => tr(d.board.lastGoodAt, { time }),
+    freshnessMinutes: (count: number) => tr(d.board.freshnessMinutes, { count }),
+    allClearEvidence: (ready: number, total: number) =>
+      tr(d.board.allClearEvidence, { ready, total }),
+    responsiblesAggregate: (filled: number) =>
+      tr(d.board.responsiblesAggregate, { filled }),
+    responsiblesDoctorCount: (count: number) =>
+      tr(d.board.responsiblesDoctorCount, { count }),
+    alertOverflow: (count: number) => tr(d.board.alertOverflow, { count }),
+    downFor: (minutes: number) => tr(d.board.downFor, { minutes }),
   },
 
   boardPair: d.boardPair,

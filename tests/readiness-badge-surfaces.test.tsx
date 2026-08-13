@@ -20,12 +20,10 @@
  *      equipment-item render OpsHomeSurface has (CoverageCard/ExceptionsTile/
  *      ReadinessTile are aggregate stats, alert rows, and room rows — none
  *      carry an `EquipmentStatus`).
- *   6. src/features/command-board/CommandBoardScreen.tsx — the legacy
- *      ward-display fallback pane (`!board` branch). This is where the real
- *      `EquipmentStatus` survives to the client; the primary CommandBoard
- *      renders `EquipmentBoardUnitRow.status: EquipmentReadinessStatus`
- *      (shared/equipment-board.ts), a different, board-specific enum with no
- *      `EquipmentStatus` value in it at all. NOTE: the literal `src/board/*`
+ *   6. (REMOVED — TV board phase 1, Task 12) the CommandBoardScreen legacy
+ *      ward-display fallback pane (`!board` branch) was deleted; an absent
+ *      commandBoard now renders the unconfigured takeover, which carries no
+ *      equipment items and no `EquipmentStatus`. NOTE: the literal `src/board/*`
  *      directory (BoardShell/KioskAwake/BoardErrorBoundary/useBoardAutoReload)
  *      is kiosk chrome only and renders no equipment items.
  *
@@ -44,7 +42,7 @@ import { Router, Route } from "wouter";
 import { memoryLocation } from "wouter/memory-location";
 import { HelmetProvider } from "react-helmet-async";
 import type { ReactNode } from "react";
-import type { Equipment, ActivityFeedItem, DisplaySnapshot } from "@/types";
+import type { Equipment, ActivityFeedItem } from "@/types";
 
 afterEach(() => cleanup());
 
@@ -197,7 +195,6 @@ import { EquipmentItem } from "@/pages/equipment-list";
 import EquipmentDetailPage from "@/pages/equipment-detail";
 import { MyEquipmentCard } from "@/features/today/surfaces/floor/MyEquipmentCard";
 import { RecentActivityCard } from "@/features/today/surfaces/RecentActivityCard";
-import CommandBoardScreen from "@/features/command-board/CommandBoardScreen";
 
 function withQuery(node: ReactNode, path = "/") {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -328,85 +325,8 @@ describe("ReadinessBadge fan-out — RecentActivityCard (OpsHomeSurface's only e
   });
 });
 
-describe("ReadinessBadge fan-out — CommandBoardScreen board fallback pane", () => {
-  it("renders a ReadinessBadge per equipment row in the legacy ward-display fallback (commandBoard unavailable)", async () => {
-    useDisplaySnapshotMock.mockReturnValue({
-      currentTime: new Date().toISOString(),
-      currentShift: [],
-      hospitalizations: [],
-      equipment: [
-        {
-          id: "eq-board-1",
-          name: "Defibrillator",
-          status: "critical",
-          inUse: false,
-          heldBy: null,
-          lastCheckInAt: null,
-          probableLocation: null,
-          isDeployable: false,
-          custodyState: "docked",
-          readinessState: "not_ready",
-          usageState: "available",
-        },
-      ],
-      upcomingTasks: [],
-      overdueTasks: [],
-      activeAlertCount: 0,
-      totalOverdueCount: 0,
-      crashCartStatus: null,
-      codeBlueSession: null,
-      commandBoard: null,
-    } satisfies DisplaySnapshot);
-
-    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    const { container } = render(
-      <QueryClientProvider client={client}>
-        <CommandBoardScreen />
-      </QueryClientProvider>,
-    );
-    await screen.findByTestId("ward-display-equipment-pane");
-    expect(readinessTiers(container)).toContain("not_ready");
-  });
-
-  it("does not crash on a status outside the known EquipmentStatus union — renders the not_ready tier instead", async () => {
-    useDisplaySnapshotMock.mockReturnValue({
-      currentTime: new Date().toISOString(),
-      currentShift: [],
-      hospitalizations: [],
-      equipment: [
-        {
-          id: "eq-board-2",
-          name: "Legacy Monitor",
-          // Not one of the six EquipmentStatus literals — e.g. stale data from
-          // a pre-migration row or a future value this client doesn't know yet.
-          status: "unrecognized_legacy_value",
-          inUse: false,
-          heldBy: null,
-          lastCheckInAt: null,
-          probableLocation: null,
-          isDeployable: false,
-          custodyState: "docked",
-          readinessState: "unknown",
-          usageState: "available",
-        },
-      ],
-      upcomingTasks: [],
-      overdueTasks: [],
-      activeAlertCount: 0,
-      totalOverdueCount: 0,
-      crashCartStatus: null,
-      codeBlueSession: null,
-      commandBoard: null,
-    } satisfies DisplaySnapshot);
-
-    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    const { container } = render(
-      <QueryClientProvider client={client}>
-        <CommandBoardScreen />
-      </QueryClientProvider>,
-    );
-    await screen.findByTestId("ward-display-equipment-pane");
-    // Fails cautious — an unrecognized status must never render as "ready".
-    expect(readinessTiers(container)).toContain("not_ready");
-  });
-});
+// Surface 6 (the CommandBoardScreen legacy `!board` ward-display fallback pane)
+// was DELETED in TV board phase 1, Task 12: an absent commandBoard now renders
+// the state machine's unconfigured takeover (no equipment items, no
+// EquipmentStatus on the board surface), so its ReadinessBadge fan-out tests
+// were removed with it.

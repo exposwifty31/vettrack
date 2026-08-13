@@ -1,440 +1,97 @@
-// Presentational Command Center board + its single-consumer leaves.
-// Verbatim move from src/pages/display.tsx:72-460 (Phase 4 C1). The only
-// behavioral change is an additive optional `kioskMode` prop: when provided
-// (the /board route) it wins over the internal ?kiosk=1 URL read; when omitted
-// (/equipment/board) the URL read is byte-identical to the pre-move behavior.
-import { useRef } from "react";
+// Presentational Command Center board (TV board phase 1, Task 10).
+// State-driven: the container (CommandBoardScreen) computes `state` via
+// useBoardState/useDisplayConnection and passes it down — this component stays
+// presentational and testable with plain props. The old calm/pressure mode
+// machine (deleted in Task 14) is replaced by the BoardStateKind stage switch:
+//   stale        → StaleTakeover (last-known state, clearly labeled)
+//   unconfigured → UnconfiguredTakeover (configuration hole, never good news)
+//   alert        → EquipmentStage locked on exception cards
+//   attention / all_clear → EquipmentStage evidence composition (Task 11 adds
+//                  the Equipment↔Ops rotation here)
+// Anchor invariant: the top band + tinted state strip and the bottom band
+// (responsibles + power + docks, absent ≠ zero) render in every state.
+// A real Code Blue never reaches this component — CommandBoardScreen's frozen
+// early return renders the overlay above all of this.
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
-import { Settings2, X } from "lucide-react";
 import { t } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { reportBoardAnomalyActivated } from "@/lib/realtime";
-import { useBoardEntityCoPresence } from "@/board/board-copresence-context";
 import { usePrefersReducedMotion } from "@/hooks/use-prefers-reduced-motion";
 import { useDirection } from "@/hooks/useDirection";
-import type { BoardResponsibles, EquipmentCommandBoardSnapshot } from "@/types/safety-surfaces";
-import type { EquipmentBoardUnitRow, EquipmentReadinessStatus } from "../../../../shared/equipment-board";
-import { STATUS_BG, STATUS_BAR_COLOR, statusLabel } from "../status-tokens";
+import type { DisplayConnection } from "@/hooks/use-display-connection";
+import type {
+  BoardResponsibles,
+  DisplaySnapshot,
+  EquipmentCommandBoardSnapshot,
+} from "@/types/safety-surfaces";
+import type { BoardStateKind } from "../board-state";
 import { useKioskModeFromUrl } from "../use-kiosk-mode-from-url";
 import { useTvModeFromUrl } from "../use-tv-mode-from-url";
 import { useBoardTvNav } from "../use-board-tv-nav";
-import { countCriticalAlerts, useBoardMode } from "../use-board-mode";
 import { BoardAttentionSection } from "./BoardAttentionSection";
+import { BoardStateStrip, BoardTopBand } from "./board-status-band";
+import { StaleTakeover, UnconfiguredTakeover } from "./board-takeovers";
+import { EquipmentStage } from "./board-stage-equipment";
+import { OpsStage } from "./board-stage-ops";
+import { opsHasContent, useStageRotation } from "../use-stage-rotation";
 import {
-  CustodyPanel,
   DocksPanel,
   PowerPanel,
   ResponsiblesPanel,
-  StagingPanel,
-  WaitlistPanel,
+  UnknownBlock,
 } from "./board-panels";
 
-/** The six readiness buckets that make up a stacked readiness bar. */
-type ReadinessCounts = {
-  ready: number;
-  inUse: number;
-  stale: number;
-  blocked: number;
-  overdue: number;
-  unknown: number;
+/**
+ * Container-less renders (legacy tests / the pre-Task-12 screen) have no
+ * connection tracker yet: treat as live-but-never-polled, which renders the
+ * "updating…" freshness copy — never a fabricated timestamp.
+ */
+const NEVER_POLLED_CONNECTION: DisplayConnection = {
+  state: "live",
+  lastSuccessAt: null,
+  missedPolls: 0,
 };
 
-/** Non-empty readiness segments in fixed display order — shared by ReadinessMix + TypeRow. */
-function buildSegments(counts: ReadinessCounts): Array<{ key: EquipmentReadinessStatus; count: number }> {
-  return (
-    [
-      { key: "ready"   as const, count: counts.ready   },
-      { key: "in_use"  as const, count: counts.inUse   },
-      { key: "stale"   as const, count: counts.stale   },
-      { key: "blocked" as const, count: counts.blocked },
-      { key: "overdue" as const, count: counts.overdue },
-      { key: "unknown" as const, count: counts.unknown },
-    ] as Array<{ key: EquipmentReadinessStatus; count: number }>
-  ).filter((s) => s.count > 0);
-}
-
-// ── ADRing ──────────────────────────────────────────────────────────────────
-
-function ADRing({ pct, ready, total }: { pct: number; ready: number; total: number }) {
-  const size = 140;
-  const stroke = 14;
-  const r = (size - stroke) / 2;
-  const circ = 2 * Math.PI * r;
-  const dash = (pct / 100) * circ;
-
-  // No critical equipment tagged for this clinic: a "0 / 0 · 0%" ring reads as
-  // an alarm (green numeral over what looks like a failed readiness score).
-  // Render an explicit empty/config state instead of the numeric ring.
-  if (total === 0) {
-    return (
-      <div className="flex flex-col items-center gap-2" data-testid="board-ring-no-critical">
-        <div
-          className="relative flex items-center justify-center rounded-full border-4 border-dashed border-ivory-border"
-          style={{ width: size, height: size }}
-        >
-          <Settings2 className="h-8 w-8 text-ivory-text3" aria-hidden="true" />
-        </div>
-        <div className="max-w-[160px] text-center">
-          <div className="vt-text-sm font-bold text-ivory-text leading-tight">
-            {t.board.noCriticalConfigured}
-          </div>
-          <div className="vt-text-xs text-ivory-text3 mt-0.5">{t.board.noCriticalConfiguredHint}</div>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex flex-col items-center gap-2">
-      <div className="relative" style={{ width: size, height: size }}>
-        <svg width={size} height={size} className="-rotate-90" aria-hidden="true">
-          {/* Track */}
-          <circle
-            cx={size / 2} cy={size / 2} r={r}
-            fill="none"
-            stroke="hsl(var(--muted))"
-            strokeWidth={stroke}
-          />
-          {/* Progress */}
-          <circle
-            cx={size / 2} cy={size / 2} r={r}
-            fill="none"
-            stroke="hsl(var(--status-ok))"
-            strokeWidth={stroke}
-            strokeLinecap="round"
-            strokeDasharray={circ}
-            strokeDashoffset={circ - dash}
-            style={{ transition: "stroke-dashoffset 700ms cubic-bezier(.4,0,.2,1)" }}
-          />
-        </svg>
-        <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className="vt-display font-black tabular-nums text-[hsl(var(--status-ok))] leading-none">
-            {ready}
-          </span>
-          <span className="vt-text-xs text-ivory-text3 leading-tight">
-            {t.board.of} {total}
-          </span>
-        </div>
-      </div>
-      <div className="text-center">
-        <div className="vt-text-sm font-bold text-ivory-text leading-tight">
-          {t.board.deployableNow}
-        </div>
-        <div className="vt-text-xs text-ivory-text3">{Math.round(pct)}%</div>
-      </div>
-    </div>
-  );
-}
-
-// ── ReadinessMix ─────────────────────────────────────────────────────────────
-
-function ReadinessMix({ overview }: { overview: EquipmentCommandBoardSnapshot["overview"] }) {
-  const total = overview.totalCritical || 1;
-  const segments = buildSegments(overview);
-
-  return (
-    <div className="flex-1 min-w-0">
-      <div className="vt-text-2xs font-bold uppercase tracking-widest text-ivory-text3 mb-2">
-        {t.board.readinessMix}
-      </div>
-      {/* Stacked bar */}
-      <div className="flex h-3 rounded-full overflow-hidden mb-3 gap-px">
-        {segments.map(({ key, count }) => (
-          <div
-            key={key}
-            className={cn("transition-all duration-700", STATUS_BAR_COLOR[key])}
-            style={{ width: `${(count / total) * 100}%` }}
-          />
-        ))}
-      </div>
-      {/* Legend */}
-      <div className="grid grid-cols-2 gap-x-4 gap-y-1">
-        {segments.map(({ key, count }) => (
-          <div key={key} className="flex items-center gap-1.5 vt-text-xs">
-            <span className={cn("w-2 h-2 rounded-full shrink-0", STATUS_BAR_COLOR[key])} />
-            <span className="text-ivory-text2 truncate">{statusLabel(key)}</span>
-            <span className="tabular-nums text-ivory-text3 ms-auto">{count}</span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// ── TypeRow ──────────────────────────────────────────────────────────────────
-
-function TypeRow({ row }: { row: EquipmentCommandBoardSnapshot["byType"][number] }) {
-  const total = row.total || 1;
-  const segments = buildSegments(row);
-
-  const belowMin = row.belowMinimumReady && row.minimumReady != null;
-
-  return (
-    <div className="py-2 border-b border-ivory-border last:border-0">
-      <div className="flex items-center gap-2 mb-1.5">
-        <span className={cn("vt-text-xs font-semibold text-ivory-text truncate flex-1", belowMin && "text-[hsl(var(--status-issue))]")}>
-          {row.typeName}
-        </span>
-        {belowMin && (
-          <span className="vt-text-2xs font-bold text-[var(--status-issue-fg)] bg-[var(--status-issue-bg)] border border-[var(--status-issue-border)] rounded px-1.5 py-0.5 shrink-0">
-            ⚠ {row.ready}/{row.minimumReady} {t.board.ready}
-          </span>
-        )}
-        <span className="vt-text-xs tabular-nums text-ivory-text3 shrink-0">{row.ready}/{row.total}</span>
-      </div>
-      <div className="flex h-2 rounded-full overflow-hidden gap-px">
-        {segments.map(({ key, count }) => (
-          <div
-            key={key}
-            className={cn("transition-all duration-700", STATUS_BAR_COLOR[key])}
-            style={{ width: `${(count / total) * 100}%` }}
-          />
-        ))}
-        {/* Empty track — driven by the raw count (total is normalized to ≥1 above). */}
-        {row.total === 0 && <div className="flex-1 bg-muted" />}
-      </div>
-    </div>
-  );
-}
-
-// ── LocationCard ─────────────────────────────────────────────────────────────
-
-function LocationCard({
-  row,
-  tvMode,
+/**
+ * 300 ms opacity cross-fade on stage view swap (Task 11). The wrapper remounts
+ * per `viewKey` and fades the incoming view in; under prefers-reduced-motion
+ * the swap is instant (`transition: none`). Purely presentational — layout is
+ * owned by the stage components themselves.
+ */
+function StageFade({
+  viewKey,
+  reducedMotion,
+  children,
 }: {
-  row: EquipmentCommandBoardSnapshot["byLocation"][number];
-  tvMode?: boolean;
+  viewKey: string;
+  reducedMotion: boolean;
+  children: React.ReactNode;
 }) {
-  const hasIssues = row.totalCritical > row.ready;
+  const [faded, setFaded] = useState(false);
+  // useLayoutEffect (not useEffect): reset to opacity 0 BEFORE the browser paints
+  // the freshly-keyed inner div, then rAF → 1 to transition it in. A passive effect
+  // runs after paint, so the incoming view would flash in at opacity 1 first — a
+  // hard cut on every rotation swap instead of the spec §2 300 ms cross-fade.
+  useLayoutEffect(() => {
+    setFaded(false);
+    const id = requestAnimationFrame(() => setFaded(true));
+    return () => cancelAnimationFrame(id);
+  }, [viewKey]);
   return (
     <div
-      className={cn(
-        "rounded-xl border flex flex-col gap-1",
-        tvMode ? "p-4" : "p-3",
-        hasIssues
-          ? "bg-[var(--status-issue-bg)] border-[var(--status-issue-border)]"
-          : "bg-[rgb(var(--ivory-surface))] border-ivory-border",
-      )}
-      data-tv-focusable={tvMode ? "" : undefined}
-      data-tv-id={tvMode ? `loc-${row.locationId ?? row.locationName}` : undefined}
+      key={viewKey}
+      data-testid="board-stage-fade"
+      className="flex-1 min-h-0 flex flex-col"
+      style={{
+        opacity: reducedMotion || faded ? 1 : 0,
+        transition: reducedMotion ? "none" : "opacity 300ms ease",
+      }}
     >
-      <div className="vt-text-xs font-bold text-ivory-text truncate">{row.locationName || t.board.unassigned}</div>
-      <div className="flex gap-2 flex-wrap">
-        <span className={cn("vt-text-2xs font-semibold px-1.5 py-0.5 rounded border", STATUS_BG.ready)}>
-          {row.ready} {t.board.available}
-        </span>
-        {row.inUse > 0 && (
-          <span className={cn("vt-text-2xs font-semibold px-1.5 py-0.5 rounded border", STATUS_BG.in_use)}>
-            {row.inUse} {t.board.deployed}
-          </span>
-        )}
-      </div>
+      {children}
     </div>
   );
 }
-
-// ── RFID chip ─────────────────────────────────────────────────────────────────
-
-/**
- * R-M1.3 — advisory RFID last-seen chip. The pinned `locationKind` discriminator
- * renders three DISTINCT, non-blank surfaces — 'external_zone' (left clinic) and
- * 'unresolved' (no resolvable room) never collapse to the same/blank surface, and
- * a resolved room shows its name. Advisory only: the human-confirmed room stays the
- * unit's resolved location (never overridden here).
- */
-function RfidChip({ unit }: { unit: EquipmentBoardUnitRow }) {
-  const rfid = unit.rfid;
-  if (!rfid) return null;
-  const kindStyle =
-    rfid.locationKind === "external_zone"
-      ? "border-[var(--status-issue-border)] bg-[var(--status-issue-bg)] text-[var(--status-issue-fg)]"
-      : rfid.locationKind === "unresolved"
-        ? "border-[var(--status-stale-border)] bg-[var(--status-stale-bg)] text-[var(--status-stale-fg)]"
-        : "border-ivory-border bg-[rgb(var(--ivory-surface))] text-ivory-text2";
-  const label =
-    rfid.locationKind === "external_zone"
-      ? t.board.rfidExternalZone
-      : rfid.locationKind === "unresolved"
-        ? t.board.rfidUnresolved
-        : (rfid.locationName ?? t.board.rfidTag);
-  return (
-    <span
-      className={cn(
-        "inline-flex items-center gap-1 vt-text-2xs font-semibold px-1.5 py-0.5 rounded border",
-        kindStyle,
-      )}
-      data-testid={`board-unit-rfid-${unit.equipmentId}`}
-      data-rfid-kind={rfid.locationKind}
-    >
-      <span>{t.board.rfidTag}</span>
-      <span>{label}</span>
-    </span>
-  );
-}
-
-// ── UnitRow ───────────────────────────────────────────────────────────────────
-
-function UnitRow({ unit, tvMode }: { unit: EquipmentBoardUnitRow; tvMode?: boolean }) {
-  const blocking = unit.blockingReasons[0] ?? unit.nextAction ?? null;
-  // R-RTC-1.3 · Feature 2 — advisory co-presence. Hovering/focusing a unit reports
-  // it as the locally-highlighted entity (producer); when a remote peer has it
-  // highlighted we draw a visible ring + name their presence. Inert without a
-  // provider (socket down / other routes), so the row is unchanged when degraded.
-  const { isPeerSelected, peerNames, onSelect, onClear } = useBoardEntityCoPresence(unit.equipmentId);
-  return (
-    <div
-      className={cn(
-        "flex items-start gap-3 border-b border-ivory-border last:border-0",
-        tvMode ? "py-3.5" : "py-2.5",
-        isPeerSelected &&
-          "rounded-lg border-b-transparent ring-2 ring-[hsl(var(--status-ok))] ring-offset-1 ring-offset-[rgb(var(--ivory-surface))]",
-      )}
-      data-testid={`board-unit-row-${unit.equipmentId}`}
-      data-board-entity-id={unit.equipmentId}
-      data-board-peer-selected={isPeerSelected ? "true" : undefined}
-      // tvMode: reachable by the D-pad layer; focusing it fires the SAME ephemeral
-      // co-presence onFocus below (no new writes). Absent on desktop/board.
-      data-tv-focusable={tvMode ? "" : undefined}
-      data-tv-id={tvMode ? `unit-${unit.equipmentId}` : undefined}
-      onPointerEnter={onSelect}
-      onPointerLeave={onClear}
-      onFocus={onSelect}
-      onBlur={onClear}
-    >
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2">
-          <span className="vt-text-sm font-semibold text-ivory-text truncate">{unit.displayName}</span>
-          {unit.typeName && (
-            <span className="vt-text-2xs text-ivory-text3 truncate shrink-0">{unit.typeName}</span>
-          )}
-          {isPeerSelected && peerNames.length > 0 && (
-            <span
-              className="vt-text-2xs font-semibold text-white bg-[hsl(var(--status-ok))] rounded-full px-2 py-0.5 shrink-0"
-              data-board-peer-selection-label
-            >
-              {peerNames.join(", ")}
-            </span>
-          )}
-        </div>
-        <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-0.5">
-          {unit.locationName && (
-            <span className="vt-text-xs text-ivory-text3">{unit.locationName}</span>
-          )}
-          {unit.custodianName && (
-            <span className="vt-text-xs text-ivory-text2">{unit.custodianName}</span>
-          )}
-          {blocking && (
-            <span className="vt-text-xs text-[hsl(var(--status-issue))]">{blocking}</span>
-          )}
-        </div>
-        {unit.rfid && (
-          <div className="mt-1">
-            <RfidChip unit={unit} />
-          </div>
-        )}
-      </div>
-      <span
-        className={cn(
-          "shrink-0 vt-text-xs font-bold px-2 py-0.5 rounded border",
-          STATUS_BG[unit.status],
-        )}
-      >
-        {statusLabel(unit.status)}
-      </span>
-    </div>
-  );
-}
-
-// ── PressureMain ─────────────────────────────────────────────────────────────
-
-function TickerStat({ label, value }: { label: string; value: string }) {
-  return (
-    <span className="flex items-center gap-1.5 shrink-0">
-      <span className="text-ivory-text3">{label}</span>
-      <span className="font-bold tabular-nums text-ivory-text">{value}</span>
-    </span>
-  );
-}
-
-/**
- * Pressure-mode body (critical-alert surge, no server Code Blue): the
- * needs-attention block goes full-bleed and the calm panels demote to a
- * single-line ticker. Layout emphasis only — a real Code Blue is handled above
- * this by CommandBoardScreen's server-driven overlay.
- */
-function PressureMain({
-  board,
-  needAttention,
-  tvMode,
-  responsibles,
-}: {
-  board: EquipmentCommandBoardSnapshot;
-  needAttention: EquipmentBoardUnitRow[];
-  tvMode?: boolean;
-  responsibles?: BoardResponsibles | null;
-}) {
-  const dir = useDirection();
-  const linked = board.activeEmergency?.linkedEquipment ?? [];
-  return (
-    <main id="main-content" className="flex-1 overflow-hidden p-4 flex flex-col gap-3" dir={dir}>
-      <section className="flex-1 overflow-auto rounded-xl border border-[var(--status-issue-border)] bg-[var(--status-issue-bg)] p-6 flex flex-col gap-4">
-        <div className="flex items-center gap-3 flex-wrap">
-          <span className="w-3 h-3 rounded-full bg-[hsl(var(--status-issue))] motion-safe:animate-pulse" aria-hidden />
-          <span className="vt-text-2xl font-black uppercase tracking-widest text-[var(--status-issue-fg)]">
-            {t.board.highLoad}
-          </span>
-          <span className="vt-text-sm text-ivory-text2 ms-auto">
-            {needAttention.length} {t.board.attention}
-          </span>
-        </div>
-        {linked.length > 0 ? (
-          <div className={cn("grid", tvMode ? "grid-cols-2 gap-4" : "grid-cols-2 lg:grid-cols-3 gap-2")}>
-            {linked.map((eq) => (
-              <div
-                key={eq.equipmentId}
-                data-tv-focusable={tvMode ? "" : undefined}
-                data-tv-id={tvMode ? `linked-${eq.equipmentId}` : undefined}
-                className={cn(
-                  "rounded-lg border border-[var(--status-issue-border)] bg-[rgb(var(--ivory-surface))]",
-                  tvMode ? "px-4 py-3" : "px-3 py-2",
-                )}
-              >
-                <div className="vt-text-sm font-bold text-ivory-text truncate">{eq.displayName}</div>
-                {eq.locationName && <div className="vt-text-xs text-ivory-text3">{eq.locationName}</div>}
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className={cn("grid gap-x-4", tvMode ? "grid-cols-1 xl:grid-cols-2 gap-x-6" : "grid-cols-1 sm:grid-cols-2")}>
-            {needAttention.map((u) => (
-              <UnitRow key={u.equipmentId} unit={u} tvMode={tvMode} />
-            ))}
-          </div>
-        )}
-      </section>
-      <div className="shrink-0 flex items-center gap-4 overflow-x-auto rounded-xl border border-ivory-border bg-[rgb(var(--ivory-surface))] px-4 py-2 vt-text-xs">
-        <TickerStat
-          label={t.board.deployableNow}
-          value={`${board.overview.ready}/${board.overview.totalCritical}`}
-        />
-        {board.power && <TickerStat label={t.board.powerAlert} value={String(board.power.alert)} />}
-        {board.docks && (
-          <TickerStat label={t.board.docks} value={`${board.docks.occupied}/${board.docks.total}`} />
-        )}
-        {board.waitlist && <TickerStat label={t.board.waitlist} value={String(board.waitlist.depth)} />}
-        {board.staging && <TickerStat label={t.board.staging} value={String(board.staging.depth)} />}
-      </div>
-      {/* Responsibles stay visible under pressure — demoted below the ticker,
-          never dropped (same tolerant reader as the calm layout). */}
-      <div className="shrink-0 max-h-56 overflow-auto">
-        <ResponsiblesPanel responsibles={responsibles} />
-      </div>
-    </main>
-  );
-}
-
-// ── CommandBoard ─────────────────────────────────────────────────────────────
 
 export function CommandBoard({
   board,
@@ -442,10 +99,18 @@ export function CommandBoard({
   currentShift,
   kioskMode: kioskModeProp,
   tvMode: tvModeProp,
-  proposalCount,
   responsibles,
+  state,
+  connection = NEVER_POLLED_CONNECTION,
+  snapshot,
 }: {
-  board: EquipmentCommandBoardSnapshot;
+  /**
+   * Task 12 — nullable: when the snapshot has no commandBoard (build timeout /
+   * pre-deploy server) the state machine classifies `unconfigured` (or a
+   * connection takeover) and the takeover owns the stage; the top/bottom bands
+   * render their muted-unknown treatments (absent ≠ zero), never zeros.
+   */
+  board: EquipmentCommandBoardSnapshot | null;
   currentTime: string;
   currentShift: Array<{ employeeName: string; role: string }>;
   kioskMode?: boolean;
@@ -459,20 +124,19 @@ export function CommandBoard({
   /**
    * Doctor shift gate (spec 2026-08-13) — snapshot `responsibles` section
    * (doctor teams + senior technician + equipment coordinator). Optional and
-   * tolerant: ResponsiblesPanel mounts unconditionally and renders all five
-   * slots in the notMarked state when the key is null/undefined (server-side
-   * withTimeout degraded, or an older server).
+   * tolerant: ResponsiblesPanel mounts unconditionally; null/undefined renders
+   * the muted-unavailable treatment (absent ≠ zero), never the 0/5 aggregate.
    */
   responsibles?: BoardResponsibles | null;
   /**
-   * VetTrack 2.0, Task 1.1 §6 (deliverable H) — bounded ambient count of
-   * Shift Autopilot proposals awaiting approval, count only. Fetched by the
-   * container (`CommandBoardScreen`, already inside the app's
-   * `QueryClientProvider`) and passed down — `CommandBoard` itself stays
-   * presentational (per this file's own header doc), matching every other
-   * board field (`board`, `currentTime`, `currentShift`).
+   * The board state computed by the container (useBoardState over the snapshot
+   * + connection). Drives the stage switch and the state-strip tint.
    */
-  proposalCount?: number;
+  state: BoardStateKind;
+  /** Connection tracker output (useDisplayConnection) — feeds the freshness chip. */
+  connection?: DisplayConnection;
+  /** Last-known snapshot, shown (clearly labeled) inside the stale takeover. */
+  snapshot?: DisplaySnapshot;
 }) {
   const [, navigate] = useLocation();
   const dir = useDirection();
@@ -483,28 +147,30 @@ export function CommandBoard({
   // Same prop ?? URL contract for ?tv=1 (10-foot presentation + D-pad nav).
   const tvModeFromUrl = useTvModeFromUrl();
   const tvMode = tvModeProp ?? tvModeFromUrl;
-  const mode = useBoardMode(board);
   const reducedMotion = usePrefersReducedMotion();
 
   // D-pad / TV-remote spatial navigation over the board content. Inert unless
   // tvMode; degrades to plain glance + pointer when a remote never arrives.
   const rootRef = useRef<HTMLDivElement>(null);
   useBoardTvNav({ enabled: tvMode, containerRef: rootRef, reducedMotion });
-  const anomalies = board.anomalies ?? [];
-  const now = new Date(currentTime);
-  const timeStr = now.toLocaleTimeString("he-IL", {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
+  const anomalies = board?.anomalies ?? [];
+  // Exit is presentation chrome relocated into the single top band (spec §2);
+  // wall kiosks (?kiosk=1) hide it — no operator to tap.
+  const handleExit = () => {
+    if (window.history.length > 1) window.history.back();
+    else navigate("/home");
+  };
+
+  // BoardAttentionSection's emphasis contract predates the state machine:
+  // "pressure" escalates card color/size. Alert is the only escalating state.
+  const attentionMode = state === "alert" ? "pressure" : "calm";
+
+  // Equipment↔Ops rotation (Task 11): quiet states only; alert/takeover lock
+  // the stage on equipment; an empty Ops view is never rotated in.
+  const stageView = useStageRotation({
+    state,
+    opsHasContent: opsHasContent(board, currentShift),
   });
-
-  const pct = board.overview.totalCritical > 0
-    ? (board.overview.ready / board.overview.totalCritical) * 100
-    : 0;
-
-  const needAttention = board.criticalUnits.filter(
-    (u) => u.status !== "ready" && u.status !== "in_use",
-  );
 
   return (
     <div
@@ -514,222 +180,90 @@ export function CommandBoard({
       // so it fits the title-safe area exactly. Desktop /board is byte-unchanged.
       data-board-tv={tvMode ? "" : undefined}
       className={cn(
-        "flex flex-col bg-[rgb(var(--ivory-bg))] text-ivory-text",
+        // Spec §3 elevation base — no pure black (#000 crushes to backlight bloom
+        // on an LCD TV). --board-bg (#0F141A) is defined on [data-board-shell]; the
+        // literal fallback covers container-less test renders.
+        "flex flex-col bg-[color:var(--board-bg,#0f141a)] text-ivory-text",
         tvMode ? "min-h-0 flex-1 overflow-hidden" : "min-h-screen",
       )}
       dir={dir}
     >
 
-      {/* Header */}
-      <header className="bg-[var(--brand-navy)] flex items-center gap-4 px-5 py-3 shrink-0 flex-wrap">
-        <span
-          className={cn(
-            "font-mono font-black tabular-nums text-white min-w-[52px]",
-            tvMode ? "text-4xl" : "text-xl",
-          )}
-        >
-          {timeStr}
-        </span>
-        <div className="w-px h-5 bg-white/20 shrink-0" />
+      {/* Anchor: the single top band (identity, ready/total, freshness heartbeat,
+          clock, exit) + the tinted state strip — present in EVERY state. The legacy
+          navy header and footer were removed (spec §2 is a single top band): they
+          re-rendered the clock, ward wordmark and a hardcoded-green LIVE badge that
+          duplicated the band and kept signalling "LIVE" during stale/offline. */}
+      <BoardTopBand
+        departmentLabel={t.board.ward}
+        readyCount={board ? board.overview.ready : null}
+        totalCount={board ? board.overview.totalCritical : null}
+        currentTime={currentTime}
+        connection={connection}
+        tvMode={tvMode}
+        kioskMode={kioskMode}
+        onExit={handleExit}
+      />
+      <BoardStateStrip state={state} />
 
-        <span className="vt-text-xs font-bold tracking-widest uppercase text-[var(--brand-green-bright)] shrink-0">
-          {t.board.ward}
-        </span>
-
-        {/* Shift staff */}
-        <div className="flex flex-wrap gap-1.5 flex-1 justify-center">
-          {currentShift.map((s) => (
-            <div
-              key={`${s.employeeName}-${s.role}`}
-              className="flex items-center gap-1.5 bg-white/10 border border-white/20 rounded-full px-3 py-0.5 vt-text-xs text-white/75"
-            >
-              {s.employeeName}
-            </div>
-          ))}
-        </div>
-
-        {/* LIVE badge */}
-        <div className="flex items-center gap-1.5 shrink-0">
-          <span className="w-2 h-2 rounded-full bg-[hsl(var(--status-ok))] motion-safe:animate-pulse" aria-hidden />
-          <span className="vt-text-xs font-bold uppercase tracking-widest text-[hsl(var(--status-ok))]">
-            {t.board.live}
-          </span>
-        </div>
-
-        {/* Exit — wall-mounted kiosks (?kiosk=1) have no operator to tap it */}
-        {!kioskMode && (
-          <button
-            type="button"
-            onClick={() => {
-              if (window.history.length > 1) window.history.back();
-              else navigate("/home");
-            }}
-            aria-label={t.common.back}
-            data-testid="board-exit"
-            data-tv-focusable={tvMode ? "" : undefined}
-            data-tv-id={tvMode ? "exit" : undefined}
-            className={cn(
-              "flex shrink-0 items-center justify-center rounded-full border border-white/20 bg-white/10 text-white/85 transition-colors hover:bg-white/20 motion-safe:active:scale-95",
-              tvMode ? "h-14 w-14" : "h-11 w-11",
-            )}
-          >
-            <X className={tvMode ? "h-6 w-6" : "h-4 w-4"} aria-hidden />
-          </button>
-        )}
-      </header>
-
-      {/* Ambient anomaly attention (R-BDF-1.2) — glance-only, present in both modes */}
-      {(anomalies.length > 0 || (proposalCount ?? 0) > 0) && (
+      {/* Ambient anomaly attention (R-BDF-1.2) — glance-only, present in every state */}
+      {anomalies.length > 0 && (
         <BoardAttentionSection
           anomalies={anomalies}
-          mode={mode}
+          mode={attentionMode}
           reducedMotion={reducedMotion}
           onAnomalyActivated={reportBoardAnomalyActivated}
-          proposalCount={proposalCount}
           tvMode={tvMode}
         />
       )}
 
-      {/* Body */}
-      {mode === "pressure" && (
-        <PressureMain
-          board={board}
-          needAttention={needAttention}
-          tvMode={tvMode}
-          responsibles={responsibles}
-        />
+      {/* Stage — state-driven: takeovers replace it wholesale; the quiet states
+          rotate Equipment↔Ops (alert locks on equipment, empty Ops never shows). */}
+      <main id="main-content" className="flex-1 min-h-0 flex flex-col p-4" dir={dir}>
+        {state === "stale" ? (
+          <StaleTakeover connection={connection} lastSnapshot={snapshot} />
+        ) : state === "unconfigured" || !board ? (
+          // `!board` is a type-level guard only: classifyBoardState maps an
+          // absent board to "unconfigured" (or a connection takeover), so a
+          // quiet/alert state always carries a board.
+          <UnconfiguredTakeover />
+        ) : (
+          <StageFade viewKey={stageView} reducedMotion={reducedMotion}>
+            {stageView === "ops" ? (
+              <OpsStage board={board} currentShift={currentShift} tvMode={tvMode} />
+            ) : (
+              <EquipmentStage board={board} state={state} tvMode={tvMode} />
+            )}
+          </StageFade>
+        )}
+      </main>
+
+      {/* During a stale/offline takeover the bottom band keeps its LAST-KNOWN
+          power/docks/responsibles (spec: stale retains last-known values) — label
+          it so a glance never reads the retained figures as live. */}
+      {state === "stale" && (
+        <div className="shrink-0 px-4 pb-1 text-center vt-text-2xs font-bold uppercase tracking-widest text-[color:var(--state-tint-warn)]">
+          {t.board.lastKnown}
+        </div>
       )}
-      {mode === "calm" && (
-      <main
-        id="main-content"
+
+      {/* Bottom band (fixed): responsibles + power + docks. Absent ≠ zero —
+          an undefined block renders the muted-unknown card, never zeros. */}
+      <div
+        data-testid="board-bottom-band"
+        data-stale={state === "stale" ? "" : undefined}
         className={cn(
-          "flex-1 overflow-auto p-4 grid grid-cols-1 lg:grid-cols-[auto_1fr]",
-          tvMode ? "gap-6" : "gap-4",
+          // Responsibles carries up to five named people at the 10-foot type floor,
+          // so it gets the wider column and lays them out in two columns (below) —
+          // otherwise a single stacked list eats ~half the board and starves the stage.
+          "shrink-0 grid grid-cols-1 items-start px-4 pb-3",
+          tvMode ? "gap-4 sm:grid-cols-[1.7fr_1fr_1fr]" : "gap-3 sm:grid-cols-3",
         )}
       >
-
-        {/* Left: ADRing + ReadinessMix — one D-pad region (initial focus) in tvMode */}
-        <div
-          className={cn(
-            "flex flex-col items-center shrink-0",
-            tvMode ? "gap-6 lg:w-[22rem]" : "gap-4 lg:w-64",
-          )}
-          data-tv-focusable={tvMode ? "" : undefined}
-          data-tv-id={tvMode ? "overview" : undefined}
-          data-tv-focus-initial={tvMode ? "" : undefined}
-        >
-          <ADRing pct={pct} ready={board.overview.ready} total={board.overview.totalCritical} />
-          <ReadinessMix overview={board.overview} />
-
-          {/* Responsibles — always mounted; the panel itself tolerates null/undefined */}
-          <ResponsiblesPanel responsibles={responsibles} />
-
-          {/* Enrichment panels — tolerant-reader: each mounts only when present */}
-          {board.power && <PowerPanel power={board.power} />}
-          {board.docks && <DocksPanel docks={board.docks} />}
-          {board.custody && board.custody.units.length > 0 && (
-            <CustodyPanel custody={board.custody} />
-          )}
-
-          {/* Alerts count */}
-          {board.alerts.length > 0 && (
-            <div className="w-full rounded-xl border border-[var(--status-issue-border)] bg-[var(--status-issue-bg)] px-3 py-2.5">
-              <div className="vt-text-xs font-bold text-[var(--status-issue-fg)]">
-                {board.alerts.length} {t.board.attention}
-              </div>
-              <div className="vt-text-2xs text-ivory-text3 mt-0.5">
-                {countCriticalAlerts(board)} {t.board.critical}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Right: by-type, by-location, critical units */}
-        <div className="flex flex-col gap-4 min-w-0">
-
-          {/* By Type */}
-          {board.byType.length > 0 && (
-            <section
-              className="rounded-xl border border-ivory-border bg-[rgb(var(--ivory-surface))] p-4"
-              data-tv-focusable={tvMode ? "" : undefined}
-              data-tv-id={tvMode ? "bytype" : undefined}
-            >
-              <h2 className="vt-text-2xs font-bold uppercase tracking-widest text-ivory-text3 mb-2">
-                {t.board.byType}
-              </h2>
-              <div className="divide-y divide-ivory-border">
-                {board.byType.map((row) => (
-                  <TypeRow key={row.typeId ?? row.typeName} row={row} />
-                ))}
-              </div>
-            </section>
-          )}
-
-          {/* By Location */}
-          {board.byLocation.length > 0 && (
-            <section>
-              <h2 className="vt-text-2xs font-bold uppercase tracking-widest text-ivory-text3 mb-2">
-                {t.board.whereTitle}
-              </h2>
-              <div
-                className={cn(
-                  "grid",
-                  tvMode ? "grid-cols-2 xl:grid-cols-3 gap-4" : "grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2",
-                )}
-              >
-                {board.byLocation.map((row) => (
-                  <LocationCard key={row.locationId ?? row.locationName} row={row} tvMode={tvMode} />
-                ))}
-              </div>
-            </section>
-          )}
-
-          {/* Waitlist / staging depth — tolerant-reader guarded */}
-          {board.waitlist && <WaitlistPanel depth={board.waitlist.depth} />}
-          {board.staging && <StagingPanel depth={board.staging.depth} />}
-
-          {/* Critical Units — needs attention */}
-          {needAttention.length > 0 && (
-            <section className="rounded-xl border border-[var(--status-issue-border)] bg-[var(--status-issue-bg)] p-4">
-              <h2 className="vt-text-2xs font-bold uppercase tracking-widest text-[var(--status-issue-fg)] mb-2">
-                {t.board.attention} · {needAttention.length}
-              </h2>
-              <div>
-                {needAttention.map((u) => (
-                  <UnitRow key={u.equipmentId} unit={u} tvMode={tvMode} />
-                ))}
-              </div>
-            </section>
-          )}
-
-          {/* No issues state */}
-          {needAttention.length === 0 && board.overview.ready >= board.overview.totalCritical && (
-            <div className="flex flex-col items-center justify-center py-8 text-center gap-2">
-              <span className="text-4xl" aria-hidden>✓</span>
-              <p className="vt-text-sm font-semibold text-[hsl(var(--status-ok))]">
-                {t.board.allCriticalReady}
-              </p>
-            </div>
-          )}
-        </div>
-      </main>
-      )}
-
-      {/* Footer — quiet status strip: last refresh + live indicator */}
-      <footer className="shrink-0 flex items-center gap-3 border-t border-ivory-border bg-[rgb(var(--ivory-surface))] px-5 py-2">
-        <span className="vt-text-2xs uppercase tracking-widest text-ivory-text3">
-          {t.board.subtitle}
-        </span>
-        <span className="vt-text-2xs tabular-nums text-ivory-text3 ms-auto">
-          {t.board.updated} {timeStr}
-        </span>
-        <span className="flex items-center gap-1.5 shrink-0">
-          <span className="w-1.5 h-1.5 rounded-full bg-[hsl(var(--status-ok))] motion-safe:animate-pulse" aria-hidden />
-          <span className="vt-text-2xs font-bold uppercase tracking-widest text-[hsl(var(--status-ok))]">
-            {t.board.live}
-          </span>
-        </span>
-      </footer>
+        <ResponsiblesPanel responsibles={responsibles} />
+        {board?.power ? <PowerPanel power={board.power} /> : <UnknownBlock title={t.board.power} />}
+        {board?.docks ? <DocksPanel docks={board.docks} /> : <UnknownBlock title={t.board.docks} />}
+      </div>
     </div>
   );
 }

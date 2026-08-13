@@ -1,54 +1,76 @@
 /**
  * @vitest-environment happy-dom
  *
- * VetTrack 2.0, Task 1.1 §6 (deliverable H) — board ambient proposal count.
- * Count ONLY, glance-only, no proposal content, no new interactive targets
- * (same glance-only guardrail as the anomaly cards this section already
- * renders — `board-attention-render.test.tsx`'s "glance-only guardrail"
- * describe block covers the anomaly-card side; this file covers the count
- * addition specifically so that existing suite stays untouched).
+ * TV board phase 1, Task 12 — the Shift Autopilot approvals banner is CUT from
+ * the kiosk board entirely (owner decision), including its polling query.
+ * This file previously asserted the Task 1.1 §6 count rendering; it is
+ * repurposed to guard the REMOVAL:
+ *   - BoardAttentionSection renders anomalies only — no proposal-count line,
+ *     and a smuggled legacy `proposalCount` prop has no effect;
+ *   - no board module references the approvals queue (poller cut).
  */
 import { describe, it, expect, afterEach } from "vitest";
-import { render, screen, cleanup, within } from "@testing-library/react";
-import { t } from "@/lib/i18n";
+import { readFileSync, readdirSync } from "node:fs";
+import { join } from "node:path";
+import { render, screen, cleanup } from "@testing-library/react";
 import { BoardAttentionSection } from "@/features/command-board/components/BoardAttentionSection";
+import type { BoardAnomaly } from "../shared/equipment-board";
 
 afterEach(() => cleanup());
 
-describe("BoardAttentionSection — proposal count (Task 1.1 §6)", () => {
-  it("still renders nothing when there are no anomalies AND no staged proposals", () => {
-    const { container } = render(
-      <BoardAttentionSection anomalies={[]} mode="calm" reducedMotion={false} />,
+const anomaly: BoardAnomaly = {
+  type: "battery_critical",
+  unitId: "eq-1",
+  severity: "pressure",
+  since: "2026-08-13T00:00:00.000Z",
+  sourceRef: { table: "vt_equipment", id: "eq-1" },
+};
+
+// The legacy prop, smuggled past the (now proposal-free) prop type on purpose:
+// passing it must change nothing.
+const smuggledLegacyProps = { proposalCount: 3 } as unknown as Record<string, never>;
+
+describe("BoardAttentionSection — approvals banner cut (Task 12)", () => {
+  it("renders nothing with zero anomalies, even when a legacy proposalCount prop is smuggled in", () => {
+    render(
+      <BoardAttentionSection
+        anomalies={[]}
+        mode="calm"
+        reducedMotion={false}
+        {...smuggledLegacyProps}
+      />,
     );
-    expect(container.querySelector("[data-testid='board-attention']")).toBeNull();
-  });
-
-  it("renders the section for a proposal count alone, even with zero anomalies", () => {
-    render(<BoardAttentionSection anomalies={[]} mode="calm" reducedMotion={false} proposalCount={3} />);
-    expect(screen.getByTestId("board-attention")).toBeTruthy();
-    expect(screen.getByText(t.autopilotQueue.board.awaitingApproval(3))).toBeTruthy();
-  });
-
-  it("does not render the count line when proposalCount is 0", () => {
-    render(<BoardAttentionSection anomalies={[]} mode="calm" reducedMotion={false} proposalCount={0} />);
     expect(screen.queryByTestId("board-attention")).toBeNull();
   });
 
-  it("shows count-only text — never a proposal id, kind, or summary", () => {
-    render(<BoardAttentionSection anomalies={[]} mode="calm" reducedMotion={false} proposalCount={2} />);
-    const section = screen.getByTestId("board-attention");
-    expect(within(section).getByTestId("board-proposal-queue-count").textContent).toBe(
-      t.autopilotQueue.board.awaitingApproval(2),
+  it("never renders the legacy proposal-count line alongside anomalies", () => {
+    render(
+      <BoardAttentionSection
+        anomalies={[anomaly]}
+        mode="calm"
+        reducedMotion={false}
+        {...smuggledLegacyProps}
+      />,
     );
+    expect(screen.getByTestId("board-attention")).toBeTruthy();
+    expect(screen.queryByTestId("board-proposal-queue-count")).toBeNull();
   });
 
-  it("adds no interactive targets for the proposal count (glance-only)", () => {
-    render(<BoardAttentionSection anomalies={[]} mode="calm" reducedMotion={false} proposalCount={5} />);
-    const section = screen.getByTestId("board-attention");
-    expect(
-      section.querySelectorAll(
-        "button, a[href], input, select, textarea, summary, [contenteditable], [role='button'], [role='link'], [tabindex]",
-      ),
-    ).toHaveLength(0);
+  it("board modules no longer reference the approvals queue (poller cut by owner decision)", () => {
+    // Scan the WHOLE command-board module surface, not a hardcoded trio — a
+    // reference re-added in any other board file must fail this guard too.
+    const dir = "src/features/command-board";
+    const files = readdirSync(dir, { recursive: true })
+      .map(String)
+      .filter((f) => f.endsWith(".ts") || f.endsWith(".tsx"))
+      .map((f) => join(dir, f));
+    for (const file of files) {
+      const src = readFileSync(file, "utf8");
+      expect(src, `${file} must not poll the proposals queue`).not.toContain("actionProposals");
+      expect(src, `${file} must not use the proposals query key`).not.toContain(
+        "proposalQueueQueryKey",
+      );
+      expect(src, `${file} must not carry a proposalCount prop`).not.toContain("proposalCount");
+    }
   });
 });

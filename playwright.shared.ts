@@ -45,10 +45,11 @@ export const PLAYWRIGHT_SUITE_MATCH: Record<string, string[]> = {
     'pwa.spec.ts',
     'phase-9-drills.spec.ts',
     'board-kiosk.spec.ts',
+    'board-states.spec.ts',
   ],
   pwa: ['pwa.spec.ts'],
   phase9: ['phase-9-drills.spec.ts'],
-  board: ['board-kiosk.spec.ts'],
+  board: ['board-kiosk.spec.ts', 'board-states.spec.ts'],
   signup: ['signup-flow.spec.ts'],
   workday: ['e2e/simulation/workday.spec.ts'],
   waitlist: [
@@ -83,6 +84,12 @@ export function sharedPlaywrightConfig(
     timeout: 30_000,
     globalTimeout: 12 * 60 * 1000,
     reporter: process.env.CI ? [['list'], ['html']] : 'html',
+    // Visual-regression baselines are platform-specific (font rendering) and
+    // the repo had none before board-states.spec.ts. `toHaveScreenshot`
+    // comparisons therefore run only when PW_VISUAL=1 is set — functional
+    // assertions always run; pixels compare only where baselines exist
+    // (generate with: PW_VISUAL=1 pnpm exec playwright test --update-snapshots).
+    ignoreSnapshots: process.env.PW_VISUAL !== '1',
     use: {
       baseURL: DEFAULT_BASE_URL,
       trace: 'on-first-retry',

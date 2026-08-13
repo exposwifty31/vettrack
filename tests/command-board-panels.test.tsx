@@ -13,8 +13,9 @@ import { render, cleanup } from "@testing-library/react";
 import { Router } from "wouter";
 import { memoryLocation } from "wouter/memory-location";
 import { CommandBoard } from "@/features/command-board/components/CommandBoard";
+import type { BoardStateKind } from "@/features/command-board/board-state";
 import { t } from "@/lib/i18n";
-import type { EquipmentCommandBoardSnapshot } from "@/types/safety-surfaces";
+import type { BoardResponsibles, EquipmentCommandBoardSnapshot } from "@/types/safety-surfaces";
 
 function board(overrides: Partial<EquipmentCommandBoardSnapshot>): EquipmentCommandBoardSnapshot {
   return {
@@ -48,11 +49,21 @@ function board(overrides: Partial<EquipmentCommandBoardSnapshot>): EquipmentComm
 
 afterEach(() => cleanup());
 
-function renderBoard(b: EquipmentCommandBoardSnapshot) {
+function renderBoard(
+  b: EquipmentCommandBoardSnapshot,
+  responsibles?: BoardResponsibles | null,
+  state: BoardStateKind = "all_clear",
+) {
   const { hook } = memoryLocation({ path: "/equipment/board" });
   return render(
     <Router hook={hook}>
-      <CommandBoard board={b} currentTime="2026-07-08T00:00:00.000Z" currentShift={[]} />
+      <CommandBoard
+        board={b}
+        currentTime="2026-07-08T00:00:00.000Z"
+        currentShift={[]}
+        responsibles={responsibles}
+        state={state}
+      />
     </Router>,
   );
 }
@@ -76,38 +87,60 @@ describe("CommandBoard enrichment panels — tolerant reader", () => {
     }
   });
 
-  it("renders each panel's title + counts when its block is present", () => {
-    const { getByText, getAllByText } = renderBoard(
+  it("renders the bottom-band panels (power, docks) with title + counts when present", () => {
+    const { getByText, getByTestId } = renderBoard(
       board({
         power: { plugged: 3, unplugged: 2, alert: 1 },
         docks: { total: 8, occupied: 5, ready: 4 },
-        waitlist: { depth: 7 },
-        staging: { depth: 6 },
       }),
     );
     expect(getByText(t.board.power)).toBeTruthy();
     expect(getByText(t.board.docks)).toBeTruthy();
-    expect(getByText(t.board.waitlist)).toBeTruthy();
-    expect(getByText(t.board.staging)).toBeTruthy();
-    expect(getByText("7")).toBeTruthy(); // waitlist depth
-    expect(getByText("6")).toBeTruthy(); // staging depth
-    expect(getAllByText(t.board.inQueue).length).toBeGreaterThanOrEqual(2); // waitlist + staging
+    // Active power alert surfaces in its own cell (severity → red + icon).
+    expect(getByTestId("board-power-alerts").textContent).toContain("1");
+    // Waitlist/staging depth render on the Ops rotation face (OpsStage), not the
+    // bottom band or the equipment evidence face — spec §2 keeps the queue detail
+    // on one face only (no identical numbers on both faces of the rotation).
   });
 
-  it("renders the pressure layout when critical alerts reach the threshold", () => {
-    const alerts = Array.from({ length: 3 }, (_, i) => ({
-      id: `a${i}`,
-      type: "critical_unit_blocked" as const,
-      severity: "critical" as const,
-      message: "x",
-    }));
-    const { getByText } = renderBoard(board({ alerts }));
-    expect(getByText(t.board.highLoad)).toBeTruthy();
+  // Task 10 — the calm/pressure threshold machine is replaced by the
+  // state-driven stage: the container passes `state`, the board renders it.
+  it("renders the locked exception stage when state is alert", () => {
+    const { getByTestId } = renderBoard(board({}), undefined, "alert");
+    expect(getByTestId("board-stage").getAttribute("data-stage")).toBe("alert");
   });
 
-  it("stays in the calm layout below the threshold (no pressure banner)", () => {
-    const { queryByText } = renderBoard(board({ alerts: [] }));
-    expect(queryByText(t.board.highLoad)).toBeNull();
+  it("renders the evidence stage when state is all_clear", () => {
+    const { getByTestId } = renderBoard(board({}), undefined, "all_clear");
+    expect(getByTestId("board-stage").getAttribute("data-stage")).toBe("evidence");
+  });
+
+  it("renders the power card as muted-unknown when power is absent — never zeros", () => {
+    const { getAllByTestId } = renderBoard(
+      board({ docks: { total: 2, occupied: 1, ready: 1 } }),
+    );
+    const unknowns = getAllByTestId("board-block-unknown");
+    const powerUnknown = unknowns.find((el) => el.textContent?.includes(t.board.power));
+    expect(powerUnknown).toBeTruthy();
+    expect(powerUnknown!.textContent).toContain(t.board.blockUnavailable);
+    expect(powerUnknown!.textContent).not.toMatch(/\d/); // muted-unknown carries no figure at all
+  });
+
+  it("renders the docks card as muted-unknown when docks is absent — never zeros", () => {
+    const { getAllByTestId } = renderBoard(
+      board({ power: { plugged: 1, unplugged: 1, alert: 0 } }),
+    );
+    const unknowns = getAllByTestId("board-block-unknown");
+    const docksUnknown = unknowns.find((el) => el.textContent?.includes(t.board.docks));
+    expect(docksUnknown).toBeTruthy();
+    expect(docksUnknown!.textContent).toContain(t.board.blockUnavailable);
+    expect(docksUnknown!.textContent).not.toMatch(/\d/); // muted-unknown carries no figure at all
+  });
+
+  it("renders the responsibles card as unavailable (NOT the 0/5 aggregate) when responsibles is null", () => {
+    const { getByText, queryByText } = renderBoard(board({}), null);
+    expect(getByText(t.board.responsiblesUnavailable)).toBeTruthy();
+    expect(queryByText(t.board.responsiblesAggregate(0))).toBeNull();
   });
 
   it("labels a room-less byLocation bucket with the unassigned key", () => {

@@ -8,6 +8,18 @@ const routeSource = readFileSync("./server/routes/display.ts", "utf-8");
 // Source-scrape assertions point at the files that now own each concern.
 const screenSource = readFileSync("./src/features/command-board/CommandBoardScreen.tsx", "utf-8");
 const boardSource = readFileSync("./src/features/command-board/components/CommandBoard.tsx", "utf-8");
+// TV board phase 1 review: the exit affordance moved out of CommandBoard's removed
+// legacy header into the single top band (BoardTopBand).
+const bandSource = readFileSync(
+  "./src/features/command-board/components/board-status-band.tsx",
+  "utf-8",
+);
+// TV board phase 1 (Task 10) moved the criticalUnits stage rendering out of
+// CommandBoard into the state-driven equipment stage.
+const stageSource = readFileSync(
+  "./src/features/command-board/components/board-stage-equipment.tsx",
+  "utf-8",
+);
 const overlaySource = readFileSync("./src/features/command-board/components/CodeBlueOverlay.tsx", "utf-8");
 const hookSource = readFileSync("./src/hooks/useDisplaySnapshot.ts", "utf-8");
 const workerSource = readFileSync("./server/workers/notification.worker.ts", "utf-8");
@@ -31,20 +43,19 @@ describe("Ward Display — route", () => {
   });
 
   it("command board uses criticalUnits for primary display", () => {
-    // The presentational board derives its needs-attention set from criticalUnits.
-    expect(boardSource).toContain("criticalUnits");
-    // The screen owns the commandBoard-vs-legacy dispatch (isDeployable fallback).
+    // The equipment stage derives its needs-attention set from criticalUnits.
+    expect(stageSource).toContain("criticalUnits");
+    // The screen derives the board from snapshot.commandBoard.
     expect(screenSource).toContain("commandBoard");
-    expect(screenSource).toContain("isDeployable");
   });
 
-  it("command board conditionally renders criticalUnits vs isDeployable", () => {
-    // CommandBoard component uses criticalUnits internally
-    expect(boardSource).toContain("criticalUnits");
+  it("absent commandBoard is owned by the board state machine (legacy fallback deleted — TV board Task 12)", () => {
     // CommandBoardScreen derives board from snapshot.commandBoard and passes it to CommandBoard
     expect(screenSource).toMatch(/snapshot\.commandBoard/);
-    // When commandBoard is absent, the legacy fallback uses isDeployable
-    expect(screenSource).toMatch(/isDeployable[\s\S]{0,50}STATUS_BG/);
+    // The legacy ward-display equipment-list fallback pane is gone — an absent
+    // board classifies as unconfigured (or a connection takeover) instead.
+    expect(screenSource).not.toContain("ward-display-equipment-pane");
+    expect(screenSource).toContain("useBoardState");
   });
 
   it("snapshot includes equipment custody fields", () => {
@@ -110,9 +121,14 @@ describe("Ward Display — overdue medication job (removed)", () => {
   it("the board is read-only except the kiosk-hidden exit button", () => {
     // The board stays read-only: the ONLY interactive element is the exit
     // affordance (navigation-only, hidden under ?kiosk=1 for wall displays).
-    expect(boardSource).toContain('data-testid="board-exit"');
-    const withoutExit = boardSource.replace(
-      /\{!kioskMode && \([\s\S]*?board-exit[\s\S]*?\)\}/,
+    // Phase-1 review relocated it into the top band, so CommandBoard itself now
+    // has no interactive elements at all.
+    expect(boardSource).not.toContain("<button");
+    expect(boardSource).not.toContain("<a href");
+
+    expect(bandSource).toContain('data-testid="board-exit"');
+    const withoutExit = bandSource.replace(
+      /\{!kioskMode && onExit && \([\s\S]*?board-exit[\s\S]*?\)\}/,
       "",
     );
     expect(withoutExit).not.toContain("onClick");

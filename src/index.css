@@ -1158,14 +1158,34 @@ nav,
    to every descendant. */
 [data-board-tv] {
   --tv-type-scale: 1.75;   /* ← the single tuned constant. Baseline 1080p @ ~3 m; range 1.6–2.0. */
-  --text-2xs:  calc(var(--text-2xs-raw) * var(--tv-type-scale));
-  --text-xs:   calc(var(--text-xs-raw) * var(--tv-type-scale));
-  --text-sm:   calc(var(--text-sm-raw) * var(--tv-type-scale));
+  /* Spec §3 type floor (binding): NOTHING renders below 28 px effective at 1080p.
+     The three smallest utilities land at ~19/23/26 px after the scale, so clamp
+     them to the 28 px floor with max(); the larger steps already clear it. This is
+     a board-wide floor for every caption/label, so no component needs per-element
+     px overrides to be legible from the corridor. */
+  --text-2xs:  max(28px, calc(var(--text-2xs-raw) * var(--tv-type-scale)));
+  --text-xs:   max(28px, calc(var(--text-xs-raw)  * var(--tv-type-scale)));
+  --text-sm:   max(28px, calc(var(--text-sm-raw)  * var(--tv-type-scale)));
   --text-base: calc(var(--text-base-raw) * var(--tv-type-scale));
   --text-lg:   calc(var(--text-lg-raw) * var(--tv-type-scale));
   --text-xl:   calc(var(--text-xl-raw) * var(--tv-type-scale));
   --text-2xl:  calc(var(--text-2xl-raw) * var(--tv-type-scale));
   --text-3xl:  calc(var(--text-3xl-raw) * var(--tv-type-scale));
+  /* Spec §3 contrast (binding): 7:1 target for 10-foot reading. The forced-dark
+     board's ivory secondary/tertiary labels (#98989D ≈5.7:1, #787880 ≈3.9:1 on the
+     card) fail that bar — #787880 fails even WCAG AA. Repoint both to the spec's
+     elevation-ladder secondary #A9B4C0 (≈8:1 on #161D26). Scoped here (a descendant
+     of .dark) so it wins by proximity; desktop /board is untouched. */
+  --ivory-text2: 169 180 192;  /* #A9B4C0 */
+  --ivory-text3: 169 180 192;  /* #A9B4C0 — no sub-7:1 tertiary on a wall display */
+}
+
+/* Spec §4 — responsibles named slots at 32 px "body" size (one step above the
+   28 px caption floor). Applied as a board-only class so desktop /board keeps the
+   vt-text-sm label size; under [data-board-tv] the 0,1,1 selector beats vt-text-sm. */
+[data-board-tv] .board-slot-name {
+  font-size: 32px;
+  line-height: 1.15;
 }
 
 /* Overscan title-safe frame for the BoardShell kiosk host. Insets content off the
@@ -1211,4 +1231,114 @@ nav,
 }
 @media (prefers-reduced-motion: reduce) {
   [data-board-tv] [data-tv-focusable] { transition: none; }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   TV board Phase 1 — elevation-gray palette + state tints, scoped to
+   [data-board-shell]. Strictly ADDITIVE: composes with (never overrides) the
+   --text-*-raw ramp and --tv-type-scale mechanism above, and touches none of
+   the Stage 1 locked tokens (tests/stage-1-token-values.test.js).
+
+   Elevation ladder: bg → card → focal. Blue-gray, never pure black — pure
+   black on an LCD TV crushes to backlight bloom; the ladder keeps card edges
+   readable from 3 m without borders.
+
+   State tints are DESATURATED on purpose: they are applied at 15% via
+   color-mix over --board-bg (state strip, Task 8), so the hue reads as a
+   corridor-glance wash, not a saturated alarm field. Full-saturation status
+   hues stay reserved for actual alert content (--status-issue etc.).
+   ───────────────────────────────────────────────────────────────────────────── */
+[data-board-shell] {
+  --board-bg: #0F141A;
+  --board-card: #161D26;
+  --board-focal: #1C2530;
+  --board-text: #F2F5F8;
+  --board-text2: #A9B4C0;
+  --state-tint-ok: #5E8C74;
+  --state-tint-warn: #A8894F;
+  --state-tint-alert: #A85B52;
+}
+
+/* Every count/clock on the board: fixed-width lining figures so numbers never
+   shimmy as they update (no count-animation is a Phase 1 invariant). */
+.board-nums {
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+/* ── Task 8: top band, state strip, freshness heartbeat ──────────────────────
+   The strip applies the desaturated tints above at 15% over --board-bg — a
+   corridor-glance wash, per the Task 5 reservation. Type sizes keep the 28 px
+   1080p floor (1.75rem+ at 16px root); weights 500–700. */
+.board-top-band {
+  display: flex;
+  align-items: baseline;
+  gap: 1.5rem;
+  padding: 1rem 1.75rem;
+  background: var(--board-card, #161d26);
+  color: var(--board-text, #f2f5f8);
+}
+.board-top-band-dept {
+  font-size: 2rem; /* 32px */
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+.board-top-band-summary {
+  font-size: 2.25rem; /* 36px */
+  font-weight: 700;
+  margin-inline-start: auto;
+}
+.board-top-band-clock {
+  font-size: 3rem; /* 48px */
+  font-weight: 600;
+}
+.board-freshness-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.625rem;
+  font-size: 1.75rem; /* 28px — the floor */
+  font-weight: 500;
+  color: var(--board-text2, #a9b4c0);
+}
+.board-freshness-chip[data-connection="delayed"],
+.board-freshness-chip[data-connection="stale"],
+.board-freshness-chip[data-connection="offline"] {
+  color: var(--state-tint-warn, #a8894f);
+}
+/* One-shot 300 ms pulse: fired by key-driven remount on each successful poll. */
+.board-heartbeat {
+  width: 0.875rem;
+  height: 0.875rem;
+  border-radius: 9999px;
+  background: currentcolor;
+  opacity: 0.45;
+  animation: board-heartbeat-pulse 300ms ease-out 1;
+}
+@keyframes board-heartbeat-pulse {
+  0% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.45;
+  }
+}
+.board-state-strip {
+  height: 0.75rem;
+  width: 100%;
+  background: var(--board-bg, #0f141a);
+}
+.board-state-strip[data-state="all_clear"] {
+  background: color-mix(in oklab, var(--state-tint-ok) 15%, var(--board-bg));
+}
+.board-state-strip[data-state="attention"],
+.board-state-strip[data-state="stale"],
+.board-state-strip[data-state="unconfigured"] {
+  background: color-mix(in oklab, var(--state-tint-warn) 15%, var(--board-bg));
+}
+.board-state-strip[data-state="alert"] {
+  background: color-mix(in oklab, var(--state-tint-alert) 15%, var(--board-bg));
+}
+@media (prefers-reduced-motion: reduce) {
+  .board-heartbeat {
+    animation: none;
+  }
 }

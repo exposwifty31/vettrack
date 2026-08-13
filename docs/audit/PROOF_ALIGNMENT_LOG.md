@@ -6697,3 +6697,152 @@ repo template (gh pr edit).
 - `pnpm typecheck` → exited clean, zero errors (both tsconfigs).
 
 **Verdict:** VERIFIED
+
+## 2026-08-13 — TV board phase 1, Task 14: frozen-surface guard, board-states Playwright drill, use-board-mode retirement, full gates
+
+**Claim:** Task 14 of the phase-1 plan complete on feat/tv-board-phase1.
+(1) `tests/board-frozen-surface-guard.test.ts` — vitest source-scan guard
+(repo has no lint infra; matches the i18n-no-hebrew guard convention):
+Code Blue early-return renders before any board-state-driven render (the
+plan's literal `codeBlueIdx < useBoardState(` ordering was watched RED and
+then corrected — React's rules of hooks force the hook CALL before the
+conditional return; the frozen invariant is render order, asserted as the
+early-return regex preceding `state={boardState}`), the 5 s/2 s snapshot poll
+contract, and no `actionProposals` import in any board module.
+(2) `tests/board-states.spec.ts` + `playwright.shared.ts` wiring (`board` +
+`ci` suites): all five states driven through route-fulfilled snapshot
+fixtures at 1920×1080 with service workers blocked; `toHaveScreenshot`
+comparisons gated by `PW_VISUAL=1` via `ignoreSnapshots` (baselines are
+platform-specific; darwin-chromium baselines committed under
+`tests/board-states.spec.ts-snapshots/`, CI runs the functional assertions).
+(3) The drill found a REAL bug: TanStack query-core resets `fetchFailureCount`
+to 0 on every fetch dispatch (`fetchState()`, verified in query-core 5.99.0
+source), so `useDisplayConnection`'s failureCount-based derivation could
+never exceed 3 — `delayed`/`stale`/`offline` were unreachable and the stale
+takeover was dead code. Fixed by anchoring the never-resetting
+`errorUpdateCount` at the last success (render-phase derived-state
+adjustment); thresholds recalibrated from attempt-counts to failed-cycle
+counts preserving the documented wall-times (3 ≈ 25 s, 15 ≈ 2 min,
+37 ≈ 5 min at the ~8 s failed-cycle cadence). Contract locked by a real
+TanStack test in `tests/use-display-connection.test.ts`.
+(4) `use-board-mode.ts` deleted (BoardMode inlined as
+BoardAttentionSection's local emphasis vocabulary; zero references remain —
+`grep -rn "useBoardMode\|use-board-mode" src/ tests/` exits 1).
+
+**Evidence (actual command outputs this session):**
+- `pnpm test -- tests/board-frozen-surface-guard.test.ts` → RED first
+  (`AssertionError: expected 8063 to be less than 4434`), GREEN after the
+  honest-invariant rewrite (`Tests  3 passed (3)`).
+- `tests/use-display-connection.test.ts` rewrite → RED against the old hook
+  (`8 failed | 2 passed`), GREEN after the fix (`Tests  10 passed (10)`).
+- `PW_SUITE=board PW_VISUAL=1 playwright test --project=chromium
+  board-states` against a dev-bypass `PLAYWRIGHT_E2E=true` server on :3101
+  (isolated; the running :3001 dev server untouched) → `5 passed (2.0m)` —
+  stale escalated live→stale in ~2 min exactly as recalibrated; re-run
+  without `--update-snapshots` → `4 passed` (baseline comparison clean).
+- `pnpm typecheck` → exited clean, zero errors (both tsconfigs).
+- `pnpm test` → `Test Files  726 passed (726) · Tests  6515 passed |
+  11 skipped (6526) · Duration 93.77s`.
+- `pnpm i18n:check` → `✓ locales/en.json and locales/he.json are in deep key
+  parity.`
+- `pnpm architecture:gates` → `[architecture-gates] All G1 checks passed.`
+  (madge `OK — server: 0 cycle(s), src: 0 cycle(s) (matches baseline)`).
+
+**Verdict:** VERIFIED
+
+## 2026-08-13 — TV board phase 1: adversarial pre-PR review (15 findings) fixed + re-reviewed on feat/tv-board-phase1
+
+**Claim:** A 6-lens adversarial pre-PR review of the completed phase-1 board redesign
+(`feat/tv-board-phase1`, 10 commits) surfaced 15 verified findings (0 critical, 2 high,
+13 medium; i18n lens clean). All 15 — every one a spec-conformance gap or bug, none new
+scope — fixed across 6 commits (045e8ce02 → 904e78f0d) with the owner's explicit "fix all
+15" approval. Fixes then adversarially RE-reviewed: 0 confirmed regressions.
+
+**What was verified against real code (not assumed):**
+(1) Findings 4,5 (a11y, HIGH): board captions/labels landed at ~19/23/26 px under the
+1.75 TV scale (< the spec §3 28 px floor) and used `#787880` (~3.9:1, fails WCAG AA).
+Fixed board-wide in the `[data-board-tv]` scope: `max(28px, calc(raw*scale))` floor +
+`--ivory-text2/3 → #A9B4C0` (~8:1 on the `#161D26` card, recomputed by hand) + a
+`.board-slot-name` 32 px class per §4. Scoped to a descendant of `.dark` so it wins by
+proximity; desktop /board untouched.
+(2) Findings 1,3,6,7,10: removed the legacy navy header + footer (they re-rendered the
+clock ×3, ward wordmark ×2, and a hardcoded-green LIVE badge ×2 that lied during
+stale/offline) — spec §2 single top band; exit relocated into `BoardTopBand`. Root bg
+`--ivory-bg` (#000) → `--board-bg` (#0F141A) per §3 no-pure-black. StageFade reset moved
+to `useLayoutEffect` so the incoming rotation view is opacity-0 before paint (was a hard
+cut each swap).
+(3) Finding 2: cold boot against an unreachable server showed an eternal skeleton;
+`CommandBoardScreen`'s `!snapshot` branch now renders `StaleTakeover` once
+`isConnectionUntrusted(state)` (new, TDD unit-tested). Verified it sits BELOW the frozen
+Code Blue early-return (no snapshot ⇒ no session), so Code Blue is never suppressed.
+(4) Findings 8,9,11: removed `EquipmentStage`'s never-read `responsibles?` prop; dropped
+`WaitlistPanel`/`StagingPanel` (+ the now-dead `DepthPanel` exports) from the equipment
+evidence face — `OpsStage` already owns queue depth (spec §2, no duplicate numbers);
+`formatLastGoodTime` now zero-pads via the he-IL formatter.
+(5) Findings 12,13,14,15: `hasResponsiblesGap` now reuses `countFilledSlots` (single §4
+source of truth) — covered first, refactored under green; new tests for unconfigured>alert
+priority, provisional-coordinator fill, the attention full-screen state, and the
+null-timestamp downtime branch.
+
+**Evidence (actual command outputs this session):**
+- Pre-PR review (6-lens adversarial Workflow, 11 agents): 15 CONFIRMED findings
+  (`{critical:0, high:2, medium:13}`); i18n lens 0.
+- Fix delta re-review (4-lens adversarial Workflow, 5 agents, 96 tool-uses, 8 min):
+  `{totalConfirmed:0}` — the one css-cascade candidate (`BoardCoPresenceOverlay`, an
+  untouched file) adversarially REJECTED. Journal confirms 3 finders clean + 1 rejected.
+- Finding 2 TDD: `isConnectionUntrusted` test RED first (`ReferenceError`-class import
+  failure), GREEN after adding the predicate; finding 13 characterized (18 classifier
+  tests pass) then refactored under green.
+- `git diff --name-only main..HEAD -- server/` → EMPTY (zero server changes; frozen
+  surface intact). Code Blue early-return at `CommandBoardScreen.tsx:175` unmoved, above
+  the state-driven board render.
+- `pnpm typecheck` → 0 errors (both tsconfigs). `pnpm i18n:check` → deep key parity.
+  `pnpm architecture:gates` → All G1 checks passed. `pnpm test` → `726 passed (726) ·
+  6522 passed | 11 skipped`.
+- `PW_VISUAL=1 PW_SUITE=board TEST_BASE_URL=:3999 playwright ... board-states
+  --update-snapshots` against a dev-bypass `PLAYWRIGHT_E2E` server on :3999 (isolated;
+  running :3001 untouched, confirmed still 200 after teardown) → `5 passed (2.1m)`;
+  stability re-run without `--update` → `4 passed`. Four darwin-chromium baselines
+  regenerated + committed; the rendered board visually confirmed (single top band,
+  no-pure-black, 32 px named slots, muted-unknown absent-vs-zero) across all_clear /
+  alert / unconfigured.
+
+**Verdict:** VERIFIED
+
+## 2026-08-13 — TV board evidence-face visual redesign (owner: "this looks bad")
+
+**Claim:** The all-clear/attention evidence face was redesigned from a corner-clustered
+small-ring-plus-void layout into a balanced, dominant readiness hero + filled tiles +
+compact responsibles. Committed (11cd1eaf1 + the missed finding-11 formatter b8b429ab9).
+
+**What was verified against a REAL browser (not assumed):** the shared dist/public is
+continuously rebuilt by concurrent dev processes (two `vettrack-ship` checkouts running
+`pnpm dev`, plus a same-repo agent), so every render against a dist-serving server showed
+a stale/clobbered board. Root-caused via a DOM probe (`getBoundingClientRect` +
+chunk-load list) that proved the redesign WAS in the served board lazy chunk while the
+screenshot lagged. Rendered reliably from an isolated `git worktree` (own dist/public,
+node_modules symlinked, uncommitted files overlaid) served by a full dev-bypass
+`PLAYWRIGHT_E2E` server on :3998 — the concurrent processes cannot touch it.
+
+Iterations (each browser-verified via a Playwright DOM probe that reported stage/cluster
+rects): v1 (flex-1 hero) over-consumed and hid the tiles; v3 margin-centred hero was
+clean but the stage was only 339 px because the 5-slot responsibles panel (28/32 px
+10-foot floor) made the bottom band ~half the screen; v4 fix — responsibles flows into
+auto-fitting columns and gets the wider bottom-band column → stage 599 px, evidence
+cluster 469 px centred within it, tiles visible at y 611–712, bottom band below at 794.
+
+**Evidence (actual outputs this session):**
+- DOM probe against :3998 v4: `stageRect.h=599`, `clusterRect {top:243,bottom:712}`,
+  `tileCount:2`, `firstTileRect {top:611,bottom:712}` (inside the stage), `bottomBandTop:794`.
+- `pnpm typecheck` clean; `pnpm i18n:check` deep parity; `pnpm architecture:gates` All G1
+  passed; board component tests `60 passed` (board-stage-states, command-board-panels,
+  board-responsibles-panel, board-stage-rotation, board-power-semantics, ward-display).
+- Four darwin-chromium board-states baselines regenerated against :3998; screenshots of
+  all-clear + attention confirmed visually (dominant hero, filled tiles, 2–3-col
+  responsibles, no void/clip/overlap).
+- Full `pnpm test`: `725 passed | 1 failed` — the one failure
+  (`routes-registration-contract-slice7`) PASSES in isolation (`2 passed`); it is a
+  server-routes test untouched by these client-only changes (parallel-run pollution),
+  and `git status` shows zero `server/` modifications.
+
+**Verdict:** VERIFIED (design); the one flaky server-route test is unrelated and passes alone.
