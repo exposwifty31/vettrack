@@ -429,17 +429,33 @@ export const clinicalCheckIns = vtTable(
     checkedInAt: timestamp("checked_in_at", { withTimezone: true }).notNull().defaultNow(),
     checkedOutAt: timestamp("checked_out_at", { withTimezone: true }),
     operationalRole: varchar("operational_role", { length: 40 }),
+    isSenior: boolean("is_senior").notNull().default(false),
     clinicalRoleAtCheckIn: varchar("clinical_role_at_check_in", { length: 20 }).notNull(),
     activeShiftId: text("active_shift_id"),
     shiftSessionId: text("shift_session_id"),
     checkOutReason: varchar("check_out_reason", { length: 40 }),
     clientId: varchar("client_id", { length: 64 }),
+    // Doctor shift gate (migration 184): immutable origin classification
+    // stamped ONCE at insert. 'doctor_gate' rows are the 14h expiry sweep's
+    // exact target; 'legacy' rows (pre-feature semantics could have produced
+    // them) are never auto-expired. Deliberately NOT re-derived from the
+    // mutable vt_users.allowed_operational_roles.
+    checkInSource: varchar("check_in_source", { length: 20 })
+      .notNull()
+      .default("legacy")
+      .$type<"doctor_gate" | "legacy">(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
     openPerUserUq: uniqueIndex("ux_vt_clinical_check_ins_open_per_user")
       .on(t.clinicId, t.userId)
       .where(sql`${t.checkedOutAt} IS NULL`),
+    // Doctor shift gate: at most one open senior per (clinic, team) —
+    // DB backstop for concurrent isSenior claims (migration 183). The
+    // service maps this index's 23505 to SENIOR_ALREADY_ASSIGNED.
+    openSeniorPerTeamUq: uniqueIndex("ux_vt_clinical_check_ins_open_senior_per_team")
+      .on(t.clinicId, t.operationalRole)
+      .where(sql`${t.isSenior} AND ${t.checkedOutAt} IS NULL`),
     clinicOpenIdx: index("idx_vt_clinical_check_ins_clinic_open")
       .on(t.clinicId)
       .where(sql`${t.checkedOutAt} IS NULL`),

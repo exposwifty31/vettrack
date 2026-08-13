@@ -26,6 +26,7 @@
  * filter — check-in-time and use-time semantics must remain identical.
  */
 
+import { isDoctorTeamRole } from "../../../../shared/doctor-teams.js";
 import {
   getAllowedOperationalRolesCached,
   type AllowlistFetchResult,
@@ -71,6 +72,15 @@ export async function evaluateOpRoleEnforcement(
   // If the check-in row has no operationalRole, there is nothing to revalidate.
   const observed = ctx.checkIn.operationalRole;
   if (observed === null || observed === undefined) {
+    return { action: "allow" };
+  }
+
+  // Doctor shift gate: doctor team roles are universally allowed for vets at
+  // check-in — no allowlist membership exists to revalidate. Mirroring that
+  // bypass here keeps check-in-time and use-time semantics identical;
+  // without it, enforce-mode clinics would deny every icu/internal_medicine
+  // check-in at use time.
+  if (isDoctorTeamRole(observed)) {
     return { action: "allow" };
   }
 

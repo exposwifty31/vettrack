@@ -63,7 +63,7 @@ const REVOKED_FETCHER = async (): Promise<AllowlistFetchResult> => ({
 });
 const ALLOWED_FETCHER = async (): Promise<AllowlistFetchResult> => ({
   kind: "ok",
-  allowlist: ["admission"] as never,
+  allowlist: ["ward"] as never,
 });
 
 beforeEach(() => {
@@ -99,7 +99,7 @@ describe("enforcement precedence + isolation", () => {
   it("stale-only enforce + revoked OPROLE-only-shadow-equivalent → CHECKED_IN_STALE", async () => {
     // OPROLE off entirely; only stale is enforcing.
     const result = await runResolverEnforcement(
-      ctx(48, "admission"),
+      ctx(48, "ward"),
       "enforce",
       "off",
       REVOKED_FETCHER,
@@ -109,7 +109,7 @@ describe("enforcement precedence + isolation", () => {
 
   it("OPROLE-only enforce + stale row but stale off → CHECKED_IN_OPROLE_REVOKED", async () => {
     const result = await runResolverEnforcement(
-      ctx(48, "admission"),
+      ctx(48, "ward"),
       "off",
       "enforce",
       REVOKED_FETCHER,
@@ -119,7 +119,7 @@ describe("enforcement precedence + isolation", () => {
 
   it("both enforce + stale row + revoked role → CHECKED_IN_STALE (stale wins by precedence)", async () => {
     const result = await runResolverEnforcement(
-      ctx(48, "admission"),
+      ctx(48, "ward"),
       "enforce",
       "enforce",
       REVOKED_FETCHER,
@@ -129,7 +129,7 @@ describe("enforcement precedence + isolation", () => {
 
   it("both enforce + fresh row + revoked role → CHECKED_IN_OPROLE_REVOKED", async () => {
     const result = await runResolverEnforcement(
-      ctx(1, "admission"),
+      ctx(1, "ward"),
       "enforce",
       "enforce",
       REVOKED_FETCHER,
@@ -139,7 +139,7 @@ describe("enforcement precedence + isolation", () => {
 
   it("both enforce + fresh row + allowed role → no denial", async () => {
     const result = await runResolverEnforcement(
-      ctx(1, "admission"),
+      ctx(1, "ward"),
       "enforce",
       "enforce",
       ALLOWED_FETCHER,
@@ -148,14 +148,14 @@ describe("enforcement precedence + isolation", () => {
   });
 
   it("single-denial: stale+revoked overlap increments stale counter only, not OPROLE", async () => {
-    await runResolverEnforcement(ctx(48, "admission"), "enforce", "enforce", REVOKED_FETCHER);
+    await runResolverEnforcement(ctx(48, "ward"), "enforce", "enforce", REVOKED_FETCHER);
     const snap = getMetricsSnapshot().authority;
     expect(snap.staleEnforce.denied).toBe(1);
     expect(snap.oproleEnforce.denied).toBe(0);
   });
 
   it("single-denial: fresh+revoked increments OPROLE counter only, not stale", async () => {
-    await runResolverEnforcement(ctx(1, "admission"), "enforce", "enforce", REVOKED_FETCHER);
+    await runResolverEnforcement(ctx(1, "ward"), "enforce", "enforce", REVOKED_FETCHER);
     const snap = getMetricsSnapshot().authority;
     expect(snap.staleEnforce.denied).toBe(0);
     expect(snap.oproleEnforce.denied).toBe(1);
@@ -166,7 +166,7 @@ describe("enforcement precedence + isolation", () => {
     for (let i = 0; i < 50; i++) {
       resetMetrics();
       await runResolverEnforcement(
-        ctx(48, "admission"),
+        ctx(48, "ward"),
         "enforce",
         "enforce",
         REVOKED_FETCHER,
@@ -177,7 +177,7 @@ describe("enforcement precedence + isolation", () => {
     for (let i = 0; i < 50; i++) {
       resetMetrics();
       await runResolverEnforcement(
-        ctx(1, "admission"),
+        ctx(1, "ward"),
         "enforce",
         "enforce",
         REVOKED_FETCHER,

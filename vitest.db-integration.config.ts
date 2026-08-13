@@ -21,6 +21,7 @@ export default defineConfig({
     include: [
       "tests/equipment-operational-state.integration.test.ts",
       "tests/seed-reviewer-demo.integration.test.ts",
+      "tests/doctor-shift-gate.integration.test.ts",
     ],
     exclude: ["**/node_modules/**"],
     hookTimeout: 60_000,

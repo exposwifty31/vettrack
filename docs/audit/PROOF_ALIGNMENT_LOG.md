@@ -6471,3 +6471,164 @@ caveat (clinic undeletable once audited). (2) Vet user assertion in
 (`and(eq(users.id, …), eq(users.clinicId, VET_CLINIC_ID))`). Evidence:
 `pnpm typecheck` clean; `vitest --config vitest.db-integration.config.ts
 tests/seed-reviewer-demo.integration.test.ts` → 12/12 passed against local DB.
+
+## 2026-08-13 — Doctor shift gate: final gates (Task 15, branch feat/doctor-shift-gate)
+
+**Claim:** All four repo gates pass on the completed 15-commit doctor-shift-gate branch
+(migrations 181–183, check-in service/route senior semantics, switch endpoint, admin
+eligibility toggle, 14h doctor expiry worker, snapshot `responsibles`, client API/i18n,
+gate popup, admin checkbox, board panel, DB round-trip integration test).
+
+**Evidence (actual command outputs this session):**
+- `pnpm typecheck` → exited clean, zero errors (`tsc --noEmit && tsc -p tsconfig.server.json --noEmit`).
+- `pnpm test` → `Test Files  715 passed (715) · Tests  6386 passed | 11 skipped (6397) · Duration 94.54s`.
+- `pnpm i18n:check` → `✓ locales/en.json and locales/he.json are in deep key parity.`
+- `pnpm architecture:gates` → depcruise `✔ no dependency violations found (1002 modules, 5170 dependencies cruised)`; madge `OK — server: 0 cycle(s), src: 0 cycle(s) (matches baseline)`; `All G1 checks passed.`
+- Warn-only governance (noted, not blocking): `pnpm tenant:lint:touched` flags
+  `board-responsibles.service.ts:98`, `clinical-check-in.ts:138/159/319` — each verified
+  by Read to filter `clinicId` in the same `where(and(...))` (linter scope heuristic
+  false positives; e.g. clinical-check-in.ts:139 `eq(users.clinicId, clinicId)`).
+  `routes:contract` / `query-keys:audit` baselines carry pre-existing drift beyond this
+  branch (e.g. shift-adjustments, uploads/avatar); this PR adds
+  `POST /api/clinical-check-in/switch`, `PATCH /api/users/:id/senior-doctor-eligible`,
+  keys `["/api/clinical-check-in/me/active"]`, `["/api/users/me","doctor-gate"]` — left
+  to a baseline-refresh pass rather than rewriting shared baselines from a feature branch.
+
+**Verdict:** VERIFIED
+
+## 2026-08-13 — PR #180 CodeRabbit round 1: 3-agent fix wave (server 12, client 10, docs 2) — final gates
+
+**Claim:** All 24 CodeRabbit round-1 findings on PR #180 (feat/doctor-shift-gate) are
+fixed — server (race-loser senior name via post-23505 re-query; immutable
+`check_in_source` origin column via new migration 184 + insert-time classification,
+sweep now filters `check_in_source='doctor_gate'` with the live-allowlist probe
+removed; interface conversions; test dedupe/failure-path/clinic-scope hardening),
+client (pressure-mode ResponsiblesPanel kept mounted; shared `readSeniorConflict`
+contract in src/types/check-in.ts; end-shift `useConfirm` dialog with 2 new i18n keys;
+gate hidden until /users/me settles; role union re-exported from shared/doctor-teams;
+shared `CheckInRequest`/`ActiveCheckInResponse` API types; Hebrew literals and
+narrative headers removed from tests), docs (plan documents all three migrations
+181–183 incl. 183 partial-unique rationale; spec names the dedicated
+`doctorCheckInExpiryWorker` and states `staleCheckInSweepWorker` stays frozen).
+One integration fix by the finalizer: `src/types/check-in.ts` shared import needed the
+explicit `.js` extension for the nodenext `tsconfig.server-check.json` gate (repo
+convention in src/types/, e.g. inventory.ts, webhooks.ts).
+
+**Evidence (actual command outputs this session):**
+- `pnpm typecheck` → exited clean, zero errors (both tsconfigs).
+- `pnpm test` → `Test Files  715 passed (715) · Tests  6394 passed | 11 skipped (6405) · Duration 94.12s` (+8 tests vs pre-wave 6386).
+- `pnpm i18n:check` → `✓ locales/en.json and locales/he.json are in deep key parity.`
+- `pnpm architecture:gates` → after the `.js`-extension fix: `All G1 checks passed.`
+  (madge `OK — server: 0 cycle(s), src: 0 cycle(s) (matches baseline)`).
+- `pnpm db:migrate` → `✅ All migrations up to date` (184_vt_clinical_check_ins_check_in_source.sql applied this session by the server agent).
+- `DATABASE_URL=<.env> npx vitest run --config vitest.db-integration.config.ts tests/doctor-shift-gate.integration.test.ts` → `Test Files  1 passed (1) · Tests  2 passed (2)`.
+
+**Verdict:** VERIFIED
+
+## 2026-08-13 — PR #180 CodeRabbit round 2: 5 findings (tenant join, explicit gate provenance, lookup logging, test comment, plan doc 184)
+
+**Claim:** All 5 round-2 findings fixed on feat/doctor-shift-gate. (1) The
+existing-senior lookup's users leftJoin in `validateAndBuildRow`
+(server/services/clinical-check-in.ts) now carries
+`eq(users.clinicId, actor.clinicId)` (mirrors the race-resolution query); new unit
+test asserts the join condition binds the actor's clinicId. (2) Doctor-gate
+provenance is now request-declared instead of allowlist-inferred: strict zod body
+gains `source: z.literal("doctor_gate").optional()` threaded through
+openCheckIn/switchOperationalRole; classification = icu/internal_medicine always
+'doctor_gate', admission 'doctor_gate' only with `source:"doctor_gate"` else
+'legacy', non-team roles ignore source ('legacy' always — checkInSource is only
+assigned inside the team-role branches); client `CheckInRequest` gains
+`source?: "doctor_gate"` and DoctorShiftGate/DoctorShiftStatus send it on all four
+mutate paths; unit + route + integration tests updated, incl. a new integration
+regression: allowlisted-for-admission vet via the gate now stamps 'doctor_gate'.
+(3) Senior-winner re-query catch now logs
+`console.error("[clinical-check-in] senior winner lookup failed", err)` (no
+staff PII). (4) `resolveMe!` in tests/doctor-shift-gate.test.tsx got a one-line
+comment (Promise executor runs synchronously). (5) Plan doc
+2026-08-13-doctor-shift-gate-vettrack.md now documents migration 184
+(check_in_source, expiry-worker dependency, psql verify step, request-declared
+source contract) in the architecture note, migration-sequence constraint, and
+Task 7; worker docblock admission bullet updated to the explicit-source contract.
+
+**Evidence (actual command outputs this session):**
+- `pnpm typecheck` → exited clean, zero errors (both tsconfigs).
+- `pnpm test` → `Test Files  715 passed (715) · Tests  6398 passed | 11 skipped (6409) · Duration 99.16s` (+4 tests vs round 1: tenant-join assert, non-team source-ignore, route source-forward, route source-literal-reject).
+- `pnpm i18n:check` → `✓ locales/en.json and locales/he.json are in deep key parity.`
+- `pnpm architecture:gates` → `All G1 checks passed.` (madge `OK — server: 0 cycle(s), src: 0 cycle(s) (matches baseline)`).
+- `DATABASE_URL=<.env> npx vitest run --config vitest.db-integration.config.ts tests/doctor-shift-gate.integration.test.ts` → `Test Files  1 passed (1) · Tests  3 passed (3)` (+1: gate-declared admission provenance).
+
+**Verdict:** VERIFIED
+
+## 2026-08-13 — PR #180 CodeRabbit round 3: 3 Major findings (senior-preserving switch, clinic-scoped expiry sweep, /switch idempotency)
+
+**Claim:** All 3 round-3 findings fixed on feat/doctor-shift-gate. (1)
+DoctorShiftStatus.tsx no longer ANDs the client-side eligibility flag into the
+switch payload — it sends `isSenior: isSeniorChecked` (server enforces
+eligibility via SENIOR_NOT_ELIGIBLE 403), so an active senior tapping a team
+button while /users/me is still pending is no longer silently demoted; new
+regression test (active senior + never-settling meQuery → switch carries
+isSenior:true). (2) `sweepExpiredDoctorCheckIns` restructured per the repo
+multi-tenancy rule: a `selectDistinct` first enumerates the clinics holding
+expired doctor_gate rows, then one clinic-scoped UPDATE per clinic with
+`eq(clinicalCheckIns.clinicId, clinicId)` AND the full expiry predicate
+(checked_out_at IS NULL, checkedInAt < cutoff, check_in_source='doctor_gate');
+return shape / per-row audit / authority-cache invalidation unchanged. Unit
+tests assert both WHERE clauses; integration test gains a second fixture
+clinic proving the per-clinic loop still closes every clinic's expired doctor
+row while an identically-aged technician row in that clinic stays open; plan
+doc Task 7 snippet updated to match. (3) POST /switch now mirrors /check-in's
+Idempotency-Key mechanism: route reads the header via the shared
+`resolveIdempotencyKey` (64-char cap, trim, blank→null) and threads it into
+`switchOperationalRole`, which stores it as the new row's `clientId`,
+pre-checks for replay BEFORE validation (a duplicate retry returns the first
+transition's row — no second close+insert, no duplicate audit, no
+shift-timestamp reset), and replays the concurrent winner's row on an
+open-per-user 23505 with a matching key (shared `isReplayOfExisting` helper,
+also reused by openCheckIn's catch). Client deliberately unchanged:
+`api.checkIn.open` sends no Idempotency-Key header (verified src/lib/api.ts),
+so /switch mirrors the existing header-less client convention. 5 new route
+tests + 4 new service tests.
+
+**Evidence (actual command outputs this session):**
+- `pnpm typecheck` → exited clean, zero errors (both tsconfigs).
+- `pnpm test` → `Test Files  715 passed (715) · Tests  6410 passed | 11 skipped (6421) · Duration 105.25s` (+12 tests vs round 2's 6398: 1 component regression, 2 expiry-sweep restructure deltas, 5 /switch route idempotency, 4 /switch service idempotency).
+- `pnpm i18n:check` → `✓ locales/en.json and locales/he.json are in deep key parity.`
+- `pnpm architecture:gates` → `All G1 checks passed.` (madge `OK — server: 0 cycle(s), src: 0 cycle(s) (matches baseline)`).
+- `DATABASE_URL=<.env> npx vitest run --config vitest.db-integration.config.ts tests/doctor-shift-gate.integration.test.ts` → `Test Files  1 passed (1) · Tests  3 passed (3)` (cross-clinic sweep assertions added inside the round-trip test).
+
+**Verdict:** VERIFIED
+
+## 2026-08-13 — PR #180 CodeRabbit round 4: 3 Minor findings (operation-scoped replay key, normalized idempotency key, per-clinic sweep side effects)
+
+**Claim:** All 3 round-4 findings fixed on feat/doctor-shift-gate. (1) Replay is
+now operation-scoped by transition shape: `isReplayOfExisting` additionally
+requires the existing row's `operationalRole` + `isSenior` to match the
+request, so a key reused from POST /check-in no longer silently no-ops a
+POST /switch to a different team (or a different senior flag). The
+"switch:"-prefix alternative was rejected with evidence: `client_id` is
+`varchar(64)` (server/schema/ops.ts:437) and the route accepts 64-char keys,
+so a prefix would overflow the column. Applied in the shared helper, so
+openCheckIn's replay carries the same shape guard (its existing replay tests
+already used matching shapes — all still green). (2) openCheckIn now
+normalizes the key ONCE at the top (`trim`, blank→null) and uses that value
+for BOTH the `clientId` insert and the replay comparison — previously it
+stored untrimmed but compared trimmed, so a padded key never replayed
+(switchOperationalRole already stored trimmed; the two now agree). (3) The
+expiry sweep's `invalidateForUser` + `logAudit` moved INSIDE the per-clinic
+loop, immediately after each clinic's returning UPDATE — a later clinic's
+UPDATE failure no longer strands already-committed closes without cache
+invalidation (stale authority until TTL) or an audit record. Row data and
+audit payload unchanged. Tests: +2 openCheckIn normalization tests (trimmed
+clientId stored; padded key replays), +2 switch shape-scope tests (check-in
+key does not replay a different-team switch; different isSenior does not
+replay), +1 worker test (later clinic's UPDATE failure → earlier clinic's
+invalidation + audit already fired).
+
+**Evidence (actual command outputs this session):**
+- `pnpm typecheck` → exited clean, zero errors (both tsconfigs).
+- `pnpm test` → `Test Files  715 passed (715) · Tests  6415 passed | 11 skipped (6426)` (+5 tests vs round 3's 6410).
+- `pnpm i18n:check` → `✓ locales/en.json and locales/he.json are in deep key parity.`
+- `pnpm architecture:gates` → `[architecture-gates] All G1 checks passed.`
+- `DATABASE_URL=<.env> npx vitest run --config vitest.db-integration.config.ts tests/doctor-shift-gate.integration.test.ts` → `Test Files  1 passed (1) · Tests  3 passed (3)`.
+
+**Verdict:** VERIFIED

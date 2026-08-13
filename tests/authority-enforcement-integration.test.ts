@@ -141,9 +141,11 @@ describe("resolver integration smoke — stale enforce", () => {
 
 describe("resolver integration smoke — OPROLE enforce", () => {
   it("denies with CHECKED_IN_OPROLE_REVOKED when role not in allowlist", async () => {
-    setCheckIn(1, "admission");
+    // Legacy role: doctor team roles (icu/admission/internal_medicine) are
+    // universally allowed since the doctor shift gate and bypass the allowlist.
+    setCheckIn(1, "ward");
     setShift("vet");
-    allowlistFetcherMock.mockResolvedValue({ kind: "ok", allowlist: ["ward"] });
+    allowlistFetcherMock.mockResolvedValue({ kind: "ok", allowlist: ["admission"] });
     process.env.AUTHORITY_OPROLE_ENFORCE_V1 = "enforce";
     __resetEnforcementConfigCacheForTests();
 
@@ -156,7 +158,7 @@ describe("resolver integration smoke — OPROLE enforce", () => {
   });
 
   it("allows when role IS in allowlist", async () => {
-    setCheckIn(1, "admission");
+    setCheckIn(1, "ward");
     setShift("vet");
     allowlistFetcherMock.mockResolvedValue({
       kind: "ok",
@@ -169,7 +171,7 @@ describe("resolver integration smoke — OPROLE enforce", () => {
 
     expect(snap.reason).toBe("CHECKED_IN");
     expect(snap.effectiveClinicalRole).toBe("vet");
-    expect(snap.operationalRole).toBe("admission");
+    expect(snap.operationalRole).toBe("ward");
     expect(getMetricsSnapshot().authority.oproleEnforce.denied).toBe(0);
   });
 });

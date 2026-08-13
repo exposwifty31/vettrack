@@ -162,6 +162,9 @@ export type AuditActionType =
   | "patient_handoff_cancelled"
   | "clinical_check_in"
   | "clinical_check_out"
+  // Doctor shift gate (spec 2026-08-13) — a senior doctor claimed a team whose
+  // previous open senior row was demoted (isSenior=false, row stays open).
+  | "doctor_senior_replaced"
   | "operational_roles_updated"
   | "authority_cache_invalidated"
   | "code_blue_replay_authority_denied"
@@ -291,6 +294,10 @@ export type AuditActionType =
   // the confirmed coordinator's userId; metadata carries shiftDate).
   | "equipment_coordinator_eligibility_set"
   | "equipment_coordinator_assigned"
+  // Doctor shift gate (spec 2026-08-13) — admin flips a user's
+  // `senior_doctor_eligible` flag (targetId = the user). Mirrors
+  // `equipment_coordinator_eligibility_set`.
+  | "senior_doctor_eligible_set"
   // P3 T3.4-ii — Room Sweep escalation ladder. `_escalated`: the worker
   // advances a shift's escalation stage (targetId = the shift's coordinator
   // row's clinicId-scoped shiftDate context; metadata carries {stage}).

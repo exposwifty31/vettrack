@@ -1,13 +1,18 @@
 import { randomUUID } from "crypto";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, isNull, ne } from "drizzle-orm";
 import {
   clinicalCheckIns,
   db,
   users,
   type ClinicalCheckIn,
 } from "../db.js";
-import { logAudit } from "../lib/audit.js";
+import { logAudit, type AuditDbExecutor } from "../lib/audit.js";
 import { invalidateForUser } from "../lib/authority-cache.js";
+import {
+  DOCTOR_TEAM_ROLES,
+  isDoctorTeamRole,
+  type DoctorTeamRole,
+} from "../../shared/doctor-teams.js";
 
 export const OPERATIONAL_ROLES = [
   "admission",
@@ -15,12 +20,33 @@ export const OPERATIONAL_ROLES = [
   "senior_lead",
   "night_admission_only",
   "night_senior_no_admission",
+  "icu",
+  "internal_medicine",
 ] as const;
 export type OperationalRole = (typeof OPERATIONAL_ROLES)[number];
 
 const OPERATIONAL_ROLE_SET = new Set<string>(OPERATIONAL_ROLES);
 
+/**
+ * Doctor shift gate (spec 2026-08-13): the three doctor team roles are
+ * universally allowed for vets — no `allowedOperationalRoles` membership
+ * required (zero admin upkeep). Legacy roles keep allowlist semantics.
+ * Canonical definition lives in shared/doctor-teams.ts (also consumed by the
+ * authority enforcement layer); re-exported here for existing consumers.
+ */
+export { DOCTOR_TEAM_ROLES, isDoctorTeamRole };
+export type { DoctorTeamRole };
+
 export type CheckInSource = "self" | "session_close" | "admin_force";
+
+/**
+ * Immutable origin of a check-in row (`check_in_source`, migration 184),
+ * computed ONCE at insert. The doctor expiry sweep targets 'doctor_gate'
+ * rows only; 'legacy' rows are untouchable. Persisted because inferring
+ * origin from the live `allowedOperationalRoles` drifts when an admin later
+ * edits the allowlist.
+ */
+export type CheckInOrigin = "doctor_gate" | "legacy";
 
 /**
  * Mirror exactly the union from `req.authUser.role` (server/middleware/auth.ts).
@@ -44,6 +70,10 @@ export type CheckInActor = {
 export type CheckInInput = {
   actor: CheckInActor;
   operationalRole?: unknown;
+  isSenior?: unknown;
+  replaceSenior?: unknown;
+  /** Gate-declared provenance (route-validated literal "doctor_gate"). */
+  source?: unknown;
   idempotencyKey?: string | null;
 };
 
@@ -53,21 +83,128 @@ export class ClinicalCheckInError extends Error {
   status: number;
   code: string;
   reason: string;
-  constructor(status: number, code: string, message: string, reason: string = code) {
+  /** Optional structured context for the client (e.g. `{ currentSeniorName }` on SENIOR_ALREADY_ASSIGNED). */
+  metadata?: Record<string, unknown>;
+  constructor(
+    status: number,
+    code: string,
+    message: string,
+    reason: string = code,
+    metadata?: Record<string, unknown>,
+  ) {
     super(message);
     this.status = status;
     this.code = code;
     this.reason = reason;
+    this.metadata = metadata;
     this.name = "ClinicalCheckInError";
   }
 }
 
 const REPLAY_WINDOW_MS = 60_000;
 
+/**
+ * Idempotent-replay match: the actor's current open row was created by this
+ * same Idempotency-Key within the replay window AND the retried request asks
+ * for the same transition (operationalRole + isSenior), so it is returned
+ * instead of executing a second transition. The shape check operation-scopes
+ * the key: one key reused across different requests (e.g. /check-in then
+ * /switch to another team) must NOT silently no-op the second request.
+ * (A "switch:" clientId prefix was rejected: the column is varchar(64) and
+ * the route already accepts 64-char keys.)
+ */
+function isReplayOfExisting(
+  existing: ClinicalCheckIn | null,
+  trimmedKey: string,
+  input: CheckInInput,
+): existing is ClinicalCheckIn {
+  if (
+    existing === null ||
+    trimmedKey.length === 0 ||
+    (existing.clientId ?? "") !== trimmedKey ||
+    Date.now() - existing.checkedInAt.getTime() > REPLAY_WINDOW_MS
+  ) {
+    return false;
+  }
+  const requestedRole =
+    typeof input.operationalRole === "string" && input.operationalRole.length > 0
+      ? input.operationalRole
+      : null;
+  return (
+    (existing.operationalRole ?? null) === requestedRole &&
+    existing.isSenior === (input.isSenior === true)
+  );
+}
+
+/** Partial unique index backing the one-open-senior-per-team invariant (migration 183). */
+const OPEN_SENIOR_PER_TEAM_INDEX = "ux_vt_clinical_check_ins_open_senior_per_team";
+
 function isUniqueConstraintViolation(err: unknown): boolean {
   if (typeof err !== "object" || err === null) return false;
   const o = err as { code?: string; cause?: { code?: string } };
   return o.code === "23505" || o.cause?.code === "23505";
+}
+
+/** Constraint/index name carried by a 23505, wherever pg/drizzle put it. */
+function uniqueViolationConstraint(err: unknown): string | null {
+  if (typeof err !== "object" || err === null) return null;
+  const o = err as {
+    code?: string;
+    constraint?: string;
+    cause?: { code?: string; constraint?: string };
+  };
+  if (o.code === "23505" && typeof o.constraint === "string") return o.constraint;
+  if (o.cause?.code === "23505" && typeof o.cause.constraint === "string") {
+    return o.cause.constraint;
+  }
+  return null;
+}
+
+async function seniorAlreadyAssignedFromRace(
+  actor: CheckInActor,
+  operationalRole: unknown,
+): Promise<ClinicalCheckInError> {
+  // The partial unique index caught a concurrent senior claim that the
+  // check-then-act SELECT could not see. Same contract as the SELECT-based
+  // 409 — the racer's transaction has committed by the time our own rolled
+  // back, so re-query the winning senior to name them in the replacement
+  // dialog; null only when the re-query finds none (or fails).
+  let currentSeniorName: string | null = null;
+  if (typeof operationalRole === "string") {
+    try {
+      const [winner] = await db
+        .select({ name: users.name, displayName: users.displayName })
+        .from(clinicalCheckIns)
+        .leftJoin(
+          users,
+          and(eq(clinicalCheckIns.userId, users.id), eq(users.clinicId, actor.clinicId)),
+        )
+        .where(
+          and(
+            eq(clinicalCheckIns.clinicId, actor.clinicId),
+            eq(clinicalCheckIns.operationalRole, operationalRole),
+            eq(clinicalCheckIns.isSenior, true),
+            isNull(clinicalCheckIns.checkedOutAt),
+            ne(clinicalCheckIns.userId, actor.userId),
+          ),
+        )
+        .limit(1);
+      currentSeniorName =
+        (winner?.displayName && winner.displayName.length > 0
+          ? winner.displayName
+          : winner?.name) ?? null;
+    } catch (err) {
+      // Best-effort name resolution — the 409 contract must not depend on it.
+      console.error("[clinical-check-in] senior winner lookup failed", err);
+    }
+  }
+  return new ClinicalCheckInError(
+    409,
+    "SENIOR_ALREADY_ASSIGNED",
+    "The team already has an open senior check-in",
+    "SENIOR_ALREADY_ASSIGNED",
+    { currentSeniorName },
+  );
 }
 
 export async function getAllowedOperationalRoles(
@@ -109,9 +246,37 @@ export async function getActiveCheckIn(
   return row ?? null;
 }
 
-export async function openCheckIn(input: CheckInInput): Promise<CheckInResult> {
+/**
+ * Query executor accepted by the shared validation core: either the global
+ * `db` handle (plain `openCheckIn`) or a transaction (`switchOperationalRole`).
+ */
+type DbExecutor = Pick<typeof db, "select" | "insert" | "update">;
+
+type ValidatedCheckIn = {
+  storedOperationalRole: OperationalRole | null;
+  wantsSenior: boolean;
+  checkInSource: CheckInOrigin;
+};
+
+/**
+ * Shared validation core for `openCheckIn` and `switchOperationalRole`.
+ * Narrows the actor role, applies the operational-role rules (doctor team
+ * roles universally allowed for vets; legacy roles keep the allowlist path),
+ * and resolves the senior semantics — including demoting an existing open
+ * senior when `replaceSenior=true`.
+ *
+ * BOTH callers run this inside a `db.transaction` and pass the tx as `dbc`
+ * AND `txForAudit`: the demote UPDATE and the `doctor_senior_replaced` audit
+ * row commit or roll back atomically with the caller's own insert. Never
+ * call this with the global `db` handle when a failable write follows — an
+ * auto-committed demote with a failed insert leaves the team with no senior.
+ */
+async function validateAndBuildRow(
+  input: CheckInInput,
+  dbc: DbExecutor,
+  txForAudit?: AuditDbExecutor,
+): Promise<ValidatedCheckIn> {
   const { actor } = input;
-  const idempotencyKey = input.idempotencyKey ?? null;
 
   if (
     input.operationalRole !== undefined &&
@@ -128,6 +293,9 @@ export async function openCheckIn(input: CheckInInput): Promise<CheckInResult> {
     typeof input.operationalRole === "string" ? input.operationalRole : undefined;
 
   let storedOperationalRole: OperationalRole | null;
+  // Immutable origin, classified ONCE here (insert time) — never re-derived
+  // from the live allowlist afterwards (migration 184).
+  let checkInSource: CheckInOrigin = "legacy";
 
   switch (actor.role) {
     case "student":
@@ -151,20 +319,34 @@ export async function openCheckIn(input: CheckInInput): Promise<CheckInResult> {
           "operationalRole is not a recognised role",
         );
       }
-      const allowed = await getAllowedOperationalRoles(actor.userId, actor.clinicId);
-      if (allowed.length === 0) {
-        throw new ClinicalCheckInError(
-          403,
-          "NO_ALLOWED_OPERATIONAL_ROLES",
-          "User has no allowed operational roles configured",
-        );
-      }
-      if (!allowed.includes(operationalRoleInput as OperationalRole)) {
-        throw new ClinicalCheckInError(
-          403,
-          "OPERATIONAL_ROLE_NOT_ALLOWED",
-          "Requested operational role is not in the user's allowlist",
-        );
+      if (!isDoctorTeamRole(operationalRoleInput)) {
+        // Legacy roles keep the pre-existing allowlist path byte-for-byte;
+        // doctor team roles are universally allowed for vets (no allowlist).
+        const allowed = await getAllowedOperationalRoles(actor.userId, actor.clinicId);
+        if (allowed.length === 0) {
+          throw new ClinicalCheckInError(
+            403,
+            "NO_ALLOWED_OPERATIONAL_ROLES",
+            "User has no allowed operational roles configured",
+          );
+        }
+        if (!allowed.includes(operationalRoleInput as OperationalRole)) {
+          throw new ClinicalCheckInError(
+            403,
+            "OPERATIONAL_ROLE_NOT_ALLOWED",
+            "Requested operational role is not in the user's allowlist",
+          );
+        }
+      } else if (operationalRoleInput === "admission") {
+        // 'admission' is ambiguous: it pre-exists as a legacy allowlist role,
+        // so origin cannot be inferred server-side. The gate client declares
+        // provenance explicitly (`source: "doctor_gate"`, route-validated);
+        // this field only controls the 14h auto-expiry sweep — never
+        // privileges — so client-declared provenance is acceptable.
+        checkInSource = input.source === "doctor_gate" ? "doctor_gate" : "legacy";
+      } else {
+        // icu / internal_medicine did not exist before the doctor gate.
+        checkInSource = "doctor_gate";
       }
       storedOperationalRole = operationalRoleInput as OperationalRole;
       break;
@@ -190,66 +372,310 @@ export async function openCheckIn(input: CheckInInput): Promise<CheckInResult> {
       );
   }
 
-  const id = randomUUID();
-  const clinicalRoleAtCheckIn = actor.role;
+  // Doctor shift gate: server-validated senior semantics. `isSenior=true`
+  // requires a doctor team role AND the admin-set `seniorDoctorEligible`
+  // flag; at most one open senior per team, replaced only with explicit
+  // `replaceSenior=true` (the previous row stays open, demoted).
+  const wantsSenior = input.isSenior === true;
+  if (wantsSenior) {
+    if (storedOperationalRole === null || !isDoctorTeamRole(storedOperationalRole)) {
+      throw new ClinicalCheckInError(
+        422,
+        "SENIOR_REQUIRES_TEAM_ROLE",
+        "isSenior requires a doctor team operational role",
+      );
+    }
+    const [u] = await dbc
+      .select({ eligible: users.seniorDoctorEligible })
+      .from(users)
+      .where(and(eq(users.id, actor.userId), eq(users.clinicId, actor.clinicId)))
+      .limit(1);
+    if (!u?.eligible) {
+      throw new ClinicalCheckInError(
+        403,
+        "SENIOR_NOT_ELIGIBLE",
+        "User is not eligible to be a senior doctor",
+      );
+    }
+    // Excludes the actor's own open row: a retried request (idempotent
+    // replay) or a same-team re-submit via /switch must never treat the
+    // caller's own senior row as "the existing senior" — that self-conflict
+    // either 409s the caller against themselves or demotes their own row.
+    const [existing] = await dbc
+      .select({
+        id: clinicalCheckIns.id,
+        userId: clinicalCheckIns.userId,
+        name: users.name,
+        displayName: users.displayName,
+      })
+      .from(clinicalCheckIns)
+      .leftJoin(
+        users,
+        and(eq(clinicalCheckIns.userId, users.id), eq(users.clinicId, actor.clinicId)),
+      )
+      .where(
+        and(
+          eq(clinicalCheckIns.clinicId, actor.clinicId),
+          eq(clinicalCheckIns.operationalRole, storedOperationalRole),
+          eq(clinicalCheckIns.isSenior, true),
+          isNull(clinicalCheckIns.checkedOutAt),
+          ne(clinicalCheckIns.userId, actor.userId),
+        ),
+      )
+      .limit(1);
+    if (existing && input.replaceSenior !== true) {
+      const currentSeniorName =
+        (existing.displayName && existing.displayName.length > 0
+          ? existing.displayName
+          : existing.name) ?? null;
+      throw new ClinicalCheckInError(
+        409,
+        "SENIOR_ALREADY_ASSIGNED",
+        "The team already has an open senior check-in",
+        "SENIOR_ALREADY_ASSIGNED",
+        { currentSeniorName },
+      );
+    }
+    if (existing) {
+      await dbc
+        .update(clinicalCheckIns)
+        .set({ isSenior: false })
+        .where(
+          and(
+            eq(clinicalCheckIns.id, existing.id),
+            eq(clinicalCheckIns.clinicId, actor.clinicId),
+          ),
+        );
+      const replaceAudit = {
+        clinicId: actor.clinicId,
+        actionType: "doctor_senior_replaced" as const,
+        performedBy: actor.userId,
+        performedByEmail: actor.email,
+        targetId: existing.id,
+        targetType: "clinical_check_in",
+        metadata: {
+          team: storedOperationalRole,
+          previousCheckInId: existing.id,
+          previousUserId: existing.userId,
+        },
+      };
+      if (txForAudit) {
+        await logAudit({ ...replaceAudit, tx: txForAudit });
+      } else {
+        // Fire-and-forget, mirrors the check-in audit in openCheckIn.
+        logAudit(replaceAudit);
+      }
+      invalidateForUser(actor.clinicId, existing.userId);
+    }
+  }
+
+  return { storedOperationalRole, wantsSenior, checkInSource };
+}
+
+export async function openCheckIn(input: CheckInInput): Promise<CheckInResult> {
+  const { actor } = input;
+  // Normalize ONCE: the stored clientId and the replay comparison must use
+  // the same value — storing untrimmed while comparing trimmed means a
+  // padded key never replays.
+  const trimmedKey = input.idempotencyKey?.trim() ?? "";
+  const idempotencyKey = trimmedKey.length > 0 ? trimmedKey : null;
 
   try {
-    const [inserted] = await db
-      .insert(clinicalCheckIns)
-      .values({
-        id,
-        clinicId: actor.clinicId,
-        userId: actor.userId,
-        operationalRole: storedOperationalRole,
-        clinicalRoleAtCheckIn,
-        activeShiftId: null,
-        shiftSessionId: null,
-        clientId: idempotencyKey,
-      })
-      .returning();
+    // One transaction around validate → (maybe demote) → insert → audit:
+    // a failed insert (e.g. the open-per-user unique index) rolls back the
+    // replace-senior demote and its audit row instead of leaving the team
+    // with no senior and a false "replaced" audit trail.
+    const inserted = await db.transaction(async (tx) => {
+      const { storedOperationalRole, wantsSenior, checkInSource } =
+        await validateAndBuildRow(input, tx, tx);
 
-    invalidateForUser(actor.clinicId, actor.userId);
+      const [row] = await tx
+        .insert(clinicalCheckIns)
+        .values({
+          id: randomUUID(),
+          clinicId: actor.clinicId,
+          userId: actor.userId,
+          operationalRole: storedOperationalRole,
+          isSenior: wantsSenior,
+          clinicalRoleAtCheckIn: actor.role,
+          activeShiftId: null,
+          shiftSessionId: null,
+          clientId: idempotencyKey,
+          checkInSource,
+        })
+        .returning();
 
-    // Fire-and-forget; if a future refactor wraps this path in db.transaction(...),
-    // thread the tx through to logAudit({ ..., tx }) so the audit row commits atomically.
-    logAudit({
-      clinicId: actor.clinicId,
-      actionType: "clinical_check_in",
-      performedBy: actor.userId,
-      performedByEmail: actor.email,
-      targetId: inserted.id,
-      targetType: "clinical_check_in",
-      metadata: {
-        checkInId: inserted.id,
+      await logAudit({
         clinicId: actor.clinicId,
-        userId: actor.userId,
-        operationalRole: storedOperationalRole,
-        source: "self",
-      },
+        actionType: "clinical_check_in",
+        performedBy: actor.userId,
+        performedByEmail: actor.email,
+        targetId: row.id,
+        targetType: "clinical_check_in",
+        metadata: {
+          checkInId: row.id,
+          clinicId: actor.clinicId,
+          userId: actor.userId,
+          operationalRole: storedOperationalRole,
+          source: "self",
+        },
+        tx,
+      });
+
+      return row;
     });
 
+    invalidateForUser(actor.clinicId, actor.userId);
     return { row: inserted, replayed: false };
   } catch (err) {
     if (!isUniqueConstraintViolation(err)) throw err;
 
+    if (uniqueViolationConstraint(err) === OPEN_SENIOR_PER_TEAM_INDEX) {
+      // Concurrent senior claim on the same team (DB backstop for the
+      // check-then-act SELECT) — not an "already checked in" condition.
+      throw await seniorAlreadyAssignedFromRace(actor, input.operationalRole);
+    }
+
     const existing = await getActiveCheckIn(actor.clinicId, actor.userId);
-    if (existing) {
-      const trimmedKey = idempotencyKey?.trim() ?? "";
-      const existingClientId = existing.clientId ?? "";
-      const ageMs = Date.now() - existing.checkedInAt.getTime();
-      if (
-        trimmedKey.length > 0 &&
-        existingClientId === trimmedKey &&
-        ageMs <= REPLAY_WINDOW_MS
-      ) {
-        return { row: existing, replayed: true };
-      }
+    if (isReplayOfExisting(existing, trimmedKey, input)) {
+      return { row: existing, replayed: true };
     }
     throw new ClinicalCheckInError(
       409,
       "ALREADY_CHECKED_IN",
       "User already has an active clinical check-in",
     );
+  }
+}
+
+/**
+ * Atomic role switch (doctor shift gate): close the actor's open check-in
+ * with `checkOutReason='role_switch'` and insert the new one inside a single
+ * transaction, so the board never observes a gap where the doctor has no
+ * open check-in. With no open row it degrades to a plain open. The new role
+ * goes through the exact same validation path as `openCheckIn` (team-role
+ * bypass, allowlist for legacy roles, server-validated senior semantics).
+ *
+ * Idempotency mirrors `openCheckIn`: the key is stored as the new row's
+ * `clientId`, and a retry whose key AND transition shape (role + senior)
+ * match the actor's CURRENT open row (within the replay window) returns that
+ * row instead of repeating the close+insert — a repeated transition would
+ * reset the shift timestamp and duplicate the audit trail. The shape match
+ * keeps a key reused from a prior /check-in from no-oping a real switch.
+ */
+export async function switchOperationalRole(
+  input: CheckInInput,
+): Promise<CheckInResult> {
+  const { actor } = input;
+  const idempotencyKey = input.idempotencyKey ?? null;
+  const trimmedKey = idempotencyKey?.trim() ?? "";
+
+  if (trimmedKey.length > 0) {
+    // Replay pre-check BEFORE validation: a replayed request must not re-run
+    // the side-effectful validation path (e.g. a replace-senior demote).
+    const existing = await getActiveCheckIn(actor.clinicId, actor.userId);
+    if (isReplayOfExisting(existing, trimmedKey, input)) {
+      return { row: existing, replayed: true };
+    }
+  }
+
+  try {
+    const inserted = await db.transaction(async (tx) => {
+      const { storedOperationalRole, wantsSenior, checkInSource } =
+        await validateAndBuildRow(input, tx, tx);
+
+      const now = new Date();
+      const [closedRow] = await tx
+        .update(clinicalCheckIns)
+        .set({ checkedOutAt: now, checkOutReason: "role_switch" })
+        .where(
+          and(
+            eq(clinicalCheckIns.clinicId, actor.clinicId),
+            eq(clinicalCheckIns.userId, actor.userId),
+            isNull(clinicalCheckIns.checkedOutAt),
+          ),
+        )
+        .returning();
+
+      const [insertedRow] = await tx
+        .insert(clinicalCheckIns)
+        .values({
+          id: randomUUID(),
+          clinicId: actor.clinicId,
+          userId: actor.userId,
+          operationalRole: storedOperationalRole,
+          isSenior: wantsSenior,
+          clinicalRoleAtCheckIn: actor.role,
+          activeShiftId: null,
+          shiftSessionId: null,
+          clientId: trimmedKey.length > 0 ? trimmedKey : null,
+          checkInSource,
+        })
+        .returning();
+
+      if (closedRow) {
+        await logAudit({
+          clinicId: actor.clinicId,
+          actionType: "clinical_check_out",
+          performedBy: actor.userId,
+          performedByEmail: actor.email,
+          targetId: closedRow.id,
+          targetType: "clinical_check_in",
+          metadata: {
+            checkInId: closedRow.id,
+            clinicId: actor.clinicId,
+            userId: actor.userId,
+            operationalRole: closedRow.operationalRole,
+            source: "role_switch",
+          },
+          tx,
+        });
+      }
+      await logAudit({
+        clinicId: actor.clinicId,
+        actionType: "clinical_check_in",
+        performedBy: actor.userId,
+        performedByEmail: actor.email,
+        targetId: insertedRow.id,
+        targetType: "clinical_check_in",
+        metadata: {
+          checkInId: insertedRow.id,
+          clinicId: actor.clinicId,
+          userId: actor.userId,
+          operationalRole: storedOperationalRole,
+          source: "role_switch",
+        },
+        tx,
+      });
+
+      return insertedRow;
+    });
+
+    invalidateForUser(actor.clinicId, actor.userId);
+    return { row: inserted, replayed: false };
+  } catch (err) {
+    if (isUniqueConstraintViolation(err)) {
+      if (uniqueViolationConstraint(err) === OPEN_SENIOR_PER_TEAM_INDEX) {
+        // Concurrent senior claim on the target team — the transaction
+        // rolled back, so the previous check-in (if any) is still open.
+        throw await seniorAlreadyAssignedFromRace(actor, input.operationalRole);
+      }
+      // Lost a race against a concurrent open/switch — the transaction rolled
+      // back. If the winner was the duplicate of THIS request (same key),
+      // replay its row; otherwise surface the conflict.
+      if (trimmedKey.length > 0) {
+        const existing = await getActiveCheckIn(actor.clinicId, actor.userId);
+        if (isReplayOfExisting(existing, trimmedKey, input)) {
+          return { row: existing, replayed: true };
+        }
+      }
+      throw new ClinicalCheckInError(
+        409,
+        "ALREADY_CHECKED_IN",
+        "User already has an active clinical check-in",
+      );
+    }
+    throw err;
   }
 }
 

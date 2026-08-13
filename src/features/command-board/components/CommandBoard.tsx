@@ -11,13 +11,20 @@ import { reportBoardAnomalyActivated } from "@/lib/realtime";
 import { useBoardEntityCoPresence } from "@/board/board-copresence-context";
 import { usePrefersReducedMotion } from "@/hooks/use-prefers-reduced-motion";
 import { useDirection } from "@/hooks/useDirection";
-import type { EquipmentCommandBoardSnapshot } from "@/types/safety-surfaces";
+import type { BoardResponsibles, EquipmentCommandBoardSnapshot } from "@/types/safety-surfaces";
 import type { EquipmentBoardUnitRow, EquipmentReadinessStatus } from "../../../../shared/equipment-board";
 import { STATUS_BG, STATUS_BAR_COLOR, statusLabel } from "../status-tokens";
 import { useKioskModeFromUrl } from "../use-kiosk-mode-from-url";
 import { countCriticalAlerts, useBoardMode } from "../use-board-mode";
 import { BoardAttentionSection } from "./BoardAttentionSection";
-import { CustodyPanel, DocksPanel, PowerPanel, StagingPanel, WaitlistPanel } from "./board-panels";
+import {
+  CustodyPanel,
+  DocksPanel,
+  PowerPanel,
+  ResponsiblesPanel,
+  StagingPanel,
+  WaitlistPanel,
+} from "./board-panels";
 
 /** The six readiness buckets that make up a stacked readiness bar. */
 type ReadinessCounts = {
@@ -342,9 +349,11 @@ function TickerStat({ label, value }: { label: string; value: string }) {
 function PressureMain({
   board,
   needAttention,
+  responsibles,
 }: {
   board: EquipmentCommandBoardSnapshot;
   needAttention: EquipmentBoardUnitRow[];
+  responsibles?: BoardResponsibles | null;
 }) {
   const dir = useDirection();
   const linked = board.activeEmergency?.linkedEquipment ?? [];
@@ -392,6 +401,11 @@ function PressureMain({
         {board.waitlist && <TickerStat label={t.board.waitlist} value={String(board.waitlist.depth)} />}
         {board.staging && <TickerStat label={t.board.staging} value={String(board.staging.depth)} />}
       </div>
+      {/* Responsibles stay visible under pressure — demoted below the ticker,
+          never dropped (same tolerant reader as the calm layout). */}
+      <div className="shrink-0 max-h-56 overflow-auto">
+        <ResponsiblesPanel responsibles={responsibles} />
+      </div>
     </main>
   );
 }
@@ -404,11 +418,20 @@ export function CommandBoard({
   currentShift,
   kioskMode: kioskModeProp,
   proposalCount,
+  responsibles,
 }: {
   board: EquipmentCommandBoardSnapshot;
   currentTime: string;
   currentShift: Array<{ employeeName: string; role: string }>;
   kioskMode?: boolean;
+  /**
+   * Doctor shift gate (spec 2026-08-13) — snapshot `responsibles` section
+   * (doctor teams + senior technician + equipment coordinator). Optional and
+   * tolerant: ResponsiblesPanel mounts unconditionally and renders all five
+   * slots in the notMarked state when the key is null/undefined (server-side
+   * withTimeout degraded, or an older server).
+   */
+  responsibles?: BoardResponsibles | null;
   /**
    * VetTrack 2.0, Task 1.1 §6 (deliverable H) — bounded ambient count of
    * Shift Autopilot proposals awaiting approval, count only. Fetched by the
@@ -506,7 +529,9 @@ export function CommandBoard({
       )}
 
       {/* Body */}
-      {mode === "pressure" && <PressureMain board={board} needAttention={needAttention} />}
+      {mode === "pressure" && (
+        <PressureMain board={board} needAttention={needAttention} responsibles={responsibles} />
+      )}
       {mode === "calm" && (
       <main id="main-content" className="flex-1 overflow-auto p-4 grid grid-cols-1 lg:grid-cols-[auto_1fr] gap-4">
 
@@ -514,6 +539,9 @@ export function CommandBoard({
         <div className="flex flex-col gap-4 items-center lg:w-64 shrink-0">
           <ADRing pct={pct} ready={board.overview.ready} total={board.overview.totalCritical} />
           <ReadinessMix overview={board.overview} />
+
+          {/* Responsibles — always mounted; the panel itself tolerates null/undefined */}
+          <ResponsiblesPanel responsibles={responsibles} />
 
           {/* Enrichment panels — tolerant-reader: each mounts only when present */}
           {board.power && <PowerPanel power={board.power} />}

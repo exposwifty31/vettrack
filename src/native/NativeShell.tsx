@@ -5,6 +5,7 @@ import { NativeTabBar } from "./NativeTabBar";
 import { NativeTabSidebar } from "./NativeTabSidebar";
 import { NativeHeader } from "./NativeHeader";
 import { MoreSheet } from "@/features/settings";
+import { DoctorShiftGate } from "@/features/shift-gate";
 import { useIsTabletViewport } from "@/lib/use-tablet-viewport";
 
 type Props = {
@@ -102,6 +103,8 @@ export function NativeShell({ children }: Props) {
               {children}
             </div>
           </div>
+
+          <DoctorShiftGate />
         </div>
       </NativeShellContext.Provider>
     );
@@ -146,6 +149,8 @@ export function NativeShell({ children }: Props) {
           open={moreOpen}
           onClose={() => setMoreOpen(false)}
         />
+
+        <DoctorShiftGate />
       </div>
     </NativeShellContext.Provider>
   );
