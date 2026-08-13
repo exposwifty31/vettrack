@@ -1,5 +1,6 @@
 import { ProfileHeroZone } from "@/features/profile/ProfileHeroZone";
 import { ShiftActivityList } from "@/features/profile/ShiftActivityList";
+import { DoctorShiftStatus } from "@/features/shift-gate";
 import { t } from "@/lib/i18n";
 import { isCapacitorNative } from "@/lib/capacitor-runtime";
 import { BackChevron } from "@/components/ui/directional-chevron";
@@ -61,6 +62,7 @@ export default function MyProfilePage() {
         {/* Content */}
         <div style={{ flex: 1, overflowY: "auto", paddingBottom: "env(safe-area-inset-bottom)" }}>
           <ProfileHeroZone />
+          <DoctorShiftStatus />
           <div style={{ height: "0.5px", background: "hsl(var(--border))", marginInline: 0 }} />
           <ShiftActivityList />
         </div>

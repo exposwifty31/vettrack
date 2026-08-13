@@ -20,13 +20,24 @@
  */
 
 import type { DoctorOperationalShiftRole } from "./doctor-operational-shift.js";
+import type { DoctorTeamRole } from "./doctor-teams.js";
 
+/**
+ * Doctor shift gate (2026-08-13): the check-in flow can now store the doctor
+ * team roles "icu" and "internal_medicine" on a vet's open check-in. A vet
+ * running the ICU or internal-medicine team is a doctor on the floor — the
+ * evaluator's hard deny for a non-null, non-allowlisted operationalRole must
+ * not strip them of Code Blue manager authority, so both team roles are
+ * allowlisted here ("admission" was already in the DECISION-1 set).
+ */
 export const CODE_BLUE_MANAGER_ALLOWED_OPERATIONAL_ROLES = [
   "senior_lead",
   "admission",
   "ward",
   "night_senior_no_admission",
-] as const satisfies readonly DoctorOperationalShiftRole[];
+  "icu",
+  "internal_medicine",
+] as const satisfies readonly (DoctorOperationalShiftRole | DoctorTeamRole)[];
 
 export type CodeBlueEligibleOperationalRole =
   (typeof CODE_BLUE_MANAGER_ALLOWED_OPERATIONAL_ROLES)[number];

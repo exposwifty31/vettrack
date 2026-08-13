@@ -142,8 +142,23 @@ function mockSelectSequence(...returns: unknown[]) {
   }
 }
 
+/**
+ * openCheckIn and switchOperationalRole both run inside db.transaction —
+ * execute the callback with a tx exposing the same mocks. Call after
+ * vi.resetAllMocks() in every describe that exercises either path.
+ */
+function installTransactionMock() {
+  mockTransaction.mockImplementation(
+    async (fn: (tx: unknown) => Promise<unknown>) =>
+      fn({ select: mockSelect, insert: mockInsert, update: mockUpdate }),
+  );
+}
+
 describe("openCheckIn — happy paths", () => {
-  beforeEach(() => vi.resetAllMocks());
+  beforeEach(() => {
+    vi.resetAllMocks();
+    installTransactionMock();
+  });
 
   it("vet check-in writes row with operationalRole and snapshot role", async () => {
     mockSelectSequence([{ allowed: ["admission", "ward"] }]);
@@ -217,7 +232,10 @@ describe("openCheckIn — happy paths", () => {
 });
 
 describe("openCheckIn — role / role-class rejections", () => {
-  beforeEach(() => vi.resetAllMocks());
+  beforeEach(() => {
+    vi.resetAllMocks();
+    installTransactionMock();
+  });
 
   it("rejects admin with ROLE_NOT_ELIGIBLE_FOR_CHECK_IN", async () => {
     const { openCheckIn } = await import("../server/services/clinical-check-in.js");
@@ -307,7 +325,10 @@ describe("openCheckIn — role / role-class rejections", () => {
 });
 
 describe("openCheckIn — idempotency and duplicates", () => {
-  beforeEach(() => vi.resetAllMocks());
+  beforeEach(() => {
+    vi.resetAllMocks();
+    installTransactionMock();
+  });
 
   function dupErr(viaCause = false) {
     if (viaCause) {
@@ -744,7 +765,10 @@ describe("forceCloseCheckIn — DB mutation contract", () => {
 });
 
 describe("doctor shift gate — openCheckIn vet branch", () => {
-  beforeEach(() => vi.resetAllMocks());
+  beforeEach(() => {
+    vi.resetAllMocks();
+    installTransactionMock();
+  });
 
   it("allows a vet to open with 'icu' with EMPTY allowedOperationalRoles (team roles bypass the allowlist)", async () => {
     // Defensive: if the implementation still fetches the allowlist, it is empty —
@@ -766,6 +790,7 @@ describe("doctor shift gate — openCheckIn vet branch", () => {
   it("allows 'internal_medicine' and 'admission' as universally-allowed team roles for vets", async () => {
     for (const role of ["internal_medicine", "admission"]) {
       vi.resetAllMocks();
+      installTransactionMock();
       mockSelectSequence([{ allowed: [] }]);
       const row = makeRow({ operationalRole: role });
       mockInsert.mockReturnValue(chainable([row]));
@@ -962,6 +987,123 @@ describe("switchOperationalRole — atomic role switch", () => {
       status: 400,
     });
     expect(mockInsert).not.toHaveBeenCalled();
+  });
+});
+
+describe("openCheckIn — transactional senior demote + senior-index mapping (review findings)", () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    mockTransaction.mockImplementation(
+      async (fn: (tx: unknown) => Promise<unknown>) =>
+        fn({ select: mockSelect, insert: mockInsert, update: mockUpdate }),
+    );
+  });
+
+  it("runs validation + demote + insert inside ONE db.transaction (failed insert rolls back the demote)", async () => {
+    mockSelectSequence(
+      [{ eligible: true }],
+      [{ id: "ci-prev", userId: "user-other", name: "Dr Other", displayName: "" }],
+    );
+    mockUpdate.mockReturnValue(chainable([]));
+    mockInsert.mockReturnValue(
+      chainable([makeRow({ operationalRole: "icu", isSenior: true })]),
+    );
+
+    const { openCheckIn } = await import("../server/services/clinical-check-in.js");
+    const { row } = await openCheckIn({
+      actor: VET_ACTOR,
+      operationalRole: "icu",
+      isSenior: true,
+      replaceSenior: true,
+    });
+    expect(row.isSenior).toBe(true);
+    // The demote and the insert must share one transaction so a failed
+    // insert cannot leave the team with zero seniors.
+    expect(mockTransaction).toHaveBeenCalledTimes(1);
+    expect(mockUpdate).toHaveBeenCalledTimes(1);
+    expect(mockInsert).toHaveBeenCalledTimes(1);
+  });
+
+  it("maps the open-senior-per-team unique index violation to SENIOR_ALREADY_ASSIGNED (409)", async () => {
+    // Eligible; no visible open senior (racer committed after our SELECT).
+    mockSelectSequence([{ eligible: true }], []);
+    mockInsert.mockReturnValue(
+      insertThatThrows({
+        code: "23505",
+        constraint: "ux_vt_clinical_check_ins_open_senior_per_team",
+      }),
+    );
+
+    const { openCheckIn } = await import("../server/services/clinical-check-in.js");
+    await expect(
+      openCheckIn({ actor: VET_ACTOR, operationalRole: "icu", isSenior: true }),
+    ).rejects.toMatchObject({ code: "SENIOR_ALREADY_ASSIGNED", status: 409 });
+  });
+
+  it("switchOperationalRole maps the senior-index violation to SENIOR_ALREADY_ASSIGNED (not ALREADY_CHECKED_IN)", async () => {
+    mockSelectSequence([{ eligible: true }], []);
+    mockUpdate.mockReturnValue(chainable([]));
+    mockInsert.mockReturnValue(
+      insertThatThrows({
+        code: "23505",
+        constraint: "ux_vt_clinical_check_ins_open_senior_per_team",
+      }),
+    );
+
+    const { switchOperationalRole } = await import(
+      "../server/services/clinical-check-in.js"
+    );
+    await expect(
+      switchOperationalRole({ actor: VET_ACTOR, operationalRole: "icu", isSenior: true }),
+    ).rejects.toMatchObject({ code: "SENIOR_ALREADY_ASSIGNED", status: 409 });
+  });
+
+  it("open-per-user violation still maps to ALREADY_CHECKED_IN / replay", async () => {
+    mockSelectSequence([{ eligible: true }], []);
+    mockInsert.mockReturnValue(
+      insertThatThrows({
+        code: "23505",
+        constraint: "ux_vt_clinical_check_ins_open_per_user",
+      }),
+    );
+    // getActiveCheckIn re-read after the violation: no idempotency key → 409.
+    mockSelectSequence([makeRow({ isSenior: true, operationalRole: "icu" })]);
+
+    const { openCheckIn } = await import("../server/services/clinical-check-in.js");
+    await expect(
+      openCheckIn({ actor: VET_ACTOR, operationalRole: "icu", isSenior: true }),
+    ).rejects.toMatchObject({ code: "ALREADY_CHECKED_IN", status: 409 });
+  });
+
+  it("idempotent replay of a senior check-in returns the OWN row with isSenior intact (no self-409, no self-demote)", async () => {
+    // Retried request: eligibility read passes; the existing-senior lookup
+    // must EXCLUDE the actor's own just-inserted row → returns [].
+    mockSelectSequence([{ eligible: true }], []);
+    const ownRow = makeRow({
+      isSenior: true,
+      operationalRole: "icu",
+      clientId: "retry-key-1",
+      checkedInAt: new Date(Date.now() - 5_000),
+    });
+    mockInsert.mockReturnValue(
+      insertThatThrows({
+        code: "23505",
+        constraint: "ux_vt_clinical_check_ins_open_per_user",
+      }),
+    );
+    mockSelectSequence([ownRow]);
+
+    const { openCheckIn } = await import("../server/services/clinical-check-in.js");
+    const result = await openCheckIn({
+      actor: VET_ACTOR,
+      operationalRole: "icu",
+      isSenior: true,
+      idempotencyKey: "retry-key-1",
+    });
+    expect(result.replayed).toBe(true);
+    expect(result.row.isSenior).toBe(true);
+    // No demote UPDATE may have fired against the actor's own row.
+    expect(mockUpdate).not.toHaveBeenCalled();
   });
 });
 

@@ -9,6 +9,7 @@ import type { NextFunction, Request, Response } from "express";
 // ── Service mocks ─────────────────────────────────────────────────────────────
 
 const mockOpenCheckIn = vi.fn();
+const mockSwitchOperationalRole = vi.fn();
 const mockCloseCheckIn = vi.fn();
 const mockForceCloseCheckIn = vi.fn();
 const mockGetActiveCheckIn = vi.fn();
@@ -36,6 +37,7 @@ vi.mock("../server/services/clinical-check-in.js", async () => {
   }
   return {
     openCheckIn: mockOpenCheckIn,
+    switchOperationalRole: mockSwitchOperationalRole,
     closeCheckIn: mockCloseCheckIn,
     forceCloseCheckIn: mockForceCloseCheckIn,
     getActiveCheckIn: mockGetActiveCheckIn,
@@ -537,6 +539,145 @@ describe("POST /check-in — doctor shift gate (isSenior/replaceSenior)", () => 
     await dispatch(req, res);
     expect(captured.statusCode).toBe(422);
     expect(captured.body).toMatchObject({ code: "SENIOR_REQUIRES_TEAM_ROLE" });
+  });
+});
+
+describe("POST /switch — atomic role switch route", () => {
+  it("returns 401 when no auth user", async () => {
+    currentAuthUser = null;
+    const req = makeReq({ method: "POST", url: "/switch", body: { operationalRole: "icu" } });
+    const { res, captured } = makeRes();
+    await dispatch(req, res);
+    expect(captured.statusCode).toBe(401);
+    expect(mockSwitchOperationalRole).not.toHaveBeenCalled();
+  });
+
+  it("returns 403 for a student (requireClinicalUser gate)", async () => {
+    currentAuthUser = { id: "u", email: "s@test", clinicId: "c", role: "student" };
+    const req = makeReq({ method: "POST", url: "/switch", body: { operationalRole: "icu" } });
+    const { res, captured } = makeRes();
+    await dispatch(req, res);
+    expect(captured.statusCode).toBe(403);
+    expect(mockSwitchOperationalRole).not.toHaveBeenCalled();
+  });
+
+  it("forwards operationalRole/isSenior/replaceSenior to the service and serializes the new row", async () => {
+    mockSwitchOperationalRole.mockResolvedValueOnce({
+      row: makeRow({ id: "ci-new", operationalRole: "icu", isSenior: true }),
+      replayed: false,
+    });
+    const req = makeReq({
+      method: "POST",
+      url: "/switch",
+      body: { operationalRole: "icu", isSenior: true, replaceSenior: true },
+    });
+    const { res, captured } = makeRes();
+    await dispatch(req, res);
+
+    expect(captured.statusCode).toBe(200);
+    expect(mockSwitchOperationalRole).toHaveBeenCalledWith({
+      actor: {
+        userId: "user-vet",
+        email: "vet@clinic.test",
+        clinicId: "clinic-1",
+        role: "vet",
+      },
+      operationalRole: "icu",
+      isSenior: true,
+      replaceSenior: true,
+    });
+    expect(captured.body).toMatchObject({
+      id: "ci-new",
+      operationalRole: "icu",
+      isSenior: true,
+      checkedInAt: "2026-05-14T08:00:00.000Z",
+      checkedOutAt: null,
+    });
+  });
+
+  it("rejects unknown extra keys with INVALID_BODY (strict schema)", async () => {
+    const req = makeReq({
+      method: "POST",
+      url: "/switch",
+      body: { operationalRole: "icu", extra: "nope" },
+    });
+    const { res, captured } = makeRes();
+    await dispatch(req, res);
+    expect(captured.statusCode).toBe(400);
+    expect(captured.body).toMatchObject({ code: "INVALID_BODY" });
+    expect(mockSwitchOperationalRole).not.toHaveBeenCalled();
+  });
+
+  it("rejects non-boolean isSenior with INVALID_BODY", async () => {
+    const req = makeReq({
+      method: "POST",
+      url: "/switch",
+      body: { operationalRole: "icu", isSenior: "yes" },
+    });
+    const { res, captured } = makeRes();
+    await dispatch(req, res);
+    expect(captured.statusCode).toBe(400);
+    expect(captured.body).toMatchObject({ code: "INVALID_BODY" });
+  });
+
+  it("passes SENIOR_ALREADY_ASSIGNED through at 409 with metadata as details", async () => {
+    const { ClinicalCheckInError } = await import(
+      "../server/services/clinical-check-in.js"
+    );
+    mockSwitchOperationalRole.mockRejectedValueOnce(
+      new ClinicalCheckInError(
+        409,
+        "SENIOR_ALREADY_ASSIGNED",
+        "The team already has an open senior check-in",
+        "SENIOR_ALREADY_ASSIGNED",
+        { currentSeniorName: "Dr Other" },
+      ),
+    );
+    const req = makeReq({
+      method: "POST",
+      url: "/switch",
+      body: { operationalRole: "icu", isSenior: true },
+    });
+    const { res, captured } = makeRes();
+    await dispatch(req, res);
+    expect(captured.statusCode).toBe(409);
+    expect(captured.body).toMatchObject({
+      code: "SENIOR_ALREADY_ASSIGNED",
+      details: { currentSeniorName: "Dr Other" },
+    });
+  });
+
+  it("passes ALREADY_CHECKED_IN through at 409", async () => {
+    const { ClinicalCheckInError } = await import(
+      "../server/services/clinical-check-in.js"
+    );
+    mockSwitchOperationalRole.mockRejectedValueOnce(
+      new ClinicalCheckInError(409, "ALREADY_CHECKED_IN", "already open"),
+    );
+    const req = makeReq({
+      method: "POST",
+      url: "/switch",
+      body: { operationalRole: "admission" },
+    });
+    const { res, captured } = makeRes();
+    await dispatch(req, res);
+    expect(captured.statusCode).toBe(409);
+    expect(captured.body).toMatchObject({ code: "ALREADY_CHECKED_IN" });
+  });
+
+  it("maps an unexpected service throw to the 500 envelope", async () => {
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    mockSwitchOperationalRole.mockRejectedValueOnce(new Error("boom"));
+    const req = makeReq({
+      method: "POST",
+      url: "/switch",
+      body: { operationalRole: "icu" },
+    });
+    const { res, captured } = makeRes();
+    await dispatch(req, res);
+    expect(captured.statusCode).toBe(500);
+    expect(captured.body).toMatchObject({ code: "INTERNAL_ERROR" });
+    consoleSpy.mockRestore();
   });
 });
 

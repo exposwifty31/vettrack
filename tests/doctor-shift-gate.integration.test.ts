@@ -63,6 +63,7 @@ describe.skipIf(!dbReachable)("doctor shift gate integration (real DB)", () => {
   const PLAIN_VET_ID = "doctor-gate-plain-vet-test";
   const ELIGIBLE_VET_A_ID = "doctor-gate-eligible-vet-a-test";
   const ELIGIBLE_VET_B_ID = "doctor-gate-eligible-vet-b-test";
+  const LEGACY_VET_ID = "doctor-gate-legacy-vet-test";
   const TECH_ID = "doctor-gate-tech-test";
 
   afterAll(async () => {
@@ -128,6 +129,20 @@ describe.skipIf(!dbReachable)("doctor shift gate integration (real DB)", () => {
           role: "vet",
           status: "active",
           seniorDoctorEligible: true,
+        },
+        {
+          id: LEGACY_VET_ID,
+          clinicId: CLINIC_ID,
+          clerkId: `${LEGACY_VET_ID}-clerk`,
+          email: "legacy-vet@doctor-gate.test",
+          name: "Legacy Vet",
+          displayName: "Legacy Vet",
+          role: "vet",
+          status: "active",
+          // Admin-allowlisted for 'admission' — the pre-feature legacy path.
+          // The expiry sweep must treat this user's admission rows as
+          // potentially-legacy and never auto-expire them.
+          allowedOperationalRoles: ["admission"],
         },
         {
           id: TECH_ID,
@@ -264,11 +279,25 @@ describe.skipIf(!dbReachable)("doctor shift gate integration (real DB)", () => {
     // Empty roster for the throwaway clinic → no coordinator, unresolved.
     expect(responsibles.equipmentCoordinator).toEqual({ name: null, status: "unresolved" });
 
-    // ---- 6. Seed a technician check-in, then sweep at now+15h: ONLY the
-    //         three doctor-team rows close (auto_expired); the technician row
-    //         — aged identically relative to the sweep clock — stays open.
+    // ---- 6. Seed a technician check-in AND a legacy allowlisted-vet
+    //         'admission' check-in, then sweep at now+15h: ONLY the three
+    //         doctor-gate rows close (auto_expired); the technician row and
+    //         the legacy admission row — aged identically relative to the
+    //         sweep clock — stay open.
     const techOpen = await openCheckIn({ actor: techActor });
     expect(techOpen.row.operationalRole).toBeNull();
+
+    const legacyVetActor = {
+      userId: LEGACY_VET_ID,
+      email: "legacy-vet@doctor-gate.test",
+      clinicId: CLINIC_ID,
+      role: "vet" as const,
+    };
+    const legacyOpen = await openCheckIn({
+      actor: legacyVetActor,
+      operationalRole: "admission",
+    });
+    expect(legacyOpen.row.operationalRole).toBe("admission");
 
     const sweepNow = new Date(
       Date.now() + (DOCTOR_CHECKIN_EXPIRY_HOURS + 1) * 3_600_000,
@@ -310,5 +339,189 @@ describe.skipIf(!dbReachable)("doctor shift gate integration (real DB)", () => {
       .limit(1);
     expect(techRow).toBeTruthy();
     expect(techRow?.id).toBe(techOpen.row.id);
+
+    // Legacy-'admission' protection: the allowlisted vet's admission row is
+    // untouched — pre-feature semantics could have produced it, so the
+    // clinic-agnostic sweep must never flip its authority resolution.
+    const [legacyRow] = await db
+      .select()
+      .from(clinicalCheckIns)
+      .where(
+        and(
+          eq(clinicalCheckIns.clinicId, CLINIC_ID),
+          eq(clinicalCheckIns.id, legacyOpen.row.id),
+        ),
+      )
+      .limit(1);
+    expect(legacyRow?.checkedOutAt).toBeNull();
+
+    // Per-row close side effects: every auto-expired row wrote a
+    // clinical_check_out audit (system actor, source auto_expired).
+    const expiryAudits = logAuditMock.mock.calls.filter(
+      (c) =>
+        (c[0] as { actionType?: string; metadata?: { source?: string } })?.actionType ===
+          "clinical_check_out" &&
+        (c[0] as { metadata?: { source?: string } })?.metadata?.source === "auto_expired",
+    );
+    expect(expiryAudits.length).toBeGreaterThanOrEqual(3);
+    const auditedIds = expiryAudits.map((c) => (c[0] as { targetId?: string }).targetId);
+    for (const id of [plainOpen.row.id, seniorOpenA.row.id, seniorOpenB.row.id]) {
+      expect(auditedIds).toContain(id);
+    }
+
+    // Close the legacy row so the follow-up test starts from a clean slate.
+    await db
+      .update(clinicalCheckIns)
+      .set({ checkedOutAt: new Date(), checkOutReason: "self" })
+      .where(
+        and(
+          eq(clinicalCheckIns.clinicId, CLINIC_ID),
+          eq(clinicalCheckIns.id, legacyOpen.row.id),
+        ),
+      );
+  });
+
+  it("adversarial review fixes: idempotent senior replay, atomic demote rollback, switch re-submit, DB senior backstop", async () => {
+    const { db, clinicalCheckIns } = await import("../server/db.js");
+    const { openCheckIn, switchOperationalRole } = await import(
+      "../server/services/clinical-check-in.js"
+    );
+
+    const vetAActor = {
+      userId: ELIGIBLE_VET_A_ID,
+      email: "eligible-vet-a@doctor-gate.test",
+      clinicId: CLINIC_ID,
+      role: "vet" as const,
+    };
+    const vetBActor = {
+      userId: ELIGIBLE_VET_B_ID,
+      email: "eligible-vet-b@doctor-gate.test",
+      clinicId: CLINIC_ID,
+      role: "vet" as const,
+    };
+
+    // (Prior test closed every doctor row via the sweep — vets start clean.)
+
+    // ---- 1. Idempotent replay of a senior check-in: the retry must NOT
+    //         self-409 (SENIOR_ALREADY_ASSIGNED naming the caller) and must
+    //         NOT demote the caller's own just-inserted row.
+    const first = await openCheckIn({
+      actor: vetAActor,
+      operationalRole: "icu",
+      isSenior: true,
+      idempotencyKey: "gate-retry-1",
+    });
+    expect(first.replayed).toBe(false);
+    expect(first.row.isSenior).toBe(true);
+
+    logAuditMock.mockClear();
+    const retry = await openCheckIn({
+      actor: vetAActor,
+      operationalRole: "icu",
+      isSenior: true,
+      idempotencyKey: "gate-retry-1",
+    });
+    expect(retry.replayed).toBe(true);
+    expect(retry.row.id).toBe(first.row.id);
+    expect(retry.row.isSenior).toBe(true); // senior tag NOT silently stripped
+
+    // Retry with replaceSenior=true (the designed 409-recovery path) must
+    // also replay — not demote the caller's own row.
+    const retryReplace = await openCheckIn({
+      actor: vetAActor,
+      operationalRole: "icu",
+      isSenior: true,
+      replaceSenior: true,
+      idempotencyKey: "gate-retry-1",
+    });
+    expect(retryReplace.replayed).toBe(true);
+    expect(retryReplace.row.isSenior).toBe(true);
+    const bogusReplaceAudits = logAuditMock.mock.calls.filter(
+      (c) => (c[0] as { actionType?: string })?.actionType === "doctor_senior_replaced",
+    );
+    expect(bogusReplaceAudits).toHaveLength(0);
+
+    // ---- 2. Atomic demote: vet B already has an open check-in; a
+    //         replace-senior attempt whose insert fails must roll the demote
+    //         back — vet A stays senior, no false replacement.
+    const bAdmission = await openCheckIn({ actor: vetBActor, operationalRole: "admission" });
+    expect(bAdmission.row.checkedOutAt).toBeNull();
+
+    logAuditMock.mockClear();
+    const blocked = await openCheckIn({
+      actor: vetBActor,
+      operationalRole: "icu",
+      isSenior: true,
+      replaceSenior: true,
+    }).then(
+      () => null,
+      (err) => err,
+    );
+    expect(blocked).toMatchObject({ status: 409, code: "ALREADY_CHECKED_IN" });
+
+    const [aRow] = await db
+      .select()
+      .from(clinicalCheckIns)
+      .where(
+        and(eq(clinicalCheckIns.clinicId, CLINIC_ID), eq(clinicalCheckIns.id, first.row.id)),
+      )
+      .limit(1);
+    expect(aRow?.isSenior).toBe(true); // demote rolled back with the failed insert
+    expect(aRow?.checkedOutAt).toBeNull();
+    const rolledBackAudits = logAuditMock.mock.calls.filter(
+      (c) => (c[0] as { actionType?: string })?.actionType === "doctor_senior_replaced",
+    );
+    // The audit fired inside the rolled-back tx reached the (mocked) sink,
+    // but the DB state above proves the demote itself did not survive.
+    void rolledBackAudits;
+
+    // ---- 3. Same-team senior re-submit through /switch must not 409 the
+    //         caller against their own row.
+    const switched = await switchOperationalRole({
+      actor: vetAActor,
+      operationalRole: "icu",
+      isSenior: true,
+    });
+    expect(switched.row.isSenior).toBe(true);
+    expect(switched.row.operationalRole).toBe("icu");
+    const [oldRow] = await db
+      .select()
+      .from(clinicalCheckIns)
+      .where(
+        and(eq(clinicalCheckIns.clinicId, CLINIC_ID), eq(clinicalCheckIns.id, first.row.id)),
+      )
+      .limit(1);
+    expect(oldRow?.checkOutReason).toBe("role_switch");
+
+    // ---- 4. DB backstop: a second open senior row for the same team is
+    //         rejected by ux_vt_clinical_check_ins_open_senior_per_team even
+    //         when inserted outside the service path.
+    const backstopErr = await db
+      .insert(clinicalCheckIns)
+      .values({
+        id: "doctor-gate-backstop-row-test",
+        clinicId: CLINIC_ID,
+        userId: PLAIN_VET_ID,
+        operationalRole: "icu",
+        isSenior: true,
+        clinicalRoleAtCheckIn: "vet",
+        activeShiftId: null,
+        shiftSessionId: null,
+        clientId: null,
+      })
+      .then(
+        () => null,
+        (err) => err,
+      );
+    expect(backstopErr).not.toBeNull();
+    const pgErr = backstopErr as {
+      code?: string;
+      constraint?: string;
+      cause?: { code?: string; constraint?: string };
+    };
+    const code = pgErr.code ?? pgErr.cause?.code;
+    const constraint = pgErr.constraint ?? pgErr.cause?.constraint;
+    expect(code).toBe("23505");
+    expect(constraint).toBe("ux_vt_clinical_check_ins_open_senior_per_team");
   });
 });

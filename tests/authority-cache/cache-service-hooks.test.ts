@@ -83,6 +83,14 @@ vi.mock("../../server/db.js", () => ({
     }),
     update: vi.fn(() => chainable(() => dbState.updateReturning)),
     select: vi.fn(() => chainable(() => dbState.selectReturning)),
+    // openCheckIn wraps validate+insert in db.transaction; execute the
+    // callback with a tx exposing the same mocked executors.
+    transaction: vi.fn(async (fn: (tx: unknown) => Promise<unknown>) => {
+      const { db } = (await import("../../server/db.js")) as unknown as {
+        db: Record<string, unknown>;
+      };
+      return fn({ select: db.select, insert: db.insert, update: db.update });
+    }),
   },
   clinicalCheckIns: {
     id: "id",

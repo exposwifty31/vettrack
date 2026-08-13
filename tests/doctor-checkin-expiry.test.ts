@@ -14,7 +14,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
-import { and, inArray, isNull, lt } from "drizzle-orm";
+import { and, eq, inArray, isNull, lt, or } from "drizzle-orm";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -42,6 +42,7 @@ vi.mock("../server/db.js", () => ({
   users: {
     id: "id",
     clinicId: "clinicId",
+    allowedOperationalRoles: "allowedOperationalRoles",
   },
 }));
 
@@ -49,10 +50,13 @@ vi.mock("../server/lib/audit.js", () => ({ logAudit: vi.fn() }));
 vi.mock("../server/lib/authority-cache.js", () => ({ invalidateForUser: vi.fn() }));
 
 import { clinicalCheckIns } from "../server/db.js";
+import { logAudit } from "../server/lib/audit.js";
+import { invalidateForUser } from "../server/lib/authority-cache.js";
 import {
   sweepExpiredDoctorCheckIns,
   startDoctorCheckInExpiryWorker,
   DOCTOR_CHECKIN_EXPIRY_HOURS,
+  LEGACY_ADMISSION_ALLOWLIST_GUARD,
 } from "../server/workers/doctorCheckInExpiryWorker.js";
 import { DOCTOR_TEAM_ROLES } from "../server/services/clinical-check-in.js";
 
@@ -136,7 +140,7 @@ describe("sweepExpiredDoctorCheckIns — closes expired doctor rows", () => {
 // ---------------------------------------------------------------------------
 
 describe("sweepExpiredDoctorCheckIns — WHERE clause contract", () => {
-  it("targets EXACTLY open doctor-team rows older than the 14h cutoff (technician/legacy rows untouchable by construction; a 13h doctor row is younger than the cutoff)", async () => {
+  it("targets EXACTLY open rows older than the 14h cutoff: gate-only roles (icu, internal_medicine) unconditionally; 'admission' only when the row's user is NOT allowlisted for it (legacy rows untouchable)", async () => {
     const chain = updateChain([]);
     mockUpdate.mockReturnValue(chain);
 
@@ -144,12 +148,25 @@ describe("sweepExpiredDoctorCheckIns — WHERE clause contract", () => {
 
     const whereArg = vi.mocked(chain.where as ReturnType<typeof vi.fn>).mock.calls[0][0];
     const expectedCutoff = new Date(NOW.getTime() - 14 * 3_600_000);
+    const gateOnlyRoles = DOCTOR_TEAM_ROLES.filter((r) => r !== "admission");
     const expected = and(
       isNull(clinicalCheckIns.checkedOutAt),
-      inArray(clinicalCheckIns.operationalRole, [...DOCTOR_TEAM_ROLES]),
       lt(clinicalCheckIns.checkedInAt, expectedCutoff),
+      or(
+        inArray(clinicalCheckIns.operationalRole, gateOnlyRoles),
+        and(
+          eq(clinicalCheckIns.operationalRole, "admission"),
+          LEGACY_ADMISSION_ALLOWLIST_GUARD,
+        ),
+      ),
     );
     expect(whereArg).toEqual(expected);
+  });
+
+  it("the admission guard is a clinic-scoped NOT EXISTS probe against the user's allowlist — pre-feature 'admission' rows (only creatable by allowlisted vets) are never swept", () => {
+    const guardSql = collectStrings(LEGACY_ADMISSION_ALLOWLIST_GUARD).join(" ");
+    expect(guardSql).toContain("NOT EXISTS");
+    expect(guardSql).toContain('["admission"]');
   });
 
   it("filters on the three doctor team roles only (icu, admission, internal_medicine)", async () => {
@@ -176,6 +193,67 @@ describe("sweepExpiredDoctorCheckIns — WHERE clause contract", () => {
 
     const whereArg = vi.mocked(chain.where as ReturnType<typeof vi.fn>).mock.calls[0][0];
     expect(collectStrings(whereArg)).not.toContain("isSenior");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 3b. Per-row close side effects — cache invalidation + audit (review findings)
+// ---------------------------------------------------------------------------
+
+describe("sweepExpiredDoctorCheckIns — per-row invalidation + audit", () => {
+  const closedRows = [
+    { id: "ci-1", clinicId: "clinic-1", userId: "user-1", operationalRole: "icu" },
+    { id: "ci-2", clinicId: "clinic-2", userId: "user-2", operationalRole: "admission" },
+  ];
+
+  it("invalidates the authority cache per closed row (writer-side invalidation contract)", async () => {
+    mockUpdate.mockReturnValue(updateChain(closedRows));
+
+    await sweepExpiredDoctorCheckIns(NOW);
+
+    expect(invalidateForUser).toHaveBeenCalledTimes(2);
+    expect(invalidateForUser).toHaveBeenCalledWith("clinic-1", "user-1");
+    expect(invalidateForUser).toHaveBeenCalledWith("clinic-2", "user-2");
+  });
+
+  it("writes a clinical_check_out audit row per closed row with source 'auto_expired' (system actor)", async () => {
+    mockUpdate.mockReturnValue(updateChain(closedRows));
+
+    await sweepExpiredDoctorCheckIns(NOW);
+
+    expect(logAudit).toHaveBeenCalledTimes(2);
+    expect(logAudit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        clinicId: "clinic-1",
+        actionType: "clinical_check_out",
+        performedBy: "system:doctor_checkin_expiry",
+        performedByEmail: "system",
+        targetId: "ci-1",
+        targetType: "clinical_check_in",
+        metadata: expect.objectContaining({
+          checkInId: "ci-1",
+          userId: "user-1",
+          operationalRole: "icu",
+          source: "auto_expired",
+        }),
+      }),
+    );
+    expect(logAudit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        clinicId: "clinic-2",
+        targetId: "ci-2",
+        metadata: expect.objectContaining({ source: "auto_expired" }),
+      }),
+    );
+  });
+
+  it("no rows closed → no invalidation, no audit", async () => {
+    mockUpdate.mockReturnValue(updateChain([]));
+
+    await sweepExpiredDoctorCheckIns(NOW);
+
+    expect(invalidateForUser).not.toHaveBeenCalled();
+    expect(logAudit).not.toHaveBeenCalled();
   });
 });
 

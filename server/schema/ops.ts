@@ -441,6 +441,12 @@ export const clinicalCheckIns = vtTable(
     openPerUserUq: uniqueIndex("ux_vt_clinical_check_ins_open_per_user")
       .on(t.clinicId, t.userId)
       .where(sql`${t.checkedOutAt} IS NULL`),
+    // Doctor shift gate: at most one open senior per (clinic, team) —
+    // DB backstop for concurrent isSenior claims (migration 183). The
+    // service maps this index's 23505 to SENIOR_ALREADY_ASSIGNED.
+    openSeniorPerTeamUq: uniqueIndex("ux_vt_clinical_check_ins_open_senior_per_team")
+      .on(t.clinicId, t.operationalRole)
+      .where(sql`${t.isSenior} AND ${t.checkedOutAt} IS NULL`),
     clinicOpenIdx: index("idx_vt_clinical_check_ins_clinic_open")
       .on(t.clinicId)
       .where(sql`${t.checkedOutAt} IS NULL`),

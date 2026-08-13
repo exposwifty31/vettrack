@@ -14,19 +14,7 @@ import { api } from "@/lib/api";
 import { t } from "@/lib/i18n";
 import type { DoctorTeamRole } from "@/types/check-in";
 import { useDoctorGateState } from "./useDoctorGateState";
-
-const TEAM_ROLES: readonly DoctorTeamRole[] = ["icu", "admission", "internal_medicine"];
-
-function teamLabel(team: DoctorTeamRole): string {
-  switch (team) {
-    case "icu":
-      return t.doctorGate.teamIcu;
-    case "admission":
-      return t.doctorGate.teamAdmission;
-    case "internal_medicine":
-      return t.doctorGate.teamInternalMedicine;
-  }
-}
+import { TEAM_ROLES, teamLabel } from "./team-labels";
 
 type GateStep =
   | { kind: "confirm" }

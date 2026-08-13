@@ -521,12 +521,15 @@ describe("resolveAuthority — snapshot shape", () => {
 // ---------------------------------------------------------------------------
 
 describe("resolveAuthority — PR 5.3 shadow validation invariants", () => {
+  // Legacy allowlist-governed role: doctor team roles (icu / admission /
+  // internal_medicine) are skipped by the shadow scheduler's guard 2b since
+  // the doctor shift gate (universally allowed — nothing to drift from).
   const checkInRow = {
     id: "ci-1",
     clinicId: "c1",
     userId: "user-1",
     clinicalRoleAtCheckIn: "vet",
-    operationalRole: "admission",
+    operationalRole: "ward",
     checkedInAt: FIXED_NOW,
   };
 
@@ -578,7 +581,7 @@ describe("resolveAuthority — PR 5.3 shadow validation invariants", () => {
       "../server/lib/operational-role-shadow.js"
     );
     shadow.__setAllowlistReaderForTests(
-      () => new Promise((resolve) => setTimeout(() => resolve(["admission"]), 500)),
+      () => new Promise((resolve) => setTimeout(() => resolve(["ward"]), 500)),
     );
 
     const start = Date.now();
@@ -592,7 +595,7 @@ describe("resolveAuthority — PR 5.3 shadow validation invariants", () => {
     expect(snapOn).toEqual(snapOff);
     expect(elapsed).toBeLessThan(50);
     expect(snapOn.source).toBe("check_in");
-    expect(snapOn.operationalRole).toBe("admission");
+    expect(snapOn.operationalRole).toBe("ward");
   });
 
   it("a throwing shadow reader does not break the resolver", async () => {
@@ -614,7 +617,7 @@ describe("resolveAuthority — PR 5.3 shadow validation invariants", () => {
     });
 
     expect(snap.source).toBe("check_in");
-    expect(snap.operationalRole).toBe("admission");
+    expect(snap.operationalRole).toBe("ward");
 
     // Yield twice so the detached runner Promise can settle and bump the
     // _runner_failed counter via .catch.

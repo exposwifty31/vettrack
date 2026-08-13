@@ -24,10 +24,13 @@ import {
   type OperationalRoleShadowArgs,
 } from "../server/lib/operational-role-shadow.js";
 
+// Legacy allowlist-governed role. Doctor team roles (icu / admission /
+// internal_medicine) are universally allowed since the doctor shift gate and
+// are skipped by guard 2b — see the dedicated test below.
 const BASE_ARGS: OperationalRoleShadowArgs = {
   clinicId: "clinic-1",
   userId: "user-1",
-  observedOperationalRole: "admission",
+  observedOperationalRole: "ward",
   checkInId: "ci-1",
   resolvedAt: "2026-05-14T12:00:00.000Z",
 };
@@ -117,6 +120,23 @@ describe("scheduleOperationalRoleShadowValidation", () => {
     expect(runner).not.toHaveBeenCalled();
     expect(snap().scheduled).toBe(0);
   });
+
+  it.each(["icu", "admission", "internal_medicine"])(
+    "guard 2b: doctor team role '%s' is skipped (universally allowed — no allowlist to drift from)",
+    async (role) => {
+      const runner = vi.fn().mockResolvedValue(undefined);
+      __setRunnerOverrideForTests(runner);
+
+      scheduleOperationalRoleShadowValidation({
+        ...uniqueArgs(`g2b-${role}`),
+        observedOperationalRole: role,
+      });
+      await flushMicrotasks();
+
+      expect(runner).not.toHaveBeenCalled();
+      expect(snap().scheduled).toBe(0);
+    },
+  );
 
   it("does not allocate a runner Promise when guard 3 (dedupe) suppresses", async () => {
     const runner = vi.fn().mockResolvedValue(undefined);
@@ -211,7 +231,7 @@ describe("scheduleOperationalRoleShadowValidation", () => {
   });
 
   it("drift (populated allowlist excluding observed): _drift_revoked + one warn", async () => {
-    __setAllowlistReaderForTests(async () => ["ward"]);
+    __setAllowlistReaderForTests(async () => ["senior_lead"]);
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
     scheduleOperationalRoleShadowValidation(uniqueArgs("drift-populated"));

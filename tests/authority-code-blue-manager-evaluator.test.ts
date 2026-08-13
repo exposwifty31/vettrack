@@ -105,6 +105,20 @@ describe("computeCodeBlueManagerSnapshotDeny — eligible managers", () => {
       ),
     ).toEqual({ kind: "allow" });
   });
+
+  it("doctor team role icu → allow (doctor shift gate roles are CB-manager eligible)", () => {
+    expect(
+      computeCodeBlueManagerSnapshotDeny(snapshot({ operationalRole: "icu" })),
+    ).toEqual({ kind: "allow" });
+  });
+
+  it("doctor team role internal_medicine → allow (doctor shift gate roles are CB-manager eligible)", () => {
+    expect(
+      computeCodeBlueManagerSnapshotDeny(
+        snapshot({ operationalRole: "internal_medicine" }),
+      ),
+    ).toEqual({ kind: "allow" });
+  });
 });
 
 describe("computeCodeBlueManagerSnapshotDeny — ineligible operational roles", () => {
