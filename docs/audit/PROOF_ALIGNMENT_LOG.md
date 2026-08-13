@@ -6808,3 +6808,41 @@ null-timestamp downtime branch.
   alert / unconfigured.
 
 **Verdict:** VERIFIED
+
+## 2026-08-13 — TV board evidence-face visual redesign (owner: "this looks bad")
+
+**Claim:** The all-clear/attention evidence face was redesigned from a corner-clustered
+small-ring-plus-void layout into a balanced, dominant readiness hero + filled tiles +
+compact responsibles. Committed (11cd1eaf1 + the missed finding-11 formatter b8b429ab9).
+
+**What was verified against a REAL browser (not assumed):** the shared dist/public is
+continuously rebuilt by concurrent dev processes (two `vettrack-ship` checkouts running
+`pnpm dev`, plus a same-repo agent), so every render against a dist-serving server showed
+a stale/clobbered board. Root-caused via a DOM probe (`getBoundingClientRect` +
+chunk-load list) that proved the redesign WAS in the served board lazy chunk while the
+screenshot lagged. Rendered reliably from an isolated `git worktree` (own dist/public,
+node_modules symlinked, uncommitted files overlaid) served by a full dev-bypass
+`PLAYWRIGHT_E2E` server on :3998 — the concurrent processes cannot touch it.
+
+Iterations (each browser-verified via a Playwright DOM probe that reported stage/cluster
+rects): v1 (flex-1 hero) over-consumed and hid the tiles; v3 margin-centred hero was
+clean but the stage was only 339 px because the 5-slot responsibles panel (28/32 px
+10-foot floor) made the bottom band ~half the screen; v4 fix — responsibles flows into
+auto-fitting columns and gets the wider bottom-band column → stage 599 px, evidence
+cluster 469 px centred within it, tiles visible at y 611–712, bottom band below at 794.
+
+**Evidence (actual outputs this session):**
+- DOM probe against :3998 v4: `stageRect.h=599`, `clusterRect {top:243,bottom:712}`,
+  `tileCount:2`, `firstTileRect {top:611,bottom:712}` (inside the stage), `bottomBandTop:794`.
+- `pnpm typecheck` clean; `pnpm i18n:check` deep parity; `pnpm architecture:gates` All G1
+  passed; board component tests `60 passed` (board-stage-states, command-board-panels,
+  board-responsibles-panel, board-stage-rotation, board-power-semantics, ward-display).
+- Four darwin-chromium board-states baselines regenerated against :3998; screenshots of
+  all-clear + attention confirmed visually (dominant hero, filled tiles, 2–3-col
+  responsibles, no void/clip/overlap).
+- Full `pnpm test`: `725 passed | 1 failed` — the one failure
+  (`routes-registration-contract-slice7`) PASSES in isolation (`2 passed`); it is a
+  server-routes test untouched by these client-only changes (parallel-run pollution),
+  and `git status` shows zero `server/` modifications.
+
+**Verdict:** VERIFIED (design); the one flaky server-route test is unrelated and passes alone.
