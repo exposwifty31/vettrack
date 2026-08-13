@@ -1,5 +1,6 @@
 import type { DisplaySnapshot } from "@/types/safety-surfaces";
 import type { EquipmentCommandBoardSnapshot } from "../../../shared/equipment-board";
+import { countFilledSlots } from "./responsibles-fill";
 
 export type BoardStateKind = "stale" | "unconfigured" | "alert" | "attention" | "all_clear";
 export type ConnectionState = "live" | "delayed" | "stale" | "offline";
@@ -21,16 +22,10 @@ function hasResponsiblesGap(snapshot: DisplaySnapshot): boolean {
   // null/undefined = server-side build failure or pre-deploy server — unknown, NOT a gap.
   if (!r) return false;
   if (snapshot.currentShift.length === 0) return false; // shift data is the schedule source
-  const doctorFilled = (b: { senior: unknown; members: unknown[] }) =>
-    b.senior != null || b.members.length > 0;
-  const coordinatorFilled = r.equipmentCoordinator.status !== "unresolved";
-  const filled =
-    Number(doctorFilled(r.doctors.icu)) +
-    Number(doctorFilled(r.doctors.admission)) +
-    Number(doctorFilled(r.doctors.internal_medicine)) +
-    Number(r.seniorTechnician != null) +
-    Number(coordinatorFilled);
-  return filled < 5;
+  // countFilledSlots is the single source of truth for the §4 fill mapping
+  // (provisional coordinator statuses and members-without-a-senior both count as
+  // filled). Re-deriving it inline here risked drifting from responsibles-fill.ts.
+  return countFilledSlots(r) < 5;
 }
 
 export function classifyBoardState({ snapshot, connection }: BoardStateInput): BoardStateKind {

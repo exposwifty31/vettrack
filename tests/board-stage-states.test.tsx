@@ -139,6 +139,36 @@ describe("all_clear stage — evidence composition, not a lone checkmark", () =>
   });
 });
 
+describe("attention stage — evidence composition without the all-clear emblem", () => {
+  it("renders the evidence face, omits the check emblem, keeps the byType tiles", () => {
+    const { getByTestId, queryByTestId } = renderBoard(
+      board({
+        waitlist: { depth: 2 },
+        byType: [
+          {
+            typeName: "Ventilator",
+            typeId: "ty-vent",
+            total: 4,
+            ready: 4,
+            inUse: 0,
+            blocked: 0,
+            stale: 0,
+            overdue: 0,
+            unknown: 0,
+            belowMinimumReady: false,
+          },
+        ],
+      }),
+      "attention",
+    );
+    expect(getByTestId("board-stage").getAttribute("data-stage")).toBe("evidence");
+    // The check emblem is gated on all_clear only — attention is "needs a look",
+    // never "all good", so it must NOT reassure with a green checkmark.
+    expect(queryByTestId("board-allclear")).toBeNull();
+    expect(getByTestId("board-type-tile-ty-vent").textContent).toContain("Ventilator");
+  });
+});
+
 describe("alert stage — locked exception cards", () => {
   it("sorts exception cards severity→elapsed and shows minute-granularity downtime", () => {
     const { container, getByTestId } = renderBoard(
@@ -188,6 +218,37 @@ describe("alert stage — locked exception cards", () => {
     const cards = container.querySelectorAll('[data-testid^="board-unit-row-"]');
     expect(cards.length).toBe(3);
     expect(getByText(t.board.alertOverflow(2))).toBeTruthy();
+  });
+
+  it("a down unit with no timestamps shows no downtime figure and sorts last within its tier", () => {
+    const { container, getByTestId } = renderBoard(
+      board({
+        overview: { ...board().overview, ready: 10, blocked: 2 },
+        criticalUnits: [
+          // blocked, NO lastEvidenceAt/lastHumanConfirmationAt → unknown downtime.
+          unit({ equipmentId: "u-undated", displayName: "Vent U", status: "blocked" }),
+          // blocked, dated 12 min ago → same tier, but dated sorts BEFORE undated.
+          unit({
+            equipmentId: "u-dated",
+            displayName: "Vent D",
+            status: "blocked",
+            lastEvidenceAt: "2026-08-13T09:48:00.000Z",
+          }),
+        ],
+      }),
+      "alert",
+    );
+    // POSITIVE_INFINITY fallback: the undated unit sorts AFTER the dated one.
+    const order = Array.from(container.querySelectorAll('[data-testid^="board-unit-row-"]')).map(
+      (c) => c.getAttribute("data-testid"),
+    );
+    expect(order).toEqual(["board-unit-row-u-dated", "board-unit-row-u-undated"]);
+    // The dated card shows minute-granularity downtime; the undated card omits the
+    // figure entirely — never a "NaN דק׳" from a null timestamp.
+    expect(getByTestId("board-unit-row-u-dated").textContent).toContain(t.board.downFor(12));
+    const undated = getByTestId("board-unit-row-u-undated").textContent ?? "";
+    expect(undated).not.toContain("NaN");
+    expect(undated).not.toMatch(/\d+\s*(דק׳|min)/);
   });
 });
 

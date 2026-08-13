@@ -106,6 +106,31 @@ describe("classifyBoardState priority order", () => {
     ).toBe("unconfigured");
   });
 
+  it("unconfigured outranks alert: a zero-config board with active-alert inputs is still unconfigured", () => {
+    // totalCritical 0 ⇒ no equipment configured, so any 'alert' input is a config
+    // artifact, not a real exception — the config hole wins (spec §1 priority order,
+    // classifier line 41 before line 42).
+    const zero = {
+      totalCritical: 0,
+      ready: 0,
+      inUse: 0,
+      blocked: 0,
+      stale: 0,
+      overdue: 0,
+      unknown: 0,
+      belowThresholdTypes: 0,
+      activeEmergencyUnits: 0,
+    };
+    const withPowerAlert = makeBoard({ overview: zero, power: { plugged: 0, unplugged: 0, alert: 3 } });
+    expect(
+      classifyBoardState({ snapshot: makeSnapshot({ commandBoard: withPowerAlert }), connection: "live" }),
+    ).toBe("unconfigured");
+    const withBlockedUnit = makeBoard({ overview: zero, criticalUnits: [unit("blocked")] });
+    expect(
+      classifyBoardState({ snapshot: makeSnapshot({ commandBoard: withBlockedUnit }), connection: "live" }),
+    ).toBe("unconfigured");
+  });
+
   it("alert on any not-ready-not-in-use critical unit", () => {
     const b = makeBoard({ criticalUnits: [unit("blocked")] });
     expect(classifyBoardState({ snapshot: makeSnapshot({ commandBoard: b }), connection: "live" })).toBe(
@@ -187,6 +212,50 @@ describe("classifyBoardState priority order", () => {
   it("all_clear otherwise; undefined snapshot with live connection is loading → treated stale-safe", () => {
     expect(classifyBoardState({ snapshot: makeSnapshot(), connection: "live" })).toBe("all_clear");
     expect(classifyBoardState({ snapshot: undefined, connection: "live" })).toBe("unconfigured");
+  });
+});
+
+describe("classifyBoardState responsibles fill mapping (spec §4)", () => {
+  const D = (name: string): { senior: { name: string; since: string }; members: [] } => ({
+    senior: { name, since: "2026-08-13T06:00:00Z" },
+    members: [],
+  });
+  const onShift = (r: BoardResponsibles): DisplaySnapshot =>
+    makeSnapshot({ responsibles: r, currentShift: [{ employeeName: "Dana", role: "vet_tech" }] });
+  const threeDoctorsAndTech = {
+    doctors: { icu: D("Dr A"), admission: D("Dr B"), internal_medicine: D("Dr C") },
+    seniorTechnician: { name: "Tami" },
+  };
+
+  it("provisional coordinator statuses count as filled → 5/5, no gap (all_clear)", () => {
+    for (const status of ["fallback_senior", "needs_confirmation"] as const) {
+      const r: BoardResponsibles = {
+        ...threeDoctorsAndTech,
+        equipmentCoordinator: { name: "Noa", status },
+      };
+      expect(classifyBoardState({ snapshot: onShift(r), connection: "live" })).toBe("all_clear");
+    }
+  });
+
+  it("a single empty slot at the 4/5 boundary is a gap (attention)", () => {
+    const r: BoardResponsibles = {
+      ...threeDoctorsAndTech,
+      equipmentCoordinator: { name: null, status: "unresolved" },
+    };
+    expect(classifyBoardState({ snapshot: onShift(r), connection: "live" })).toBe("attention");
+  });
+
+  it("a doctor block with members but no senior counts as filled (filled_flagged)", () => {
+    const r: BoardResponsibles = {
+      doctors: {
+        icu: { senior: null, members: [{ name: "Dr X", since: "2026-08-13T06:00:00Z" }] },
+        admission: D("Dr B"),
+        internal_medicine: D("Dr C"),
+      },
+      seniorTechnician: { name: "Tami" },
+      equipmentCoordinator: { name: "Noa", status: "confirmed" },
+    };
+    expect(classifyBoardState({ snapshot: onShift(r), connection: "live" })).toBe("all_clear");
   });
 });
 
