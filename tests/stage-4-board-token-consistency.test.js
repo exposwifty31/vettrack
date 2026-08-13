@@ -75,9 +75,14 @@ describe("Stage 4 board — additive skeleton + footer", () => {
   it("keeps the accessible loading label", () => {
     expect(screenSrc.includes("t.board.loading")).toBe(true);
   });
-  it("renders a footer status strip reusing board.updated + board.live", () => {
-    expect(/<footer/.test(boardSrc)).toBe(true);
-    expect(boardSrc.includes("t.board.updated")).toBe(true);
-    expect(boardSrc.includes("t.board.live")).toBe(true);
+  it("owns freshness in the single top band — no duplicate footer/header LIVE badge", () => {
+    // Phase-1 review removed the legacy footer (and navy header) status strips: they
+    // duplicated BoardTopBand and hardcoded a green LIVE badge that kept signalling
+    // "LIVE" during stale/offline. Freshness/liveness now lives solely in the top
+    // band's FreshnessChip, driven by the real connection state (spec §2 = one band).
+    expect(/<footer/.test(boardSrc)).toBe(false);
+    expect(boardSrc.includes("t.board.live")).toBe(false);
+    expect(boardSrc.includes("BoardTopBand")).toBe(true);
+    expect(boardSrc.includes("connection={connection}")).toBe(true);
   });
 });
