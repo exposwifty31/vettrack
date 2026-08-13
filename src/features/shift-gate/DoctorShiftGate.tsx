@@ -118,7 +118,13 @@ export function DoctorShiftGate() {
                   className="min-h-11 w-full"
                   data-testid={`doctor-gate-team-${team}`}
                   disabled={checkInMutation.isPending}
-                  onClick={() => checkInMutation.mutate({ operationalRole: team, isSenior })}
+                  onClick={() =>
+                    checkInMutation.mutate({
+                      operationalRole: team,
+                      isSenior,
+                      source: "doctor_gate",
+                    })
+                  }
                 >
                   {teamLabel(team)}
                 </Button>
@@ -148,6 +154,7 @@ export function DoctorShiftGate() {
                     operationalRole: step.team,
                     isSenior: true,
                     replaceSenior: true,
+                    source: "doctor_gate",
                   })
                 }
               >

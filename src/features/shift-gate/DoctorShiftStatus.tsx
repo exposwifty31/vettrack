@@ -171,6 +171,7 @@ export function DoctorShiftStatus() {
                       switchMutation.mutate({
                         operationalRole: nextTeam,
                         isSenior: seniorDoctorEligible && isSeniorChecked,
+                        source: "doctor_gate",
                       })
                     }
                   >
@@ -202,6 +203,7 @@ export function DoctorShiftStatus() {
                       operationalRole: switchStep.team,
                       isSenior: true,
                       replaceSenior: true,
+                      source: "doctor_gate",
                     })
                   }
                 >

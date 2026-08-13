@@ -155,8 +155,9 @@ describe.skipIf(!dbReachable)("doctor shift gate integration (real DB)", () => {
           role: "vet",
           status: "active",
           // Admin-allowlisted for 'admission' — the pre-feature legacy path.
-          // The expiry sweep must treat this user's admission rows as
-          // potentially-legacy and never auto-expire them.
+          // Provenance is request-declared: a check-in WITHOUT
+          // source:'doctor_gate' stamps 'legacy' and is never auto-expired,
+          // regardless of this allowlist.
           allowedOperationalRoles: ["admission"],
         },
         {
@@ -315,8 +316,9 @@ describe.skipIf(!dbReachable)("doctor shift gate integration (real DB)", () => {
       operationalRole: "admission",
     });
     expect(legacyOpen.row.operationalRole).toBe("admission");
-    // Immutable origin stamped at insert (migration 184): allowlisted vet's
-    // admission row is 'legacy'; gate rows are 'doctor_gate'.
+    // Immutable origin stamped at insert (migration 184): an admission
+    // check-in with NO declared source is 'legacy'; icu/internal_medicine
+    // gate rows are 'doctor_gate' by construction.
     expect(legacyOpen.row.checkInSource).toBe("legacy");
     expect(plainOpen.row.checkInSource).toBe("doctor_gate");
     expect(seniorOpenB.row.checkInSource).toBe("doctor_gate");
@@ -381,10 +383,11 @@ describe.skipIf(!dbReachable)("doctor shift gate integration (real DB)", () => {
     expect(techRow).toBeTruthy();
     expect(techRow?.id).toBe(techOpen.row.id);
 
-    // Legacy-'admission' protection: the allowlisted vet's admission row was
-    // stamped check_in_source='legacy' at insert — pre-feature semantics
-    // could have produced it, so the clinic-agnostic sweep must never flip
-    // its authority resolution (even though it is equally aged).
+    // Legacy-'admission' protection: the vet's admission row carried no
+    // source:'doctor_gate' declaration, so it was stamped
+    // check_in_source='legacy' at insert — pre-feature semantics could have
+    // produced it, so the clinic-agnostic sweep must never flip its
+    // authority resolution (even though it is equally aged).
     const [legacyRow] = await db
       .select()
       .from(clinicalCheckIns)
@@ -554,5 +557,25 @@ describe.skipIf(!dbReachable)("doctor shift gate integration (real DB)", () => {
     const constraint = pgErr.constraint ?? pgErr.cause?.constraint;
     expect(code).toBe("23505");
     expect(constraint).toBe("ux_vt_clinical_check_ins_open_senior_per_team");
+  });
+
+  it("stamps 'doctor_gate' on an admission check-in that declares source, even for an allowlisted vet", async () => {
+    // CodeRabbit round 2 regression: an allowlisted-for-admission vet coming
+    // through the GATE must still get 'doctor_gate' (14h auto-expiry applies)
+    // — provenance rides on the request's explicit source declaration, not on
+    // allowlist membership.
+    const { openCheckIn } = await import("../server/services/clinical-check-in.js");
+    const gateOpen = await openCheckIn({
+      actor: {
+        userId: LEGACY_VET_ID,
+        email: "legacy-vet@doctor-gate.test",
+        clinicId: CLINIC_ID,
+        role: "vet" as const,
+      },
+      operationalRole: "admission",
+      source: "doctor_gate",
+    });
+    expect(gateOpen.row.operationalRole).toBe("admission");
+    expect(gateOpen.row.checkInSource).toBe("doctor_gate");
   });
 });

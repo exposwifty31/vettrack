@@ -139,7 +139,11 @@ describe("DoctorShiftGate — mobile shell popup (doctor shift gate)", () => {
     fireEvent.click(screen.getByTestId("doctor-gate-team-icu"));
 
     await waitFor(() =>
-      expect(openMock).toHaveBeenCalledWith({ operationalRole: "icu", isSenior: false }),
+      expect(openMock).toHaveBeenCalledWith({
+        operationalRole: "icu",
+        isSenior: false,
+        source: "doctor_gate",
+      }),
     );
     await waitFor(() =>
       expect(screen.queryByText(t.doctorGate.pickTeam)).toBeNull(),
@@ -147,6 +151,8 @@ describe("DoctorShiftGate — mobile shell popup (doctor shift gate)", () => {
   });
 
   it("stays hidden until the seniorDoctorEligible lookup settles, so the senior option cannot be raced past", async () => {
+    // Safe definite-assignment: the Promise executor runs synchronously, so
+    // resolveMe is assigned before mockReturnValue returns.
     let resolveMe!: (v: unknown) => void;
     meMock.mockReturnValue(new Promise((r) => { resolveMe = r; }));
     renderGate();
@@ -178,7 +184,11 @@ describe("DoctorShiftGate — mobile shell popup (doctor shift gate)", () => {
     fireEvent.click(screen.getByTestId("doctor-gate-team-admission"));
 
     await waitFor(() =>
-      expect(openMock).toHaveBeenCalledWith({ operationalRole: "admission", isSenior: true }),
+      expect(openMock).toHaveBeenCalledWith({
+        operationalRole: "admission",
+        isSenior: true,
+        source: "doctor_gate",
+      }),
     );
   });
 
@@ -207,6 +217,7 @@ describe("DoctorShiftGate — mobile shell popup (doctor shift gate)", () => {
         operationalRole: "icu",
         isSenior: true,
         replaceSenior: true,
+        source: "doctor_gate",
       }),
     );
     expect(toastError).not.toHaveBeenCalled();

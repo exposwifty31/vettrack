@@ -6524,3 +6524,37 @@ convention in src/types/, e.g. inventory.ts, webhooks.ts).
 - `DATABASE_URL=<.env> npx vitest run --config vitest.db-integration.config.ts tests/doctor-shift-gate.integration.test.ts` → `Test Files  1 passed (1) · Tests  2 passed (2)`.
 
 **Verdict:** VERIFIED
+
+## 2026-08-13 — PR #180 CodeRabbit round 2: 5 findings (tenant join, explicit gate provenance, lookup logging, test comment, plan doc 184)
+
+**Claim:** All 5 round-2 findings fixed on feat/doctor-shift-gate. (1) The
+existing-senior lookup's users leftJoin in `validateAndBuildRow`
+(server/services/clinical-check-in.ts) now carries
+`eq(users.clinicId, actor.clinicId)` (mirrors the race-resolution query); new unit
+test asserts the join condition binds the actor's clinicId. (2) Doctor-gate
+provenance is now request-declared instead of allowlist-inferred: strict zod body
+gains `source: z.literal("doctor_gate").optional()` threaded through
+openCheckIn/switchOperationalRole; classification = icu/internal_medicine always
+'doctor_gate', admission 'doctor_gate' only with `source:"doctor_gate"` else
+'legacy', non-team roles ignore source ('legacy' always — checkInSource is only
+assigned inside the team-role branches); client `CheckInRequest` gains
+`source?: "doctor_gate"` and DoctorShiftGate/DoctorShiftStatus send it on all four
+mutate paths; unit + route + integration tests updated, incl. a new integration
+regression: allowlisted-for-admission vet via the gate now stamps 'doctor_gate'.
+(3) Senior-winner re-query catch now logs
+`console.error("[clinical-check-in] senior winner lookup failed", err)` (no
+staff PII). (4) `resolveMe!` in tests/doctor-shift-gate.test.tsx got a one-line
+comment (Promise executor runs synchronously). (5) Plan doc
+2026-08-13-doctor-shift-gate-vettrack.md now documents migration 184
+(check_in_source, expiry-worker dependency, psql verify step, request-declared
+source contract) in the architecture note, migration-sequence constraint, and
+Task 7; worker docblock admission bullet updated to the explicit-source contract.
+
+**Evidence (actual command outputs this session):**
+- `pnpm typecheck` → exited clean, zero errors (both tsconfigs).
+- `pnpm test` → `Test Files  715 passed (715) · Tests  6398 passed | 11 skipped (6409) · Duration 99.16s` (+4 tests vs round 1: tenant-join assert, non-team source-ignore, route source-forward, route source-literal-reject).
+- `pnpm i18n:check` → `✓ locales/en.json and locales/he.json are in deep key parity.`
+- `pnpm architecture:gates` → `All G1 checks passed.` (madge `OK — server: 0 cycle(s), src: 0 cycle(s) (matches baseline)`).
+- `DATABASE_URL=<.env> npx vitest run --config vitest.db-integration.config.ts tests/doctor-shift-gate.integration.test.ts` → `Test Files  1 passed (1) · Tests  3 passed (3)` (+1: gate-declared admission provenance).
+
+**Verdict:** VERIFIED

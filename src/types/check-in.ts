@@ -24,6 +24,12 @@ export interface CheckInRequest {
   operationalRole: DoctorTeamRole;
   isSenior?: boolean;
   replaceSenior?: boolean;
+  /**
+   * Gate-declared provenance: stamps check_in_source='doctor_gate' on the
+   * ambiguous 'admission' role so the 14h auto-expiry sweep covers it.
+   * Controls expiry semantics only — never privileges.
+   */
+  source?: "doctor_gate";
 }
 
 /** Response envelope of GET /api/clinical-check-in/me/active. */

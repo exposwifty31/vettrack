@@ -158,6 +158,7 @@ describe("DoctorShiftStatus — on-shift status + exit surface", () => {
       expect(switchMock).toHaveBeenCalledWith({
         operationalRole: "admission",
         isSenior: false,
+        source: "doctor_gate",
       }),
     );
   });
@@ -173,6 +174,7 @@ describe("DoctorShiftStatus — on-shift status + exit surface", () => {
       expect(switchMock).toHaveBeenCalledWith({
         operationalRole: "internal_medicine",
         isSenior: true,
+        source: "doctor_gate",
       }),
     );
   });
@@ -200,6 +202,7 @@ describe("DoctorShiftStatus — on-shift status + exit surface", () => {
         operationalRole: "admission",
         isSenior: true,
         replaceSenior: true,
+        source: "doctor_gate",
       }),
     );
     expect(toastError).not.toHaveBeenCalled();

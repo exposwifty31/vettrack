@@ -4,7 +4,7 @@
 
 **Goal:** Vet-role users self-declare "on shift" with a team (ICU / admission / internal medicine) and optional senior status via the existing clinical check-in mechanism, and the ward board's `/api/display/snapshot` gains a `responsibles` section (doctor teams + senior technician + equipment coordinator).
 
-**Architecture:** Three additive migrations (users eligibility flag, check-ins `is_senior`, open-senior partial unique index), extension of the existing `openCheckIn` vet branch (three new universally-allowed doctor team roles + server-validated senior semantics with per-team replace), a doctor-only 14 h auto-expiry sweep, an additive `responsibles` key on the display snapshot, and client work (gate popup in NativeShell, admin checkbox, board panel). Spec: `docs/superpowers/specs/2026-08-13-doctor-shift-gate-design.md`.
+**Architecture:** Four additive migrations (users eligibility flag, check-ins `is_senior`, open-senior partial unique index, check-ins `check_in_source` provenance), extension of the existing `openCheckIn` vet branch (three new universally-allowed doctor team roles + server-validated senior semantics with per-team replace), a doctor-only 14 h auto-expiry sweep keyed on `check_in_source='doctor_gate'` (migration 184 — the sweep's targeting column), an additive `responsibles` key on the display snapshot, and client work (gate popup in NativeShell, admin checkbox, board panel). Provenance for the ambiguous `admission` role is request-declared: the gate client sends `source: "doctor_gate"` (zod literal on the check-in/switch body), classified once at insert; requests without it stamp `legacy` and are never auto-expired. Spec: `docs/superpowers/specs/2026-08-13-doctor-shift-gate-design.md`.
 
 **Tech Stack:** Express + Drizzle + PostgreSQL, hand-authored SQL migrations, vitest (mocked-db unit tests + db-integration config), React 18 + TanStack Query + shadcn primitives, typed i18n (he/en).
 
@@ -16,7 +16,7 @@
 - Auto-expiry: doctor check-ins only, threshold **14 hours**, `checkOutReason='auto_expired'`.
 - All user-facing copy via typed `t.*`; keys added to BOTH `locales/he.json` and `locales/en.json` AND to `buildTranslations` in `src/lib/i18n.ts` (hand-built accessor — JSON alone does nothing).
 - New audit kinds must be added to the `AuditActionType` union in `server/lib/audit.ts` — never log a string outside the union.
-- Migrations are hand-authored (drizzle-kit snapshot is drifted), numbered `181_…`, `182_…`, `183_…`, idempotent (`ADD COLUMN IF NOT EXISTS` / `CREATE UNIQUE INDEX IF NOT EXISTS`). Migration `183_vt_clinical_check_ins_open_senior_unique.sql` (partial unique index `ux_vt_clinical_check_ins_open_senior_per_team` on `(clinic_id, operational_role) WHERE is_senior AND checked_out_at IS NULL`) is the DB backstop for one-open-senior-per-team — the service's check-then-act SELECT cannot stop two concurrent `isSenior` claims, so the service maps the index's 23505 to `SENIOR_ALREADY_ASSIGNED`. Verify with: `psql "$DATABASE_URL" -c "\di ux_vt_clinical_check_ins_open_senior_per_team"` → index listed as partial unique.
+- Migrations are hand-authored (drizzle-kit snapshot is drifted), numbered `181_…`, `182_…`, `183_…`, `184_…`, idempotent (`ADD COLUMN IF NOT EXISTS` / `CREATE UNIQUE INDEX IF NOT EXISTS`). Migration `183_vt_clinical_check_ins_open_senior_unique.sql` (partial unique index `ux_vt_clinical_check_ins_open_senior_per_team` on `(clinic_id, operational_role) WHERE is_senior AND checked_out_at IS NULL`) is the DB backstop for one-open-senior-per-team — the service's check-then-act SELECT cannot stop two concurrent `isSenior` claims, so the service maps the index's 23505 to `SENIOR_ALREADY_ASSIGNED`. Verify with: `psql "$DATABASE_URL" -c "\di ux_vt_clinical_check_ins_open_senior_per_team"` → index listed as partial unique. Migration `184_vt_clinical_check_ins_check_in_source.sql` (`check_in_source varchar(20) NOT NULL DEFAULT 'legacy'`, backfilling pre-existing `icu`/`internal_medicine` rows to `'doctor_gate'`) is the expiry worker's targeting column — `sweepExpiredDoctorCheckIns` closes only `check_in_source = 'doctor_gate'` rows, so `legacy` rows (technicians, legacy-role vets, and `admission` check-ins opened without the gate's `source: "doctor_gate"` declaration) are untouchable by construction. Verify with: `psql "$DATABASE_URL" -c "\d vt_clinical_check_ins" | grep check_in_source` → column listed, `not null`, `default 'legacy'`.
 - Commit after every task. `pnpm typecheck` must be clean before every commit.
 
 ---
@@ -270,7 +270,7 @@ Pass both through to `openCheckIn`; add `isSenior: row.isSenior` to `serializeCh
 **Interfaces:**
 - Produces: `export async function sweepExpiredDoctorCheckIns(now?: Date): Promise<{ closedCount: number }>` + `export function startDoctorCheckInExpiryWorker(): void` (interval scheduler, hourly). Constant `DOCTOR_CHECKIN_EXPIRY_HOURS = 14`.
 
-**CRITICAL:** the existing `staleCheckInSweepWorker` is shadow/read-only — do NOT modify it. This is a separate worker whose `UPDATE` filters `operationalRole IN ('icu','admission','internal_medicine')` (imported `DOCTOR_TEAM_ROLES`), so technician rows and legacy-role vet rows are untouchable by construction.
+**CRITICAL:** the existing `staleCheckInSweepWorker` is shadow/read-only — do NOT modify it. This is a separate worker whose `UPDATE` filters `check_in_source = 'doctor_gate'` (migration 184, stamped once at insert), so technician rows, legacy-role vet rows, and `admission` rows opened without the gate's `source: "doctor_gate"` declaration are untouchable by construction. (Filtering on the LIVE role/allowlist instead would drift when an admin later edits the allowlist — hence the persisted provenance column.)
 
 - [ ] **Step 1: Failing tests** — a doctor row aged 15 h gets closed with `checkOutReason:'auto_expired'`; a technician row (operationalRole null) aged 48 h is NOT touched; a doctor row aged 13 h is NOT touched; `isSenior` rows close the same way.
 - [ ] **Step 2: Implement**:
@@ -284,7 +284,7 @@ export async function sweepExpiredDoctorCheckIns(now: Date = new Date()): Promis
     .set({ checkedOutAt: now, checkOutReason: "auto_expired" })
     .where(and(
       isNull(clinicalCheckIns.checkedOutAt),
-      inArray(clinicalCheckIns.operationalRole, [...DOCTOR_TEAM_ROLES]),
+      eq(clinicalCheckIns.checkInSource, "doctor_gate"),   // migration 184
       lt(clinicalCheckIns.checkedInAt, cutoff),
     ))
     .returning({ id: clinicalCheckIns.id, clinicId: clinicalCheckIns.clinicId });

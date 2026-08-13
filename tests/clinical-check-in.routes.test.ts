@@ -477,6 +477,37 @@ describe("POST /check-in — doctor shift gate (isSenior/replaceSenior)", () => 
     expect(mockOpenCheckIn).not.toHaveBeenCalled();
   });
 
+  it("forwards source:'doctor_gate' to the service (explicit gate provenance)", async () => {
+    mockOpenCheckIn.mockResolvedValueOnce({
+      row: makeRow({ operationalRole: "admission" }),
+      replayed: false,
+    });
+    const req = makeReq({
+      method: "POST",
+      url: "/check-in",
+      body: { operationalRole: "admission", source: "doctor_gate" },
+    });
+    const { res, captured } = makeRes();
+    await dispatch(req, res);
+    expect(captured.statusCode).toBe(200);
+    expect(mockOpenCheckIn).toHaveBeenCalledWith(
+      expect.objectContaining({ operationalRole: "admission", source: "doctor_gate" }),
+    );
+  });
+
+  it("rejects any source value other than the 'doctor_gate' literal with INVALID_BODY", async () => {
+    const req = makeReq({
+      method: "POST",
+      url: "/check-in",
+      body: { operationalRole: "admission", source: "legacy" },
+    });
+    const { res, captured } = makeRes();
+    await dispatch(req, res);
+    expect(captured.statusCode).toBe(400);
+    expect(captured.body).toMatchObject({ code: "INVALID_BODY" });
+    expect(mockOpenCheckIn).not.toHaveBeenCalled();
+  });
+
   it("passes SENIOR_ALREADY_ASSIGNED through at 409 with metadata as details", async () => {
     const { ClinicalCheckInError } = await import(
       "../server/services/clinical-check-in.js"

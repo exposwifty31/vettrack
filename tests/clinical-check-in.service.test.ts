@@ -66,6 +66,20 @@ function chainable(returnValue: unknown) {
   return chain;
 }
 
+/**
+ * Recursively search a drizzle SQL condition object graph for a bound value.
+ * The schema mocks are plain strings, so a real value (e.g. the actor's
+ * clinicId) appearing in the graph proves it was bound into the condition.
+ */
+function sqlContainsValue(node: unknown, value: string, seen = new Set<unknown>()): boolean {
+  if (node === value) return true;
+  if (typeof node !== "object" || node === null || seen.has(node)) return false;
+  seen.add(node);
+  return Object.values(node as Record<string, unknown>).some((v) =>
+    sqlContainsValue(v, value, seen),
+  );
+}
+
 // chainable that throws on `.returning()` await
 function insertThatThrows(err: unknown) {
   const chain: Record<string, unknown> = {};
@@ -196,7 +210,7 @@ describe("openCheckIn — happy paths", () => {
     expect(inserted.shiftSessionId).toBeNull();
     expect(inserted.clinicalRoleAtCheckIn).toBe("vet");
     expect(inserted.operationalRole).toBe("admission");
-    // Allowlisted-for-'admission' vet → immutable origin stamped 'legacy'.
+    // No source declared → ambiguous 'admission' stamps 'legacy'.
     expect(inserted.checkInSource).toBe("legacy");
   });
 
@@ -346,10 +360,10 @@ describe("openCheckIn — idempotency and duplicates", () => {
       clientId: "abc-123",
     });
     mockInsert.mockReturnValue(insertThatThrows(dupErr()));
-    // 'admission' classification reads the allowlist once at insert time
-    // (check_in_source, migration 184); the duplicate-key re-read
-    // (getActiveCheckIn) is the second SELECT.
-    mockSelectSequence([{ allowed: ["admission"] }], [existing]);
+    // 'admission' with no declared source stamps 'legacy' without touching
+    // the allowlist — the duplicate-key re-read (getActiveCheckIn) is the
+    // only SELECT.
+    mockSelectSequence([existing]);
 
     const { openCheckIn } = await import("../server/services/clinical-check-in.js");
     const result = await openCheckIn({
@@ -367,10 +381,10 @@ describe("openCheckIn — idempotency and duplicates", () => {
       clientId: "abc-123",
     });
     mockInsert.mockReturnValue(insertThatThrows(dupErr(true)));
-    // 'admission' classification reads the allowlist once at insert time
-    // (check_in_source, migration 184); the duplicate-key re-read
-    // (getActiveCheckIn) is the second SELECT.
-    mockSelectSequence([{ allowed: ["admission"] }], [existing]);
+    // 'admission' with no declared source stamps 'legacy' without touching
+    // the allowlist — the duplicate-key re-read (getActiveCheckIn) is the
+    // only SELECT.
+    mockSelectSequence([existing]);
 
     const { openCheckIn } = await import("../server/services/clinical-check-in.js");
     const result = await openCheckIn({
@@ -384,10 +398,10 @@ describe("openCheckIn — idempotency and duplicates", () => {
   it("rejects ALREADY_CHECKED_IN with no idempotency key", async () => {
     const existing = makeRow();
     mockInsert.mockReturnValue(insertThatThrows(dupErr()));
-    // 'admission' classification reads the allowlist once at insert time
-    // (check_in_source, migration 184); the duplicate-key re-read
-    // (getActiveCheckIn) is the second SELECT.
-    mockSelectSequence([{ allowed: ["admission"] }], [existing]);
+    // 'admission' with no declared source stamps 'legacy' without touching
+    // the allowlist — the duplicate-key re-read (getActiveCheckIn) is the
+    // only SELECT.
+    mockSelectSequence([existing]);
 
     const { openCheckIn } = await import("../server/services/clinical-check-in.js");
     await expect(
@@ -401,10 +415,10 @@ describe("openCheckIn — idempotency and duplicates", () => {
       clientId: "abc-123",
     });
     mockInsert.mockReturnValue(insertThatThrows(dupErr()));
-    // 'admission' classification reads the allowlist once at insert time
-    // (check_in_source, migration 184); the duplicate-key re-read
-    // (getActiveCheckIn) is the second SELECT.
-    mockSelectSequence([{ allowed: ["admission"] }], [existing]);
+    // 'admission' with no declared source stamps 'legacy' without touching
+    // the allowlist — the duplicate-key re-read (getActiveCheckIn) is the
+    // only SELECT.
+    mockSelectSequence([existing]);
 
     const { openCheckIn } = await import("../server/services/clinical-check-in.js");
     await expect(
@@ -422,10 +436,10 @@ describe("openCheckIn — idempotency and duplicates", () => {
       clientId: "abc-123",
     });
     mockInsert.mockReturnValue(insertThatThrows(dupErr()));
-    // 'admission' classification reads the allowlist once at insert time
-    // (check_in_source, migration 184); the duplicate-key re-read
-    // (getActiveCheckIn) is the second SELECT.
-    mockSelectSequence([{ allowed: ["admission"] }], [existing]);
+    // 'admission' with no declared source stamps 'legacy' without touching
+    // the allowlist — the duplicate-key re-read (getActiveCheckIn) is the
+    // only SELECT.
+    mockSelectSequence([existing]);
 
     const { openCheckIn } = await import("../server/services/clinical-check-in.js");
     await expect(
@@ -810,27 +824,47 @@ describe("doctor shift gate — openCheckIn vet branch", () => {
     }
   });
 
-  it("stamps check_in_source='doctor_gate' for 'admission' when the vet is NOT allowlisted for it", async () => {
-    mockSelectSequence([{ allowed: ["ward"] }]);
+  it("stamps check_in_source='doctor_gate' for 'admission' when the request declares source:'doctor_gate'", async () => {
     const insertChain = chainable([
       makeRow({ operationalRole: "admission", checkInSource: "doctor_gate" }),
     ]);
     mockInsert.mockReturnValue(insertChain);
 
     const { openCheckIn } = await import("../server/services/clinical-check-in.js");
-    await openCheckIn({ actor: VET_ACTOR, operationalRole: "admission" });
+    await openCheckIn({
+      actor: VET_ACTOR,
+      operationalRole: "admission",
+      source: "doctor_gate",
+    });
 
     const inserted = (insertChain["values"] as ReturnType<typeof vi.fn>).mock.calls[0][0];
     expect(inserted.checkInSource).toBe("doctor_gate");
+    // Classification no longer reads the allowlist for 'admission'.
+    expect(mockSelect).not.toHaveBeenCalled();
   });
 
-  it("stamps check_in_source='legacy' for 'admission' when the vet IS allowlisted at insert time", async () => {
-    mockSelectSequence([{ allowed: ["admission"] }]);
+  it("stamps check_in_source='legacy' for 'admission' when the request carries no source", async () => {
     const insertChain = chainable([makeRow({ operationalRole: "admission" })]);
     mockInsert.mockReturnValue(insertChain);
 
     const { openCheckIn } = await import("../server/services/clinical-check-in.js");
     await openCheckIn({ actor: VET_ACTOR, operationalRole: "admission" });
+
+    const inserted = (insertChain["values"] as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    expect(inserted.checkInSource).toBe("legacy");
+  });
+
+  it("ignores source:'doctor_gate' on a non-team legacy role — 'ward' stays 'legacy'", async () => {
+    mockSelectSequence([{ allowed: ["ward"] }]);
+    const insertChain = chainable([makeRow({ operationalRole: "ward" })]);
+    mockInsert.mockReturnValue(insertChain);
+
+    const { openCheckIn } = await import("../server/services/clinical-check-in.js");
+    await openCheckIn({
+      actor: VET_ACTOR,
+      operationalRole: "ward",
+      source: "doctor_gate",
+    });
 
     const inserted = (insertChain["values"] as ReturnType<typeof vi.fn>).mock.calls[0][0];
     expect(inserted.checkInSource).toBe("legacy");
@@ -970,8 +1004,7 @@ describe("switchOperationalRole — atomic role switch", () => {
   });
 
   it("with no open row behaves like a plain open (no close audit, insert still happens)", async () => {
-    // 'admission' classification reads the allowlist once at insert time.
-    mockSelectSequence([{ allowed: [] }]);
+    // 'admission' with no declared source stamps 'legacy' — no allowlist read.
     // UPDATE ... WHERE checked_out_at IS NULL matches nothing.
     mockUpdate.mockReturnValue(chainable([]));
     const newRow = makeRow({ id: "ci-new", operationalRole: "admission" });
@@ -1163,6 +1196,25 @@ describe("openCheckIn — transactional senior demote + senior-index mapping (re
     expect(result.row.isSenior).toBe(true);
     // No demote UPDATE may have fired against the actor's own row.
     expect(mockUpdate).not.toHaveBeenCalled();
+  });
+
+  it("scopes the existing-senior users join to the actor's clinic (tenant boundary on the leftJoin)", async () => {
+    const eligibilityChain = chainable([{ eligible: true }]);
+    const existingChain = chainable([]);
+    mockSelect
+      .mockReturnValueOnce(eligibilityChain)
+      .mockReturnValueOnce(existingChain);
+    mockInsert.mockReturnValue(
+      chainable([makeRow({ operationalRole: "icu", isSenior: true })]),
+    );
+
+    const { openCheckIn } = await import("../server/services/clinical-check-in.js");
+    await openCheckIn({ actor: VET_ACTOR, operationalRole: "icu", isSenior: true });
+
+    const leftJoin = existingChain["leftJoin"] as ReturnType<typeof vi.fn>;
+    expect(leftJoin).toHaveBeenCalledTimes(1);
+    const joinCondition = leftJoin.mock.calls[0][1];
+    expect(sqlContainsValue(joinCondition, VET_ACTOR.clinicId)).toBe(true);
   });
 });
 

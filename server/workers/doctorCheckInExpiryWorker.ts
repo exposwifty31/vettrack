@@ -7,12 +7,11 @@
  *
  *  - `icu` / `internal_medicine` rows are always 'doctor_gate' — these role
  *    values did not exist before the doctor gate.
- *  - `admission` is ambiguous: a row opened by a vet whose
- *    `allowedOperationalRoles` contained "admission" AT INSERT TIME is
- *    'legacy' (pre-feature semantics could have produced it); otherwise
- *    'doctor_gate'. Persisting the verdict makes the sweep immune to later
- *    allowlist edits — inferring from the LIVE allowlist would let removing
- *    "admission" expire a legacy row, or adding it strand a gate row open.
+ *  - `admission` is ambiguous: the gate client declares provenance
+ *    explicitly (request `source: "doctor_gate"`, route-validated literal);
+ *    a request without it — every legacy surface — stamps 'legacy'.
+ *    Persisting the verdict at insert keeps the sweep immune to later
+ *    allowlist edits; the field controls expiry only, never privileges.
  *  - Technician rows (operational_role NULL) and legacy-only roles (`ward`,
  *    `senior_lead`, `night_*`) are 'legacy' by construction — untouchable.
  *

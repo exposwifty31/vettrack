@@ -29,6 +29,9 @@ const checkInBodySchema = z
     operationalRole: z.string().min(1).optional(),
     isSenior: z.boolean().optional(),
     replaceSenior: z.boolean().optional(),
+    // Gate-declared provenance for the ambiguous 'admission' role — feeds
+    // check_in_source (auto-expiry semantics only, never privileges).
+    source: z.literal("doctor_gate").optional(),
   })
   .strict();
 
@@ -150,6 +153,7 @@ router.post(
         operationalRole: parsed.data.operationalRole,
         isSenior: parsed.data.isSenior,
         replaceSenior: parsed.data.replaceSenior,
+        source: parsed.data.source,
         idempotencyKey: keyResult.value,
       });
       res.status(200).json(serializeCheckIn(result.row));
@@ -188,6 +192,7 @@ router.post(
         operationalRole: parsed.data.operationalRole,
         isSenior: parsed.data.isSenior,
         replaceSenior: parsed.data.replaceSenior,
+        source: parsed.data.source,
       });
       res.status(200).json(serializeCheckIn(result.row));
     } catch (err) {

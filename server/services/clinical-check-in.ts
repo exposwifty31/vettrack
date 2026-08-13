@@ -72,6 +72,8 @@ export type CheckInInput = {
   operationalRole?: unknown;
   isSenior?: unknown;
   replaceSenior?: unknown;
+  /** Gate-declared provenance (route-validated literal "doctor_gate"). */
+  source?: unknown;
   idempotencyKey?: string | null;
 };
 
@@ -158,8 +160,9 @@ async function seniorAlreadyAssignedFromRace(
         (winner?.displayName && winner.displayName.length > 0
           ? winner.displayName
           : winner?.name) ?? null;
-    } catch {
+    } catch (err) {
       // Best-effort name resolution — the 409 contract must not depend on it.
+      console.error("[clinical-check-in] senior winner lookup failed", err);
     }
   }
   return new ClinicalCheckInError(
@@ -302,13 +305,12 @@ async function validateAndBuildRow(
           );
         }
       } else if (operationalRoleInput === "admission") {
-        // 'admission' is ambiguous: it pre-exists as a legacy allowlist role.
-        // A row opened by a vet allowlisted for it AT INSERT TIME is
-        // classified 'legacy' (pre-feature semantics could have produced it,
-        // so the expiry sweep must never touch it); everyone else reaches
-        // 'admission' only via the doctor gate.
-        const allowed = await getAllowedOperationalRoles(actor.userId, actor.clinicId);
-        checkInSource = allowed.includes("admission") ? "legacy" : "doctor_gate";
+        // 'admission' is ambiguous: it pre-exists as a legacy allowlist role,
+        // so origin cannot be inferred server-side. The gate client declares
+        // provenance explicitly (`source: "doctor_gate"`, route-validated);
+        // this field only controls the 14h auto-expiry sweep — never
+        // privileges — so client-declared provenance is acceptable.
+        checkInSource = input.source === "doctor_gate" ? "doctor_gate" : "legacy";
       } else {
         // icu / internal_medicine did not exist before the doctor gate.
         checkInSource = "doctor_gate";
@@ -374,7 +376,10 @@ async function validateAndBuildRow(
         displayName: users.displayName,
       })
       .from(clinicalCheckIns)
-      .leftJoin(users, eq(clinicalCheckIns.userId, users.id))
+      .leftJoin(
+        users,
+        and(eq(clinicalCheckIns.userId, users.id), eq(users.clinicId, actor.clinicId)),
+      )
       .where(
         and(
           eq(clinicalCheckIns.clinicId, actor.clinicId),
