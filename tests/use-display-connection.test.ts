@@ -37,6 +37,7 @@ vi.mock("@/hooks/useDisplaySnapshot", async (importOriginal) => {
 
 import {
   useDisplayConnection,
+  isConnectionUntrusted,
   DELAYED_AFTER_MISSED_POLLS,
   STALE_AFTER_MISSED_POLLS,
   OFFLINE_AFTER_MISSED_POLLS,
@@ -197,5 +198,18 @@ describe("TanStack contract the derivation relies on (query-core 5.99)", () => {
     expect(result.current.errorUpdateCount).toBe(2);
     expect(result.current.dataUpdatedAt).toBeGreaterThan(0);
     client.clear();
+  });
+});
+
+describe("isConnectionUntrusted — boot-time takeover trigger", () => {
+  // A cold boot against an unreachable server never receives a snapshot, so the
+  // board would otherwise show a loading skeleton forever. This predicate lets
+  // CommandBoardScreen swap the skeleton for the StaleTakeover once the tracker
+  // escalates past "delayed", so staff can tell "server down" from "slow load".
+  it("is true only for the untrusted states (stale / offline)", () => {
+    expect(isConnectionUntrusted("live")).toBe(false);
+    expect(isConnectionUntrusted("delayed")).toBe(false);
+    expect(isConnectionUntrusted("stale")).toBe(true);
+    expect(isConnectionUntrusted("offline")).toBe(true);
   });
 });

@@ -87,22 +87,20 @@ describe("CommandBoard enrichment panels — tolerant reader", () => {
     }
   });
 
-  it("renders each panel's title + counts when its block is present", () => {
-    const { getByText, getAllByText } = renderBoard(
+  it("renders the bottom-band panels (power, docks) with title + counts when present", () => {
+    const { getByText, getByTestId } = renderBoard(
       board({
         power: { plugged: 3, unplugged: 2, alert: 1 },
         docks: { total: 8, occupied: 5, ready: 4 },
-        waitlist: { depth: 7 },
-        staging: { depth: 6 },
       }),
     );
     expect(getByText(t.board.power)).toBeTruthy();
     expect(getByText(t.board.docks)).toBeTruthy();
-    expect(getByText(t.board.waitlist)).toBeTruthy();
-    expect(getByText(t.board.staging)).toBeTruthy();
-    expect(getByText("7")).toBeTruthy(); // waitlist depth
-    expect(getByText("6")).toBeTruthy(); // staging depth
-    expect(getAllByText(t.board.inQueue).length).toBeGreaterThanOrEqual(2); // waitlist + staging
+    // Active power alert surfaces in its own cell (severity → red + icon).
+    expect(getByTestId("board-power-alerts").textContent).toContain("1");
+    // Waitlist/staging depth render on the Ops rotation face (OpsStage), not the
+    // bottom band or the equipment evidence face — spec §2 keeps the queue detail
+    // on one face only (no identical numbers on both faces of the rotation).
   });
 
   // Task 10 — the calm/pressure threshold machine is replaced by the

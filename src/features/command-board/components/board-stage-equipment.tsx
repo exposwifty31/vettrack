@@ -21,11 +21,11 @@ import { CheckCircle2, Settings2 } from "lucide-react";
 import { t } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { useBoardEntityCoPresence } from "@/board/board-copresence-context";
-import type { BoardResponsibles, EquipmentCommandBoardSnapshot } from "@/types/safety-surfaces";
+import type { EquipmentCommandBoardSnapshot } from "@/types/safety-surfaces";
 import type { EquipmentBoardUnitRow, EquipmentReadinessStatus } from "../../../../shared/equipment-board";
 import { STATUS_BG, STATUS_BAR_COLOR, statusLabel } from "../status-tokens";
 import type { BoardStateKind } from "../board-state";
-import { CustodyPanel, StagingPanel, WaitlistPanel } from "./board-panels";
+import { CustodyPanel } from "./board-panels";
 
 /** The six readiness buckets that make up a stacked readiness bar. */
 type ReadinessCounts = {
@@ -448,9 +448,6 @@ export function EquipmentStage({
   board: EquipmentCommandBoardSnapshot;
   state: BoardStateKind;
   tvMode?: boolean;
-  /** Accepted for stage-composition parity (Task 11 rotation); the bottom band
-   * in CommandBoard owns the always-mounted ResponsiblesPanel. */
-  responsibles?: BoardResponsibles | null;
 }): JSX.Element {
   const exceptions = sortExceptions(
     board.criticalUnits.filter((u) => u.status !== "ready" && u.status !== "in_use"),
@@ -613,9 +610,9 @@ export function EquipmentStage({
           </section>
         )}
 
-        {/* Waitlist / staging depth — tolerant-reader guarded (Task 11 relocates to the Ops view) */}
-        {board.waitlist && <WaitlistPanel depth={board.waitlist.depth} />}
-        {board.staging && <StagingPanel depth={board.staging.depth} />}
+        {/* Waitlist / staging depth live on the Ops rotation face (OpsStage), never
+            here — the evidence face would otherwise show the identical numbers on
+            both faces of the rotation (spec §2: Ops owns the queue detail). */}
         {board.custody && board.custody.units.length > 0 && <CustodyPanel custody={board.custody} />}
       </div>
     </section>

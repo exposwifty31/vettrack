@@ -22,7 +22,7 @@ import {
   publishCodeBlueSeenGossip,
 } from "@/lib/realtime";
 import { useDisplaySnapshot } from "@/hooks/useDisplaySnapshot";
-import { useDisplayConnection } from "@/hooks/use-display-connection";
+import { useDisplayConnection, isConnectionUntrusted } from "@/hooks/use-display-connection";
 import { useDisplayHeartbeat } from "@/hooks/useDisplayHeartbeat";
 import { useRealtimeReconciliation } from "@/hooks/useRealtimeReconciliation";
 import { useCodeBlueKeepaliveReconciliation } from "@/hooks/useCodeBlueKeepaliveReconciliation";
@@ -30,6 +30,7 @@ import { t } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { CommandBoard } from "./components/CommandBoard";
 import { CodeBlueOverlay } from "./components/CodeBlueOverlay";
+import { StaleTakeover } from "./components/board-takeovers";
 import { useBoardState } from "./use-board-state";
 import { useKioskModeFromUrl } from "./use-kiosk-mode-from-url";
 import { useTvModeFromUrl } from "./use-tv-mode-from-url";
@@ -138,6 +139,24 @@ function CommandBoardScreen({ kioskMode: kioskModeProp }: CommandBoardScreenProp
   }, [snapshotLoaded, localCbId]);
 
   if (!snapshot) {
+    // Cold boot against an unreachable server never receives a snapshot. Once the
+    // connection tracker escalates past "delayed", show the offline takeover rather
+    // than a skeleton that would spin forever — staff must be able to tell "server
+    // down" from "still loading". StaleTakeover degrades gracefully with no
+    // last-known values (headline only). Sits BELOW the Code Blue early-return.
+    if (isConnectionUntrusted(connection.state)) {
+      return (
+        <div
+          className="dark flex min-h-screen flex-col bg-[color:var(--board-bg,#0f141a)] text-ivory-text"
+          dir={dir}
+          data-testid="board-boot-takeover"
+        >
+          <main className="flex min-h-0 flex-1 flex-col">
+            <StaleTakeover connection={connection} lastSnapshot={undefined} />
+          </main>
+        </div>
+      );
+    }
     return (
       <div
         className="dark flex flex-col min-h-screen bg-[rgb(var(--ivory-bg))] text-ivory-text"

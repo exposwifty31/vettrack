@@ -57,18 +57,6 @@ function Stat({ count, label, className }: { count: number; label: string; class
   );
 }
 
-/** Single big-number depth panel (waitlist / staging). */
-function DepthPanel({ title, depth }: { title: string; depth: number }) {
-  return (
-    <Panel title={title}>
-      <div className="flex items-baseline gap-2">
-        <span className="vt-text-2xl font-black tabular-nums text-ivory-text leading-none">{depth}</span>
-        <span className="vt-text-xs text-ivory-text3">{t.board.inQueue}</span>
-      </div>
-    </Panel>
-  );
-}
-
 export function PowerPanel({ power }: { power: EquipmentBoardPowerBlock }) {
   // Red is an alarm color on the board: it appears only when alerts are ACTIVE.
   // A zero renders neutral — never a red zero (status semantics, Phase 1 §3).
@@ -116,14 +104,6 @@ export function DocksPanel({ docks }: { docks: EquipmentBoardDocksBlock }) {
       </div>
     </Panel>
   );
-}
-
-export function WaitlistPanel({ depth }: { depth: number }) {
-  return <DepthPanel title={t.board.waitlist} depth={depth} />;
-}
-
-export function StagingPanel({ depth }: { depth: number }) {
-  return <DepthPanel title={t.board.staging} depth={depth} />;
 }
 
 // ── ResponsiblesPanel v2 (TV board phase 1, spec §4) ─────────────────────────

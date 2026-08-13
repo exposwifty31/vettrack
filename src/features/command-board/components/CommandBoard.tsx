@@ -232,7 +232,7 @@ export function CommandBoard({
             {stageView === "ops" ? (
               <OpsStage board={board} currentShift={currentShift} tvMode={tvMode} />
             ) : (
-              <EquipmentStage board={board} state={state} tvMode={tvMode} responsibles={responsibles} />
+              <EquipmentStage board={board} state={state} tvMode={tvMode} />
             )}
           </StageFade>
         )}

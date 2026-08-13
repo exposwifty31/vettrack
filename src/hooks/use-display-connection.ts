@@ -29,6 +29,16 @@ export interface DisplayConnection {
   missedPolls: number;
 }
 
+/**
+ * The connection has degraded past "delayed" — the feed can no longer be trusted
+ * as live. On a cold boot with no snapshot yet, CommandBoardScreen uses this to
+ * swap the loading skeleton for the StaleTakeover, so a wall display shows
+ * "server down" instead of a skeleton that spins forever.
+ */
+export function isConnectionUntrusted(state: ConnectionState): boolean {
+  return state === "stale" || state === "offline";
+}
+
 interface MissAnchor {
   dataUpdatedAt: number;
   errorUpdateCount: number;
