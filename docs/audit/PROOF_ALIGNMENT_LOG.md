@@ -6558,3 +6558,42 @@ Task 7; worker docblock admission bullet updated to the explicit-source contract
 - `DATABASE_URL=<.env> npx vitest run --config vitest.db-integration.config.ts tests/doctor-shift-gate.integration.test.ts` → `Test Files  1 passed (1) · Tests  3 passed (3)` (+1: gate-declared admission provenance).
 
 **Verdict:** VERIFIED
+
+## 2026-08-13 — PR #180 CodeRabbit round 3: 3 Major findings (senior-preserving switch, clinic-scoped expiry sweep, /switch idempotency)
+
+**Claim:** All 3 round-3 findings fixed on feat/doctor-shift-gate. (1)
+DoctorShiftStatus.tsx no longer ANDs the client-side eligibility flag into the
+switch payload — it sends `isSenior: isSeniorChecked` (server enforces
+eligibility via SENIOR_NOT_ELIGIBLE 403), so an active senior tapping a team
+button while /users/me is still pending is no longer silently demoted; new
+regression test (active senior + never-settling meQuery → switch carries
+isSenior:true). (2) `sweepExpiredDoctorCheckIns` restructured per the repo
+multi-tenancy rule: a `selectDistinct` first enumerates the clinics holding
+expired doctor_gate rows, then one clinic-scoped UPDATE per clinic with
+`eq(clinicalCheckIns.clinicId, clinicId)` AND the full expiry predicate
+(checked_out_at IS NULL, checkedInAt < cutoff, check_in_source='doctor_gate');
+return shape / per-row audit / authority-cache invalidation unchanged. Unit
+tests assert both WHERE clauses; integration test gains a second fixture
+clinic proving the per-clinic loop still closes every clinic's expired doctor
+row while an identically-aged technician row in that clinic stays open; plan
+doc Task 7 snippet updated to match. (3) POST /switch now mirrors /check-in's
+Idempotency-Key mechanism: route reads the header via the shared
+`resolveIdempotencyKey` (64-char cap, trim, blank→null) and threads it into
+`switchOperationalRole`, which stores it as the new row's `clientId`,
+pre-checks for replay BEFORE validation (a duplicate retry returns the first
+transition's row — no second close+insert, no duplicate audit, no
+shift-timestamp reset), and replays the concurrent winner's row on an
+open-per-user 23505 with a matching key (shared `isReplayOfExisting` helper,
+also reused by openCheckIn's catch). Client deliberately unchanged:
+`api.checkIn.open` sends no Idempotency-Key header (verified src/lib/api.ts),
+so /switch mirrors the existing header-less client convention. 5 new route
+tests + 4 new service tests.
+
+**Evidence (actual command outputs this session):**
+- `pnpm typecheck` → exited clean, zero errors (both tsconfigs).
+- `pnpm test` → `Test Files  715 passed (715) · Tests  6410 passed | 11 skipped (6421) · Duration 105.25s` (+12 tests vs round 2's 6398: 1 component regression, 2 expiry-sweep restructure deltas, 5 /switch route idempotency, 4 /switch service idempotency).
+- `pnpm i18n:check` → `✓ locales/en.json and locales/he.json are in deep key parity.`
+- `pnpm architecture:gates` → `All G1 checks passed.` (madge `OK — server: 0 cycle(s), src: 0 cycle(s) (matches baseline)`).
+- `DATABASE_URL=<.env> npx vitest run --config vitest.db-integration.config.ts tests/doctor-shift-gate.integration.test.ts` → `Test Files  1 passed (1) · Tests  3 passed (3)` (cross-clinic sweep assertions added inside the round-trip test).
+
+**Verdict:** VERIFIED

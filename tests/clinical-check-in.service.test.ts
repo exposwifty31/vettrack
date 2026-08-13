@@ -1055,6 +1055,116 @@ describe("switchOperationalRole — atomic role switch", () => {
     });
     expect(mockInsert).not.toHaveBeenCalled();
   });
+
+  it("replays the prior switch on a duplicate idempotency key — NO second close+insert, no new audit", async () => {
+    // Pre-check SELECT: the actor's current open row was created by this key.
+    const ownRow = makeRow({
+      id: "ci-switched",
+      operationalRole: "icu",
+      checkInSource: "doctor_gate",
+      clientId: "switch-retry-1",
+      checkedInAt: new Date(Date.now() - 5_000),
+    });
+    mockSelectSequence([ownRow]);
+
+    const { switchOperationalRole } = await import(
+      "../server/services/clinical-check-in.js"
+    );
+    const result = await switchOperationalRole({
+      actor: VET_ACTOR,
+      operationalRole: "icu",
+      idempotencyKey: "switch-retry-1",
+    });
+
+    expect(result.replayed).toBe(true);
+    expect(result.row.id).toBe("ci-switched");
+    expect(mockTransaction).not.toHaveBeenCalled();
+    expect(mockUpdate).not.toHaveBeenCalled();
+    expect(mockInsert).not.toHaveBeenCalled();
+    expect(mockLogAudit).not.toHaveBeenCalled();
+  });
+
+  it("stores the idempotency key as the new row's clientId so a retry can replay it", async () => {
+    mockSelectSequence([]); // replay pre-check: no open row created by this key
+    mockUpdate.mockReturnValue(
+      chainable([makeRow({ id: "ci-old", checkOutReason: "role_switch" })]),
+    );
+    const insertChain = chainable([
+      makeRow({ id: "ci-new", operationalRole: "icu", clientId: "switch-key-9" }),
+    ]);
+    mockInsert.mockReturnValue(insertChain);
+
+    const { switchOperationalRole } = await import(
+      "../server/services/clinical-check-in.js"
+    );
+    const result = await switchOperationalRole({
+      actor: VET_ACTOR,
+      operationalRole: "icu",
+      idempotencyKey: "switch-key-9",
+    });
+
+    expect(result.replayed).toBe(false);
+    const inserted = (insertChain["values"] as ReturnType<typeof vi.fn>).mock
+      .calls[0][0];
+    expect(inserted.clientId).toBe("switch-key-9");
+  });
+
+  it("does NOT replay when the open row was not created by this key — the switch executes normally", async () => {
+    // Pre-check finds an open row with a DIFFERENT clientId → real transition.
+    mockSelectSequence([
+      makeRow({ id: "ci-old", clientId: null, checkedInAt: new Date(Date.now() - 5_000) }),
+    ]);
+    mockUpdate.mockReturnValue(
+      chainable([makeRow({ id: "ci-old", checkOutReason: "role_switch" })]),
+    );
+    mockInsert.mockReturnValue(chainable([makeRow({ id: "ci-new", operationalRole: "icu" })]));
+
+    const { switchOperationalRole } = await import(
+      "../server/services/clinical-check-in.js"
+    );
+    const result = await switchOperationalRole({
+      actor: VET_ACTOR,
+      operationalRole: "icu",
+      idempotencyKey: "fresh-key",
+    });
+
+    expect(result.replayed).toBe(false);
+    expect(result.row.id).toBe("ci-new");
+    expect(mockTransaction).toHaveBeenCalledTimes(1);
+  });
+
+  it("open-per-user race with a matching key replays the concurrent winner's row", async () => {
+    // Pre-check: no open row yet (both duplicates passed it), then the
+    // catch-path re-read finds the winner's row carrying the same key.
+    mockSelectSequence([]);
+    mockUpdate.mockReturnValue(chainable([]));
+    mockInsert.mockReturnValue(
+      insertThatThrows({
+        code: "23505",
+        constraint: "ux_vt_clinical_check_ins_open_per_user",
+      }),
+    );
+    mockSelectSequence([
+      makeRow({
+        id: "ci-winner",
+        operationalRole: "icu",
+        clientId: "dup-switch-key",
+        checkedInAt: new Date(Date.now() - 1_000),
+      }),
+    ]);
+
+    const { switchOperationalRole } = await import(
+      "../server/services/clinical-check-in.js"
+    );
+    const result = await switchOperationalRole({
+      actor: VET_ACTOR,
+      operationalRole: "icu",
+      idempotencyKey: "dup-switch-key",
+    });
+
+    expect(result.replayed).toBe(true);
+    expect(result.row.id).toBe("ci-winner");
+  });
 });
 
 describe("openCheckIn — transactional senior demote + senior-index mapping (review findings)", () => {

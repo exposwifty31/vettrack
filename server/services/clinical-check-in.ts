@@ -103,6 +103,23 @@ export class ClinicalCheckInError extends Error {
 
 const REPLAY_WINDOW_MS = 60_000;
 
+/**
+ * Idempotent-replay match: the actor's current open row was created by this
+ * same Idempotency-Key within the replay window, so a retried request must
+ * return it instead of executing a second transition.
+ */
+function isReplayOfExisting(
+  existing: ClinicalCheckIn | null,
+  trimmedKey: string,
+): existing is ClinicalCheckIn {
+  return (
+    existing !== null &&
+    trimmedKey.length > 0 &&
+    (existing.clientId ?? "") === trimmedKey &&
+    Date.now() - existing.checkedInAt.getTime() <= REPLAY_WINDOW_MS
+  );
+}
+
 /** Partial unique index backing the one-open-senior-per-team invariant (migration 183). */
 const OPEN_SENIOR_PER_TEAM_INDEX = "ux_vt_clinical_check_ins_open_senior_per_team";
 
@@ -500,17 +517,8 @@ export async function openCheckIn(input: CheckInInput): Promise<CheckInResult> {
     }
 
     const existing = await getActiveCheckIn(actor.clinicId, actor.userId);
-    if (existing) {
-      const trimmedKey = idempotencyKey?.trim() ?? "";
-      const existingClientId = existing.clientId ?? "";
-      const ageMs = Date.now() - existing.checkedInAt.getTime();
-      if (
-        trimmedKey.length > 0 &&
-        existingClientId === trimmedKey &&
-        ageMs <= REPLAY_WINDOW_MS
-      ) {
-        return { row: existing, replayed: true };
-      }
+    if (isReplayOfExisting(existing, idempotencyKey?.trim() ?? "")) {
+      return { row: existing, replayed: true };
     }
     throw new ClinicalCheckInError(
       409,
@@ -527,11 +535,28 @@ export async function openCheckIn(input: CheckInInput): Promise<CheckInResult> {
  * open check-in. With no open row it degrades to a plain open. The new role
  * goes through the exact same validation path as `openCheckIn` (team-role
  * bypass, allowlist for legacy roles, server-validated senior semantics).
+ *
+ * Idempotency mirrors `openCheckIn`: the key is stored as the new row's
+ * `clientId`, and a retry whose key matches the actor's CURRENT open row
+ * (within the replay window) returns that row instead of repeating the
+ * close+insert — a repeated transition would reset the shift timestamp and
+ * duplicate the audit trail.
  */
 export async function switchOperationalRole(
   input: CheckInInput,
 ): Promise<CheckInResult> {
   const { actor } = input;
+  const idempotencyKey = input.idempotencyKey ?? null;
+  const trimmedKey = idempotencyKey?.trim() ?? "";
+
+  if (trimmedKey.length > 0) {
+    // Replay pre-check BEFORE validation: a replayed request must not re-run
+    // the side-effectful validation path (e.g. a replace-senior demote).
+    const existing = await getActiveCheckIn(actor.clinicId, actor.userId);
+    if (isReplayOfExisting(existing, trimmedKey)) {
+      return { row: existing, replayed: true };
+    }
+  }
 
   try {
     const inserted = await db.transaction(async (tx) => {
@@ -562,7 +587,7 @@ export async function switchOperationalRole(
           clinicalRoleAtCheckIn: actor.role,
           activeShiftId: null,
           shiftSessionId: null,
-          clientId: null,
+          clientId: trimmedKey.length > 0 ? trimmedKey : null,
           checkInSource,
         })
         .returning();
@@ -614,8 +639,15 @@ export async function switchOperationalRole(
         // rolled back, so the previous check-in (if any) is still open.
         throw await seniorAlreadyAssignedFromRace(actor, input.operationalRole);
       }
-      // Lost a race against a concurrent open — the transaction rolled back,
-      // so the previous check-in (if any) is still open.
+      // Lost a race against a concurrent open/switch — the transaction rolled
+      // back. If the winner was the duplicate of THIS request (same key),
+      // replay its row; otherwise surface the conflict.
+      if (trimmedKey.length > 0) {
+        const existing = await getActiveCheckIn(actor.clinicId, actor.userId);
+        if (isReplayOfExisting(existing, trimmedKey)) {
+          return { row: existing, replayed: true };
+        }
+      }
       throw new ClinicalCheckInError(
         409,
         "ALREADY_CHECKED_IN",

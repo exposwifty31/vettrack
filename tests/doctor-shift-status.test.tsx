@@ -179,6 +179,23 @@ describe("DoctorShiftStatus — on-shift status + exit surface", () => {
     );
   });
 
+  it("preserves senior on switch while the eligibility query is still PENDING (regression: no silent demote)", async () => {
+    activeMock.mockResolvedValue({ active: makeRow({ isSenior: true }) });
+    // /api/users/me never settles — the switch request must still carry the
+    // active senior state; eligibility is validated server-side.
+    meMock.mockReset().mockReturnValue(new Promise(() => {}));
+    renderStatus();
+    fireEvent.click(await screen.findByTestId("doctor-status-switch-role"));
+    fireEvent.click(await screen.findByTestId("doctor-switch-team-admission"));
+    await waitFor(() =>
+      expect(switchMock).toHaveBeenCalledWith({
+        operationalRole: "admission",
+        isSenior: true,
+        source: "doctor_gate",
+      }),
+    );
+  });
+
   it("409 SENIOR_ALREADY_ASSIGNED on switch shows the replace-confirm and retries with replaceSenior: true", async () => {
     meMock.mockResolvedValue({ id: "u-vet-1", role: "vet", seniorDoctorEligible: true });
     const conflict = Object.assign(new Error("senior already assigned"), {

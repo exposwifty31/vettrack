@@ -616,6 +616,8 @@ describe("POST /switch — atomic role switch route", () => {
       operationalRole: "icu",
       isSenior: true,
       replaceSenior: true,
+      source: undefined,
+      idempotencyKey: null,
     });
     expect(captured.body).toMatchObject({
       id: "ci-new",
@@ -709,6 +711,91 @@ describe("POST /switch — atomic role switch route", () => {
     expect(captured.statusCode).toBe(500);
     expect(captured.body).toMatchObject({ code: "INTERNAL_ERROR" });
     consoleSpy.mockRestore();
+  });
+});
+
+describe("POST /switch — Idempotency-Key handling (mirrors /check-in)", () => {
+  it("accepts a 64-char key and forwards to service", async () => {
+    mockSwitchOperationalRole.mockResolvedValueOnce({ row: makeRow(), replayed: false });
+    const key = "b".repeat(64);
+    const req = makeReq({
+      method: "POST",
+      url: "/switch",
+      body: { operationalRole: "icu" },
+      headers: { "idempotency-key": key },
+    });
+    const { res, captured } = makeRes();
+    await dispatch(req, res);
+    expect(captured.statusCode).toBe(200);
+    expect(mockSwitchOperationalRole).toHaveBeenCalledWith(
+      expect.objectContaining({ idempotencyKey: key }),
+    );
+  });
+
+  it("rejects 65-char key with IDEMPOTENCY_KEY_TOO_LONG envelope (service never called)", async () => {
+    const req = makeReq({
+      method: "POST",
+      url: "/switch",
+      body: { operationalRole: "icu" },
+      headers: { "idempotency-key": "b".repeat(65) },
+    });
+    const { res, captured } = makeRes();
+    await dispatch(req, res);
+    expect(captured.statusCode).toBe(400);
+    expect(captured.body).toMatchObject({
+      code: "IDEMPOTENCY_KEY_TOO_LONG",
+      error: "IDEMPOTENCY_KEY_TOO_LONG",
+      reason: "IDEMPOTENCY_KEY_TOO_LONG",
+    });
+    expect(mockSwitchOperationalRole).not.toHaveBeenCalled();
+  });
+
+  it("treats whitespace-only key as absent (service receives null)", async () => {
+    mockSwitchOperationalRole.mockResolvedValueOnce({ row: makeRow(), replayed: false });
+    const req = makeReq({
+      method: "POST",
+      url: "/switch",
+      body: { operationalRole: "icu" },
+      headers: { "idempotency-key": "   " },
+    });
+    const { res } = makeRes();
+    await dispatch(req, res);
+    expect(mockSwitchOperationalRole).toHaveBeenCalledWith(
+      expect.objectContaining({ idempotencyKey: null }),
+    );
+  });
+
+  it("trims leading/trailing whitespace before forwarding", async () => {
+    mockSwitchOperationalRole.mockResolvedValueOnce({ row: makeRow(), replayed: false });
+    const req = makeReq({
+      method: "POST",
+      url: "/switch",
+      body: { operationalRole: "icu" },
+      headers: { "idempotency-key": "  switch-key-1  " },
+    });
+    const { res } = makeRes();
+    await dispatch(req, res);
+    expect(mockSwitchOperationalRole).toHaveBeenCalledWith(
+      expect.objectContaining({ idempotencyKey: "switch-key-1" }),
+    );
+  });
+
+  it("serializes a replayed row as a normal 200 (duplicate key → first transition returned, no second switch)", async () => {
+    mockSwitchOperationalRole.mockResolvedValueOnce({
+      row: makeRow({ id: "ci-replayed", operationalRole: "icu" }),
+      replayed: true,
+    });
+    const req = makeReq({
+      method: "POST",
+      url: "/switch",
+      body: { operationalRole: "icu" },
+      headers: { "idempotency-key": "switch-key-1" },
+    });
+    const { res, captured } = makeRes();
+    await dispatch(req, res);
+    expect(captured.statusCode).toBe(200);
+    expect(captured.body).toMatchObject({ id: "ci-replayed", operationalRole: "icu" });
+    expect(mockSwitchOperationalRole).toHaveBeenCalledTimes(1);
   });
 });
 

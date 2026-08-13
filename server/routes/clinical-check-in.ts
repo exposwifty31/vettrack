@@ -186,6 +186,13 @@ router.post(
       return;
     }
 
+    const keyResult = resolveIdempotencyKey(
+      req.headers["idempotency-key"],
+      res,
+      requestId,
+    );
+    if (!keyResult.ok) return;
+
     try {
       const result = await switchOperationalRole({
         actor: actorFromRequest(req.authUser!),
@@ -193,6 +200,7 @@ router.post(
         isSenior: parsed.data.isSenior,
         replaceSenior: parsed.data.replaceSenior,
         source: parsed.data.source,
+        idempotencyKey: keyResult.value,
       });
       res.status(200).json(serializeCheckIn(result.row));
     } catch (err) {

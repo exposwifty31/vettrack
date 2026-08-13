@@ -168,9 +168,13 @@ export function DoctorShiftStatus() {
                     data-testid={`doctor-switch-team-${nextTeam}`}
                     disabled={switchMutation.isPending}
                     onClick={() =>
+                      // isSenior is the checkbox state alone — eligibility is
+                      // enforced server-side (SENIOR_NOT_ELIGIBLE 403). ANDing
+                      // in the client-side eligibility flag would silently
+                      // demote an active senior while meQuery is still pending.
                       switchMutation.mutate({
                         operationalRole: nextTeam,
-                        isSenior: seniorDoctorEligible && isSeniorChecked,
+                        isSenior: isSeniorChecked,
                         source: "doctor_gate",
                       })
                     }

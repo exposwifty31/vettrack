@@ -280,19 +280,32 @@ export const DOCTOR_CHECKIN_EXPIRY_HOURS = 14;
 
 export async function sweepExpiredDoctorCheckIns(now: Date = new Date()): Promise<{ closedCount: number }> {
   const cutoff = new Date(now.getTime() - DOCTOR_CHECKIN_EXPIRY_HOURS * 3_600_000);
-  const closed = await db.update(clinicalCheckIns)
-    .set({ checkedOutAt: now, checkOutReason: "auto_expired" })
-    .where(and(
-      isNull(clinicalCheckIns.checkedOutAt),
-      eq(clinicalCheckIns.checkInSource, "doctor_gate"),   // migration 184
-      lt(clinicalCheckIns.checkedInAt, cutoff),
-    ))
-    .returning({ id: clinicalCheckIns.id, clinicId: clinicalCheckIns.clinicId });
+  const expiredDoctorRows = and(
+    isNull(clinicalCheckIns.checkedOutAt),
+    lt(clinicalCheckIns.checkedInAt, cutoff),
+    eq(clinicalCheckIns.checkInSource, "doctor_gate"),   // migration 184
+  );
+
+  // Repo rule: every query filters by clinicId — enumerate the clinics
+  // holding expired doctor rows, then close them clinic by clinic.
+  const clinicsWithExpired = await db
+    .selectDistinct({ clinicId: clinicalCheckIns.clinicId })
+    .from(clinicalCheckIns)
+    .where(expiredDoctorRows);
+
+  const closed: { id: string; clinicId: string }[] = [];
+  for (const { clinicId } of clinicsWithExpired) {
+    const rows = await db.update(clinicalCheckIns)
+      .set({ checkedOutAt: now, checkOutReason: "auto_expired" })
+      .where(and(eq(clinicalCheckIns.clinicId, clinicId), expiredDoctorRows))
+      .returning({ id: clinicalCheckIns.id, clinicId: clinicalCheckIns.clinicId });
+    closed.push(...rows);
+  }
   return { closedCount: closed.length };
 }
 ```
 
-(The sweep is cross-clinic by nature — the WHERE targets only doctor-role rows; per-row clinicId is preserved in the returned set for logging. Register `startDoctorCheckInExpiryWorker()` in `start-schedulers.ts` next to the other in-process schedulers, `setInterval` 60 min, guarded try/catch.)
+(The sweep still covers every clinic — the candidate SELECT targets only doctor-gate rows, and each clinic's close runs as a clinic-scoped UPDATE with `eq(clinicalCheckIns.clinicId, clinicId)` in the WHERE; per-row clinicId is preserved in the returned set for logging. Register `startDoctorCheckInExpiryWorker()` in `start-schedulers.ts` next to the other in-process schedulers, `setInterval` 60 min, guarded try/catch.)
 
 - [ ] **Step 3: Tests green → Commit** — `git commit -m "feat(check-in): 14h auto-expiry for doctor check-ins (doctor rows only)"`
 

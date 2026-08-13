@@ -1,7 +1,9 @@
 /**
  * Doctor check-in auto-expiry sweep (doctor shift gate, spec 2026-08-13).
  *
- * Closes forgotten DOCTOR-GATE check-ins after 14 hours with one UPDATE.
+ * Closes forgotten DOCTOR-GATE check-ins after 14 hours: the affected
+ * clinics are enumerated first, then each clinic's expired rows close in a
+ * clinic-scoped UPDATE (repo rule: every query filters by clinicId).
  * Targeting rides on the immutable `check_in_source` column (migration 184),
  * classified ONCE at insert by the check-in service:
  *
@@ -42,22 +44,38 @@ export async function sweepExpiredDoctorCheckIns(
   now: Date = new Date(),
 ): Promise<{ closedCount: number }> {
   const cutoff = new Date(now.getTime() - DOCTOR_CHECKIN_EXPIRY_HOURS * 3_600_000);
-  const closed = await db
-    .update(clinicalCheckIns)
-    .set({ checkedOutAt: now, checkOutReason: "auto_expired" })
-    .where(
-      and(
-        isNull(clinicalCheckIns.checkedOutAt),
-        lt(clinicalCheckIns.checkedInAt, cutoff),
-        eq(clinicalCheckIns.checkInSource, "doctor_gate"),
-      ),
-    )
-    .returning({
-      id: clinicalCheckIns.id,
-      clinicId: clinicalCheckIns.clinicId,
-      userId: clinicalCheckIns.userId,
-      operationalRole: clinicalCheckIns.operationalRole,
-    });
+  const expiredDoctorRows = and(
+    isNull(clinicalCheckIns.checkedOutAt),
+    lt(clinicalCheckIns.checkedInAt, cutoff),
+    eq(clinicalCheckIns.checkInSource, "doctor_gate"),
+  );
+
+  // Enumerate the clinics holding expired doctor rows, then close them one
+  // clinic at a time so every UPDATE carries an explicit clinicId predicate.
+  const clinicsWithExpired = await db
+    .selectDistinct({ clinicId: clinicalCheckIns.clinicId })
+    .from(clinicalCheckIns)
+    .where(expiredDoctorRows);
+
+  const closed: {
+    id: string;
+    clinicId: string;
+    userId: string;
+    operationalRole: string | null;
+  }[] = [];
+  for (const { clinicId } of clinicsWithExpired) {
+    const rows = await db
+      .update(clinicalCheckIns)
+      .set({ checkedOutAt: now, checkOutReason: "auto_expired" })
+      .where(and(eq(clinicalCheckIns.clinicId, clinicId), expiredDoctorRows))
+      .returning({
+        id: clinicalCheckIns.id,
+        clinicId: clinicalCheckIns.clinicId,
+        userId: clinicalCheckIns.userId,
+        operationalRole: clinicalCheckIns.operationalRole,
+      });
+    closed.push(...rows);
+  }
 
   for (const row of closed) {
     // Writer-side invalidation contract: mirror every sibling close path so

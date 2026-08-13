@@ -7,7 +7,10 @@
  * replace-senior demotes the previous senior in place (row stays open),
  * `buildBoardResponsibles` aggregates the resulting board block, and the
  * 14 h `sweepExpiredDoctorCheckIns` closes ONLY doctor-team rows — a
- * technician check-in aged identically stays open.
+ * technician check-in aged identically stays open. The sweep runs one
+ * clinic-scoped UPDATE per affected clinic: a second fixture clinic proves
+ * both that its expired doctor row still closes (multi-clinic coverage) and
+ * that its non-doctor rows stay untouched.
  *
  * Requires DATABASE_URL + migrations applied (181/182/183/184); skips
  * cleanly otherwise. Registered in vitest.db-integration.config.ts
@@ -69,27 +72,33 @@ describe.skipIf(!dbReachable)("doctor shift gate integration (real DB)", () => {
   const ELIGIBLE_VET_B_ID = "doctor-gate-eligible-vet-b-test";
   const LEGACY_VET_ID = "doctor-gate-legacy-vet-test";
   const TECH_ID = "doctor-gate-tech-test";
+  // Second clinic: cross-clinic sweep coverage (per-clinic UPDATE loop).
+  const CLINIC_B_ID = "doctor-gate-clinic-b-test";
+  const CLINIC_B_VET_ID = "doctor-gate-clinic-b-vet-test";
+  const CLINIC_B_TECH_ID = "doctor-gate-clinic-b-tech-test";
 
   beforeEach(async () => {
     // Test independence: every test starts with NO open check-ins for the
-    // fixture clinic — no test may rely on a prior test's sweep or close.
+    // fixture clinics — no test may rely on a prior test's sweep or close.
     await probePool?.query(
       `UPDATE vt_clinical_check_ins
        SET checked_out_at = now(), check_out_reason = 'self'
-       WHERE clinic_id = $1 AND checked_out_at IS NULL`,
-      [CLINIC_ID],
+       WHERE clinic_id = ANY($1) AND checked_out_at IS NULL`,
+      [[CLINIC_ID, CLINIC_B_ID]],
     );
   });
 
   afterAll(async () => {
     // FK-safe teardown, children first (vt_clinical_check_ins RESTRICTs both
     // vt_users and vt_clinics).
-    try {
-      await probePool?.query(`DELETE FROM vt_clinical_check_ins WHERE clinic_id = $1`, [CLINIC_ID]);
-      await probePool?.query(`DELETE FROM vt_users WHERE clinic_id = $1`, [CLINIC_ID]);
-      await probePool?.query(`DELETE FROM vt_clinics WHERE id = $1`, [CLINIC_ID]);
-    } catch (err) {
-      console.warn(`[doctor-shift-gate.integration.test] cleanup failed for ${CLINIC_ID}`, err);
+    for (const clinicId of [CLINIC_ID, CLINIC_B_ID]) {
+      try {
+        await probePool?.query(`DELETE FROM vt_clinical_check_ins WHERE clinic_id = $1`, [clinicId]);
+        await probePool?.query(`DELETE FROM vt_users WHERE clinic_id = $1`, [clinicId]);
+        await probePool?.query(`DELETE FROM vt_clinics WHERE id = $1`, [clinicId]);
+      } catch (err) {
+        console.warn(`[doctor-shift-gate.integration.test] cleanup failed for ${clinicId}`, err);
+      }
     }
     await probePool?.end();
   });
@@ -106,8 +115,12 @@ describe.skipIf(!dbReachable)("doctor shift gate integration (real DB)", () => {
       "../server/workers/doctorCheckInExpiryWorker.js"
     );
 
-    // ---- Seed: throwaway clinic + three vets (one plain, two senior-eligible) + a technician.
-    await db.insert(clinics).values({ id: CLINIC_ID }).onConflictDoNothing();
+    // ---- Seed: throwaway clinic + three vets (one plain, two senior-eligible) + a technician,
+    //      plus a second clinic (one vet, one technician) for the cross-clinic sweep assertions.
+    await db
+      .insert(clinics)
+      .values([{ id: CLINIC_ID }, { id: CLINIC_B_ID }])
+      .onConflictDoNothing();
     await db
       .insert(users)
       .values([
@@ -167,6 +180,26 @@ describe.skipIf(!dbReachable)("doctor shift gate integration (real DB)", () => {
           email: "tech@doctor-gate.test",
           name: "Gate Tech",
           displayName: "Gate Tech",
+          role: "technician",
+          status: "active",
+        },
+        {
+          id: CLINIC_B_VET_ID,
+          clinicId: CLINIC_B_ID,
+          clerkId: `${CLINIC_B_VET_ID}-clerk`,
+          email: "clinic-b-vet@doctor-gate.test",
+          name: "Clinic B Vet",
+          displayName: "Clinic B Vet",
+          role: "vet",
+          status: "active",
+        },
+        {
+          id: CLINIC_B_TECH_ID,
+          clinicId: CLINIC_B_ID,
+          clerkId: `${CLINIC_B_TECH_ID}-clerk`,
+          email: "clinic-b-tech@doctor-gate.test",
+          name: "Clinic B Tech",
+          displayName: "Clinic B Tech",
           role: "technician",
           status: "active",
         },
@@ -296,14 +329,36 @@ describe.skipIf(!dbReachable)("doctor shift gate integration (real DB)", () => {
     expect(responsibles.equipmentCoordinator).toEqual({ name: null, status: "unresolved" });
 
     // ---- 6. Seed a technician check-in AND a legacy allowlisted-vet
-    //         'admission' check-in, back-date ALL fixture rows past the 14h
-    //         threshold, then sweep with the REAL clock: ONLY the three
-    //         doctor-gate rows close (auto_expired); the technician row and
-    //         the legacy admission row — aged identically — stay open.
-    //         (No future-clock sweep: the clinic-agnostic UPDATE must not
-    //         close every open check-in database-wide.)
+    //         'admission' check-in, plus a doctor-gate row and a technician
+    //         row in a SECOND clinic; back-date ALL fixture rows past the
+    //         14h threshold, then sweep with the REAL clock: ONLY the
+    //         doctor-gate rows close (auto_expired) — in BOTH clinics (the
+    //         per-clinic UPDATE loop covers every affected clinic); the
+    //         technician rows and the legacy admission row — aged
+    //         identically — stay open.
+    //         (No future-clock sweep: the sweep must not close every open
+    //         check-in database-wide.)
     const techOpen = await openCheckIn({ actor: techActor });
     expect(techOpen.row.operationalRole).toBeNull();
+
+    const clinicBVetActor = {
+      userId: CLINIC_B_VET_ID,
+      email: "clinic-b-vet@doctor-gate.test",
+      clinicId: CLINIC_B_ID,
+      role: "vet" as const,
+    };
+    const clinicBTechActor = {
+      userId: CLINIC_B_TECH_ID,
+      email: "clinic-b-tech@doctor-gate.test",
+      clinicId: CLINIC_B_ID,
+      role: "technician" as const,
+    };
+    const clinicBDoctorOpen = await openCheckIn({
+      actor: clinicBVetActor,
+      operationalRole: "internal_medicine",
+    });
+    expect(clinicBDoctorOpen.row.checkInSource).toBe("doctor_gate");
+    const clinicBTechOpen = await openCheckIn({ actor: clinicBTechActor });
 
     const legacyVetActor = {
       userId: LEGACY_VET_ID,
@@ -343,12 +398,21 @@ describe.skipIf(!dbReachable)("doctor shift gate integration (real DB)", () => {
           ]),
         ),
       );
+    await db
+      .update(clinicalCheckIns)
+      .set({ checkedInAt: backdatedCheckIn })
+      .where(
+        and(
+          eq(clinicalCheckIns.clinicId, CLINIC_B_ID),
+          inArray(clinicalCheckIns.id, [clinicBDoctorOpen.row.id, clinicBTechOpen.row.id]),
+        ),
+      );
 
     const { closedCount } = await sweepExpiredDoctorCheckIns();
-    // The sweep is cross-clinic by design; other clinics in a shared dev DB
-    // may contribute genuinely-stale rows — assert at-least on the global
-    // count, exactly on ours.
-    expect(closedCount).toBeGreaterThanOrEqual(3);
+    // The per-clinic loop still covers every clinic; other clinics in a
+    // shared dev DB may contribute genuinely-stale rows — assert at-least on
+    // the global count, exactly on ours (3 in clinic A + 1 in clinic B).
+    expect(closedCount).toBeGreaterThanOrEqual(4);
 
     const doctorRows = await db
       .select()
@@ -383,10 +447,28 @@ describe.skipIf(!dbReachable)("doctor shift gate integration (real DB)", () => {
     expect(techRow).toBeTruthy();
     expect(techRow?.id).toBe(techOpen.row.id);
 
+    // Cross-clinic coverage: clinic B's expired doctor-gate row closed too —
+    // the per-clinic UPDATE loop reaches every affected clinic — while
+    // clinic B's technician row (aged identically) stays untouched.
+    const clinicBRows = await db
+      .select()
+      .from(clinicalCheckIns)
+      .where(
+        and(
+          eq(clinicalCheckIns.clinicId, CLINIC_B_ID),
+          inArray(clinicalCheckIns.id, [clinicBDoctorOpen.row.id, clinicBTechOpen.row.id]),
+        ),
+      );
+    const clinicBDoctorRow = clinicBRows.find((r) => r.id === clinicBDoctorOpen.row.id);
+    const clinicBTechRow = clinicBRows.find((r) => r.id === clinicBTechOpen.row.id);
+    expect(clinicBDoctorRow?.checkedOutAt).not.toBeNull();
+    expect(clinicBDoctorRow?.checkOutReason).toBe("auto_expired");
+    expect(clinicBTechRow?.checkedOutAt).toBeNull();
+
     // Legacy-'admission' protection: the vet's admission row carried no
     // source:'doctor_gate' declaration, so it was stamped
     // check_in_source='legacy' at insert — pre-feature semantics could have
-    // produced it, so the clinic-agnostic sweep must never flip its
+    // produced it, so the sweep must never flip its
     // authority resolution (even though it is equally aged).
     const [legacyRow] = await db
       .select()
@@ -408,9 +490,14 @@ describe.skipIf(!dbReachable)("doctor shift gate integration (real DB)", () => {
           "clinical_check_out" &&
         (c[0] as { metadata?: { source?: string } })?.metadata?.source === "auto_expired",
     );
-    expect(expiryAudits.length).toBeGreaterThanOrEqual(3);
+    expect(expiryAudits.length).toBeGreaterThanOrEqual(4);
     const auditedIds = expiryAudits.map((c) => (c[0] as { targetId?: string }).targetId);
-    for (const id of [plainOpen.row.id, seniorOpenA.row.id, seniorOpenB.row.id]) {
+    for (const id of [
+      plainOpen.row.id,
+      seniorOpenA.row.id,
+      seniorOpenB.row.id,
+      clinicBDoctorOpen.row.id,
+    ]) {
       expect(auditedIds).toContain(id);
     }
   });
