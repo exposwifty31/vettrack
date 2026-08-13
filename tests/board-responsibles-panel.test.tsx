@@ -1,13 +1,18 @@
 /**
  * @vitest-environment happy-dom
  *
- * Doctor shift gate (spec 2026-08-13 §3) — board ResponsiblesPanel rendering
- * contract. Five slots ALWAYS render (ICU senior / admission senior / internal
- * medicine senior / senior technician / equipment coordinator); an empty slot
- * shows the muted notMarked copy (never a red/blinking state), members without
- * a senior get the small noSeniorMarked label, and a null/undefined
- * `responsibles` payload (snapshot build failed/timed out) degrades to all
- * five slots in the notMarked state — kiosk-safe, no throw.
+ * Responsibles v2 (TV board phase 1, spec §4) — board ResponsiblesPanel
+ * rendering contract:
+ * - `responsibles === null/undefined` (snapshot build failed/timed out) →
+ *   muted-unknown card (`responsiblesUnavailable`) — NEVER the 0/5 aggregate
+ *   (absent ≠ zero, binding).
+ * - All five slots empty → single aggregate row ("0/5") + a 5-segment progress
+ *   element filling LTR (Hebrew LTR-fill exception); no per-slot notMarked rows.
+ * - ≥1 slot filled → named slots (same `board-responsibles-*` testids), with
+ *   the remaining empty slots grouped into ONE muted line.
+ * - Members without a senior → member count + amber "no senior" accent,
+ *   `data-fill="filled_flagged"`. Coordinator `needs_confirmation` → name,
+ *   flagged. Filled slots always show names.
  */
 import { describe, it, expect, afterEach } from "vitest";
 import { render, cleanup, within } from "@testing-library/react";
@@ -74,32 +79,69 @@ function sinceTime(iso: string): string {
 
 afterEach(() => cleanup());
 
-const SLOT_TEST_IDS = [
-  "board-responsibles-icu",
-  "board-responsibles-admission",
-  "board-responsibles-internal-medicine",
-  "board-responsibles-senior-technician",
-  "board-responsibles-equipment-coordinator",
-] as const;
-
-describe("ResponsiblesPanel — rendering contract", () => {
-  it("renders all five slots in the notMarked state when responsibles is undefined (no crash)", () => {
-    const { getByText, getAllByText, getByTestId } = render(
+describe("ResponsiblesPanel — unavailable (null/undefined) is not a gap", () => {
+  it("renders the muted unavailable copy when responsibles is undefined (no crash)", () => {
+    const { getByText, queryByText, getByTestId } = render(
       <ResponsiblesPanel responsibles={undefined} />,
     );
     expect(getByText(t.board.responsiblesTitle)).toBeTruthy();
-    for (const id of SLOT_TEST_IDS) expect(getByTestId(id)).toBeTruthy();
-    expect(getByText(t.board.seniorIcu)).toBeTruthy();
-    expect(getByText(t.board.seniorAdmission)).toBeTruthy();
-    expect(getByText(t.board.seniorInternal)).toBeTruthy();
-    expect(getByText(t.board.seniorTechnician)).toBeTruthy();
-    expect(getByText(t.board.equipmentCoordinator)).toBeTruthy();
-    expect(getAllByText(t.board.notMarked)).toHaveLength(5);
+    expect(getByTestId("board-responsibles")).toBeTruthy();
+    expect(getByText(t.board.responsiblesUnavailable)).toBeTruthy();
+    // Never the 0/5 aggregate — absent data is not "nobody signed in".
+    expect(queryByText(t.board.responsiblesAggregate(0))).toBeNull();
+    expect(queryByText(t.board.notMarked)).toBeNull();
   });
 
-  it("renders all five slots in the notMarked state when responsibles is null", () => {
-    const { getAllByText } = render(<ResponsiblesPanel responsibles={null} />);
-    expect(getAllByText(t.board.notMarked)).toHaveLength(5);
+  it("renders the muted unavailable copy when responsibles is null", () => {
+    const { getByText, queryByText } = render(<ResponsiblesPanel responsibles={null} />);
+    expect(getByText(t.board.responsiblesUnavailable)).toBeTruthy();
+    expect(queryByText(t.board.responsiblesAggregate(0))).toBeNull();
+  });
+});
+
+describe("ResponsiblesPanel — all-empty aggregate", () => {
+  it("renders the 0/5 aggregate row with an LTR 5-segment progress, no per-slot rows", () => {
+    const { getByText, getByTestId, queryAllByText } = render(
+      <ResponsiblesPanel responsibles={responsibles()} />,
+    );
+    expect(getByText(t.board.responsiblesAggregate(0))).toBeTruthy();
+    expect(getByText(t.board.responsiblesNoneShift)).toBeTruthy();
+    const progress = getByTestId("board-responsibles-progress");
+    // Hebrew LTR-fill exception: progress fills left-to-right even in RTL.
+    expect(progress.getAttribute("dir")).toBe("ltr");
+    expect(progress.children.length).toBe(5);
+    // The five notMarked rows are gone.
+    expect(queryAllByText(t.board.notMarked)).toHaveLength(0);
+  });
+});
+
+describe("ResponsiblesPanel — mixed fill", () => {
+  it("renders the filled slot by name and groups the empties into ONE muted line", () => {
+    const { getByTestId, getAllByTestId, queryByTestId } = render(
+      <ResponsiblesPanel
+        responsibles={responsibles({
+          doctors: {
+            icu: {
+              senior: { name: "Dr. Senior", since: "2026-08-13T06:00:00.000Z" },
+              members: [],
+            },
+            admission: EMPTY_TEAM,
+            internal_medicine: EMPTY_TEAM,
+          },
+        })}
+      />,
+    );
+    const icu = getByTestId("board-responsibles-icu");
+    expect(icu.getAttribute("data-fill")).toBe("filled");
+    expect(within(icu).getByText("Dr. Senior")).toBeTruthy();
+    // Empty slots collapse into a single muted group line — not four rows.
+    expect(getAllByTestId("board-responsibles-empty-group")).toHaveLength(1);
+    const group = getByTestId("board-responsibles-empty-group");
+    expect(group.textContent).toContain(t.board.seniorAdmission);
+    expect(group.textContent).toContain(t.board.seniorInternal);
+    expect(group.textContent).toContain(t.board.seniorTechnician);
+    expect(group.textContent).toContain(t.board.equipmentCoordinator);
+    expect(queryByTestId("board-responsibles-admission")).toBeNull();
   });
 
   it("renders the senior prominently and members beneath with since-times", () => {
@@ -127,12 +169,10 @@ describe("ResponsiblesPanel — rendering contract", () => {
     expect(
       icu.getByText(t.board.sincePrefix(sinceTime("2026-08-13T05:30:00.000Z"))),
     ).toBeTruthy();
-    // A populated slot never shows notMarked or noSeniorMarked.
     expect(icu.queryByText(t.board.notMarked)).toBeNull();
-    expect(icu.queryByText(t.board.noSeniorMarked)).toBeNull();
   });
 
-  it("labels a members-without-senior team with noSeniorMarked", () => {
+  it("renders a members-without-senior team as a flagged member count with the amber no-senior accent", () => {
     const { getByTestId } = render(
       <ResponsiblesPanel
         responsibles={responsibles({
@@ -147,10 +187,10 @@ describe("ResponsiblesPanel — rendering contract", () => {
         })}
       />,
     );
-    const admission = within(getByTestId("board-responsibles-admission"));
-    expect(admission.getByText(t.board.noSeniorMarked)).toBeTruthy();
-    expect(admission.getByText("Dr. Alone")).toBeTruthy();
-    expect(admission.queryByText(t.board.notMarked)).toBeNull();
+    const admission = getByTestId("board-responsibles-admission");
+    expect(admission.getAttribute("data-fill")).toBe("filled_flagged");
+    expect(within(admission).getByText(t.board.responsiblesDoctorCount(1))).toBeTruthy();
+    expect(within(admission).getByText(t.board.responsiblesNoSenior)).toBeTruthy();
   });
 
   it("renders senior technician and equipment coordinator names when present", () => {
@@ -162,12 +202,25 @@ describe("ResponsiblesPanel — rendering contract", () => {
         })}
       />,
     );
-    expect(
-      within(getByTestId("board-responsibles-senior-technician")).getByText("Tami Tech"),
-    ).toBeTruthy();
-    expect(
-      within(getByTestId("board-responsibles-equipment-coordinator")).getByText("Coby Coord"),
-    ).toBeTruthy();
+    const tech = getByTestId("board-responsibles-senior-technician");
+    expect(tech.getAttribute("data-fill")).toBe("filled");
+    expect(within(tech).getByText("Tami Tech")).toBeTruthy();
+    const coord = getByTestId("board-responsibles-equipment-coordinator");
+    expect(coord.getAttribute("data-fill")).toBe("filled");
+    expect(within(coord).getByText("Coby Coord")).toBeTruthy();
+  });
+
+  it("renders a needs_confirmation coordinator by name, flagged", () => {
+    const { getByTestId } = render(
+      <ResponsiblesPanel
+        responsibles={responsibles({
+          equipmentCoordinator: { name: "Coby Coord", status: "needs_confirmation" },
+        })}
+      />,
+    );
+    const coord = getByTestId("board-responsibles-equipment-coordinator");
+    expect(coord.getAttribute("data-fill")).toBe("filled_flagged");
+    expect(within(coord).getByText("Coby Coord")).toBeTruthy();
   });
 });
 
@@ -199,10 +252,10 @@ describe("CommandBoard — responsibles wiring", () => {
     ).toBeTruthy();
   });
 
-  it("still mounts all five notMarked slots when the snapshot key is absent (tolerant reader)", () => {
-    const { getByTestId, getAllByText } = renderCommandBoard(undefined);
+  it("degrades to the unavailable copy when the snapshot key is absent (tolerant reader)", () => {
+    const { getByTestId, getByText } = renderCommandBoard(undefined);
     expect(getByTestId("board-responsibles")).toBeTruthy();
-    expect(getAllByText(t.board.notMarked)).toHaveLength(5);
+    expect(getByText(t.board.responsiblesUnavailable)).toBeTruthy();
   });
 
   it("keeps the panel mounted in pressure mode (active emergency)", () => {
