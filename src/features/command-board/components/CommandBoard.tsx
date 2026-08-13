@@ -349,9 +349,11 @@ function TickerStat({ label, value }: { label: string; value: string }) {
 function PressureMain({
   board,
   needAttention,
+  responsibles,
 }: {
   board: EquipmentCommandBoardSnapshot;
   needAttention: EquipmentBoardUnitRow[];
+  responsibles?: BoardResponsibles | null;
 }) {
   const dir = useDirection();
   const linked = board.activeEmergency?.linkedEquipment ?? [];
@@ -398,6 +400,11 @@ function PressureMain({
         )}
         {board.waitlist && <TickerStat label={t.board.waitlist} value={String(board.waitlist.depth)} />}
         {board.staging && <TickerStat label={t.board.staging} value={String(board.staging.depth)} />}
+      </div>
+      {/* Responsibles stay visible under pressure — demoted below the ticker,
+          never dropped (same tolerant reader as the calm layout). */}
+      <div className="shrink-0 max-h-56 overflow-auto">
+        <ResponsiblesPanel responsibles={responsibles} />
       </div>
     </main>
   );
@@ -522,7 +529,9 @@ export function CommandBoard({
       )}
 
       {/* Body */}
-      {mode === "pressure" && <PressureMain board={board} needAttention={needAttention} />}
+      {mode === "pressure" && (
+        <PressureMain board={board} needAttention={needAttention} responsibles={responsibles} />
+      )}
       {mode === "calm" && (
       <main id="main-content" className="flex-1 overflow-auto p-4 grid grid-cols-1 lg:grid-cols-[auto_1fr] gap-4">
 

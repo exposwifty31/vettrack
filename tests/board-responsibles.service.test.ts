@@ -73,6 +73,19 @@ function collectValues(node: unknown, out: unknown[] = [], seen = new Set<unknow
   return out;
 }
 
+/** Query chain whose awaited result rejects — simulates a DB failure. */
+function rejectingChain(err: unknown) {
+  const chain: Record<string, unknown> = {};
+  const methods = ["from", "where", "limit", "leftJoin", "innerJoin", "orderBy"];
+  for (const m of methods) {
+    chain[m] = vi.fn().mockReturnValue(chain);
+  }
+  chain["then"] = (_resolve: (v: unknown) => void, reject?: (e: unknown) => void) => {
+    reject?.(err);
+  };
+  return chain;
+}
+
 function unresolvedCoordinator() {
   return {
     coordinatorUserId: null,
@@ -269,5 +282,43 @@ describe("buildBoardResponsibles", () => {
       expect(values).toContain("clinicId");
       expect(values).toContain(CLINIC_ID);
     }
+  });
+});
+
+describe("buildBoardResponsibles — failure paths (snapshot handler degrades to responsibles:null)", () => {
+  // The snapshot handler wraps this call in withTimeout and maps ANY
+  // rejection to `responsibles: null` — so each internal failure must
+  // PROPAGATE as a rejection, never resolve to a half-built payload.
+  it("rejects when the doctors query fails", async () => {
+    mockSelect.mockReturnValueOnce(rejectingChain(new Error("doctors query down")));
+
+    await expect(
+      buildBoardResponsibles({ clinicId: CLINIC_ID, todayDate: TODAY, currentShift: [] }),
+    ).rejects.toThrow("doctors query down");
+  });
+
+  it("rejects when resolveShiftCoordinator fails", async () => {
+    mockSelect.mockReturnValueOnce(chainable([]));
+    mockResolveShiftCoordinator.mockRejectedValue(new Error("coordinator resolver down"));
+
+    await expect(
+      buildBoardResponsibles({ clinicId: CLINIC_ID, todayDate: TODAY, currentShift: [] }),
+    ).rejects.toThrow("coordinator resolver down");
+  });
+
+  it("rejects when the fallback coordinator-name user query fails", async () => {
+    mockSelect
+      .mockReturnValueOnce(chainable([]))
+      .mockReturnValueOnce(rejectingChain(new Error("user lookup down")));
+    mockResolveShiftCoordinator.mockResolvedValue({
+      coordinatorUserId: "u-conf",
+      status: "confirmed",
+      candidates: [],
+      seniorTechUserId: null,
+    });
+
+    await expect(
+      buildBoardResponsibles({ clinicId: CLINIC_ID, todayDate: TODAY, currentShift: [] }),
+    ).rejects.toThrow("user lookup down");
   });
 });

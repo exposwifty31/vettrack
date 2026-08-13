@@ -1,12 +1,4 @@
-/**
- * @vitest-environment happy-dom
- *
- * Doctor shift status/exit surface (spec §1, review finding: the four
- * doctorGate status keys + api.checkIn.switch were wired but consumed by
- * nothing). Renders on the profile page for a vet with an open doctor-team
- * check-in: "במשמרת — {team}" (plus "(בכיר)" when senior) with סיום משמרת
- * (close) and שינוי תפקיד (transaction-safe switch) actions.
- */
+/** @vitest-environment happy-dom */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, cleanup, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -17,6 +9,7 @@ const switchMock = vi.fn();
 const closeMock = vi.fn();
 const meMock = vi.fn();
 const toastError = vi.fn();
+const confirmMock = vi.fn();
 
 let authRole = "vet";
 
@@ -48,6 +41,10 @@ vi.mock("sonner", () => ({
     error: (...a: unknown[]) => toastError(...a),
     success: vi.fn(),
   },
+}));
+
+vi.mock("@/hooks/use-confirm", () => ({
+  useConfirm: () => confirmMock,
 }));
 
 import { DoctorShiftStatus } from "@/features/shift-gate";
@@ -87,6 +84,7 @@ beforeEach(() => {
     seniorDoctorEligible: false,
   });
   toastError.mockReset();
+  confirmMock.mockReset().mockResolvedValue(true);
 });
 
 afterEach(() => cleanup());
@@ -132,13 +130,27 @@ describe("DoctorShiftStatus — on-shift status + exit surface", () => {
     expect(screen.getByText(t.doctorGate.onShiftSenior)).toBeTruthy();
   });
 
-  it("סיום משמרת calls api.checkIn.close", async () => {
+  it("end-shift asks for confirmation and calls api.checkIn.close on accept", async () => {
     renderStatus();
     fireEvent.click(await screen.findByTestId("doctor-status-end-shift"));
+    await waitFor(() =>
+      expect(confirmMock).toHaveBeenCalledWith(
+        expect.objectContaining({ title: t.doctorGate.endShiftConfirmTitle }),
+      ),
+    );
     await waitFor(() => expect(closeMock).toHaveBeenCalledTimes(1));
   });
 
-  it("שינוי תפקיד opens the team picker; a team tap posts the switch", async () => {
+  it("end-shift does NOT close when the confirmation is declined", async () => {
+    confirmMock.mockResolvedValue(false);
+    renderStatus();
+    fireEvent.click(await screen.findByTestId("doctor-status-end-shift"));
+    await waitFor(() => expect(confirmMock).toHaveBeenCalled());
+    await new Promise((r) => setTimeout(r, 20));
+    expect(closeMock).not.toHaveBeenCalled();
+  });
+
+  it("switch-role opens the team picker; a team tap posts the switch", async () => {
     renderStatus();
     fireEvent.click(await screen.findByTestId("doctor-status-switch-role"));
     fireEvent.click(await screen.findByTestId("doctor-switch-team-admission"));
@@ -170,7 +182,7 @@ describe("DoctorShiftStatus — on-shift status + exit surface", () => {
     const conflict = Object.assign(new Error("senior already assigned"), {
       status: 409,
       code: "SENIOR_ALREADY_ASSIGNED",
-      payload: { details: { currentSeniorName: "ד\"ר כהן" } },
+      payload: { details: { currentSeniorName: "Dr. Cohen" } },
     });
     switchMock
       .mockRejectedValueOnce(conflict)

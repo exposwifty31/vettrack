@@ -13,19 +13,14 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { api } from "@/lib/api";
 import { t } from "@/lib/i18n";
 import { useAuth } from "@/hooks/use-auth";
-import type { DoctorTeamRole } from "@/types/check-in";
+import { useConfirm } from "@/hooks/use-confirm";
+import { readSeniorConflict, type CheckInRequest, type DoctorTeamRole } from "@/types/check-in";
 import { TEAM_ROLES, isDoctorTeamRole, teamLabel } from "./team-labels";
 
 type SwitchStep =
   | { kind: "closed" }
   | { kind: "team" }
   | { kind: "replace"; team: DoctorTeamRole; currentSeniorName: string | null };
-
-type SwitchPayload = {
-  operationalRole: DoctorTeamRole;
-  isSenior?: boolean;
-  replaceSenior?: boolean;
-};
 
 /**
  * Doctor shift status + exit surface (spec §1). Renders on the profile page
@@ -37,6 +32,7 @@ type SwitchPayload = {
  */
 export function DoctorShiftStatus() {
   const { role, isLoaded, isSignedIn } = useAuth();
+  const confirm = useConfirm();
   const queryClient = useQueryClient();
   const [switchStep, setSwitchStep] = useState<SwitchStep>({ kind: "closed" });
   const [wantSenior, setWantSenior] = useState<boolean | null>(null);
@@ -72,22 +68,18 @@ export function DoctorShiftStatus() {
   });
 
   const switchMutation = useMutation({
-    mutationFn: (data: SwitchPayload) => api.checkIn.switch(data),
+    mutationFn: (data: CheckInRequest) => api.checkIn.switch(data),
     onSuccess: () => {
       invalidate();
       setSwitchStep({ kind: "closed" });
     },
     onError: (err: unknown, variables) => {
-      const code = (err as { code?: unknown } | null)?.code;
-      if (code === "SENIOR_ALREADY_ASSIGNED") {
-        const details = (err as { payload?: { details?: Record<string, unknown> } })
-          .payload?.details;
-        const name =
-          typeof details?.currentSeniorName === "string" ? details.currentSeniorName : null;
+      const conflict = readSeniorConflict(err);
+      if (conflict) {
         setSwitchStep({
           kind: "replace",
           team: variables.operationalRole,
-          currentSeniorName: name,
+          currentSeniorName: conflict.currentSeniorName,
         });
         return;
       }
@@ -131,7 +123,14 @@ export function DoctorShiftStatus() {
           className="min-h-11 flex-1"
           data-testid="doctor-status-end-shift"
           disabled={closeMutation.isPending}
-          onClick={() => closeMutation.mutate()}
+          onClick={async () => {
+            const confirmed = await confirm({
+              title: t.doctorGate.endShiftConfirmTitle,
+              description: t.doctorGate.endShiftConfirmBody,
+              confirmLabel: t.doctorGate.endShift,
+            });
+            if (confirmed) closeMutation.mutate();
+          }}
         >
           {t.doctorGate.endShift}
         </Button>

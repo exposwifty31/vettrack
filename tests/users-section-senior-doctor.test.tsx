@@ -1,11 +1,4 @@
-/**
- * @vitest-environment happy-dom
- *
- * Doctor shift gate (spec 2026-08-13) — UsersSection senior-doctor eligibility
- * checkbox. Admin-only surface; the toggle calls
- * `api.users.setSeniorDoctorEligible(userId, next)` and is only rendered for
- * vet-role users — not technician/admin.
- */
+/** @vitest-environment happy-dom */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, cleanup, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -97,6 +90,9 @@ describe("UsersSection — senior-doctor eligibility checkbox (doctor shift gate
 
     renderSection();
 
+    // The shared Checkbox component renders a native <input type="checkbox">
+    // and spreads the test id onto it, so the cast to HTMLInputElement is
+    // exact (same for every cast below).
     const checkbox = (await screen.findByTestId(
       "checkbox-senior-doctor-eligible-u-vet",
     )) as HTMLInputElement;

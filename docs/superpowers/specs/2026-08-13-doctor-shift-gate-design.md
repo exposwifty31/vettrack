@@ -87,10 +87,13 @@ doctor. Seniors rotate between teams day-to-day.
   already has an open senior requires an explicit `replaceSenior: true` param;
   the server then clears `is_senior` on the previous row (row stays open). Audited.
 - **Role change:** close+open in a single transaction.
-- **Auto-expiry:** extend the existing `staleCheckInSweepWorker` with one rule —
-  open check-ins whose `operationalRole` is a doctor value and age > 14 h are
-  closed with `checkOutReason='auto_expired'`. **Doctor rows only**; technician
-  check-in behavior is untouched (no authority-envelope change).
+- **Auto-expiry:** a dedicated `doctorCheckInExpiryWorker`
+  (`server/workers/doctorCheckInExpiryWorker.ts`, started from
+  `start-schedulers.ts`) — open check-ins whose `operationalRole` is a doctor
+  value and age > 14 h are closed with `checkOutReason='auto_expired'`.
+  **Doctor rows only**; the existing `staleCheckInSweepWorker` stays untouched
+  (frozen), and technician check-in behavior is unchanged (no
+  authority-envelope change).
 - **Audit:** new kinds added to the closed `AuditActionType` union (check-in via
   gate, senior replace, auto-expiry uses `checkOutReason`).
 - **Multi-tenancy:** every query filters `clinicId` (existing indexes:

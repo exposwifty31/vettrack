@@ -56,8 +56,14 @@ export function useDoctorGateState() {
     setSnoozedUntil(until);
   }, []);
 
+  // Hold the popup until the eligibility lookup settles — otherwise an
+  // eligible senior could race through the team step before the senior
+  // toggle appears and check in as non-senior. An error settles fail-open
+  // (gate shows, senior option absent).
+  const eligibilitySettled = meQuery.isSuccess || meQuery.isError;
+
   return {
-    shouldShow: gateEnabled && hasNoActiveCheckIn,
+    shouldShow: gateEnabled && hasNoActiveCheckIn && eligibilitySettled,
     seniorDoctorEligible: meQuery.data?.seniorDoctorEligible === true,
     snooze,
   };

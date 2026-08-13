@@ -3,18 +3,19 @@
  * spec 2026-08-13). Mocked-db pattern from tests/stale-checkin-sweep.test.ts —
  * no Redis, no live server, no real database.
  *
- * The sweep is ONE clinic-agnostic UPDATE whose WHERE clause makes technician
- * rows (operationalRole NULL) and legacy-role vet rows untouchable by
- * construction: it filters operationalRole IN (icu, admission,
- * internal_medicine), open rows only, checkedInAt < now - 14h. The unit tests
- * assert that exact clause (a mocked db cannot execute SQL); row-level
- * behavior against a real database lands in the Task 14 integration test.
+ * The sweep is ONE clinic-agnostic UPDATE whose WHERE clause targets rows by
+ * the IMMUTABLE `check_in_source` column (migration 184): open rows only,
+ * checkedInAt < now - 14h, check_in_source = 'doctor_gate'. Classification
+ * happens once at insert in the check-in service — the sweep never consults
+ * the mutable users.allowedOperationalRoles. The unit tests assert that exact
+ * clause (a mocked db cannot execute SQL); row-level behavior against a real
+ * database lands in the Task 14 integration test.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
-import { and, eq, inArray, isNull, lt, or } from "drizzle-orm";
+import { and, eq, isNull, lt } from "drizzle-orm";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -38,6 +39,7 @@ vi.mock("../server/db.js", () => ({
     operationalRole: "operationalRole",
     isSenior: "isSenior",
     checkOutReason: "checkOutReason",
+    checkInSource: "checkInSource",
   },
   users: {
     id: "id",
@@ -56,9 +58,7 @@ import {
   sweepExpiredDoctorCheckIns,
   startDoctorCheckInExpiryWorker,
   DOCTOR_CHECKIN_EXPIRY_HOURS,
-  LEGACY_ADMISSION_ALLOWLIST_GUARD,
 } from "../server/workers/doctorCheckInExpiryWorker.js";
-import { DOCTOR_TEAM_ROLES } from "../server/services/clinical-check-in.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -73,6 +73,13 @@ function updateChain(returningRows: unknown[]) {
   return chain;
 }
 
+/** Shared sweep-mock setup: wires db.update to a chain returning `rows`. */
+function mockSweepReturning(rows: unknown[] = []) {
+  const chain = updateChain(rows);
+  mockUpdate.mockReturnValue(chain);
+  return chain;
+}
+
 /** Recursively collect every string value inside an object graph (cycle-safe). */
 function collectStrings(value: unknown, seen = new Set<unknown>()): string[] {
   if (typeof value === "string") return [value];
@@ -83,6 +90,11 @@ function collectStrings(value: unknown, seen = new Set<unknown>()): string[] {
     out.push(...collectStrings(v, seen));
   }
   return out;
+}
+
+/** The WHERE argument the sweep passed to its single UPDATE. */
+function sweptWhereArg(chain: Record<string, unknown>) {
+  return vi.mocked(chain.where as ReturnType<typeof vi.fn>).mock.calls[0][0];
 }
 
 const NOW = new Date("2026-08-13T12:00:00.000Z");
@@ -111,11 +123,10 @@ describe("DOCTOR_CHECKIN_EXPIRY_HOURS", () => {
 
 describe("sweepExpiredDoctorCheckIns — closes expired doctor rows", () => {
   it("closes doctor rows past 14h with checkOutReason 'auto_expired' and returns closedCount", async () => {
-    const chain = updateChain([
+    const chain = mockSweepReturning([
       { id: "ci-1", clinicId: "clinic-1" },
       { id: "ci-2", clinicId: "clinic-2" },
     ]);
-    mockUpdate.mockReturnValue(chain);
 
     const result = await sweepExpiredDoctorCheckIns(NOW);
 
@@ -129,7 +140,7 @@ describe("sweepExpiredDoctorCheckIns — closes expired doctor rows", () => {
   });
 
   it("returns closedCount 0 when no rows match", async () => {
-    mockUpdate.mockReturnValue(updateChain([]));
+    mockSweepReturning([]);
     const result = await sweepExpiredDoctorCheckIns(NOW);
     expect(result.closedCount).toBe(0);
   });
@@ -140,59 +151,42 @@ describe("sweepExpiredDoctorCheckIns — closes expired doctor rows", () => {
 // ---------------------------------------------------------------------------
 
 describe("sweepExpiredDoctorCheckIns — WHERE clause contract", () => {
-  it("targets EXACTLY open rows older than the 14h cutoff: gate-only roles (icu, internal_medicine) unconditionally; 'admission' only when the row's user is NOT allowlisted for it (legacy rows untouchable)", async () => {
-    const chain = updateChain([]);
-    mockUpdate.mockReturnValue(chain);
+  it("targets EXACTLY open rows older than the 14h cutoff whose PERSISTED check_in_source is 'doctor_gate' (classified once at insert — migration 184)", async () => {
+    const chain = mockSweepReturning();
 
     await sweepExpiredDoctorCheckIns(NOW);
 
-    const whereArg = vi.mocked(chain.where as ReturnType<typeof vi.fn>).mock.calls[0][0];
     const expectedCutoff = new Date(NOW.getTime() - 14 * 3_600_000);
-    const gateOnlyRoles = DOCTOR_TEAM_ROLES.filter((r) => r !== "admission");
     const expected = and(
       isNull(clinicalCheckIns.checkedOutAt),
       lt(clinicalCheckIns.checkedInAt, expectedCutoff),
-      or(
-        inArray(clinicalCheckIns.operationalRole, gateOnlyRoles),
-        and(
-          eq(clinicalCheckIns.operationalRole, "admission"),
-          LEGACY_ADMISSION_ALLOWLIST_GUARD,
-        ),
-      ),
+      eq(clinicalCheckIns.checkInSource, "doctor_gate"),
     );
-    expect(whereArg).toEqual(expected);
+    expect(sweptWhereArg(chain)).toEqual(expected);
   });
 
-  it("the admission guard is a clinic-scoped NOT EXISTS probe against the user's allowlist — pre-feature 'admission' rows (only creatable by allowlisted vets) are never swept", () => {
-    const guardSql = collectStrings(LEGACY_ADMISSION_ALLOWLIST_GUARD).join(" ");
-    expect(guardSql).toContain("NOT EXISTS");
-    expect(guardSql).toContain('["admission"]');
-  });
-
-  it("filters on the three doctor team roles only (icu, admission, internal_medicine)", async () => {
-    const chain = updateChain([]);
-    mockUpdate.mockReturnValue(chain);
+  it("never consults the LIVE allowlist — no users probe, no role list in the WHERE (legacy rows are untouchable via check_in_source='legacy')", async () => {
+    const chain = mockSweepReturning();
 
     await sweepExpiredDoctorCheckIns(NOW);
 
-    const whereArg = vi.mocked(chain.where as ReturnType<typeof vi.fn>).mock.calls[0][0];
-    const strings = collectStrings(whereArg);
-    expect(strings).toContain("icu");
-    expect(strings).toContain("admission");
-    expect(strings).toContain("internal_medicine");
-    // No legacy roles are ever swept.
-    expect(strings).not.toContain("ward");
-    expect(strings).not.toContain("senior_lead");
+    const strings = collectStrings(sweptWhereArg(chain));
+    expect(strings).toContain("checkInSource");
+    expect(strings).toContain("doctor_gate");
+    expect(strings).not.toContain("allowedOperationalRoles");
+    expect(strings.join(" ")).not.toContain("NOT EXISTS");
+    // Role values must not appear — origin is the persisted column, not the role.
+    for (const role of ["icu", "admission", "internal_medicine", "ward", "senior_lead"]) {
+      expect(strings).not.toContain(role);
+    }
   });
 
   it("does NOT filter on isSenior — senior rows auto-expire the same way", async () => {
-    const chain = updateChain([]);
-    mockUpdate.mockReturnValue(chain);
+    const chain = mockSweepReturning();
 
     await sweepExpiredDoctorCheckIns(NOW);
 
-    const whereArg = vi.mocked(chain.where as ReturnType<typeof vi.fn>).mock.calls[0][0];
-    expect(collectStrings(whereArg)).not.toContain("isSenior");
+    expect(collectStrings(sweptWhereArg(chain))).not.toContain("isSenior");
   });
 });
 
@@ -207,7 +201,7 @@ describe("sweepExpiredDoctorCheckIns — per-row invalidation + audit", () => {
   ];
 
   it("invalidates the authority cache per closed row (writer-side invalidation contract)", async () => {
-    mockUpdate.mockReturnValue(updateChain(closedRows));
+    mockSweepReturning(closedRows);
 
     await sweepExpiredDoctorCheckIns(NOW);
 
@@ -217,7 +211,7 @@ describe("sweepExpiredDoctorCheckIns — per-row invalidation + audit", () => {
   });
 
   it("writes a clinical_check_out audit row per closed row with source 'auto_expired' (system actor)", async () => {
-    mockUpdate.mockReturnValue(updateChain(closedRows));
+    mockSweepReturning(closedRows);
 
     await sweepExpiredDoctorCheckIns(NOW);
 
@@ -248,7 +242,7 @@ describe("sweepExpiredDoctorCheckIns — per-row invalidation + audit", () => {
   });
 
   it("no rows closed → no invalidation, no audit", async () => {
-    mockUpdate.mockReturnValue(updateChain([]));
+    mockSweepReturning([]);
 
     await sweepExpiredDoctorCheckIns(NOW);
 
@@ -315,8 +309,12 @@ describe("Worker source — separation contract", () => {
     "utf8",
   );
 
-  it("imports DOCTOR_TEAM_ROLES from the check-in service (no hand-rolled role list)", () => {
-    expect(source).toMatch(/import\s*\{[^}]*DOCTOR_TEAM_ROLES[^}]*\}\s*from\s*"\.\.\/services\/clinical-check-in\.js"/);
+  it("filters by the persisted checkInSource, never the mutable allowlist", () => {
+    expect(source).toMatch(/clinicalCheckIns\.checkInSource/);
+    // No live-allowlist probe: no users import, no NOT EXISTS / jsonb containment.
+    expect(source).not.toMatch(/import[^;]*\busers\b[^;]*from/);
+    expect(source).not.toMatch(/NOT EXISTS/);
+    expect(source).not.toMatch(/@>/);
   });
 
   it("does not import the shadow-only staleCheckInSweepWorker", () => {

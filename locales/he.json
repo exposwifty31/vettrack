@@ -4029,6 +4029,8 @@
     "onShiftStatus": "במשמרת — {team}",
     "onShiftSenior": "(בכיר)",
     "endShift": "סיום משמרת",
+    "endShiftConfirmTitle": "לסיים את המשמרת?",
+    "endShiftConfirmBody": "הסטטוס שלך במשמרת יוסר מהלוח.",
     "switchRole": "שינוי תפקיד",
     "checkInFailed": "הסימון נכשל — נסה שוב"
   },

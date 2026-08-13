@@ -4,7 +4,7 @@
 
 **Goal:** Vet-role users self-declare "on shift" with a team (ICU / admission / internal medicine) and optional senior status via the existing clinical check-in mechanism, and the ward board's `/api/display/snapshot` gains a `responsibles` section (doctor teams + senior technician + equipment coordinator).
 
-**Architecture:** Two additive migrations (users eligibility flag, check-ins `is_senior`), extension of the existing `openCheckIn` vet branch (three new universally-allowed doctor team roles + server-validated senior semantics with per-team replace), a doctor-only 14 h auto-expiry sweep, an additive `responsibles` key on the display snapshot, and client work (gate popup in NativeShell, admin checkbox, board panel). Spec: `docs/superpowers/specs/2026-08-13-doctor-shift-gate-design.md`.
+**Architecture:** Three additive migrations (users eligibility flag, check-ins `is_senior`, open-senior partial unique index), extension of the existing `openCheckIn` vet branch (three new universally-allowed doctor team roles + server-validated senior semantics with per-team replace), a doctor-only 14 h auto-expiry sweep, an additive `responsibles` key on the display snapshot, and client work (gate popup in NativeShell, admin checkbox, board panel). Spec: `docs/superpowers/specs/2026-08-13-doctor-shift-gate-design.md`.
 
 **Tech Stack:** Express + Drizzle + PostgreSQL, hand-authored SQL migrations, vitest (mocked-db unit tests + db-integration config), React 18 + TanStack Query + shadcn primitives, typed i18n (he/en).
 
@@ -16,7 +16,7 @@
 - Auto-expiry: doctor check-ins only, threshold **14 hours**, `checkOutReason='auto_expired'`.
 - All user-facing copy via typed `t.*`; keys added to BOTH `locales/he.json` and `locales/en.json` AND to `buildTranslations` in `src/lib/i18n.ts` (hand-built accessor — JSON alone does nothing).
 - New audit kinds must be added to the `AuditActionType` union in `server/lib/audit.ts` — never log a string outside the union.
-- Migrations are hand-authored (drizzle-kit snapshot is drifted), numbered `181_…`, `182_…`, idempotent (`ADD COLUMN IF NOT EXISTS`).
+- Migrations are hand-authored (drizzle-kit snapshot is drifted), numbered `181_…`, `182_…`, `183_…`, idempotent (`ADD COLUMN IF NOT EXISTS` / `CREATE UNIQUE INDEX IF NOT EXISTS`). Migration `183_vt_clinical_check_ins_open_senior_unique.sql` (partial unique index `ux_vt_clinical_check_ins_open_senior_per_team` on `(clinic_id, operational_role) WHERE is_senior AND checked_out_at IS NULL`) is the DB backstop for one-open-senior-per-team — the service's check-then-act SELECT cannot stop two concurrent `isSenior` claims, so the service maps the index's 23505 to `SENIOR_ALREADY_ASSIGNED`. Verify with: `psql "$DATABASE_URL" -c "\di ux_vt_clinical_check_ins_open_senior_per_team"` → index listed as partial unique.
 - Commit after every task. `pnpm typecheck` must be clean before every commit.
 
 ---

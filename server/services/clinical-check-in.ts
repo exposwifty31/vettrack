@@ -40,6 +40,15 @@ export type { DoctorTeamRole };
 export type CheckInSource = "self" | "session_close" | "admin_force";
 
 /**
+ * Immutable origin of a check-in row (`check_in_source`, migration 184),
+ * computed ONCE at insert. The doctor expiry sweep targets 'doctor_gate'
+ * rows only; 'legacy' rows are untouchable. Persisted because inferring
+ * origin from the live `allowedOperationalRoles` drifts when an admin later
+ * edits the allowlist.
+ */
+export type CheckInOrigin = "doctor_gate" | "legacy";
+
+/**
  * Mirror exactly the union from `req.authUser.role` (server/middleware/auth.ts).
  * Do not narrow here — narrowing happens inside `openCheckIn` so admin / unknown
  * roles produce a consistent `ROLE_NOT_ELIGIBLE_FOR_CHECK_IN` error.
@@ -116,16 +125,49 @@ function uniqueViolationConstraint(err: unknown): string | null {
   return null;
 }
 
-function seniorAlreadyAssignedFromRace(): ClinicalCheckInError {
+async function seniorAlreadyAssignedFromRace(
+  actor: CheckInActor,
+  operationalRole: unknown,
+): Promise<ClinicalCheckInError> {
   // The partial unique index caught a concurrent senior claim that the
   // check-then-act SELECT could not see. Same contract as the SELECT-based
-  // 409; the racer's name is unknown here, so metadata carries null.
+  // 409 — the racer's transaction has committed by the time our own rolled
+  // back, so re-query the winning senior to name them in the replacement
+  // dialog; null only when the re-query finds none (or fails).
+  let currentSeniorName: string | null = null;
+  if (typeof operationalRole === "string") {
+    try {
+      const [winner] = await db
+        .select({ name: users.name, displayName: users.displayName })
+        .from(clinicalCheckIns)
+        .leftJoin(
+          users,
+          and(eq(clinicalCheckIns.userId, users.id), eq(users.clinicId, actor.clinicId)),
+        )
+        .where(
+          and(
+            eq(clinicalCheckIns.clinicId, actor.clinicId),
+            eq(clinicalCheckIns.operationalRole, operationalRole),
+            eq(clinicalCheckIns.isSenior, true),
+            isNull(clinicalCheckIns.checkedOutAt),
+            ne(clinicalCheckIns.userId, actor.userId),
+          ),
+        )
+        .limit(1);
+      currentSeniorName =
+        (winner?.displayName && winner.displayName.length > 0
+          ? winner.displayName
+          : winner?.name) ?? null;
+    } catch {
+      // Best-effort name resolution — the 409 contract must not depend on it.
+    }
+  }
   return new ClinicalCheckInError(
     409,
     "SENIOR_ALREADY_ASSIGNED",
     "The team already has an open senior check-in",
     "SENIOR_ALREADY_ASSIGNED",
-    { currentSeniorName: null },
+    { currentSeniorName },
   );
 }
 
@@ -177,6 +219,7 @@ type DbExecutor = Pick<typeof db, "select" | "insert" | "update">;
 type ValidatedCheckIn = {
   storedOperationalRole: OperationalRole | null;
   wantsSenior: boolean;
+  checkInSource: CheckInOrigin;
 };
 
 /**
@@ -214,6 +257,9 @@ async function validateAndBuildRow(
     typeof input.operationalRole === "string" ? input.operationalRole : undefined;
 
   let storedOperationalRole: OperationalRole | null;
+  // Immutable origin, classified ONCE here (insert time) — never re-derived
+  // from the live allowlist afterwards (migration 184).
+  let checkInSource: CheckInOrigin = "legacy";
 
   switch (actor.role) {
     case "student":
@@ -255,6 +301,17 @@ async function validateAndBuildRow(
             "Requested operational role is not in the user's allowlist",
           );
         }
+      } else if (operationalRoleInput === "admission") {
+        // 'admission' is ambiguous: it pre-exists as a legacy allowlist role.
+        // A row opened by a vet allowlisted for it AT INSERT TIME is
+        // classified 'legacy' (pre-feature semantics could have produced it,
+        // so the expiry sweep must never touch it); everyone else reaches
+        // 'admission' only via the doctor gate.
+        const allowed = await getAllowedOperationalRoles(actor.userId, actor.clinicId);
+        checkInSource = allowed.includes("admission") ? "legacy" : "doctor_gate";
+      } else {
+        // icu / internal_medicine did not exist before the doctor gate.
+        checkInSource = "doctor_gate";
       }
       storedOperationalRole = operationalRoleInput as OperationalRole;
       break;
@@ -374,7 +431,7 @@ async function validateAndBuildRow(
     }
   }
 
-  return { storedOperationalRole, wantsSenior };
+  return { storedOperationalRole, wantsSenior, checkInSource };
 }
 
 export async function openCheckIn(input: CheckInInput): Promise<CheckInResult> {
@@ -387,11 +444,8 @@ export async function openCheckIn(input: CheckInInput): Promise<CheckInResult> {
     // replace-senior demote and its audit row instead of leaving the team
     // with no senior and a false "replaced" audit trail.
     const inserted = await db.transaction(async (tx) => {
-      const { storedOperationalRole, wantsSenior } = await validateAndBuildRow(
-        input,
-        tx,
-        tx,
-      );
+      const { storedOperationalRole, wantsSenior, checkInSource } =
+        await validateAndBuildRow(input, tx, tx);
 
       const [row] = await tx
         .insert(clinicalCheckIns)
@@ -405,6 +459,7 @@ export async function openCheckIn(input: CheckInInput): Promise<CheckInResult> {
           activeShiftId: null,
           shiftSessionId: null,
           clientId: idempotencyKey,
+          checkInSource,
         })
         .returning();
 
@@ -436,7 +491,7 @@ export async function openCheckIn(input: CheckInInput): Promise<CheckInResult> {
     if (uniqueViolationConstraint(err) === OPEN_SENIOR_PER_TEAM_INDEX) {
       // Concurrent senior claim on the same team (DB backstop for the
       // check-then-act SELECT) — not an "already checked in" condition.
-      throw seniorAlreadyAssignedFromRace();
+      throw await seniorAlreadyAssignedFromRace(actor, input.operationalRole);
     }
 
     const existing = await getActiveCheckIn(actor.clinicId, actor.userId);
@@ -475,11 +530,8 @@ export async function switchOperationalRole(
 
   try {
     const inserted = await db.transaction(async (tx) => {
-      const { storedOperationalRole, wantsSenior } = await validateAndBuildRow(
-        input,
-        tx,
-        tx,
-      );
+      const { storedOperationalRole, wantsSenior, checkInSource } =
+        await validateAndBuildRow(input, tx, tx);
 
       const now = new Date();
       const [closedRow] = await tx
@@ -506,6 +558,7 @@ export async function switchOperationalRole(
           activeShiftId: null,
           shiftSessionId: null,
           clientId: null,
+          checkInSource,
         })
         .returning();
 
@@ -554,7 +607,7 @@ export async function switchOperationalRole(
       if (uniqueViolationConstraint(err) === OPEN_SENIOR_PER_TEAM_INDEX) {
         // Concurrent senior claim on the target team — the transaction
         // rolled back, so the previous check-in (if any) is still open.
-        throw seniorAlreadyAssignedFromRace();
+        throw await seniorAlreadyAssignedFromRace(actor, input.operationalRole);
       }
       // Lost a race against a concurrent open — the transaction rolled back,
       // so the previous check-in (if any) is still open.

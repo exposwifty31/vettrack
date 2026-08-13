@@ -435,6 +435,15 @@ export const clinicalCheckIns = vtTable(
     shiftSessionId: text("shift_session_id"),
     checkOutReason: varchar("check_out_reason", { length: 40 }),
     clientId: varchar("client_id", { length: 64 }),
+    // Doctor shift gate (migration 184): immutable origin classification
+    // stamped ONCE at insert. 'doctor_gate' rows are the 14h expiry sweep's
+    // exact target; 'legacy' rows (pre-feature semantics could have produced
+    // them) are never auto-expired. Deliberately NOT re-derived from the
+    // mutable vt_users.allowed_operational_roles.
+    checkInSource: varchar("check_in_source", { length: 20 })
+      .notNull()
+      .default("legacy")
+      .$type<"doctor_gate" | "legacy">(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({

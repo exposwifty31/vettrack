@@ -9,9 +9,9 @@
  * 14 h `sweepExpiredDoctorCheckIns` closes ONLY doctor-team rows — a
  * technician check-in aged identically stays open.
  *
- * Requires DATABASE_URL + migrations applied (181/182); skips cleanly
- * otherwise. Registered in vitest.db-integration.config.ts (allowlist-only
- * discovery).
+ * Requires DATABASE_URL + migrations applied (181/182/183/184); skips
+ * cleanly otherwise. Registered in vitest.db-integration.config.ts
+ * (allowlist-only discovery).
  *
  * Run: DATABASE_URL=postgres://vettrack:vettrack@localhost:5432/vettrack \
  *   pnpm exec vitest run --config vitest.db-integration.config.ts \
@@ -22,7 +22,7 @@
  * (see reference_audit_log_append_only).
  */
 import "dotenv/config";
-import { afterAll, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { Pool } from "pg";
 import { and, eq, isNull, inArray } from "drizzle-orm";
 
@@ -49,7 +49,11 @@ if (DATABASE_URL) {
   try {
     await probePool.query("SELECT 1");
     dbReachable = true;
-  } catch {
+  } catch (err) {
+    console.warn(
+      "[doctor-shift-gate.integration.test] DB probe failed — suite will skip:",
+      err,
+    );
     dbReachable = false;
   }
 }
@@ -65,6 +69,17 @@ describe.skipIf(!dbReachable)("doctor shift gate integration (real DB)", () => {
   const ELIGIBLE_VET_B_ID = "doctor-gate-eligible-vet-b-test";
   const LEGACY_VET_ID = "doctor-gate-legacy-vet-test";
   const TECH_ID = "doctor-gate-tech-test";
+
+  beforeEach(async () => {
+    // Test independence: every test starts with NO open check-ins for the
+    // fixture clinic — no test may rely on a prior test's sweep or close.
+    await probePool?.query(
+      `UPDATE vt_clinical_check_ins
+       SET checked_out_at = now(), check_out_reason = 'self'
+       WHERE clinic_id = $1 AND checked_out_at IS NULL`,
+      [CLINIC_ID],
+    );
+  });
 
   afterAll(async () => {
     // FK-safe teardown, children first (vt_clinical_check_ins RESTRICTs both
@@ -280,10 +295,12 @@ describe.skipIf(!dbReachable)("doctor shift gate integration (real DB)", () => {
     expect(responsibles.equipmentCoordinator).toEqual({ name: null, status: "unresolved" });
 
     // ---- 6. Seed a technician check-in AND a legacy allowlisted-vet
-    //         'admission' check-in, then sweep at now+15h: ONLY the three
+    //         'admission' check-in, back-date ALL fixture rows past the 14h
+    //         threshold, then sweep with the REAL clock: ONLY the three
     //         doctor-gate rows close (auto_expired); the technician row and
-    //         the legacy admission row — aged identically relative to the
-    //         sweep clock — stay open.
+    //         the legacy admission row — aged identically — stay open.
+    //         (No future-clock sweep: the clinic-agnostic UPDATE must not
+    //         close every open check-in database-wide.)
     const techOpen = await openCheckIn({ actor: techActor });
     expect(techOpen.row.operationalRole).toBeNull();
 
@@ -298,13 +315,37 @@ describe.skipIf(!dbReachable)("doctor shift gate integration (real DB)", () => {
       operationalRole: "admission",
     });
     expect(legacyOpen.row.operationalRole).toBe("admission");
+    // Immutable origin stamped at insert (migration 184): allowlisted vet's
+    // admission row is 'legacy'; gate rows are 'doctor_gate'.
+    expect(legacyOpen.row.checkInSource).toBe("legacy");
+    expect(plainOpen.row.checkInSource).toBe("doctor_gate");
+    expect(seniorOpenB.row.checkInSource).toBe("doctor_gate");
 
-    const sweepNow = new Date(
-      Date.now() + (DOCTOR_CHECKIN_EXPIRY_HOURS + 1) * 3_600_000,
+    // Back-date every fixture row past the threshold, then sweep at the real
+    // now — only the intentionally-stale fixtures cross the 14h cutoff.
+    const backdatedCheckIn = new Date(
+      Date.now() - (DOCTOR_CHECKIN_EXPIRY_HOURS + 1) * 3_600_000,
     );
-    const { closedCount } = await sweepExpiredDoctorCheckIns(sweepNow);
+    await db
+      .update(clinicalCheckIns)
+      .set({ checkedInAt: backdatedCheckIn })
+      .where(
+        and(
+          eq(clinicalCheckIns.clinicId, CLINIC_ID),
+          inArray(clinicalCheckIns.id, [
+            plainOpen.row.id,
+            seniorOpenA.row.id,
+            seniorOpenB.row.id,
+            techOpen.row.id,
+            legacyOpen.row.id,
+          ]),
+        ),
+      );
+
+    const { closedCount } = await sweepExpiredDoctorCheckIns();
     // The sweep is cross-clinic by design; other clinics in a shared dev DB
-    // may contribute — assert at-least on the global count, exactly on ours.
+    // may contribute genuinely-stale rows — assert at-least on the global
+    // count, exactly on ours.
     expect(closedCount).toBeGreaterThanOrEqual(3);
 
     const doctorRows = await db
@@ -340,9 +381,10 @@ describe.skipIf(!dbReachable)("doctor shift gate integration (real DB)", () => {
     expect(techRow).toBeTruthy();
     expect(techRow?.id).toBe(techOpen.row.id);
 
-    // Legacy-'admission' protection: the allowlisted vet's admission row is
-    // untouched — pre-feature semantics could have produced it, so the
-    // clinic-agnostic sweep must never flip its authority resolution.
+    // Legacy-'admission' protection: the allowlisted vet's admission row was
+    // stamped check_in_source='legacy' at insert — pre-feature semantics
+    // could have produced it, so the clinic-agnostic sweep must never flip
+    // its authority resolution (even though it is equally aged).
     const [legacyRow] = await db
       .select()
       .from(clinicalCheckIns)
@@ -368,17 +410,6 @@ describe.skipIf(!dbReachable)("doctor shift gate integration (real DB)", () => {
     for (const id of [plainOpen.row.id, seniorOpenA.row.id, seniorOpenB.row.id]) {
       expect(auditedIds).toContain(id);
     }
-
-    // Close the legacy row so the follow-up test starts from a clean slate.
-    await db
-      .update(clinicalCheckIns)
-      .set({ checkedOutAt: new Date(), checkOutReason: "self" })
-      .where(
-        and(
-          eq(clinicalCheckIns.clinicId, CLINIC_ID),
-          eq(clinicalCheckIns.id, legacyOpen.row.id),
-        ),
-      );
   });
 
   it("adversarial review fixes: idempotent senior replay, atomic demote rollback, switch re-submit, DB senior backstop", async () => {
@@ -400,7 +431,7 @@ describe.skipIf(!dbReachable)("doctor shift gate integration (real DB)", () => {
       role: "vet" as const,
     };
 
-    // (Prior test closed every doctor row via the sweep — vets start clean.)
+    // (beforeEach closed every open check-in for the clinic — vets start clean.)
 
     // ---- 1. Idempotent replay of a senior check-in: the retry must NOT
     //         self-409 (SENIOR_ALREADY_ASSIGNED naming the caller) and must

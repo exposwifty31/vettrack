@@ -4032,6 +4032,8 @@ export interface TStructure {
     onShiftStatus: string;
     onShiftSenior: string;
     endShift: string;
+    endShiftConfirmTitle: string;
+    endShiftConfirmBody: string;
     switchRole: string;
     checkInFailed: string;
   };

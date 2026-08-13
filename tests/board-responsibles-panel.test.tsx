@@ -172,12 +172,15 @@ describe("ResponsiblesPanel — rendering contract", () => {
 });
 
 describe("CommandBoard — responsibles wiring", () => {
-  function renderCommandBoard(r: BoardResponsibles | null | undefined) {
+  function renderCommandBoard(
+    r: BoardResponsibles | null | undefined,
+    boardOverride?: EquipmentCommandBoardSnapshot,
+  ) {
     const { hook } = memoryLocation({ path: "/board" });
     return render(
       <Router hook={hook}>
         <CommandBoard
-          board={board()}
+          board={boardOverride ?? board()}
           currentTime="2026-08-13T00:00:00.000Z"
           currentShift={[]}
           responsibles={r}
@@ -200,5 +203,26 @@ describe("CommandBoard — responsibles wiring", () => {
     const { getByTestId, getAllByText } = renderCommandBoard(undefined);
     expect(getByTestId("board-responsibles")).toBeTruthy();
     expect(getAllByText(t.board.notMarked)).toHaveLength(5);
+  });
+
+  it("keeps the panel mounted in pressure mode (active emergency)", () => {
+    const pressureBoard = board();
+    pressureBoard.activeEmergency = {
+      sessionId: "cb-1",
+      startedAt: "2026-08-13T00:00:00.000Z",
+      elapsedMs: 60_000,
+      linkedEquipment: [],
+    };
+    const { getByTestId, getByText } = renderCommandBoard(
+      responsibles({ seniorTechnician: { name: "Tami Tech" } }),
+      pressureBoard,
+    );
+    // Pressure branch is live (its high-load banner renders)…
+    expect(getByText(t.board.highLoad)).toBeTruthy();
+    // …and the responsibles panel is still mounted with its slot content.
+    expect(getByTestId("board-responsibles")).toBeTruthy();
+    expect(
+      within(getByTestId("board-responsibles-senior-technician")).getByText("Tami Tech"),
+    ).toBeTruthy();
   });
 });

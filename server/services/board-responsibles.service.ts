@@ -16,23 +16,34 @@ import {
   type CoordinatorStatus,
 } from "./equipment-coordinator.service.js";
 
-export type ResponsibleEntry = { name: string; since: string };
-export type DoctorTeamBlock = { senior: ResponsibleEntry | null; members: ResponsibleEntry[] };
-export type BoardResponsibles = {
+export interface ResponsibleEntry {
+  name: string;
+  since: string;
+}
+export interface DoctorTeamBlock {
+  senior: ResponsibleEntry | null;
+  members: ResponsibleEntry[];
+}
+export interface BoardResponsibles {
   doctors: { icu: DoctorTeamBlock; admission: DoctorTeamBlock; internal_medicine: DoctorTeamBlock };
   seniorTechnician: { name: string } | null;
   equipmentCoordinator: { name: string | null; status: CoordinatorStatus };
-};
+}
+
+export interface BuildBoardResponsiblesArgs {
+  clinicId: string;
+  /** YYYY-MM-DD, already computed in the snapshot handler. */
+  todayDate: string;
+  currentShift: Array<{ employeeName: string; role: string }>;
+}
 
 function emptyBlock(): DoctorTeamBlock {
   return { senior: null, members: [] };
 }
 
-export async function buildBoardResponsibles(args: {
-  clinicId: string;
-  todayDate: string; // YYYY-MM-DD, already computed in the snapshot handler
-  currentShift: Array<{ employeeName: string; role: string }>;
-}): Promise<BoardResponsibles> {
+export async function buildBoardResponsibles(
+  args: BuildBoardResponsiblesArgs,
+): Promise<BoardResponsibles> {
   const { clinicId, todayDate, currentShift } = args;
 
   // Doctors — open check-ins on the three team roles, oldest first so member

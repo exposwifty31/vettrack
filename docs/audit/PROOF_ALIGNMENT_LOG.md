@@ -6495,3 +6495,32 @@ gate popup, admin checkbox, board panel, DB round-trip integration test).
   to a baseline-refresh pass rather than rewriting shared baselines from a feature branch.
 
 **Verdict:** VERIFIED
+
+## 2026-08-13 — PR #180 CodeRabbit round 1: 3-agent fix wave (server 12, client 10, docs 2) — final gates
+
+**Claim:** All 24 CodeRabbit round-1 findings on PR #180 (feat/doctor-shift-gate) are
+fixed — server (race-loser senior name via post-23505 re-query; immutable
+`check_in_source` origin column via new migration 184 + insert-time classification,
+sweep now filters `check_in_source='doctor_gate'` with the live-allowlist probe
+removed; interface conversions; test dedupe/failure-path/clinic-scope hardening),
+client (pressure-mode ResponsiblesPanel kept mounted; shared `readSeniorConflict`
+contract in src/types/check-in.ts; end-shift `useConfirm` dialog with 2 new i18n keys;
+gate hidden until /users/me settles; role union re-exported from shared/doctor-teams;
+shared `CheckInRequest`/`ActiveCheckInResponse` API types; Hebrew literals and
+narrative headers removed from tests), docs (plan documents all three migrations
+181–183 incl. 183 partial-unique rationale; spec names the dedicated
+`doctorCheckInExpiryWorker` and states `staleCheckInSweepWorker` stays frozen).
+One integration fix by the finalizer: `src/types/check-in.ts` shared import needed the
+explicit `.js` extension for the nodenext `tsconfig.server-check.json` gate (repo
+convention in src/types/, e.g. inventory.ts, webhooks.ts).
+
+**Evidence (actual command outputs this session):**
+- `pnpm typecheck` → exited clean, zero errors (both tsconfigs).
+- `pnpm test` → `Test Files  715 passed (715) · Tests  6394 passed | 11 skipped (6405) · Duration 94.12s` (+8 tests vs pre-wave 6386).
+- `pnpm i18n:check` → `✓ locales/en.json and locales/he.json are in deep key parity.`
+- `pnpm architecture:gates` → after the `.js`-extension fix: `All G1 checks passed.`
+  (madge `OK — server: 0 cycle(s), src: 0 cycle(s) (matches baseline)`).
+- `pnpm db:migrate` → `✅ All migrations up to date` (184_vt_clinical_check_ins_check_in_source.sql applied this session by the server agent).
+- `DATABASE_URL=<.env> npx vitest run --config vitest.db-integration.config.ts tests/doctor-shift-gate.integration.test.ts` → `Test Files  1 passed (1) · Tests  2 passed (2)`.
+
+**Verdict:** VERIFIED

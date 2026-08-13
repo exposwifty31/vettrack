@@ -17,7 +17,8 @@ import type {
   ReadinessForecast,
   User,
   CheckInRow,
-  DoctorTeamRole,
+  CheckInRequest,
+  ActiveCheckInResponse,
   UploadUrlRequest,
   UploadUrlResponse,
   AlertAcknowledgment,
@@ -552,13 +553,13 @@ export const api = {
     },
   },
   checkIn: {
-    active: () => request<{ active: CheckInRow | null }>("/api/clinical-check-in/me/active"),
-    open: (data: { operationalRole: DoctorTeamRole; isSenior?: boolean; replaceSenior?: boolean }) =>
+    active: () => request<ActiveCheckInResponse>("/api/clinical-check-in/me/active"),
+    open: (data: CheckInRequest) =>
       request<CheckInRow>("/api/clinical-check-in/check-in", {
         method: "POST",
         body: JSON.stringify(data),
       }),
-    switch: (data: { operationalRole: DoctorTeamRole; isSenior?: boolean; replaceSenior?: boolean }) =>
+    switch: (data: CheckInRequest) =>
       request<CheckInRow>("/api/clinical-check-in/switch", {
         method: "POST",
         body: JSON.stringify(data),

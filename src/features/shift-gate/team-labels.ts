@@ -1,14 +1,14 @@
 import { t } from "@/lib/i18n";
+import {
+  DOCTOR_TEAM_ROLES,
+  isDoctorTeamRole as isDoctorTeamRoleShared,
+} from "../../../shared/doctor-teams";
 import type { DoctorTeamRole } from "@/types/check-in";
 
-export const TEAM_ROLES: readonly DoctorTeamRole[] = [
-  "icu",
-  "admission",
-  "internal_medicine",
-];
+export const TEAM_ROLES: readonly DoctorTeamRole[] = DOCTOR_TEAM_ROLES;
 
 export function isDoctorTeamRole(v: string | null | undefined): v is DoctorTeamRole {
-  return v === "icu" || v === "admission" || v === "internal_medicine";
+  return typeof v === "string" && isDoctorTeamRoleShared(v);
 }
 
 export function teamLabel(team: DoctorTeamRole): string {

@@ -137,10 +137,12 @@ async function seedUser(
   );
 }
 
-async function seniorDoctorEligibleFlag(userId: string): Promise<boolean> {
+async function seniorDoctorEligibleFlag(userId: string, expectedClinicId: string): Promise<boolean> {
+  // Clinic-scoped assertion oracle: the tenant boundary is part of what the
+  // tests verify, so the read filters by clinicId too.
   const { rows } = await requireProbePool().query<{ senior_doctor_eligible: boolean }>(
-    `SELECT senior_doctor_eligible FROM vt_users WHERE id = $1`,
-    [userId],
+    `SELECT senior_doctor_eligible FROM vt_users WHERE id = $1 AND clinic_id = $2`,
+    [userId, expectedClinicId],
   );
   return rows[0]?.senior_doctor_eligible === true;
 }
@@ -187,9 +189,13 @@ describe.skipIf(!DATABASE_URL)("senior_doctor_eligible admin toggle (doctor shif
   });
 
   afterAll(async () => {
-    await new Promise<void>((resolve, reject) => {
-      server.close((err) => (err ? reject(err) : resolve()));
-    });
+    // beforeAll may have thrown before assigning `server` — don't let the
+    // hook's own TypeError mask the real diagnostic.
+    if (server) {
+      await new Promise<void>((resolve, reject) => {
+        server.close((err) => (err ? reject(err) : resolve()));
+      });
+    }
     if (probePool) {
       await probePool.end();
       probePool = null;
@@ -217,7 +223,7 @@ describe.skipIf(!DATABASE_URL)("senior_doctor_eligible admin toggle (doctor shif
     expect(res.status).toBe(200);
     if (!isRecord(res.json)) throw new Error("expected object");
     expect(res.json.seniorDoctorEligible).toBe(true);
-    expect(await seniorDoctorEligibleFlag(target)).toBe(true);
+    expect(await seniorDoctorEligibleFlag(target, clinicId)).toBe(true);
 
     expect(logAudit).toHaveBeenCalledTimes(1);
     const call = logAudit.mock.calls[0]?.[0] as unknown;
@@ -237,7 +243,7 @@ describe.skipIf(!DATABASE_URL)("senior_doctor_eligible admin toggle (doctor shif
     expect(res.status).toBe(200);
     if (!isRecord(res.json)) throw new Error("expected object");
     expect(res.json.seniorDoctorEligible).toBe(false);
-    expect(await seniorDoctorEligibleFlag(target)).toBe(false);
+    expect(await seniorDoctorEligibleFlag(target, clinicId)).toBe(false);
   });
 
   it("non-admin actor -> 403, flag untouched", async () => {
@@ -248,7 +254,7 @@ describe.skipIf(!DATABASE_URL)("senior_doctor_eligible admin toggle (doctor shif
     const res = await api(`/api/users/${target}/senior-doctor-eligible`, "PATCH", { seniorDoctorEligible: true });
 
     expect(res.status).toBe(403);
-    expect(await seniorDoctorEligibleFlag(target)).toBe(false);
+    expect(await seniorDoctorEligibleFlag(target, clinicId)).toBe(false);
     expect(logAudit).not.toHaveBeenCalled();
   });
 
@@ -262,7 +268,7 @@ describe.skipIf(!DATABASE_URL)("senior_doctor_eligible admin toggle (doctor shif
       const res = await api(`/api/users/${target}/senior-doctor-eligible`, "PATCH", { seniorDoctorEligible: true });
 
       expect(res.status).toBe(404);
-      expect(await seniorDoctorEligibleFlag(target)).toBe(false);
+      expect(await seniorDoctorEligibleFlag(target, otherClinicId)).toBe(false);
       expect(logAudit).not.toHaveBeenCalled();
     } finally {
       await purgeClinic(otherClinicId);

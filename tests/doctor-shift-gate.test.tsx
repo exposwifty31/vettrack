@@ -1,14 +1,4 @@
-/**
- * @vitest-environment happy-dom
- *
- * Doctor shift gate (spec 2026-08-13) — mobile-shell popup for vet-role
- * users. Renders only when ALL hold: role === "vet", no open clinical
- * check-in (`api.checkIn.active()` → { active: null }), and no un-expired
- * snooze (`localStorage.vt_doctor_gate_snooze_until` epoch-ms). "לא"
- * snoozes for 8 h; "כן" opens the team step; a team tap posts the
- * check-in; a 409 SENIOR_ALREADY_ASSIGNED shows the replace-confirm and
- * retries with `replaceSenior: true`.
- */
+/** @vitest-environment happy-dom */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, cleanup, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -121,7 +111,7 @@ describe("DoctorShiftGate — mobile shell popup (doctor shift gate)", () => {
     expect(screen.queryByText(t.doctorGate.areYouOnShift)).toBeNull();
   });
 
-  it("'לא' sets an 8h snooze key and closes; a remount within the window renders nothing", async () => {
+  it("'No' sets an 8h snooze key and closes; a remount within the window renders nothing", async () => {
     const before = Date.now();
     renderGate();
     fireEvent.click(await screen.findByTestId("doctor-gate-no"));
@@ -141,7 +131,7 @@ describe("DoctorShiftGate — mobile shell popup (doctor shift gate)", () => {
     expect(screen.queryByText(t.doctorGate.areYouOnShift)).toBeNull();
   });
 
-  it("'כן' → team step; a team tap posts { operationalRole: 'icu', isSenior: false } and closes on success", async () => {
+  it("'Yes' → team step; a team tap posts { operationalRole: 'icu', isSenior: false } and closes on success", async () => {
     renderGate();
     fireEvent.click(await screen.findByTestId("doctor-gate-yes"));
 
@@ -154,6 +144,20 @@ describe("DoctorShiftGate — mobile shell popup (doctor shift gate)", () => {
     await waitFor(() =>
       expect(screen.queryByText(t.doctorGate.pickTeam)).toBeNull(),
     );
+  });
+
+  it("stays hidden until the seniorDoctorEligible lookup settles, so the senior option cannot be raced past", async () => {
+    let resolveMe!: (v: unknown) => void;
+    meMock.mockReturnValue(new Promise((r) => { resolveMe = r; }));
+    renderGate();
+
+    await waitFor(() => expect(meMock).toHaveBeenCalled());
+    expect(screen.queryByText(t.doctorGate.areYouOnShift)).toBeNull();
+
+    resolveMe({ id: "u-vet-1", role: "vet", seniorDoctorEligible: true });
+    expect(await screen.findByText(t.doctorGate.areYouOnShift)).toBeTruthy();
+    fireEvent.click(screen.getByTestId("doctor-gate-yes"));
+    expect(await screen.findByTestId("doctor-gate-senior-toggle")).toBeTruthy();
   });
 
   it("hides the senior toggle when seniorDoctorEligible=false", async () => {
@@ -183,7 +187,7 @@ describe("DoctorShiftGate — mobile shell popup (doctor shift gate)", () => {
     const conflict = Object.assign(new Error("senior already assigned"), {
       status: 409,
       code: "SENIOR_ALREADY_ASSIGNED",
-      payload: { details: { currentSeniorName: "ד\"ר כהן" } },
+      payload: { details: { currentSeniorName: "Dr. Cohen" } },
     });
     openMock.mockRejectedValueOnce(conflict).mockResolvedValueOnce(makeRow({ isSenior: true }));
 
@@ -194,7 +198,7 @@ describe("DoctorShiftGate — mobile shell popup (doctor shift gate)", () => {
 
     expect(await screen.findByText(t.doctorGate.replaceSeniorTitle)).toBeTruthy();
     expect(
-      screen.getByText(t.doctorGate.replaceSeniorBody("ד\"ר כהן", t.doctorGate.teamIcu)),
+      screen.getByText(t.doctorGate.replaceSeniorBody("Dr. Cohen", t.doctorGate.teamIcu)),
     ).toBeTruthy();
 
     fireEvent.click(screen.getByTestId("doctor-gate-replace-confirm"));
@@ -213,7 +217,7 @@ describe("DoctorShiftGate — mobile shell popup (doctor shift gate)", () => {
     const conflict = Object.assign(new Error("senior already assigned"), {
       status: 409,
       code: "SENIOR_ALREADY_ASSIGNED",
-      payload: { details: { currentSeniorName: "ד\"ר כהן" } },
+      payload: { details: { currentSeniorName: "Dr. Cohen" } },
     });
     openMock.mockRejectedValueOnce(conflict);
 

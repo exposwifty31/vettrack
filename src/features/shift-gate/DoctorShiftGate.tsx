@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { api } from "@/lib/api";
 import { t } from "@/lib/i18n";
-import type { DoctorTeamRole } from "@/types/check-in";
+import { readSeniorConflict, type CheckInRequest, type DoctorTeamRole } from "@/types/check-in";
 import { useDoctorGateState } from "./useDoctorGateState";
 import { TEAM_ROLES, teamLabel } from "./team-labels";
 
@@ -20,12 +20,6 @@ type GateStep =
   | { kind: "confirm" }
   | { kind: "team" }
   | { kind: "replace"; team: DoctorTeamRole; currentSeniorName: string | null };
-
-type CheckInPayload = {
-  operationalRole: DoctorTeamRole;
-  isSenior?: boolean;
-  replaceSenior?: boolean;
-};
 
 /**
  * Doctor shift gate popup (spec 2026-08-13). Self-contained: renders null
@@ -41,7 +35,7 @@ export function DoctorShiftGate() {
   const queryClient = useQueryClient();
 
   const checkInMutation = useMutation({
-    mutationFn: (data: CheckInPayload) => api.checkIn.open(data),
+    mutationFn: (data: CheckInRequest) => api.checkIn.open(data),
     onSuccess: () => {
       // The board reads doctors from the snapshot's responsibles section;
       // the active-check-in query gates this popup itself.
@@ -50,13 +44,13 @@ export function DoctorShiftGate() {
       setDismissed(true);
     },
     onError: (err: unknown, variables) => {
-      const code = (err as { code?: unknown } | null)?.code;
-      if (code === "SENIOR_ALREADY_ASSIGNED") {
-        const details = (err as { payload?: { details?: Record<string, unknown> } })
-          .payload?.details;
-        const name =
-          typeof details?.currentSeniorName === "string" ? details.currentSeniorName : null;
-        setStep({ kind: "replace", team: variables.operationalRole, currentSeniorName: name });
+      const conflict = readSeniorConflict(err);
+      if (conflict) {
+        setStep({
+          kind: "replace",
+          team: variables.operationalRole,
+          currentSeniorName: conflict.currentSeniorName,
+        });
         return;
       }
       toast.error(t.doctorGate.checkInFailed);
