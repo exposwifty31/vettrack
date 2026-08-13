@@ -429,6 +429,7 @@ export const clinicalCheckIns = vtTable(
     checkedInAt: timestamp("checked_in_at", { withTimezone: true }).notNull().defaultNow(),
     checkedOutAt: timestamp("checked_out_at", { withTimezone: true }),
     operationalRole: varchar("operational_role", { length: 40 }),
+    isSenior: boolean("is_senior").notNull().default(false),
     clinicalRoleAtCheckIn: varchar("clinical_role_at_check_in", { length: 20 }).notNull(),
     activeShiftId: text("active_shift_id"),
     shiftSessionId: text("shift_session_id"),
