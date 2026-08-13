@@ -6749,3 +6749,62 @@ BoardAttentionSection's local emphasis vocabulary; zero references remain —
   (madge `OK — server: 0 cycle(s), src: 0 cycle(s) (matches baseline)`).
 
 **Verdict:** VERIFIED
+
+## 2026-08-13 — TV board phase 1: adversarial pre-PR review (15 findings) fixed + re-reviewed on feat/tv-board-phase1
+
+**Claim:** A 6-lens adversarial pre-PR review of the completed phase-1 board redesign
+(`feat/tv-board-phase1`, 10 commits) surfaced 15 verified findings (0 critical, 2 high,
+13 medium; i18n lens clean). All 15 — every one a spec-conformance gap or bug, none new
+scope — fixed across 6 commits (045e8ce02 → 904e78f0d) with the owner's explicit "fix all
+15" approval. Fixes then adversarially RE-reviewed: 0 confirmed regressions.
+
+**What was verified against real code (not assumed):**
+(1) Findings 4,5 (a11y, HIGH): board captions/labels landed at ~19/23/26 px under the
+1.75 TV scale (< the spec §3 28 px floor) and used `#787880` (~3.9:1, fails WCAG AA).
+Fixed board-wide in the `[data-board-tv]` scope: `max(28px, calc(raw*scale))` floor +
+`--ivory-text2/3 → #A9B4C0` (~8:1 on the `#161D26` card, recomputed by hand) + a
+`.board-slot-name` 32 px class per §4. Scoped to a descendant of `.dark` so it wins by
+proximity; desktop /board untouched.
+(2) Findings 1,3,6,7,10: removed the legacy navy header + footer (they re-rendered the
+clock ×3, ward wordmark ×2, and a hardcoded-green LIVE badge ×2 that lied during
+stale/offline) — spec §2 single top band; exit relocated into `BoardTopBand`. Root bg
+`--ivory-bg` (#000) → `--board-bg` (#0F141A) per §3 no-pure-black. StageFade reset moved
+to `useLayoutEffect` so the incoming rotation view is opacity-0 before paint (was a hard
+cut each swap).
+(3) Finding 2: cold boot against an unreachable server showed an eternal skeleton;
+`CommandBoardScreen`'s `!snapshot` branch now renders `StaleTakeover` once
+`isConnectionUntrusted(state)` (new, TDD unit-tested). Verified it sits BELOW the frozen
+Code Blue early-return (no snapshot ⇒ no session), so Code Blue is never suppressed.
+(4) Findings 8,9,11: removed `EquipmentStage`'s never-read `responsibles?` prop; dropped
+`WaitlistPanel`/`StagingPanel` (+ the now-dead `DepthPanel` exports) from the equipment
+evidence face — `OpsStage` already owns queue depth (spec §2, no duplicate numbers);
+`formatLastGoodTime` now zero-pads via the he-IL formatter.
+(5) Findings 12,13,14,15: `hasResponsiblesGap` now reuses `countFilledSlots` (single §4
+source of truth) — covered first, refactored under green; new tests for unconfigured>alert
+priority, provisional-coordinator fill, the attention full-screen state, and the
+null-timestamp downtime branch.
+
+**Evidence (actual command outputs this session):**
+- Pre-PR review (6-lens adversarial Workflow, 11 agents): 15 CONFIRMED findings
+  (`{critical:0, high:2, medium:13}`); i18n lens 0.
+- Fix delta re-review (4-lens adversarial Workflow, 5 agents, 96 tool-uses, 8 min):
+  `{totalConfirmed:0}` — the one css-cascade candidate (`BoardCoPresenceOverlay`, an
+  untouched file) adversarially REJECTED. Journal confirms 3 finders clean + 1 rejected.
+- Finding 2 TDD: `isConnectionUntrusted` test RED first (`ReferenceError`-class import
+  failure), GREEN after adding the predicate; finding 13 characterized (18 classifier
+  tests pass) then refactored under green.
+- `git diff --name-only main..HEAD -- server/` → EMPTY (zero server changes; frozen
+  surface intact). Code Blue early-return at `CommandBoardScreen.tsx:175` unmoved, above
+  the state-driven board render.
+- `pnpm typecheck` → 0 errors (both tsconfigs). `pnpm i18n:check` → deep key parity.
+  `pnpm architecture:gates` → All G1 checks passed. `pnpm test` → `726 passed (726) ·
+  6522 passed | 11 skipped`.
+- `PW_VISUAL=1 PW_SUITE=board TEST_BASE_URL=:3999 playwright ... board-states
+  --update-snapshots` against a dev-bypass `PLAYWRIGHT_E2E` server on :3999 (isolated;
+  running :3001 untouched, confirmed still 200 after teardown) → `5 passed (2.1m)`;
+  stability re-run without `--update` → `4 passed`. Four darwin-chromium baselines
+  regenerated + committed; the rendered board visually confirmed (single top band,
+  no-pure-black, 32 px named slots, muted-unknown absent-vs-zero) across all_clear /
+  alert / unconfigured.
+
+**Verdict:** VERIFIED
