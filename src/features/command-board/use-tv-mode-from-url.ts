@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { useSearch } from "wouter";
 
 /**
  * Single source of truth for the `?tv=1` URL contract that opts the Command
@@ -8,20 +9,16 @@ import { useMemo } from "react";
  * big-screen type scale, overscan-safe framing, and the D-pad focus layer. A
  * wall-mounted TV display typically sets BOTH; either can be set alone.
  *
- * SSR-safe; returns false when there is no window or the URL can't be parsed.
+ * Reactive to query-only navigation: subscribes to wouter's search string so a
+ * `?tv=1` → no-query (or reverse) transition recomputes while `/board` stays
+ * mounted. SSR-safe; returns false when there is no window.
  * Read by BoardShell (overscan-safe framing) and CommandBoardScreen (presentation)
  * independently — both call this hook rather than threading a prop through routes.
  */
 export function useTvModeFromUrl(): boolean {
+  const search = useSearch();
   return useMemo(() => {
     if (typeof window === "undefined") return false;
-    try {
-      return new URL(window.location.href).searchParams.get("tv") === "1";
-    } catch (err) {
-      // window.location.href is normally a well-formed URL; log if it ever isn't,
-      // then fall back to non-TV rather than swallowing it silently.
-      console.warn("[board] failed to parse ?tv from the URL; defaulting to non-TV", err);
-      return false;
-    }
-  }, []);
+    return new URLSearchParams(search).get("tv") === "1";
+  }, [search]);
 }

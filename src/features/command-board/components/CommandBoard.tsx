@@ -393,6 +393,8 @@ function PressureMain({
             {linked.map((eq) => (
               <div
                 key={eq.equipmentId}
+                data-tv-focusable={tvMode ? "" : undefined}
+                data-tv-id={tvMode ? `linked-${eq.equipmentId}` : undefined}
                 className={cn(
                   "rounded-lg border border-[var(--status-issue-border)] bg-[rgb(var(--ivory-surface))]",
                   tvMode ? "px-4 py-3" : "px-3 py-2",

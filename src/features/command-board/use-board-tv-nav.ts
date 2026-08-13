@@ -42,7 +42,12 @@ type Direction = "up" | "down" | "left" | "right";
 
 function isVisible(el: HTMLElement): boolean {
   const r = el.getBoundingClientRect();
-  return r.width > 0 && r.height > 0;
+  if (r.width <= 0 || r.height <= 0) return false;
+  // A nonzero rect is not enough: `visibility: hidden` (and `display: none` on an
+  // ancestor mid-transition) keeps layout box dimensions while the element is not
+  // actually visible — exclude those so the D-pad never lands on hidden targets.
+  const style = window.getComputedStyle(el);
+  return style.visibility !== "hidden" && style.display !== "none";
 }
 
 function inDirection(cur: DOMRect, cand: DOMRect, dir: Direction): boolean {
@@ -70,15 +75,13 @@ function directionalScore(cur: DOMRect, cand: DOMRect, dir: Direction): number {
   return along + perp * PERP_PENALTY;
 }
 
-export function useBoardTvNav({
-  enabled,
-  containerRef,
-  reducedMotion,
-}: {
+interface BoardTvNavOptions {
   enabled: boolean;
   containerRef: RefObject<HTMLElement>;
   reducedMotion: boolean;
-}): void {
+}
+
+export function useBoardTvNav({ enabled, containerRef, reducedMotion }: BoardTvNavOptions): void {
   const lastFocusedId = useRef<string | null>(null);
 
   // Runs after EVERY render while enabled: (1) keep programmatic-focus tabindex in
@@ -111,8 +114,10 @@ export function useBoardTvNav({
     // interaction (breaks "a remote-less board still glances fine"). Only RE-HOME
     // focus once nav has engaged (lastFocusedId set) and the focused node was
     // unmounted by a reconcile or the calm↔pressure <main> swap. The first arrow
-    // press engages nav via move()'s no-current-focus branch.
-    if (!lastFocusedId.current) return;
+    // press engages nav via move()'s no-current-focus branch. `null` means "never
+    // engaged"; an empty string means "engaged on a target without a data-tv-id",
+    // which must still re-home (to the initial anchor) after a reconcile.
+    if (lastFocusedId.current === null) return;
     const survivor = targets.find((el) => el.getAttribute("data-tv-id") === lastFocusedId.current);
     const anchor = survivor ?? container.querySelector<HTMLElement>(INITIAL_SELECTOR) ?? targets[0] ?? null;
     anchor?.focus({ preventScroll: true });
@@ -128,7 +133,10 @@ export function useBoardTvNav({
     }
 
     function reveal(el: HTMLElement): void {
-      lastFocusedId.current = el.getAttribute("data-tv-id");
+      // Keep the last known id when a target ships without `data-tv-id` (fall back
+      // to the "" sentinel so restoration stays engaged and re-homes to the initial
+      // anchor) — a null overwrite would silently disable focus restoration.
+      lastFocusedId.current = el.getAttribute("data-tv-id") ?? lastFocusedId.current ?? "";
       // scrollIntoView is what makes long unit/location lists traversable by remote:
       // the focused item is pulled to the middle of its scroll container.
       el.scrollIntoView({
@@ -141,7 +149,8 @@ export function useBoardTvNav({
     function move(dir: Direction, scope: HTMLElement): void {
       const targets = visibleTargets(scope);
       if (targets.length === 0) return;
-      const active = document.activeElement as HTMLElement | null;
+      const activeEl = document.activeElement;
+      const active = activeEl instanceof HTMLElement ? activeEl : null;
       const current =
         active && scope.contains(active) && active.matches(FOCUSABLE_SELECTOR) ? active : null;
       if (!current) {
@@ -172,6 +181,20 @@ export function useBoardTvNav({
     function onKeyDown(event: KeyboardEvent): void {
       const scope = containerRef.current;
       if (!scope) return;
+      // A dialog or an editable control owns the key first: Radix closes on Escape
+      // and text fields own arrow keys, so a window-level D-pad handler must not
+      // double-handle them (caret would freeze; Escape would close the dialog AND
+      // click the exit control in the same press).
+      if (event.defaultPrevented) return;
+      const target = event.target;
+      if (
+        target instanceof HTMLElement &&
+        (target.isContentEditable ||
+          target.closest('input, textarea, select, [contenteditable="true"]') ||
+          target.closest('[role="dialog"], [role="alertdialog"]'))
+      ) {
+        return;
+      }
       switch (event.key) {
         case "ArrowUp":
           event.preventDefault();
@@ -190,7 +213,8 @@ export function useBoardTvNav({
           move("right", scope);
           break;
         case "Enter": {
-          const active = document.activeElement as HTMLElement | null;
+          const activeEl = document.activeElement;
+          const active = activeEl instanceof HTMLElement ? activeEl : null;
           if (!active || !scope.contains(active) || !active.matches(FOCUSABLE_SELECTOR)) break;
           // Activate ONLY a genuinely-interactive control (today: the exit button).
           // Inert display regions are reachable for reading/reveal but do nothing —

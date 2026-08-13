@@ -59,15 +59,26 @@
     /* ── Typographic scale — mobile-first, 16px base (no iOS input zoom) ──
        Modular ~1.22 ratio. RTL-agnostic (sizes only, no direction). Adopt via
        the .vt-text-* utilities or var() directly; do not hardcode px sizes. */
-    /* iOS type ramp (Stage 1) — rem on a 17px root (see html{font-size}). */
-    --text-2xs:  calc(0.647rem * var(--type-scale, 1));    /* ~11px — dense meta, nav labels */
-    --text-xs:   calc(0.765rem * var(--type-scale, 1));    /* ~13px — captions, helper text */
-    --text-sm:   calc(0.882rem * var(--type-scale, 1));    /* ~15px — secondary body, labels */
-    --text-base: calc(1rem * var(--type-scale, 1));        /* 17px — body default */
-    --text-lg:   calc(1.176rem * var(--type-scale, 1));    /* ~20px — emphasized body, card titles */
-    --text-xl:   calc(1.294rem * var(--type-scale, 1));    /* ~22px — section headings */
-    --text-2xl:  calc(2rem * var(--type-scale, 1));        /* ~34px — page titles (iOS large title) */
-    --text-3xl:  calc(2.353rem * var(--type-scale, 1));    /* ~40px — hero numerals / display */
+    /* iOS type ramp (Stage 1) — rem on a 17px root (see html{font-size}).
+       Raw size tokens are the single source for the ramp constants; the board TV
+       scope ([data-board-tv]) re-derives the same ramp from these raws with its
+       own scale, so the two ramps cannot drift. */
+    --text-2xs-raw:  0.647rem;   /* ~11px — dense meta, nav labels */
+    --text-xs-raw:   0.765rem;   /* ~13px — captions, helper text */
+    --text-sm-raw:   0.882rem;   /* ~15px — secondary body, labels */
+    --text-base-raw: 1rem;       /* 17px — body default */
+    --text-lg-raw:   1.176rem;   /* ~20px — emphasized body, card titles */
+    --text-xl-raw:   1.294rem;   /* ~22px — section headings */
+    --text-2xl-raw:  2rem;       /* ~34px — page titles (iOS large title) */
+    --text-3xl-raw:  2.353rem;   /* ~40px — hero numerals / display */
+    --text-2xs:  calc(var(--text-2xs-raw) * var(--type-scale, 1));
+    --text-xs:   calc(var(--text-xs-raw) * var(--type-scale, 1));
+    --text-sm:   calc(var(--text-sm-raw) * var(--type-scale, 1));
+    --text-base: calc(var(--text-base-raw) * var(--type-scale, 1));
+    --text-lg:   calc(var(--text-lg-raw) * var(--type-scale, 1));
+    --text-xl:   calc(var(--text-xl-raw) * var(--type-scale, 1));
+    --text-2xl:  calc(var(--text-2xl-raw) * var(--type-scale, 1));
+    --text-3xl:  calc(var(--text-3xl-raw) * var(--type-scale, 1));
     --display:         var(--text-3xl);   /* design name — hero/display numerals */
     --text-largetitle: var(--text-2xl);   /* design name — iOS large title */
     --leading-tight:  1.2;    /* headings */
@@ -1147,14 +1158,14 @@ nav,
    to every descendant. */
 [data-board-tv] {
   --tv-type-scale: 1.75;   /* ← the single tuned constant. Baseline 1080p @ ~3 m; range 1.6–2.0. */
-  --text-2xs:  calc(0.647rem * var(--tv-type-scale));
-  --text-xs:   calc(0.765rem * var(--tv-type-scale));
-  --text-sm:   calc(0.882rem * var(--tv-type-scale));
-  --text-base: calc(1rem     * var(--tv-type-scale));
-  --text-lg:   calc(1.176rem * var(--tv-type-scale));
-  --text-xl:   calc(1.294rem * var(--tv-type-scale));
-  --text-2xl:  calc(2rem     * var(--tv-type-scale));
-  --text-3xl:  calc(2.353rem * var(--tv-type-scale));
+  --text-2xs:  calc(var(--text-2xs-raw) * var(--tv-type-scale));
+  --text-xs:   calc(var(--text-xs-raw) * var(--tv-type-scale));
+  --text-sm:   calc(var(--text-sm-raw) * var(--tv-type-scale));
+  --text-base: calc(var(--text-base-raw) * var(--tv-type-scale));
+  --text-lg:   calc(var(--text-lg-raw) * var(--tv-type-scale));
+  --text-xl:   calc(var(--text-xl-raw) * var(--tv-type-scale));
+  --text-2xl:  calc(var(--text-2xl-raw) * var(--tv-type-scale));
+  --text-3xl:  calc(var(--text-3xl-raw) * var(--tv-type-scale));
 }
 
 /* Overscan title-safe frame for the BoardShell kiosk host. Insets content off the
@@ -1183,7 +1194,9 @@ nav,
   --tv-focus: 56 189 248;   /* #38BDF8 sky-400 */
 }
 [data-board-tv] [data-tv-focusable] {
-  border-radius: var(--radius-xl);
+  /* No border-radius here: the focus outline follows each component's own radius,
+     and forcing --radius-xl at 0,2,0 specificity would override Tailwind radius
+     utilities (0,1,0) on every target in the resting state too. */
   scroll-margin: 14vh 6vw;   /* reveal keeps the focused item clear of the overscan edge */
   transition:
     outline-offset 140ms cubic-bezier(0.2, 0, 0, 1),

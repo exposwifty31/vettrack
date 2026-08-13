@@ -6632,3 +6632,44 @@ invalidation + audit already fired).
 - `DATABASE_URL=<.env> npx vitest run --config vitest.db-integration.config.ts tests/doctor-shift-gate.integration.test.ts` → `Test Files  1 passed (1) · Tests  3 passed (3)`.
 
 **Verdict:** VERIFIED
+
+## 2026-08-13 — PR #178 (feat/tv-board-redesign): merge origin/main + CodeRabbit round 1 (9 findings)
+
+**Claim:** Branch merged with origin/main (merge commit, not rebase) and all 9
+open CodeRabbit findings addressed. Merge reconciliation: the only conflicted
+file was `src/features/command-board/components/CommandBoard.tsx` — all four
+hunks were keep-both compositions of the branch's TV mode (`tvMode` prop +
+D-pad layer) with main's ResponsiblesPanel (PR #180): PressureMain now accepts
+BOTH `tvMode` and `responsibles` (panel stays as the compact `max-h-56` block
+below the ticker), CommandBoard carries both prop docs, and the pressure-mode
+call site passes both. Calm-mode ResponsiblesPanel mount and
+CommandBoardScreen's `responsibles={snapshot.responsibles}` wiring survived
+untouched. Findings: (1) linked emergency equipment cards in PressureMain now
+carry `data-tv-focusable`/`data-tv-id="linked-<id>"` when tvMode; (2)
+`isVisible` adds computed-style `visibility`/`display` checks; (3) hook props
+extracted to `interface BoardTvNavOptions`; (4) `reveal()` no longer
+overwrites `lastFocusedId` with null — falls back to previous id then a ""
+sentinel, and the restoration guard distinguishes null (never engaged) from ""
+(engaged, id-less target) so re-homing stays alive; (5) both
+`document.activeElement` casts replaced with `instanceof HTMLElement`
+narrows; (6) window keydown handler now ignores `defaultPrevented` events and
+events originating in editable fields (`input/textarea/select/
+contenteditable`) or open dialogs (`[role=dialog]/[role=alertdialog]`); (7)
+`useTvModeFromUrl` subscribes to wouter's `useSearch()` so query-only
+`?tv=1` transitions recompute while /board stays mounted; (8) type-ramp
+constants single-sourced as `--text-*-raw` tokens — base ramp and
+`[data-board-tv]` TV ramp both derive from them (stage-1 lock test updated to
+pin the raws, same drift protection); (9) `border-radius: var(--radius-xl)`
+removed from `[data-board-tv] [data-tv-focusable]` so component radii win.
+New tests `tests/board-tv-nav.test.tsx` (3): arrows in editable field
+ignored, Escape inside dialog does not click exit (positive control: outside
+does), id-less-target focus restoration survives a reconcile unmount.
+
+**Evidence (actual command outputs this session):**
+- `pnpm typecheck` → exited clean, zero errors (both tsconfigs).
+- `pnpm test` → `Test Files  716 passed (716) · Tests  6418 passed | 11 skipped (6429) · Duration 98.25s` (+1 file / +3 tests: board-tv-nav).
+- `pnpm test -- tests/board-responsibles-panel.test.tsx` → `Test Files  1 passed (1) · Tests  8 passed (8)` (run post-merge, before the merge commit).
+- `pnpm i18n:check` → `✓ locales/en.json and locales/he.json are in deep key parity.`
+- `pnpm architecture:gates` → `[architecture-gates] All G1 checks passed.` (madge `OK — server: 0 cycle(s), src: 0 cycle(s) (matches baseline)`).
+
+**Verdict:** VERIFIED
