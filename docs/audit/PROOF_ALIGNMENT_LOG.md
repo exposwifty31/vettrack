@@ -6471,3 +6471,27 @@ caveat (clinic undeletable once audited). (2) Vet user assertion in
 (`and(eq(users.id, …), eq(users.clinicId, VET_CLINIC_ID))`). Evidence:
 `pnpm typecheck` clean; `vitest --config vitest.db-integration.config.ts
 tests/seed-reviewer-demo.integration.test.ts` → 12/12 passed against local DB.
+
+## 2026-08-13 — Doctor shift gate: final gates (Task 15, branch feat/doctor-shift-gate)
+
+**Claim:** All four repo gates pass on the completed 15-commit doctor-shift-gate branch
+(migrations 181–183, check-in service/route senior semantics, switch endpoint, admin
+eligibility toggle, 14h doctor expiry worker, snapshot `responsibles`, client API/i18n,
+gate popup, admin checkbox, board panel, DB round-trip integration test).
+
+**Evidence (actual command outputs this session):**
+- `pnpm typecheck` → exited clean, zero errors (`tsc --noEmit && tsc -p tsconfig.server.json --noEmit`).
+- `pnpm test` → `Test Files  715 passed (715) · Tests  6386 passed | 11 skipped (6397) · Duration 94.54s`.
+- `pnpm i18n:check` → `✓ locales/en.json and locales/he.json are in deep key parity.`
+- `pnpm architecture:gates` → depcruise `✔ no dependency violations found (1002 modules, 5170 dependencies cruised)`; madge `OK — server: 0 cycle(s), src: 0 cycle(s) (matches baseline)`; `All G1 checks passed.`
+- Warn-only governance (noted, not blocking): `pnpm tenant:lint:touched` flags
+  `board-responsibles.service.ts:98`, `clinical-check-in.ts:138/159/319` — each verified
+  by Read to filter `clinicId` in the same `where(and(...))` (linter scope heuristic
+  false positives; e.g. clinical-check-in.ts:139 `eq(users.clinicId, clinicId)`).
+  `routes:contract` / `query-keys:audit` baselines carry pre-existing drift beyond this
+  branch (e.g. shift-adjustments, uploads/avatar); this PR adds
+  `POST /api/clinical-check-in/switch`, `PATCH /api/users/:id/senior-doctor-eligible`,
+  keys `["/api/clinical-check-in/me/active"]`, `["/api/users/me","doctor-gate"]` — left
+  to a baseline-refresh pass rather than rewriting shared baselines from a feature branch.
+
+**Verdict:** VERIFIED
