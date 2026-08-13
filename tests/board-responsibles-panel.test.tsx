@@ -258,20 +258,21 @@ describe("CommandBoard — responsibles wiring", () => {
     expect(getByText(t.board.responsiblesUnavailable)).toBeTruthy();
   });
 
-  it("keeps the panel mounted in pressure mode (active emergency)", () => {
-    const pressureBoard = board();
-    pressureBoard.activeEmergency = {
+  it("keeps the panel mounted during the alert stage (active emergency)", () => {
+    const alertBoard = board();
+    alertBoard.activeEmergency = {
       sessionId: "cb-1",
       startedAt: "2026-08-13T00:00:00.000Z",
       elapsedMs: 60_000,
       linkedEquipment: [],
     };
-    const { getByTestId, getByText } = renderCommandBoard(
+    const { getByTestId } = renderCommandBoard(
       responsibles({ seniorTechnician: { name: "Tami Tech" } }),
-      pressureBoard,
+      alertBoard,
     );
-    // Pressure branch is live (its high-load banner renders)…
-    expect(getByText(t.board.highLoad)).toBeTruthy();
+    // Alert (exception) stage is live (Task 10: state-driven stage replaced
+    // the old calm/pressure high-load banner)…
+    expect(getByTestId("board-stage").getAttribute("data-stage")).toBe("alert");
     // …and the responsibles panel is still mounted with its slot content.
     expect(getByTestId("board-responsibles")).toBeTruthy();
     expect(

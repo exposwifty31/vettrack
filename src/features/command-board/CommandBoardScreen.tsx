@@ -22,6 +22,7 @@ import {
   publishCodeBlueSeenGossip,
 } from "@/lib/realtime";
 import { useDisplaySnapshot } from "@/hooks/useDisplaySnapshot";
+import { useDisplayConnection } from "@/hooks/use-display-connection";
 import { useDisplayHeartbeat } from "@/hooks/useDisplayHeartbeat";
 import { useRealtimeReconciliation } from "@/hooks/useRealtimeReconciliation";
 import { useCodeBlueKeepaliveReconciliation } from "@/hooks/useCodeBlueKeepaliveReconciliation";
@@ -33,6 +34,7 @@ import type { EquipmentStatus } from "@/types";
 import { STATUS_BG } from "./status-tokens";
 import { CommandBoard } from "./components/CommandBoard";
 import { CodeBlueOverlay } from "./components/CodeBlueOverlay";
+import { useBoardState } from "./use-board-state";
 import { useKioskModeFromUrl } from "./use-kiosk-mode-from-url";
 import { useTvModeFromUrl } from "./use-tv-mode-from-url";
 import { useDirection } from "@/hooks/useDirection";
@@ -117,6 +119,12 @@ function CommandBoardScreen({ kioskMode: kioskModeProp }: CommandBoardScreenProp
   }, [qc, realtimeIngestor]);
 
   const snapshot = useDisplaySnapshot();
+
+  // Task 10 made `state` a required CommandBoard prop; the full container
+  // rework (poller cut + legacy-fallback removal) lands in Task 12. This is
+  // the minimal state wiring from the plan's Task 12 snippet.
+  const connection = useDisplayConnection();
+  const boardState = useBoardState({ snapshot, connection: connection.state });
 
   // Phase 9 PR 9.2 — heartbeat (operational-only). Always runs while the
   // display surface is mounted; never gates rendering or any clinical path.
@@ -248,6 +256,9 @@ function CommandBoardScreen({ kioskMode: kioskModeProp }: CommandBoardScreenProp
     <div className={cn("dark", tvMode && "flex min-h-0 flex-1 flex-col")}>
       <CommandBoard
         board={board}
+        state={boardState}
+        connection={connection}
+        snapshot={snapshot}
         currentTime={snapshot.currentTime}
         currentShift={snapshot.currentShift}
         kioskMode={kioskMode}

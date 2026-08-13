@@ -22,12 +22,29 @@ import {
 } from "../responsibles-fill";
 
 /** Titled container matching the board's ivory-surface panel idiom. */
-function Panel({ title, children }: { title: string; children: ReactNode }) {
+function Panel({ title, children, testId }: { title: string; children: ReactNode; testId?: string }) {
   return (
-    <div className="w-full rounded-xl border border-ivory-border bg-[rgb(var(--ivory-surface))] px-3 py-2.5">
+    <div
+      data-testid={testId}
+      className="w-full rounded-xl border border-ivory-border bg-[rgb(var(--ivory-surface))] px-3 py-2.5"
+    >
       <div className="vt-text-2xs font-bold uppercase tracking-widest text-ivory-text3 mb-2">{title}</div>
       {children}
     </div>
+  );
+}
+
+/**
+ * Muted-unknown treatment for an ABSENT optional snapshot block (Phase 1,
+ * absent ≠ zero — binding). An undefined block means the server-side producer
+ * degraded, not that the count is zero: render the block's title + a quiet
+ * "unavailable" line, never a numeral.
+ */
+export function UnknownBlock({ title }: { title: string }): JSX.Element {
+  return (
+    <Panel title={title} testId="board-block-unknown">
+      <div className="vt-text-xs text-ivory-text3">{t.board.blockUnavailable}</div>
+    </Panel>
   );
 }
 
