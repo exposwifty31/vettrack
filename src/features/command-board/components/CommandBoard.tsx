@@ -243,8 +243,11 @@ export function CommandBoard({
       <div
         data-testid="board-bottom-band"
         className={cn(
-          "shrink-0 grid grid-cols-1 sm:grid-cols-3 items-start px-4 pb-3",
-          tvMode ? "gap-4" : "gap-3",
+          // Responsibles carries up to five named people at the 10-foot type floor,
+          // so it gets the wider column and lays them out in two columns (below) —
+          // otherwise a single stacked list eats ~half the board and starves the stage.
+          "shrink-0 grid grid-cols-1 items-start px-4 pb-3",
+          tvMode ? "gap-4 sm:grid-cols-[1.7fr_1fr_1fr]" : "gap-3 sm:grid-cols-3",
         )}
       >
         <ResponsiblesPanel responsibles={responsibles} />

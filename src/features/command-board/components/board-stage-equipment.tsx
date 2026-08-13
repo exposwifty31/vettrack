@@ -53,9 +53,20 @@ function buildSegments(counts: ReadinessCounts): Array<{ key: EquipmentReadiness
 
 // ── ADRing ──────────────────────────────────────────────────────────────────
 
-function ADRing({ pct, ready, total }: { pct: number; ready: number; total: number }) {
-  const size = 140;
-  const stroke = 14;
+function ADRing({
+  pct,
+  ready,
+  total,
+  size = 140,
+}: {
+  pct: number;
+  ready: number;
+  total: number;
+  /** Hero variant on the evidence face passes a larger ring; default keeps the
+   *  original compact size for any other caller. */
+  size?: number;
+}) {
+  const stroke = Math.round(size * 0.1);
   const r = (size - stroke) / 2;
   const circ = 2 * Math.PI * r;
   const dash = (pct / 100) * circ;
@@ -525,95 +536,108 @@ export function EquipmentStage({
       ? (board.overview.ready / board.overview.totalCritical) * 100
       : 0;
 
+  // Centered evidence composition. The old two-column grid clustered content into
+  // one corner and left a dead void; here the whole cluster (readiness hero + the
+  // breakdown tiles) is centered in the stage so the negative space stays balanced
+  // and intentional at 10 ft, not a broken-looking hole. One unified readiness
+  // statement (ring + status + mix) replaces the old redundant check/ring/count.
+  const tileMin = tvMode ? "300px" : "180px";
+  const breakdown: JSX.Element[] = [];
+  if (board.byType.length > 0) {
+    breakdown.push(
+      <section key="bytype" data-tv-focusable={tvMode ? "" : undefined} data-tv-id={tvMode ? "bytype" : undefined}>
+        <h2 className="vt-text-2xs font-bold uppercase tracking-widest text-ivory-text3 mb-2 text-center">
+          {t.board.byType}
+        </h2>
+        <div
+          className={cn("grid", tvMode ? "gap-4" : "gap-2")}
+          style={{ gridTemplateColumns: `repeat(auto-fit, minmax(${tileMin}, 1fr))` }}
+        >
+          {board.byType.map((row) => (
+            <TypeTile key={row.typeId ?? row.typeName} row={row} tvMode={tvMode} />
+          ))}
+        </div>
+      </section>,
+    );
+  }
+  if (board.byLocation.length > 0) {
+    breakdown.push(
+      <section key="byloc">
+        <h2 className="vt-text-2xs font-bold uppercase tracking-widest text-ivory-text3 mb-2 text-center">
+          {t.board.whereTitle}
+        </h2>
+        <div
+          className={cn("grid", tvMode ? "gap-4" : "gap-2")}
+          style={{ gridTemplateColumns: `repeat(auto-fit, minmax(${tileMin}, 1fr))` }}
+        >
+          {board.byLocation.map((row) => (
+            <LocationCard key={row.locationId ?? row.locationName} row={row} tvMode={tvMode} />
+          ))}
+        </div>
+      </section>,
+    );
+  }
+  if (board.custody && board.custody.units.length > 0) {
+    breakdown.push(<CustodyPanel key="custody" custody={board.custody} />);
+  }
+  // The readiness-mix bar only earns its space when readiness is actually mixed;
+  // for an all-ready board it is one green segment redundant with the ring.
+  const hasMix = buildSegments(board.overview).length > 1;
+
   return (
     <section
       data-testid="board-stage"
       data-stage="evidence"
-      className={cn(
-        "flex-1 min-h-0 overflow-auto grid grid-cols-1 lg:grid-cols-[auto_1fr]",
-        tvMode ? "gap-6" : "gap-4",
-      )}
+      className={cn("flex-1 min-h-0 flex flex-col overflow-hidden", tvMode ? "p-8" : "p-4")}
     >
-      {/* Left: emblem + ADRing + ReadinessMix — one D-pad region (initial focus) in tvMode */}
-      <div
-        className={cn(
-          "flex flex-col items-center shrink-0",
-          tvMode ? "gap-6 lg:w-[22rem]" : "gap-4 lg:w-64",
-        )}
-        data-tv-focusable={tvMode ? "" : undefined}
-        data-tv-id={tvMode ? "overview" : undefined}
-        data-tv-focus-initial={tvMode ? "" : undefined}
-      >
-        {state === "all_clear" && (
-          // Evidence, not a lone checkmark: the emblem always carries the
-          // configured-count phrase ("N of M · checked now") beside it.
-          <div data-testid="board-allclear" className="flex flex-col items-center gap-1.5 text-center">
-            <CheckCircle2
-              aria-hidden="true"
-              className={cn("text-[hsl(var(--status-ok))]", tvMode ? "h-16 w-16" : "h-10 w-10")}
-            />
-            <p
-              className={cn(
-                "font-bold text-[hsl(var(--status-ok))]",
-                tvMode ? "vt-text-lg" : "vt-text-sm",
-              )}
-            >
-              {t.board.allCriticalReady}
-            </p>
-            <p className="board-nums vt-text-xs tabular-nums text-ivory-text2">
-              {t.board.allClearEvidence(board.overview.ready, board.overview.totalCritical)}
-            </p>
-          </div>
-        )}
-        <ADRing pct={pct} ready={board.overview.ready} total={board.overview.totalCritical} />
-        <ReadinessMix overview={board.overview} />
-      </div>
-
-      {/* Right: monitored-equipment tiles, locations, queue depths, custody */}
-      <div className="flex flex-col gap-4 min-w-0">
-        {board.byType.length > 0 && (
-          <section
-            data-tv-focusable={tvMode ? "" : undefined}
-            data-tv-id={tvMode ? "bytype" : undefined}
-          >
-            <h2 className="vt-text-2xs font-bold uppercase tracking-widest text-ivory-text3 mb-2">
-              {t.board.byType}
-            </h2>
-            <div
-              className={cn(
-                "grid",
-                tvMode ? "grid-cols-2 xl:grid-cols-3 gap-4" : "grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2",
-              )}
-            >
-              {board.byType.map((row) => (
-                <TypeTile key={row.typeId ?? row.typeName} row={row} tvMode={tvMode} />
-              ))}
+      {/* The whole cluster (readiness hero + breakdown tiles) is margin-centered so
+          the negative space stays balanced top-and-bottom — no corner void, and
+          (unlike justify-center) no top-clip when a dense clinic overflows. */}
+      <div className={cn("m-auto flex flex-col items-center w-full", tvMode ? "gap-10 max-w-6xl" : "gap-6 max-w-3xl")}>
+        {/* Readiness hero — ring + one unified status statement. */}
+        <div
+          className={cn("flex items-center", tvMode ? "gap-14" : "gap-8")}
+          data-tv-focusable={tvMode ? "" : undefined}
+          data-tv-id={tvMode ? "overview" : undefined}
+          data-tv-focus-initial={tvMode ? "" : undefined}
+        >
+          {state === "all_clear" ? (
+            // Evidence, not a lone checkmark: the headline carries the configured-
+            // count phrase ("N of M · checked now"). board-allclear testid preserved.
+            <div data-testid="board-allclear" className={cn("flex flex-col", tvMode ? "gap-3 max-w-[34rem]" : "gap-2 max-w-sm")}>
+              <CheckCircle2
+                aria-hidden="true"
+                className={cn("text-[hsl(var(--status-ok))]", tvMode ? "h-14 w-14" : "h-10 w-10")}
+              />
+              <p className={cn("font-bold text-[hsl(var(--status-ok))] leading-tight", tvMode ? "text-[48px]" : "text-2xl")}>
+                {t.board.allCriticalReady}
+              </p>
+              <p className={cn("board-nums tabular-nums text-ivory-text2", tvMode ? "text-[30px]" : "vt-text-sm")}>
+                {t.board.allClearEvidence(board.overview.ready, board.overview.totalCritical)}
+              </p>
             </div>
-          </section>
-        )}
+          ) : (
+            hasMix && (
+              // Non-all-clear: no "all good" reassurance — the mix beside the ring
+              // carries the readiness picture without a green claim.
+              <div className={cn("flex flex-col", tvMode ? "min-w-[20rem] max-w-[34rem]" : "max-w-sm")}>
+                <ReadinessMix overview={board.overview} />
+              </div>
+            )
+          )}
+          <ADRing
+            pct={pct}
+            ready={board.overview.ready}
+            total={board.overview.totalCritical}
+            size={tvMode ? 190 : 140}
+          />
+        </div>
 
-        {board.byLocation.length > 0 && (
-          <section>
-            <h2 className="vt-text-2xs font-bold uppercase tracking-widest text-ivory-text3 mb-2">
-              {t.board.whereTitle}
-            </h2>
-            <div
-              className={cn(
-                "grid",
-                tvMode ? "grid-cols-2 xl:grid-cols-3 gap-4" : "grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2",
-              )}
-            >
-              {board.byLocation.map((row) => (
-                <LocationCard key={row.locationId ?? row.locationName} row={row} tvMode={tvMode} />
-              ))}
-            </div>
-          </section>
+        {/* Breakdown — big tiles, centered + width-constrained so a sparse fixture
+            reads as composed instead of small boxes floating in a wide grid. */}
+        {breakdown.length > 0 && (
+          <div className={cn("w-full flex flex-col", tvMode ? "gap-5" : "gap-3")}>{breakdown}</div>
         )}
-
-        {/* Waitlist / staging depth live on the Ops rotation face (OpsStage), never
-            here — the evidence face would otherwise show the identical numbers on
-            both faces of the rotation (spec §2: Ops owns the queue detail). */}
-        {board.custody && board.custody.units.length > 0 && <CustodyPanel custody={board.custody} />}
       </div>
     </section>
   );

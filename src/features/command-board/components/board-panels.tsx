@@ -307,7 +307,12 @@ export function ResponsiblesPanel({
   return (
     <Panel title={t.board.responsiblesTitle}>
       <div className="flex flex-col gap-2.5" data-testid="board-responsibles">
-        {slotEls}
+        {/* Auto-fitting columns: on the board's wide responsibles column the five
+            named slots flow into 2–3 columns (a compact block, not a half-screen
+            stack); in the narrow desktop panel it collapses to one. */}
+        <div className="grid gap-x-6 gap-y-3" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(12rem, 1fr))" }}>
+          {slotEls}
+        </div>
         {emptyLabels.length > 0 ? (
           // Empty slots collapse into ONE muted line — never N repeated rows.
           <div data-testid="board-responsibles-empty-group" className="vt-text-2xs text-ivory-text3">
