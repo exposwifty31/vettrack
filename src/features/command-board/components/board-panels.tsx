@@ -5,6 +5,7 @@
 // so a panel never sees undefined (the tolerant-reader contract lives at the
 // call site).
 import type { ReactNode } from "react";
+import { TriangleAlert } from "lucide-react";
 import { t } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import type {
@@ -46,12 +47,34 @@ function DepthPanel({ title, depth }: { title: string; depth: number }) {
 }
 
 export function PowerPanel({ power }: { power: EquipmentBoardPowerBlock }) {
+  // Red is an alarm color on the board: it appears only when alerts are ACTIVE.
+  // A zero renders neutral — never a red zero (status semantics, Phase 1 §3).
+  const alertActive = power.alert > 0;
   return (
     <Panel title={t.board.power}>
       <div className="grid grid-cols-3 gap-2">
         <Stat count={power.plugged} label={t.board.plugged} className="text-[hsl(var(--status-ok))]" />
         <Stat count={power.unplugged} label={t.board.unplugged} className="text-ivory-text2" />
-        <Stat count={power.alert} label={t.board.powerAlert} className="text-[hsl(var(--status-issue))]" />
+        <div className="flex flex-col items-center">
+          <span
+            data-testid="board-power-alerts"
+            data-severity={alertActive ? "active" : "none"}
+            className={cn(
+              "inline-flex items-center gap-1 vt-text-lg font-black tabular-nums leading-none",
+              alertActive ? "text-[hsl(var(--status-issue))]" : "text-ivory-text2",
+            )}
+          >
+            {alertActive ? (
+              <TriangleAlert
+                data-testid="board-power-alert-icon"
+                aria-hidden="true"
+                className="size-[0.8em] shrink-0"
+              />
+            ) : null}
+            {power.alert}
+          </span>
+          <span className="vt-text-2xs text-ivory-text3 mt-0.5 text-center">{t.board.powerAlert}</span>
+        </div>
       </div>
     </Panel>
   );

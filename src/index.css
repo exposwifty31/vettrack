@@ -1212,3 +1212,35 @@ nav,
 @media (prefers-reduced-motion: reduce) {
   [data-board-tv] [data-tv-focusable] { transition: none; }
 }
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   TV board Phase 1 — elevation-gray palette + state tints, scoped to
+   [data-board-shell]. Strictly ADDITIVE: composes with (never overrides) the
+   --text-*-raw ramp and --tv-type-scale mechanism above, and touches none of
+   the Stage 1 locked tokens (tests/stage-1-token-values.test.js).
+
+   Elevation ladder: bg → card → focal. Blue-gray, never pure black — pure
+   black on an LCD TV crushes to backlight bloom; the ladder keeps card edges
+   readable from 3 m without borders.
+
+   State tints are DESATURATED on purpose: they are applied at 15% via
+   color-mix over --board-bg (state strip, Task 8), so the hue reads as a
+   corridor-glance wash, not a saturated alarm field. Full-saturation status
+   hues stay reserved for actual alert content (--status-issue etc.).
+   ───────────────────────────────────────────────────────────────────────────── */
+[data-board-shell] {
+  --board-bg: #0F141A;
+  --board-card: #161D26;
+  --board-focal: #1C2530;
+  --board-text: #F2F5F8;
+  --board-text2: #A9B4C0;
+  --state-tint-ok: #5E8C74;
+  --state-tint-warn: #A8894F;
+  --state-tint-alert: #A85B52;
+}
+
+/* Every count/clock on the board: fixed-width lining figures so numbers never
+   shimmy as they update (no count-animation is a Phase 1 invariant). */
+.board-nums {
+  font-variant-numeric: tabular-nums lining-nums;
+}
