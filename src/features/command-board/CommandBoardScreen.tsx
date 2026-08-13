@@ -244,6 +244,7 @@ function CommandBoardScreen({ kioskMode: kioskModeProp }: CommandBoardScreenProp
         currentShift={snapshot.currentShift}
         kioskMode={kioskMode}
         proposalCount={autopilotQueueCount}
+        responsibles={snapshot.responsibles}
       />
     </div>
   );
