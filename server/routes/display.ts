@@ -34,6 +34,10 @@ import {
   buildCommandBoardSnapshot,
   type BuildCommandBoardSnapshotFn,
 } from "../services/equipment-command-board.service.js";
+import {
+  buildBoardResponsibles,
+  type BoardResponsibles,
+} from "../services/board-responsibles.service.js";
 import type { EquipmentCommandBoardSnapshot } from "../../shared/equipment-board.js";
 import { resolveRequestId, apiError } from "../lib/route-utils.js";
 
@@ -234,12 +238,31 @@ export function createDisplaySnapshotHandler(deps: DisplayRouterDeps = {}): Requ
         });
       }
 
+      const currentShift = shiftRows.map((s) => ({
+        employeeName: s.employeeName,
+        role: s.role,
+      }));
+
+      // Doctor shift gate — additive responsibles section. Failure degrades
+      // to null (board renders empty slots); the snapshot must never 500
+      // because of it.
+      let responsibles: BoardResponsibles | null = null;
+      try {
+        responsibles = await withTimeout(
+          buildBoardResponsibles({ clinicId, todayDate, currentShift }),
+          commandBoardTimeoutMs,
+        );
+      } catch (error) {
+        console.warn("[display snapshot] responsibles_build_failed", {
+          clinicId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+
       res.json({
         currentTime: now.toISOString(),
-        currentShift: shiftRows.map((s) => ({
-          employeeName: s.employeeName,
-          role: s.role,
-        })),
+        currentShift,
+        responsibles,
         hospitalizations: [],
         equipment: equipRows.map((e) => ({
           id: e.id,
