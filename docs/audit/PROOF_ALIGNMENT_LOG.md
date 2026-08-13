@@ -6597,3 +6597,38 @@ tests + 4 new service tests.
 - `DATABASE_URL=<.env> npx vitest run --config vitest.db-integration.config.ts tests/doctor-shift-gate.integration.test.ts` → `Test Files  1 passed (1) · Tests  3 passed (3)` (cross-clinic sweep assertions added inside the round-trip test).
 
 **Verdict:** VERIFIED
+
+## 2026-08-13 — PR #180 CodeRabbit round 4: 3 Minor findings (operation-scoped replay key, normalized idempotency key, per-clinic sweep side effects)
+
+**Claim:** All 3 round-4 findings fixed on feat/doctor-shift-gate. (1) Replay is
+now operation-scoped by transition shape: `isReplayOfExisting` additionally
+requires the existing row's `operationalRole` + `isSenior` to match the
+request, so a key reused from POST /check-in no longer silently no-ops a
+POST /switch to a different team (or a different senior flag). The
+"switch:"-prefix alternative was rejected with evidence: `client_id` is
+`varchar(64)` (server/schema/ops.ts:437) and the route accepts 64-char keys,
+so a prefix would overflow the column. Applied in the shared helper, so
+openCheckIn's replay carries the same shape guard (its existing replay tests
+already used matching shapes — all still green). (2) openCheckIn now
+normalizes the key ONCE at the top (`trim`, blank→null) and uses that value
+for BOTH the `clientId` insert and the replay comparison — previously it
+stored untrimmed but compared trimmed, so a padded key never replayed
+(switchOperationalRole already stored trimmed; the two now agree). (3) The
+expiry sweep's `invalidateForUser` + `logAudit` moved INSIDE the per-clinic
+loop, immediately after each clinic's returning UPDATE — a later clinic's
+UPDATE failure no longer strands already-committed closes without cache
+invalidation (stale authority until TTL) or an audit record. Row data and
+audit payload unchanged. Tests: +2 openCheckIn normalization tests (trimmed
+clientId stored; padded key replays), +2 switch shape-scope tests (check-in
+key does not replay a different-team switch; different isSenior does not
+replay), +1 worker test (later clinic's UPDATE failure → earlier clinic's
+invalidation + audit already fired).
+
+**Evidence (actual command outputs this session):**
+- `pnpm typecheck` → exited clean, zero errors (both tsconfigs).
+- `pnpm test` → `Test Files  715 passed (715) · Tests  6415 passed | 11 skipped (6426)` (+5 tests vs round 3's 6410).
+- `pnpm i18n:check` → `✓ locales/en.json and locales/he.json are in deep key parity.`
+- `pnpm architecture:gates` → `[architecture-gates] All G1 checks passed.`
+- `DATABASE_URL=<.env> npx vitest run --config vitest.db-integration.config.ts tests/doctor-shift-gate.integration.test.ts` → `Test Files  1 passed (1) · Tests  3 passed (3)`.
+
+**Verdict:** VERIFIED

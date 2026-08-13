@@ -105,18 +105,34 @@ const REPLAY_WINDOW_MS = 60_000;
 
 /**
  * Idempotent-replay match: the actor's current open row was created by this
- * same Idempotency-Key within the replay window, so a retried request must
- * return it instead of executing a second transition.
+ * same Idempotency-Key within the replay window AND the retried request asks
+ * for the same transition (operationalRole + isSenior), so it is returned
+ * instead of executing a second transition. The shape check operation-scopes
+ * the key: one key reused across different requests (e.g. /check-in then
+ * /switch to another team) must NOT silently no-op the second request.
+ * (A "switch:" clientId prefix was rejected: the column is varchar(64) and
+ * the route already accepts 64-char keys.)
  */
 function isReplayOfExisting(
   existing: ClinicalCheckIn | null,
   trimmedKey: string,
+  input: CheckInInput,
 ): existing is ClinicalCheckIn {
+  if (
+    existing === null ||
+    trimmedKey.length === 0 ||
+    (existing.clientId ?? "") !== trimmedKey ||
+    Date.now() - existing.checkedInAt.getTime() > REPLAY_WINDOW_MS
+  ) {
+    return false;
+  }
+  const requestedRole =
+    typeof input.operationalRole === "string" && input.operationalRole.length > 0
+      ? input.operationalRole
+      : null;
   return (
-    existing !== null &&
-    trimmedKey.length > 0 &&
-    (existing.clientId ?? "") === trimmedKey &&
-    Date.now() - existing.checkedInAt.getTime() <= REPLAY_WINDOW_MS
+    (existing.operationalRole ?? null) === requestedRole &&
+    existing.isSenior === (input.isSenior === true)
   );
 }
 
@@ -458,7 +474,11 @@ async function validateAndBuildRow(
 
 export async function openCheckIn(input: CheckInInput): Promise<CheckInResult> {
   const { actor } = input;
-  const idempotencyKey = input.idempotencyKey ?? null;
+  // Normalize ONCE: the stored clientId and the replay comparison must use
+  // the same value — storing untrimmed while comparing trimmed means a
+  // padded key never replays.
+  const trimmedKey = input.idempotencyKey?.trim() ?? "";
+  const idempotencyKey = trimmedKey.length > 0 ? trimmedKey : null;
 
   try {
     // One transaction around validate → (maybe demote) → insert → audit:
@@ -517,7 +537,7 @@ export async function openCheckIn(input: CheckInInput): Promise<CheckInResult> {
     }
 
     const existing = await getActiveCheckIn(actor.clinicId, actor.userId);
-    if (isReplayOfExisting(existing, idempotencyKey?.trim() ?? "")) {
+    if (isReplayOfExisting(existing, trimmedKey, input)) {
       return { row: existing, replayed: true };
     }
     throw new ClinicalCheckInError(
@@ -537,10 +557,11 @@ export async function openCheckIn(input: CheckInInput): Promise<CheckInResult> {
  * bypass, allowlist for legacy roles, server-validated senior semantics).
  *
  * Idempotency mirrors `openCheckIn`: the key is stored as the new row's
- * `clientId`, and a retry whose key matches the actor's CURRENT open row
- * (within the replay window) returns that row instead of repeating the
- * close+insert — a repeated transition would reset the shift timestamp and
- * duplicate the audit trail.
+ * `clientId`, and a retry whose key AND transition shape (role + senior)
+ * match the actor's CURRENT open row (within the replay window) returns that
+ * row instead of repeating the close+insert — a repeated transition would
+ * reset the shift timestamp and duplicate the audit trail. The shape match
+ * keeps a key reused from a prior /check-in from no-oping a real switch.
  */
 export async function switchOperationalRole(
   input: CheckInInput,
@@ -553,7 +574,7 @@ export async function switchOperationalRole(
     // Replay pre-check BEFORE validation: a replayed request must not re-run
     // the side-effectful validation path (e.g. a replace-senior demote).
     const existing = await getActiveCheckIn(actor.clinicId, actor.userId);
-    if (isReplayOfExisting(existing, trimmedKey)) {
+    if (isReplayOfExisting(existing, trimmedKey, input)) {
       return { row: existing, replayed: true };
     }
   }
@@ -644,7 +665,7 @@ export async function switchOperationalRole(
       // replay its row; otherwise surface the conflict.
       if (trimmedKey.length > 0) {
         const existing = await getActiveCheckIn(actor.clinicId, actor.userId);
-        if (isReplayOfExisting(existing, trimmedKey)) {
+        if (isReplayOfExisting(existing, trimmedKey, input)) {
           return { row: existing, replayed: true };
         }
       }

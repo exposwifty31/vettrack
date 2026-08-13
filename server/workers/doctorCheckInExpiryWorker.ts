@@ -74,30 +74,34 @@ export async function sweepExpiredDoctorCheckIns(
         userId: clinicalCheckIns.userId,
         operationalRole: clinicalCheckIns.operationalRole,
       });
-    closed.push(...rows);
-  }
 
-  for (const row of closed) {
-    // Writer-side invalidation contract: mirror every sibling close path so
-    // resolveAuthority never serves a stale open check-in past this close.
-    invalidateForUser(row.clinicId, row.userId);
-    // Fire-and-forget, mirrors autoCheckOutForSessionEnd. An auto-expiry is a
-    // clinical-authority state change — it must be visible in vt_audit_logs.
-    logAudit({
-      clinicId: row.clinicId,
-      actionType: "clinical_check_out",
-      performedBy: "system:doctor_checkin_expiry",
-      performedByEmail: "system",
-      targetId: row.id,
-      targetType: "clinical_check_in",
-      metadata: {
-        checkInId: row.id,
+    // Side effects run per clinic, immediately after its UPDATE commits — a
+    // later clinic's failure must not strand already-closed rows without
+    // invalidation (stale authority until cache TTL) or an audit record.
+    for (const row of rows) {
+      // Writer-side invalidation contract: mirror every sibling close path so
+      // resolveAuthority never serves a stale open check-in past this close.
+      invalidateForUser(row.clinicId, row.userId);
+      // Fire-and-forget, mirrors autoCheckOutForSessionEnd. An auto-expiry is a
+      // clinical-authority state change — it must be visible in vt_audit_logs.
+      logAudit({
         clinicId: row.clinicId,
-        userId: row.userId,
-        operationalRole: row.operationalRole,
-        source: "auto_expired",
-      },
-    });
+        actionType: "clinical_check_out",
+        performedBy: "system:doctor_checkin_expiry",
+        performedByEmail: "system",
+        targetId: row.id,
+        targetType: "clinical_check_in",
+        metadata: {
+          checkInId: row.id,
+          clinicId: row.clinicId,
+          userId: row.userId,
+          operationalRole: row.operationalRole,
+          source: "auto_expired",
+        },
+      });
+    }
+
+    closed.push(...rows);
   }
 
   if (closed.length > 0) {

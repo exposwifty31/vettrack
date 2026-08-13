@@ -395,6 +395,44 @@ describe("openCheckIn — idempotency and duplicates", () => {
     expect(result.replayed).toBe(true);
   });
 
+  it("stores the TRIMMED key as clientId — insert and replay comparison share one normalized value", async () => {
+    const insertChain = chainable([
+      makeRow({ id: "ci-new", operationalRole: "icu", clientId: "pad-key" }),
+    ]);
+    mockInsert.mockReturnValue(insertChain);
+
+    const { openCheckIn } = await import("../server/services/clinical-check-in.js");
+    await openCheckIn({
+      actor: VET_ACTOR,
+      operationalRole: "icu",
+      idempotencyKey: "  pad-key  ",
+    });
+
+    const inserted = (insertChain["values"] as ReturnType<typeof vi.fn>).mock
+      .calls[0][0];
+    expect(inserted.clientId).toBe("pad-key");
+  });
+
+  it("a padded key still replays (regression: untrimmed clientId vs trimmed comparison never matched)", async () => {
+    mockInsert.mockReturnValue(insertThatThrows(dupErr()));
+    // Duplicate-key re-read: the stored clientId is the TRIMMED key.
+    mockSelectSequence([
+      makeRow({
+        operationalRole: "icu",
+        clientId: "pad-key",
+        checkedInAt: new Date(Date.now() - 5_000),
+      }),
+    ]);
+
+    const { openCheckIn } = await import("../server/services/clinical-check-in.js");
+    const result = await openCheckIn({
+      actor: VET_ACTOR,
+      operationalRole: "icu",
+      idempotencyKey: "  pad-key  ",
+    });
+    expect(result.replayed).toBe(true);
+  });
+
   it("rejects ALREADY_CHECKED_IN with no idempotency key", async () => {
     const existing = makeRow();
     mockInsert.mockReturnValue(insertThatThrows(dupErr()));
@@ -1131,6 +1169,74 @@ describe("switchOperationalRole — atomic role switch", () => {
     expect(result.replayed).toBe(false);
     expect(result.row.id).toBe("ci-new");
     expect(mockTransaction).toHaveBeenCalledTimes(1);
+  });
+
+  it("a key previously used for /check-in does NOT replay a /switch to a different team (replay is transition-shape scoped)", async () => {
+    // Pre-check finds the /check-in row carrying the SAME key — but the
+    // requested transition differs (icu → admission), so the switch must
+    // execute normally instead of silently no-oping.
+    mockSelectSequence([
+      makeRow({
+        id: "ci-checkin",
+        operationalRole: "icu",
+        isSenior: false,
+        clientId: "shared-key",
+        checkedInAt: new Date(Date.now() - 5_000),
+      }),
+    ]);
+    mockUpdate.mockReturnValue(
+      chainable([makeRow({ id: "ci-checkin", checkOutReason: "role_switch" })]),
+    );
+    mockInsert.mockReturnValue(
+      chainable([makeRow({ id: "ci-new", operationalRole: "admission" })]),
+    );
+
+    const { switchOperationalRole } = await import(
+      "../server/services/clinical-check-in.js"
+    );
+    const result = await switchOperationalRole({
+      actor: VET_ACTOR,
+      operationalRole: "admission",
+      idempotencyKey: "shared-key",
+    });
+
+    expect(result.replayed).toBe(false);
+    expect(result.row.id).toBe("ci-new");
+    expect(mockTransaction).toHaveBeenCalledTimes(1);
+  });
+
+  it("a matching key with a DIFFERENT isSenior flag does not replay either", async () => {
+    mockSelectSequence([
+      makeRow({
+        id: "ci-prior",
+        operationalRole: "icu",
+        isSenior: false,
+        clientId: "shared-key-2",
+        checkedInAt: new Date(Date.now() - 5_000),
+      }),
+    ]);
+    // isSenior:true path — eligibility read + existing-senior lookup, then
+    // close + insert inside the transaction.
+    mockSelectSequence([{ eligible: true }], []);
+    mockUpdate.mockReturnValue(
+      chainable([makeRow({ id: "ci-prior", checkOutReason: "role_switch" })]),
+    );
+    mockInsert.mockReturnValue(
+      chainable([makeRow({ id: "ci-new", operationalRole: "icu", isSenior: true })]),
+    );
+
+    const { switchOperationalRole } = await import(
+      "../server/services/clinical-check-in.js"
+    );
+    const result = await switchOperationalRole({
+      actor: VET_ACTOR,
+      operationalRole: "icu",
+      isSenior: true,
+      idempotencyKey: "shared-key-2",
+    });
+
+    expect(result.replayed).toBe(false);
+    expect(result.row.id).toBe("ci-new");
   });
 
   it("open-per-user race with a matching key replays the concurrent winner's row", async () => {

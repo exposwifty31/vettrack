@@ -298,6 +298,37 @@ describe("sweepExpiredDoctorCheckIns — per-row invalidation + audit", () => {
     expect(invalidateForUser).not.toHaveBeenCalled();
     expect(logAudit).not.toHaveBeenCalled();
   });
+
+  it("side effects run per clinic — a LATER clinic's UPDATE failure does not strand an earlier clinic's committed closes", async () => {
+    mockSelectDistinct.mockReturnValue(
+      selectDistinctChain([{ clinicId: "clinic-1" }, { clinicId: "clinic-2" }]),
+    );
+    const failingChain: Record<string, unknown> = {};
+    for (const m of ["set", "where"]) {
+      failingChain[m] = vi.fn().mockReturnValue(failingChain);
+    }
+    failingChain["returning"] = vi.fn().mockRejectedValue(new Error("clinic-2 update failed"));
+    mockUpdate
+      .mockReturnValueOnce(
+        updateChain([
+          { id: "ci-1", clinicId: "clinic-1", userId: "user-1", operationalRole: "icu" },
+        ]),
+      )
+      .mockReturnValueOnce(failingChain);
+
+    await expect(sweepExpiredDoctorCheckIns(NOW)).rejects.toThrow("clinic-2 update failed");
+
+    // Clinic 1's rows already committed — their invalidation + audit fired
+    // BEFORE clinic 2's UPDATE threw.
+    expect(invalidateForUser).toHaveBeenCalledWith("clinic-1", "user-1");
+    expect(logAudit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        clinicId: "clinic-1",
+        targetId: "ci-1",
+        metadata: expect.objectContaining({ source: "auto_expired" }),
+      }),
+    );
+  });
 });
 
 // ---------------------------------------------------------------------------
