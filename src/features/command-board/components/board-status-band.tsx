@@ -9,7 +9,9 @@
 //   carry .board-nums (tabular-nums lining-nums). Nothing count-animates.
 // - Freshness is coarse buckets only (<10 s / <60 s / floored minutes) — no
 //   live-ticking seconds on a wall display.
+import { X } from "lucide-react";
 import { t } from "@/lib/i18n";
+import { cn } from "@/lib/utils";
 import type { BoardStateKind } from "../board-state";
 import type { DisplayConnection } from "@/hooks/use-display-connection";
 
@@ -83,12 +85,21 @@ export function BoardTopBand({
   totalCount,
   currentTime,
   connection,
+  tvMode,
+  kioskMode,
+  onExit,
 }: {
   departmentLabel: string;
   readyCount: number | null;
   totalCount: number | null;
   currentTime: string;
   connection: DisplayConnection;
+  /** 10-foot presentation: enlarges the exit target + wires D-pad focus metadata. */
+  tvMode?: boolean;
+  /** Wall kiosks (?kiosk=1) have no operator — the exit control is hidden. */
+  kioskMode?: boolean;
+  /** Relocated from the removed legacy header (spec §2 single top band). */
+  onExit?: () => void;
 }): JSX.Element {
   // Same clock treatment as the legacy header: he-IL HH:mm, never seconds.
   const parsed = new Date(currentTime);
@@ -112,6 +123,23 @@ export function BoardTopBand({
       <span data-testid="board-clock" className="board-nums board-top-band-clock">
         <bdi dir="ltr">{timeStr}</bdi>
       </span>
+      {!kioskMode && onExit && (
+        <button
+          type="button"
+          onClick={onExit}
+          aria-label={t.common.back}
+          data-testid="board-exit"
+          data-tv-focusable={tvMode ? "" : undefined}
+          data-tv-id={tvMode ? "exit" : undefined}
+          className={cn(
+            "flex shrink-0 items-center justify-center self-center rounded-full border transition-colors motion-safe:active:scale-95",
+            "border-[color:var(--board-text2,#a9b4c0)]/30 text-[color:var(--board-text2,#a9b4c0)] hover:bg-white/10",
+            tvMode ? "h-14 w-14" : "h-11 w-11",
+          )}
+        >
+          <X className={tvMode ? "h-6 w-6" : "h-5 w-5"} aria-hidden />
+        </button>
+      )}
     </header>
   );
 }

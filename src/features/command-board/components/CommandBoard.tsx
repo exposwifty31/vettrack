@@ -12,9 +12,8 @@
 // (responsibles + power + docks, absent ≠ zero) render in every state.
 // A real Code Blue never reaches this component — CommandBoardScreen's frozen
 // early return renders the overlay above all of this.
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
-import { X } from "lucide-react";
 import { t } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { reportBoardAnomalyActivated } from "@/lib/realtime";
@@ -70,7 +69,11 @@ function StageFade({
   children: React.ReactNode;
 }) {
   const [faded, setFaded] = useState(false);
-  useEffect(() => {
+  // useLayoutEffect (not useEffect): reset to opacity 0 BEFORE the browser paints
+  // the freshly-keyed inner div, then rAF → 1 to transition it in. A passive effect
+  // runs after paint, so the incoming view would flash in at opacity 1 first — a
+  // hard cut on every rotation swap instead of the spec §2 300 ms cross-fade.
+  useLayoutEffect(() => {
     setFaded(false);
     const id = requestAnimationFrame(() => setFaded(true));
     return () => cancelAnimationFrame(id);
@@ -151,12 +154,12 @@ export function CommandBoard({
   const rootRef = useRef<HTMLDivElement>(null);
   useBoardTvNav({ enabled: tvMode, containerRef: rootRef, reducedMotion });
   const anomalies = board?.anomalies ?? [];
-  const now = new Date(currentTime);
-  const timeStr = now.toLocaleTimeString("he-IL", {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  });
+  // Exit is presentation chrome relocated into the single top band (spec §2);
+  // wall kiosks (?kiosk=1) hide it — no operator to tap.
+  const handleExit = () => {
+    if (window.history.length > 1) window.history.back();
+    else navigate("/home");
+  };
 
   // BoardAttentionSection's emphasis contract predates the state machine:
   // "pressure" escalates card color/size. Alert is the only escalating state.
@@ -177,66 +180,29 @@ export function CommandBoard({
       // so it fits the title-safe area exactly. Desktop /board is byte-unchanged.
       data-board-tv={tvMode ? "" : undefined}
       className={cn(
-        "flex flex-col bg-[rgb(var(--ivory-bg))] text-ivory-text",
+        // Spec §3 elevation base — no pure black (#000 crushes to backlight bloom
+        // on an LCD TV). --board-bg (#0F141A) is defined on [data-board-shell]; the
+        // literal fallback covers container-less test renders.
+        "flex flex-col bg-[color:var(--board-bg,#0f141a)] text-ivory-text",
         tvMode ? "min-h-0 flex-1 overflow-hidden" : "min-h-screen",
       )}
       dir={dir}
     >
 
-      {/* Header — the shift strip moved to the Ops stage view (Task 11) */}
-      <header className="bg-[var(--brand-navy)] flex items-center gap-4 px-5 py-3 shrink-0 flex-wrap">
-        <span
-          className={cn(
-            "font-mono font-black tabular-nums text-white min-w-[52px]",
-            tvMode ? "text-4xl" : "text-xl",
-          )}
-        >
-          {timeStr}
-        </span>
-        <div className="w-px h-5 bg-white/20 shrink-0" />
-
-        <span className="vt-text-xs font-bold tracking-widest uppercase text-[var(--brand-green-bright)] flex-1">
-          {t.board.ward}
-        </span>
-
-        {/* LIVE badge */}
-        <div className="flex items-center gap-1.5 shrink-0">
-          <span className="w-2 h-2 rounded-full bg-[hsl(var(--status-ok))] motion-safe:animate-pulse" aria-hidden />
-          <span className="vt-text-xs font-bold uppercase tracking-widest text-[hsl(var(--status-ok))]">
-            {t.board.live}
-          </span>
-        </div>
-
-        {/* Exit — wall-mounted kiosks (?kiosk=1) have no operator to tap it */}
-        {!kioskMode && (
-          <button
-            type="button"
-            onClick={() => {
-              if (window.history.length > 1) window.history.back();
-              else navigate("/home");
-            }}
-            aria-label={t.common.back}
-            data-testid="board-exit"
-            data-tv-focusable={tvMode ? "" : undefined}
-            data-tv-id={tvMode ? "exit" : undefined}
-            className={cn(
-              "flex shrink-0 items-center justify-center rounded-full border border-white/20 bg-white/10 text-white/85 transition-colors hover:bg-white/20 motion-safe:active:scale-95",
-              tvMode ? "h-14 w-14" : "h-11 w-11",
-            )}
-          >
-            <X className={tvMode ? "h-6 w-6" : "h-4 w-4"} aria-hidden />
-          </button>
-        )}
-      </header>
-
-      {/* Anchor: top band (identity, ready/total, freshness heartbeat, clock)
-          + the tinted state strip — present in EVERY state. */}
+      {/* Anchor: the single top band (identity, ready/total, freshness heartbeat,
+          clock, exit) + the tinted state strip — present in EVERY state. The legacy
+          navy header and footer were removed (spec §2 is a single top band): they
+          re-rendered the clock, ward wordmark and a hardcoded-green LIVE badge that
+          duplicated the band and kept signalling "LIVE" during stale/offline. */}
       <BoardTopBand
         departmentLabel={t.board.ward}
         readyCount={board ? board.overview.ready : null}
         totalCount={board ? board.overview.totalCritical : null}
         currentTime={currentTime}
         connection={connection}
+        tvMode={tvMode}
+        kioskMode={kioskMode}
+        onExit={handleExit}
       />
       <BoardStateStrip state={state} />
 
@@ -285,22 +251,6 @@ export function CommandBoard({
         {board?.power ? <PowerPanel power={board.power} /> : <UnknownBlock title={t.board.power} />}
         {board?.docks ? <DocksPanel docks={board.docks} /> : <UnknownBlock title={t.board.docks} />}
       </div>
-
-      {/* Footer — quiet status strip: last refresh + live indicator */}
-      <footer className="shrink-0 flex items-center gap-3 border-t border-ivory-border bg-[rgb(var(--ivory-surface))] px-5 py-2">
-        <span className="vt-text-2xs uppercase tracking-widest text-ivory-text3">
-          {t.board.subtitle}
-        </span>
-        <span className="vt-text-2xs tabular-nums text-ivory-text3 ms-auto">
-          {t.board.updated} {timeStr}
-        </span>
-        <span className="flex items-center gap-1.5 shrink-0">
-          <span className="w-1.5 h-1.5 rounded-full bg-[hsl(var(--status-ok))] motion-safe:animate-pulse" aria-hidden />
-          <span className="vt-text-2xs font-bold uppercase tracking-widest text-[hsl(var(--status-ok))]">
-            {t.board.live}
-          </span>
-        </span>
-      </footer>
     </div>
   );
 }

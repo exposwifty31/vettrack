@@ -8,6 +8,12 @@ const routeSource = readFileSync("./server/routes/display.ts", "utf-8");
 // Source-scrape assertions point at the files that now own each concern.
 const screenSource = readFileSync("./src/features/command-board/CommandBoardScreen.tsx", "utf-8");
 const boardSource = readFileSync("./src/features/command-board/components/CommandBoard.tsx", "utf-8");
+// TV board phase 1 review: the exit affordance moved out of CommandBoard's removed
+// legacy header into the single top band (BoardTopBand).
+const bandSource = readFileSync(
+  "./src/features/command-board/components/board-status-band.tsx",
+  "utf-8",
+);
 // TV board phase 1 (Task 10) moved the criticalUnits stage rendering out of
 // CommandBoard into the state-driven equipment stage.
 const stageSource = readFileSync(
@@ -115,9 +121,14 @@ describe("Ward Display — overdue medication job (removed)", () => {
   it("the board is read-only except the kiosk-hidden exit button", () => {
     // The board stays read-only: the ONLY interactive element is the exit
     // affordance (navigation-only, hidden under ?kiosk=1 for wall displays).
-    expect(boardSource).toContain('data-testid="board-exit"');
-    const withoutExit = boardSource.replace(
-      /\{!kioskMode && \([\s\S]*?board-exit[\s\S]*?\)\}/,
+    // Phase-1 review relocated it into the top band, so CommandBoard itself now
+    // has no interactive elements at all.
+    expect(boardSource).not.toContain("<button");
+    expect(boardSource).not.toContain("<a href");
+
+    expect(bandSource).toContain('data-testid="board-exit"');
+    const withoutExit = bandSource.replace(
+      /\{!kioskMode && onExit && \([\s\S]*?board-exit[\s\S]*?\)\}/,
       "",
     );
     expect(withoutExit).not.toContain("onClick");
