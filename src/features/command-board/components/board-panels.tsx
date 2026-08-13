@@ -170,7 +170,7 @@ function DoctorTeamSlot({ label, block, testId }: { label: string; block: Doctor
     // Members without a senior — covered but flagged: count + amber accent.
     return (
       <SlotShell label={label} testId={testId} fill={fill}>
-        <div className="vt-text-sm font-bold tabular-nums text-ivory-text">
+        <div className="board-slot-name vt-text-sm font-bold tabular-nums text-ivory-text">
           {t.board.responsiblesDoctorCount(block.members.length)}
         </div>
         <div className="vt-text-2xs font-semibold text-[color:var(--ivory-warn)]">
@@ -181,7 +181,7 @@ function DoctorTeamSlot({ label, block, testId }: { label: string; block: Doctor
   }
   return (
     <SlotShell label={label} testId={testId} fill={fill}>
-      <div className="vt-text-sm font-bold text-ivory-text truncate" dir="auto">
+      <div className="board-slot-name vt-text-sm font-bold text-ivory-text truncate" dir="auto">
         {block.senior.name}
       </div>
       {block.members.map((m) => (
@@ -216,7 +216,7 @@ function PersonSlot({
       {name ? (
         <div
           className={cn(
-            "vt-text-sm font-bold truncate",
+            "board-slot-name vt-text-sm font-bold truncate",
             flagged ? "text-[color:var(--ivory-warn)]" : "text-ivory-text",
           )}
           dir="auto"
@@ -278,7 +278,7 @@ export function ResponsiblesPanel({
     return (
       <Panel title={t.board.responsiblesTitle}>
         <div className="flex flex-col gap-2" data-testid="board-responsibles">
-          <div className="vt-text-sm font-bold tabular-nums text-ivory-text">
+          <div className="board-slot-name vt-text-sm font-bold tabular-nums text-ivory-text">
             {t.board.responsiblesAggregate(0)}
           </div>
           <AggregateProgress filled={0} />

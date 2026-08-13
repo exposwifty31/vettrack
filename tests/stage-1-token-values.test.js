@@ -104,9 +104,18 @@ describe("Stage 1 token foundation — type ramp on a 17px root", () => {
     const block = match[0];
     expect(block.includes("--tv-type-scale: 1.75")).toBe(true);
     for (const name of ["2xs", "xs", "sm", "base", "lg", "xl", "2xl", "3xl"]) {
-      expect(
-        block.includes(`--text-${name}: calc(var(--text-${name}-raw) * var(--tv-type-scale))`),
-      ).toBe(true);
+      // Every size still derives from raw × the tuned scale; the three smallest
+      // additionally wrap it in max(28px, …) for the spec §3 1080p floor.
+      expect(block).toMatch(
+        new RegExp(
+          `--text-${name}:\\s*(?:max\\(28px,\\s*)?calc\\(var\\(--text-${name}-raw\\)\\s*\\*\\s*var\\(--tv-type-scale\\)\\)`,
+        ),
+      );
+    }
+    // Spec §3 type floor (binding): the smallest three utilities clamp to 28px so
+    // no caption/label renders below the 10-foot floor.
+    for (const name of ["2xs", "xs", "sm"]) {
+      expect(block).toMatch(new RegExp(`--text-${name}:\\s*max\\(28px,`));
     }
   });
 });

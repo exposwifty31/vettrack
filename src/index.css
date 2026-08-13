@@ -1158,14 +1158,34 @@ nav,
    to every descendant. */
 [data-board-tv] {
   --tv-type-scale: 1.75;   /* ← the single tuned constant. Baseline 1080p @ ~3 m; range 1.6–2.0. */
-  --text-2xs:  calc(var(--text-2xs-raw) * var(--tv-type-scale));
-  --text-xs:   calc(var(--text-xs-raw) * var(--tv-type-scale));
-  --text-sm:   calc(var(--text-sm-raw) * var(--tv-type-scale));
+  /* Spec §3 type floor (binding): NOTHING renders below 28 px effective at 1080p.
+     The three smallest utilities land at ~19/23/26 px after the scale, so clamp
+     them to the 28 px floor with max(); the larger steps already clear it. This is
+     a board-wide floor for every caption/label, so no component needs per-element
+     px overrides to be legible from the corridor. */
+  --text-2xs:  max(28px, calc(var(--text-2xs-raw) * var(--tv-type-scale)));
+  --text-xs:   max(28px, calc(var(--text-xs-raw)  * var(--tv-type-scale)));
+  --text-sm:   max(28px, calc(var(--text-sm-raw)  * var(--tv-type-scale)));
   --text-base: calc(var(--text-base-raw) * var(--tv-type-scale));
   --text-lg:   calc(var(--text-lg-raw) * var(--tv-type-scale));
   --text-xl:   calc(var(--text-xl-raw) * var(--tv-type-scale));
   --text-2xl:  calc(var(--text-2xl-raw) * var(--tv-type-scale));
   --text-3xl:  calc(var(--text-3xl-raw) * var(--tv-type-scale));
+  /* Spec §3 contrast (binding): 7:1 target for 10-foot reading. The forced-dark
+     board's ivory secondary/tertiary labels (#98989D ≈5.7:1, #787880 ≈3.9:1 on the
+     card) fail that bar — #787880 fails even WCAG AA. Repoint both to the spec's
+     elevation-ladder secondary #A9B4C0 (≈8:1 on #161D26). Scoped here (a descendant
+     of .dark) so it wins by proximity; desktop /board is untouched. */
+  --ivory-text2: 169 180 192;  /* #A9B4C0 */
+  --ivory-text3: 169 180 192;  /* #A9B4C0 — no sub-7:1 tertiary on a wall display */
+}
+
+/* Spec §4 — responsibles named slots at 32 px "body" size (one step above the
+   28 px caption floor). Applied as a board-only class so desktop /board keeps the
+   vt-text-sm label size; under [data-board-tv] the 0,1,1 selector beats vt-text-sm. */
+[data-board-tv] .board-slot-name {
+  font-size: 32px;
+  line-height: 1.15;
 }
 
 /* Overscan title-safe frame for the BoardShell kiosk host. Insets content off the
