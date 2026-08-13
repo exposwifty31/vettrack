@@ -96,13 +96,18 @@ export function CommandBoard({
   currentShift,
   kioskMode: kioskModeProp,
   tvMode: tvModeProp,
-  proposalCount,
   responsibles,
   state,
   connection = NEVER_POLLED_CONNECTION,
   snapshot,
 }: {
-  board: EquipmentCommandBoardSnapshot;
+  /**
+   * Task 12 — nullable: when the snapshot has no commandBoard (build timeout /
+   * pre-deploy server) the state machine classifies `unconfigured` (or a
+   * connection takeover) and the takeover owns the stage; the top/bottom bands
+   * render their muted-unknown treatments (absent ≠ zero), never zeros.
+   */
+  board: EquipmentCommandBoardSnapshot | null;
   currentTime: string;
   currentShift: Array<{ employeeName: string; role: string }>;
   kioskMode?: boolean;
@@ -120,12 +125,6 @@ export function CommandBoard({
    * the muted-unavailable treatment (absent ≠ zero), never the 0/5 aggregate.
    */
   responsibles?: BoardResponsibles | null;
-  /**
-   * VetTrack 2.0, Task 1.1 §6 (deliverable H) — bounded ambient count of
-   * Shift Autopilot proposals awaiting approval, count only. (Cut in Task 12
-   * by owner decision; the prop survives until the container drops it.)
-   */
-  proposalCount?: number;
   /**
    * The board state computed by the container (useBoardState over the snapshot
    * + connection). Drives the stage switch and the state-strip tint.
@@ -151,7 +150,7 @@ export function CommandBoard({
   // tvMode; degrades to plain glance + pointer when a remote never arrives.
   const rootRef = useRef<HTMLDivElement>(null);
   useBoardTvNav({ enabled: tvMode, containerRef: rootRef, reducedMotion });
-  const anomalies = board.anomalies ?? [];
+  const anomalies = board?.anomalies ?? [];
   const now = new Date(currentTime);
   const timeStr = now.toLocaleTimeString("he-IL", {
     hour: "2-digit",
@@ -234,21 +233,20 @@ export function CommandBoard({
           + the tinted state strip — present in EVERY state. */}
       <BoardTopBand
         departmentLabel={t.board.ward}
-        readyCount={board.overview.ready}
-        totalCount={board.overview.totalCritical}
+        readyCount={board ? board.overview.ready : null}
+        totalCount={board ? board.overview.totalCritical : null}
         currentTime={currentTime}
         connection={connection}
       />
       <BoardStateStrip state={state} />
 
       {/* Ambient anomaly attention (R-BDF-1.2) — glance-only, present in every state */}
-      {(anomalies.length > 0 || (proposalCount ?? 0) > 0) && (
+      {anomalies.length > 0 && (
         <BoardAttentionSection
           anomalies={anomalies}
           mode={attentionMode}
           reducedMotion={reducedMotion}
           onAnomalyActivated={reportBoardAnomalyActivated}
-          proposalCount={proposalCount}
           tvMode={tvMode}
         />
       )}
@@ -258,7 +256,10 @@ export function CommandBoard({
       <main id="main-content" className="flex-1 min-h-0 flex flex-col p-4" dir={dir}>
         {state === "stale" ? (
           <StaleTakeover connection={connection} lastSnapshot={snapshot} />
-        ) : state === "unconfigured" ? (
+        ) : state === "unconfigured" || !board ? (
+          // `!board` is a type-level guard only: classifyBoardState maps an
+          // absent board to "unconfigured" (or a connection takeover), so a
+          // quiet/alert state always carries a board.
           <UnconfiguredTakeover />
         ) : (
           <StageFade viewKey={stageView} reducedMotion={reducedMotion}>
@@ -281,8 +282,8 @@ export function CommandBoard({
         )}
       >
         <ResponsiblesPanel responsibles={responsibles} />
-        {board.power ? <PowerPanel power={board.power} /> : <UnknownBlock title={t.board.power} />}
-        {board.docks ? <DocksPanel docks={board.docks} /> : <UnknownBlock title={t.board.docks} />}
+        {board?.power ? <PowerPanel power={board.power} /> : <UnknownBlock title={t.board.power} />}
+        {board?.docks ? <DocksPanel docks={board.docks} /> : <UnknownBlock title={t.board.docks} />}
       </div>
 
       {/* Footer — quiet status strip: last refresh + live indicator */}

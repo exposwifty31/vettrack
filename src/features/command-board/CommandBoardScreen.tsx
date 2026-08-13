@@ -13,7 +13,7 @@
 // the board's exit-button guard (falls back to the internal ?kiosk=1 read when
 // omitted, so /equipment/board stays byte-identical).
 import { useEffect, useMemo } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   connectRealtime,
   disconnectRealtime,
@@ -28,41 +28,15 @@ import { useRealtimeReconciliation } from "@/hooks/useRealtimeReconciliation";
 import { useCodeBlueKeepaliveReconciliation } from "@/hooks/useCodeBlueKeepaliveReconciliation";
 import { t } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
-import { api } from "@/lib/api";
-import { ReadinessBadge } from "@/components/ui/readiness-badge";
-import type { EquipmentStatus } from "@/types";
-import { STATUS_BG } from "./status-tokens";
 import { CommandBoard } from "./components/CommandBoard";
 import { CodeBlueOverlay } from "./components/CodeBlueOverlay";
 import { useBoardState } from "./use-board-state";
 import { useKioskModeFromUrl } from "./use-kiosk-mode-from-url";
 import { useTvModeFromUrl } from "./use-tv-mode-from-url";
 import { useDirection } from "@/hooks/useDirection";
-import { boardProposalCountQueryOptions, proposalQueueQueryKey } from "@/features/autopilot/proposal-queue-keys";
 
 interface CommandBoardScreenProps {
   kioskMode?: boolean;
-}
-
-// eq.status on the fallback pane below is the raw vt_equipment.status column
-// (loosely typed `string` on DisplaySnapshotEquipment) — validate before
-// handing it to ReadinessBadge, which indexes READINESS_GLYPH by tier and
-// throws if given a status outside the known EquipmentStatus union.
-const KNOWN_EQUIPMENT_STATUSES = new Set<EquipmentStatus>([
-  "ok",
-  "issue",
-  "maintenance",
-  "sterilized",
-  "critical",
-  "needs_attention",
-]);
-
-function toKnownEquipmentStatus(status: string): EquipmentStatus {
-  return KNOWN_EQUIPMENT_STATUSES.has(status as EquipmentStatus)
-    ? (status as EquipmentStatus)
-    : // Fail cautious on this wall display: an unrecognized status renders as
-      // the most attention-grabbing tier, never a falsely-reassuring "ready".
-      "critical";
 }
 
 function CommandBoardScreen({ kioskMode: kioskModeProp }: CommandBoardScreenProps) {
@@ -70,17 +44,9 @@ function CommandBoardScreen({ kioskMode: kioskModeProp }: CommandBoardScreenProp
   const dir = useDirection();
   const realtimeIngestor = useMemo(() => new EventIngestor(qc), [qc]);
 
-  // Task 1.1 §6 (deliverable H) — board ambient count only. Plain polling
-  // query (the kiosk board is already a polling-based ambient display, not
-  // a `/collab-ws` consumer); the count still cache-shares (via
-  // `proposalQueueQueryKey`) with whatever the approval-queue page's
-  // collab-ws nudge invalidates elsewhere. No proposal content is read here.
-  const { data: autopilotQueueData } = useQuery({
-    queryKey: proposalQueueQueryKey({ status: "staged" }),
-    queryFn: () => api.actionProposals.list({ status: "staged" }),
-    ...boardProposalCountQueryOptions,
-  });
-  const autopilotQueueCount = autopilotQueueData?.proposals.length ?? 0;
+  // The Task 1.1 §6 ambient proposal-count poller was CUT here in TV board
+  // phase 1 (Task 12, owner decision) — the kiosk polls the display snapshot
+  // only; no approvals-queue query runs on this surface.
 
   // Phase 9 PR 9.2 — `?kiosk=1` opts a Department Display surface into TV-grade
   // behavior. The /board route passes kioskMode explicitly (it wins); the
@@ -120,9 +86,10 @@ function CommandBoardScreen({ kioskMode: kioskModeProp }: CommandBoardScreenProp
 
   const snapshot = useDisplaySnapshot();
 
-  // Task 10 made `state` a required CommandBoard prop; the full container
-  // rework (poller cut + legacy-fallback removal) lands in Task 12. This is
-  // the minimal state wiring from the plan's Task 12 snippet.
+  // Task 12 — the board state machine is the single layout driver: connection
+  // tracker (derived from the shared snapshot query, no extra request) feeds
+  // useBoardState, whose result CommandBoard consumes as a required prop.
+  // Layered UNDER the frozen Code Blue early-return below.
   const connection = useDisplayConnection();
   const boardState = useBoardState({ snapshot, connection: connection.state });
 
@@ -209,45 +176,11 @@ function CommandBoardScreen({ kioskMode: kioskModeProp }: CommandBoardScreenProp
     return <CodeBlueOverlay session={snapshot.codeBlueSession} />;
   }
 
-  const board = snapshot.commandBoard;
-
-  if (!board) {
-    // commandBoard timed out or service error — show legacy equipment list
-    return (
-      <div className="min-h-screen bg-[rgb(var(--ivory-bg))] text-ivory-text flex flex-col dark" dir={dir}>
-        <div className="flex items-center gap-3 px-5 py-3 bg-[var(--brand-navy)]">
-          <span className="text-sm font-bold text-white/70">{t.board.subtitle}</span>
-          <span className="vt-text-2xs text-emergency-amber ms-auto">{t.board.fallbackBoardUnavailable}</span>
-        </div>
-        <div className="flex-1 p-4 space-y-2" data-testid="ward-display-equipment-pane">
-          {snapshot.equipment.map((eq) => (
-            <div
-              key={eq.id}
-              data-testid={`ward-display-equipment-row-${eq.id}`}
-              className="rounded-lg border border-ivory-border bg-[rgb(var(--ivory-surface))] px-3 py-2.5 flex items-center gap-3 min-h-11"
-            >
-              <span className="flex-1 vt-text-sm font-semibold text-ivory-text">{eq.name}</span>
-              {/* eq.status is the raw vt_equipment.status (server/routes/display.ts),
-                  loosely typed as `string` on DisplaySnapshotEquipment — glance-only,
-                  additive; this fallback pane owns no interactivity or reload logic.
-                  toKnownEquipmentStatus guards ReadinessBadge against a value
-                  outside EquipmentStatus (see comment above KNOWN_EQUIPMENT_STATUSES). */}
-              <ReadinessBadge status={toKnownEquipmentStatus(eq.status)} />
-              <span
-                data-testid={`ward-display-equipment-deployable-${eq.id}`}
-                className={cn(
-                  "vt-text-xs font-bold px-2 py-0.5 rounded border",
-                  eq.isDeployable ? STATUS_BG.ready : STATUS_BG.blocked,
-                )}
-              >
-                {eq.isDeployable ? t.board.deployable : t.board.notDeployable}
-              </span>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  }
+  // Task 12 — the legacy "commandBoard unavailable" equipment-list fallback is
+  // deleted: an absent board classifies as `unconfigured` (or a connection
+  // takeover) and CommandBoard's takeover + muted-unknown bands own that render
+  // (absent ≠ zero — never a zeroed board).
+  const board = snapshot.commandBoard ?? null;
 
   return (
     // In tvMode the wrapper joins the BoardShell overscan flex column so the board
@@ -263,7 +196,6 @@ function CommandBoardScreen({ kioskMode: kioskModeProp }: CommandBoardScreenProp
         currentShift={snapshot.currentShift}
         kioskMode={kioskMode}
         tvMode={tvMode}
-        proposalCount={autopilotQueueCount}
         responsibles={snapshot.responsibles}
       />
     </div>

@@ -46,9 +46,9 @@ describe("Stage 4 board — no hardcoded palette (incl. Code Blue overlay)", () 
     expect(overlaySrc.includes("bg-emergency-accent")).toBe(true);
     expect(overlaySrc.includes("text-emergency-text2")).toBe(true);
   });
-  it("fallback board unavailable notice uses the emergency-amber token", () => {
-    expect(screenSrc.includes("text-emergency-amber")).toBe(true);
-  });
+  // (The legacy "fallback board unavailable" amber notice was deleted with the
+  // ward-display fallback pane in TV board phase 1, Task 12 — an absent
+  // commandBoard now renders the state machine's unconfigured takeover.)
 });
 
 describe("Stage 4 board — overdue reads orange, not red", () => {
