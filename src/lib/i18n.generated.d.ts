@@ -2175,6 +2175,9 @@ export interface TStructure {
     equipmentCoordinatorLabel: string;
     equipmentCoordinatorUpdated: string;
     equipmentCoordinatorUpdateFailed: string;
+    seniorDoctorEligibleLabel: string;
+    seniorDoctorEligibleUpdated: string;
+    seniorDoctorEligibleUpdateFailed: string;
     inviteStaff: {
       title: string;
       description: string;
@@ -3482,6 +3485,7 @@ export interface TStructure {
     lockSuccess: string;
     lockAlreadyLocked: string;
     lockFailed: string;
+    lockTimeout: string;
     lockUnsupported: string;
     alreadyToggledRecently: string;
     toggling: string;
@@ -3499,6 +3503,10 @@ export interface TStructure {
     pushBody: string;
   };
   staleReturned: {
+    pushTitle: string;
+    pushBody: string;
+  };
+  equipmentMissing: {
     pushTitle: string;
     pushBody: string;
   };
@@ -3995,9 +4003,37 @@ export interface TStructure {
     rfidPossibleEgress: string;
     rfidConflict: string;
     rfidAmbiguous: string;
+    responsiblesTitle: string;
+    seniorIcu: string;
+    seniorAdmission: string;
+    seniorInternal: string;
+    seniorTechnician: string;
+    equipmentCoordinator: string;
+    notMarked: string;
+    noSeniorMarked: string;
+    sincePrefix: string;
     collab: {
       present: string;
     };
+  };
+  doctorGate: {
+    areYouOnShift: string;
+    yes: string;
+    no: string;
+    pickTeam: string;
+    teamIcu: string;
+    teamAdmission: string;
+    teamInternalMedicine: string;
+    iAmSenior: string;
+    replaceSeniorTitle: string;
+    replaceSeniorBody: string;
+    replace: string;
+    cancel: string;
+    onShiftStatus: string;
+    onShiftSenior: string;
+    endShift: string;
+    switchRole: string;
+    checkInFailed: string;
   };
   recordCollab: {
     editingThis: string;

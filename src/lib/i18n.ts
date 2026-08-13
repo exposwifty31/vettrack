@@ -1207,9 +1207,19 @@ const translations = {
 
   console: d.console,
 
-  board: d.board,
+  board: {
+    ...d.board,
+    sincePrefix: (time: string) => tr(d.board.sincePrefix, { time }),
+  },
 
   boardPair: d.boardPair,
+
+  doctorGate: {
+    ...d.doctorGate,
+    replaceSeniorBody: (name: string, team: string) =>
+      tr(d.doctorGate.replaceSeniorBody, { name, team }),
+    onShiftStatus: (team: string) => tr(d.doctorGate.onShiftStatus, { team }),
+  },
 
   recordCollab: {
     editingThis: (name: string) => tr(d.recordCollab.editingThis, { name }),
