@@ -12,7 +12,7 @@
 // (responsibles + power + docks, absent ≠ zero) render in every state.
 // A real Code Blue never reaches this component — CommandBoardScreen's frozen
 // early return renders the overlay above all of this.
-import { useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { X } from "lucide-react";
 import { t } from "@/lib/i18n";
@@ -34,6 +34,8 @@ import { BoardAttentionSection } from "./BoardAttentionSection";
 import { BoardStateStrip, BoardTopBand } from "./board-status-band";
 import { StaleTakeover, UnconfiguredTakeover } from "./board-takeovers";
 import { EquipmentStage } from "./board-stage-equipment";
+import { OpsStage } from "./board-stage-ops";
+import { opsHasContent, useStageRotation } from "../use-stage-rotation";
 import {
   DocksPanel,
   PowerPanel,
@@ -51,6 +53,42 @@ const NEVER_POLLED_CONNECTION: DisplayConnection = {
   lastSuccessAt: null,
   missedPolls: 0,
 };
+
+/**
+ * 300 ms opacity cross-fade on stage view swap (Task 11). The wrapper remounts
+ * per `viewKey` and fades the incoming view in; under prefers-reduced-motion
+ * the swap is instant (`transition: none`). Purely presentational — layout is
+ * owned by the stage components themselves.
+ */
+function StageFade({
+  viewKey,
+  reducedMotion,
+  children,
+}: {
+  viewKey: string;
+  reducedMotion: boolean;
+  children: React.ReactNode;
+}) {
+  const [faded, setFaded] = useState(false);
+  useEffect(() => {
+    setFaded(false);
+    const id = requestAnimationFrame(() => setFaded(true));
+    return () => cancelAnimationFrame(id);
+  }, [viewKey]);
+  return (
+    <div
+      key={viewKey}
+      data-testid="board-stage-fade"
+      className="flex-1 min-h-0 flex flex-col"
+      style={{
+        opacity: reducedMotion || faded ? 1 : 0,
+        transition: reducedMotion ? "none" : "opacity 300ms ease",
+      }}
+    >
+      {children}
+    </div>
+  );
+}
 
 export function CommandBoard({
   board,
@@ -125,6 +163,13 @@ export function CommandBoard({
   // "pressure" escalates card color/size. Alert is the only escalating state.
   const attentionMode = state === "alert" ? "pressure" : "calm";
 
+  // Equipment↔Ops rotation (Task 11): quiet states only; alert/takeover lock
+  // the stage on equipment; an empty Ops view is never rotated in.
+  const stageView = useStageRotation({
+    state,
+    opsHasContent: opsHasContent(board, currentShift),
+  });
+
   return (
     <div
       ref={rootRef}
@@ -139,7 +184,7 @@ export function CommandBoard({
       dir={dir}
     >
 
-      {/* Header (shift block relocates to the Ops view in Task 11) */}
+      {/* Header — the shift strip moved to the Ops stage view (Task 11) */}
       <header className="bg-[var(--brand-navy)] flex items-center gap-4 px-5 py-3 shrink-0 flex-wrap">
         <span
           className={cn(
@@ -151,21 +196,9 @@ export function CommandBoard({
         </span>
         <div className="w-px h-5 bg-white/20 shrink-0" />
 
-        <span className="vt-text-xs font-bold tracking-widest uppercase text-[var(--brand-green-bright)] shrink-0">
+        <span className="vt-text-xs font-bold tracking-widest uppercase text-[var(--brand-green-bright)] flex-1">
           {t.board.ward}
         </span>
-
-        {/* Shift staff */}
-        <div className="flex flex-wrap gap-1.5 flex-1 justify-center">
-          {currentShift.map((s) => (
-            <div
-              key={`${s.employeeName}-${s.role}`}
-              className="flex items-center gap-1.5 bg-white/10 border border-white/20 rounded-full px-3 py-0.5 vt-text-xs text-white/75"
-            >
-              {s.employeeName}
-            </div>
-          ))}
-        </div>
 
         {/* LIVE badge */}
         <div className="flex items-center gap-1.5 shrink-0">
@@ -220,15 +253,21 @@ export function CommandBoard({
         />
       )}
 
-      {/* Stage — state-driven: takeovers replace it wholesale; otherwise the
-          Equipment stage (Task 11 adds Equipment↔Ops rotation with alert lock). */}
+      {/* Stage — state-driven: takeovers replace it wholesale; the quiet states
+          rotate Equipment↔Ops (alert locks on equipment, empty Ops never shows). */}
       <main id="main-content" className="flex-1 min-h-0 flex flex-col p-4" dir={dir}>
         {state === "stale" ? (
           <StaleTakeover connection={connection} lastSnapshot={snapshot} />
         ) : state === "unconfigured" ? (
           <UnconfiguredTakeover />
         ) : (
-          <EquipmentStage board={board} state={state} tvMode={tvMode} responsibles={responsibles} />
+          <StageFade viewKey={stageView} reducedMotion={reducedMotion}>
+            {stageView === "ops" ? (
+              <OpsStage board={board} currentShift={currentShift} tvMode={tvMode} />
+            ) : (
+              <EquipmentStage board={board} state={state} tvMode={tvMode} responsibles={responsibles} />
+            )}
+          </StageFade>
         )}
       </main>
 
