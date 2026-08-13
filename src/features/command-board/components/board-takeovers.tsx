@@ -16,10 +16,17 @@ import { t } from "@/lib/i18n";
 import type { DisplayConnection } from "@/hooks/use-display-connection";
 import type { DisplaySnapshot } from "@/types/safety-surfaces";
 
-/** Minute-granularity local clock time for the last successful poll. */
+/**
+ * Minute-granularity local clock time for the last successful poll — zero-padded
+ * HH:mm via the same he-IL 24h formatter the board clock and formatSince use.
+ * (Bare getHours() rendered "9:05" instead of "09:05".)
+ */
 export function formatLastGoodTime(lastSuccessAtMs: number): string {
-  const d = new Date(lastSuccessAtMs);
-  return `${d.getHours()}:${String(d.getMinutes()).padStart(2, "0")}`;
+  return new Date(lastSuccessAtMs).toLocaleTimeString("he-IL", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
 }
 
 function TakeoverFrame({
