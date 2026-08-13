@@ -154,7 +154,7 @@ describe("rollback invariant — stale: enforce → off", () => {
 
 describe("rollback invariant — OPROLE: enforce → off", () => {
   it("stops denial and restores allow within one TTL window", async () => {
-    setStaleCheckIn(1, "admission"); // fresh
+    setStaleCheckIn(1, "ward"); // fresh, legacy allowlist-governed role
     setShift("vet");
     allowlistFetcherMock.mockResolvedValue({ kind: "ok", allowlist: [] });
 
@@ -178,7 +178,7 @@ describe("rollback invariant — OPROLE: enforce → off", () => {
 
 describe("rollback invariant — independence of families", () => {
   it("flipping stale off leaves OPROLE enforcement intact", async () => {
-    setStaleCheckIn(48, "admission"); // both stale AND revoked
+    setStaleCheckIn(48, "ward"); // both stale AND revoked (legacy role)
     setShift("vet");
     allowlistFetcherMock.mockResolvedValue({ kind: "ok", allowlist: [] });
 

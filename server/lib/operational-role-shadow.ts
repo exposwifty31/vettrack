@@ -17,6 +17,7 @@
 
 import { and, eq } from "drizzle-orm";
 import { db, users } from "../db.js";
+import { isDoctorTeamRole } from "../../shared/doctor-teams.js";
 import { createLogLimiter } from "./log-safety.js";
 import { incrementMetric } from "./metrics.js";
 
@@ -193,6 +194,12 @@ export function scheduleOperationalRoleShadowValidation(
 
   // Guard 2: nothing to compare against the allowlist.
   if (!args.observedOperationalRole) return;
+
+  // Guard 2b (doctor shift gate): doctor team roles are universally allowed
+  // for vets — they have no allowlist membership to drift from, so a shadow
+  // comparison would report false "drift_revoked" for every icu /
+  // internal_medicine / admission check-in.
+  if (isDoctorTeamRole(args.observedOperationalRole)) return;
 
   // Guard 3: per-(clinic,user,operationalRole) dedupe — PEEK ONLY.
   // We do NOT mark the key here; that happens after guard 4 also passes,

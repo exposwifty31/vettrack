@@ -89,9 +89,9 @@ describe("evaluateOpRoleEnforcement", () => {
     expect(fetcher).not.toHaveBeenCalled();
   });
 
-  it("enforce + role in allowlist → allow, no counter", async () => {
+  it("enforce + legacy role in allowlist → allow, no counter", async () => {
     const fetcher = vi.fn().mockResolvedValue(okResult(["admission", "ward"]));
-    const verdict = await evaluateOpRoleEnforcement(ctx("admission"), {
+    const verdict = await evaluateOpRoleEnforcement(ctx("ward"), {
       modeResolver: MODE("enforce"),
       allowlistFetcher: fetcher,
     });
@@ -99,9 +99,9 @@ describe("evaluateOpRoleEnforcement", () => {
     expect(getMetricsSnapshot().authority.oproleEnforce.denied).toBe(0);
   });
 
-  it("enforce + role NOT in allowlist → deny + denied counter", async () => {
-    const fetcher = vi.fn().mockResolvedValue(okResult(["ward"]));
-    const verdict = await evaluateOpRoleEnforcement(ctx("admission"), {
+  it("enforce + legacy role NOT in allowlist → deny + denied counter", async () => {
+    const fetcher = vi.fn().mockResolvedValue(okResult(["admission"]));
+    const verdict = await evaluateOpRoleEnforcement(ctx("ward"), {
       modeResolver: MODE("enforce"),
       allowlistFetcher: fetcher,
     });
@@ -109,18 +109,35 @@ describe("evaluateOpRoleEnforcement", () => {
     expect(getMetricsSnapshot().authority.oproleEnforce.denied).toBe(1);
   });
 
-  it("enforce + empty allowlist → deny", async () => {
+  it("enforce + empty allowlist → deny (legacy role)", async () => {
     const fetcher = vi.fn().mockResolvedValue(okResult([]));
-    const verdict = await evaluateOpRoleEnforcement(ctx("admission"), {
+    const verdict = await evaluateOpRoleEnforcement(ctx("ward"), {
       modeResolver: MODE("enforce"),
       allowlistFetcher: fetcher,
     });
     expect(verdict.action).toBe("deny");
   });
 
+  it.each(["icu", "internal_medicine", "admission"])(
+    "enforce + doctor team role '%s' → allow WITHOUT consulting the allowlist (check-in-time bypass mirrored)",
+    async (role) => {
+      // Doctor team roles are universally allowed for vets at check-in
+      // (doctor shift gate) — use-time revalidation must mirror that or
+      // enforce-mode clinics deny every icu/internal_medicine check-in.
+      const fetcher = vi.fn().mockResolvedValue(okResult([]));
+      const verdict = await evaluateOpRoleEnforcement(ctx(role), {
+        modeResolver: MODE("enforce"),
+        allowlistFetcher: fetcher,
+      });
+      expect(verdict).toEqual({ action: "allow" });
+      expect(fetcher).not.toHaveBeenCalled();
+      expect(getMetricsSnapshot().authority.oproleEnforce.denied).toBe(0);
+    },
+  );
+
   it("enforce + fetcher returns error → allow (fail open)", async () => {
     const fetcher = vi.fn().mockResolvedValue({ kind: "error" } as AllowlistFetchResult);
-    const verdict = await evaluateOpRoleEnforcement(ctx("admission"), {
+    const verdict = await evaluateOpRoleEnforcement(ctx("ward"), {
       modeResolver: MODE("enforce"),
       allowlistFetcher: fetcher,
     });
@@ -130,7 +147,7 @@ describe("evaluateOpRoleEnforcement", () => {
 
   it("enforce + fetcher throws → allow (fail open, defense in depth)", async () => {
     const fetcher = vi.fn().mockRejectedValue(new Error("DB exploded"));
-    const verdict = await evaluateOpRoleEnforcement(ctx("admission"), {
+    const verdict = await evaluateOpRoleEnforcement(ctx("ward"), {
       modeResolver: MODE("enforce"),
       allowlistFetcher: fetcher,
     });

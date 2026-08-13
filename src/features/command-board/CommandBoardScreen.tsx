@@ -253,6 +253,7 @@ function CommandBoardScreen({ kioskMode: kioskModeProp }: CommandBoardScreenProp
         kioskMode={kioskMode}
         tvMode={tvMode}
         proposalCount={autopilotQueueCount}
+        responsibles={snapshot.responsibles}
       />
     </div>
   );

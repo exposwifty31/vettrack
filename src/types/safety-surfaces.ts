@@ -65,6 +65,39 @@ export interface DisplaySnapshotHospitalization {
   };
 }
 
+/**
+ * Doctor shift gate — board `responsibles` section. Local mirror of
+ * server/services/board-responsibles.service.ts (client type files never
+ * import server code). `since` is the ISO checkedInAt of the open check-in.
+ */
+export interface ResponsibleEntry {
+  name: string;
+  since: string;
+}
+
+export interface DoctorTeamBlock {
+  senior: ResponsibleEntry | null;
+  members: ResponsibleEntry[];
+}
+
+/** Mirrors CoordinatorStatus in server/services/equipment-coordinator.service.ts. */
+export type BoardCoordinatorStatus =
+  | "auto"
+  | "confirmed"
+  | "fallback_senior"
+  | "needs_confirmation"
+  | "unresolved";
+
+export interface BoardResponsibles {
+  doctors: {
+    icu: DoctorTeamBlock;
+    admission: DoctorTeamBlock;
+    internal_medicine: DoctorTeamBlock;
+  };
+  seniorTechnician: { name: string } | null;
+  equipmentCoordinator: { name: string | null; status: BoardCoordinatorStatus };
+}
+
 export interface DisplaySnapshot {
   currentTime: string;
   currentShift: Array<{ employeeName: string; role: string }>;
@@ -82,6 +115,8 @@ export interface DisplaySnapshot {
   codeBlueSession: DisplaySnapshotCodeBlueSession | null;
   /** Equipment command board — present when buildCommandBoardSnapshot succeeds. */
   commandBoard?: EquipmentCommandBoardSnapshot | null;
+  /** Doctor shift gate — responsibles section; null when the build failed/timed out. */
+  responsibles?: BoardResponsibles | null;
 }
 
 export interface CrashCartItem {

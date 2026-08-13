@@ -15,6 +15,7 @@ import {
   getActiveCheckIn,
   getAllowedOperationalRoles,
   openCheckIn,
+  switchOperationalRole,
   type ActorRole,
   type CheckInActor,
 } from "../services/clinical-check-in.js";
@@ -26,6 +27,11 @@ const router = Router();
 const checkInBodySchema = z
   .object({
     operationalRole: z.string().min(1).optional(),
+    isSenior: z.boolean().optional(),
+    replaceSenior: z.boolean().optional(),
+    // Gate-declared provenance for the ambiguous 'admission' role — feeds
+    // check_in_source (auto-expiry semantics only, never privileges).
+    source: z.literal("doctor_gate").optional(),
   })
   .strict();
 
@@ -52,6 +58,7 @@ function serializeCheckIn(row: ClinicalCheckIn) {
     clinicId: row.clinicId,
     userId: row.userId,
     operationalRole: row.operationalRole,
+    isSenior: row.isSenior,
     clinicalRoleAtCheckIn: row.clinicalRoleAtCheckIn,
     checkedInAt: row.checkedInAt.toISOString(),
     checkedOutAt: row.checkedOutAt ? row.checkedOutAt.toISOString() : null,
@@ -84,9 +91,19 @@ function resolveIdempotencyKey(
 
 function handleServiceError(err: unknown, res: Response, requestId: string): void {
   if (err instanceof ClinicalCheckInError) {
-    res
-      .status(err.status)
-      .json(apiError({ code: err.code, reason: err.reason, message: err.message, requestId }));
+    // Status/code passthrough covers the doctor-gate errors too
+    // (SENIOR_NOT_ELIGIBLE 403, SENIOR_REQUIRES_TEAM_ROLE 422,
+    // SENIOR_ALREADY_ASSIGNED 409); metadata (e.g. currentSeniorName)
+    // surfaces as the envelope's `details`.
+    res.status(err.status).json(
+      apiError({
+        code: err.code,
+        reason: err.reason,
+        message: err.message,
+        requestId,
+        details: err.metadata,
+      }),
+    );
     return;
   }
   console.error("[clinical-check-in] internal error", err);
@@ -134,6 +151,55 @@ router.post(
       const result = await openCheckIn({
         actor: actorFromRequest(req.authUser!),
         operationalRole: parsed.data.operationalRole,
+        isSenior: parsed.data.isSenior,
+        replaceSenior: parsed.data.replaceSenior,
+        source: parsed.data.source,
+        idempotencyKey: keyResult.value,
+      });
+      res.status(200).json(serializeCheckIn(result.row));
+    } catch (err) {
+      handleServiceError(err, res, requestId);
+    }
+  },
+);
+
+router.post(
+  "/switch",
+  requireAuth,
+  requireClinicalUser,
+  async (req: Request, res: Response) => {
+    const requestId = resolveRequestId(res, req.headers["x-request-id"]);
+    const parsed = checkInBodySchema.safeParse(req.body ?? {});
+    if (!parsed.success) {
+      const first = parsed.error.issues[0];
+      const message = first
+        ? `${first.path.join(".") || "body"}: ${first.message}`
+        : "Invalid body";
+      res.status(400).json(
+        apiError({
+          code: "INVALID_BODY",
+          reason: "INVALID_BODY",
+          message,
+          requestId,
+        }),
+      );
+      return;
+    }
+
+    const keyResult = resolveIdempotencyKey(
+      req.headers["idempotency-key"],
+      res,
+      requestId,
+    );
+    if (!keyResult.ok) return;
+
+    try {
+      const result = await switchOperationalRole({
+        actor: actorFromRequest(req.authUser!),
+        operationalRole: parsed.data.operationalRole,
+        isSenior: parsed.data.isSenior,
+        replaceSenior: parsed.data.replaceSenior,
+        source: parsed.data.source,
         idempotencyKey: keyResult.value,
       });
       res.status(200).json(serializeCheckIn(result.row));

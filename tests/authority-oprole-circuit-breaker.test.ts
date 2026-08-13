@@ -81,7 +81,7 @@ describe("OPROLE breaker-reuse invariants", () => {
   it("does NOT open the circuit before the existing threshold (5 failures)", async () => {
     const fetcher = vi.fn().mockResolvedValue(errorFetcher());
     for (let i = 0; i < 5; i++) {
-      await evaluateOpRoleEnforcement(ctx("admission"), {
+      await evaluateOpRoleEnforcement(ctx("ward"), {
         modeResolver: OPROLE_MODE("enforce"),
         allowlistFetcher: fetcher,
       });
@@ -95,7 +95,7 @@ describe("OPROLE breaker-reuse invariants", () => {
   it("opens the circuit on the 6th consecutive failure (existing module threshold)", async () => {
     const fetcher = vi.fn().mockResolvedValue(errorFetcher());
     for (let i = 0; i < 6; i++) {
-      await evaluateOpRoleEnforcement(ctx("admission"), {
+      await evaluateOpRoleEnforcement(ctx("ward"), {
         modeResolver: OPROLE_MODE("enforce"),
         allowlistFetcher: fetcher,
       });
@@ -107,7 +107,7 @@ describe("OPROLE breaker-reuse invariants", () => {
   it("skips cache reads while the circuit is open", async () => {
     const failing = vi.fn().mockResolvedValue(errorFetcher());
     for (let i = 0; i < 6; i++) {
-      await evaluateOpRoleEnforcement(ctx("admission"), {
+      await evaluateOpRoleEnforcement(ctx("ward"), {
         modeResolver: OPROLE_MODE("enforce"),
         allowlistFetcher: failing,
       });
@@ -118,7 +118,7 @@ describe("OPROLE breaker-reuse invariants", () => {
     const wouldThrow = vi.fn(() => {
       throw new Error("fetcher should not be called while circuit is open");
     });
-    const verdict = await evaluateOpRoleEnforcement(ctx("admission"), {
+    const verdict = await evaluateOpRoleEnforcement(ctx("ward"), {
       modeResolver: OPROLE_MODE("enforce"),
       allowlistFetcher: wouldThrow as never,
     });
@@ -129,7 +129,7 @@ describe("OPROLE breaker-reuse invariants", () => {
   it("recordSuccess clears the breaker (recovery via success after window)", async () => {
     const failing = vi.fn().mockResolvedValue(errorFetcher());
     for (let i = 0; i < 6; i++) {
-      await evaluateOpRoleEnforcement(ctx("admission"), {
+      await evaluateOpRoleEnforcement(ctx("ward"), {
         modeResolver: OPROLE_MODE("enforce"),
         allowlistFetcher: failing,
       });
@@ -147,7 +147,7 @@ describe("OPROLE breaker-reuse invariants", () => {
   it("stale evaluator is unaffected while OPROLE circuit is open", async () => {
     const failing = vi.fn().mockResolvedValue(errorFetcher());
     for (let i = 0; i < 6; i++) {
-      await evaluateOpRoleEnforcement(ctx("admission"), {
+      await evaluateOpRoleEnforcement(ctx("ward"), {
         modeResolver: OPROLE_MODE("enforce"),
         allowlistFetcher: failing,
       });
@@ -155,7 +155,7 @@ describe("OPROLE breaker-reuse invariants", () => {
     expect(isCircuitOpen(SERVICE)).toBe(true);
 
     // Stale evaluator on a 48h-old row, enforce mode → must still deny.
-    const staleVerdict = await evaluateStaleEnforcement(ctx("admission", 48), STALE_MODE("enforce"));
+    const staleVerdict = await evaluateStaleEnforcement(ctx("ward", 48), STALE_MODE("enforce"));
     expect(staleVerdict).toEqual({ action: "deny", reason: "CHECKED_IN_STALE" });
     expect(getMetricsSnapshot().authority.staleEnforce.denied).toBe(1);
   });
@@ -163,7 +163,7 @@ describe("OPROLE breaker-reuse invariants", () => {
   it("circuit_breaker_opened increments exactly once per open event", async () => {
     const failing = vi.fn().mockResolvedValue(errorFetcher());
     for (let i = 0; i < 6; i++) {
-      await evaluateOpRoleEnforcement(ctx("admission"), {
+      await evaluateOpRoleEnforcement(ctx("ward"), {
         modeResolver: OPROLE_MODE("enforce"),
         allowlistFetcher: failing,
       });
@@ -175,7 +175,7 @@ describe("OPROLE breaker-reuse invariants", () => {
     // counter again. The existing module resets `state.failures = []` on open
     // so it takes another 6 failures (after recovery) to re-trip.
     for (let i = 0; i < 3; i++) {
-      await evaluateOpRoleEnforcement(ctx("admission"), {
+      await evaluateOpRoleEnforcement(ctx("ward"), {
         modeResolver: OPROLE_MODE("enforce"),
         allowlistFetcher: failing,
       });

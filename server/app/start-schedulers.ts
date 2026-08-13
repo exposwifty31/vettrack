@@ -35,6 +35,7 @@ import { startAutopilotHandoverDraftWorker } from "../workers/autopilotHandoverD
 import { startShiftHandoverScheduler } from "../lib/shift-handover-scheduler.js";
 import { startRfidReaderOfflineSweep } from "../lib/rfid/reader-offline-sweep.js";
 import { startRfidFinalizingSweep } from "../lib/rfid/finalizing-sweep.js";
+import { startDoctorCheckInExpiryWorker } from "../workers/doctorCheckInExpiryWorker.js";
 
 export async function startBackgroundSchedulers() {
   if (process.env.NODE_ENV === "test") {
@@ -130,4 +131,9 @@ export async function startBackgroundSchedulers() {
   // finalize can never brick a clinic's one-in-flight rotation gate (time-bounded backstop for the
   // post-delete window + quiet-clinic case the lazy ingest reclaim cannot cover).
   startRfidFinalizingSweep();
+
+  // Doctor shift gate (spec 2026-08-13) — 14h auto-expiry for doctor check-ins.
+  // Doctor team rows ONLY (operational_role IN icu/admission/internal_medicine);
+  // separate from the shadow/read-only staleCheckInSweepWorker above.
+  startDoctorCheckInExpiryWorker();
 }

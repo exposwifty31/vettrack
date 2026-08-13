@@ -193,6 +193,17 @@ export function UsersSection() {
     onError: () => toast.error(t.adminPage.equipmentCoordinatorUpdateFailed),
   });
 
+  const setSeniorDoctorEligibleMut = useMutation({
+    mutationFn: ({ id, seniorDoctorEligible }: { id: string; seniorDoctorEligible: boolean }) =>
+      api.users.setSeniorDoctorEligible(id, seniorDoctorEligible),
+    onSuccess: () => {
+      haptics.tap();
+      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      toast.success(t.adminPage.seniorDoctorEligibleUpdated);
+    },
+    onError: () => toast.error(t.adminPage.seniorDoctorEligibleUpdateFailed),
+  });
+
   const deleteUserMut = useMutation({
     mutationFn: (id: string) => api.users.delete(id),
     onSuccess: () => {
@@ -320,6 +331,22 @@ export function UsersSection() {
                         data-testid={`checkbox-equipment-coordinator-${user.id}`}
                       />
                       {t.adminPage.equipmentCoordinatorLabel}
+                    </label>
+                  )}
+                  {user.role === "vet" && (
+                    <label
+                      className="flex items-center gap-2 text-xs text-muted-foreground mt-2"
+                      data-testid={`senior-doctor-eligible-row-${user.id}`}
+                    >
+                      <Checkbox
+                        checked={!!user.seniorDoctorEligible}
+                        onCheckedChange={(checked) =>
+                          setSeniorDoctorEligibleMut.mutate({ id: user.id, seniorDoctorEligible: checked })
+                        }
+                        disabled={setSeniorDoctorEligibleMut.isPending}
+                        data-testid={`checkbox-senior-doctor-eligible-${user.id}`}
+                      />
+                      {t.adminPage.seniorDoctorEligibleLabel}
                     </label>
                   )}
                   {user.status === "pending" && (

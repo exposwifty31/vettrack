@@ -48,6 +48,13 @@ export const users = vtTable("vt_users", {
    * separately (`resolveShiftCoordinator`), never stored on the user row.
    */
   isEquipmentCoordinator: boolean("is_equipment_coordinator").notNull().default(false),
+  /**
+   * Doctor shift gate: static, admin-set eligibility to mark oneself as the
+   * responsible senior of a doctor team at check-in. Which team a senior
+   * leads is chosen per check-in, never stored here. Distinct from
+   * `secondaryRole` (account RBAC — never consulted by the clinical path).
+   */
+  seniorDoctorEligible: boolean("senior_doctor_eligible").notNull().default(false),
   allowedOperationalRoles: jsonb("allowed_operational_roles").notNull().default(sql`'[]'::jsonb`),
   status: varchar("status", { length: 20 }).notNull().default("active"),
   preferredLocale: varchar("preferred_locale", { length: 10 }).notNull().default("he"),
