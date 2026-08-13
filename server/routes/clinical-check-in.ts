@@ -15,6 +15,7 @@ import {
   getActiveCheckIn,
   getAllowedOperationalRoles,
   openCheckIn,
+  switchOperationalRole,
   type ActorRole,
   type CheckInActor,
 } from "../services/clinical-check-in.js";
@@ -150,6 +151,43 @@ router.post(
         isSenior: parsed.data.isSenior,
         replaceSenior: parsed.data.replaceSenior,
         idempotencyKey: keyResult.value,
+      });
+      res.status(200).json(serializeCheckIn(result.row));
+    } catch (err) {
+      handleServiceError(err, res, requestId);
+    }
+  },
+);
+
+router.post(
+  "/switch",
+  requireAuth,
+  requireClinicalUser,
+  async (req: Request, res: Response) => {
+    const requestId = resolveRequestId(res, req.headers["x-request-id"]);
+    const parsed = checkInBodySchema.safeParse(req.body ?? {});
+    if (!parsed.success) {
+      const first = parsed.error.issues[0];
+      const message = first
+        ? `${first.path.join(".") || "body"}: ${first.message}`
+        : "Invalid body";
+      res.status(400).json(
+        apiError({
+          code: "INVALID_BODY",
+          reason: "INVALID_BODY",
+          message,
+          requestId,
+        }),
+      );
+      return;
+    }
+
+    try {
+      const result = await switchOperationalRole({
+        actor: actorFromRequest(req.authUser!),
+        operationalRole: parsed.data.operationalRole,
+        isSenior: parsed.data.isSenior,
+        replaceSenior: parsed.data.replaceSenior,
       });
       res.status(200).json(serializeCheckIn(result.row));
     } catch (err) {

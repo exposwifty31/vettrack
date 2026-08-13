@@ -7,6 +7,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 const mockInsert = vi.fn();
 const mockSelect = vi.fn();
 const mockUpdate = vi.fn();
+const mockTransaction = vi.fn();
 const mockLogAudit = vi.fn();
 
 vi.mock("../server/db.js", () => ({
@@ -14,6 +15,7 @@ vi.mock("../server/db.js", () => ({
     insert: mockInsert,
     select: mockSelect,
     update: mockUpdate,
+    transaction: mockTransaction,
   },
   clinicalCheckIns: {
     id: "id",
@@ -857,6 +859,109 @@ describe("doctor shift gate — openCheckIn vet branch", () => {
     await expect(
       openCheckIn({ actor: TECH_ACTOR, operationalRole: "icu" }),
     ).rejects.toMatchObject({ code: "OPERATIONAL_ROLE_NOT_ALLOWED_FOR_NON_VET" });
+  });
+});
+
+describe("switchOperationalRole — atomic role switch", () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    // db.transaction executes the callback with a tx exposing the same mocks.
+    mockTransaction.mockImplementation(
+      async (fn: (tx: unknown) => Promise<unknown>) =>
+        fn({ select: mockSelect, insert: mockInsert, update: mockUpdate }),
+    );
+  });
+
+  it("closes the open row with checkOutReason='role_switch' and inserts the new row in one transaction", async () => {
+    const closedOld = makeRow({
+      id: "ci-old",
+      operationalRole: "admission",
+      checkedOutAt: new Date("2026-08-13T10:00:00Z"),
+      checkOutReason: "role_switch",
+    });
+    const updChain = chainable([closedOld]);
+    mockUpdate.mockReturnValue(updChain);
+    const newRow = makeRow({ id: "ci-new", operationalRole: "icu" });
+    const insertChain = chainable([newRow]);
+    mockInsert.mockReturnValue(insertChain);
+
+    const { switchOperationalRole } = await import(
+      "../server/services/clinical-check-in.js"
+    );
+    const result = await switchOperationalRole({
+      actor: VET_ACTOR,
+      operationalRole: "icu",
+    });
+
+    expect(result.replayed).toBe(false);
+    expect(result.row.id).toBe("ci-new");
+    expect(mockTransaction).toHaveBeenCalledTimes(1);
+
+    const setArg = (updChain["set"] as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    expect(setArg.checkOutReason).toBe("role_switch");
+    expect(setArg.checkedOutAt).toBeInstanceOf(Date);
+
+    const inserted = (insertChain["values"] as ReturnType<typeof vi.fn>).mock
+      .calls[0][0];
+    expect(inserted.operationalRole).toBe("icu");
+    expect(inserted.isSenior).toBe(false);
+    expect(inserted.clinicalRoleAtCheckIn).toBe("vet");
+
+    const kinds = mockLogAudit.mock.calls.map((c) => c[0].actionType);
+    expect(kinds).toContain("clinical_check_out");
+    expect(kinds).toContain("clinical_check_in");
+  });
+
+  it("with no open row behaves like a plain open (no close audit, insert still happens)", async () => {
+    // UPDATE ... WHERE checked_out_at IS NULL matches nothing.
+    mockUpdate.mockReturnValue(chainable([]));
+    const newRow = makeRow({ id: "ci-new", operationalRole: "admission" });
+    mockInsert.mockReturnValue(chainable([newRow]));
+
+    const { switchOperationalRole } = await import(
+      "../server/services/clinical-check-in.js"
+    );
+    const result = await switchOperationalRole({
+      actor: VET_ACTOR,
+      operationalRole: "admission",
+    });
+
+    expect(result.row.id).toBe("ci-new");
+    const kinds = mockLogAudit.mock.calls.map((c) => c[0].actionType);
+    expect(kinds).not.toContain("clinical_check_out");
+    expect(kinds).toContain("clinical_check_in");
+  });
+
+  it("applies senior validation to the new role: SENIOR_NOT_ELIGIBLE rejects before any write", async () => {
+    // Team role skips the allowlist; first SELECT is the eligibility read.
+    mockSelectSequence([{ eligible: false }]);
+
+    const { switchOperationalRole } = await import(
+      "../server/services/clinical-check-in.js"
+    );
+    await expect(
+      switchOperationalRole({
+        actor: VET_ACTOR,
+        operationalRole: "icu",
+        isSenior: true,
+      }),
+    ).rejects.toMatchObject({ code: "SENIOR_NOT_ELIGIBLE", status: 403 });
+
+    expect(mockUpdate).not.toHaveBeenCalled();
+    expect(mockInsert).not.toHaveBeenCalled();
+  });
+
+  it("runs the same validation path as openCheckIn: non-vet with operationalRole rejected", async () => {
+    const { switchOperationalRole } = await import(
+      "../server/services/clinical-check-in.js"
+    );
+    await expect(
+      switchOperationalRole({ actor: TECH_ACTOR, operationalRole: "icu" }),
+    ).rejects.toMatchObject({
+      code: "OPERATIONAL_ROLE_NOT_ALLOWED_FOR_NON_VET",
+      status: 400,
+    });
+    expect(mockInsert).not.toHaveBeenCalled();
   });
 });
 
