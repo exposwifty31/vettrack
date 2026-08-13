@@ -39,7 +39,9 @@
 > `exposwifty31/VetTrack---RN-Migration-`. What this repo still owns for the push:
 > the server the RN app calls, the `@vettrack/contracts` package, `well-known-assetlinks.ts`
 > (needs the Play App Signing SHA-256 once the first AAB is uploaded), and the reviewer-demo
-> seed that must be run against production before submission.
+> seed that must be run against production before submission — that last one writes to a
+> production database, so it is gated on the tenant-isolation / idempotency / synthetic-data /
+> cleanup conditions recorded in **TASKS.md § In Progress**. Do not run it without reading them.
 >
 > Phase 0A (T-05, T-01…T-04) COMPLETED 2026-07-12 — proof-logged (PROOF_ALIGNMENT_LOG
 > "2026-07-12 — Consolidated Audit × 10x"; fixes re-verified in-code 2026-07-28:
@@ -97,7 +99,7 @@ Agents execute **plan cards**, not free-form interpretations of this file. Card 
 - Appointment → task renames of internal surfaces (only copy changed)
 - Any work in the external RN mobile repo (separate **public** repo `exposwifty31/VetTrack---RN-Migration-`; `literate-dollop` is retired as the active target, while its physical delete-versus-archive decision remains open — see `docs/plans/master-plan-2026-07.md` Layer 4)
 - Phase 4 parked items until entry conditions clear: **massive-03** (clinic network), **medium-04** (copilot/voice)
-- Starting Phase 1+ before Phase 0 exit drill (T-16) passes
+- ~~Starting Phase 1+ before Phase 0 exit drill (T-16) passes~~ — **historical; void as of 2026-08-13** (see banner)
 
 ---
 
@@ -137,7 +139,10 @@ T-06…T-15: binary ops/config/account/build checks. **Not RED→GREEN.** See pl
 
 ### Phase 0 exit
 
-**T-16** on-device drill blocks leaving Phase 0.
+~~**T-16** on-device drill blocks leaving Phase 0.~~
+**Historical — this gate no longer blocks anything (void 2026-08-13; see banner).** Its only
+surviving descendant is the store-lane **G3 on-device verdict** (owner gate: iPhone 16 Plus +
+Pixel 7), tracked in `~/.claude/plans/store-submission-runbook.md` as **O8** — not here.
 
 ### Later phases (queued — not Ready)
 
