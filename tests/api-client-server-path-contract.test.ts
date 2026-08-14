@@ -132,21 +132,45 @@ function expandRouter(prefix: string, router: unknown, out: Set<string>): void {
 /**
  * Routes registered directly on the app in `server/index.ts`, outside
  * `registerApiRoutes` — `/api/version`, `/api/healthz`, and the routers mounted
- * before auth. They are read from the source rather than hardcoded so a new one
- * is picked up automatically. `app.use` mounts a router whose sub-paths cannot
- * be walked statically, so those become prefix roots; `app.get`/`app.post` are
- * exact paths.
+ * ahead of auth. Read from the source rather than hardcoded, so a new one is
+ * picked up automatically.
+ *
+ * An `app.use` mount is resolved back to its imported module and expanded like
+ * any other router. Accepting every path under a mount because the mount exists
+ * would reinstate the prefix match this test exists to kill: `/api/health/typo`
+ * would pass. A mount that cannot be resolved is recorded as unresolved and
+ * fails the suite instead.
+ *
+ * `server/index.ts` itself is only ever READ here — importing it would start a
+ * server. Only the modules it names are imported.
  */
-function appLevelRoutes(): { exact: string[]; prefixRoots: string[] } {
+async function appLevelRoutes(): Promise<{ exact: string[]; mounts: Mount[] }> {
   const source = readFileSync("server/index.ts", "utf8");
-  const exact: string[] = [];
-  const prefixRoots: string[] = [];
-  for (const m of source.matchAll(/\bapp\.(use|get|post|patch|put|delete)\("(\/api[^"]*)"/g)) {
-    const [, verb, routePath] = m;
-    if (segments(routePath).length < 2) continue; // bare "/api" is middleware, not a route
-    (verb === "use" ? prefixRoots : exact).push(routePath);
+  const defaultImports = new Map<string, string>();
+  for (const m of source.matchAll(/^import\s+([A-Za-z_$][\w$]*)\s+from\s+"([^"]+)"/gm)) {
+    defaultImports.set(m[1], m[2]);
   }
-  return { exact, prefixRoots };
+
+  const exact: string[] = [];
+  const mounts: Mount[] = [];
+  for (const m of source.matchAll(
+    /\bapp\.(use|get|post|patch|put|delete)\("(\/api[^"]*)"\s*,\s*([A-Za-z_$][\w$]*)/g,
+  )) {
+    const [, verb, routePath, handler] = m;
+    if (segments(routePath).length < 2) continue; // bare "/api" is middleware, not a route
+    if (verb !== "use") {
+      exact.push(routePath);
+      continue;
+    }
+    const spec = defaultImports.get(handler);
+    if (!spec?.startsWith("./")) {
+      unresolved.push(`server/index.ts: app.use("${routePath}", ${handler}) — no local default import to expand`);
+      continue;
+    }
+    const mod = (await import(spec.replace(/^\.\//, "../server/"))) as { default?: unknown };
+    mounts.push({ path: routePath, router: mod.default });
+  }
+  return { exact, mounts };
 }
 
 /** Every `.ts`/`.tsx` file under `src/`. */
@@ -210,10 +234,8 @@ function sameShape(a: string[], b: string[]): boolean {
   return a.length === b.length && a.every((s, i) => s === "*" || b[i] === "*" || s === b[i]);
 }
 
-function isServable(client: ClientPath, routes: string[][], prefixRoots: string[][]): boolean {
+function isServable(client: ClientPath, routes: string[][]): boolean {
   const want = segments(client.path);
-  const under = (root: string[]) => want.length >= root.length && sameShape(root, want.slice(0, root.length));
-  if (prefixRoots.some(under)) return true;
   return routes.some((route) => {
     if (sameShape(want, route)) return true;
     return client.openEnded && route.length > want.length && sameShape(want, route.slice(0, want.length));
@@ -222,21 +244,20 @@ function isServable(client: ClientPath, routes: string[][], prefixRoots: string[
 
 describe("client → server API path contract", () => {
   it("every /api path the web client calls resolves to a registered server route", async () => {
-    const mounts = await collectMounts();
-    const servable = new Set<string>();
-    for (const mount of mounts) expandRouter(mount.path, mount.router, servable);
-    const appLevel = appLevelRoutes();
-    for (const path of appLevel.exact) servable.add(path);
+    const appLevel = await appLevelRoutes();
+    const servable = new Set<string>(appLevel.exact);
+    for (const mount of [...(await collectMounts()), ...appLevel.mounts]) {
+      expandRouter(mount.path, mount.router, servable);
+    }
     const routes = [...servable].map(segments);
-    const prefixRoots = appLevel.prefixRoots.map(segments);
 
     expect(routes.length, "no server routes were discovered — the walker is broken").toBeGreaterThan(100);
-    expect(prefixRoots.length, "no app-level mounts were parsed from server/index.ts").toBeGreaterThan(0);
+    expect(appLevel.mounts.length, "no app-level mounts were expanded from server/index.ts").toBeGreaterThan(0);
 
     const clientPaths = clientApiPaths(clientSourceFiles());
     expect(clientPaths.length, "no client API paths were discovered — the extractor is broken").toBeGreaterThan(50);
 
-    const unreachable = clientPaths.filter((c) => !isServable(c, routes, prefixRoots));
+    const unreachable = clientPaths.filter((c) => !isServable(c, routes));
 
     expect(
       unreachable.map((c) => `${c.path}  (${c.file})`),
