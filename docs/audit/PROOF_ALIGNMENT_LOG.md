@@ -6846,3 +6846,29 @@ cluster 469 px centred within it, tiles visible at y 611–712, bottom band belo
   and `git status` shows zero `server/` modifications.
 
 **Verdict:** VERIFIED (design); the one flaky server-route test is unrelated and passes alone.
+
+## 2026-08-14 — A1 mount fix, /api/* 404 guard, client↔server path contract (#183, c7366c6de)
+
+**Claim:** The doctor shift gate's broken mount is fixed, any unmatched `/api/*` path now returns a
+standard JSON 404 instead of the SPA shell, and a contract test crosses the client/server boundary
+that no existing test crossed. The test found a second instance of the same defect class.
+
+**Evidence:**
+- `server/app/routes.ts:150` — mount is `app.use("/api/clinical-check-in", clinicalCheckInRoutes)`; both clients call that path.
+- `server/index.ts:387-397` — the `/api` catch-all now builds its body via `apiError({code,reason,message,requestId})` from `server/lib/route-utils.ts` with `resolveRequestId(res, req.headers["x-request-id"])`. Confirmed `route-utils.ts:29` is the object builder (not the i18n writer in `server/lib/apiError.ts`), so the envelope matches every other error response.
+- `tests/routes-registration-contract-slice7.test.ts:67` — updated to `/api/clinical-check-in` in the same PR, deliberately rather than incidentally.
+- Red-first, run three times with the change reverted and restored each time:
+  - revert mount to `/api/clinical` → `Tests 1 failed | 1 passed`
+  - client path → `/api/clinical-check-in/me/typo` (the deep typo a prefix comparison misses) → `Tests 1 failed | 1 passed`
+  - inject `authFetch("/api/health/typo")` under an app-level mount → `Tests 1 failed | 1 passed`
+  - all three restored → `Tests 2 passed (2)`
+- **New finding (A3):** `rg "reconcile-unused-charge" server` → no output; `rg "reconcileUnusedCharge" src` → only its own declaration at `src/lib/api.ts:906`. `git log -S` attributes it to #191. A client POST to a route that never existed, with zero callers — removed, not kept as a trap.
+- Test: `pnpm test` → `Test Files 727 passed (727) · Tests 6525 passed | 11 skipped (6536)`
+- Command: `npx tsc --noEmit` and `npx tsc -p tsconfig.server.json --noEmit` → both clean, zero errors.
+- PR #183 state: all checks green, `reviewDecision=APPROVED`, `mergeStateStatus=CLEAN`, 0 unresolved threads (two CodeRabbit rounds, both fixed and verified red-first).
+
+**Not yet verified:** the fix is not deployed. `curl` against production still returns the pre-fix
+behaviour until #183 merges; `scripts/verify-prod-deploy.ts` (probing the **client** path plus a
+JSON-404 assertion) is the post-merge check and has not run against the deployed server yet.
+
+**Verdict:** VERIFIED (code + tests) / PARTIAL (production behaviour pending deploy)
