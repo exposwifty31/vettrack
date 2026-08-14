@@ -56,6 +56,24 @@ async function probeApi(path: string): Promise<boolean> {
   return ok;
 }
 
+/**
+ * An unmatched /api/* path must be a JSON 404 — never the SPA shell.
+ *
+ * A 200 text/html here means the API router chain did not match and the request
+ * reached the SPA catch-all. That is silent: the client gets a success code and
+ * an HTML body where it expected JSON.
+ */
+async function probeApiNotFound(path: string): Promise<boolean> {
+  const res = await fetch(`${PROD}${path}`, { headers: { Accept: "application/json" } });
+  const ct = res.headers.get("content-type") ?? "";
+  const ok = res.status === 404 && ct.includes("application/json");
+  console.log(
+    `${ok ? "PASS" : "FAIL"} ${path} status=${res.status} content-type=${ct.split(";")[0]}` +
+      (ok ? "" : " — unmatched /api paths must be JSON 404, not the SPA shell"),
+  );
+  return ok;
+}
+
 async function main(): Promise<void> {
   console.log(`=== verify-prod-deploy ===`);
   console.log(`PROD=${PROD} TARGET=${TARGET} TIMEOUT=${TIMEOUT_MS / 1000}s`);
@@ -71,15 +89,27 @@ async function main(): Promise<void> {
     console.log("PASS pilotMode", pilot);
   }
 
+  // Probe the paths CLIENTS call, never the server's own mount strings. On
+  // 2026-08-14 this list carried "/api/clinical/me/active" — the server's mount —
+  // which returned a clean 401 JSON and passed for ~24h while the path both
+  // clients actually call, "/api/clinical-check-in/me/active", was falling
+  // through to the SPA catch-all as 200 text/html. A probe that asks the server
+  // about itself cannot detect client/server drift; it must ask the question the
+  // client asks.
   for (const path of [
     "/api/appointments",
     "/api/billing",
     "/api/tasks/dashboard",
     "/api/shift-handover/summary",
-    "/api/clinical/me/active",
+    "/api/clinical-check-in/me/active",
   ]) {
     if (!(await probeApi(path))) pass = false;
   }
+
+  // Any unmatched /api/* path must be a JSON 404, never the SPA shell. This is
+  // the generalized guard: without it, every future client/server path drift
+  // reappears as a misleading 200 text/html instead of a debuggable error.
+  if (!(await probeApiNotFound("/api/__does_not_exist__"))) pass = false;
 
   const health = await fetchJson<{ status?: string; checks?: Record<string, string> }>("/api/health");
   console.log(`health status=${health.status} checks=${JSON.stringify(health.body.checks)}`);
