@@ -38,6 +38,7 @@ import { buildAndroidAssetLinks } from "./lib/well-known-assetlinks.js";
 import { startBackgroundSchedulers } from "./app/start-schedulers.js";
 import { ensureClinicPhase2Defaults } from "./lib/ensure-clinic-phase2-defaults.js";
 import healthRoutes from "./routes/health.js";
+import { apiError, resolveRequestId } from "./lib/route-utils.js";
 import {
   resolveAuthModeFromEnv,
   describeAuthMode,
@@ -385,11 +386,14 @@ if (process.env.NODE_ENV === "production" || process.env.PLAYWRIGHT_E2E === "tru
   // and the mismatch returned a success code with an HTML body. A JSON 404 turns
   // that entire failure class from silent into obvious.
   app.use("/api", (req, res) => {
-    res.status(404).json({
-      error: "NOT_FOUND",
-      code: "NOT_FOUND",
-      message: `No API route matches ${req.method} ${req.baseUrl}${req.path}`,
-    });
+    res.status(404).json(
+      apiError({
+        code: "NOT_FOUND",
+        reason: "no_matching_api_route",
+        message: `No API route matches ${req.method} ${req.baseUrl}${req.path}`,
+        requestId: resolveRequestId(res, req.headers["x-request-id"]),
+      }),
+    );
   });
   // SPA shell: never cache — browsers must always get the latest index.html
   // so they pick up new content-hashed asset filenames after a deployment.

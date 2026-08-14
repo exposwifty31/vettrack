@@ -14,18 +14,36 @@
  * boundary. This one does.
  *
  * WHAT IT ASSERTS
- * Every `/api/...` literal the web client calls resolves to a real registered
- * route once mount paths and router-internal paths are composed. It boots the
- * real `registerApiRoutes` and walks each router's own stack rather than
- * string-matching mount prefixes — three routers mount at bare `/api`, so a
- * prefix check would match everything and prove nothing.
+ * Every `/api/…` literal anywhere in the web client resolves to a real
+ * registered route, matched on the FULL path — not a leading prefix. It boots
+ * the real `registerApiRoutes`, walks each router's own stack (including nested
+ * routers), and compares segment by segment with `:param` and `${expr}` both
+ * treated as single-segment wildcards. A near-miss deeper in the path
+ * (`/api/clinical-check-in/me/typo`) fails, which a prefix comparison would let
+ * through.
+ *
+ * SCOPE
+ * The whole web/Capacitor client (`src/**` .ts/.tsx), not just `src/lib/api.ts`
+ * — the incident's own feature calls the API from `src/features/shift-gate/`.
+ * Only literals passed directly as a call argument count: React Query keys look
+ * exactly like URLs (`queryKey: ["/api/containers/detail", id]`) but are never
+ * fetched, and treating them as requests produces noise that hides real drift.
+ * The React Native client lives in a separate repository and cannot be read
+ * from here; it needs the equivalent guard on its own side.
+ *
+ * When this test fails, either the client path is wrong or the server mount is.
+ * Do not "fix" it by loosening the comparison.
  */
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
+import { join } from "node:path";
 import type { Express, Router } from "express";
 
 /** A registered mount: the path passed to `app.use` plus the router mounted there. */
 type Mount = { path: string; router: unknown };
+
+/** Anything the walkers could not read. A blind spot must fail loudly, not pass quietly. */
+const unresolved: string[] = [];
 
 /** Collect every `app.use("/api…", router)` the real registration performs. */
 async function collectMounts(): Promise<Mount[]> {
@@ -49,63 +67,192 @@ async function collectMounts(): Promise<Mount[]> {
   return mounts;
 }
 
-/**
- * Full paths a mounted router actually serves.
- *
- * Express Router keeps its layers on `.stack`; a layer with `.route` carries the
- * router-relative path. Nested routers (a layer without `.route`) are not walked
- * — their sub-paths are covered by the prefix they contribute, which is enough
- * for the base-path drift this guard exists to catch.
- */
-function routePathsOf(mount: Mount): string[] {
-  const stack = (mount.router as Router & { stack?: unknown[] })?.stack;
-  if (!Array.isArray(stack)) return [mount.path];
-  const paths = stack
-    .map((layer) => (layer as { route?: { path?: string } })?.route?.path)
-    .filter((p): p is string => typeof p === "string")
-    .map((p) => (mount.path + (p === "/" ? "" : p)).replace(/\/+$/, ""));
-  return paths.length > 0 ? paths : [mount.path];
-}
-
-/** `/api/equipment/:id/waitlist` → `/api/equipment` — the segments a client can't get wrong. */
-function basePrefix(path: string): string {
-  const segments = path.split("/").filter(Boolean); // ["api","equipment",":id",…]
-  const stable = segments.slice(0, 2).filter((s) => !s.startsWith(":"));
-  return "/" + stable.join("/");
+/** `/api/equipment/:id/waitlist` → `["api","equipment","*","waitlist"]`. */
+function segments(path: string): string[] {
+  return path
+    .split("/")
+    .filter(Boolean)
+    .map((s) => (s.startsWith(":") || s === "*" ? "*" : s));
 }
 
 /**
- * `/api/...` paths the web client requests.
+ * The sub-path of a nested `router.use("/ops", subRouter)` layer.
  *
- * Template-literal interpolations (`${id}`) and query strings are truncated, so
- * only the static leading path is compared — exactly the part a client cannot
- * get wrong by accident, and the part that drifted in the incident above.
+ * Express 4 keeps it only as a compiled regexp (`/^\/ops\/?(?=\/|$)/i`), so it
+ * has to be read back out. A regexp carrying anything but literal segments
+ * (a `:param` in the sub-mount) is reported as unresolved rather than guessed.
  */
-function clientApiPaths(file: string): string[] {
-  const source = readFileSync(file, "utf8");
-  const found = new Set<string>();
-  for (const match of source.matchAll(/["'`](\/api\/[^"'`\s]*)["'`]/g)) {
-    const staticPart = match[1].split(/[$?#]/)[0].replace(/\/+$/, "");
-    if (staticPart.split("/").filter(Boolean).length >= 2) found.add(staticPart);
+function nestedMountPath(layer: { regexp?: RegExp & { fast_slash?: boolean } }): string | null {
+  const re = layer.regexp;
+  if (!re) return null;
+  if (re.fast_slash) return "";
+  const body = re.source.replace(/^\^/, "").replace(/\\\/\?\(\?=\\\/\|\$\)$/, "");
+  const literal = body.replace(/\\\//g, "/");
+  return /^(?:\/[A-Za-z0-9._~-]+)+$/.test(literal) ? literal : null;
+}
+
+/** Every full path a mounted router serves, expanded recursively. */
+function expandRouter(prefix: string, router: unknown, out: Set<string>): void {
+  const stack = (router as Router & { stack?: unknown[] })?.stack;
+  if (!Array.isArray(stack)) {
+    out.add(prefix);
+    return;
   }
-  return [...found].sort();
+  let added = false;
+  for (const raw of stack) {
+    const layer = raw as {
+      route?: { path?: unknown };
+      handle?: { stack?: unknown[] };
+      name?: string;
+      regexp?: RegExp & { fast_slash?: boolean };
+    };
+    const routePath = layer.route?.path;
+    if (layer.route !== undefined) {
+      if (typeof routePath !== "string") {
+        unresolved.push(`${prefix} → non-string route path ${JSON.stringify(routePath)}`);
+        continue;
+      }
+      out.add((prefix + (routePath === "/" ? "" : routePath)).replace(/\/+$/, "") || prefix);
+      added = true;
+      continue;
+    }
+    if (layer.name === "router" && Array.isArray(layer.handle?.stack) && layer.handle.stack.length > 0) {
+      const sub = nestedMountPath(layer);
+      if (sub === null) {
+        unresolved.push(`${prefix} → unreadable nested mount ${String(layer.regexp)}`);
+        continue;
+      }
+      expandRouter(prefix + sub, layer.handle, out);
+      added = true;
+    }
+  }
+  if (!added) out.add(prefix);
+}
+
+/**
+ * Routes registered directly on the app in `server/index.ts`, outside
+ * `registerApiRoutes` — `/api/version`, `/api/healthz`, and the routers mounted
+ * before auth. They are read from the source rather than hardcoded so a new one
+ * is picked up automatically. `app.use` mounts a router whose sub-paths cannot
+ * be walked statically, so those become prefix roots; `app.get`/`app.post` are
+ * exact paths.
+ */
+function appLevelRoutes(): { exact: string[]; prefixRoots: string[] } {
+  const source = readFileSync("server/index.ts", "utf8");
+  const exact: string[] = [];
+  const prefixRoots: string[] = [];
+  for (const m of source.matchAll(/\bapp\.(use|get|post|patch|put|delete)\("(\/api[^"]*)"/g)) {
+    const [, verb, routePath] = m;
+    if (segments(routePath).length < 2) continue; // bare "/api" is middleware, not a route
+    (verb === "use" ? prefixRoots : exact).push(routePath);
+  }
+  return { exact, prefixRoots };
+}
+
+/** Every `.ts`/`.tsx` file under `src/`. */
+function clientSourceFiles(dir = "src", acc: string[] = []): string[] {
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const full = join(dir, entry.name);
+    if (entry.isDirectory()) clientSourceFiles(full, acc);
+    else if (/\.tsx?$/.test(entry.name)) acc.push(full);
+  }
+  return acc;
+}
+
+type ClientPath = { path: string; file: string; openEnded: boolean };
+
+/**
+ * `/api/…` paths the web client requests.
+ *
+ * Only literals in call-argument position (`request(`/api/…`)`) are collected —
+ * the lookbehind is what separates a real request from a React Query key, which
+ * is a URL-shaped array element and never fetched.
+ *
+ * `${expr}` becomes a `*` wildcard SEGMENT rather than a truncation point, so
+ * the segments after an interpolation are still compared. Two forms are open
+ * ended, because what follows is decided at runtime and cannot be read here: a
+ * literal ending in `/` (string concatenation, `"/api/equipment/" + id`) and a
+ * literal whose trailing `${expr}` is glued to a segment (a query string,
+ * `` `/api/audit-logs${query}` ``). Those match a route or any route beneath it;
+ * every other path must match a route in full.
+ */
+function clientApiPaths(files: string[]): ClientPath[] {
+  const seen = new Set<string>();
+  const found: ClientPath[] = [];
+  for (const file of files) {
+    const source = readFileSync(file, "utf8");
+    for (const match of source.matchAll(/(?<=\(\s*)["'`](\/api\/[^"'`\s\\]*)["'`]/g)) {
+      const raw = match[1];
+      const withoutQuery = raw.split(/[?#]/)[0];
+      const normalized = withoutQuery.replace(/\$\{[^{}]*\}/g, "*");
+      if (/[${}]/.test(normalized)) {
+        unresolved.push(`${file}: cannot normalize ${raw}`);
+        continue;
+      }
+      // A trailing `${expr}` GLUED to a segment is a query string, so the `*` it
+      // became is dropped and the path is left open ended. A trailing `${expr}`
+      // that is its own segment is a real path parameter and keeps its wildcard.
+      const gluedTail = /[^/]\$\{[^{}]*\}$/.test(withoutQuery);
+      const openEnded = withoutQuery.endsWith("/") || gluedTail;
+      const path = (gluedTail ? normalized.replace(/\*$/, "") : normalized).replace(/\/+$/, "");
+      if (segments(path).length < 2) continue;
+      const key = `${path}|${openEnded}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      found.push({ path, file, openEnded });
+    }
+  }
+  return found.sort((a, b) => a.path.localeCompare(b.path));
+}
+
+/** Segment-wise comparison; `*` (from `:param` or `${expr}`) matches one segment. */
+function sameShape(a: string[], b: string[]): boolean {
+  return a.length === b.length && a.every((s, i) => s === "*" || b[i] === "*" || s === b[i]);
+}
+
+function isServable(client: ClientPath, routes: string[][], prefixRoots: string[][]): boolean {
+  const want = segments(client.path);
+  const under = (root: string[]) => want.length >= root.length && sameShape(root, want.slice(0, root.length));
+  if (prefixRoots.some(under)) return true;
+  return routes.some((route) => {
+    if (sameShape(want, route)) return true;
+    return client.openEnded && route.length > want.length && sameShape(want, route.slice(0, want.length));
+  });
 }
 
 describe("client → server API path contract", () => {
   it("every /api path the web client calls resolves to a registered server route", async () => {
     const mounts = await collectMounts();
-    const servable = new Set(mounts.flatMap(routePathsOf).map(basePrefix));
+    const servable = new Set<string>();
+    for (const mount of mounts) expandRouter(mount.path, mount.router, servable);
+    const appLevel = appLevelRoutes();
+    for (const path of appLevel.exact) servable.add(path);
+    const routes = [...servable].map(segments);
+    const prefixRoots = appLevel.prefixRoots.map(segments);
 
-    const unreachable = clientApiPaths("src/lib/api.ts")
-      .filter((clientPath) => !servable.has(basePrefix(clientPath)))
-      .sort();
+    expect(routes.length, "no server routes were discovered — the walker is broken").toBeGreaterThan(100);
+    expect(prefixRoots.length, "no app-level mounts were parsed from server/index.ts").toBeGreaterThan(0);
+
+    const clientPaths = clientApiPaths(clientSourceFiles());
+    expect(clientPaths.length, "no client API paths were discovered — the extractor is broken").toBeGreaterThan(50);
+
+    const unreachable = clientPaths.filter((c) => !isServable(c, routes, prefixRoots));
 
     expect(
-      unreachable,
+      unreachable.map((c) => `${c.path}  (${c.file})`),
       `These client paths match no registered server route. Express matches mounts on\n` +
         `segment boundaries, so a near-miss like /api/clinical vs /api/clinical-check-in\n` +
-        `silently falls through to the SPA catch-all and returns 200 text/html:\n` +
-        unreachable.map((p) => `  ${p}`).join("\n"),
+        `silently falls through to the SPA catch-all and returns 200 text/html.`,
+    ).toEqual([]);
+    // Importing the whole route graph and reading every client source file runs
+    // in ~3s alone but contends for CPU under the full parallel suite.
+  }, 30_000);
+
+  it("leaves no unreadable route or client literal behind", () => {
+    expect(
+      unresolved,
+      "Something could not be parsed. An unparsed entry is an untested path — teach the\n" +
+        "walker to read it rather than letting it pass silently.",
     ).toEqual([]);
   });
 });
