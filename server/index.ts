@@ -38,6 +38,7 @@ import { buildAndroidAssetLinks } from "./lib/well-known-assetlinks.js";
 import { startBackgroundSchedulers } from "./app/start-schedulers.js";
 import { ensureClinicPhase2Defaults } from "./lib/ensure-clinic-phase2-defaults.js";
 import healthRoutes from "./routes/health.js";
+import { apiError, resolveRequestId } from "./lib/route-utils.js";
 import {
   resolveAuthModeFromEnv,
   describeAuthMode,
@@ -374,6 +375,26 @@ if (process.env.NODE_ENV === "production" || process.env.PLAYWRIGHT_E2E === "tru
   });
   // Everything else (icons, etc.): short cache.
   app.use(express.static(path.join(path.dirname(fileURLToPath(import.meta.url)), "../dist/public"), { maxAge: 0 }));
+  // Unmatched /api/* must be a JSON 404 — it must NEVER reach the SPA catch-all
+  // below. Registered here, after every API router, so it only sees requests no
+  // route claimed.
+  //
+  // Without this, a client calling a path the server does not serve gets
+  // `200 text/html` (the SPA shell) instead of an error. That is exactly how the
+  // doctor shift gate stayed broken in production for ~24h on 2026-08-14: the
+  // clients called /api/clinical-check-in/*, the server mounted /api/clinical,
+  // and the mismatch returned a success code with an HTML body. A JSON 404 turns
+  // that entire failure class from silent into obvious.
+  app.use("/api", (req, res) => {
+    res.status(404).json(
+      apiError({
+        code: "NOT_FOUND",
+        reason: "no_matching_api_route",
+        message: `No API route matches ${req.method} ${req.baseUrl}${req.path}`,
+        requestId: resolveRequestId(res, req.headers["x-request-id"]),
+      }),
+    );
+  });
   // SPA shell: never cache — browsers must always get the latest index.html
   // so they pick up new content-hashed asset filenames after a deployment.
   app.get("*", (_req, res) => {

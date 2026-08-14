@@ -903,15 +903,6 @@ export const api = {
       request<InventoryContainerWithItems>(
         `/api/containers?nfcTagId=${encodeURIComponent(nfcTagId)}`,
       ),
-    reconcileUnusedCharge: (body: { billingLedgerId: string; note?: string }) =>
-      request<{
-        success: boolean;
-        billingLedgerId: string;
-        restoredQuantity: number;
-        containerId: string;
-        newStock: number;
-        requestId: string;
-      }>("/api/containers/reconcile-unused-charge", { method: "POST", body: JSON.stringify(body) }),
   },
   rfidReaders: {
     list: () =>

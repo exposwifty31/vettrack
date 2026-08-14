@@ -147,7 +147,11 @@ function registerPlatformRoutes(app: express.Express) {
   app.use("/api/inventory-items", inventoryItemsRoutes);
   app.use("/api/nudges", nudgesRoutes);
   app.use("/api/procurement", procurementRoutes);
-  app.use("/api/clinical", clinicalCheckInRoutes);
+  // Mounted at the path both clients have always called. It was "/api/clinical"
+  // until 2026-08-14; Express matches mounts on segment boundaries, so
+  // "/api/clinical-check-in/…" never reached this router and fell through to the
+  // SPA catch-all as 200 text/html. See tests/api-client-server-path-contract.test.ts.
+  app.use("/api/clinical-check-in", clinicalCheckInRoutes);
   app.use("/api/dispense", dispenseRoutes);
   app.use("/api/shift-chat", shiftChatRoutes);
   app.use("/api/shift-handover", shiftHandoverRoutes);

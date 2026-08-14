@@ -64,7 +64,10 @@ const EXPECTED_MOUNT_PATHS = [
   "/api/inventory-items",
   "/api/nudges", // nudgesRoutes (T-30a1-i)
   "/api/procurement",
-  "/api/clinical",
+  // Renamed from "/api/clinical" on 2026-08-14 to match the path both clients
+  // call. The old mount was unreachable by any caller — see
+  // tests/api-client-server-path-contract.test.ts.
+  "/api/clinical-check-in",
   "/api/dispense",
   "/api/shift-chat",
   "/api/shift-handover",
