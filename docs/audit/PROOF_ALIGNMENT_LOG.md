@@ -6932,3 +6932,39 @@ learned nothing.
 `reviewDecision` is still `CHANGES_REQUESTED` from the prior round and has not been re-issued.
 
 **Verdict:** VERIFIED (all 11 fixed, each red-first or measured) / PENDING (re-review + CI)
+
+## 2026-08-16 — PR #184 CodeRabbit round 2: the directory-only hole I opened (1030a6325)
+
+**Claim:** CodeRabbit confirmed 9 of the 11 round-1 fixes and found one genuine remaining gap — in
+the matcher I wrote to close the round-1 gap. Fixed and proven.
+
+**Evidence:**
+- CodeRabbit's round-2 verdicts, read individually rather than in aggregate: P1/P2/C1/C2/C3/T1/T4/
+  T5/T6 all confirmed addressed (comment_ids 3790438256, 3790438269, 3790438285, 3790438321,
+  3790438355, 3790438398, 3790438457, 3790438458, 3790438472, 3790439101). The ♻️ "duplicate"
+  re-raising the seven unbounded worker cases was generated before it read `34ad8ab0f`; its own
+  later inline reply (3790438458) accepts the `vi.setConfig` fix, so no action was owed.
+- **Real finding (3790438887):** `matchesPattern` returned `null` for every trailing-slash pattern.
+  The comment justified this with "a directory pattern cannot exclude a file" — true of the one
+  path the function is called with, false of its signature, which takes any path. `generated/` does
+  exclude `generated/vt-build-sha.txt`. The skip would have gone silent the moment the SHA file
+  moved out of the repo root: the same "passes having learned nothing" failure the round-1 rewrite
+  removed, reintroduced one layer down by the rewrite itself.
+- Handled rather than API-narrowed (the finding offered both). A directory-only pattern now
+  compiles with a **required** segment below the match (`/.*` not `(?:/.*)?`), so `generated/` hits
+  `generated/anything` and never a plain file named `generated`. A bare `/` names nothing.
+- Self-test table rebuilt as **19 pattern/path triples over two paths**, up from 13 patterns over
+  one. That is the transferable lesson: a matcher only ever exercised against a single root-level
+  file can hide an entire rule, and did.
+- RED: with the old skip restored, the table fails on exactly `["generated/", NESTED]` —
+  `1 failed | 18 passed`. GREEN after restore: `19 passed`.
+
+**Commands:**
+- `pnpm test` → `Test Files 729 passed (729) · Tests 6602 passed | 11 skipped (6613)`
+- `npx tsc --noEmit` → clean.
+- GraphQL: `threads=11 unresolved=0`.
+
+**Not yet verified:** the third CodeRabbit pass over `1030a6325`, and CI on that head.
+`reviewDecision` is still the stale `CHANGES_REQUESTED` from round 1.
+
+**Verdict:** VERIFIED (fix + red-first proof) / PENDING (round-3 review + CI)
