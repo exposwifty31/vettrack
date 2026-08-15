@@ -7001,3 +7001,34 @@ findings were against this audit log, and both were right.
 
 **Verdict:** VERIFIED — code clean at round 3; two log corrections applied, both self-checked
 against the tools rather than accepted or dismissed on the reviewer's word.
+
+## 2026-08-16 (IDT, = 2026-08-15 UTC) — PR #184 closed out: four review rounds, CI fully green
+
+**Claim:** Every CodeRabbit finding across four rounds is fixed and confirmed by the reviewer that
+raised it; all CI checks pass. One non-code item remains and it is not mine to clear.
+
+**Evidence:**
+- Round 1 — 11 findings, all fixed (`1e8dfd20c`, `34ad8ab0f`, `f4eefebf5`).
+- Round 2 — 9 confirmed; 1 real gap found **in the fix I wrote for round 1** (the directory-only
+  skip). Fixed `1030a6325`, red-first.
+- Round 3 — code clean; 2 findings against this log (ambiguous date, "last cast" overclaim). Fixed
+  `06bf93155`, both self-checked against `date`/`TZ=UTC date`/`git log` and a cast inventory rather
+  than accepted or dismissed on the reviewer's word.
+- Round 4 (review `4944898391`, 23:01:26Z, over `06bf93155`) — *"I found no new blocking issue. The
+  date correction is accurate. The cast correction is accurate."*
+- Review threads: `total=13 unresolved=0`.
+- CI on `06bf93155`: Typecheck · Frontend build · Tests shards 1–4 · Playwright shards 1–2 ·
+  Integration ops · Architecture gates (G1) · Static resubmission gates · **Merge gate** — all
+  SUCCESS. `mergeStateStatus=CLEAN`.
+- Local: `pnpm test` → 729 files / 6602 passed / 11 skipped; `tsc --noEmit` and
+  `tsc -p tsconfig.server.json --noEmit` clean.
+
+**Open, and owner-gated:** `reviewDecision` still reads `CHANGES_REQUESTED` from review
+`4944890213` (22:55:26Z) — the round-3 doc nits, both since fixed and confirmed by review
+`4944898391` five minutes later. A COMMENTED review does not clear a CHANGES_REQUESTED, so the
+decision is stale rather than open. Dismissing it was attempted and **blocked by the permission
+gate**, correctly: dismissing someone's review is a state change on the PR. Left for the owner.
+Merging is likewise the owner's call per `.claude/rules/agent-conduct.md` §2.
+
+**Verdict:** VERIFIED — all findings closed, all checks green, `merge=CLEAN`. One stale review
+decision awaiting an owner action.
