@@ -6873,7 +6873,13 @@ JSON-404 assertion) is the post-merge check and has not run against the deployed
 
 **Verdict:** VERIFIED (code + tests) / PARTIAL (production behaviour pending deploy)
 
-## 2026-08-16 — PR #184 CodeRabbit round: 11 findings (1e8dfd20c, 34ad8ab0f, f4eefebf5)
+## 2026-08-16 (IDT, = 2026-08-15 22:41 UTC) — PR #184 CodeRabbit round: 11 findings (1e8dfd20c, 34ad8ab0f, f4eefebf5)
+
+> Dated in the committer's timezone, which is what `git log` records:
+> `1e8dfd20c 2026-08-16T01:41:14+03:00`. A reader on UTC sees 2026-08-15 and
+> would reasonably read this heading as a future date — CodeRabbit did. The
+> offset is stated rather than the date being changed, because moving it to
+> 08-15 would contradict every commit timestamp in the entry.
 
 **Claim:** All 11 CodeRabbit findings on `fix/deploy-sha-fallback` are fixed, each one verified
 against the real failure mode rather than accepted from the description. Every finding turned out
@@ -6893,8 +6899,12 @@ learned nothing.
   `//api/version`, a false-fail on otherwise verifiable input (header invariant B).
 - **C2 `:898`** — `worker` read and normalised once into `workerStatus`; gates are now
   `=== undefined` / `!== "ok"`. **58/58 passed with no test edits**, which is the evidence it is
-  behaviour-neutral rather than believed to be. `f4eefebf5` removed the last cast
-  (`Object.keys(checks)`, redundant — the guard above already narrows to a non-null object).
+  behaviour-neutral rather than believed to be. `f4eefebf5` removed the last redundant cast in
+  this block
+  (`Object.keys(checks)`, redundant — the guard above already narrows to a non-null object). The
+  deliberate `checks as Record<string, unknown> | undefined` on the `rawWorker` read remains, and
+  so do the `as const` / `as readonly string[]` elsewhere in the file — "last cast" would have
+  been an overclaim.
 - **C3 `:755`** — header 90 → 50 lines, six in-body narration blocks condensed. Comment density
   430/936 (45%) → 359/865 (41%).
 
@@ -6933,7 +6943,7 @@ learned nothing.
 
 **Verdict:** VERIFIED (all 11 fixed, each red-first or measured) / PENDING (re-review + CI)
 
-## 2026-08-16 — PR #184 CodeRabbit round 2: the directory-only hole I opened (1030a6325)
+## 2026-08-16 (IDT, = 2026-08-15 22:54 UTC) — PR #184 CodeRabbit round 2: the directory-only hole I opened (1030a6325)
 
 **Claim:** CodeRabbit confirmed 9 of the 11 round-1 fixes and found one genuine remaining gap — in
 the matcher I wrote to close the round-1 gap. Fixed and proven.
@@ -6968,3 +6978,26 @@ the matcher I wrote to close the round-1 gap. Fixed and proven.
 `reviewDecision` is still the stale `CHANGES_REQUESTED` from round 1.
 
 **Verdict:** VERIFIED (fix + red-first proof) / PENDING (round-3 review + CI)
+
+## 2026-08-16 (IDT, = 2026-08-15 UTC) — PR #184 CodeRabbit round 3: code clean, two corrections to THIS log
+
+**Claim:** Round 3 found no blocking issue in the code — *"The directory-only implementation is
+correct"* (issue comment 5304624553, and inline 3790447173 confirming `1030a63`). Both remaining
+findings were against this audit log, and both were right.
+
+**Evidence:**
+- **Date (3790447178).** CodeRabbit read the `2026-08-16` heading as a future date. Checked rather
+  than conceded: `date` → `Sun Aug 16 01:59 IDT 2026`, `TZ=UTC date` → `Sat Aug 15 22:59 UTC 2026`,
+  and `git log --date=iso-strict` records `1e8dfd20c 2026-08-16T01:41:14+03:00`. Both frames are
+  correct; the heading was ambiguous. Fixed by stating the offset and the UTC equivalent rather
+  than by changing the date, because moving it to 08-15 would contradict every commit timestamp
+  the entry cites.
+- **Overclaim (3790447180).** The log said `f4eefebf5` "removed the last cast". Verified false:
+  `scripts/verify-prod-deploy.ts` still carries the deliberate
+  `checks as Record<string, unknown> | undefined` on the `rawWorker` read, plus `as const` and
+  `as readonly string[]`. Corrected to "the last redundant cast in this block", with the surviving
+  casts named. A proof log that overclaims is worse than none — it is the document whose whole
+  value is that its statements can be trusted without re-checking.
+
+**Verdict:** VERIFIED — code clean at round 3; two log corrections applied, both self-checked
+against the tools rather than accepted or dismissed on the reviewer's word.
