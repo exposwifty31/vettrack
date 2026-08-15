@@ -123,11 +123,14 @@ async function startStub(
     };
 
     if (path === "/api/version" && rawQueue.length > 0) {
+      // `!` is safe under `length > 1`: the last entry is held and replayed
+      // forever rather than shifted, so the queue can never drain to empty here.
       const raw = rawQueue.length > 1 ? rawQueue.shift()! : rawQueue[0];
       res.writeHead(raw.status, { "content-type": raw.contentType });
       return res.end(raw.body);
     }
     if (path === "/api/version") {
+      // Same hold-the-last-entry contract as `rawQueue` above, so `!` cannot fire.
       const gitCommit = queue.length > 1 ? queue.shift()! : queue[0];
       return json(200, {
         version: "1.2.0",
@@ -165,6 +168,9 @@ async function startStub(
   });
 
   await new Promise<void>((r) => server.listen(0, "127.0.0.1", r));
+  // `address()` is typed `string | AddressInfo | null` to cover pipe servers and
+  // the pre-listen state; this one is TCP and the listen callback has already
+  // resolved, so AddressInfo is the only reachable shape.
   const { port } = server.address() as AddressInfo;
   return {
     url: `http://127.0.0.1:${port}`,
@@ -224,7 +230,7 @@ function spawnVerifier(
   const started = Date.now();
   const env = { ...(process.env as Record<string, string>), ...extraEnv };
   for (const key of deleteEnv) delete env[key];
-  return new Promise((resolvePromise) => {
+  return new Promise((resolvePromise, rejectPromise) => {
     const child = spawn(TSX, [SCRIPT, ...args], {
       env,
       stdio: ["ignore", "pipe", "pipe"],
@@ -233,9 +239,29 @@ function spawnVerifier(
     child.stdout.on("data", (d: Buffer) => (out += d.toString()));
     child.stderr.on("data", (d: Buffer) => (out += d.toString()));
     // Hard cap so a polling regression fails the test instead of hanging the suite.
-    const killer = setTimeout(() => child.kill("SIGKILL"), 45_000);
+    //
+    // It REJECTS rather than resolving, and that is the whole point. `code ?? 1`
+    // turned a SIGKILLed child into exit 1, which every failure-path case accepts
+    // via `expect(code).not.toBe(0)` — so a hung verifier passed AS the expected
+    // failure, and the cases without an `elapsedMs` bound could not see it at all.
+    // The cap exists to catch a hang; a hang is never an expected outcome, so it
+    // must fail every case unconditionally rather than be graded by its assertions.
+    let killed = false;
+    const killer = setTimeout(() => {
+      killed = true;
+      child.kill("SIGKILL");
+    }, 45_000);
     child.on("close", (code) => {
       clearTimeout(killer);
+      if (killed) {
+        rejectPromise(
+          new Error(
+            `verifier did not exit within 45s and was SIGKILLed — a hang, not a verdict. ` +
+              `args=${JSON.stringify(args)} output so far:\n${out}`,
+          ),
+        );
+        return;
+      }
       resolvePromise({ code: code ?? 1, out, elapsedMs: Date.now() - started });
     });
   });
@@ -1456,7 +1482,7 @@ describe("verify-prod-deploy — the /api/health hint only speaks about what it 
     }
   });
 
-  it("treats a empty worker status as NOT REPORTED, never as not-ok", async () => {
+  it("treats an empty worker status as NOT REPORTED, never as not-ok", async () => {
     const stub = await startStub(MATCHING, {
       healthRaw: { status: 200, contentType: "application/json", body: JSON.stringify({ status: "ok", checks: { worker: '' } }) },
     });

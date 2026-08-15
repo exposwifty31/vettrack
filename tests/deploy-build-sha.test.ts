@@ -191,21 +191,114 @@ describe("the SHA file survives every ignore filter between the repo and the bui
   // A future broadening of any of the three silently reintroduces gitCommit: null.
   const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
+  /**
+   * Compiles one ignore-file pattern into a RegExp over a repo-relative path.
+   *
+   * An earlier version of this only understood `*`, which made the guard below
+   * report "not excluded" for four of the five pattern shapes that would really
+   * exclude the file — `/vt-build-sha.txt`, `**​/vt-build-sha.txt`, `?` and
+   * `[…]`. A guard that cannot see the pattern it is guarding against passes
+   * for the wrong reason, which is worse than no guard at all.
+   *
+   * Where this is still imprecise it must OVER-match, never under-match: a
+   * false positive fails the test loudly and gets read by a human, while a
+   * false negative is exactly the silent pass this exists to prevent.
+   */
+  function patternToRegExp(pattern: string): RegExp {
+    let anchored = pattern.startsWith("/");
+    const body = anchored ? pattern.slice(1) : pattern;
+    // gitignore(5): a pattern containing a non-trailing slash is relative to the
+    // ignore file's directory; one without matches a basename at any depth.
+    if (!anchored && body.includes("/")) anchored = true;
+
+    let out = "";
+    for (let i = 0; i < body.length; i += 1) {
+      const c = body[i];
+      if (c === "\\" && i + 1 < body.length) {
+        i += 1;
+        out += escapeRe(body[i]);
+      } else if (c === "*") {
+        if (body[i + 1] === "*") {
+          i += 1;
+          if (body[i + 1] === "/") {
+            i += 1;
+            out += "(?:.*/)?";
+          } else {
+            out += ".*";
+          }
+        } else {
+          out += "[^/]*";
+        }
+      } else if (c === "?") {
+        out += "[^/]";
+      } else if (c === "[") {
+        const close = body.indexOf("]", i + 1);
+        if (close === -1) {
+          out += "\\[";
+        } else {
+          const cls = body.slice(i + 1, close);
+          out += `[${cls.startsWith("!") ? `^${cls.slice(1)}` : cls}]`;
+          i = close;
+        }
+      } else {
+        out += escapeRe(c);
+      }
+    }
+    // `(?:/.*)?` because a pattern that names a directory also excludes its contents.
+    return new RegExp(`^${anchored ? "" : "(?:.*/)?"}${out}(?:/.*)?$`);
+  }
+
+  function matchesPattern(line: string, path: string): { negated: boolean; hit: boolean } | null {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) return null;
+    const negated = trimmed.startsWith("!");
+    const body = negated ? trimmed.slice(1) : trimmed;
+    // A trailing slash makes the pattern directory-only, so it cannot exclude a
+    // file — safe to skip only because the target is a file, which is asserted
+    // by the `is not committed` case below (a tracked path would be a file too).
+    if (body.endsWith("/")) return null;
+    return { negated, hit: patternToRegExp(body).test(path) };
+  }
+
   function excludes(ignoreFile: string, filename: string): boolean {
     const full = resolve(REPO_ROOT, ignoreFile);
     if (!existsSync(full)) return false;
     let excluded = false;
     for (const raw of readFileSync(full, "utf8").split("\n")) {
-      const line = raw.trim();
-      if (!line || line.startsWith("#")) continue;
-      const negated = line.startsWith("!");
-      const body = negated ? line.slice(1) : line;
-      if (body.endsWith("/")) continue; // directory-only pattern
-      const rx = new RegExp(`^${body.split("*").map(escapeRe).join("[^/]*")}$`);
-      if (rx.test(filename)) excluded = !negated;
+      const m = matchesPattern(raw, filename);
+      if (m?.hit) excluded = !m.negated;
     }
     return excluded;
   }
+
+  it("the pattern matcher models the ignore syntaxes it claims to", () => {
+    // Guards the guard. Each left-hand pattern really would exclude the SHA file
+    // if someone added it; the previous `*`-only matcher scored `false` on the
+    // first four and this suite passed while blind to them.
+    const excluding = [
+      "vt-build-sha.txt",
+      "/vt-build-sha.txt",
+      "**/vt-build-sha.txt",
+      "vt-build-sha.tx?",
+      "vt-build-sha.[tx]xt",
+      "*.txt",
+      "vt-*",
+      "**",
+    ];
+    const notExcluding = [
+      "dist/vt-build-sha.txt", // anchored under a directory the file is not in
+      "vt-build-sha.tx", // no implicit prefix matching
+      "vt-build-sha.txt/", // directory-only pattern
+      "vt-build-sha.[!t]xt", // negated class excludes the real character
+      "# vt-build-sha.txt", // comment
+    ];
+    for (const p of excluding) {
+      expect(matchesPattern(p, BUILD_SHA_FILENAME)?.hit ?? false).toBe(true);
+    }
+    for (const p of notExcluding) {
+      expect(matchesPattern(p, BUILD_SHA_FILENAME)?.hit ?? false).toBe(false);
+    }
+  });
 
   it("is not matched by .railwayignore or .dockerignore", () => {
     expect(excludes(".railwayignore", BUILD_SHA_FILENAME)).toBe(false);
@@ -213,15 +306,33 @@ describe("the SHA file survives every ignore filter between the repo and the bui
   });
 
   it("is not gitignored — `railway up` filters by .gitignore, so an ignored file never uploads", () => {
-    let ignored = true;
-    try {
-      execFileSync("git", ["-C", REPO_ROOT, "check-ignore", "-q", BUILD_SHA_FILENAME], {
-        stdio: "ignore",
-      });
-    } catch {
-      ignored = false; // exit 1 == not ignored
-    }
-    expect(ignored).toBe(false);
+    // `git check-ignore -q` documents three outcomes and they are NOT all the
+    // same: 0 = ignored, 1 = not ignored, 128 = it could not answer. Collapsing
+    // every throw to "not ignored" meant a missing git binary or a broken repo
+    // scored a PASS — the guard would report the file safe precisely when it had
+    // learned nothing. Modelled as three cases so only one of them can pass.
+    type IgnoreCheck =
+      | { kind: "ignored" }
+      | { kind: "not_ignored" }
+      | { kind: "check_failed"; detail: string };
+
+    const check = ((): IgnoreCheck => {
+      try {
+        execFileSync("git", ["-C", REPO_ROOT, "check-ignore", "-q", BUILD_SHA_FILENAME], {
+          stdio: "ignore",
+        });
+        return { kind: "ignored" };
+      } catch (error) {
+        const { status, code } = error as { status?: unknown; code?: unknown };
+        if (status === 1) return { kind: "not_ignored" };
+        return {
+          kind: "check_failed",
+          detail: `git check-ignore could not answer (status=${String(status)}, code=${String(code)})`,
+        };
+      }
+    })();
+
+    expect(check).toEqual({ kind: "not_ignored" });
   });
 
   it("is not committed — it is generated per deploy, never source", () => {

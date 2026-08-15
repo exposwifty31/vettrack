@@ -4,86 +4,46 @@
  * Usage: tsx scripts/verify-prod-deploy.ts <target-sha-prefix> [--timeout 600] [--prod https://vettrack.uk]
  *
  * TWO invariants, in two different failure directions. The second exists because
- * this file kept satisfying the first and shipping the opposite bug anyway.
+ * guarding only the first kept shipping the opposite bug.
  *
- *   A. AN UNVERIFIABLE INPUT IS NEVER A MATCH. The script's job is to refuse to say
- *      "deployed" when it cannot prove it, so an input it cannot interpret has to
- *      stop it, not slip past. This guards against a FALSE PASS.
+ *   A. AN UNVERIFIABLE INPUT IS NEVER A MATCH. An input this script cannot
+ *      interpret must stop it, not slip past. Guards against a FALSE PASS.
  *   B. A VERIFIABLE INPUT IS NEVER REJECTED FOR A REASON THE SCRIPT INVENTED. A
- *      FALSE FAIL is not the safe direction of the same rule — it is a second bug
- *      class that invariant A says nothing about, and this file has now shipped one
- *      in three of four review rounds: `slice(0, 8)` made a correct 7-char target
- *      unmatchable; `nullDeadline = min(grace, timeout)` made the specific verdicts
- *      unreachable for every `--timeout <= 60`; and the reported commit was
- *      compared as-received against a lowercased target, so an UPPERCASE SHA could
- *      not match a byte-identical one. Each reported a timeout on a correct deploy.
- *      Every normalisation the target gets, the reported value must get too.
+ *      false FAIL is a second bug class, not the safe side of the first, and this
+ *      file shipped one in three of four review rounds. Concretely: every
+ *      normalisation the target gets, the reported value must get too.
  *
- * Invariant A kept being violated in one shape, six times over three review rounds:
- * a value that was FALSY but PRESENT satisfied the check written to reject it. `??`
- * let an empty target match a null gitCommit; `||` then let an empty target silently
- * become local HEAD; a blank env var read as zero; an empty --prod read as
- * "unreachable"; a valueless --timeout read as NaN; a non-JSON response read as
- * "no commit SHA".
+ * Both were violated in ONE shape, repeatedly: a value that was FALSY BUT PRESENT
+ * satisfied the check written to reject it. The cause was never a bad check — it
+ * was three structures in which "absent", "empty" and "malformed" were the SAME
+ * VALUE, so nothing downstream could tell them apart. Each is now a tagged type,
+ * which is why the bug class is unrepresentable rather than guarded:
  *
- * The common cause was not six bad checks, it was three structures in which
- * "absent", "empty" and "malformed" are the SAME VALUE, so no check downstream
- * could tell them apart:
+ *   1. argv    -> parseArgs() returns `absent | present(value)` per input and
+ *                 flags consume their values. An omitted argument and one supplied
+ *                 as empty are different values; an unknown flag or stray
+ *                 positional is an error, not a silent revert to a default.
+ *   2. a poll  -> classifyPoll() returns a tagged PollOutcome; diagnose() maps the
+ *                 accumulated observations to a verdict. See waitForDeploy.
+ *   3. a body  -> fetchJson() returns `parsed | unparseable`, so "could not be
+ *                 parsed" and "was an empty object" are distinguishable. Without
+ *                 this, a 200 declaring application/json and serving the SPA shell
+ *                 was reported as a build that forgot its SHA — sending an operator
+ *                 to the wrong file during an incident whose fault is routing.
  *
- *   1. argv was parsed by `filter(a => !a.startsWith("--"))`, which cannot
- *      distinguish an omitted argument from a supplied-and-empty one, and lets a
- *      flag's value fall into the positional list. parseArgs() now returns an
- *      explicit `absent | present(value)` per input and consumes flag values, so
- *      "not given" and "given as empty" are different values and each resolver
- *      decides what to do about its own. This is also why the target no longer has
- *      to come first, and why an unknown flag or a stray positional is an error
- *      rather than a silent revert to a default.
- *   2. one poll's result was flattened into loose booleans and a string, so a
- *      routing fault and a missing SHA arrived at the verdict looking identical.
- *      classifyPoll() now returns a tagged PollOutcome and diagnose() maps the
- *      accumulated observations to a verdict. See waitForDeploy.
- *   3. the response BODY was flattened by `res.json().catch(() => ({}))`, which made
- *      "could not be parsed" and "was an empty object" one value. Fixing (2) alone
- *      moved the collapse rather than removing it: the discriminator went up to
- *      status + content-type, so a 200 that DECLARED `application/json` and served
- *      the SPA shell still passed the gate and was reported as a build that forgot
- *      its SHA — sending an operator to inspect scripts/write-build-sha.sh during an
- *      incident whose fault is in routing. fetchJson() now returns a tagged
- *      `parsed | unparseable`, and classifyPoll() rejects a parsed-but-non-object
- *      body as well. See JsonBody and the `unreadable-json` outcome.
- *   4. the /api/health block consumed that same seam WITHOUT the same care, and the
- *      round that hardened (3) broke it in both directions at once. It read
- *      `health.body.value?.checks`, so a JSON `null` body (which parses fine)
- *      became `undefined` and printed "WARN worker check is not ok (redeploy
- *      Worker)" beside a green ALL PROBES PASS: an optional chain silently
- *      converting "I could not read this" into "the worker is down", which is
- *      invariant B's confident-wrong-diagnosis failure with the exit code still 0,
- *      and strictly worse than the visible crash it replaced. It also called
- *      fetchJson unguarded, so a connect-time or mid-body rejection exited 1 with
- *      NO verdict at all, after every probe had already passed. Both were fixed at
- *      the block level, and the whole block is wrapped so nothing inside it can
- *      reach the exit code or the verdict. A DIAGNOSTIC HINT MUST NOT BE ABLE TO
- *      FAIL THE GATE, and that is structural rather than a convention every future
- *      edit has to remember.
- *   5. that round then claimed the fix was complete — "the hint now discriminates
- *      three body shapes as classifyPoll does", and "only (c) may say anything about
- *      the worker". BOTH WERE FALSE, and the gap between them was the next defect.
- *      It discriminated body SHAPE and not TRANSPORT, so a 404 or a 502 carrying a
- *      JSON body passed every shape gate, reached the `checks` read, found nothing,
- *      and printed the redeploy instruction — a third producer of the same
- *      wrong-component diagnosis, sending an on-call engineer to redeploy a healthy
- *      Worker because a route returned 502. Three gates were doing the work of five.
- *      The block now discriminates in classifyPoll's own order — transport
- *      (status + content-type) first, then unparseable, then parsed-non-object, then
- *      whether the payload named the thing being asked about — with one extra layer
- *      classifyPoll does not need because `checks` is nested: the checks object, and
- *      then the worker field within it. AN ABSENT READING IS NOT A BAD READING; only
- *      a worker status actually read and actually not "ok" reaches the redeploy
- *      instruction. See main(), and the round-5 and round-6 describes in
- *      tests/verify-prod-deploy.test.ts. Round 5's eight cases were ALL exit-0 runs,
- *      so none of them could show this block cannot mask a failure — the property
- *      its own contract asserts; round 6's last case exercises it on a run that must
- *      exit 1 and is the first test to hold that claim down.
+ * The /api/health block is a DIAGNOSTIC HINT and is wrapped so nothing inside it
+ * can reach `pass`, the exit code, or the verdict. That is structural, not a
+ * convention each future edit must remember: a hint that can fail the gate is not
+ * a hint. It gates in the same order as classifyPoll — transport (status +
+ * content-type; 200 AND 503 are both health reports, see server/routes/health.ts)
+ * -> unparseable -> parsed-non-object -> the checks object -> the worker field.
+ * AN ABSENT READING IS NOT A BAD READING.
+ *
+ * A NOTE ON THE COMMENTS HERE, earned the hard way: nine comments in this file
+ * asserted invariants the code did not hold, and one of them ("this state can only
+ * be produced by a real JSON 200") let a defect survive a full restructure. A
+ * comment that misstates the code is worse than no comment. If you change a gate,
+ * change the sentence above it or delete it.
  *
  * Env tunables:
  *   VT_VERIFY_POLL_SECS        seconds between polls (default 10)
@@ -324,7 +284,11 @@ function resolveProd(arg: ArgValue): string {
         "to parse and be misreported as production being unreachable.",
     );
   }
-  return prod;
+  // Strip trailing slashes: `https://vettrack.uk/` would build `//api/version`,
+  // which most routers do not match — so a perfectly verifiable input gets
+  // reported as a routing fault. That is invariant B, in the resolver of the file
+  // that declares invariant B.
+  return prod.replace(/\/+$/, "");
 }
 
 /** Absent → the default timeout. Present-but-unparseable → stop, rather than reach the loop as NaN. */
@@ -803,18 +767,9 @@ async function main(): Promise<void> {
     // `"worker":"fail"` visible in its own snippet. Verified against the route, not
     // inferred from the status code.
     if ((health.status !== 200 && health.status !== 503) || !health.ct.includes("application/json")) {
-      // (0) THE TRANSPORT GATE, and the round-5 defect it closes. Round 5 hardened
-      // this block against BODY SHAPE and stopped there, so a 404 or a 502 that
-      // happens to carry a JSON body — a gateway error page, an unmatched route
-      // answering JSON — satisfied every shape gate below, reached the `checks`
-      // read, found nothing, and printed "WARN worker check is not ok (redeploy
-      // Worker after #508 merge)". Same wrong-component diagnosis that justified
-      // round 5, from a third producer: an on-call engineer sent to redeploy a
-      // healthy Worker because a route returned 502. The status was quoted in every
-      // branch's message and branched on in NONE of them — visible in the log and
-      // absent from the logic, which is how it stayed invisible for a round.
-      // classifyPoll gates on status+content-type FIRST for exactly this reason;
-      // this block now does the same, and in the same order.
+      // (0) TRANSPORT. A 404 or 502 carrying a JSON body satisfies every shape
+      // gate below and would reach the `checks` read with nothing there — the
+      // wrong-component diagnosis. Gate transport first, as classifyPoll does.
       const snippet =
         body.kind === "unparseable" ? body.snippet : bodySnippet(JSON.stringify(body.value));
       console.log(
@@ -832,18 +787,9 @@ async function main(): Promise<void> {
           "Not a worker fault — the response never got as far as reporting one.",
       );
     } else if (typeof body.value !== "object" || body.value === null || Array.isArray(body.value)) {
-      // (b) THE MISSING THIRD CASE, and the one round 4 turned from a loud crash
-      // into a silent wrong verdict. `JSON.parse("null")` succeeds, so this slips
-      // past the parse guard above; `health.body.value?.checks` then yielded
-      // `undefined`, which fails `checks?.worker !== "ok"` and printed
-      // "WARN worker check is not ok (redeploy Worker after #508 merge)" next to a
-      // green ALL PROBES PASS. The optional chain silently converts "I could not
-      // read this" into "the worker is down" — a confident wrong diagnosis that
-      // sends an operator to redeploy a healthy Worker, which is the precise
-      // failure the /api/version half of this file was restructured to stop making.
-      // Phrased to match classifyPoll's parsed-but-non-object verdict deliberately,
-      // so the two call sites read alike; the wording is duplicated rather than
-      // extracted because classifyPoll is proven-tested and not worth disturbing.
+      // (b) `JSON.parse("null")` succeeds, so a null body slips past the parse
+      // guard; `?.checks` then yields undefined and reads as "the worker is down".
+      // An optional chain must not convert "I could not read this" into a fault.
       const shape = Array.isArray(body.value)
         ? "an array"
         : body.value === null
@@ -856,17 +802,23 @@ async function main(): Promise<void> {
           "Not a worker fault — the response never got as far as reporting one.",
       );
     } else {
-      // (c) a JSON 200 whose body is an object. Reaching here is necessary but NOT
-      // sufficient to say anything about the worker — two more gates stand between
-      // this point and the redeploy instruction, because "I could not find a worker
-      // status" and "the worker reported a bad status" are different observations
-      // and only the second is a worker fault.
+      // (c) Reaching here is necessary but NOT sufficient to speak about the
+      // worker: "no worker status found" and "the worker reported a bad status"
+      // are different observations, and only the second warrants a redeploy.
       const checks = (body.value as { checks?: unknown }).checks;
       console.log(`health status=${health.status} checks=${JSON.stringify(checks)}`);
+      // Read and normalise ONCE. Normalised for the same reason the reported commit
+      // is (invariant B): every normalisation one side gets, the other must get too.
+      // `undefined` here means NO READING — absent, wrong type, or blank — and an
+      // absent reading is not a bad one.
+      const rawWorker = (checks as Record<string, unknown> | undefined)?.worker;
+      const workerStatus =
+        typeof rawWorker === "string" && rawWorker.trim() !== ""
+          ? rawWorker.trim().toLowerCase()
+          : undefined;
       if (typeof checks !== "object" || checks === null || Array.isArray(checks)) {
-        // (c1) THE `checks` GATE. `checks?.worker` is `undefined` on a string, a
-        // number, an array and on nothing at all, and `undefined !== "ok"` — so
-        // every one of those shapes was reported as the worker being down.
+        // (c1) `checks?.worker` is undefined on a string, a number, an array and
+        // on nothing at all, and `undefined !== "ok"` — so all of those read as down.
         const checksShape =
           checks === undefined
             ? "absent"
@@ -879,33 +831,18 @@ async function main(): Promise<void> {
           `WARN /api/health returned no readable checks object (checks is ${checksShape}). ` +
             "Not a worker fault — the response never got as far as reporting one.",
         );
-      } else if (
-        typeof (checks as Record<string, unknown>).worker !== "string" ||
-        ((checks as Record<string, unknown>).worker as string).trim() === ""
-      ) {
-        // (c2) THE FIELD GATE. ABSENT IS NOT "NOT OK". An endpoint that reports on
-        // the db and says nothing about the worker has made no claim about the
-        // worker; turning that silence into a redeploy instruction is the same
-        // confident-wrong-diagnosis failure as (0), one layer in.
+      } else if (workerStatus === undefined) {
+        // (c2) ABSENT IS NOT "NOT OK". An endpoint that reports on the db and says
+        // nothing about the worker has made no claim about it.
         const named = Object.keys(checks as Record<string, unknown>).join(", ") || "(none)";
         console.log(
           `WARN /api/health did not report on the worker (checks named: ${named}). ` +
             "Not a claim that the worker is down — an absent worker status is a different " +
             "statement from a bad one, and only a bad one warrants a redeploy.",
         );
-      } else if (
-        ((checks as Record<string, unknown>).worker as string).trim().toLowerCase() !== "ok"
-      ) {
-        // (c3) The genuine signal, and the ONLY producer of the redeploy
-        // instruction: a worker status actually read, and actually not "ok".
-        //
-        // NORMALISED before comparing, for the same reason the reported commit is
-        // (invariant B): every normalisation one side gets, the other must get too.
-        // Compared raw, this branch blamed the worker for FIVE healthy or unread
-        // statuses — "OK", "Ok", "ok " (all healthy), and "" / "   " (never read at
-        // all, now routed to (c2) as an absent reading). Only "down" was a real
-        // fault. A hint that cries wolf on a correctly-spelled healthy status is the
-        // same wrong-component failure as (0), at the last gate instead of the first.
+      } else if (workerStatus !== "ok") {
+        // (c3) The ONLY producer of the redeploy instruction: a worker status
+        // actually read, and actually not "ok". Compared normalised — "OK" is ok.
         console.log("WARN worker check is not ok (redeploy Worker after #508 merge)");
       }
     }

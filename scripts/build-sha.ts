@@ -69,7 +69,15 @@ export function resolveBuildSha(options: ResolveBuildShaOptions = {}): string | 
   if (!existsSync(file)) return null;
   try {
     return readFileSync(file, "utf8").trim() || null;
-  } catch {
+  } catch (err) {
+    // The file EXISTS (checked above) and could not be read — a filesystem fault,
+    // not an omitted upload. Returning null in silence makes those two
+    // indistinguishable downstream: the build emits `gitCommit: null` either way
+    // and the verifier reports "the build produced no SHA", sending someone to
+    // inspect the writer for a fault that is in the disk. Named, then degraded.
+    console.warn(
+      `[build-sha] ${file} exists but could not be read: ${(err as Error).message}`,
+    );
     return null;
   }
 }

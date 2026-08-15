@@ -17,7 +17,14 @@
 # Env:
 #   GITHUB_SHA             preferred source (always set on an Actions runner)
 #   VT_BUILD_SHA_GIT_DIR   git checkout to fall back to (default: target-dir)
-set -u
+# `-e` as well as `-u`, and it is load-bearing: with `-u` alone a failed redirection
+# on the write below still let the next line succeed and the script exit 0, so
+# deploy.sh proceeded to `railway up` with a missing or stale SHA file despite
+# being written to abort. Its own `set -e` cannot help when the child reports
+# success. That is the same false-pass this whole change exists to remove, in the
+# producer. The only deliberately-tolerated non-zero exit here is the `git
+# rev-parse` fallback, which is already guarded with `|| true`.
+set -eu
 
 target_dir="${1:-$(cd "$(dirname "$0")/.." && pwd)}"
 git_dir="${VT_BUILD_SHA_GIT_DIR:-$target_dir}"
