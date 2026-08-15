@@ -203,8 +203,17 @@ describe("the SHA file survives every ignore filter between the repo and the bui
    * Where this is still imprecise it must OVER-match, never under-match: a
    * false positive fails the test loudly and gets read by a human, while a
    * false negative is exactly the silent pass this exists to prevent.
+   *
+   * `directoryOnly` is the trailing-slash form. A first pass skipped those
+   * outright on the reasoning that a directory pattern cannot exclude a file —
+   * true of the one path this is called with today, false of the signature,
+   * which takes any path. `generated/` really does exclude
+   * `generated/vt-build-sha.txt`, so the skip would have gone quiet the moment
+   * the SHA file moved out of the repo root. It now requires a segment BELOW
+   * the match instead of skipping: `generated/` hits `generated/anything` and
+   * not a plain file named `generated`, which is the actual rule.
    */
-  function patternToRegExp(pattern: string): RegExp {
+  function patternToRegExp(pattern: string, directoryOnly: boolean): RegExp {
     let anchored = pattern.startsWith("/");
     const body = anchored ? pattern.slice(1) : pattern;
     // gitignore(5): a pattern containing a non-trailing slash is relative to the
@@ -244,20 +253,22 @@ describe("the SHA file survives every ignore filter between the repo and the bui
         out += escapeRe(c);
       }
     }
-    // `(?:/.*)?` because a pattern that names a directory also excludes its contents.
-    return new RegExp(`^${anchored ? "" : "(?:.*/)?"}${out}(?:/.*)?$`);
+    // A plain pattern that names a directory also excludes its contents, so the
+    // tail is optional; a directory-only one matches ONLY the contents, so it is
+    // required. That single difference is the whole of the trailing-slash rule.
+    const tail = directoryOnly ? "/.*" : "(?:/.*)?";
+    return new RegExp(`^${anchored ? "" : "(?:.*/)?"}${out}${tail}$`);
   }
 
   function matchesPattern(line: string, path: string): { negated: boolean; hit: boolean } | null {
     const trimmed = line.trim();
     if (!trimmed || trimmed.startsWith("#")) return null;
     const negated = trimmed.startsWith("!");
-    const body = negated ? trimmed.slice(1) : trimmed;
-    // A trailing slash makes the pattern directory-only, so it cannot exclude a
-    // file — safe to skip only because the target is a file, which is asserted
-    // by the `is not committed` case below (a tracked path would be a file too).
-    if (body.endsWith("/")) return null;
-    return { negated, hit: patternToRegExp(body).test(path) };
+    const withoutBang = negated ? trimmed.slice(1) : trimmed;
+    const directoryOnly = withoutBang.endsWith("/");
+    const body = directoryOnly ? withoutBang.slice(0, -1) : withoutBang;
+    if (body === "") return null; // a bare "/" names nothing
+    return { negated, hit: patternToRegExp(body, directoryOnly).test(path) };
   }
 
   function excludes(ignoreFile: string, filename: string): boolean {
@@ -272,31 +283,41 @@ describe("the SHA file survives every ignore filter between the repo and the bui
   }
 
   it("the pattern matcher models the ignore syntaxes it claims to", () => {
-    // Guards the guard. Each left-hand pattern really would exclude the SHA file
-    // if someone added it; the previous `*`-only matcher scored `false` on the
-    // first four and this suite passed while blind to them.
-    const excluding = [
-      "vt-build-sha.txt",
-      "/vt-build-sha.txt",
-      "**/vt-build-sha.txt",
-      "vt-build-sha.tx?",
-      "vt-build-sha.[tx]xt",
-      "*.txt",
-      "vt-*",
-      "**",
+    // Guards the guard. Every pattern below really would (or would not) exclude
+    // the path beside it under gitignore(5); the original `*`-only matcher
+    // scored FALSE on four of the first five, and this suite passed while blind
+    // to them. Two paths, because a matcher checked against one root-level file
+    // can hide a rule — the directory-only case did exactly that.
+    const NESTED = `generated/${BUILD_SHA_FILENAME}`;
+    const cases: Array<[pattern: string, path: string, hit: boolean]> = [
+      // root-level file
+      ["vt-build-sha.txt", BUILD_SHA_FILENAME, true],
+      ["/vt-build-sha.txt", BUILD_SHA_FILENAME, true], // root-anchored
+      ["**/vt-build-sha.txt", BUILD_SHA_FILENAME, true],
+      ["vt-build-sha.tx?", BUILD_SHA_FILENAME, true],
+      ["vt-build-sha.[tx]xt", BUILD_SHA_FILENAME, true],
+      ["*.txt", BUILD_SHA_FILENAME, true],
+      ["vt-*", BUILD_SHA_FILENAME, true],
+      ["**", BUILD_SHA_FILENAME, true],
+      ["dist/vt-build-sha.txt", BUILD_SHA_FILENAME, false], // anchored elsewhere
+      ["vt-build-sha.tx", BUILD_SHA_FILENAME, false], // no prefix matching
+      ["vt-build-sha.[!t]xt", BUILD_SHA_FILENAME, false], // class excludes the real char
+      ["# vt-build-sha.txt", BUILD_SHA_FILENAME, false], // comment
+      // directory-only patterns — a trailing slash matches the CONTENTS
+      ["generated/", NESTED, true],
+      ["/generated/", NESTED, true],
+      ["**/generated/", NESTED, true],
+      ["generated", NESTED, true], // no slash: the dir and everything under it
+      ["generated/", "generated", false], // ...but never a plain FILE of that name
+      ["vt-build-sha.txt/", BUILD_SHA_FILENAME, false], // same rule, at the root
+      ["/", BUILD_SHA_FILENAME, false], // a bare slash names nothing
     ];
-    const notExcluding = [
-      "dist/vt-build-sha.txt", // anchored under a directory the file is not in
-      "vt-build-sha.tx", // no implicit prefix matching
-      "vt-build-sha.txt/", // directory-only pattern
-      "vt-build-sha.[!t]xt", // negated class excludes the real character
-      "# vt-build-sha.txt", // comment
-    ];
-    for (const p of excluding) {
-      expect(matchesPattern(p, BUILD_SHA_FILENAME)?.hit ?? false).toBe(true);
-    }
-    for (const p of notExcluding) {
-      expect(matchesPattern(p, BUILD_SHA_FILENAME)?.hit ?? false).toBe(false);
+    for (const [pattern, path, hit] of cases) {
+      expect({ pattern, path, hit: matchesPattern(pattern, path)?.hit ?? false }).toEqual({
+        pattern,
+        path,
+        hit,
+      });
     }
   });
 
