@@ -30,11 +30,20 @@
  * missed there: it gated on body SHAPE without gating on TRANSPORT, so a JSON 404 or
  * 502 still reached the worker verdict. See the last two describes.
  */
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { spawn, execSync } from "node:child_process";
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { resolve } from "node:path";
+
+// Every case here spawns a real `tsx` child that `spawnVerifier` lets run for up
+// to 45s, but the root config sets no `testTimeout`, so Vitest's 5s default
+// applied. Fifty-one cases carried their own `}, N)` and were fine; the seven
+// worker-status cases did not, and were one slow spawn away from a timeout that
+// looks like a verifier bug. Set once for the file rather than copied per case,
+// so case 59 is covered by construction — a per-case argument still wins where
+// one is given, which is why the existing tighter bounds keep their meaning.
+vi.setConfig({ testTimeout: 90_000 });
 
 const REPO_ROOT = process.cwd();
 const SCRIPT = resolve(REPO_ROOT, "scripts/verify-prod-deploy.ts");
