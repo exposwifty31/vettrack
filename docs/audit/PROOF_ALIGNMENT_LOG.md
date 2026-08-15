@@ -6872,3 +6872,63 @@ behaviour until #183 merges; `scripts/verify-prod-deploy.ts` (probing the **clie
 JSON-404 assertion) is the post-merge check and has not run against the deployed server yet.
 
 **Verdict:** VERIFIED (code + tests) / PARTIAL (production behaviour pending deploy)
+
+## 2026-08-16 — PR #184 CodeRabbit round: 11 findings (1e8dfd20c, 34ad8ab0f, f4eefebf5)
+
+**Claim:** All 11 CodeRabbit findings on `fix/deploy-sha-fallback` are fixed, each one verified
+against the real failure mode rather than accepted from the description. Every finding turned out
+to be the same shape as the defect the PR itself fixes — a check that reports success while having
+learned nothing.
+
+**Evidence — producer:**
+- **P1 `scripts/write-build-sha.sh:20`** (Major). Ran the script against an unwritable target dir:
+  `BEFORE fix: exit=0` / `AFTER fix: exit=1`. Under `set -u` alone a failed redirection let the
+  next line succeed and the script exit 0, so `deploy.sh` proceeded to `railway up` with no SHA
+  file — `deploy.sh`'s own `set -e` cannot help when the child reports success. Now `set -eu`; the
+  one tolerated non-zero (`git rev-parse` fallback) was already `|| true`-guarded.
+- **P2 `scripts/build-sha.ts:81`** — catch now names the path and the error before returning null.
+
+**Evidence — consumer:**
+- **C1 `verify-prod-deploy.ts:292`** — `return prod.replace(/\/+$/, "");`. A trailing slash built
+  `//api/version`, a false-fail on otherwise verifiable input (header invariant B).
+- **C2 `:898`** — `worker` read and normalised once into `workerStatus`; gates are now
+  `=== undefined` / `!== "ok"`. **58/58 passed with no test edits**, which is the evidence it is
+  behaviour-neutral rather than believed to be. `f4eefebf5` removed the last cast
+  (`Object.keys(checks)`, redundant — the guard above already narrows to a non-null object).
+- **C3 `:755`** — header 90 → 50 lines, six in-body narration blocks condensed. Comment density
+  430/936 (45%) → 359/865 (41%).
+
+**Evidence — tests:**
+- **T1 `verify-prod-deploy.test.ts:267`** (Major). `code ?? 1` on SIGKILL made a hung verifier
+  indistinguishable from an expected failure. Measured with the cap dropped to 250 ms so every
+  child is killed: **before 28/58 PASSED against a totally hung verifier; after, 10 pass** (the ten
+  that never spawn one) and 48 fail loudly. The fix converts 18 silently-passing cases into
+  failures. Rejects rather than resolving with a sentinel — a hang is never an expected outcome.
+- **T2 `deploy-build-sha.test.ts:271`** (Major). Confirmed the old `*`-only matcher scored
+  "not excluded" for `/vt-build-sha.txt`, `**/vt-build-sha.txt`, `vt-build-sha.tx?` and
+  `vt-build-sha.[tx]xt` — four of five real pattern shapes. Replaced with a gitignore-syntax
+  compiler (anchoring, `**`, `**/`, `*`, `?`, `[…]`/`[!…]`, `\` escapes) plus a 13-case table
+  (8 must-exclude, 5 must-not) that guards the guard; all 13 verified correct.
+- **T3 `:224`** — `git check-ignore` on a non-repo exits **128**, and the old catch turned that
+  into a PASS: `real repo {"kind":"not_ignored"}` vs `not-a-repo {"kind":"check_failed",
+  "detail":"status=128 code=undefined"}`. Now three cases, asserted with
+  `toEqual({kind:"not_ignored"})`.
+- **T4 `:134`, T5 `:1459`** — inline reasons on both `!` assertions and the `AddressInfo` cast;
+  "a empty" → "an empty".
+- **T6 `:1511`** (Major, `34ad8ab0f`). Verified real: no `testTimeout` in the root config, so the
+  5 s default applied while every case spawns a `tsx` child `spawnVerifier` allows 45 s. Exactly
+  seven cases lacked a `}, N)` (1412, 1433, 1446, 1459, 1472, 1485, 1499). RED: a 6 s sleep in the
+  first → `Error: Test timed out in 5000ms`. GREEN: same sleep passes after the fix. Set once via
+  `vi.setConfig({ testTimeout: 90_000 })` rather than seven copies, and **proved this does not
+  loosen the 51 existing bounds** — a case declaring `}, 1000)` under a 90 000 file default still
+  fails with `Test timed out in 1000ms`.
+
+**Commands:**
+- `pnpm test` → `Test Files 729 passed (729) · Tests 6602 passed | 11 skipped (6613)`
+- `npx tsc --noEmit` and `npx tsc -p tsconfig.server.json --noEmit` → both clean.
+- All 11 threads replied to individually and resolved; `unresolved=0` via GraphQL.
+
+**Not yet verified:** CodeRabbit's re-review of the three new commits, and CI on the pushed head.
+`reviewDecision` is still `CHANGES_REQUESTED` from the prior round and has not been re-issued.
+
+**Verdict:** VERIFIED (all 11 fixed, each red-first or measured) / PENDING (re-review + CI)
