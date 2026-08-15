@@ -4,6 +4,7 @@ import path from "path";
 import { readFileSync, writeFileSync, existsSync } from "fs";
 import { fileURLToPath } from "url";
 import { sentryVitePlugin } from "@sentry/vite-plugin";
+import { resolveBuildSha } from "./scripts/build-sha.js";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const { version } = JSON.parse(readFileSync("./package.json", "utf-8")) as { version: string };
 
@@ -36,22 +37,30 @@ function swBuildTagTemplate(buildTag: string): Plugin {
   };
 }
 
-/** Written to dist/public/build-info.json — consumed by GET /api/version. */
-function deployBuildInfo(appVersion: string, buildTag: string): Plugin {
+/**
+ * Written to dist/public/build-info.json — consumed by GET /api/version and gated
+ * on by scripts/verify-prod-deploy.ts.
+ *
+ * Exported so tests can drive its hooks directly (tests/deploy-build-sha.test.ts):
+ * a `gitCommit` that never arrives is invisible until production is polled, which
+ * is how it went unnoticed for every deploy this pipeline has produced.
+ */
+export function deployBuildInfo(appVersion: string, buildTag: string): Plugin {
   let outDir = "dist/public";
+  let rootDir = process.cwd();
   return {
     name: "vt-deploy-build-info",
     apply: "build",
     configResolved(config) {
       outDir = config.build.outDir;
+      rootDir = config.root;
     },
     closeBundle() {
       const vitePilotMode = false;
-      const gitCommit =
-        process.env.RAILWAY_GIT_COMMIT_SHA?.trim() ||
-        process.env.GITHUB_SHA?.trim() ||
-        process.env.VERCEL_GIT_COMMIT_SHA?.trim() ||
-        null;
+      // Resolved from the deploy-context file, not from env alone: inside the
+      // Docker build there is no .git and no SHA build ARG, so the env vars are
+      // structurally unreachable. See scripts/build-sha.ts for the derivation.
+      const gitCommit = resolveBuildSha({ rootDir });
       const payload = {
         appVersion,
         buildTag,
