@@ -834,7 +834,9 @@ async function main(): Promise<void> {
       } else if (workerStatus === undefined) {
         // (c2) ABSENT IS NOT "NOT OK". An endpoint that reports on the db and says
         // nothing about the worker has made no claim about it.
-        const named = Object.keys(checks as Record<string, unknown>).join(", ") || "(none)";
+        // No cast: the guard above has already narrowed `checks` to a non-null,
+        // non-array object, which is what `Object.keys` wants.
+        const named = Object.keys(checks).join(", ") || "(none)";
         console.log(
           `WARN /api/health did not report on the worker (checks named: ${named}). ` +
             "Not a claim that the worker is down — an absent worker status is a different " +
