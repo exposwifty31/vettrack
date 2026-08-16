@@ -730,29 +730,19 @@ async function main(): Promise<void> {
   // paragraph false while everything still compiled, which is exactly how an untrue
   // comment about why a branch is safe has survived a restructure in this file
   // before. The try/catch guarantees only that a THROW cannot escape. That is a
-  // STRUCTURAL claim, and it is the fix for the second round-4 defect rather than a
-  // belt-and-braces addition — `fetchJson` awaits `fetch()` and `res.text()` with no
-  // try of its own, `classifyPoll` wraps its call and this one did not, so either
-  // rejection propagated to `main().catch` and exited 1 with a bare stack trace and
-  // NO verdict, having already matched the target and passed all six probes. The
-  // block's own contract said it "has always been a WARN"; it had stopped being one.
+  // STRUCTURAL claim, not belt-and-braces: `fetchJson` awaits `fetch()` and
+  // `res.text()` with no try of its own, so without this guard either rejection
+  // reaches `main().catch` and exits 1 with a bare stack trace and NO verdict —
+  // after the target already matched and every probe already passed.
   //
-  // That claim went four rounds unbacked in the OTHER direction — nothing showed the
-  // block could not MASK a failure, because every case exercising it was an exit-0
-  // run in which there was no failure to mask. "cannot mask a failing probe" in the
-  // round-6 describe is the case that holds it down: a probe fails while this block
-  // runs and warns, and the run still exits 1 with no green banner.
-  //
-  // WHY THE GUARD IS HERE AND NOT A THIRD `JsonBody` TAG. A tag for "the body died
-  // mid-read" would be symmetric with parsed/unparseable and would force both call
-  // sites to handle it — but it cannot cover the connect-time rejection, because
-  // when `fetch()` itself rejects there is no response and therefore no `JsonBody`
-  // to carry a tag. Both failures were reproduced against this script and both
-  // exited 1; both are now pinned by the round-5 describe in
-  // tests/verify-prod-deploy.test.ts ("dies mid-read" and "cannot be reached at
-  // all"). Only a guard around the whole block covers both, and it also covers
-  // whatever the next line added here can throw. A hint that can fail the build is
-  // not a hint.
+  // WHY A GUARD AND NOT A THIRD `JsonBody` TAG. A "died mid-read" tag would be
+  // symmetric with parsed/unparseable and would force both call sites to handle
+  // it, but it cannot cover the connect-time rejection: when `fetch()` itself
+  // rejects there is no response, so there is no `JsonBody` to carry a tag. Only
+  // a guard around the whole block covers both — and it covers whatever the next
+  // line added here can throw. A hint that can fail the build is not a hint.
+  // Pinned by "dies mid-read", "cannot be reached at all" and "cannot mask a
+  // failing probe" in tests/verify-prod-deploy.test.ts.
   try {
     const health = await fetchJson<unknown>(cfg, "/api/health");
     const body = health.body;
@@ -760,12 +750,12 @@ async function main(): Promise<void> {
     // answers `allOk ? 200 : 503`, and `:163` sets `allOk = false` whenever
     // `checks.worker !== "ok"` — so a 503 carrying a JSON body from this endpoint is
     // the documented DEGRADED REPORT, i.e. exactly the shape a genuinely failing
-    // worker produces. Round 6 gated on `status === 200` alone and thereby inverted
-    // this block: the sole producer of the redeploy instruction (c3) could no longer
-    // fire on the one production shape it was written for, and the transport branch
-    // printed "the response never got as far as reporting one" over a body with
-    // `"worker":"fail"` visible in its own snippet. Verified against the route, not
-    // inferred from the status code.
+    // worker produces. Gating on `status === 200` alone inverts this whole block:
+    // the sole producer of the redeploy instruction (c3) stops firing on the one
+    // production shape it was written for, and the transport branch prints "the
+    // response never got as far as reporting one" over a body with `"worker":"fail"`
+    // visible in its own snippet. Verified against the route, not inferred from the
+    // status code.
     if ((health.status !== 200 && health.status !== 503) || !health.ct.includes("application/json")) {
       // (0) TRANSPORT. A 404 or 502 carrying a JSON body satisfies every shape
       // gate below and would reach the `checks` read with nothing there — the

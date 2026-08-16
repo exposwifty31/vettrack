@@ -69,6 +69,49 @@ function runWriteScript(
   }
 }
 
+describe("this suite is testing the source, not a stale compiled copy of it", () => {
+  it("has no emitted .js shadowing a tracked .ts it imports through", () => {
+    // This is not hypothetical and it is not cheap. A stray `tsc` (no --noEmit) left
+    // scripts/build-sha.js and vite.config.js on disk, and BOTH of this file's
+    // imports bind to a real emitted .js over the .ts it was written for — Vite's
+    // DEFAULT_CONFIG_FILES resolves vite.config.js BEFORE vite.config.ts, and
+    // `from "../scripts/build-sha.js"` resolves to a real sibling .js when one
+    // exists. Measured, same total mutation of resolveBuildSha in the .ts:
+    //   stale scripts/build-sha.js present -> 6 passed   (green against dead code)
+    //   stale file moved aside             -> 6 failed
+    // So the suite reported success while the shipped source was never loaded.
+    //
+    // .gitignore:125-133 already names this hazard and ignores the artifacts. That
+    // stops them being COMMITTED; it does nothing about the shadowing, which happens
+    // locally, silently, and only to whoever ran tsc. CI is a fresh checkout and
+    // never sees it — so this is precisely the class of defect that cannot be caught
+    // by CI being green, only by a check that runs where the artifact lives.
+    const tracked = execFileSync("git", ["-C", REPO_ROOT, "ls-files", "*.ts", "scripts/*.ts"], {
+      encoding: "utf8",
+    })
+      .split("\n")
+      .filter(Boolean);
+
+    const shadowed = tracked.filter((ts) => {
+      const emitted = ts.replace(/\.ts$/, ".js");
+      if (!existsSync(resolve(REPO_ROOT, emitted))) return false;
+      // A .js that is itself tracked is a real source file, not emit.
+      const isTracked = execFileSync("git", ["-C", REPO_ROOT, "ls-files", "--", emitted], {
+        encoding: "utf8",
+      }).trim();
+      return isTracked === "";
+    });
+
+    expect({
+      shadowed,
+      hint: "delete the emitted .js/.d.ts — a stale copy silently wins over the .ts",
+    }).toEqual({
+      shadowed: [],
+      hint: "delete the emitted .js/.d.ts — a stale copy silently wins over the .ts",
+    });
+  });
+});
+
 describe("resolveBuildSha — env first, deploy-context file as the fallback that survives Docker", () => {
   it("prefers RAILWAY_GIT_COMMIT_SHA", () => {
     expect(
@@ -174,6 +217,30 @@ describe("write-build-sha.sh — resolves on the host, into the upload context",
     }
   });
 
+  it("exits non-zero when the write itself fails, instead of announcing success", () => {
+    // The regression test the `set -eu` finding asked for and did not get. Without
+    // errexit this is the ONE case that goes wrong, and it goes wrong silently: a
+    // resolvable SHA plus an unwritable destination. The redirection fails, the
+    // banner still prints, and the script exits 0 — so deploy.sh runs `railway up`
+    // with no SHA file and every existing case here stays green, because they all
+    // exercise the path where NO SHA could be resolved (which exits 1 either way).
+    //
+    // Measured on this script, `set -eu` vs `set -u`, same invocation:
+    //   set -eu -> exit=1, no banner
+    //   set -u  -> exit=0, "🔖 Deploy context SHA: … -> /nonexistent/dir/…"
+    //
+    // A nonexistent parent rather than a chmod'd directory, so the case still
+    // discriminates when the suite runs as root (CI containers usually do).
+    const { code, out } = runWriteScript(
+      "/nonexistent/dir",
+      childEnv({ GITHUB_SHA: "deadbeefdeadbeefdeadbeefdeadbeefdeadbeef" }),
+    );
+    expect(code).not.toBe(0);
+    // The sharper half: silence. A zero exit is the symptom, but the banner is what
+    // makes a human believe the file is there.
+    expect(out).not.toContain("Deploy context SHA:");
+  });
+
   it("writes the same filename literal the resolver reads", () => {
     // The whole fix hinges on producer and consumer agreeing on one filename.
     expect(readFileSync(WRITE_SCRIPT, "utf8")).toContain(BUILD_SHA_FILENAME);
@@ -213,7 +280,37 @@ describe("the SHA file survives every ignore filter between the repo and the bui
    * the match instead of skipping: `generated/` hits `generated/anything` and
    * not a plain file named `generated`, which is the actual rule.
    */
-  function patternToRegExp(pattern: string, directoryOnly: boolean): RegExp {
+  /**
+   * `.dockerignore` is NOT gitignore. Docker and BuildKit parse it with
+   * moby/patternmatcher, which runs `filepath.Clean` over every pattern — so
+   * `./x`, `x/` and `a/../x` all collapse to `x`, and its patterns are always
+   * relative to the context root rather than matching a basename at any depth.
+   *
+   * Feeding those files to a gitignore compiler was a silent under-match, and it
+   * had teeth: a single `./vt-build-sha.txt` line in `.dockerignore` drops the
+   * SHA out of the build context and returns `gitCommit: null` — the exact
+   * regression this file exists to prevent — while `excludes()` reported the
+   * file safe and the suite stayed green.
+   */
+  type Dialect = "git" | "docker";
+
+  /** `filepath.Clean`, restricted to what an ignore-file pattern can contain. */
+  function cleanPath(pattern: string): string {
+    const parts: string[] = [];
+    for (const seg of pattern.split("/")) {
+      if (seg === "" || seg === ".") continue;
+      // A `..` that pops past the root leaves the segment stack empty, which
+      // widens the pattern. That is the over-match direction, so it is allowed.
+      if (seg === "..") {
+        parts.pop();
+        continue;
+      }
+      parts.push(seg);
+    }
+    return parts.join("/");
+  }
+
+  function patternToRegExp(pattern: string, directoryOnly: boolean): RegExp | null {
     let anchored = pattern.startsWith("/");
     const body = anchored ? pattern.slice(1) : pattern;
     // gitignore(5): a pattern containing a non-trailing slash is relative to the
@@ -246,6 +343,19 @@ describe("the SHA file survives every ignore filter between the repo and the bui
           out += "\\[";
         } else {
           const cls = body.slice(i + 1, close);
+          // Two class forms a JS regex CANNOT express the way git's wildmatch
+          // reads them, both verified against real `git check-ignore`:
+          //   `[]t]`  — a leading `]` is a literal member for wildmatch, but
+          //             opens an empty (never-matching) class in JS.
+          //   `[\t]`  — `\` means "the next char, literally" for wildmatch; JS
+          //             reads it as an escape, so this silently becomes TAB.
+          // Both under-match, which is the one direction this compiler promises
+          // never to go. Return null and let the caller treat it as a hit.
+          // An empty `cls` IS the leading-`]` form: `[]t]` terminates the class at
+          // the very first `]`, so the scanner sees `[]` where wildmatch sees a
+          // class containing `]` and `t`. Checking for a leading `]` in `cls` never
+          // fires, because that character was already consumed as the terminator.
+          if (cls.replace(/^!/, "") === "" || cls.includes("\\")) return null;
           out += `[${cls.startsWith("!") ? `^${cls.slice(1)}` : cls}]`;
           i = close;
         }
@@ -257,29 +367,77 @@ describe("the SHA file survives every ignore filter between the repo and the bui
     // tail is optional; a directory-only one matches ONLY the contents, so it is
     // required. That single difference is the whole of the trailing-slash rule.
     const tail = directoryOnly ? "/.*" : "(?:/.*)?";
-    return new RegExp(`^${anchored ? "" : "(?:.*/)?"}${out}${tail}$`);
+    try {
+      return new RegExp(`^${anchored ? "" : "(?:.*/)?"}${out}${tail}$`);
+    } catch {
+      // A malformed class such as `[\]]` throws. Uncaught, one such line anywhere
+      // in an ignore file takes the whole guard down; swallowed, it would skip the
+      // line and under-match. Null keeps the promise: the caller counts it a hit.
+      return null;
+    }
   }
 
-  function matchesPattern(line: string, path: string): { negated: boolean; hit: boolean } | null {
+  function matchesPattern(
+    line: string,
+    path: string,
+    dialect: Dialect = "git",
+  ): { negated: boolean; hit: boolean; directoryOnly: boolean } | null {
     const trimmed = line.trim();
     if (!trimmed || trimmed.startsWith("#")) return null;
     const negated = trimmed.startsWith("!");
     const withoutBang = negated ? trimmed.slice(1) : trimmed;
+
+    if (dialect === "docker") {
+      // Clean collapses `./x`, `x/` and `a/../x` to `x`, which also means the
+      // directory-only concept does not survive normalisation. Docker patterns
+      // are root-relative, never basename-at-any-depth, so always anchor.
+      const cleaned = cleanPath(withoutBang);
+      if (cleaned === "") return null;
+      const rx = patternToRegExp(`/${cleaned}`, false);
+      return { negated, hit: rx === null || rx.test(path), directoryOnly: false };
+    }
+
     const directoryOnly = withoutBang.endsWith("/");
     const body = directoryOnly ? withoutBang.slice(0, -1) : withoutBang;
     if (body === "") return null; // a bare "/" names nothing
-    return { negated, hit: patternToRegExp(body, directoryOnly).test(path) };
+    const rx = patternToRegExp(body, directoryOnly);
+    // `rx === null` means "this compiler cannot model the pattern faithfully".
+    // Counted as a HIT, because over-matching fails loudly and under-matching is
+    // the silent pass. Never flip this to `false` for a quieter suite.
+    return { negated, hit: rx === null || rx.test(path), directoryOnly };
+  }
+
+  /** The whole-file rule, split out so the multi-line cases can drive it directly. */
+  function excludesFromLines(lines: string[], filename: string, dialect: Dialect): boolean {
+    let excluded = false;
+    // gitignore(5): "It is not possible to re-include a file if a parent directory
+    // of that file is excluded." A later `!generated/vt-build-sha.txt` after
+    // `generated/` does NOT bring the file back — git never descends into the
+    // directory to consider it. Without this the loop un-excluded on the negation
+    // and reported the file safe when git had dropped it: a silent pass.
+    let excludedByDirectory = false;
+    for (const raw of lines) {
+      const m = matchesPattern(raw, filename, dialect);
+      if (!m?.hit) continue;
+      if (m.negated) {
+        if (excludedByDirectory) continue; // unreachable re-include
+        excluded = false;
+      } else {
+        excluded = true;
+        excludedByDirectory = m.directoryOnly;
+      }
+    }
+    return excluded;
   }
 
   function excludes(ignoreFile: string, filename: string): boolean {
     const full = resolve(REPO_ROOT, ignoreFile);
     if (!existsSync(full)) return false;
-    let excluded = false;
-    for (const raw of readFileSync(full, "utf8").split("\n")) {
-      const m = matchesPattern(raw, filename);
-      if (m?.hit) excluded = !m.negated;
-    }
-    return excluded;
+    return excludesFromLines(
+      readFileSync(full, "utf8").split("\n"),
+      filename,
+      ignoreFile.endsWith(".dockerignore") ? "docker" : "git",
+    );
   }
 
   it("the pattern matcher models the ignore syntaxes it claims to", () => {
@@ -319,6 +477,54 @@ describe("the SHA file survives every ignore filter between the repo and the bui
         hit,
       });
     }
+  });
+
+  it("over-matches rather than under-matches on classes it cannot model", () => {
+    // The docstring promises to err toward a false positive. It did not: verified
+    // against real `git check-ignore`, all three of these DO ignore the file while
+    // the compiler scored them false — a silent pass, the one outcome the guard
+    // exists to prevent. `[]t]` puts a literal `]` in the class (empty class in
+    // JS), `[\t]` means a literal `t` to wildmatch but TAB to JS, and `[\]]` does
+    // not even compile as a JS regex, which took the whole guard down by throwing.
+    for (const pattern of ["vt-build-sha.tx[]t]", "vt-build-sha.tx[\\t]", "[\\]]"]) {
+      expect({ pattern, hit: matchesPattern(pattern, BUILD_SHA_FILENAME)?.hit ?? false }).toEqual({
+        pattern,
+        hit: true,
+      });
+    }
+  });
+
+  it("reads .dockerignore with Docker's rules, not git's", () => {
+    // Docker/BuildKit parse .dockerignore with moby/patternmatcher, which runs
+    // filepath.Clean on every pattern. Verified against that library: each line
+    // below excludes the SHA file, so the build context loses it and
+    // build-info.json regresses to `gitCommit: null`. Under git's rules all three
+    // score false, which is what this compiler used to return for a .dockerignore.
+    for (const line of ["./vt-build-sha.txt", "vt-build-sha.txt/", "a/../vt-build-sha.txt"]) {
+      expect({ line, excluded: excludesFromLines([line], BUILD_SHA_FILENAME, "docker") }).toEqual({
+        line,
+        excluded: true,
+      });
+      // Same line under git's rules genuinely does NOT exclude it — the dialects
+      // disagree, which is the entire reason this split exists.
+      expect({ line, excluded: excludesFromLines([line], BUILD_SHA_FILENAME, "git") }).toEqual({
+        line,
+        excluded: false,
+      });
+    }
+  });
+
+  it("does not re-include a file whose parent directory is excluded", () => {
+    // gitignore(5): "It is not possible to re-include a file if a parent directory
+    // of that file is excluded" — git never descends into the directory, so the
+    // negation is dead. Confirmed against real `git check-ignore`. The loop used to
+    // honour the negation and report the file safe.
+    const NESTED = `generated/${BUILD_SHA_FILENAME}`;
+    expect(excludesFromLines(["generated/", `!${NESTED}`], NESTED, "git")).toBe(true);
+    expect(excludesFromLines(["/generated/", `!/${NESTED}`], NESTED, "git")).toBe(true);
+    // A negation still works when the exclusion came from a FILE pattern, which is
+    // the case git does honour — so this is a scoped rule, not a blanket one.
+    expect(excludesFromLines([NESTED, `!${NESTED}`], NESTED, "git")).toBe(false);
   });
 
   it("is not matched by .railwayignore or .dockerignore", () => {
