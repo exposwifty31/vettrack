@@ -7091,3 +7091,44 @@ emit artifacts.
 
 **Verdict:** VERIFIED — 3 real defect classes closed, all silent-pass, none of which CI could have
 caught. The pass paid for itself.
+
+## 2026-08-16 (IDT, = 2026-08-15 UTC) — PR #184 rounds 5–6: four strikes, then a method change (55ffd3bc2)
+
+**Claim:** Two further review rounds each found a real gap **inside the fix I had just written for the
+previous one**. Rather than patch a fourth increment, the oracle was replaced.
+
+**The pattern, stated because it is the finding:** each round I fixed the case in front of me and
+described it as the rule.
+1. Matcher understood only `*` → wrote a compiler → skipped every trailing-slash pattern.
+2. Handled directory-only → keyed on how the pattern was *written* (`m.directoryOnly`), so
+   `generated` and `/generated` silently failed while `generated/` and `/generated/` passed.
+3. Keyed on what matched → but *assigned* the flag per line, so a file-level rule after the parent
+   rule wiped the parent exclusion and let a later negation through.
+
+**Evidence — round 5 (parent scoping).** `git check-ignore`, fresh repo per case: `generated`,
+`generated/`, `/generated`, `/generated/` all keep `generated/vt-build-sha.txt` ignored after a
+negation; only a pattern matching the FILE re-includes. RED: reverting to
+`excludedByDirectory = m.directoryOnly` fails on exactly `parent: 'generated'`.
+
+**Evidence — round 6 (ordering).** Six orderings measured against git established that the state is
+per-directory, **sticky through file-level rules**, and cleared only by a negation naming the
+directory. Modelled as a `Set` of excluded ancestors; assignment was the bug, membership is the rule.
+
+**The structural fix, which is the real deliverable.** A hand-written table only ever holds the cases
+its author thought of — which is precisely why every gap above was invisible to it. Added a case that
+runs a 23-row corpus through **real `git check-ignore`** (fresh repo per row; reuse leaves
+directories behind and changes how git reads a directory-only pattern, which produced a false
+divergence on the first attempt) and asserts the compiler never UNDER-matches. One-directional by
+contract. Proven to earn its place, independently of the table:
+- revert the character-class fix → oracle reports **2** under-matches
+- revert the re-include guard → oracle reports **3**
+Both are bugs that cost a full review round each to find by hand.
+
+**And it caught me once more on the way in:** the oracle timed out on its first run at 6.8s against
+the 5s default — the same defect the T6 finding was about, one file over. Given an explicit 60s.
+
+**Commands:** `pnpm test` → `Test Files 729 passed (729) · Tests 6608 passed | 11 skipped (6619)`;
+`npx tsc --noEmit` clean. CI on the prior head `76b674d40`: ALL CHECKS GREEN, `merge=CLEAN`.
+
+**Verdict:** VERIFIED — and the transferable lesson is the method, not the patches: when the same
+defect class survives three fixes, replace the oracle rather than the increment.
