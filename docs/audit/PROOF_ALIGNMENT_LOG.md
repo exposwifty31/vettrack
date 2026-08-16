@@ -7032,3 +7032,62 @@ Merging is likewise the owner's call per `.claude/rules/agent-conduct.md` §2.
 
 **Verdict:** VERIFIED — all findings closed, all checks green, `merge=CLEAN`. One stale review
 decision awaiting an owner action.
+
+## 2026-08-16 (IDT, = 2026-08-15 UTC) — PR #184 adversarial pass: 3 of 4 claims broke (e3a23b5d1)
+
+**Claim:** Before declaring #184 done I ran four independent skeptics, each paid to REFUTE one of my
+claims rather than confirm it. Three broke. Every counterexample was re-derived here before acting —
+a reviewer paid to refute will sometimes manufacture a refutation, and one of theirs did not survive.
+
+**Why the pass ran at all:** five strong claims earlier in this session were wrong (the EAS env vars,
+K4, the skills roster, the "34 safe branches", my own `getBackgroundNdef` correction) and every one
+was caught only by independent verification. The failure shape is always the same — a search of one
+location treated as evidence of absence. This round added a sixth instance, below.
+
+**Evidence:**
+
+1. **The suite was not testing the source.** A stray `tsc` had left `scripts/build-sha.js` and
+   `vite.config.js` on disk. Vite's `DEFAULT_CONFIG_FILES` resolves `vite.config.js` **before**
+   `vite.config.ts`, and `from "../scripts/build-sha.js"` binds to a real sibling `.js`. Measured
+   with a total mutation of `resolveBuildSha` (`return "MUTANT-SHA"`):
+   - stale `.js` present → `Tests 6 passed` — green against dead code
+   - stale `.js` moved aside → `Tests 6 failed`
+   `.gitignore:125-133` already documents this exact mechanism. **Ignoring the artifacts stops them
+   being committed and does nothing about the shadowing**, which is local, silent, and structurally
+   invisible to CI (fresh checkout). So every local run I cited for `resolveBuildSha` in this PR was
+   worthless — the conclusion happened to be right, verified by re-running against the real TS:
+   `19 passed`. New guard added; RED proof: with the shadow restored **and** the source mutated,
+   **20 of 21 cases still passed** and only the guard failed.
+2. **`.dockerignore` is not gitignore.** Docker/BuildKit parse it with `moby/patternmatcher`, which
+   runs `filepath.Clean` on every pattern (`./x`, `x/`, `a/../x` → `x`) and treats patterns as
+   root-relative. A single `./vt-build-sha.txt` line drops the SHA from the build context and
+   returns `gitCommit: null` — this file's entire subject — while `excludes()` reported it safe.
+   Dialects split; both directions asserted.
+3. **The "over-match, never under-match" promise was false.** Re-verified here against real
+   `git check-ignore`, fresh repo per case: `vt-build-sha.tx[]t]` → IGNORES, `vt-build-sha.tx[\t]`
+   (literal backslash, confirmed via `cat -A`) → IGNORES, `generated/` + `!generated/…` → IGNORES,
+   file-pattern + negation → keeps. The compiler scored the first two false and `[\]]` **threw**,
+   which takes the whole guard down. Unmodelable patterns now count as a hit; the documented
+   "cannot re-include under an excluded directory" rule is implemented.
+4. **The errexit finding got the fix but not the test it asked for.** `set -eu` → `set -u` was
+   undetectable by the suite. Now pinned on behaviour: resolvable SHA + unwritable destination must
+   exit non-zero **and print no success banner**. Measured — `set -eu` → exit 1, silent; `set -u` →
+   exit 0 with `🔖 Deploy context SHA: …`. Proven red.
+5. **Finding 3790097418 was answered as addressed and only partly was** — 3 of 5 named narration
+   blocks survived. Condensed, invariants kept.
+
+**Claim that SURVIVED refutation:** the `verify-prod-deploy.ts` changes. No input produces a false
+pass or a false fail; the `workerStatus` hoist is neutral across 12 shapes. One fair wording hit:
+"behaviour-neutral" is wrong for `resolveProd`, which deliberately changes the verdict on
+trailing-slash input — that is the point of the change, not a side effect.
+
+**Refutation that did NOT survive:** a skeptic first reported `generated/` vs a file named
+`generated` as a divergence; that was its own harness reusing one git repo across cases, and it
+retracted. Recorded because the discipline is symmetric — a skeptic's finding gets checked too.
+
+**Commands:** `pnpm test` → `Test Files 729 passed (729) · Tests 6607 passed | 11 skipped (6618)`;
+`npx tsc --noEmit` and `npx tsc -p tsconfig.server.json --noEmit` clean; `git status` clean of
+emit artifacts.
+
+**Verdict:** VERIFIED — 3 real defect classes closed, all silent-pass, none of which CI could have
+caught. The pass paid for itself.
