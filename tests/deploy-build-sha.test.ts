@@ -407,15 +407,28 @@ describe("the SHA file survives every ignore filter between the repo and the bui
     return { negated, hit: rx === null || rx.test(path), directoryOnly };
   }
 
+  /** Every proper ancestor directory of a repo-relative path, outermost first. */
+  function ancestorsOf(path: string): string[] {
+    const parts = path.split("/");
+    return parts.slice(0, -1).map((_, i) => parts.slice(0, i + 1).join("/"));
+  }
+
   /** The whole-file rule, split out so the multi-line cases can drive it directly. */
   function excludesFromLines(lines: string[], filename: string, dialect: Dialect): boolean {
     let excluded = false;
     // gitignore(5): "It is not possible to re-include a file if a parent directory
-    // of that file is excluded." A later `!generated/vt-build-sha.txt` after
-    // `generated/` does NOT bring the file back — git never descends into the
-    // directory to consider it. Without this the loop un-excluded on the negation
-    // and reported the file safe when git had dropped it: a silent pass.
+    // of that file is excluded." A later `!generated/vt-build-sha.txt` does NOT
+    // bring the file back — git never descends into the directory to consider it.
+    //
+    // The test is whether the exclusion covers a PARENT, not whether the pattern
+    // happened to end in `/`. A first attempt keyed on the trailing slash and so
+    // handled `generated/` and `/generated/` while missing the two forms without
+    // one; all four keep the file ignored, verified with `git check-ignore`:
+    //   generated  ·  generated/  ·  /generated  ·  /generated/   -> IGNORED
+    //   generated/vt-build-sha.txt (the FILE itself)              -> re-included
+    // So the rule is scoped by what the pattern matched, not by how it was written.
     let excludedByDirectory = false;
+    const parents = ancestorsOf(filename);
     for (const raw of lines) {
       const m = matchesPattern(raw, filename, dialect);
       if (!m?.hit) continue;
@@ -424,7 +437,13 @@ describe("the SHA file survives every ignore filter between the repo and the bui
         excluded = false;
       } else {
         excluded = true;
-        excludedByDirectory = m.directoryOnly;
+        // `directoryOnly` stays in the disjunction because a trailing-slash pattern
+        // deliberately does NOT match the bare directory name — `generated/` needs a
+        // segment below it — so the ancestor probe alone would miss exactly the case
+        // the first attempt did handle.
+        excludedByDirectory =
+          m.directoryOnly ||
+          parents.some((parent) => matchesPattern(raw, parent, dialect)?.hit === true);
       }
     }
     return excluded;
@@ -519,9 +538,15 @@ describe("the SHA file survives every ignore filter between the repo and the bui
     // of that file is excluded" — git never descends into the directory, so the
     // negation is dead. Confirmed against real `git check-ignore`. The loop used to
     // honour the negation and report the file safe.
+    // All four spellings of "exclude the parent" behave identically — verified with
+    // `git check-ignore`, one fresh repo per case. Keying the rule on the trailing
+    // slash passed the two `/` forms and silently failed the other two.
     const NESTED = `generated/${BUILD_SHA_FILENAME}`;
-    expect(excludesFromLines(["generated/", `!${NESTED}`], NESTED, "git")).toBe(true);
-    expect(excludesFromLines(["/generated/", `!/${NESTED}`], NESTED, "git")).toBe(true);
+    for (const parent of ["generated", "generated/", "/generated", "/generated/"]) {
+      expect({ parent, excluded: excludesFromLines([parent, `!${NESTED}`], NESTED, "git") }).toEqual(
+        { parent, excluded: true },
+      );
+    }
     // A negation still works when the exclusion came from a FILE pattern, which is
     // the case git does honour — so this is a scoped rule, not a blanket one.
     expect(excludesFromLines([NESTED, `!${NESTED}`], NESTED, "git")).toBe(false);
