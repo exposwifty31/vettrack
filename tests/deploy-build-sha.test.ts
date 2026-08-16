@@ -421,29 +421,46 @@ describe("the SHA file survives every ignore filter between the repo and the bui
     // bring the file back — git never descends into the directory to consider it.
     //
     // The test is whether the exclusion covers a PARENT, not whether the pattern
-    // happened to end in `/`. A first attempt keyed on the trailing slash and so
-    // handled `generated/` and `/generated/` while missing the two forms without
-    // one; all four keep the file ignored, verified with `git check-ignore`:
+    // happened to end in `/`. Keying on the trailing slash handled `generated/` and
+    // `/generated/` and missed the two forms without one; all four keep the file
+    // ignored, verified with `git check-ignore`:
     //   generated  ·  generated/  ·  /generated  ·  /generated/   -> IGNORED
     //   generated/vt-build-sha.txt (the FILE itself)              -> re-included
-    // So the rule is scoped by what the pattern matched, not by how it was written.
-    let excludedByDirectory = false;
+    //
+    // A SET of excluded ancestors, not a boolean, because the state is per-directory
+    // and survives later lines. Verified with `git check-ignore`, fresh repo each:
+    //   generated · generated/vt-build-sha.txt · !generated/…   -> IGNORED
+    //   generated/vt-build-sha.txt · generated · !generated/…   -> IGNORED
+    //   generated · !generated                                  -> kept
+    //   generated/ · !generated/                                -> kept
+    //   generated · !generated/                                 -> kept
+    // So a later FILE-level rule must not clear the parent exclusion (a boolean
+    // that gets reassigned per line does exactly that), while a negation naming the
+    // DIRECTORY does clear it. Assignment was the bug; membership is the rule.
+    const excludedParents = new Set<string>();
     const parents = ancestorsOf(filename);
     for (const raw of lines) {
+      // Ancestors first: `!generated` must clear the directory before the same line
+      // is allowed to re-include the file beneath it.
+      //
+      // Probed with the trailing slash stripped. `generated/` deliberately does NOT
+      // match the bare name `generated` — it requires a segment below — so probing
+      // the pattern verbatim would never see the directory it names.
+      const asDirPattern = raw.trim().replace(/\/$/, "");
+      for (const parent of parents) {
+        const pm = matchesPattern(asDirPattern, parent, dialect);
+        if (!pm?.hit) continue;
+        if (pm.negated) excludedParents.delete(parent);
+        else excludedParents.add(parent);
+      }
+
       const m = matchesPattern(raw, filename, dialect);
       if (!m?.hit) continue;
       if (m.negated) {
-        if (excludedByDirectory) continue; // unreachable re-include
+        if (excludedParents.size > 0) continue; // unreachable re-include
         excluded = false;
       } else {
         excluded = true;
-        // `directoryOnly` stays in the disjunction because a trailing-slash pattern
-        // deliberately does NOT match the bare directory name — `generated/` needs a
-        // segment below it — so the ancestor probe alone would miss exactly the case
-        // the first attempt did handle.
-        excludedByDirectory =
-          m.directoryOnly ||
-          parents.some((parent) => matchesPattern(raw, parent, dialect)?.hit === true);
       }
     }
     return excluded;
@@ -513,6 +530,81 @@ describe("the SHA file survives every ignore filter between the repo and the bui
     }
   });
 
+  it("never under-matches what real git ignores — checked against git, not a table", () => {
+    // THE STRUCTURAL FIX, and it is here because the hand-written table failed four
+    // times in a row. A table only ever contains the cases its author thought of;
+    // every gap found in this matcher — `/x`, `**/x`, `?`, `[…]`, directory-only,
+    // `[]t]`, `[\t]`, `[\]]`, the re-include rule, then its ordering — was invisible
+    // to the table precisely because I had not thought of it. `git check-ignore` is
+    // the real oracle and it is already a dependency of this file, so ask it.
+    //
+    // The assertion is one-directional on purpose: this compiler PROMISES to
+    // over-match rather than under-match, so git-ignores-it while we say safe is a
+    // silent pass and fails here, and the reverse is allowed by contract.
+    //
+    // A fresh repo per case, deliberately: reusing one leaves real directories
+    // behind from earlier cases, which changes how git reads a directory-only
+    // pattern and produced a false divergence when this was first attempted.
+    const FILE = BUILD_SHA_FILENAME;
+    const NESTED = `generated/${FILE}`;
+    const corpus: Array<[lines: string[], target: string]> = [
+      [[FILE], FILE],
+      [[`/${FILE}`], FILE],
+      [[`**/${FILE}`], FILE],
+      [["*.txt"], FILE],
+      [["vt-*"], FILE],
+      [["**"], FILE],
+      [["vt-build-sha.tx?"], FILE],
+      [["vt-build-sha.[tx]xt"], FILE],
+      [["vt-build-sha.tx[]t]"], FILE], // leading `]` is a literal for wildmatch
+      [["vt-build-sha.tx[\\t]"], FILE], // `\` means "literal next char", not TAB
+      [["[\\]]"], FILE], // does not even compile as a JS regex
+      [["vt-build-sha.tx[a-z]"], FILE],
+      [["generated"], NESTED],
+      [["generated/"], NESTED],
+      [["/generated"], NESTED],
+      [["/generated/"], NESTED],
+      [["generated/*"], NESTED],
+      [["generated/**"], NESTED],
+      [["**/generated/**"], NESTED],
+      [["generated", NESTED, `!${NESTED}`], NESTED],
+      [[NESTED, "generated", `!${NESTED}`], NESTED],
+      [["generated/", `!${NESTED}`], NESTED],
+      [["*.txt", `!${FILE}`, "*.txt"], FILE], // last match wins, at file level
+    ];
+
+    const underMatched: Array<{ lines: string[]; target: string }> = [];
+    for (const [lines, target] of corpus) {
+      const dir = mkdtempSync(join(tmpdir(), "vt-ignore-oracle-"));
+      try {
+        execFileSync("git", ["-C", dir, "init", "-q"], { stdio: "ignore" });
+        execFileSync("git", ["-C", dir, "config", "core.excludesFile", "/dev/null"]);
+        writeFileSync(join(dir, ".gitignore"), `${lines.join("\n")}\n`, "utf8");
+        const parent = join(dir, target.includes("/") ? target.split("/")[0] : "");
+        if (target.includes("/")) execFileSync("mkdir", ["-p", parent]);
+        writeFileSync(join(dir, target), "", "utf8");
+        let gitIgnores = true;
+        try {
+          execFileSync("git", ["-C", dir, "check-ignore", "-q", target], { stdio: "ignore" });
+        } catch (error) {
+          const { status } = error as { status?: unknown };
+          if (status !== 1) throw error; // 128 = git could not answer; never a pass
+          gitIgnores = false;
+        }
+        if (gitIgnores && !excludesFromLines(lines, target, "git")) {
+          underMatched.push({ lines, target });
+        }
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    }
+
+    expect(underMatched).toEqual([]);
+    // 60s, not the 5s default: this spawns a fresh `git init` per corpus row and
+    // measured 6.8s locally, so it timed out on its first run — the same defect the
+    // review found in the sibling suite, walked straight into one file over.
+  }, 60_000);
+
   it("reads .dockerignore with Docker's rules, not git's", () => {
     // Docker/BuildKit parse .dockerignore with moby/patternmatcher, which runs
     // filepath.Clean on every pattern. Verified against that library: each line
@@ -547,9 +639,26 @@ describe("the SHA file survives every ignore filter between the repo and the bui
         { parent, excluded: true },
       );
     }
-    // A negation still works when the exclusion came from a FILE pattern, which is
-    // the case git does honour — so this is a scoped rule, not a blanket one.
-    expect(excludesFromLines([NESTED, `!${NESTED}`], NESTED, "git")).toBe(false);
+    // ORDER MATTERS, and a boolean flag got this wrong: a file-level rule arriving
+    // after the parent rule must not wipe out the parent exclusion. Every row below
+    // is what real `git check-ignore` returns, one fresh repo per row.
+    const ordered: Array<[lines: string[], excluded: boolean]> = [
+      [["generated", NESTED, `!${NESTED}`], true], // file rule between: still ignored
+      [[NESTED, "generated", `!${NESTED}`], true], // parent rule arrives second
+      [["generated", "!generated"], false], // negating the DIRECTORY re-includes
+      [["generated", "!generated", `!${NESTED}`], false],
+      [["generated/", "!generated/"], false],
+      [["generated", "!generated/"], false],
+      // A negation still works when the exclusion came from a FILE pattern, which is
+      // the case git does honour — so this is a scoped rule, not a blanket one.
+      [[NESTED, `!${NESTED}`], false],
+    ];
+    for (const [lines, excluded] of ordered) {
+      expect({ lines, excluded: excludesFromLines(lines, NESTED, "git") }).toEqual({
+        lines,
+        excluded,
+      });
+    }
   });
 
   it("is not matched by .railwayignore or .dockerignore", () => {
