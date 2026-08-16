@@ -51,6 +51,7 @@
  *                              reported as such rather than polled to timeout (default 60)
  */
 import { execSync } from "node:child_process";
+import { NOT_FOUND_PROBE_PATH, PROD_CLIENT_PROBE_PATHS } from "./lib/prod-probe-paths";
 
 const DEFAULT_PROD = "https://vettrack.uk";
 const DEFAULT_TIMEOUT_SECS = 600;
@@ -707,20 +708,22 @@ async function main(): Promise<void> {
   // through to the SPA catch-all as 200 text/html. A probe that asks the server
   // about itself cannot detect client/server drift; it must ask the question the
   // client asks.
-  for (const path of [
-    "/api/appointments",
-    "/api/billing",
-    "/api/tasks/dashboard",
-    "/api/shift-handover/summary",
-    "/api/clinical-check-in/me/active",
-  ]) {
+  //
+  // THE LIST LIVES IN A MODULE BECAUSE THAT PARAGRAPH WAS NOT TRUE. When this
+  // script first reached its probes (2026-08-16) two of the five paths here were
+  // called by no client and registered by no router — see the history in
+  // scripts/lib/prod-probe-paths.ts. The rule is now asserted offline against the
+  // real route graph and the real client tree by
+  // tests/api-client-server-path-contract.test.ts, so it is a check rather than a
+  // comment asking the next editor to remember it.
+  for (const path of PROD_CLIENT_PROBE_PATHS) {
     if (!(await probeApi(cfg, path))) pass = false;
   }
 
   // Any unmatched /api/* path must be a JSON 404, never the SPA shell. This is
   // the generalized guard: without it, every future client/server path drift
   // reappears as a misleading 200 text/html instead of a debuggable error.
-  if (!(await probeApiNotFound(cfg, "/api/__does_not_exist__"))) pass = false;
+  if (!(await probeApiNotFound(cfg, NOT_FOUND_PROBE_PATH))) pass = false;
 
   // NON-FATAL BY CONSTRUCTION, not by convention. Everything from the fetch to the
   // last WARN is inside this try, and the catch only prints: no path through this

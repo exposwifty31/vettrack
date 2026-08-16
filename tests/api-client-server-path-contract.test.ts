@@ -38,6 +38,13 @@ import { describe, it, expect } from "vitest";
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import type { Express, Router } from "express";
+import {
+  NOT_FOUND_PROBE_PATH,
+  PROD_CLIENT_PROBE_PATHS,
+} from "../scripts/lib/prod-probe-paths";
+
+/** Named in failure messages so the fix location is in the output, not in tribal memory. */
+const PROBE_LIST_FILE = "scripts/lib/prod-probe-paths.ts";
 
 /** A registered mount: the path passed to `app.use` plus the router mounted there. */
 type Mount = { path: string; router: unknown };
@@ -242,6 +249,23 @@ function isServable(client: ClientPath, routes: string[][]): boolean {
   });
 }
 
+/**
+ * Every full path the server registers, as segment arrays.
+ *
+ * Extracted so the deploy-probe test below reads the SAME route graph as the
+ * client-path test rather than a second walker that could disagree with it. The
+ * original test keeps its own inline copy deliberately: it is the load-bearing
+ * assertion in this file and is left byte-for-byte alone.
+ */
+async function registeredRouteSegments(): Promise<string[][]> {
+  const appLevel = await appLevelRoutes();
+  const servable = new Set<string>(appLevel.exact);
+  for (const mount of [...(await collectMounts()), ...appLevel.mounts]) {
+    expandRouter(mount.path, mount.router, servable);
+  }
+  return [...servable].map(segments);
+}
+
 describe("client → server API path contract", () => {
   it("every /api path the web client calls resolves to a registered server route", async () => {
     const appLevel = await appLevelRoutes();
@@ -267,6 +291,66 @@ describe("client → server API path contract", () => {
     ).toEqual([]);
     // Importing the whole route graph and reading every client source file runs
     // in ~3s alone but contends for CPU under the full parallel suite.
+  }, 30_000);
+
+  /**
+   * The deploy verifier's probe list is a THIRD artifact that can drift from the
+   * other two, and nothing was comparing it to either.
+   *
+   * Run against production for the first time on 2026-08-16, it failed on
+   * `/api/billing` (no router, no mount, no client call site — only dead
+   * query-key registry entries) and `/api/shift-handover/summary` (the router
+   * serves `/current`, which is what the client calls). Two of its five "client
+   * paths" were asked by no client, so the script could report FAIL on a
+   * perfectly healthy deploy — and wiring it into CI in that state would have
+   * made the post-deploy step permanently red on two non-defects.
+   *
+   * `scripts/verify-prod-deploy.ts` itself cannot be imported here: it calls
+   * `main()` at module scope, so importing it would open sockets. That is why the
+   * list lives in `scripts/lib/prod-probe-paths.ts`.
+   *
+   * What this CANNOT prove: that each probe answers 401 rather than 200. Route
+   * registration is visible statically; middleware order is not. That half is
+   * established by running the verifier against the deployed server, which is
+   * the script's whole job. This test only guarantees the list asks questions a
+   * client asks about routes the server has.
+   */
+  it("every path the deploy verifier probes is a real client path on a registered route", async () => {
+    const routes = await registeredRouteSegments();
+    const clientPaths = clientApiPaths(clientSourceFiles());
+
+    expect(PROD_CLIENT_PROBE_PATHS.length, "the deploy verifier probes nothing").toBeGreaterThan(0);
+
+    const notOnServer = PROD_CLIENT_PROBE_PATHS.filter(
+      (path) => !isServable({ path, file: PROBE_LIST_FILE, openEnded: false }, routes),
+    );
+    expect(
+      notOnServer,
+      `${PROBE_LIST_FILE} probes paths the server does not register. The verifier would\n` +
+        `report FAIL on a healthy deploy, and as a CI step it would be red forever.`,
+    ).toEqual([]);
+
+    const notCalledByClient = PROD_CLIENT_PROBE_PATHS.filter(
+      (path) => !clientPaths.some((c) => sameShape(segments(path), segments(c.path))),
+    );
+    expect(
+      notCalledByClient,
+      `${PROBE_LIST_FILE} probes paths no client requests. A probe exists to detect\n` +
+        `client/server drift, so a path no client calls cannot detect anything — it can\n` +
+        `only fail on a healthy deploy. Probe the path the client actually calls.`,
+    ).toEqual([]);
+
+    // The 404 guard is the one entry that must NOT be a client path.
+    expect(
+      clientPaths.some((c) => sameShape(segments(NOT_FOUND_PROBE_PATH), segments(c.path))),
+      `${NOT_FOUND_PROBE_PATH} is supposed to match no route — if a client calls it, the\n` +
+        `unmatched-path guard is probing something real and proves nothing.`,
+    ).toBe(false);
+    expect(
+      isServable({ path: NOT_FOUND_PROBE_PATH, file: PROBE_LIST_FILE, openEnded: false }, routes),
+      `${NOT_FOUND_PROBE_PATH} resolves to a registered route, so the JSON-404 probe would\n` +
+        `assert 404 against a path that legitimately answers something else.`,
+    ).toBe(false);
   }, 30_000);
 
   it("leaves no unreadable route or client literal behind", () => {
