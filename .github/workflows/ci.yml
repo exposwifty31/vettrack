@@ -308,11 +308,68 @@ jobs:
       - name: 🚀 Deploy
         run: bash deploy.sh --no-color
 
+  # E1 — the deploy that just ran is asked, from the outside, whether it is the
+  # revision we shipped and whether the paths CLIENTS call still answer JSON.
+  #
+  # This is the step that was missing when A1 shipped: the mount moved to
+  # /api/clinical, every unit test passed, and the path both clients call fell
+  # through to the SPA catch-all as 200 text/html for ~24h. Nothing in CI asked the
+  # running server a client's question.
+  #
+  # Separate job, not a step in `deploy`: that job holds RAILWAY_TOKEN and the
+  # production secrets, and a verification step needs none of them. It also needs a
+  # Node/pnpm toolchain the deploy job deliberately does not set up.
+  #
+  # No sleep and no fixed wait. `deploy.sh` returns when Railway has accepted the
+  # deploy, not when it is live, so the verifier polls /api/version until gitCommit
+  # matches this run's SHA — then and only then does it probe. Before 2026-08-16 it
+  # could never get that far: the build reported gitCommit: null and the script
+  # polled to its own timeout, which is why wiring it up had to wait for #184.
+  verify-deploy:
+    name: 🔎 Verify production deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: [deploy]
+    # A skipped `deploy` skips this too (GitHub skips dependents of skipped jobs),
+    # so PRs and kill-switched runs never reach it. Stated explicitly anyway: a
+    # verification that runs when nothing was deployed would assert against
+    # whatever revision happens to be live.
+    if: needs.deploy.result == 'success'
+
+    steps:
+      - name: ⬇️ Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: 📦 pnpm
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.4.0
+        with:
+          run_install: false
+
+      - name: 🟢 Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version-file: ".nvmrc"
+          cache: "pnpm"
+
+      - name: 📥 Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Quoted deliberately. An unquoted empty $GITHUB_SHA would vanish from the
+      # command line and the script would take its default; quoted, it arrives as a
+      # supplied-but-empty argument, which the script rejects as a broken command
+      # line rather than silently verifying the wrong thing.
+      - name: 🔎 verify-prod-deploy
+        run: pnpm verify:prod-deploy "$GITHUB_SHA"
+        env:
+          GITHUB_SHA: ${{ github.sha }}
+
   gate:
     name: ✅ Merge gate
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    needs: [typecheck, build, test, integration-ops, architecture-gates, deploy]
+    needs: [typecheck, build, test, integration-ops, architecture-gates, deploy, verify-deploy]
     if: always()
 
     steps:
@@ -343,6 +400,18 @@ jobs:
               echo "ℹ️ Railway deploy skipped (RAILWAY_USE_CLI_DEPLOY disabled)"
             else
               echo "❌ Railway deploy job did not succeed"
+              exit 1
+            fi
+          fi
+          # Skipped is tolerated for the same reason as deploy: no deploy, nothing to
+          # verify. A FAILURE is not tolerated — it means the revision that is live is
+          # not the one we shipped, or a path a client calls stopped answering JSON.
+          # That is precisely the A1 signal, and it must be loud rather than advisory.
+          if [[ "${{ needs.verify-deploy.result }}" != "success" ]]; then
+            if [[ "${{ needs.verify-deploy.result }}" == "skipped" ]]; then
+              echo "ℹ️ Production deploy verification skipped (no deploy ran)"
+            else
+              echo "❌ Production deploy verification failed — the live revision or a client path is wrong"
               exit 1
             fi
           fi

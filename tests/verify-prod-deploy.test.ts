@@ -33,6 +33,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { spawn, execSync } from "node:child_process";
 import { createServer, type Server } from "node:http";
+import { PROD_CLIENT_PROBE_PATHS } from "../scripts/lib/prod-probe-paths";
 import type { AddressInfo } from "node:net";
 import { resolve } from "node:path";
 
@@ -50,13 +51,20 @@ const SCRIPT = resolve(REPO_ROOT, "scripts/verify-prod-deploy.ts");
 const TSX = resolve(REPO_ROOT, "node_modules/.bin/tsx");
 
 const TARGET = "abcd1234";
-const PROBE_PATHS = [
-  "/api/appointments",
-  "/api/billing",
-  "/api/tasks/dashboard",
-  "/api/shift-handover/summary",
-  "/api/clinical-check-in/me/active",
-];
+
+/**
+ * The paths the stub answers `401 application/json` on — DERIVED from the list the
+ * script probes, never a copy of it.
+ *
+ * It was a copy until 2026-08-16, and that made the stub the third independent
+ * transcription of the same list (script, stub, nothing else checking either). The
+ * cost was concrete: when the script's list was corrected, all 30 exit-0 cases in
+ * this file failed — not because the script regressed, but because the stub had
+ * never heard of the corrected paths and answered 404. A stub that must be edited
+ * in lockstep with the thing it stands in for will eventually disagree with it, and
+ * a disagreeing stub reports a defect in whichever side happens to be right.
+ */
+const PROBE_PATHS: readonly string[] = PROD_CLIENT_PROBE_PATHS;
 
 /**
  * Stub production server. `commits` is consumed one entry per /api/version call;

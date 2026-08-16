@@ -32,6 +32,7 @@
     "worker": "pnpm worker:notifications",
     "worker:notifications": "tsx server/workers/notification.worker.ts",
     "validate:prod": "tsx scripts/validate-prod.ts",
+    "verify:prod-deploy": "tsx scripts/verify-prod-deploy.ts",
     "auth:preflight": "tsx scripts/auth-preflight.ts",
     "auth:user-status": "tsx scripts/dev-user-status.ts",
     "test": "vitest run",
