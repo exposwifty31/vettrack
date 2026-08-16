@@ -97,6 +97,13 @@ wait_for_deploy() {
 deploy_service() {
   local svc="$1"
   echo "🚀 Deploying to Railway (service: $svc)..."
+  # The upload tarball is the ONLY channel that carries the commit SHA into the
+  # build: `railway up` strips .git and the Dockerfile declares no SHA build ARG,
+  # so without this the build stamps `gitCommit: null` and verify-prod-deploy.ts
+  # polls a predicate that can never match. Run per-upload (both services build
+  # from the same Dockerfile); it is idempotent and overwrites in place.
+  # set -e aborts the deploy if the SHA cannot be resolved — never ship a blank file.
+  bash "$(dirname "$0")/scripts/write-build-sha.sh"
   railway_cli up --service "$svc" --ci
   wait_for_deploy "$svc"
 }

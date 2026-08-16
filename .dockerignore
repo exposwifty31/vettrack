@@ -9,6 +9,10 @@
 # Runtime dirs the Express server needs at `pnpm start` (server/, lib/, shared/,
 # shared-contracts/, locales/, migrations/, public/, scripts/, src/) are NOT listed.
 
+# DO NOT add a pattern matching vt-build-sha.txt. With .git/ excluded below, that
+# file is the only way the commit SHA reaches `vite build`; excluding it silently
+# restores `gitCommit: null`. See scripts/build-sha.ts; pinned by tests/deploy-build-sha.test.ts.
+
 # VCS
 .git/
 .gitignore

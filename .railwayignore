@@ -1,3 +1,8 @@
+# DO NOT add a pattern matching vt-build-sha.txt. It is the only channel carrying
+# the commit SHA into the build (`railway up` strips .git; the Dockerfile has no
+# SHA ARG), so excluding it silently restores `gitCommit: null` in /api/version.
+# See scripts/build-sha.ts; pinned by tests/deploy-build-sha.test.ts.
+
 # Dependencies and build output — Railway runs pnpm install + pnpm build (see railway.json)
 node_modules/
 dist/

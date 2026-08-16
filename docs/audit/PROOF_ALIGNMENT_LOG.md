@@ -6872,3 +6872,263 @@ behaviour until #183 merges; `scripts/verify-prod-deploy.ts` (probing the **clie
 JSON-404 assertion) is the post-merge check and has not run against the deployed server yet.
 
 **Verdict:** VERIFIED (code + tests) / PARTIAL (production behaviour pending deploy)
+
+## 2026-08-16 (IDT, = 2026-08-15 22:41 UTC) — PR #184 CodeRabbit round: 11 findings (1e8dfd20c, 34ad8ab0f, f4eefebf5)
+
+> Dated in the committer's timezone, which is what `git log` records:
+> `1e8dfd20c 2026-08-16T01:41:14+03:00`. A reader on UTC sees 2026-08-15 and
+> would reasonably read this heading as a future date — CodeRabbit did. The
+> offset is stated rather than the date being changed, because moving it to
+> 08-15 would contradict every commit timestamp in the entry.
+
+**Claim:** All 11 CodeRabbit findings on `fix/deploy-sha-fallback` are fixed, each one verified
+against the real failure mode rather than accepted from the description. Every finding turned out
+to be the same shape as the defect the PR itself fixes — a check that reports success while having
+learned nothing.
+
+**Evidence — producer:**
+- **P1 `scripts/write-build-sha.sh:20`** (Major). Ran the script against an unwritable target dir:
+  `BEFORE fix: exit=0` / `AFTER fix: exit=1`. Under `set -u` alone a failed redirection let the
+  next line succeed and the script exit 0, so `deploy.sh` proceeded to `railway up` with no SHA
+  file — `deploy.sh`'s own `set -e` cannot help when the child reports success. Now `set -eu`; the
+  one tolerated non-zero (`git rev-parse` fallback) was already `|| true`-guarded.
+- **P2 `scripts/build-sha.ts:81`** — catch now names the path and the error before returning null.
+
+**Evidence — consumer:**
+- **C1 `verify-prod-deploy.ts:292`** — `return prod.replace(/\/+$/, "");`. A trailing slash built
+  `//api/version`, a false-fail on otherwise verifiable input (header invariant B).
+- **C2 `:898`** — `worker` read and normalised once into `workerStatus`; gates are now
+  `=== undefined` / `!== "ok"`. **58/58 passed with no test edits**, which is the evidence it is
+  behaviour-neutral rather than believed to be. `f4eefebf5` removed the last redundant cast in
+  this block
+  (`Object.keys(checks)`, redundant — the guard above already narrows to a non-null object). The
+  deliberate `checks as Record<string, unknown> | undefined` on the `rawWorker` read remains, and
+  so do the `as const` / `as readonly string[]` elsewhere in the file — "last cast" would have
+  been an overclaim.
+- **C3 `:755`** — header 90 → 50 lines, six in-body narration blocks condensed. Comment density
+  430/936 (45%) → 359/865 (41%).
+
+**Evidence — tests:**
+- **T1 `verify-prod-deploy.test.ts:267`** (Major). `code ?? 1` on SIGKILL made a hung verifier
+  indistinguishable from an expected failure. Measured with the cap dropped to 250 ms so every
+  child is killed: **before 28/58 PASSED against a totally hung verifier; after, 10 pass** (the ten
+  that never spawn one) and 48 fail loudly. The fix converts 18 silently-passing cases into
+  failures. Rejects rather than resolving with a sentinel — a hang is never an expected outcome.
+- **T2 `deploy-build-sha.test.ts:271`** (Major). Confirmed the old `*`-only matcher scored
+  "not excluded" for `/vt-build-sha.txt`, `**/vt-build-sha.txt`, `vt-build-sha.tx?` and
+  `vt-build-sha.[tx]xt` — four of five real pattern shapes. Replaced with a gitignore-syntax
+  compiler (anchoring, `**`, `**/`, `*`, `?`, `[…]`/`[!…]`, `\` escapes) plus a 13-case table
+  (8 must-exclude, 5 must-not) that guards the guard; all 13 verified correct.
+- **T3 `:224`** — `git check-ignore` on a non-repo exits **128**, and the old catch turned that
+  into a PASS: `real repo {"kind":"not_ignored"}` vs `not-a-repo {"kind":"check_failed",
+  "detail":"status=128 code=undefined"}`. Now three cases, asserted with
+  `toEqual({kind:"not_ignored"})`.
+- **T4 `:134`, T5 `:1459`** — inline reasons on both `!` assertions and the `AddressInfo` cast;
+  "a empty" → "an empty".
+- **T6 `:1511`** (Major, `34ad8ab0f`). Verified real: no `testTimeout` in the root config, so the
+  5 s default applied while every case spawns a `tsx` child `spawnVerifier` allows 45 s. Exactly
+  seven cases lacked a `}, N)` (1412, 1433, 1446, 1459, 1472, 1485, 1499). RED: a 6 s sleep in the
+  first → `Error: Test timed out in 5000ms`. GREEN: same sleep passes after the fix. Set once via
+  `vi.setConfig({ testTimeout: 90_000 })` rather than seven copies, and **proved this does not
+  loosen the 51 existing bounds** — a case declaring `}, 1000)` under a 90 000 file default still
+  fails with `Test timed out in 1000ms`.
+
+**Commands:**
+- `pnpm test` → `Test Files 729 passed (729) · Tests 6602 passed | 11 skipped (6613)`
+- `npx tsc --noEmit` and `npx tsc -p tsconfig.server.json --noEmit` → both clean.
+- All 11 threads replied to individually and resolved; `unresolved=0` via GraphQL.
+
+**Not yet verified:** CodeRabbit's re-review of the three new commits, and CI on the pushed head.
+`reviewDecision` is still `CHANGES_REQUESTED` from the prior round and has not been re-issued.
+
+**Verdict:** VERIFIED (all 11 fixed, each red-first or measured) / PENDING (re-review + CI)
+
+## 2026-08-16 (IDT, = 2026-08-15 22:54 UTC) — PR #184 CodeRabbit round 2: the directory-only hole I opened (1030a6325)
+
+**Claim:** CodeRabbit confirmed 9 of the 11 round-1 fixes and found one genuine remaining gap — in
+the matcher I wrote to close the round-1 gap. Fixed and proven.
+
+**Evidence:**
+- CodeRabbit's round-2 verdicts, read individually rather than in aggregate: P1/P2/C1/C2/C3/T1/T4/
+  T5/T6 all confirmed addressed (comment_ids 3790438256, 3790438269, 3790438285, 3790438321,
+  3790438355, 3790438398, 3790438457, 3790438458, 3790438472, 3790439101). The ♻️ "duplicate"
+  re-raising the seven unbounded worker cases was generated before it read `34ad8ab0f`; its own
+  later inline reply (3790438458) accepts the `vi.setConfig` fix, so no action was owed.
+- **Real finding (3790438887):** `matchesPattern` returned `null` for every trailing-slash pattern.
+  The comment justified this with "a directory pattern cannot exclude a file" — true of the one
+  path the function is called with, false of its signature, which takes any path. `generated/` does
+  exclude `generated/vt-build-sha.txt`. The skip would have gone silent the moment the SHA file
+  moved out of the repo root: the same "passes having learned nothing" failure the round-1 rewrite
+  removed, reintroduced one layer down by the rewrite itself.
+- Handled rather than API-narrowed (the finding offered both). A directory-only pattern now
+  compiles with a **required** segment below the match (`/.*` not `(?:/.*)?`), so `generated/` hits
+  `generated/anything` and never a plain file named `generated`. A bare `/` names nothing.
+- Self-test table rebuilt as **19 pattern/path triples over two paths**, up from 13 patterns over
+  one. That is the transferable lesson: a matcher only ever exercised against a single root-level
+  file can hide an entire rule, and did.
+- RED: with the old skip restored, the table fails on exactly `["generated/", NESTED]` —
+  `1 failed | 18 passed`. GREEN after restore: `19 passed`.
+
+**Commands:**
+- `pnpm test` → `Test Files 729 passed (729) · Tests 6602 passed | 11 skipped (6613)`
+- `npx tsc --noEmit` → clean.
+- GraphQL: `threads=11 unresolved=0`.
+
+**Not yet verified:** the third CodeRabbit pass over `1030a6325`, and CI on that head.
+`reviewDecision` is still the stale `CHANGES_REQUESTED` from round 1.
+
+**Verdict:** VERIFIED (fix + red-first proof) / PENDING (round-3 review + CI)
+
+## 2026-08-16 (IDT, = 2026-08-15 UTC) — PR #184 CodeRabbit round 3: code clean, two corrections to THIS log
+
+**Claim:** Round 3 found no blocking issue in the code — *"The directory-only implementation is
+correct"* (issue comment 5304624553, and inline 3790447173 confirming `1030a63`). Both remaining
+findings were against this audit log, and both were right.
+
+**Evidence:**
+- **Date (3790447178).** CodeRabbit read the `2026-08-16` heading as a future date. Checked rather
+  than conceded: `date` → `Sun Aug 16 01:59 IDT 2026`, `TZ=UTC date` → `Sat Aug 15 22:59 UTC 2026`,
+  and `git log --date=iso-strict` records `1e8dfd20c 2026-08-16T01:41:14+03:00`. Both frames are
+  correct; the heading was ambiguous. Fixed by stating the offset and the UTC equivalent rather
+  than by changing the date, because moving it to 08-15 would contradict every commit timestamp
+  the entry cites.
+- **Overclaim (3790447180).** The log said `f4eefebf5` "removed the last cast". Verified false:
+  `scripts/verify-prod-deploy.ts` still carries the deliberate
+  `checks as Record<string, unknown> | undefined` on the `rawWorker` read, plus `as const` and
+  `as readonly string[]`. Corrected to "the last redundant cast in this block", with the surviving
+  casts named. A proof log that overclaims is worse than none — it is the document whose whole
+  value is that its statements can be trusted without re-checking.
+
+**Verdict:** VERIFIED — code clean at round 3; two log corrections applied, both self-checked
+against the tools rather than accepted or dismissed on the reviewer's word.
+
+## 2026-08-16 (IDT, = 2026-08-15 UTC) — PR #184 closed out: four review rounds, CI fully green
+
+**Claim:** Every CodeRabbit finding across four rounds is fixed and confirmed by the reviewer that
+raised it; all CI checks pass. One non-code item remains and it is not mine to clear.
+
+**Evidence:**
+- Round 1 — 11 findings, all fixed (`1e8dfd20c`, `34ad8ab0f`, `f4eefebf5`).
+- Round 2 — 9 confirmed; 1 real gap found **in the fix I wrote for round 1** (the directory-only
+  skip). Fixed `1030a6325`, red-first.
+- Round 3 — code clean; 2 findings against this log (ambiguous date, "last cast" overclaim). Fixed
+  `06bf93155`, both self-checked against `date`/`TZ=UTC date`/`git log` and a cast inventory rather
+  than accepted or dismissed on the reviewer's word.
+- Round 4 (review `4944898391`, 23:01:26Z, over `06bf93155`) — *"I found no new blocking issue. The
+  date correction is accurate. The cast correction is accurate."*
+- Review threads: `total=13 unresolved=0`.
+- CI on `06bf93155`: Typecheck · Frontend build · Tests shards 1–4 · Playwright shards 1–2 ·
+  Integration ops · Architecture gates (G1) · Static resubmission gates · **Merge gate** — all
+  SUCCESS. `mergeStateStatus=CLEAN`.
+- Local: `pnpm test` → 729 files / 6602 passed / 11 skipped; `tsc --noEmit` and
+  `tsc -p tsconfig.server.json --noEmit` clean.
+
+**Open, and owner-gated:** `reviewDecision` still reads `CHANGES_REQUESTED` from review
+`4944890213` (22:55:26Z) — the round-3 doc nits, both since fixed and confirmed by review
+`4944898391` five minutes later. A COMMENTED review does not clear a CHANGES_REQUESTED, so the
+decision is stale rather than open. Dismissing it was attempted and **blocked by the permission
+gate**, correctly: dismissing someone's review is a state change on the PR. Left for the owner.
+Merging is likewise the owner's call per `.claude/rules/agent-conduct.md` §2.
+
+**Verdict:** VERIFIED — all findings closed, all checks green, `merge=CLEAN`. One stale review
+decision awaiting an owner action.
+
+## 2026-08-16 (IDT, = 2026-08-15 UTC) — PR #184 adversarial pass: 3 of 4 claims broke (e3a23b5d1)
+
+**Claim:** Before declaring #184 done I ran four independent skeptics, each paid to REFUTE one of my
+claims rather than confirm it. Three broke. Every counterexample was re-derived here before acting —
+a reviewer paid to refute will sometimes manufacture a refutation, and one of theirs did not survive.
+
+**Why the pass ran at all:** five strong claims earlier in this session were wrong (the EAS env vars,
+K4, the skills roster, the "34 safe branches", my own `getBackgroundNdef` correction) and every one
+was caught only by independent verification. The failure shape is always the same — a search of one
+location treated as evidence of absence. This round added a sixth instance, below.
+
+**Evidence:**
+
+1. **The suite was not testing the source.** A stray `tsc` had left `scripts/build-sha.js` and
+   `vite.config.js` on disk. Vite's `DEFAULT_CONFIG_FILES` resolves `vite.config.js` **before**
+   `vite.config.ts`, and `from "../scripts/build-sha.js"` binds to a real sibling `.js`. Measured
+   with a total mutation of `resolveBuildSha` (`return "MUTANT-SHA"`):
+   - stale `.js` present → `Tests 6 passed` — green against dead code
+   - stale `.js` moved aside → `Tests 6 failed`
+   `.gitignore:125-133` already documents this exact mechanism. **Ignoring the artifacts stops them
+   being committed and does nothing about the shadowing**, which is local, silent, and structurally
+   invisible to CI (fresh checkout). So every local run I cited for `resolveBuildSha` in this PR was
+   worthless — the conclusion happened to be right, verified by re-running against the real TS:
+   `19 passed`. New guard added; RED proof: with the shadow restored **and** the source mutated,
+   **20 of 21 cases still passed** and only the guard failed.
+2. **`.dockerignore` is not gitignore.** Docker/BuildKit parse it with `moby/patternmatcher`, which
+   runs `filepath.Clean` on every pattern (`./x`, `x/`, `a/../x` → `x`) and treats patterns as
+   root-relative. A single `./vt-build-sha.txt` line drops the SHA from the build context and
+   returns `gitCommit: null` — this file's entire subject — while `excludes()` reported it safe.
+   Dialects split; both directions asserted.
+3. **The "over-match, never under-match" promise was false.** Re-verified here against real
+   `git check-ignore`, fresh repo per case: `vt-build-sha.tx[]t]` → IGNORES, `vt-build-sha.tx[\t]`
+   (literal backslash, confirmed via `cat -A`) → IGNORES, `generated/` + `!generated/…` → IGNORES,
+   file-pattern + negation → keeps. The compiler scored the first two false and `[\]]` **threw**,
+   which takes the whole guard down. Unmodelable patterns now count as a hit; the documented
+   "cannot re-include under an excluded directory" rule is implemented.
+4. **The errexit finding got the fix but not the test it asked for.** `set -eu` → `set -u` was
+   undetectable by the suite. Now pinned on behaviour: resolvable SHA + unwritable destination must
+   exit non-zero **and print no success banner**. Measured — `set -eu` → exit 1, silent; `set -u` →
+   exit 0 with `🔖 Deploy context SHA: …`. Proven red.
+5. **Finding 3790097418 was answered as addressed and only partly was** — 3 of 5 named narration
+   blocks survived. Condensed, invariants kept.
+
+**Claim that SURVIVED refutation:** the `verify-prod-deploy.ts` changes. No input produces a false
+pass or a false fail; the `workerStatus` hoist is neutral across 12 shapes. One fair wording hit:
+"behaviour-neutral" is wrong for `resolveProd`, which deliberately changes the verdict on
+trailing-slash input — that is the point of the change, not a side effect.
+
+**Refutation that did NOT survive:** a skeptic first reported `generated/` vs a file named
+`generated` as a divergence; that was its own harness reusing one git repo across cases, and it
+retracted. Recorded because the discipline is symmetric — a skeptic's finding gets checked too.
+
+**Commands:** `pnpm test` → `Test Files 729 passed (729) · Tests 6607 passed | 11 skipped (6618)`;
+`npx tsc --noEmit` and `npx tsc -p tsconfig.server.json --noEmit` clean; `git status` clean of
+emit artifacts.
+
+**Verdict:** VERIFIED — 3 real defect classes closed, all silent-pass, none of which CI could have
+caught. The pass paid for itself.
+
+## 2026-08-16 (IDT, = 2026-08-15 UTC) — PR #184 rounds 5–6: four strikes, then a method change (55ffd3bc2)
+
+**Claim:** Two further review rounds each found a real gap **inside the fix I had just written for the
+previous one**. Rather than patch a fourth increment, the oracle was replaced.
+
+**The pattern, stated because it is the finding:** each round I fixed the case in front of me and
+described it as the rule.
+1. Matcher understood only `*` → wrote a compiler → skipped every trailing-slash pattern.
+2. Handled directory-only → keyed on how the pattern was *written* (`m.directoryOnly`), so
+   `generated` and `/generated` silently failed while `generated/` and `/generated/` passed.
+3. Keyed on what matched → but *assigned* the flag per line, so a file-level rule after the parent
+   rule wiped the parent exclusion and let a later negation through.
+
+**Evidence — round 5 (parent scoping).** `git check-ignore`, fresh repo per case: `generated`,
+`generated/`, `/generated`, `/generated/` all keep `generated/vt-build-sha.txt` ignored after a
+negation; only a pattern matching the FILE re-includes. RED: reverting to
+`excludedByDirectory = m.directoryOnly` fails on exactly `parent: 'generated'`.
+
+**Evidence — round 6 (ordering).** Six orderings measured against git established that the state is
+per-directory, **sticky through file-level rules**, and cleared only by a negation naming the
+directory. Modelled as a `Set` of excluded ancestors; assignment was the bug, membership is the rule.
+
+**The structural fix, which is the real deliverable.** A hand-written table only ever holds the cases
+its author thought of — which is precisely why every gap above was invisible to it. Added a case that
+runs a 23-row corpus through **real `git check-ignore`** (fresh repo per row; reuse leaves
+directories behind and changes how git reads a directory-only pattern, which produced a false
+divergence on the first attempt) and asserts the compiler never UNDER-matches. One-directional by
+contract. Proven to earn its place, independently of the table:
+- revert the character-class fix → oracle reports **2** under-matches
+- revert the re-include guard → oracle reports **3**
+Both are bugs that cost a full review round each to find by hand.
+
+**And it caught me once more on the way in:** the oracle timed out on its first run at 6.8s against
+the 5s default — the same defect the T6 finding was about, one file over. Given an explicit 60s.
+
+**Commands:** `pnpm test` → `Test Files 729 passed (729) · Tests 6608 passed | 11 skipped (6619)`;
+`npx tsc --noEmit` clean. CI on the prior head `76b674d40`: ALL CHECKS GREEN, `merge=CLEAN`.
+
+**Verdict:** VERIFIED — and the transferable lesson is the method, not the patches: when the same
+defect class survives three fixes, replace the oracle rather than the increment.

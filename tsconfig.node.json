@@ -7,5 +7,7 @@
     "allowSyntheticDefaultImports": true,
     "strict": true
   },
-  "include": ["vite.config.ts"]
+  // scripts/build-sha.ts is imported by vite.config.ts; a composite project must
+  // list every file it pulls in (TS6307).
+  "include": ["vite.config.ts", "scripts/build-sha.ts"]
 }

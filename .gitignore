@@ -122,3 +122,14 @@ scripts/wetcheck/results-*.json
 android/keystore.properties
 *.jks
 *.keystore
+
+# TypeScript emit next to its own source — a committed/stale .js SILENTLY WINS.
+# Vite's DEFAULT_CONFIG_FILES resolves vite.config.js BEFORE vite.config.ts, and
+# `import ... from "./scripts/build-sha.js"` binds to a real emitted .js over the
+# .ts, so a stale artifact replaces the live config with no warning anywhere.
+# Verified none of these are tracked (2026-08-15) before ignoring them.
+/vite.config.js
+/vite.config.d.ts
+/scripts/build-sha.js
+/scripts/build-sha.d.ts
+*.tsbuildinfo
