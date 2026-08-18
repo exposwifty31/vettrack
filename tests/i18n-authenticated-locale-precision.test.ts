@@ -15,7 +15,6 @@ import { describe, it, expect, beforeAll, vi } from "vitest";
 import type { Request, Response, NextFunction } from "express";
 import { normalizeLocale, normalizeLocaleStrict } from "../lib/i18n/loader.js";
 import { resolveRequestLocale } from "../lib/i18n/middleware.js";
-import { resolveClerkLocalePreference } from "../server/middleware/auth.js";
 import { INITIAL_LOCALE, DEFAULT_LOCALE } from "../lib/i18n/types.js";
 
 type JsonBody = Record<string, unknown>;
