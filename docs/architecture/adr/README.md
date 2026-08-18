@@ -24,10 +24,14 @@ See **[TRIGGERS.md](./TRIGGERS.md)** for the full table (mirrors [architecture-h
 | ADR-004 | RFID reader selection & Israeli band (915–917 MHz) | proposed | [ADR-004-rfid-reader-selection-and-band.md](./ADR-004-rfid-reader-selection-and-band.md) |
 | ADR-005 | RFID HMAC-signing middleware placement | proposed | [ADR-005-rfid-hmac-middleware-placement.md](./ADR-005-rfid-hmac-middleware-placement.md) |
 | ADR-006 | RFID reader-side adapter boundary & advisory-only invariant | proposed | [ADR-006-rfid-adapter-boundary-and-advisory-invariant.md](./ADR-006-rfid-adapter-boundary-and-advisory-invariant.md) |
+| ADR-010 | Gate the dev clinic-override header behind dev-bypass in `tenantContext` | proposed | [ADR-010-dev-tenant-header-gating.md](./ADR-010-dev-tenant-header-gating.md) |
 
 New ADRs use **`docs/architecture/adr/NNN-slug.md`**. Legacy files stay in place until an optional move PR; do not renumber without team agreement.
 
-**Next suggested number:** ADR-007
+**Next suggested number:** ADR-011
+
+> Index note: ADR-007 and ADR-009 exist on disk but were never added to this
+> table. Left as-is here rather than backfilled — this PR only claims its own row.
 
 ## Lifecycle
 

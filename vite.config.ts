@@ -154,6 +154,13 @@ export default defineConfig(({ mode }) => {
         "tests/shift-chat-window.integration.test.ts",
         "tests/seed-reviewer-demo.integration.test.ts",
         "tests/doctor-shift-gate.integration.test.ts",
+        // Runs real DDL — CREATE TABLE + ENABLE/FORCE ROW LEVEL SECURITY +
+        // CREATE POLICY — against whatever DATABASE_URL is exported. It scopes
+        // itself to a zz_-prefixed probe table and self-skips on the placeholder
+        // URL, but `pnpm test` must never be a path to DDL on a database the
+        // developer merely happens to be pointed at. Same treatment every other
+        // DB-backed test here gets; run it deliberately via test:rls-pooling.
+        "tests/tenant-pooling-isolation.integration.test.ts",
         "tests/charge-alert-worker.test.js",
         "tests/code-blue-mode-equipment.test.js",
         "tests/equipment-scan-e2e.test.js",
