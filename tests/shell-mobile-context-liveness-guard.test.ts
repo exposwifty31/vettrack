@@ -84,6 +84,13 @@ function moduleSpecifiersOf(source: string, fileName: string): Set<string> {
     if ((ts.isImportDeclaration(node) || ts.isExportDeclaration(node))) {
       const spec = literal(node.moduleSpecifier);
       if (spec) found.add(spec);
+    } else if (ts.isImportTypeNode(node)) {
+      // `typeof import("x")` in a type position is a real dependency on x, and
+      // it is the form a lazily-imported module is usually typed with.
+      if (ts.isLiteralTypeNode(node.argument)) {
+        const spec = literal(node.argument.literal);
+        if (spec) found.add(spec);
+      }
     } else if (ts.isCallExpression(node)) {
       const callee = node.expression;
       const isDynamicImport = callee.kind === ts.SyntaxKind.ImportKeyword;
@@ -174,5 +181,30 @@ describe("src/shell/mobile/MobileShellContext.ts liveness guard", () => {
       reExports.get("MobileShellContext"),
       `${TARGET} must re-export NativeShellContext from the canonical module`,
     ).toBe("NativeShellContext@@/native/NativeShellContext");
+  });
+});
+
+describe("moduleSpecifiersOf covers every dependency form", () => {
+  const cases: ReadonlyArray<readonly [string, string]> = [
+    ["static import", `import { x } from "${SPECIFIER}";`],
+    ["re-export", `export { x } from "${SPECIFIER}";`],
+    ["dynamic import", `const m = await import("${SPECIFIER}");`],
+    ["require", `const m = require("${SPECIFIER}");`],
+    ["vi.mock", `vi.mock("${SPECIFIER}", () => ({}));`],
+    ["inline import type", `let m: typeof import("${SPECIFIER}");`],
+  ];
+
+  it.each(cases)("detects a %s", (_label, source) => {
+    expect(importsSpecifier(source, "probe.ts")).toBe(true);
+  });
+
+  const decoys: ReadonlyArray<readonly [string, string]> = [
+    ["a line comment", `// import { x } from "${SPECIFIER}";`],
+    ["a block comment", `/* export { x } from "${SPECIFIER}"; */`],
+    ["a string literal", `const doc = 'import "${SPECIFIER}"';`],
+  ];
+
+  it.each(decoys)("does NOT count %s", (_label, source) => {
+    expect(importsSpecifier(source, "probe.ts")).toBe(false);
   });
 });
