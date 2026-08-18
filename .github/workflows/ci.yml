@@ -49,7 +49,7 @@ jobs:
       # which incremental needs. .cache is keyed on lockfile+tsconfig, with restore-keys
       # falling back to the most recent partial cache.
       - name: ♻️ Restore tsc build info
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: .cache
           key: tsc-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml', 'tsconfig*.json') }}-${{ github.sha }}
