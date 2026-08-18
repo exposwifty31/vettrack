@@ -170,6 +170,16 @@ function importsXlsx(source: string, fileName: string): boolean {
       const dynamic = c.kind === ts.SyntaxKind.ImportKeyword;
       const req = ts.isIdentifier(c) && c.text === "require";
       if ((dynamic || req) && lit(node.arguments[0]) === "xlsx") found = true;
+    } else if (ts.isImportEqualsDeclaration(node)) {
+      // `import X = require("xlsx")` — the require() here is an
+      // ExternalModuleReference, not a CallExpression, so the branch above
+      // never sees it.
+      if (
+        ts.isExternalModuleReference(node.moduleReference) &&
+        lit(node.moduleReference.expression) === "xlsx"
+      ) {
+        found = true;
+      }
     }
     ts.forEachChild(node, visit);
   };
@@ -204,6 +214,11 @@ describe("xlsx (SheetJS CE) stays write-only and pinned", () => {
       READ_API_NAMES.has(n),
     );
     expect(reached.sort(), `${SOLE_IMPORTER} reaches a SheetJS read API`).toEqual([]);
+  });
+
+  it("parses TS import-equals syntax — import X = require(\"xlsx\") cannot slip the boundary", () => {
+    expect(importsXlsx('import XLSX = require("xlsx");', "probe.ts")).toBe(true);
+    expect(importsXlsx('// import XLSX = require("xlsx");', "probe.ts")).toBe(false);
   });
 
   it("is pinned to an exact version, because no upgrade will ever arrive on npm", () => {

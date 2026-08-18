@@ -101,6 +101,14 @@ function moduleSpecifiersOf(source: string, fileName: string): Set<string> {
         const spec = literal(node.arguments[0]);
         if (spec) found.add(spec);
       }
+    } else if (ts.isImportEqualsDeclaration(node)) {
+      // `import m = require("x")` — TS import-equals still reaches x. Its
+      // require() is an ExternalModuleReference node, NOT a CallExpression,
+      // so the branch above never sees it.
+      if (ts.isExternalModuleReference(node.moduleReference)) {
+        const spec = literal(node.moduleReference.expression);
+        if (spec) found.add(spec);
+      }
     }
     ts.forEachChild(node, visit);
   };
@@ -192,6 +200,7 @@ describe("moduleSpecifiersOf covers every dependency form", () => {
     ["require", `const m = require("${SPECIFIER}");`],
     ["vi.mock", `vi.mock("${SPECIFIER}", () => ({}));`],
     ["inline import type", `let m: typeof import("${SPECIFIER}");`],
+    ["import-equals", `import m = require("${SPECIFIER}");`],
   ];
 
   it.each(cases)("detects a %s", (_label, source) => {
