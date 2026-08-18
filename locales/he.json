@@ -1262,7 +1262,7 @@
     "masterSound": "שמע ראשי",
     "masterSoundDescription": "הפעל או כבה את כל הצלילים",
     "criticalAlerts": "התראות קריטיות",
-    "criticalAlertsDescription": "הפעל שמע להתראות ציוד דחופות",
+    "criticalAlertsDescription": "צליל והתראות דחיפה לציוד דחוף. קוד כחול מתריע תמיד.",
     "dateAndTime": "תאריך ושעה",
     "timeFormat": "תבנית שעה",
     "timeFormatDescription": "איך השעות מוצגות",

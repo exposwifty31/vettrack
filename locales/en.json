@@ -1262,7 +1262,7 @@
     "masterSound": "Master sound",
     "masterSoundDescription": "Enable or disable all sounds",
     "criticalAlerts": "Critical alerts",
-    "criticalAlertsDescription": "Enable sound for urgent equipment alerts",
+    "criticalAlertsDescription": "Sound and push alerts for urgent equipment. Code Blue always alerts.",
     "dateAndTime": "Date and time",
     "timeFormat": "Time format",
     "timeFormatDescription": "How times are displayed",

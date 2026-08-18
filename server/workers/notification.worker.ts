@@ -27,7 +27,14 @@ import { startWorkerHeartbeat } from "../lib/worker-heartbeat.js";
 import { incrementMetric } from "../lib/metrics.js";
 import { checkIdempotentAsync, markIdempotentAsync } from "../lib/idempotency.js";
 import { isCircuitOpen } from "../lib/circuit-breaker.js";
-import { checkDedupe, initVapid, sendPushToAll, sendPushToRole, sendPushToUser } from "../lib/push.js";
+import {
+  checkDedupe,
+  initVapid,
+  sendEmergencyPushToAll,
+  sendPushToAll,
+  sendPushToRole,
+  sendPushToUser,
+} from "../lib/push.js";
 import { initApns } from "../lib/push-apns.js";
 import { initFcm } from "../lib/push-fcm.js";
 import { withTimeout } from "../lib/timeout.js";
@@ -143,8 +150,11 @@ async function processSendNotification(data: NotificationJobData): Promise<void>
     return;
   }
   if (data.type === "code_blue_broadcast") {
+    // sendEmergencyPushToAll, NOT sendPushToAll: the latter honours the
+    // `alertsEnabled` preference, and a preference must never be able to
+    // suppress a cardiac-arrest page. See the doc on the emergency sender.
     await withTimeout(
-      sendPushToAll(data.clinicId, {
+      sendEmergencyPushToAll(data.clinicId, {
         title: data.title,
         body: data.body,
         tag: data.tag,

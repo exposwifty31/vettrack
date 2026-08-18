@@ -445,18 +445,94 @@ export async function sendPushToAll(
     .from(pushSubscriptions)
     .where(eq(pushSubscriptions.clinicId, clinicId));
   if (subs.length === 0) {
-    if (delivery?.requestedOutboxId !== undefined && !delivery.deferTerminalOutbox) {
-      await emitNotificationFailedOutbox(clinicId, {
-        scope: "all",
-        reason: "no_active_subscription",
-        requestedOutboxId: delivery.requestedOutboxId,
-        tag: payload.tag ?? null,
-        title: payload.title,
-      });
-    }
+    return emptyClinicResult(clinicId, payload, delivery);
+  }
+
+  // The ONLY difference between routine and emergency delivery. It lives here,
+  // in the caller, so the machinery below never receives the preference and
+  // therefore cannot consult it — see sendEmergencyPushToAll.
+  return deliverToClinicSubscriptions(
+    clinicId,
+    subs.filter((s) => s.alertsEnabled),
+    payload,
+    delivery,
+  );
+}
+
+/**
+ * Page every subscription in the clinic, IGNORING the alerts preference.
+ *
+ * This exists because `alertsEnabled` could silence a Code Blue. It is written
+ * from the web console by a toggle labelled "Critical alerts — Enable sound for
+ * urgent equipment alerts" (`src/pages/settings.tsx:146`), and both scoping
+ * promises in that label were false: it suppresses DELIVERY rather than a
+ * sound, and it was not confined to equipment, because `sendPushToAll` skipped
+ * the whole subscription and `sendPushToAll` is how `code_blue_broadcast` is
+ * delivered. A technician silencing what read as an equipment chime stopped
+ * receiving cardiac-arrest pages, silently.
+ *
+ * A separate function rather than a `bypassPreferences` flag on the existing
+ * one, deliberately: a parameter is a gate every future call site has to
+ * remember to pass, and the failure mode of forgetting is a missed page. This
+ * function does not have the preference in scope at all, and a test asserts its
+ * body never names it — a property a flag could not have.
+ *
+ * The preference still governs ROUTINE pushes, and that is the point rather
+ * than a concession: if noise were unmutable too, people would mute VetTrack at
+ * the OS level and take Code Blue down with it.
+ */
+export async function sendEmergencyPushToAll(
+  clinicId: string,
+  payload: PushPayload,
+  delivery?: PushDeliveryContext,
+): Promise<PushSendResult> {
+  assertClinicId(clinicId);
+  if (!vapidReady && !isApnsReady() && !isFcmReady()) {
     return { deliveredAny: false, transientFailures: 0, invalidOrGoneCount: 0 };
   }
 
+  const subs = await db
+    .select()
+    .from(pushSubscriptions)
+    .where(eq(pushSubscriptions.clinicId, clinicId));
+  if (subs.length === 0) {
+    return emptyClinicResult(clinicId, payload, delivery);
+  }
+
+  return deliverToClinicSubscriptions(clinicId, subs, payload, delivery);
+}
+
+/** The "nobody is subscribed" terminal path, shared by both clinic-wide senders. */
+async function emptyClinicResult(
+  clinicId: string,
+  payload: PushPayload,
+  delivery: PushDeliveryContext | undefined,
+): Promise<PushSendResult> {
+  if (delivery?.requestedOutboxId !== undefined && !delivery.deferTerminalOutbox) {
+    await emitNotificationFailedOutbox(clinicId, {
+      scope: "all",
+      reason: "no_active_subscription",
+      requestedOutboxId: delivery.requestedOutboxId,
+      tag: payload.tag ?? null,
+      title: payload.title,
+    });
+  }
+  return { deliveredAny: false, transientFailures: 0, invalidOrGoneCount: 0 };
+}
+
+/**
+ * Dispatch + expiry cleanup + terminal outbox for an ALREADY-FILTERED list.
+ *
+ * It takes the subscriptions it should page rather than deciding which to page,
+ * which is what keeps the alerts preference out of the emergency path: there is
+ * no branch here to forget, because there is no preference here to branch on.
+ */
+async function deliverToClinicSubscriptions(
+  clinicId: string,
+  subs: Array<typeof pushSubscriptions.$inferSelect>,
+  payload: PushPayload,
+  delivery: PushDeliveryContext | undefined,
+): Promise<PushSendResult> {
   const expired: ExpiredSubscriptionRef[] = [];
   let deliveredAny = false;
   let transientFailures = 0;
@@ -464,8 +540,6 @@ export async function sendPushToAll(
 
   await Promise.all(
     subs.map(async (sub) => {
-      if (!sub.alertsEnabled) return;
-
       const result = await dispatchToSubscription(sub, buildEnvelopeForSub(sub, payload));
       if (result === "ok") deliveredAny = true;
       if (result === "expired" || result === "invalid") {
@@ -478,7 +552,9 @@ export async function sendPushToAll(
 
   if (expired.length > 0) await cleanupExpiredSubscriptions(clinicId, expired);
 
-  const attemptedAny = subs.some((s) => s.alertsEnabled);
+  // Was `subs.some((s) => s.alertsEnabled)` when this list was unfiltered;
+  // the list arrives filtered now, so its length carries the same meaning.
+  const attemptedAny = subs.length > 0;
   const defer = delivery?.deferTerminalOutbox === true;
   if (!defer && attemptedAny && !deliveredAny && (transientFailures > 0 || invalidOrGoneCount > 0)) {
     const reason =
