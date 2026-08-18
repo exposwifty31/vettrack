@@ -1745,13 +1745,13 @@ sweep + typecheck green, independent tenancy/query review PASS). Committed local
   3. **Loop guard**: reuse CHUNK_RECOVERY_GUARD_KEY via `recoverFromChunkLoadFailure({unregisterServiceWorkers:false})` (owner-approved: one reload/session across all triggers). PEEK sessionStorage first → post `swForcedReloadLoopSuppressed:true` if already set, else `swForcedReloadSurface:'kiosk'` (both pre-existing bounded fields, api.ts:1035-1036; 'kiosk' already in the closed enum; BoardShell is the first client producer of 'kiosk'). No splitVersionClientDetected / swUpdateConflict double-fire; no server-enum edit; no second SW message listener; no registration.update()/unregister().
 - **Wiring:** BoardShell calls `useBoardAutoReload()`. platform-router.test.tsx wrapped in QueryClientProvider (BoardShell now needs useQueryClient).
 - **Test:** `tests/board-auto-reload.test.ts` (new, happy-dom) — 9 cases: discriminator accept/reject×5 (stubbed ServiceWorker + __VT_BUILD_TAG__), reload-on-confirmed (recover + swForcedReloadSurface:'kiosk'), defer-then-calm-fires, loop-guard→swForcedReloadLoopSuppressed classification, waiting/peer-gossip ignored. **9/9 + the 2 router tests pass.**
-- **Gate:** FE tsc 0 · server tsc 0 · **full suite 414 files / 4018 tests** · architecture:gates PASS (0 new violations, 0 new cycles).
+- **Gate:** FE tsc 0 · server tsc 0 · **full suite 414 files / 4018 tests at that commit (33 after review round 1)** · architecture:gates PASS (0 new violations, 0 new cycles).
 
 ### Commit 5 — /board Playwright smoke + full phase gate
 - **Board smoke spec** (`tests/board-kiosk.spec.ts`, new): 2 chromium tests — (1) BoardShell mounts chrome-free: `[data-board-shell]` visible, ZERO `button:has-text("💬")` (chat FAB suppressed on board target), ZERO `[data-testid="web-only-guard-screen"]` (AuthGuard-only route), board content/skeleton/legacy visible (never blank); (2) live poll: observes a GET `/api/display/snapshot` within 12s (relocated data path runs). Self-skips (mirrors phase-9 drills) when the server bounces to /signin — i.e. not dev-bypass. Registered in `playwright.shared.ts` `ci` allowlist (runs in CI's playwright.yml on every push) + a dedicated `board` suite. Discovery verified via `PW_SUITE=board playwright test --list` (2 tests) and `PW_SUITE=ci --list` (board-kiosk present) — no server needed.
 - **Browser-verification status (honest):** the live browser run is CI-gated. Locally it self-skips: this machine's .env/.env.local set VITE_CLERK_PUBLISHABLE_KEY, so any locally-served frontend is Clerk-mode → /board (AuthGuard) → /signin → skip. A faithful local dev-bypass run would require mutating the user's existing .env.local + a full prod build (intrusive; declined in this background session, and would only produce a SKIP). What IS browser-adjacent verified locally: `tests/platform-router.test.tsx` (happy-dom renders BoardShell for /board, passthrough for desktop) + `display.empty-panes.test.tsx` (data-path wiring intact through the move). Live transport is exercised by CI's board smoke + the phase-9 drills.
 - **knip cleanup:** collapsed CommandBoardScreen to a single default export (dropped the speculative named export + barrel named re-export — YAGNI; nothing imported it). Barrel `index.ts` now `export { default } from "./CommandBoardScreen"`. knip clean for the new module; the barrel default still resolves through display.tsx (empty-panes) + routes lazy import.
-- **FULL PHASE GATE (all green):** FE tsc 0 · server tsc 0 · **vitest 414 files / 4018 tests** (incl. tests/phase-9-deterministic-drills.test.ts 14/14 — bounded-counter contracts for the moved realtime wiring unchanged) · architecture:gates PASS (0 new depcruise violations, 0 new madge cycles) · i18n parity ✓ · knip clean (new module) · board smoke spec parses + discovered by ci/board suites.
+- **FULL PHASE GATE (all green):** FE tsc 0 · server tsc 0 · **vitest 414 files / 4018 tests at that commit (33 after review round 1)** (incl. tests/phase-9-deterministic-drills.test.ts 14/14 — bounded-counter contracts for the moved realtime wiring unchanged) · architecture:gates PASS (0 new depcruise violations, 0 new madge cycles) · i18n parity ✓ · knip clean (new module) · board smoke spec parses + discovered by ci/board suites.
 
 ### Phase 4 (C1) — COMPLETE
 5 commits on branch claude/phase-4-board-platform: (1) platform seam, (2) verbatim command-board extraction (display.tsx 772→27), (3) BoardShell + /board route + fence amendment, (4) kiosk auto-reload, (5) smoke + gate. All 9 frozen-surface invariants preserved with file:line proofs (blueprint frozenSurfaceChecklist); the Phase-9 realtime data path relocated byte-for-byte (git rename detection + behavioral empty-panes test + deterministic drills all green). Fence held: the ONLY out-of-fence touch was the owner-approved one-line main.tsx GlobalShiftChat gate. Owner decisions honored: FAB-gate-only amendment; loop-guard reuses CHUNK_RECOVERY_GUARD_KEY. Open follow-up (owner-deferred, not blocking): SwUpdateBanner board gate for a fully chrome-free kiosk during a Code-Blue-deferred update (program-plan open item).
@@ -1764,7 +1764,7 @@ Branch claude/phase-4-board-platform. Each finding re-verified against the curre
 - **[a11y] ADRing SVG aria-hidden** (CommandBoard.tsx:27) — the decorative progress ring is now `aria-hidden="true"`; the ready/total meaning stays on the sibling text overlay (not inside the SVG), so nothing accessible is lost.
 - **[correctness] TypeRow empty-track unreachable** (CommandBoard.tsx) — `const total = row.total || 1` made the `total === 0` empty-track branch dead. Fixed to `row.total === 0` (raw count), so a 0-item type now renders its muted track as intended.
 - **[dead-code] STATUS_COLOR removed** (status-tokens.ts) — deleted the unreferenced const + its deferral comment (verified dead: only its own definition in src/). `EquipmentReadinessStatus` import still used by STATUS_BG/STATUS_BAR_COLOR/statusLabel. Cascade: stage-4-board-token-consistency.test.js overdue-maps assertion relaxed `>= 3` → `>= 2` (2 class-token maps remain) with updated wording.
-- **Gate:** FE tsc 0 · server tsc 0 · **full suite 414 files / 4018 tests** · architecture:gates PASS (0 new violations, 0 new cycles — the new hook file resolves clean) · knip clean for all touched files (the STATUS_COLORS hit is a pre-existing unrelated finding in src/types/equipment.ts). i18n parity unchanged (no locale edits).
+- **Gate:** FE tsc 0 · server tsc 0 · **full suite 414 files / 4018 tests at that commit (33 after review round 1)** · architecture:gates PASS (0 new violations, 0 new cycles — the new hook file resolves clean) · knip clean for all touched files (the STATUS_COLORS hit is a pre-existing unrelated finding in src/types/equipment.ts). i18n parity unchanged (no locale edits).
 
 ## 2026-07-08 — Phase 5 (C2): snapshot enrichment + calm/pressure modes (branch claude/phase-5-snapshot-enrichment)
 
@@ -2573,9 +2573,9 @@ The "CodeRabbit / Review" check showed **neutral** (its non-blocking completed s
 - **T-22b** (R-EQ-F1 · locate client): `api.equipment.locate(q)` → `GET /api/equipment/locate?q=` + `src/types/locate.ts` mirroring the server shape. RED `tests/api-locate.test.ts`. `7cc9cec97` → cp `f6e2d8bac`.
 - **T-24c** (R-EQ-F3 · damage client): `api.equipment.reportDamage()` + `DamageReport`/`CreateDamageReport*` types. RED `tests/api-damage.test.ts`. `9680a5e9c` → cp `e1556feb6`. **⚠ CONTRACT MISMATCH found + reconciled:** the agent (blind to T-24b's worktree) authored `POST /api/equipment/damage-reports` with `{equipmentId}` in body, but the merged T-24b route serves `POST /api/equipment/:id/damage` (id in path, `{note}` body, subset 201 response). Controller reconciled the CLIENT to the server: URL→`/api/equipment/${id}/damage`, body→`{note}`, response type→`Pick<DamageReport, id|equipmentId|reportedBy|at|note>`, and the test's URL/body assertions. Reconciliation commit `1367695d2`. (Server kept: more RESTful, already registered/tested/allowlisted.)
 - **T-24b** (R-EQ-F3 · damage route+audit): `POST /:id/damage` — `clinicId`-scoped, one transaction (insert `vt_damage_events` + flip `conditionStatus="damaged"`), fire-and-forget `logAudit` after commit; new `equipment_damage_reported` in the closed `AuditActionType` union. **Both governance gates pre-handled** (i18n `KNOWN_DEBT_ALLOWLIST` + `routes-registration-contract`). RED `tests/damage-report-route.test.ts` (persist+flip; cross-clinic 404 no-mutation; audit emitted). Mocked-unit. `a6a479cac` → cp `35c574b75`. Deferred (minor, out of scope): `routes-contract.json` doc artifact; route doesn't bump `equipment.version`.
-- **T-24e** (R-EQ-F3 · readiness gate): `computeBundleReadinessGate()` demotes any non-`'ok'` `conditionStatus` to not-ready (new reason `CONDITION_STATUS_NOT_CLEAR`) as an additive first-check; healthy path byte-preserved (18/18 sibling tests), `!= null` guard keeps existing call sites unaffected; composes automatically at the two real call sites (deployability GET + dock-return). RED `tests/damage-readiness-not-ready.test.ts`. `acb84d1c3` → cp `8e7614bc8`.
+- **T-24e** (R-EQ-F3 · readiness gate): `computeBundleReadinessGate()` demotes any non-`'ok'` `conditionStatus` to not-ready (new reason `CONDITION_STATUS_NOT_CLEAR`) as an additive first-check; healthy path byte-preserved (18/18 at the time of that run; 33/33 after review round 1 widened the file sibling tests), `!= null` guard keeps existing call sites unaffected; composes automatically at the two real call sites (deployability GET + dock-return). RED `tests/damage-readiness-not-ready.test.ts`. `acb84d1c3` → cp `8e7614bc8`.
 - **T-23d** (R-EQ-F2 · ReadinessBadge): new `src/components/ui/readiness-badge.tsx` composing the tier helper over `StatusBadge`; distinct **shape** per tier (check-circle/triangle/octagon), `aria-hidden` glyph + visible text label (not color-only). Contrast asserted from the **real `src/index.css` token values** via in-test WCAG math (4.81–7.18 across both themes, clears 3:1 glyph / 4.5:1 text). 19 tests. `8b31609dc` → cp `83ad8a9f1`. Note: WCAG math lives in the test only (no shared prod helper — extract if reused).
-- **Batch gate:** `pnpm typecheck` 0; full `pnpm test` = **506 files / 4618 tests, 0 fail** (34.4s). Worktrees removed.
+- **Batch gate:** `pnpm typecheck` 0; full `pnpm test` = **506 files / 4618 tests at that commit (33 after review round 1), 0 fail** (34.4s). Worktrees removed.
 
 **Verdict:** VERIFIED — Wave F2 complete. Next: Wave F3 — F3a (T-22c LocateSearch UI ∥ T-24d ReturnPlugDialog damaged-choice) then F3b (T-23e badge mount fan-out; edits equipment-detail after T-24d + needs LocateSearch from T-22c).
 
@@ -5493,7 +5493,7 @@ no-native-shell-build-path-changes guardrail while a review is open.
   script → zero hits.
 
 **Verdict:** VERIFIED (scope: the 18-task tracker contract + the transfer wiring itself — not a claim
-that untracked future items, e.g. the FCM push path, are covered by 18/18).
+that untracked future items, e.g. the FCM push path, are covered by 18/18 at the time of that run; 33/33 after review round 1 widened the file).
 
 ## 2026-07-28 — Android-phase Lane-A wave 1: T0 de-number + T1 H4 version align + T2 H3 deletion page — PRs #151/#152/#153
 
@@ -5511,7 +5511,7 @@ Data-safety URL), marketing-path routed, he+en.
 - T2 RED: two new `tests/platform-target.test.ts` cases (`/account-deletion` → marketing, sync +
   reactive) failed against the untouched resolver (2 failed / 10 passed); GREEN after
   `MARKETING_PATHS` + routes + page + locales + accessor + `pnpm i18n:generate-types` →
-  `tests/{platform-target,i18n-parity,i18n-no-hebrew-in-source}` 18/18, `pnpm i18n:check` deep parity
+  `tests/{platform-target,i18n-parity,i18n-no-hebrew-in-source}` 18/18 at the time of that run; 33/33 after review round 1 widened the file, `pnpm i18n:check` deep parity
   ✓, `npx tsc --noEmit` exit 0. In-app deletion path already live (5.1.1(v) proof, session 2026-07-28)
   — both Play deletion requirements satisfied once this deploys. PR #153.
 - Visual pass for T2 (3 breakpoints × he/en) recorded on the PR before merge (screenshots in the PR
@@ -5648,7 +5648,7 @@ spec, the tag UID was discarded, and there was no lock path at all. All three cl
 **Evidence:**
 - **RED first:** `pnpm test -- tests/nfc-sticker-management.test.ts` → `Failed to resolve
   import "../server/lib/pg-errors"` (the audit's new modules did not exist). After
-  implementation: **18/18 passed**. `tests/ios-nfc-lock-plugin-wired.test.ts` **7/7**.
+  implementation: **18/18 at the time of that run; 33/33 after review round 1 widened the file passed**. `tests/ios-nfc-lock-plugin-wired.test.ts` **7/7**.
 - **F1 payload (fixed):** `writeNfcUrl` wrote ONE record; spec
   (`docs/design/nfc-sticker-e2e-audit.md:44-48`) requires URI + AAR. New pure module
   `src/lib/nfc-sticker-payload.ts`; `encodeCapgoNdefAarRecord` (TNF 0x04, type
@@ -7809,5 +7809,54 @@ both closed and both proven by a failing run first.
 unaffected — it is independently supported by the count (10 live violations ↔ 10 entries),
 by the pre-regen exit-0 no-absorption proof, and by reading all ten full chains — but the
 triple comparison alone is not a bijection and should not be cited as if it were.
+
+## 2026-08-18 — Audit finding §1: an absent Clerk locale claim outranked an explicit `X-Locale`
+
+**Claim under test.** RN sends `X-Locale` on every authenticated request
+(`VetTrack-RN-Migration/src/lib/auth-fetch.ts:341`), and the server discards it. Verified, and the
+mechanism is narrower than "discards": `server/middleware/auth.ts` mapped the Clerk `locale` session
+claim through `normalizeLocale`, which is TOTAL (`lib/i18n/loader.ts (`normalizeLocaleStrict`)` — an absent value returns
+`DEFAULT_LOCALE`, not null). The defaulted "en" then arrived at
+`resolveRequestLocale(req, result.user.locale)` as a *user preference*, and `??` never falls through a
+non-null value (`lib/i18n/middleware.ts (`resolveRequestLocale`)`). So "no claim at all" silently beat an explicit header.
+Precision, not precedence.
+
+**Evidence — RED.** New `tests/i18n-authenticated-locale-precision.test.ts` drives the real
+composition (production claim mapping → real `createRequireAuth` → real `resolveRequestLocale`), not
+the new helper in isolation. First run: `Tests 13 failed | 5 passed (18)`.
+
+**Evidence — non-vacuity.** With the fix in place and green (18/18 at the time of that run; 33/33 after review round 1 widened the file), each production change was
+reverted alone and the SAME tests went red on assertions, not errors:
+`expected 'en' to be 'he'` × 5 — an authenticated user asking for Hebrew being served English.
+Restored → 18/18 at the time of that run; 33/33 after review round 1 widened the file green again.
+
+**Evidence — no regression.** `pnpm vitest run tests/*auth* tests/*i18n* --testTimeout=30000` →
+`Test Files 97 passed (97) · Tests 1161 passed (1161)`. `pnpm typecheck` (frontend + server) exit 0.
+`tests/i18n-hardening.test.ts:165` (`accept-language: zz-ZZ` → `en`) still passes — `resolveRequestLocale`
+line 28 was deliberately NOT made strict per-leg, only the producer changed.
+
+**Pre-existing failure, not mine.** `tests/i18n-api-error-test-route-adoption.test.ts` times out at the
+5s default under CPU contention. Reproduced identically with my changes stashed. Passes at 30s.
+
+**Deliberate collateral change.** Authenticated + no claim + no `X-Locale` + no `Accept-Language` now
+resolves `INITIAL_LOCALE` ("he") instead of "en". That is the documented role of `INITIAL_LOCALE`
+(`lib/i18n/types.ts:22-29`); browsers always send `Accept-Language`, so web is unaffected. Asserted
+explicitly so it reads as chosen.
+
+**Considered and rejected.** Wiring `vt_users.preferred_locale` into the request path:
+`server/schema/core.ts:60` declares it `notNull().default("he")`, so it reproduces the exact collapse
+being fixed — a schema default masquerading as an expressed preference, in the other direction.
+
+**Shared-module check (`lib/i18n` is frontend+backend).** `loader.ts` is NOT in the client graph:
+`lib/i18n/index.ts` has exactly one import — `import type { ... } from "./types.js"` — and
+`internal-keys.ts` / `types.ts` import nothing. `src/lib/i18n.ts` imports `index`, `internal-keys`,
+and `types` only; no `src/` path reaches `loader.ts` (which uses `readFileSync`). So the strict-variant
+addition is server-only in effect, and `normalizeLocale` stays total for every existing caller anyway.
+
+**`normalizeLocale` warn contract pinned.** The refactor extracted a shared `parseLocaleTag` so the
+warn condition is computed once rather than duplicated. Two added tests assert the warn fires for
+`zz-ZZ` and stays silent for absent/blank input; both proven non-vacuous by mutation —
+dropping the guard → `expected "warn" to not be called at all, but actually been called 3 times`;
+dropping the warn → `expected false to be true`.
 
 **Verdict:** VERIFIED.
