@@ -21,15 +21,19 @@ function isLocale(value: string): value is Locale {
  * carry that distinction — an absent value silently becomes a real-looking
  * locale, which then outranks weaker-but-explicit signals downstream.
  */
+function parseLocaleTag(locale?: string | null): string {
+  return locale?.split(",")[0]?.split("-")[0]?.toLowerCase().trim() ?? "";
+}
+
 export function normalizeLocaleStrict(locale?: string | null): Locale | undefined {
-  const normalized = locale?.split(",")[0]?.split("-")[0]?.toLowerCase().trim() ?? "";
+  const normalized = parseLocaleTag(locale);
   return isLocale(normalized) ? normalized : undefined;
 }
 
 export function normalizeLocale(locale?: string | null): Locale {
-  const strict = normalizeLocaleStrict(locale);
-  if (strict) return strict;
-  if (locale?.split(",")[0]?.split("-")[0]?.toLowerCase().trim()) {
+  const raw = parseLocaleTag(locale);
+  if (isLocale(raw)) return raw;
+  if (raw) {
     console.warn(`[i18n] Invalid locale "${locale}", falling back to "${DEFAULT_LOCALE}"`);
   }
   return DEFAULT_LOCALE;

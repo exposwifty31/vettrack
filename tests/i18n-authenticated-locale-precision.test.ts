@@ -11,7 +11,7 @@
  * The contract asserted here: an EXPRESSED preference still wins over the
  * header; an ABSENT (or uninterpretable) one must not.
  */
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect, beforeAll, vi } from "vitest";
 import type { Request, Response, NextFunction } from "express";
 import { normalizeLocale, normalizeLocaleStrict } from "../lib/i18n/loader.js";
 import { resolveRequestLocale } from "../lib/i18n/middleware.js";
@@ -151,6 +151,28 @@ describe("normalizeLocale stays total for its existing frontend+backend consumer
 
   it("still normalizes a region-tagged supported value", () => {
     expect(normalizeLocale("he-IL")).toBe("he");
+  });
+
+  it("still warns when an unsupported value is coerced to DEFAULT_LOCALE", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      normalizeLocale("zz-ZZ");
+      expect(warn.mock.calls.some(([m]) => String(m).includes("zz-ZZ"))).toBe(true);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it("stays silent when there was no value to coerce", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      normalizeLocale(undefined);
+      normalizeLocale("");
+      normalizeLocale("   ");
+      expect(warn).not.toHaveBeenCalled();
+    } finally {
+      warn.mockRestore();
+    }
   });
 });
 

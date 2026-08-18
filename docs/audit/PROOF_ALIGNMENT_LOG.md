@@ -7172,4 +7172,16 @@ explicitly so it reads as chosen.
 `server/schema/core.ts:60` declares it `notNull().default("he")`, so it reproduces the exact collapse
 being fixed — a schema default masquerading as an expressed preference, in the other direction.
 
+**Shared-module check (`lib/i18n` is frontend+backend).** `loader.ts` is NOT in the client graph:
+`lib/i18n/index.ts` has exactly one import — `import type { ... } from "./types.js"` — and
+`internal-keys.ts` / `types.ts` import nothing. `src/lib/i18n.ts` imports `index`, `internal-keys`,
+and `types` only; no `src/` path reaches `loader.ts` (which uses `readFileSync`). So the strict-variant
+addition is server-only in effect, and `normalizeLocale` stays total for every existing caller anyway.
+
+**`normalizeLocale` warn contract pinned.** The refactor extracted a shared `parseLocaleTag` so the
+warn condition is computed once rather than duplicated. Two added tests assert the warn fires for
+`zz-ZZ` and stays silent for absent/blank input; both proven non-vacuous by mutation —
+dropping the guard → `expected "warn" to not be called at all, but actually been called 3 times`;
+dropping the warn → `expected false to be true`.
+
 **Verdict:** VERIFIED.
