@@ -7612,3 +7612,14 @@ re-split it. Attribution is corrected here instead of in git history.
 
 **Verdict:** VERIFIED — diffstat, start-of-session `git status`, reflog timestamps
 (`135045ffe` 17:20:25 → `0f78f20e4` 17:29:08) and `tsc` exit 0 all observed this session.
+
+**Commit-collision note (not a rewrite).** The 12 deletions above were staged in this worktree and
+were then swept into a **concurrent workflow's** commit — `git show --stat 0f78f20e4` lists all 12
+deleted paths alongside that commit's own `PROOF_ALIGNMENT_LOG.md` additions, under the message
+"docs(audit): G3 localStorage credential map …". That workflow evidently staged everything in the
+shared worktree rather than its own paths. The deletions are therefore already in the branch and
+correct on disk; only their commit message is wrong. Not amended and not reverted-and-recommitted —
+history rewriting is off-limits under the repo's git rules, and re-deleting would produce a no-op
+diff. Recorded here so the sweep is attributable. `package.json`'s `xlsx` pin and
+`tests/xlsx-write-only-guard.test.ts` are that same workflow's in-flight work; they were explicitly
+unstaged and left alone.
