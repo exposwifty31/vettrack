@@ -142,6 +142,9 @@ function accessedMemberNames(source: string, fileName: string): Set<string> {
     } else if (ts.isBindingElement(node)) {
       const key = node.propertyName ?? node.name;
       if (ts.isIdentifier(key)) names.add(key.text);          // const { read } = XLSX
+      else if (ts.isComputedPropertyName(key) && ts.isStringLiteralLike(key.expression)) {
+        names.add(key.expression.text);                       // const { ["read"]: p } = XLSX
+      }
     } else if (ts.isImportSpecifier(node)) {
       names.add((node.propertyName ?? node.name).text);       // import { read } from "xlsx"
     }
