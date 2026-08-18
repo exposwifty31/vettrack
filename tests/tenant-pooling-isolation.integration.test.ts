@@ -62,6 +62,25 @@ suite("tenant context cannot outlive its transaction on a pooled connection", ()
     }
   });
 
+  it("pins a request's statements to one session instead of one checkout each", async () => {
+    // Establishes that the leak below is not an artefact of a single-connection
+    // pool: with drizzle(pool), concurrent statements land on DIFFERENT backends,
+    // so a request's SET and its later SELECT are not guaranteed to share a session.
+    const pool = new Pool({ connectionString: DB_URL, max: 2 });
+    const db = drizzle(pool);
+    try {
+      const [r1, r2]: any[] = await Promise.all([
+        db.execute(sql`SELECT pg_backend_pid() AS p`),
+        db.execute(sql`SELECT pg_backend_pid() AS p`),
+      ]);
+      const pid1 = (r1.rows ?? r1)[0].p;
+      const pid2 = (r2.rows ?? r2)[0].p;
+      expect(pid1, `concurrent statements ran on separate backends ${pid1}/${pid2}`).toBe(pid2);
+    } finally {
+      await pool.end();
+    }
+  });
+
   it("never executes a request's query under another tenant's context", async () => {
     const pool = new Pool({ connectionString: DB_URL, max: 1 });
     const db = drizzle(pool);
