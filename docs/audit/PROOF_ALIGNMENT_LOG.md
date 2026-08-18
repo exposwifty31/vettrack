@@ -7623,3 +7623,150 @@ history rewriting is off-limits under the repo's git rules, and re-deleting woul
 diff. Recorded here so the sweep is attributable. `package.json`'s `xlsx` pin and
 `tests/xlsx-write-only-guard.test.ts` are that same workflow's in-flight work; they were explicitly
 unstaged and left alone.
+
+## 2026-08-18 — G4/H1 + H7: two stale config numbers — xlsx caret and the depcruise/cycles baselines (chore/w5-vettrack-residue)
+
+**Claim:** (H1) The council's demotion of `xlsx@^0.18.5` rests on a reachability argument
+that is only *half* sourced; the verdict survives but the basis is now split by evidence
+grade, pinned exactly, and enforced by a CI guard instead of prose. (H7) The
+dependency-cruiser baseline forgave 21 violations when only 10 exist; the madge cycle
+baseline listed a server cycle that was already resolved. Both regenerated.
+
+**Evidence — H1, reachability:**
+- `src/lib/export-excel.ts:30-40` — the only xlsx call sites: `utils.json_to_sheet`,
+  `utils.book_new`, `utils.book_append_sheet`, `writeFile`. All write-side. `xlsx` is
+  reached via `await import("xlsx")` (line 7), i.e. lazily.
+- `src/pages/equipment-list.tsx:96,489` — the sole caller. `:491` mentions `.xlsx` only as
+  a download *filename*, not an import.
+- Command: `rg -i xlsx` across the repo (excluding node_modules/dist/.claude/skills) →
+  one importer, one caller, one comment in `vite.config.ts:129`, two docs mentions.
+  No `XLSX.read`/`readFile`/`sheet_to_json` anywhere in `src/` or `server/`.
+- Command: `pnpm why xlsx` → `dependencies: xlsx 0.18.5`. Single direct production
+  dependency, **no transitive path** — nothing else in the tree pulls SheetJS in.
+- Probe: instrumented the real export path (proxying every public export, then running the
+  exact call sequence from `export-excel.ts`) →
+  `TOUCHED PUBLIC APIS: utils.book_append_sheet, utils.book_new, utils.json_to_sheet, write`
+  / `READ-PATH APIS TOUCHED: (none)`.
+
+**Evidence — H1, the two CVEs do NOT have equal support (this is the finding):**
+- **CVE-2023-30533 — advisory-exempted (strong).** `pnpm audit --json` returns the GHSA
+  overview verbatim: *"All versions of SheetJS CE through 0.19.2 are vulnerable to
+  'Prototype Pollution' when reading specially crafted files. Workflows that do not read
+  arbitrary files (for example, exporting data to spreadsheet files) are unaffected."*
+  Our workflow is named in the exemption. Verdict: not applicable.
+- **CVE-2024-22363 — empirically bounded, vendor silent (weaker).** The "read-path" claim
+  is **NOT** supported by any source I could reach:
+  - GHSA-5pgg-2g8v-p4x9 → *"SheetJS Community Edition before 0.20.2 is vulnerable.to
+    Regular Expression Denial of Service (ReDoS)."* No code path named.
+  - NVD CVE-2024-22363 → identical one-line text. No function named.
+  - Vendor `cdn.sheetjs.com/advisories/CVE-2024-22363` (fetched 200 via curl; WebFetch got
+    403) → summary + CVSS + affected-products only; defers to regexide.com. No code path.
+  Support for it is therefore *measurement*, not citation:
+  - Probe: 8 adversarial cell payloads (32k digit runs, nested-quantifier bait,
+    currency/scientific/cell-ref/XML-meta lookalikes) through the real write path →
+    baseline 5.9ms, then 1.7 / 1.3 / 1.2 / 1.3 / 1.1 ms. No super-linear backtracking.
+  - `node_modules/xlsx/xlsx.mjs:14884` — `if(cell.v.length > 32767) throw new Error("Text
+    length must not exceed 32767 characters")`. Two payloads *hit this cap and threw*,
+    which is itself the point: the write path structurally bounds the input to any regex.
+- **Correction to the council's wording:** "both CVEs are READ-path" overstates the record.
+  One is exempted by advisory text; the other is bounded by measurement while the vendor
+  declines to say. The demotion still holds — client-side, lazily-loaded, export-only, no
+  transitive exposure, hard input cap — but it is recorded at two different evidence grades.
+
+**Evidence — H1, the pin:**
+- Command: `npm view xlsx dist-tags` → `{"latest":"0.18.5"}`; `npm view xlsx versions` ends
+  at `0.18.5`. So `^0.18.5` on a 0.x (`>=0.18.5 <0.19.0`) is **inert** — it cannot resolve
+  anywhere. Pinning is *not* closing a live float; it removes a caret that advertises an
+  upgrade path which does not exist and never will (SheetJS left npm; patches are CDN-only).
+- `package.json:157` — `"xlsx": "^0.18.5"` → `"xlsx": "0.18.5"`.
+- `pnpm-lock.yaml:231` — `specifier: ^0.18.5` → `specifier: 0.18.5`. `version: 0.18.5` on
+  the next line is **unchanged**, so resolution is provably identical; the diff is one line.
+- **Hazard hit and avoided:** `node_modules` in this worktree is a **symlink to
+  `/Users/dan/vettrack/node_modules`** (`readlink` confirmed), shared with two other live
+  workflows. `pnpm install --lockfile-only` still prompted *"The modules directories will be
+  removed and reinstalled from scratch"* — it aborted, changing nothing (lockfile byte-identical,
+  `.pnpm` entry count 1417 before and after). The lockfile line was therefore edited surgically
+  instead, and validated in an isolated sandbox rather than in-place:
+  - RED: `pnpm install --frozen-lockfile --lockfile-only` in a temp dir with only the
+    manifests → `ERR_PNPM_OUTDATED_LOCKFILE`, failure reason names exactly one delta,
+    `"xlsx":"^0.18.5"` vs `"xlsx":"0.18.5"`.
+  - GREEN: same command after the one-line fix → `Done in 414ms`, exit 0.
+  This mattered: CI runs `pnpm install --frozen-lockfile` in **18 places**
+  (`.github/workflows/{ci,release-gate,playwright,flake-detection,...}.yml`), so leaving the
+  mismatch would have broken every workflow.
+
+**Evidence — H1, the guard (RED before GREEN, all three assertions):**
+- New file `tests/xlsx-write-only-guard.test.ts` — asserts (a) exactly one shipped importer
+  under `src/`+`server/`, (b) no SheetJS read API in it, (c) an exact pin in `package.json`.
+- RED 1 (pin): run against unpinned tree → `AssertionError: expected '^0.18.5' to match
+  /^\d+\.\d+\.\d+$/`.
+- RED 2 (read API): temporarily inserted `XLSX.utils.sheet_to_json(XLSX.read("x"))` into
+  `export-excel.ts` → `expected [ 'XLSX.read', 'sheet_to_json' ] to deeply equal []`.
+  Restored with `git checkout --` (not retyped); `git status --short` on that path → empty.
+- RED 3 (sole importer): temporarily added a second file importing xlsx →
+  `expected [ …(2) ] to deeply equal [ 'src/lib/export-excel.ts' ]`, listing the probe file.
+  Probe deleted; `git status --short` then showed only the new test as untracked.
+- GREEN: `pnpm test -- tests/xlsx-write-only-guard.test.ts` → `Test Files 1 passed (1) /
+  Tests 3 passed (3)`.
+- **Rejected alternatives, stated so this is a decision and not a default:** swapping to
+  `@e965/xlsx` (fork republishing patched SheetJS to npm) or to a write-only library changes
+  the bytes of a shipped user-facing export — feature-tier under
+  `.claude/rules/phase-delivery.md`, out of scope for a residue sweep. Vendoring the CDN
+  build adds an unauditable blob. Chosen: pin + document + CI-enforce the exemption.
+
+**Evidence — H7, depcruise baseline:**
+- RED: `.dependency-cruiser-known-violations.json` held **21** entries;
+  `pnpm depcruise:check` → `✔ no dependency violations found` + `‼ 10 known violations
+  ignored`. 11 forgiven that no longer exist.
+- **No-absorption proof (the reason this regeneration is not laundering):** the *pre*-regen
+  `pnpm depcruise:check` exited **0**, i.e. every live violation already matched a baseline
+  entry, so `--output-type baseline` had nothing new to absorb.
+- `pnpm depcruise:baseline` → 21 → **10** entries. 13 dropped, and 2 appeared. The 2 were
+  checked rather than waved through: `src/lib/realtime.ts -> src/lib/event-reducer.ts` and
+  `src/lib/sync-engine-telemetry.ts -> src/lib/api.ts` are **re-anchorings** of cycles that
+  are currently reported — depcruise records a cycle by its first edge, and the enumeration
+  start moved when 12 files were deleted from the tree mid-session.
+- Set-equality check against the cruiser's own JSON output:
+  `LIVE: 10` / `IN BASELINE BUT NOT LIVE (stale residue — must be 0): 0` /
+  `IN LIVE BUT NOT BASELINE (uncovered — must be 0): 0`. The baseline is now exactly the
+  live violation set.
+- Note (not acted on — ownership): 4 of the dropped entries involve `src/lib/api.ts`, owned
+  by the concurrent audit workflow. Regenerating the baseline does not touch that file, so
+  this stayed in lane; but if that workflow changes its imports, this baseline goes stale again.
+
+**Evidence — H7, cycles baseline:**
+- RED: `pnpm architecture:cycles` → `Resolved cycles in server (update baseline-cycles.json):
+  - jobs/definitions/index.ts > workers/chargeAlertWorker.ts > jobs/enqueue.ts`.
+  The comparator flags it itself.
+- Rotation trap avoided: the comparator *prints* the cycle normalized (rotated to the
+  lexicographically smallest node, `scripts/architecture/compare-cycles.mjs:16-32`) but
+  `docs/architecture/baseline-cycles.json` *stores* it unrotated as
+  `workers/chargeAlertWorker.ts > jobs/enqueue.ts > jobs/definitions/index.ts`. A literal
+  string match on the printed form finds nothing and would have deleted the wrong line.
+- GREEN: `pnpm architecture:cycles` → `OK — server: 2 cycle(s), src: 0 cycle(s) (matches
+  baseline).` with **no** "Resolved cycles" warning.
+
+**Evidence — gates:**
+- `pnpm architecture:gates` (the gate, not just the sub-command) → `[architecture-gates] All
+  G1 checks passed.` covering TypeScript frontend + server, dependency-cruiser
+  (`10 known violations ignored`), and the madge baseline.
+- `npx tsc --noEmit` → exit 0, no output.
+- `pnpm test -- tests/xlsx-write-only-guard.test.ts tests/phase-4-i18n-rtl-foundation.test.js
+  tests/shell-mobile-context-liveness-guard.test.ts` → `Test Files 3 passed (3) / Tests 11
+  passed (11)`.
+
+**NOT CLAIMED — full-suite green.** Unchanged from the prior entry in this worktree: the
+shared local Postgres is mid-migration under the concurrent RLS workflow and timer-window
+tests flake under three concurrent workflows, so `pnpm test` is not a usable signal here.
+Scope was held to the gates + typecheck + targeted tests above.
+
+**Concurrency disclosure.** HEAD moved **twice** underneath this session on this same branch
+(`135045ffe` → `0f78f20e4` → `34514e3e8`, both dead-code sweeps this task did not author),
+and the module count depcruise sees dropped 1013 → 1000 as a result. Every RED was therefore
+re-confirmed on the current tree before its GREEN, and the depcruise baseline was regenerated
+*after* the last of those commits. `git status --short` confirmed this session's four changes
+survived both.
+
+**Verdict:** VERIFIED for H7 (both baselines, tool-confirmed set equality and a clean gate).
+VERIFIED-WITH-CORRECTION for H1: the demotion stands, but the stated basis was half-sourced
+and is now recorded at two evidence grades, pinned, and CI-enforced.
