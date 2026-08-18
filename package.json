@@ -52,6 +52,7 @@
     "knip": "knip",
     "test:integration:ops": "vitest run --config vitest.integration.ops.config.ts",
     "test:db-integration": "vitest run --config vitest.db-integration.config.ts",
+    "test:rls-pooling": "vitest run --config vitest.rls-pooling.config.ts",
     "test:server:smoke": "tsx server/tests/security.test.ts && tsx server/tests/shift-chat.test.ts",
     "test:playwright:waitlist": "cross-env PW_SUITE=waitlist playwright test --config=playwright.config.ts --project=chromium",
     "test:playwright": "pnpm test:playwright:ci",
@@ -154,7 +155,7 @@
     "tsx": "^4.19.0",
     "web-push": "^3.6.7",
     "wouter": "^3.3.0",
-    "xlsx": "^0.18.5",
+    "xlsx": "0.18.5",
     "xss": "^1.0.15",
     "zod": "^3.23.0"
   },
