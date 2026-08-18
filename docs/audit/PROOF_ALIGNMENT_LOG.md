@@ -7866,15 +7866,14 @@ dropping the warn → `expected false to be true`.
 ## 2026-08-18 — AST import guards: ImportEqualsDeclaration coverage
 
 **Task.** Close the parser gap CodeRabbit found on the RN repo's port of this walker
-(VetTrack---RN-Migration- PR #75, review comment 3807779657): `import X = require("m")`
+(the RN-migration repo — literal GitHub slug ``VetTrack---RN-Migration-`` — PR #75, review comment 3807779657): `import X = require("m")`
 (TS import-equals) never reached either guard's specifier collection, because its
 `require()` is an `ExternalModuleReference` node, not a `CallExpression`.
 
 **Files.** `tests/xlsx-write-only-guard.test.ts` (importsXlsx), 
 `tests/shell-mobile-context-liveness-guard.test.ts` (moduleSpecifiersOf).
 
-**RED proven, not assumed.** Fixtures added FIRST — shell guard: `["import-equals",
-`import m = require("${SPECIFIER}");`]` in the existing parser-coverage table; xlsx guard:
+**RED proven, not assumed.** Fixtures added FIRST — shell guard: ``["import-equals", `import m = require("${SPECIFIER}");`]`` in the existing parser-coverage table; xlsx guard:
 new `it` asserting `importsXlsx('import XLSX = require("xlsx");') === true` plus the
 commented-out decoy `=== false`. Run before the walker change: **2 failed | 15 passed** —
 exactly the two new fixtures, one per file.

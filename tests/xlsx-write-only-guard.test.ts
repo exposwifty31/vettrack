@@ -216,8 +216,11 @@ describe("xlsx (SheetJS CE) stays write-only and pinned", () => {
     expect(reached.sort(), `${SOLE_IMPORTER} reaches a SheetJS read API`).toEqual([]);
   });
 
-  it("parses TS import-equals syntax — import X = require(\"xlsx\") cannot slip the boundary", () => {
+  it("detects xlsx when source uses TS import-equals syntax", () => {
     expect(importsXlsx('import XLSX = require("xlsx");', "probe.ts")).toBe(true);
+  });
+
+  it("ignores commented-out TS import-equals syntax", () => {
     expect(importsXlsx('// import XLSX = require("xlsx");', "probe.ts")).toBe(false);
   });
 
