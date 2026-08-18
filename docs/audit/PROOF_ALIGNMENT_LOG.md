@@ -7184,3 +7184,121 @@ the flake is load-induced and not caused by this change. Test totals reconcile e
 
 **Verdict:** VERIFIED for the guard (RED/RED/GREEN in isolation, typecheck clean);
 PARTIAL for full-suite green, with the two external causes named above.
+
+## 2026-08-18 — G3 localStorage credentials: complete read/write map, premise inversion, and the server change the fix requires (chore/w5-vettrack-residue)
+
+**Claim:** No production code changed. This entry records three things established by evidence:
+(1) the task's "corrected file target" for finding J10 is **inverted** — the writer is
+`clerk-native-instance.ts`, not `native-clerk-session-token.ts`; (2) there are **three**
+long-lived credentials in `localStorage`, not the two named — the third
+(`vt_session`, the user's API bearer JWT) is the most dangerous and was unlisted; (3) neither
+named credential can be relocated to safer client storage — one is architecturally barred from
+cookies, the other needs a server change, specified below.
+
+**Evidence — the J10 "correction" is backwards (this is the finding, not a detour).**
+- `src/lib/clerk-native-instance.ts:38` — `window.localStorage.setItem(CLERK_CLIENT_JWT_STORAGE_KEY, jwt)`.
+  `rg -n "CLERK_CLIENT_JWT_STORAGE_KEY"` over the repo returns this as the **only** `setItem`.
+- `src/lib/native-clerk-session-token.ts:4` **declares** the key; `:25` **reads** it
+  (`window.localStorage.getItem`). It never writes. Its own docblock at `:3` names the writer:
+  *"Persisted by `createNativeClerkInstance`"* — which lives at `clerk-native-instance.ts:44`.
+- Proven at runtime, not by reading: a throwaway probe mocked `@clerk/clerk-js`, called
+  `createNativeClerkInstance("pk_test_probe")`, asserted exactly one `__unstable__onAfterResponse`
+  hook was registered, and replayed a FAPI response carrying an `authorization` header. The JWT
+  landed in `localStorage` → `AssertionError: expected 'eyJ.CLIENT_JWT_SECRET.sig' not to contain
+  'CLIENT_JWT_SECRET'`. The hook that wrote it was registered by `clerk-native-instance.ts`.
+  A one-writer-per-file rule following the "correction" would have handed an agent a file that
+  cannot fix the defect.
+
+**Evidence — complete read/write map (all three credentials).**
+- `vt_display_token` (`vtd_` device bearer) — key `src/lib/display-token-store.ts:21`.
+  Write `:49` (+ clinic id `:50`). Reads `:37` (`getStoredDisplayToken`), `:44`. Clear `:62-63`.
+  Consumers: `src/lib/auth-fetch.ts:124-137` (attaches `x-display-token`, and on 401 marks the
+  revoked notice, clears, redirects to `/board/pair`); `src/lib/realtime.ts:899` (display SSE via
+  fetch) and `:969`; `src/app/routes.tsx:118` (`hasStoredDisplayToken()` decides whether `/board`
+  drops `AuthGuard`); `src/pages/board-pair.tsx:18`. Server side:
+  `server/middleware/auth.ts:823` (`extractDisplayToken`), `:856` (`resolveDisplayAuth`).
+- `__vt_clerk_client_jwt` — key `src/lib/native-clerk-session-token.ts:4`.
+  **Write** `src/lib/clerk-native-instance.ts:38` (only). Reads `clerk-native-instance.ts:30`
+  (attached as the `authorization` header at `:53`) and `native-clerk-session-token.ts:25`.
+  Reached only from `src/main.tsx:243-245`, gated on `isCapacitorNative()`.
+- **`vt_session` — third credential, not named in the task, higher value than either.**
+  `src/lib/offline-session.ts:15` key, `:69` `safeStorageSetItem(SESSION_KEY, JSON.stringify(snapshot))`
+  with the default kind `"local"` (`src/lib/safe-browser.ts:89`). The snapshot includes `token`
+  (`offline-session.ts:9`) — the same Clerk **session** JWT set as `bearerToken` at
+  `src/hooks/use-auth.tsx:435` and persisted at `:440-447`, i.e. the bearer every `/api` route
+  accepts. Probe → `AssertionError`, dump:
+  `{"userId":"u1",...,"token":"eyJhbGciOiJI.USER_BEARER_SECRET.sig","tokenExp":0,...,"clinicId":"clinic-A"}`
+  — the token plus email, name, role and clinic id. Dev-bypass stores `""` (`use-auth.tsx:214`);
+  Clerk mode stores the real JWT.
+- Sweep for a fourth: `rg -n "localStorage\.setItem|safeStorageSetItem\("` across `src/`
+  (tests excluded) returns 32 hits; every other one is UI state, locale, cursor, or a dismissal
+  flag. Three credentials, no more.
+
+**Evidence — the exposure, as failing output rather than assertion.** Throwaway probes (run, then
+deleted; `git status --short` clean afterwards) asserting each credential is *not* readable by
+same-origin script:
+- `expected 'vtd_super_secret_device_credential|clinic-A' not to contain 'vtd_super_secret_device_credential'`
+- `expected 'eyJ.CLIENT_JWT_SECRET.sig' not to contain 'CLIENT_JWT_SECRET'`
+- `expected '{...,"token":"eyJhbGciOiJI.USER_BEARER_SECRET.sig",...}' not to contain 'USER_BEARER_SECRET'`
+
+**Verdict per credential — why "move it" is not available.**
+1. `__vt_clerk_client_jwt` — **cannot be a cookie at all**, and the module's own docblock is the
+   primary source: `clerk-native-instance.ts:6-23` records that cookie-based clerk-js *is* the
+   failure this module exists to route around (SFSafariViewController cannot present the
+   WKWebView's cookies, so `/v1/oauth_callback` dies with `authorization_invalid`; the fix is
+   `_is_native=1` + the JWT in the `Authorization` header). Making it httpOnly re-breaks native
+   OAuth by construction. **Pre-empting the likely "hardening":** Capacitor Preferences /
+   SecureStorage is JS-reachable from the same WebView, so against XSS it is exactly as weak as
+   `sessionStorage` — it buys device-at-rest protection (Keychain/Keystore) and *no* XSS
+   protection. Do not bank an XSS win on it.
+2. `vt_display_token` — fixable, but **not client-side**. `sessionStorage` is both no safer against
+   XSS *and* actively breaks the acceptance bar: a kiosk power-cycle starts a new session and the
+   pairing is gone. The property wanted is *usable-but-not-exfiltratable*, and a browser offers
+   exactly two ways to get it — an httpOnly cookie, or a non-extractable `CryptoKey`
+   (`extractable: false`) in IndexedDB signing a DPoP-style proof. Both require the server to
+   accept something other than a bearer read out of JS. Cookie is the cheap one.
+3. `vt_session` — same shape as (2) and strictly higher priority, since it is a **user** bearer for
+   every `/api` route, not a board-scoped device token. Out of this task's named scope; reported,
+   not touched.
+
+**The server change, specified (display token).**
+- `POST /api/display/pair/claim` (`server/routes/display.ts`) additionally sends
+  `Set-Cookie: vt_display=<token>; HttpOnly; Secure; SameSite=Strict; Path=/api; Max-Age=<years>`.
+  `SameSite=Strict` is required, not optional: an httpOnly cookie is ambient authority, and Lax
+  would let a cross-site top-level GET ride it. A kiosk never follows external links, so Strict
+  costs nothing.
+- **`server/middleware/auth.ts` need not be touched** (it is owned by the concurrent audit
+  workflow this session). A new middleware registered before route wiring copies the cookie into
+  `req.headers["x-display-token"]` when the header is absent, leaving `extractDisplayToken`
+  (`auth.ts:823`) and `resolveDisplayAuth` (`:856`) byte-identical. `server/routes/display.ts` and
+  `server/index.ts` are on neither workflow's owned list.
+- **Revocation moves to the server.** Today `src/lib/auth-fetch.ts:130-137` clears the credential
+  itself on 401. With httpOnly the client cannot; the 401 path must `Set-Cookie ... Max-Age=0` or a
+  revoked kiosk loops forever between `/board` and `/board/pair`.
+- **`/board` needs a client-readable marker.** `src/app/routes.tsx:118` uses
+  `hasStoredDisplayToken()` to drop `AuthGuard`. An httpOnly cookie is unreadable, so a non-secret
+  `vt_display_paired=1` (or the already-stored clinic id) has to carry that decision — and the spec
+  must state the new failure mode: **marker present + cookie expired/cleared → the kiosk renders
+  unauthenticated**. That is the case that breaks "pair, auto-reload, hold during a Code Blue".
+- Client half touches `src/lib/api.ts:397` (the claim fetch), **owned by the audit workflow** →
+  reported, not edited.
+
+**Why nothing was implemented here.** The acceptance bar is a browser kiosk that pairs, survives
+`useBoardAutoReload`'s full-page reload (`src/board/useBoardAutoReload.ts:73-82`, which defers while
+a Code Blue is active), and holds through an emergency. Nothing in this worktree can exercise that,
+and the full suite is not a usable signal here (see the 2026-08-17 entry: shared Postgres mid-migration
+under the concurrent RLS workflow, plus load-induced timer flake). A half-landed cookie path —
+`Set-Cookie` without the shim, or the shim without the marker — breaks pairing outright, which is
+strictly worse than the present exposure. Specification is the deliverable the task itself named
+for this branch; implementation needs a browser.
+
+**Verification (this branch):**
+- `git status --short` → empty before and after the probes; only this log entry is committed.
+- `npx tsc --noEmit` → exit 0.
+- `pnpm test -- tests/display-token-store.test.ts tests/display-token-header.test.ts tests/display-token-allow.test.ts tests/display-token-deny-list.test.ts tests/native-clerk-session-token.test.ts tests/board-pair.test.tsx`
+  → `Test Files 6 passed (6) · Tests 36 passed (36)`.
+
+**Verdict:** VERIFIED for the map, the J10 inversion, the third credential, and the
+cannot-relocate-client-side conclusion (all backed by failing/passing command output above).
+PARTIAL for the task as written — the credentials were **not** moved; the required server change is
+specified instead, per the task's own escape clause.
