@@ -22,7 +22,7 @@
 >
 > | Item | Owner | State |
 > |---|---|---|
-> | Run `pnpm seed:reviewer-demo` against **production** so the store reviewer sees real data (not empty lists) — ⚠ **read the safety note below first** | Owner | not done — needs prod `DATABASE_URL` + a Clerk identity |
+> | Run `pnpm seed:reviewer-demo` against **production** so the store reviewer sees real data (not empty lists) | Owner | ✅ **DONE 2026-08-11** — the demo-5roles fire seeded 5 isolated demo clinics (`reviewer-demo-clinic-*`) + 5 prod Clerk users, verified against prod (`vt_users`/`vt_shifts` counts). Credentials CSV in the job dir; **teardown owed** after the G3 on-device verdict |
 > | Play App Signing SHA-256 → `server/lib/well-known-assetlinks.ts` + redeploy | Agent | blocked until the first AAB is uploaded |
 > | `pnpm test:db-integration` runs in **zero** CI workflows, and its files are excluded from `pnpm test` — incl. the doctor-gate integration test that asserts the `source:"doctor_gate"` contract the RN app depends on | Agent | open |
 > | `tenant:lint` is `--warn-only` + `--touched` + `continue-on-error`, emitting ~208 findings of which ~197 are false positives (the heuristic never inspects the `.where()` chain) — a real `clinicId` leak would be indistinguishable from noise | Agent | open |
