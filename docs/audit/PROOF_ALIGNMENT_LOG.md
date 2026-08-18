@@ -7340,3 +7340,58 @@ no source touched).
 
 **Verdict:** VERIFIED for both CSP readings (`file:line` quoted above). NOT ACTED ON — CSP hardening
 is specified as follow-on work, not performed.
+
+## 2026-08-18 — G3 correction + reprioritisation: which origin each credential lives on, and why `vt_session` is the headline (chore/w5-vettrack-residue)
+
+**Claim:** No code changed. This entry **supersedes one sentence** of the 2026-08-18 CSP entry and
+re-ranks the three credentials. The CSP entry implied the native shell is the safer of the two
+origins; it is not — the Capacitor WebView receives **no CSP at all**. And the third credential
+(`vt_session`) is a live, replayable user bearer, not an identity snapshot, so it outranks both
+credentials the task named.
+
+**Correction — origin per credential, and which CSP actually applies.**
+- Helmet's CSP (`server/index.ts:124-179`) is an **HTTP response header from the Express app**. It
+  therefore applies to the web origin that serves `/board` and the PWA — where `vt_display_token`
+  and `vt_session` live.
+- `__vt_clerk_client_jwt` lives **only** on `capacitor://localhost` (`src/main.tsx:243-245` gates
+  `createNativeClerkInstance` on `isCapacitorNative()`). The bundled shell loads its document from
+  local assets, not from the API host, so it never receives that header — and there is no fallback:
+  `rg -n -i "content-security-policy" index.html` → no match; `ios/App/App/Info.plist` → no match;
+  `capacitor.config.ts` sets no CSP (only an optional `server.url` for live-reload). **The native
+  WebView runs with no CSP.**
+- Net: the earlier sentence *"holds on the Capacitor origin, where the bundle is local, but not on
+  the web origin"* is withdrawn. The native origin's protection is that it ships **only local
+  bundled assets with no remote content load**, not that a CSP constrains it. That is a real but
+  different property, and it does not survive `CAPACITOR_SERVER_URL` being set (live-reload/staging,
+  `capacitor.config.ts:7-19`), which points the WebView at a remote origin.
+
+**Reprioritisation — `vt_session` is the top finding, and it is live, not inert.**
+- The restored token is fed straight back in as the API bearer: `src/hooks/use-auth.tsx:277`
+  (Clerk provider) and `:95` (dev provider) both call
+  `setAuthState({ ..., bearerToken: offlineSnapshot.token })`, and `src/lib/auth-store.ts:29-33`
+  turns that into `Authorization: Bearer <token>`. So it is a working session credential, not an
+  identity-only snapshot — that check was run precisely because "identity only" would have dropped
+  the severity sharply. It does not.
+- It is written on **every** authenticated resolve (`use-auth.tsx:440-447`), not gated behind any
+  pairing or kiosk flow, and it carries email, name, role and clinic id alongside the token.
+- It sits on the origin whose CSP permits inline script (`server/index.ts:129`) and `https:` image
+  exfil (`:159`) — i.e. the exposure and the weak CSP overlap on the *same* origin. That is the
+  combination the previous entry mis-assigned.
+- **Bounded, honestly:** `restoreOfflineSession` does enforce limits — `offline-session.ts:78`
+  rejects on `Date.now() >= tokenExp`, `:79` on a 24 h `lastActiveAt` age, `:80` on non-active
+  status. But those guard *this app's own restore path*; an attacker who reads the raw
+  `localStorage` value replays it directly against `/api` and is bounded only by the Clerk JWT's own
+  `exp`. That TTL was **not measured in this session** — stating it as short would be a claim, not
+  evidence. Measuring it is the next check before ranking severity finally.
+- Ranking, therefore: **1) `vt_session`** (user bearer + PII, web origin, no pairing gate) →
+  **2) `vt_display_token`** (device bearer, board-scoped, web origin) →
+  **3) `__vt_clerk_client_jwt`** (native origin only, no CSP but no remote content either).
+  The task named 2 and 3 and not 1.
+
+**Verification:** `git status --short` → only this log entry. `npx tsc --noEmit` → exit 0.
+Commands run for this entry: `rg -n -i "content-security-policy" index.html` → no match;
+`rg -n -i "content-security" ios/App/App/Info.plist` → no match;
+`sed -n '84,100p;265,300p' src/hooks/use-auth.tsx` → `bearerToken: offlineSnapshot.token` at both sites.
+
+**Verdict:** VERIFIED for the origin correction and for `vt_session` being a live bearer.
+PARTIAL for its severity ceiling — the Clerk JWT `exp` window is unmeasured and named as the next check.
