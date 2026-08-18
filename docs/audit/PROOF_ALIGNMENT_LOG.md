@@ -7858,6 +7858,5 @@ warn condition is computed once rather than duplicated. Two added tests assert t
 `zz-ZZ` and stays silent for absent/blank input; both proven non-vacuous by mutation —
 dropping the guard → `expected "warn" to not be called at all, but actually been called 3 times`;
 dropping the warn → `expected false to be true`.
-||||||| 8d379facc
 
 **Verdict:** VERIFIED.
