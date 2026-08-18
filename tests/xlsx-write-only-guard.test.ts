@@ -107,6 +107,15 @@ const XLSX_SPECIFIER =
  *
  * `readFileSync` is node's, not SheetJS's; it is kept as a conservative
  * belt-and-braces name because this file may not touch the filesystem either.
+ *
+ * DELIBERATELY NOT SCOPED to bindings that resolve to the xlsx module, and this
+ * is the safer error rather than a shortcut. Binding-scoped tracking has to
+ * follow aliases transitively — `const u = XLSX.utils; u.sheet_to_json(...)`
+ * escapes any tracker that only watches direct `XLSX.*` access — so precision
+ * here buys false negatives, which is the exact failure this guard exists to
+ * prevent. Over-approximating costs a false positive: a loud, obvious failure
+ * that a developer resolves in seconds. The scope stays cheap because the
+ * sibling assertion pins this file as the SOLE importer of xlsx.
  */
 const READ_API_NAMES = new Set([
   "read",
