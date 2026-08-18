@@ -7132,3 +7132,44 @@ the 5s default — the same defect the T6 finding was about, one file over. Give
 
 **Verdict:** VERIFIED — and the transferable lesson is the method, not the patches: when the same
 defect class survives three fixes, replace the oracle rather than the increment.
+
+---
+
+## 2026-08-18 — Audit finding §1: an absent Clerk locale claim outranked an explicit `X-Locale`
+
+**Claim under test.** RN sends `X-Locale` on every authenticated request
+(`VetTrack-RN-Migration/src/lib/auth-fetch.ts:341`), and the server discards it. Verified, and the
+mechanism is narrower than "discards": `server/middleware/auth.ts` mapped the Clerk `locale` session
+claim through `normalizeLocale`, which is TOTAL (`lib/i18n/loader.ts:14-21` — an absent value returns
+`DEFAULT_LOCALE`, not null). The defaulted "en" then arrived at
+`resolveRequestLocale(req, result.user.locale)` as a *user preference*, and `??` never falls through a
+non-null value (`lib/i18n/middleware.ts:28`). So "no claim at all" silently beat an explicit header.
+Precision, not precedence.
+
+**Evidence — RED.** New `tests/i18n-authenticated-locale-precision.test.ts` drives the real
+composition (production claim mapping → real `createRequireAuth` → real `resolveRequestLocale`), not
+the new helper in isolation. First run: `Tests 13 failed | 5 passed (18)`.
+
+**Evidence — non-vacuity.** With the fix in place and green (18/18), each production change was
+reverted alone and the SAME tests went red on assertions, not errors:
+`expected 'en' to be 'he'` × 5 — an authenticated user asking for Hebrew being served English.
+Restored → 18/18 green again.
+
+**Evidence — no regression.** `pnpm vitest run tests/*auth* tests/*i18n* --testTimeout=30000` →
+`Test Files 97 passed (97) · Tests 1161 passed (1161)`. `pnpm typecheck` (frontend + server) exit 0.
+`tests/i18n-hardening.test.ts:165` (`accept-language: zz-ZZ` → `en`) still passes — `resolveRequestLocale`
+line 28 was deliberately NOT made strict per-leg, only the producer changed.
+
+**Pre-existing failure, not mine.** `tests/i18n-api-error-test-route-adoption.test.ts` times out at the
+5s default under CPU contention. Reproduced identically with my changes stashed. Passes at 30s.
+
+**Deliberate collateral change.** Authenticated + no claim + no `X-Locale` + no `Accept-Language` now
+resolves `INITIAL_LOCALE` ("he") instead of "en". That is the documented role of `INITIAL_LOCALE`
+(`lib/i18n/types.ts:22-29`); browsers always send `Accept-Language`, so web is unaffected. Asserted
+explicitly so it reads as chosen.
+
+**Considered and rejected.** Wiring `vt_users.preferred_locale` into the request path:
+`server/schema/core.ts:60` declares it `notNull().default("he")`, so it reproduces the exact collapse
+being fixed — a schema default masquerading as an expressed preference, in the other direction.
+
+**Verdict:** VERIFIED.

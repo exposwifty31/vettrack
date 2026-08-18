@@ -10,7 +10,8 @@ import { randomUUID } from "crypto";
 import { STABILITY_TOKEN } from "../lib/stability-token.js";
 import { resolveCurrentRole } from "../lib/role-resolution.js";
 import { resolveRequestLocale } from "../../lib/i18n/middleware.js";
-import { normalizeLocale } from "../../lib/i18n/loader.js";
+import { normalizeLocaleStrict } from "../../lib/i18n/loader.js";
+import type { Locale } from "../../lib/i18n/types.js";
 import { buildAccessDeniedBody, recordAccessDenied } from "../lib/access-denied.js";
 import { isAdminEmail } from "../lib/admin-email-allowlist.js";
 import { incrementMetric } from "../lib/metrics.js";
@@ -294,6 +295,25 @@ function isLikelyInvalidTokenError(err: unknown): boolean {
 
 const LOOPBACK_ADDRS = new Set(["127.0.0.1", "::1", "::ffff:127.0.0.1"]);
 
+/**
+ * Reads the caller's EXPRESSED locale preference from Clerk session claims.
+ *
+ * Returns `undefined` when no claim is present or the claim does not resolve to
+ * a supported locale. That distinction is load-bearing: `resolveRequestLocale`
+ * treats a defined user preference as outranking the `X-Locale` header, so
+ * defaulting an absent claim to a concrete locale (what `normalizeLocale` does)
+ * silently makes "no preference" beat an explicit client header. A real
+ * preference must win; a default must not.
+ */
+export function resolveClerkLocalePreference(
+  sessionClaims: Record<string, unknown> | undefined,
+): Locale | undefined {
+  const claim =
+    (sessionClaims?.locale as string | undefined) ??
+    (sessionClaims?.["https://clerk.dev/locale"] as string | undefined);
+  return normalizeLocaleStrict(claim);
+}
+
 export async function resolveAuthUser(req: Request): Promise<ResolveResult> {
   if (req.headers["x-stability-token"] === STABILITY_TOKEN) {
     if (process.env.NODE_ENV === "production") {
@@ -423,10 +443,7 @@ export async function resolveAuthUser(req: Request): Promise<ResolveResult> {
 
   let clerkEmail = (sessionClaims?.email as string | undefined) ?? "";
   let clerkName = (sessionClaims?.name as string | undefined) ?? "";
-  const clerkLocaleClaim =
-    (sessionClaims?.locale as string | undefined) ??
-    (sessionClaims?.["https://clerk.dev/locale"] as string | undefined);
-  const clerkLocale = normalizeLocale(clerkLocaleClaim);
+  const clerkLocale = resolveClerkLocalePreference(sessionClaims);
   // ADVISORY-ONLY: self-requested role from sign-up. Read from the session
   // claims if a JWT template exposes them, otherwise from the Clerk user object
   // we already fetch below for profile enrichment (no extra API round-trip).

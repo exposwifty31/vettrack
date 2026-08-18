@@ -17,7 +17,10 @@ export function i18nMiddleware(req: Request, _res: Response, next: NextFunction)
 }
 
 export function resolveRequestLocale(req: Request, userLocale?: string | null): Locale {
-  const userPreferred = typeof userLocale === "string" ? userLocale : undefined;
+  // A blank/whitespace value is an absent preference, not an expressed one.
+  // `??` does not fall through on "", so it must be normalised to undefined here.
+  const userPreferred =
+    typeof userLocale === "string" && userLocale.trim() !== "" ? userLocale : undefined;
   const customHeaderValue = req.headers["x-locale"];
   const requestOverride = Array.isArray(customHeaderValue) ? customHeaderValue[0] : customHeaderValue;
   const acceptLanguage = req.headers["accept-language"];

@@ -11,10 +11,25 @@ function isLocale(value: string): value is Locale {
   return SUPPORTED_LOCALES.includes(value as Locale);
 }
 
-export function normalizeLocale(locale?: string | null): Locale {
+/**
+ * Strict variant of `normalizeLocale`: returns `undefined` when the input is
+ * absent or does not resolve to a supported locale, instead of collapsing both
+ * cases into `DEFAULT_LOCALE`.
+ *
+ * Callers that need to distinguish "a preference was expressed" from "nothing
+ * was expressed" MUST use this. `normalizeLocale` is total by design and cannot
+ * carry that distinction — an absent value silently becomes a real-looking
+ * locale, which then outranks weaker-but-explicit signals downstream.
+ */
+export function normalizeLocaleStrict(locale?: string | null): Locale | undefined {
   const normalized = locale?.split(",")[0]?.split("-")[0]?.toLowerCase().trim() ?? "";
-  if (isLocale(normalized)) return normalized;
-  if (normalized) {
+  return isLocale(normalized) ? normalized : undefined;
+}
+
+export function normalizeLocale(locale?: string | null): Locale {
+  const strict = normalizeLocaleStrict(locale);
+  if (strict) return strict;
+  if (locale?.split(",")[0]?.split("-")[0]?.toLowerCase().trim()) {
     console.warn(`[i18n] Invalid locale "${locale}", falling back to "${DEFAULT_LOCALE}"`);
   }
   return DEFAULT_LOCALE;
