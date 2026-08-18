@@ -298,20 +298,32 @@ const LOOPBACK_ADDRS = new Set(["127.0.0.1", "::1", "::ffff:127.0.0.1"]);
 /**
  * Reads the caller's EXPRESSED locale preference from Clerk session claims.
  *
- * Returns `undefined` when no claim is present or the claim does not resolve to
- * a supported locale. That distinction is load-bearing: `resolveRequestLocale`
- * treats a defined user preference as outranking the `X-Locale` header, so
- * defaulting an absent claim to a concrete locale (what `normalizeLocale` does)
- * silently makes "no preference" beat an explicit client header. A real
- * preference must win; a default must not.
+ * Returns `undefined` when no claim resolves. That distinction is load-bearing:
+ * `resolveRequestLocale` treats a defined preference as outranking the
+ * `X-Locale` header, so defaulting an absent claim to a concrete locale would
+ * silently make "no preference" beat an explicit client header.
+ *
+ * `sessionClaims` is untrusted JWT payload, so each candidate is TYPE-CHECKED
+ * rather than cast: a non-string claim survives `??` (only null and undefined
+ * fall through), reaches the parser, and throws on `.split` — a 500 on the
+ * authenticated path from a value the caller controls.
+ *
+ * The sources are tried in order until one RESOLVES, which `??` cannot express:
+ * it chains on nullishness, so an empty or unsupported standard claim would
+ * shadow a perfectly good namespaced one.
  */
+const CLERK_LOCALE_CLAIMS = ["locale", "https://clerk.dev/locale"] as const;
+
 export function resolveClerkLocalePreference(
   sessionClaims: Record<string, unknown> | undefined,
 ): Locale | undefined {
-  const claim =
-    (sessionClaims?.locale as string | undefined) ??
-    (sessionClaims?.["https://clerk.dev/locale"] as string | undefined);
-  return normalizeLocaleStrict(claim);
+  for (const key of CLERK_LOCALE_CLAIMS) {
+    const raw = sessionClaims?.[key];
+    if (typeof raw !== "string") continue;
+    const resolved = normalizeLocaleStrict(raw);
+    if (resolved) return resolved;
+  }
+  return undefined;
 }
 
 export async function resolveAuthUser(req: Request): Promise<ResolveResult> {

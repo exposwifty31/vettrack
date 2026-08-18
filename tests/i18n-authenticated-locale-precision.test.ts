@@ -15,6 +15,7 @@ import { describe, it, expect, beforeAll, vi } from "vitest";
 import type { Request, Response, NextFunction } from "express";
 import { normalizeLocale, normalizeLocaleStrict } from "../lib/i18n/loader.js";
 import { resolveRequestLocale } from "../lib/i18n/middleware.js";
+import { resolveClerkLocalePreference } from "../server/middleware/auth.js";
 import { INITIAL_LOCALE, DEFAULT_LOCALE } from "../lib/i18n/types.js";
 
 type JsonBody = Record<string, unknown>;
@@ -74,7 +75,7 @@ async function localeForClerkRequest(
   }));
   const req = makeReq(headers);
   await middleware(req, makeRes(), noopNext);
-  return (req as Request & { locale?: string }).locale;
+  return req.locale;
 }
 
 describe("authenticated locale: absent Clerk claim must not outrank an explicit X-Locale", () => {
@@ -126,7 +127,7 @@ describe("dev-bypass auth mode keeps honouring X-Locale", () => {
     const middleware = createRequireAuth(async () => ({ ok: true, user: { ...BASE_USER } }));
     const req = makeReq({ "x-locale": "en" });
     await middleware(req, makeRes(), noopNext);
-    expect((req as Request & { locale?: string }).locale).toBe("en");
+    expect(req.locale).toBe("en");
   });
 });
 
@@ -225,5 +226,48 @@ describe("resolveRequestLocale — a present-but-empty header is not a preferenc
 
   it("a real X-Locale still outranks Accept-Language", () => {
     expect(resolveRequestLocale(reqWith({ "x-locale": "en", "accept-language": "he-IL" }))).toBe("en");
+  });
+});
+
+/**
+ * `sessionClaims` is untrusted JWT payload, so `as string | undefined` is a
+ * promise rather than a check. A non-string claim survives `??` (only null and
+ * undefined fall through), reaches `parseLocaleTag`, and throws on `.split` —
+ * a 500 on the authenticated path from a value the caller controls.
+ *
+ * And an empty-or-unsupported standard claim must not shadow the namespaced
+ * one: `?? ` cannot express "try the next SOURCE", only "the next non-nullish
+ * value", which is the same distinction the header chain needed.
+ */
+describe("resolveClerkLocalePreference — claims are untrusted input", () => {
+  it.each([
+    ["a number", 5],
+    ["an object", { he: true }],
+    ["an array", ["he"]],
+    ["a boolean", true],
+    ["null", null],
+  ])("survives %s claim without throwing", (_label, claim) => {
+    expect(() =>
+      resolveClerkLocalePreference({ locale: claim } as Record<string, unknown>),
+    ).not.toThrow();
+    expect(resolveClerkLocalePreference({ locale: claim } as Record<string, unknown>)).toBeUndefined();
+  });
+
+  it("falls through to the namespaced claim when the standard one is empty", () => {
+    expect(
+      resolveClerkLocalePreference({ locale: "", "https://clerk.dev/locale": "he-IL" }),
+    ).toBe("he");
+  });
+
+  it("falls through to the namespaced claim when the standard one is unsupported", () => {
+    expect(
+      resolveClerkLocalePreference({ locale: "zz-ZZ", "https://clerk.dev/locale": "he" }),
+    ).toBe("he");
+  });
+
+  it("still prefers a resolvable standard claim", () => {
+    expect(
+      resolveClerkLocalePreference({ locale: "en", "https://clerk.dev/locale": "he" }),
+    ).toBe("en");
   });
 });
