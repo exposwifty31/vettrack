@@ -7132,3 +7132,55 @@ the 5s default — the same defect the T6 finding was about, one file over. Give
 
 **Verdict:** VERIFIED — and the transferable lesson is the method, not the patches: when the same
 defect class survives three fixes, replace the oracle rather than the increment.
+
+---
+
+## 2026-08-18 — W5/G5 step one: CI guard for `src/shell/mobile/MobileShellContext.ts`
+
+**Claim:** The free-text rule "the dead-code sweep must not touch `MobileShellContext.ts`" is now a
+CI assertion (`tests/shell-mobile-context-liveness-guard.test.ts`) that fails both if the file is
+deleted while production importers remain, and if the importer set drifts. No production code changed.
+
+**Evidence — the premise, verified rather than trusted.** The dispatch claimed four production
+importers; `rg` over the whole repo (excluding `node_modules`/`dist`/`.git`) for the specifier in a
+module-resolution position returns exactly four `src/` files, unchanged from the claim:
+- `src/pages/alerts.tsx:2` · `src/pages/equipment-detail.tsx:2` · `src/pages/equipment-list.tsx:1` ·
+  `src/pages/scan.tsx:2` — all `import { useMobileShellContext } from "@/shell/mobile/MobileShellContext"`.
+- The test surface is separate and larger: `tests/mobile-shell.test.tsx:23` imports it directly and
+  five files `vi.mock` the path (`return-damaged`, `readiness-badge-surfaces`,
+  `equipment-detail-shift-error`, `equipment-detail-dock-return-mount`,
+  `equipment-detail-touch-targets`). Ten path references in total; **four** is the production count.
+- `src/shell/mobile/MobileShellContext.ts:1-5` is a re-export of `@/native/NativeShellContext`
+  (`src/native/NativeShellContext.ts:8-9`), so deleting it breaks four live pages.
+
+**Evidence — the guard is non-vacuous, proven both ways, run in isolation so the RED is attributable
+to this test and not to the six pre-existing tests that also touch the path:**
+- `rm src/shell/mobile/MobileShellContext.ts` → `pnpm test -- tests/shell-mobile-context-liveness-guard.test.ts`
+  → `Tests 1 failed | 2 passed (3)`, failing on *"is not deleted while production code still imports it"*
+  and naming all four importers in the message.
+- Restore, then drift one importer (`src/pages/alerts.tsx` repointed to
+  `@/native/NativeShellContext` with an alias, so the file still compiles) →
+  `Tests 1 failed | 2 passed (3)`, failing on *"keeps exactly the production importers on record"*
+  with `expected 4 / actual 3`. **This is the case with no other coverage** — the alias still
+  resolves, so nothing else in the suite notices importers leaving one at a time.
+- `git checkout --` both files → `git status --short` shows only the new test file, i.e. the restore
+  is byte-identical → `Tests 3 passed (3)`.
+
+**Evidence — no collateral damage:**
+- `pnpm test -- tests/mobile-shell.test.tsx tests/return-damaged.test.tsx tests/readiness-badge-surfaces.test.tsx tests/equipment-detail-shift-error.test.tsx tests/equipment-detail-dock-return-mount.test.tsx tests/equipment-detail-touch-targets.test.tsx tests/shell-mobile-context-liveness-guard.test.ts`
+  → `Test Files 7 passed (7) · Tests 38 passed (38)`.
+- `npx tsc --noEmit` → exit 0.
+
+**PARTIAL — the full suite is not a usable signal in this worktree right now, and that is an
+environment finding, not a result.** `pnpm test` gave `12 failed (730 files)` on one run and
+`44 failed (731 files)` on the next with no source change between them beyond restoring one import
+line. Two independent causes, both external: (1) 20 failures trace to
+`column "signup_join_code" of relation "vt_clinics" does not exist` — the shared local Postgres is
+mid-migration under the concurrent RLS workflow that owns `migrations/**`; (2) timer-window tests
+flake under three concurrent workflows — `tests/return-damaged.test.tsx` failed inside the full run
+and then passed three times standalone **with the new file present** (alone, and paired with it), so
+the flake is load-induced and not caused by this change. Test totals reconcile exactly:
+`6625 → 6628 (+3)`, `730 → 731 files (+1)`.
+
+**Verdict:** VERIFIED for the guard (RED/RED/GREEN in isolation, typecheck clean);
+PARTIAL for full-suite green, with the two external causes named above.
