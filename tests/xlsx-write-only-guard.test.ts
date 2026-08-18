@@ -51,7 +51,7 @@
  * move off unmaintained SheetJS, because the exemption above no longer applies.
  */
 import { describe, it, expect } from "vitest";
-import { readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 
 const repoRoot = path.resolve(__dirname, "..");
@@ -59,10 +59,29 @@ const repoRoot = path.resolve(__dirname, "..");
 /** The one file allowed to depend on xlsx. */
 const SOLE_IMPORTER = "src/lib/export-excel.ts";
 
-/** Trees that ship. `tests/` and `scripts/` are deliberately out of scope. */
-const SCANNED_TREES = ["src", "server"];
+/**
+ * Every tree that can put code into a shipped artifact. `src` and `server` are
+ * the app; `scripts` runs in CI and on ops machines; `shared` and `packages` are
+ * imported by both. All four were verified xlsx-free when this guard was written,
+ * so widening the scan costs nothing and closes the drift mode where a SECOND
+ * importer lands somewhere unscanned and the guard still passes.
+ *
+ * `tests/` is the one deliberate exclusion: this very file names the read APIs in
+ * `READ_APIS` below, so scanning `tests/` would make the guard fail on itself.
+ * Test coupling is also not what "ships" means.
+ */
+const SCANNED_TREES = ["src", "server", "scripts", "shared", "packages"];
 
-const SOURCE_EXTENSIONS = new Set([".ts", ".tsx", ".js", ".jsx", ".mts", ".cts"]);
+const SOURCE_EXTENSIONS = new Set([
+  ".ts",
+  ".tsx",
+  ".mts",
+  ".cts",
+  ".js",
+  ".jsx",
+  ".mjs", // scripts/ is mostly .mjs — omitting it left an 11-file blind spot.
+  ".cjs",
+]);
 
 /**
  * Matches `xlsx` only in module-specifier position: `from "xlsx"`,
@@ -93,6 +112,7 @@ const READ_APIS = [
 function listSourceFiles(tree: string): string[] {
   const root = path.join(repoRoot, tree);
   const out: string[] = [];
+  if (!existsSync(root)) return out;
   for (const entry of readdirSync(root, { withFileTypes: true, recursive: true })) {
     if (!entry.isFile()) continue;
     if (!SOURCE_EXTENSIONS.has(path.extname(entry.name))) continue;

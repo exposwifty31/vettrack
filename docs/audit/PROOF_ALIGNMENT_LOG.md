@@ -7770,3 +7770,44 @@ survived both.
 **Verdict:** VERIFIED for H7 (both baselines, tool-confirmed set equality and a clean gate).
 VERIFIED-WITH-CORRECTION for H1: the demotion stands, but the stated basis was half-sourced
 and is now recorded at two evidence grades, pinned, and CI-enforced.
+
+## 2026-08-18 — G4/H1 follow-up: the xlsx guard had two blind spots of its own (chore/w5-vettrack-residue)
+
+**Claim:** The guard committed in `1bfb9d64d` would have passed while a second xlsx
+importer shipped. Two scope holes, both found by attacking the guard rather than reading it,
+both closed and both proven by a failing run first.
+
+**Evidence:**
+- Hole 1 — **unscanned trees.** `SCANNED_TREES` was `["src", "server"]`. `scripts/`,
+  `shared/`, and `packages/` also ship (CI, ops, and workspace packages consumed by both
+  app halves) and were not scanned. Confirmed clean first —
+  `rg '(from|import\(|require\()\s*["'"'"']xlsx' scripts packages shared` → no matches —
+  so widening stays GREEN. Now `["src", "server", "scripts", "shared", "packages"]`.
+  - RED 6: temporary `packages/contracts/__redprobe.ts` importing xlsx →
+    `expected [ …(2) ] to deeply equal [ 'src/lib/export-excel.ts' ]`, listing the probe.
+    Before the widening this probe was invisible to the guard.
+- Hole 2 — **unscanned extension**, found only because RED 7 *failed to go red*. A probe at
+  `scripts/__redprobe.mjs` did **not** trip the widened guard, because `SOURCE_EXTENSIONS`
+  listed `.ts/.tsx/.js/.jsx/.mts/.cts` but not `.mjs`.
+  - Command: `find src server scripts shared packages -type f -name "*.*" | sed 's/.*\.//' |
+    sort | uniq -c | sort -rn` → `692 ts, 282 tsx, 15 sh, 11 mjs, ...`. `scripts/` is
+    predominantly `.mjs`, so this was an 11-file blind spot in a tree I had just added.
+  - Added `.mjs` + `.cjs`. RED 7 retry → `expected [ 'scripts/__redprobe.mjs', …(1) ] to
+    deeply equal [ 'src/lib/export-excel.ts' ]`.
+- `existsSync` early-return added to `listSourceFiles` so a future tree removal cannot turn
+  the guard into a hard crash.
+- `tests/` remains the one deliberate exclusion, now with the reason stated in the docblock:
+  this file itself contains the `READ_APIS` strings, so scanning `tests/` makes the guard
+  fail on itself.
+- GREEN: `pnpm test -- tests/xlsx-write-only-guard.test.ts` → `Test Files 1 passed (1) /
+  Tests 3 passed (3)`. `npx tsc --noEmit` → exit 0.
+- Both probes deleted; `git status --short` showed only the guard file modified.
+
+**Note on the H7 set-equality proof (not a defect, a precision caveat):** that check compares
+`(rule, from, to)` triples, and depcruise anchors a `no-circular` on its first edge, so two
+*different* cycles sharing a first edge would collapse to one triple. The conclusion is
+unaffected — it is independently supported by the count (10 live violations ↔ 10 entries),
+by the pre-regen exit-0 no-absorption proof, and by reading all ten full chains — but the
+triple comparison alone is not a bijection and should not be cited as if it were.
+
+**Verdict:** VERIFIED.
