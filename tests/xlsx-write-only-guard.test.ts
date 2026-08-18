@@ -53,10 +53,10 @@
 import { describe, it, expect } from "vitest";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
+import ts from "typescript";
 
 const repoRoot = path.resolve(__dirname, "..");
 
-/** The one file allowed to depend on xlsx. */
 const SOLE_IMPORTER = "src/lib/export-excel.ts";
 
 /**
@@ -96,10 +96,21 @@ const XLSX_SPECIFIER =
  * SheetJS APIs that parse input. Any of these means the CVE-2023-30533 advisory
  * exemption no longer covers us.
  */
-const READ_APIS = [
-  "XLSX.read",
-  "XLSX.readFile",
-  ".readFile(",
+/**
+ * SheetJS parse/read entry points, as BARE MEMBER NAMES.
+ *
+ * Names, not source fragments, because the check below is structural. A
+ * substring scan for `"XLSX.read"` is blind to `XLSX["read"]`, to
+ * `const parse = XLSX.read`, and to `const { read } = XLSX` — three spellings
+ * of the same call. It is also blind in the other direction: it fires on the
+ * string appearing in a comment. Matching parsed member names removes both.
+ *
+ * `readFileSync` is node's, not SheetJS's; it is kept as a conservative
+ * belt-and-braces name because this file may not touch the filesystem either.
+ */
+const READ_API_NAMES = new Set([
+  "read",
+  "readFile",
   "readFileSync",
   "sheet_to_json",
   "sheet_to_csv",
@@ -107,7 +118,52 @@ const READ_APIS = [
   "sheet_to_formulae",
   "table_to_book",
   "table_to_sheet",
-];
+]);
+
+/** Every member name the file actually reaches, however it is spelled. */
+function accessedMemberNames(source: string, fileName: string): Set<string> {
+  const sf = ts.createSourceFile(fileName, source, ts.ScriptTarget.Latest, true);
+  const names = new Set<string>();
+  const visit = (node: ts.Node): void => {
+    if (ts.isPropertyAccessExpression(node)) {
+      names.add(node.name.text);                              // XLSX.read
+    } else if (ts.isElementAccessExpression(node)) {
+      const arg = node.argumentExpression;
+      if (ts.isStringLiteralLike(arg)) names.add(arg.text);   // XLSX["read"]
+    } else if (ts.isBindingElement(node)) {
+      const key = node.propertyName ?? node.name;
+      if (ts.isIdentifier(key)) names.add(key.text);          // const { read } = XLSX
+    } else if (ts.isImportSpecifier(node)) {
+      names.add((node.propertyName ?? node.name).text);       // import { read } from "xlsx"
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(sf);
+  return names;
+}
+
+/** Module specifiers reached by real module syntax — parsed, never matched. */
+function importsXlsx(source: string, fileName: string): boolean {
+  const sf = ts.createSourceFile(fileName, source, ts.ScriptTarget.Latest, true);
+  let found = false;
+  const lit = (n: ts.Node | undefined) => (n && ts.isStringLiteralLike(n) ? n.text : undefined);
+  const visit = (node: ts.Node): void => {
+    if (found) return;
+    if (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) {
+      if (lit(node.moduleSpecifier) === "xlsx") found = true;
+    } else if (ts.isImportTypeNode(node)) {
+      if (ts.isLiteralTypeNode(node.argument) && lit(node.argument.literal) === "xlsx") found = true;
+    } else if (ts.isCallExpression(node)) {
+      const c = node.expression;
+      const dynamic = c.kind === ts.SyntaxKind.ImportKeyword;
+      const req = ts.isIdentifier(c) && c.text === "require";
+      if ((dynamic || req) && lit(node.arguments[0]) === "xlsx") found = true;
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(sf);
+  return found;
+}
 
 function listSourceFiles(tree: string): string[] {
   const root = path.join(repoRoot, tree);
@@ -125,15 +181,17 @@ function listSourceFiles(tree: string): string[] {
 describe("xlsx (SheetJS CE) stays write-only and pinned", () => {
   it("is imported by exactly one shipped file", () => {
     const importers = SCANNED_TREES.flatMap(listSourceFiles).filter((rel) =>
-      XLSX_SPECIFIER.test(readFileSync(path.join(repoRoot, rel), "utf8")),
+      importsXlsx(readFileSync(path.join(repoRoot, rel), "utf8"), rel),
     );
     expect(importers.sort()).toEqual([SOLE_IMPORTER]);
   });
 
   it("never reaches a SheetJS parse/read API", () => {
     const source = readFileSync(path.join(repoRoot, SOLE_IMPORTER), "utf8");
-    const found = READ_APIS.filter((api) => source.includes(api));
-    expect(found).toEqual([]);
+    const reached = [...accessedMemberNames(source, SOLE_IMPORTER)].filter((n) =>
+      READ_API_NAMES.has(n),
+    );
+    expect(reached.sort(), `${SOLE_IMPORTER} reaches a SheetJS read API`).toEqual([]);
   });
 
   it("is pinned to an exact version, because no upgrade will ever arrive on npm", () => {

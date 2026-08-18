@@ -31,15 +31,13 @@
  */
 import { describe, it, expect } from "vitest";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
+import ts from "typescript";
 import path from "node:path";
 
-/** The protected file, repo-relative (POSIX separators). */
 const TARGET = "src/shell/mobile/MobileShellContext.ts";
 
-/** The canonical implementation the target re-exports from. */
 const CANONICAL = "src/native/NativeShellContext.ts";
 
-/** The module specifier production code uses to reach the target. */
 const SPECIFIER = "@/shell/mobile/MobileShellContext";
 
 /**
@@ -67,19 +65,50 @@ function listSourceFiles(root: string): string[] {
 }
 
 /**
- * Matches the specifier only in a module-resolution position — `from "x"`,
- * `import("x")`, `import "x"`, `require("x")`, `vi.mock("x")` — so that a
- * passing mention in a comment or a doc string is not counted as an importer.
+ * Module specifiers reached by real module syntax — `import`/`export ... from`,
+ * `import()`, `require()`, `vi.mock()`/`jest.mock()`.
+ *
+ * Parsed rather than matched. A regex over source text cannot tell a module
+ * position from the same words inside a comment or a string literal, so it
+ * answers "does this file MENTION the specifier" while claiming to answer "does
+ * this file IMPORT it" — and a guard that cannot fail on its own subject is
+ * worse than no guard, because it is counted as coverage.
  */
-function importsSpecifier(source: string): boolean {
-  const escaped = SPECIFIER.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  return new RegExp(`(?:from|import|require|mock)\\s*\\(?\\s*["']${escaped}["']`).test(source);
+function moduleSpecifiersOf(source: string, fileName: string): Set<string> {
+  const sf = ts.createSourceFile(fileName, source, ts.ScriptTarget.Latest, true);
+  const found = new Set<string>();
+  const literal = (n: ts.Node | undefined) =>
+    n && ts.isStringLiteralLike(n) ? n.text : undefined;
+
+  const visit = (node: ts.Node): void => {
+    if ((ts.isImportDeclaration(node) || ts.isExportDeclaration(node))) {
+      const spec = literal(node.moduleSpecifier);
+      if (spec) found.add(spec);
+    } else if (ts.isCallExpression(node)) {
+      const callee = node.expression;
+      const isDynamicImport = callee.kind === ts.SyntaxKind.ImportKeyword;
+      const isRequire = ts.isIdentifier(callee) && callee.text === "require";
+      const isMock =
+        ts.isPropertyAccessExpression(callee) && callee.name.text === "mock";
+      if (isDynamicImport || isRequire || isMock) {
+        const spec = literal(node.arguments[0]);
+        if (spec) found.add(spec);
+      }
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(sf);
+  return found;
+}
+
+function importsSpecifier(source: string, fileName: string): boolean {
+  return moduleSpecifiersOf(source, fileName).has(SPECIFIER);
 }
 
 function currentProductionImporters(): string[] {
   return listSourceFiles("src")
     .filter((file) => file !== TARGET)
-    .filter((file) => importsSpecifier(readFileSync(file, "utf8")))
+    .filter((file) => importsSpecifier(readFileSync(file, "utf8"), file))
     .sort();
 }
 
@@ -117,11 +146,33 @@ describe("src/shell/mobile/MobileShellContext.ts liveness guard", () => {
 
   it("still re-exports the canonical symbols rather than being gutted in place", () => {
     if (!existsSync(TARGET)) return; // Covered by the deletion assertion above.
-
-    const source = readFileSync(TARGET, "utf8");
     expect(existsSync(CANONICAL), `${CANONICAL} is the canonical implementation`).toBe(true);
-    expect(source).toContain("@/native/NativeShellContext");
-    expect(source).toContain("useNativeShellContext as useMobileShellContext");
-    expect(source).toContain("NativeShellContext as MobileShellContext");
+
+    // Parsed, not string-matched: a module gutted to a comment mentioning these
+    // names would satisfy a `toContain` check while exporting nothing.
+    const source = readFileSync(TARGET, "utf8");
+    const sf = ts.createSourceFile(TARGET, source, ts.ScriptTarget.Latest, true);
+    const reExports = new Map<string, string>(); // exported name -> source module
+
+    sf.forEachChild((node) => {
+      if (!ts.isExportDeclaration(node)) return;
+      const from =
+        node.moduleSpecifier && ts.isStringLiteralLike(node.moduleSpecifier)
+          ? node.moduleSpecifier.text
+          : undefined;
+      if (!from || !node.exportClause || !ts.isNamedExports(node.exportClause)) return;
+      for (const el of node.exportClause.elements) {
+        reExports.set(el.name.text, `${el.propertyName?.text ?? el.name.text}@${from}`);
+      }
+    });
+
+    expect(
+      reExports.get("useMobileShellContext"),
+      `${TARGET} must re-export useNativeShellContext from the canonical module`,
+    ).toBe("useNativeShellContext@@/native/NativeShellContext");
+    expect(
+      reExports.get("MobileShellContext"),
+      `${TARGET} must re-export NativeShellContext from the canonical module`,
+    ).toBe("NativeShellContext@@/native/NativeShellContext");
   });
 });
