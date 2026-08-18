@@ -57,7 +57,11 @@ function devClinicHeaderAllowed(): boolean {
 export async function tenantContext(req: Request, res: Response, next: NextFunction): Promise<void> {
   const fromAuthUser = req.authUser?.clinicId;
   const rawDevHeader = req.headers["x-dev-clinic-id-override"];
-  const fromDevHeader = devClinicHeaderAllowed() && typeof rawDevHeader === "string"
+  // Header presence is checked FIRST: `tenantContext` is mounted on every /api
+  // request, and no production request carries this header, so resolving the
+  // auth mode ahead of the cheap type check would allocate a resolution object
+  // on every request to answer a question that is already moot.
+  const fromDevHeader = typeof rawDevHeader === "string" && devClinicHeaderAllowed()
     ? rawDevHeader
     : undefined;
   const fromDevDefault = process.env.DEV_DEFAULT_CLINIC_ID;
