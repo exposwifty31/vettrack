@@ -7395,3 +7395,220 @@ Commands run for this entry: `rg -n -i "content-security-policy" index.html` →
 
 **Verdict:** VERIFIED for the origin correction and for `vt_session` being a live bearer.
 PARTIAL for its severity ceiling — the Clerk JWT `exp` window is unmeasured and named as the next check.
+
+## 2026-08-18 — G5/L6 dead-code sweep: 12 files deleted, and three "stubs" re-classified (chore/w5-vettrack-residue)
+
+**Claim:** Twelve provably-unreachable files removed from `src/`. The three flagged "always returns
+empty / no-op / injects NULL" modules were traced to their call sites first; **two of the three are
+live stubs feeding real code, not dead code**, and were left in place with the defect documented.
+
+**Skills:** `tech-debt`, `vettrack-codebase-relevance-audit`. Tooling hole restated: `verify-security`
+/ `verify-quality` do not exist despite `~/.claude/rules/ccg-skills.md` listing them; no
+subagent-dispatch tool is available in this session, so the `security-reviewer` agent could not be
+delegated to. Not applicable to this change (no auth/credential/tenancy surface touched) but stated
+rather than skipped.
+
+### RED (before)
+
+`pnpm knip` → exit 1, `Unused files (132)`, of which **22** are under `src/` + `shared/`:
+
+```
+shared/index.ts                         src/infrastructure/platform/index.ts
+src/components/alerts/AlertCard.tsx     src/lib/camera.ts
+src/components/home/ShiftProgressHero.tsx  src/lib/query-keys/registry.ts
+src/components/layout/Sidebar.tsx       src/native/index.ts
+src/core/entities/index.ts              src/native/NativeScreen.tsx
+src/core/index.ts                       src/shared/index.ts
+src/core/use-cases/index.ts             src/shell/desktop/index.ts
+src/desktop/index.ts                    src/shell/index.ts
+src/infrastructure/api/index.ts         src/shell/mobile/index.ts
+src/infrastructure/auth/index.ts        src/shell/mobile/MobilePageHeader.tsx
+src/infrastructure/db/index.ts
+src/infrastructure/index.ts
+```
+
+### GREEN (after)
+
+- `pnpm knip` → `Unused files (120)`; src/+shared subset **22 → 10**. Exactly the 12 deleted paths
+  disappeared and **no new unused entry appeared** — no cascade.
+- `pnpm typecheck` (frontend + `tsconfig.server.json`) → **exit 0**.
+- `pnpm test -- tests/shell-mobile-context-liveness-guard.test.ts tests/mobile-shell.test.tsx
+  tests/return-damaged.test.tsx tests/readiness-badge-surfaces.test.tsx
+  tests/equipment-detail-shift-error.test.tsx tests/equipment-detail-dock-return-mount.test.tsx
+  tests/equipment-detail-touch-targets.test.tsx` → **Test Files 7 passed (7) / Tests 38 passed (38)**.
+  The `MobileShellContext` liveness guard passes: the deleted `src/shell/mobile/index.ts` re-exports
+  from `@/native/NativeShellContext`, not from `@/shell/mobile/MobileShellContext`, so it never
+  matched the guard's specifier regex and `PRODUCTION_IMPORTERS` is unchanged.
+- `pnpm depcruise:check` → exit 0, `no dependency violations found (1000 modules, 5201 dependencies)`.
+  All 12 paths pre-checked against `.dependency-cruiser-known-violations.json`: 0 hits each.
+- `pnpm architecture:cycles` → exit 0, matches baseline.
+- `pnpm build` → exit 0, `✓ built in 11.78s`.
+- Dangling-reference grep for every deleted specifier across `src/ server/ tests/ shared/` → exit 1
+  (no matches).
+
+### Deleted (12) — zero importers by import-position grep, not by mention-grep
+
+`src/lib/camera.ts` · `src/native/NativeScreen.tsx` · `src/shared/index.ts` ·
+`src/core/index.ts` · `src/core/entities/index.ts` · `src/core/use-cases/index.ts` ·
+`src/shell/index.ts` · `src/shell/desktop/index.ts` · `src/shell/mobile/index.ts` ·
+`src/shell/mobile/MobilePageHeader.tsx` · `src/desktop/index.ts` · `src/native/index.ts`
+
+`src/desktop/index.ts` and `src/native/index.ts` were reachable *only* from `src/shell/index.ts:3-4`,
+so they are dead only once the shell barrels go — deleted in the same commit, not a later pass.
+
+### Three "stubs" — traced before touching. Two are live defects, not dead code.
+
+**1. `server/lib/dispense-order-validation.ts` — LIVE STUB. `enforce` mode can never deny.**
+`evaluateDispenseAgainstOrders` unconditionally returns `{ orphanLines: [] }`
+(`dispense-order-validation.ts:35-37`). It has **two production call sites**:
+- `server/lib/authority/enforcement/clinical-invariant.evaluator.ts:124` —
+  `const { orphanLines } = await evaluateDispenseAgainstOrders(ctx.tx, {…})`. This is the
+  `clinical-invariant` evaluator family. Because `orphanLines` is always empty, the family can
+  **never** return `deny`, in `shadow` *or* `enforce`. A clinic set to `enforce` gets `allow` on
+  every dispense while reporting an enforcing posture. The documented `422 ORPHAN_DISPENSE_BLOCKED`
+  path (CLAUDE.md, "Authority + enforcement") is unreachable at runtime.
+- `server/routes/containers.ts:640` — the legacy pre-Phase-5 hard block
+  `if (orphanLines.length > 0 && !body.bypassReason)` at `:646`. Never fires.
+
+Not dead code, not deletable: the file's other export `loadInventoryItemLabelCode` and its types are
+imported by `server/services/dispense.service.ts:16-19,34-37` and `server/routes/containers.ts:24-42`,
+and ~6 test files assert the evaluator's behaviour through a mock of this function — the mock returns
+non-empty `orphanLines`, so **the tests exercise a path production cannot reach**. Left in place;
+this is an enforcement-semantics decision, not a sweep.
+
+**2. `server/queues/inventory-deduction.queue.ts` / `server/workers/inventory-deduction.worker.ts`
+— dead in production, and the note protecting them is factually wrong.**
+`inventoryDeductionQueue.add` is `return;` (`inventory-deduction.queue.ts:17-23`);
+`processInventoryDeductionJob` is `return;` and `startInventoryDeductionWorker` only warns
+(`inventory-deduction.worker.ts:4-13`). Grep for `inventoryDeductionQueue` across the repo returns
+**zero production importers** — only tests.
+
+Two on-record justifications for keeping them are **stale**:
+- `TASKS.md:224` — "NOT dead — `server/services/dispense.service.ts:614` enqueues it". It does not.
+  `dispense.service.ts:614` calls `enqueueDispenseInventoryDeduction`, a **local** function declared
+  at `dispense.service.ts:639` that does inline `db.transaction` stock decrements. Same-word name,
+  different symbol; the queue module is never imported by that file.
+  `docs/audit/RELEVANCE_BASELINE.md:70` repeats the same claim.
+- `server/jobs/enqueue.ts:117-118` — "`inventoryDeductionQueue.add` in inventory-deduction.queue.ts
+  delegates `inventory-deduction` (1c-2)". It delegates nothing; `add` returns immediately without
+  calling `enqueueJob`.
+
+**Not deleted anyway.** `docs/design/program-plan.md:285` records a standing owner decision that the
+no-op is *intentionally preserved* post-migration-143, and the repo's own Removal Protocol classes
+this as a behaviour change rather than a relevance cleanup. A wrong justification does not void the
+decision — it means the justification needs correcting. Reported, not acted on.
+
+**3. `server/routes/equipment/equipment-linked-animal-select.ts` — LIVE STUB feeding a permanently
+dead UI branch.** It injects `sql\`NULL\`` for `linkedAnimalId` / `linkedAnimalName` and is spread
+into three live read handlers: `get-equipment-list.ts:126`, `get-equipment-by-id.ts:49`,
+`get-my-equipment.ts:48`. The second possible producer is also dead end-to-end:
+- `src/lib/api/equipment.ts:437-443` writes those fields into the Dexie cache, but only
+  `if ("linked" in result && result.linked && result.animal)`.
+- `server/routes/equipment.ts:836-839` responds `{ linked: result.linked, roomId }` — **no `animal`
+  field is ever sent**.
+- `server/lib/equipment-seen.ts:9` types the success case as `{ ok: true; linked: false; … }` — a
+  `false` **literal** — and `:37` returns `linked: false` unconditionally.
+
+So both branches are unreachable, and the UI that consumes them can never render:
+`src/pages/equipment-list.tsx:1253` and `src/pages/room-radar.tsx:251` both guard on
+`{eq.linkedAnimalName && …}` to show `t.equipmentList.linkedInUse(…)`. That badge is dead, and the
+i18n key is orphaned. The `linked: true` arm of `EquipmentSeenResponse`
+(`src/types/equipment.ts:288-295`) is a phantom variant. Not deleted — three live handlers and the
+public response shape depend on it; removing it is an API-shape change.
+
+### Premise corrections (task brief vs. the tree)
+
+- **22** unused files under `src/`+`shared/`, not 21.
+- **15** `index.ts` barrels among them, not 13 — and **none is empty**. All 15 were dumped in full.
+  `src/shared/index.ts` (a single comment line, zero exports) is the only effectively-empty one;
+  `shared/index.ts` is a 24-line public barrel; the rest re-export real modules.
+- `docs/audit/PROOF_ALIGNMENT_LOG.md:1538`'s "`src/lib/camera.ts` (6 refs)" is **stale**. Those were
+  substring matches on the word "camera" in `src/components/qr-scanner.tsx` comments. Import-position
+  grep for `lib/camera` across `src/ server/ tests/ shared/` returns zero. Deleted.
+- The `@capacitor/camera` entry in `knip.json:5` `ignoreDependencies` is indeed stale as a
+  *justification* — after this deletion, the only remaining reference to that package in TypeScript
+  is gone (`src/lib/camera.ts:30` was the last one). **The entry is kept regardless**, because the
+  package is still autolinked into both native shells: `android/capacitor.build.gradle:14`,
+  `android/capacitor.settings.gradle:11-12`, `ios/App/CapApp-SPM/Package.swift:18,33`. Dropping the
+  dependency requires a `cap sync` regeneration of `ios/`+`android/` — a build change, out of scope
+  here. Standing cost: the Camera plugin ships in both native binaries for a feature gated behind
+  `VITE_FEATURE_CAMERA` that now has no caller at all.
+
+### Kept, with reason — knip false positives
+
+- `public/sw.js` — frozen surface (CLAUDE.md, PWA build-tag + emergency cache denylist).
+- `src/lib/query-keys/registry.ts` — read **by path**, not imported:
+  `scripts/architecture/collect-query-keys.mjs:17,370`, driven by `pnpm query-keys:audit`
+  (`package.json:46`) and required by `.github/pull_request_template.md:22`.
+- `src/components/alerts/AlertCard.tsx`, `src/components/home/ShiftProgressHero.tsx`,
+  `src/components/layout/Sidebar.tsx` — reachable from `src/design-system-entry.ts:38,62,33`, the
+  entry named in `.design-sync/config.json:18`. **Gate hole worth knowing:** `tsconfig.json:26`
+  *excludes* `src/design-system-entry.ts`, so `pnpm typecheck` would stay green even if that entry
+  were broken. That exclusion is why knip flags these three, and why the flag is a false positive
+  rather than a lead.
+- `shared/index.ts` — the `@vettrack/shared` barrel, documented in its own header as the entry for
+  the external React Native migration repo. Zero **in-repo** importers is not evidence of absence
+  for a cross-repo consumer.
+- The five `src/infrastructure/**/index.ts` barrels — zero importers today, but CLAUDE.md documents
+  `src/core/` + `src/infrastructure/` as an **in-progress** hexagonal migration and each barrel's own
+  docblock states the forward intent ("so features can import from `@/infrastructure/api` without
+  depending directly on `src/lib/`"). Deleting in-flight scaffolding is a migration decision.
+  Listed as follow-up, not swept.
+- `src/shell/mobile/MobileShell.tsx`, `src/shell/mobile/MobileTabBar.tsx` — sole importers are
+  `tests/mobile-shell.test.tsx:24-25`. A file with a live test importer is not provably unreachable,
+  and rewriting a passing test to enable a deletion is outside a sweep. This is exactly the drift the
+  guard's own docstring predicts; logged as follow-up.
+
+### Ownership
+
+No file owned by a concurrent workflow was touched. `migrations/**`,
+`server/middleware/tenant-context.ts`, `server/db.ts` (RLS workflow) and
+`server/middleware/auth.ts`, `lib/i18n/**`, `src/lib/api.ts` (audit workflow) are untouched —
+confirmed by `git status --short` listing only the 12 deletions plus this log entry.
+
+### Not claimed
+
+Full-suite `pnpm test` green. Per the prior entry on this branch it is not a usable signal in this
+worktree (12 vs 44 failures across two runs with no source change; shared local Postgres is
+mid-migration under the concurrent RLS workflow, and timer tests flake under three concurrent
+workflows). The targeted 7-file run above, `pnpm typecheck`, `pnpm build`, `pnpm depcruise:check`,
+`pnpm architecture:cycles` and the knip before/after diff are the evidence offered instead.
+
+**Verdict:** VERIFIED for the 12 deletions (RED/GREEN above). VERIFIED-AS-DEFECT, not acted on, for
+`dispense-order-validation` and `equipment-linked-animal-select`. REPORTED, not acted on, for
+`inventory-deduction` — the code stays per the standing owner decision, but `TASKS.md:224`,
+`docs/audit/RELEVANCE_BASELINE.md:70` and `server/jobs/enqueue.ts:117-118` assert a call that does
+not exist.
+
+## 2026-08-18 — Disclosure: commit 0f78f20e4 carries a dead-code sweep this session did not author (chore/w5-vettrack-residue)
+
+**Claim:** Commit `0f78f20e4` is titled as a docs-only entry but its diffstat contains 12 source
+files besides `docs/audit/PROOF_ALIGNMENT_LOG.md`. Those 12 were **already staged in the index** by
+a concurrent workflow sharing this worktree when `git commit` ran; `git add` named only the log file
+and `-a` was not used, so `git commit` picked them up from the pre-existing index. Recorded here
+rather than quietly rewritten, because the alternative — `reset`/`revert` — would destroy another
+agent's in-flight work.
+
+**Evidence:**
+- `git show --stat 0f78f20e4` → `13 files changed, 118 insertions(+), 425 deletions(-)`. Mine is the
+  `118` insertions in `docs/audit/PROOF_ALIGNMENT_LOG.md`. Not mine, all deletions:
+  `src/lib/camera.ts` (318), `src/shell/mobile/MobilePageHeader.tsx` (64),
+  `src/native/NativeScreen.tsx` (19), and nine barrel `index.ts` files under
+  `src/core/`, `src/desktop/`, `src/native/`, `src/shared/`, `src/shell/`.
+- `git status --short` at session start (before any work) → **empty**. The staging happened between
+  that check and the commit, i.e. concurrently.
+- The two later commits (`568bd4e2a`, `f5acc6199`) are clean: `1 file changed` each,
+  `docs/audit/PROOF_ALIGNMENT_LOG.md` only.
+- Still-uncommitted and left untouched, also not this session's: `M package.json`
+  (`"xlsx": "^0.18.5"` → `"0.18.5"`) and `?? tests/xlsx-write-only-guard.test.ts`.
+
+**Non-destructive check that the swept tree is not broken:**
+- `npx tsc --noEmit` → exit 0 (run after all three commits).
+- `rg -n "lib/camera" src/ server/ tests/` → no match, so the deleted module has no dangling importer.
+
+**Not done, deliberately:** no `reset`, no `revert`, no `amend`. The sweep is preserved inside
+`0f78f20e4` rather than lost; nothing is pushed and no PR is open, so the owning workflow can still
+re-split it. Attribution is corrected here instead of in git history.
+
+**Verdict:** VERIFIED — diffstat, start-of-session `git status`, reflog timestamps
+(`135045ffe` 17:20:25 → `0f78f20e4` 17:29:08) and `tsc` exit 0 all observed this session.
