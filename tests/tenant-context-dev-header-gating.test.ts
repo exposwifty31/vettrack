@@ -103,4 +103,15 @@ describe("tenantContext — x-dev-clinic-id-override gating", () => {
 
     expect(req.clinicId).toBe("real-clinic");
   });
+
+  it("treats a whitespace-only override as absent, so a dev default still applies", async () => {
+    // Third instance of one class in this workstream: a blank-but-present value
+    // survives `??` (only null/undefined fall through), so it wins its position
+    // and starves every weaker-but-real source after it. Here it skipped both
+    // dev defaults and left `req.clinicId` unset for `requireClinicId`.
+    const req = makeReq({ "x-dev-clinic-id-override": "   " });
+    await runMiddleware(req);
+
+    expect(req.clinicId).toBe("dev-clinic-default");
+  });
 });

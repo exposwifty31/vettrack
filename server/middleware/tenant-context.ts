@@ -47,8 +47,11 @@ export async function tenantContext(req: Request, res: Response, next: NextFunct
   // request and most requests omit this header, so resolving the auth mode
   // ahead of the cheap type check would allocate a resolution object to answer
   // a question that is usually already moot.
+  // `.trim() || undefined` and not just `.trim()`: a whitespace-only header is
+  // an ABSENT value, but an empty string survives `??`, so it would skip both
+  // dev defaults below and leave `req.clinicId` unset for `requireClinicId`.
   const fromDevHeader = typeof rawDevHeader === "string" && devClinicHeaderAllowed()
-    ? rawDevHeader
+    ? rawDevHeader.trim() || undefined
     : undefined;
   const fromDevDefault = process.env.DEV_DEFAULT_CLINIC_ID;
   const fromImplicitDevDefault = process.env.NODE_ENV !== "production" ? "dev-clinic-default" : undefined;

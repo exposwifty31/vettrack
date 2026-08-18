@@ -110,8 +110,8 @@ suite("what a pooled connection actually does to a session-scoped tenant GUC", (
     try {
       // Two requests establish context on one pooled connection; each drizzle
       // statement is its own checkout, so the LAST `SET` wins for both.
-      await db.execute(sql`SET app.clinic_id = 'clinic-A'`); // request A
-      await db.execute(sql`SET app.clinic_id = 'clinic-B'`); // request B
+      await db.execute(sql`SET app.clinic_id = 'clinic-A'`);
+      await db.execute(sql`SET app.clinic_id = 'clinic-B'`);
 
       // Request A now runs its query, believing it is scoped to clinic-A.
       const res = await db.execute<ProbeRow>(sql`SELECT clinic_id, secret FROM ${sql.identifier(PROBE)} ORDER BY id`);
