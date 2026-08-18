@@ -60,7 +60,7 @@ jobs:
           persist-credentials: false
 
       - name: 📦 pnpm
-        uses: pnpm/action-setup@v6
+        uses: pnpm/action-setup@v6.0.10
         with:
           run_install: false
 
