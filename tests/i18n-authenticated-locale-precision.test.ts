@@ -189,3 +189,41 @@ describe("normalizeLocaleStrict distinguishes present from defaulted", () => {
     expect(normalizeLocaleStrict("he-IL")).toBe("he");
   });
 });
+
+/**
+ * The SAME defect class, two legs further down the same `??` chain.
+ *
+ * `resolveRequestLocale` normalised `userLocale` so that a blank value stops
+ * outranking weaker-but-explicit signals — but `requestOverride` and
+ * `acceptLanguageValue` were left raw. `??` falls through only on null and
+ * undefined, and an Express header that is present-but-empty is `""`, which is
+ * neither. So an empty `X-Locale` SWALLOWS `Accept-Language` entirely, and an
+ * empty `Accept-Language` swallows INITIAL_LOCALE — both landing on
+ * `normalizeLocale("")`, i.e. English, in a Hebrew-default app.
+ *
+ * Fixing only the first leg is fixing an instance, not the class.
+ */
+describe("resolveRequestLocale — a present-but-empty header is not a preference", () => {
+  const reqWith = (headers: Record<string, string | string[] | undefined>) =>
+    ({ headers }) as unknown as Parameters<typeof resolveRequestLocale>[0];
+
+  it("an empty X-Locale must not swallow Accept-Language", () => {
+    expect(resolveRequestLocale(reqWith({ "x-locale": "", "accept-language": "he-IL" }))).toBe("he");
+  });
+
+  it("a whitespace-only X-Locale must not swallow Accept-Language", () => {
+    expect(resolveRequestLocale(reqWith({ "x-locale": "   ", "accept-language": "he-IL" }))).toBe("he");
+  });
+
+  it("an empty first value in a repeated X-Locale must not swallow Accept-Language", () => {
+    expect(resolveRequestLocale(reqWith({ "x-locale": ["", "en"], "accept-language": "he-IL" }))).toBe("he");
+  });
+
+  it("an empty Accept-Language falls through to INITIAL_LOCALE, not to English", () => {
+    expect(resolveRequestLocale(reqWith({ "accept-language": "" }))).toBe(INITIAL_LOCALE);
+  });
+
+  it("a real X-Locale still outranks Accept-Language", () => {
+    expect(resolveRequestLocale(reqWith({ "x-locale": "en", "accept-language": "he-IL" }))).toBe("en");
+  });
+});
