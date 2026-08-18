@@ -5,21 +5,26 @@ import { defineConfig } from "vitest/config";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 /**
- * The tenant-pooling / RLS invariant suite, excluded from default `pnpm test`
- * (vite.config.ts) because it runs real DDL: CREATE TABLE, ENABLE and FORCE
+ * The tenant-pooling / RLS breakage probes, excluded from default `pnpm test`
+ * (vite.config.ts) because they run real DDL: CREATE TABLE, ENABLE and FORCE
  * ROW LEVEL SECURITY, CREATE POLICY.
  *
- * It gets its OWN config rather than joining vitest.db-integration.config.ts,
- * so invoking it stays a separate, deliberate act — that runner's documented
+ * Their own config rather than joining vitest.db-integration.config.ts, so
+ * invoking them stays a separate, deliberate act — that runner's documented
  * scope should not silently grow to include schema-altering statements.
  *
- * The suite still self-skips unless DATABASE_URL is real (not the placeholder
- * tests/vitest-setup.ts injects), so this runner is safe to call blind; it will
- * report skipped rather than touch a database nobody chose.
+ * This runner is NOT safe to call blind, and it does not try to be. The suite
+ * requires TWO explicit opt-ins and reads `RLS_PROBE_DATABASE_URL` INSTEAD of
+ * `DATABASE_URL`, with no fallback, so a developer who happens to have staging
+ * configured cannot reach it by omission:
  *
- * Run: DATABASE_URL=... pnpm test:rls-pooling
- */
-export default defineConfig({
+ *   RLS_POOLING_PROBE=1 \
+ *   RLS_PROBE_DATABASE_URL=postgres://.../a_throwaway_db \
+ *   pnpm test:rls-pooling
+ *
+ * Point it at a database you are willing to lose. It creates and drops
+ * `zz_tenant_pooling_probe` and alters that table's row-security settings.
+ */export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),

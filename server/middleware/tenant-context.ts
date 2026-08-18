@@ -17,31 +17,17 @@ declare global {
 }
 
 /**
- * `x-dev-clinic-id-override` is a CLIENT-SUPPLIED header, so it is honored only
- * where `server/middleware/auth.ts` honors it: under BOTH `NODE_ENV !==
- * "production"` (auth.ts:159) and auth-mode dev-bypass (auth.ts:312), before it
- * reads the same header at auth.ts:317. `.cursorrules` records that contract —
- * dev-only headers are "honored only in dev bypass path". This middleware read
- * the header with no environment condition at all, four lines above an implicit
- * dev default that IS gated on NODE_ENV; that asymmetry inside one file, against
- * a sibling that double-gates the identical header, was an omission rather than
- * a design choice.
+ * `x-dev-clinic-id-override` is client-supplied, so it is honored only where
+ * `server/middleware/auth.ts` honors it: non-production AND auth-mode
+ * dev-bypass. One rule for one header, across both middlewares — the contract
+ * `.cursorrules:26` states in words.
  *
- * Severity, stated precisely and not inflated: `tenantContext` is mounted at
- * server/index.ts:312, BEFORE any per-route `requireAuth`, so `req.authUser` is
- * usually unset and precedence can fall through to the header. But whenever
- * credentials resolve, `req.clinicId` is OVERWRITTEN from the session — globally
- * by `sessionContextMiddleware` one line later (server/index.ts:313 →
- * auth.ts:633) and again per-route by `requireAuth` (auth.ts:675/774/907). The
- * header value therefore survives only on requests whose credentials do NOT
- * resolve, reaching handlers that read `req.clinicId` without `requireAuth`.
- * This hint is best-effort by design (see the note below); end-to-end
- * exploitability was NOT demonstrated and is not claimed.
+ * Gated even though this hint is best-effort and overwritten from the session
+ * downstream: the day `req.clinicId` sources a row-level-security GUC, a
+ * client-supplied header would set database-enforced tenant scope rather than
+ * merely hinting at it.
  *
- * It is worth gating anyway: the day `req.clinicId` sources a row-level-security
- * GUC, a client-supplied header would set DATABASE-ENFORCED tenant scope rather
- * than merely hinting at it. Closing this now is what makes that RLS work safe
- * to start later.
+ * Full threat model, blast radius and the options rejected: ADR-010.
  */
 function devClinicHeaderAllowed(): boolean {
   return process.env.NODE_ENV !== "production"
@@ -57,10 +43,10 @@ function devClinicHeaderAllowed(): boolean {
 export async function tenantContext(req: Request, res: Response, next: NextFunction): Promise<void> {
   const fromAuthUser = req.authUser?.clinicId;
   const rawDevHeader = req.headers["x-dev-clinic-id-override"];
-  // Header presence is checked FIRST: `tenantContext` is mounted on every /api
-  // request, and no production request carries this header, so resolving the
-  // auth mode ahead of the cheap type check would allocate a resolution object
-  // on every request to answer a question that is already moot.
+  // Header presence is checked FIRST: `tenantContext` runs on every /api
+  // request and most requests omit this header, so resolving the auth mode
+  // ahead of the cheap type check would allocate a resolution object to answer
+  // a question that is usually already moot.
   const fromDevHeader = typeof rawDevHeader === "string" && devClinicHeaderAllowed()
     ? rawDevHeader
     : undefined;

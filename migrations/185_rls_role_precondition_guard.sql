@@ -29,21 +29,32 @@ AS $$
 DECLARE
   offending text;
 BEGIN
-  -- Catches the direct attribute AND inheritance of it via role membership.
-  SELECT string_agg(r.rolname, ', ' ORDER BY r.rolname)
+  -- SUPERUSER and BYPASSRLS are ROLE ATTRIBUTES, and attributes are NOT
+  -- inherited through membership. So an INHERIT/'USAGE' test is the wrong
+  -- question twice over: it accepts a role that cannot use the attribute it
+  -- inherits, and it MISSES the path that actually confers one -- SET ROLE
+  -- into a role that holds it. `session_user` matters as well as
+  -- `current_user`, because a SET ROLE away from a bypassing login role does
+  -- not remove the ability to switch back.
+  SELECT string_agg(DISTINCT r.rolname, ', ' ORDER BY r.rolname)
     INTO offending
     FROM pg_roles r
    WHERE (r.rolsuper OR r.rolbypassrls)
-     AND pg_has_role(current_user, r.oid, 'USAGE');
+     AND (
+           r.rolname = current_user
+        OR r.rolname = session_user
+        OR pg_has_role(session_user, r.oid, 'SET')
+        OR pg_has_role(current_user, r.oid, 'SET')
+     );
 
   IF offending IS NOT NULL THEN
     RAISE EXCEPTION
-      'RLS tenant isolation cannot be enforced: current_user % is, or inherits, % (SUPERUSER/BYPASSRLS), which bypasses ROW LEVEL SECURITY unconditionally. FORCE ROW LEVEL SECURITY does not apply to such a role. Provision a non-superuser, non-BYPASSRLS application role and repoint DATABASE_URL before enabling RLS.',
-      current_user, offending
+      'RLS tenant isolation cannot be enforced: current_user % / session_user % is, or can SET ROLE to, % (SUPERUSER/BYPASSRLS), which bypasses ROW LEVEL SECURITY unconditionally. FORCE ROW LEVEL SECURITY does not apply to such a role. Provision a non-superuser, non-BYPASSRLS application role that cannot SET ROLE to one, and repoint DATABASE_URL before enabling RLS.',
+      current_user, session_user, offending
       USING ERRCODE = 'insufficient_privilege';
   END IF;
 END;
 $$;
 
 COMMENT ON FUNCTION vt_assert_rls_capable_role() IS
-  'Fails if the connecting role can bypass RLS (SUPERUSER or BYPASSRLS, directly or inherited). Must be called by any migration that enables row-level tenant isolation.';
+  'Fails if the connecting role can bypass RLS: current_user or session_user holds SUPERUSER/BYPASSRLS directly, or can SET ROLE to a role that does. Attributes are not inherited, so membership is tested with SET, not USAGE. Must be called by any migration that enables row-level tenant isolation.';

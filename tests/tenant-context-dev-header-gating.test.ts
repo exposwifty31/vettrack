@@ -1,22 +1,11 @@
 /**
- * `x-dev-clinic-id-override` must not be honored outside local dev bypass.
+ * INVARIANT: `tenantContext` reads `x-dev-clinic-id-override` only under
+ * non-production AND auth-mode dev-bypass — the same pair `auth.ts` requires
+ * before reading the identical header.
  *
- * `server/middleware/tenant-context.ts` reads the client-supplied
- * `x-dev-clinic-id-override` header with no environment condition, four lines
- * above an implicit dev default that IS gated on `NODE_ENV !== "production"`.
- * The sibling middleware gates the identical header twice — `NODE_ENV !==
- * "production"` (auth.ts:159) AND auth-mode dev-bypass (auth.ts:312) — before
- * reading it at auth.ts:317, and `.cursorrules:26` documents that contract:
- * "Dev-only headers ... honored only in dev bypass path".
- *
- * Severity note (deliberately not inflated): `tenantContext` is mounted at
- * server/index.ts:312, before any per-route `requireAuth`, so `req.authUser` is
- * usually unset and precedence can fall through to the header. But `requireAuth`
- * then overwrites `req.clinicId` from the session (auth.ts:633/675/774/907), so
- * on authenticated routes the header value is discarded. End-to-end
- * exploitability is NOT claimed here. What these tests lock is the invariant
- * itself: a client-supplied header must never be able to source tenant scope in
- * production or in Clerk mode.
+ * The three permissive cases are guard rails, not filler: they are what stops a
+ * fix for the two restrictive cases from over-correcting into "the header never
+ * works". Rationale and rejected alternatives: ADR-010.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import type { NextFunction, Request, Response } from "express";

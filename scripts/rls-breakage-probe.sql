@@ -14,13 +14,21 @@
 
 \echo '=== 1. AUTH BOOTSTRAP DEADLOCK (server/middleware/tenant-context.ts:44-51) ==='
 SELECT count(*) AS bootstrap_BEFORE
-  FROM (SELECT clinic_id FROM vt_users WHERE clerk_id='dev-user-alpha' AND deleted_at IS NULL LIMIT 1) x;
+  FROM (
+    SELECT clinic_id FROM vt_users
+    WHERE clerk_id = 'dev-user-alpha' AND deleted_at IS NULL
+    LIMIT 1
+  ) x;
 BEGIN;
   ALTER TABLE vt_users ENABLE ROW LEVEL SECURITY;
   ALTER TABLE vt_users FORCE ROW LEVEL SECURITY;
   CREATE POLICY g7_probe ON vt_users USING (clinic_id = current_setting('app.clinic_id', true));
   SELECT count(*) AS bootstrap_AFTER
-    FROM (SELECT clinic_id FROM vt_users WHERE clerk_id='dev-user-alpha' AND deleted_at IS NULL LIMIT 1) x;
+    FROM (
+    SELECT clinic_id FROM vt_users
+    WHERE clerk_id = 'dev-user-alpha' AND deleted_at IS NULL
+    LIMIT 1
+  ) x;
 ROLLBACK;
 
 \echo '=== 2. REALTIME OUTBOX PUBLISHER (server/lib/event-publisher.ts:62-67) ==='
@@ -50,12 +58,15 @@ BEGIN;
 ROLLBACK;
 
 \echo '=== 3. MIGRATION DML SILENTLY NO-OPS (migrations/127_promote_pending_admin.sql) ==='
-SELECT count(*) AS rows_127_SHOULD_touch FROM vt_users WHERE status='pending';
+SELECT count(*) AS rows_127_SHOULD_touch
+FROM vt_users
+WHERE status = 'pending';
 BEGIN;
   ALTER TABLE vt_users ENABLE ROW LEVEL SECURITY;
   ALTER TABLE vt_users FORCE ROW LEVEL SECURITY;
   CREATE POLICY g7_probe ON vt_users USING (clinic_id = current_setting('app.clinic_id', true));
-  UPDATE vt_users SET status='active', role='admin' WHERE status='pending';  -- expect UPDATE 0
+  UPDATE vt_users SET status = 'active', role = 'admin'
+  WHERE status = 'pending';  -- expect UPDATE 0
 ROLLBACK;
 
 \echo '=== 4. CLINIC FAN-OUT COLLAPSE (server/lib/ensure-clinic-phase2-defaults.ts:8) ==='
