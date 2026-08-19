@@ -7887,3 +7887,154 @@ by the W-AUTH agent on PR #75 the same day. Both repos now cover: static import,
 dynamic import(), require(), vi/jest.mock, inline import type, and import-equals.
 
 **Verdict:** VERIFIED.
+
+---
+
+## 2026-08-19 — Clerk production key rotation, and the Railway env cross-wiring it exposed
+
+**Task.** Close the live-credential finding from the two-repo audit: the production
+Clerk `sk_live_*` key sat in plaintext in this public repo, inside runbook 1.4 —
+the document written to prevent exactly this. Then fix the two misconfigurations
+the rotation surfaced.
+
+**Leak confirmed live, not assumed.** `GET https://api.clerk.com/v1/instance` with the
+value from `docs/runbooks/1.4-clerk-key-rotation.md` → **HTTP 200**, instance
+`ins_3CBKmon97uMlVn0EFJCXMy8gfeg`, `environment_type: production`, origins
+`vettrack.uk` + `capacitor://localhost`. SHA-256 fingerprint of the file value ==
+fingerprint of `CLERK_SECRET_KEY` on Railway `production` — matched on **three**
+slots, not the two the audit named: `VetTrack`, `Worker`, and `Staging/Worker`.
+No secret value was ever printed; every comparison was by fingerprint.
+
+**Rotation.** `POST /platform/applications/{app}/instances/{ins}/rotate_secret_keys`
+with `delay_old_secrets_expiration_hours: 1`. The grace window was the point: it made
+a failed propagation survivable instead of an outage. Propagation used
+`railway variable set --stdin`, so the value was never an argv entry, never echoed,
+never written to disk. Read-back on both production services matched the new
+fingerprint.
+
+**The grace window earned its keep within twenty minutes.** The variable change
+triggered a redeploy that could not succeed: `configErrors: ["Failed to snapshot
+repository"]` — Railway could not fetch source, and had already failed the same way
+twice at 21:19 and 21:42 UTC, before this work started. Production was therefore
+still serving the 20:01 deployment, holding the *old* key, with ~35 minutes of grace
+left. Fixed with `deploymentRedeploy(usePreviousImageTag: true)` on the last
+successful deployment of each service — reuses the built image, needs no snapshot.
+`VetTrack` `cab85026` SUCCESS in ~45s, `Worker` `959590be` SUCCESS; both stuck builds
+auto-REMOVED. `/api/health` green on all four checks.
+
+**The snapshot failure, traced properly (a first hypothesis was wrong and is recorded
+as such).** It is not repo bloat: `.railwayignore` already excludes `docs/`, `.claude/`,
+`ios/`, `android/`, and GitHub archives `main` fine (HTTP 200, 81 MB, 16 s). It is not
+the missing `source.repo` on the production service instances either — that is
+*deliberate* (auto-deploy disconnected 2026-07-10, CI-driven since; staging keeps its
+repo source as a mirror), though it does mean a Railway-initiated redeploy after a
+variable change can never succeed, which is exactly what happened at 23:31 and is worth
+knowing as a permanent property. The rule that follows is **not** "always pass
+`skip_deploys`" on its own — a credential written but never loaded is a variable change
+that silently does nothing, and with a grace window running that is the worst state to
+be in. The rule is: pass `skip_deploys` so the doomed auto-redeploy cannot consume the
+window, then **immediately** deploy a known-good image
+(`deploymentRedeploy(usePreviousImageTag: true)`) and verify runtime health *before* the
+window closes. Batching several variable writes behind `skip_deploys` is fine; ending
+the batch without that explicit redeploy is not. The actual failure is Railway-side: CI's `railway up --ci` uploaded
+successfully (`Indexing... Uploading...`), the build was scheduled on Metal builder
+`builder-bzuwqj`, and then failed with `Failed to snapshot repository. Please try again
+in a few minutes.`
+
+**Railway calls it transient; five attempts say otherwise.** 21:19 and 21:42 UTC (CI
+`deploy` job on `main`), 23:31 (variable-triggered redeploy) — all three with that
+`configErrors` string. Then two CI reruns at 00:19 and 00:35 with a *different*
+signature: the upload succeeded, a deployment record was created, and it sat in
+`INITIALIZING` for 15+ minutes with `statusUpdatedAt: null` and `buildLogs` answering
+`Deployment does not have an associated build` — Railway's builder never picked the
+work up at all. Clearing the queue between attempts (`deploymentCancel` on the zombie)
+changed nothing. Both zombies were cancelled; production was never affected, since a
+deployment that never builds cannot replace the running one.
+
+Ruled out with evidence, not assumption: repo size (`.railwayignore` already excludes
+`docs/`, `.claude/`, `ios/`, `android/`; GitHub archives `main` in 16 s / 81 MB), the
+absent `source.repo` (deliberate, and the CLI upload path does not use it), and a
+blocked queue. What remains is Railway-side and needs Railway: escalate with deployment
+ids `4fb83cb3`, `a4e698c0`, `acc8cf44`, `5f82c578`, `bebf71a0`.
+
+**Urgency, measured rather than assumed:** `git diff --name-only 3f5fc8a2 adfa4ac3`
+touches `TASKS.md`, this log, `package.json`/`pnpm-lock.yaml` (a devDependency bump),
+and two test files — **zero** files under `server/`, `src/`, `shared/`, `migrations/` or
+`packages/`. Production is not missing any runtime change. The pipeline must be fixed
+before the next real change ships; nothing is degraded tonight.
+
+**Consequence found while tracing it:** production is behind `main` by two merges. The
+last green CI deploy was `3f5fc8a2` at 19:51 UTC; `887e87c1` (PR #190) and `adfa4ac3`
+(PR #123) both merged and both failed at the deploy job with every test, typecheck,
+architecture-gate and integration job green. The image-reuse redeploy fixed the *key*,
+not the *code* — prod still runs `3f5fc8a2`.
+
+**Finding 1 — Staging/Worker was wired to production.** Not just Clerk: `DATABASE_URL`
+and `DATABASE_PUBLIC_URL` pointed at the production database, `DB_CONFIG_ENCRYPTION_KEY`
+was the production integration-credential key, `ALLOWED_ORIGIN` was `vettrack.uk` —
+while `REDIS_URL` pointed at *staging* Redis. Staging-queued jobs mutating production
+data. Blast radius today is zero only because that service has **0 deployments** and
+never ran; one click on Deploy would have started it. Repointed all eight to Railway
+references (`${{Postgres.*}}`, `${{VetTrack.*}}`) so no literal secret was handled,
+with `skip_deploys: true` so the fix could not itself trigger that first deployment.
+
+**Finding 2 — `SESSION_SECRET` referenced itself.** Raw definition on both Workers:
+`<88-char literal>${{SESSION_SECRET}}`. Railway expanded it recursively to the depth
+cap — 128 copies, 11,320 characters. Classic shape of editing the value in the UI and
+pasting *before* the pre-filled reference instead of replacing it. Repointed to
+`${{VetTrack.SESSION_SECRET}}`: resolved length 11,320 → 88 (production) and 63
+(staging). Verified harmless in the meantime — `SESSION_SECRET` has no cryptographic
+consumer anywhere (`express-session`/`cookie-session` are not dependencies); it is
+only presence-checked in `envValidation.ts` and reported as a boolean by
+`/api/health`, and the worker never calls `validateEnv()` at all.
+
+**Finding 3 — `CLERK_WEBHOOK_SECRET` disagreed across production services**
+(`VetTrack` vs `Worker`). Only `server/routes/webhooks.ts`, mounted in
+`server/index.ts`, reads it — the worker's copy was vestigial. Consolidated to
+`${{VetTrack.CLERK_WEBHOOK_SECRET}}`, which removes the disagreement but does **not**
+establish that the surviving value is right. **This finding stays OPEN.** The evidence
+so far shows only that one secret is now present on both services and that the handler
+verifies signatures; it does not show that the value matches the endpoint Clerk actually
+signs with, and the API cannot answer it (Clerk exposes create/delete for the Svix app,
+no read). Closing it requires a *successful signed delivery accepted by
+`POST /api/webhooks/clerk`* — send a test event from the Clerk dashboard and record the
+2xx. Until that evidence exists, treat Clerk→`vt_users` lifecycle sync as unproven.
+
+**Final state, resolved values, every slot fingerprinted:** production pairs match
+each other, staging pairs match each other, and no staging slot holds a production
+value on any of the eight variables checked.
+
+**Corrected exposure map** (the audit's five commits were wrong; verified against the
+object store): `.env.production` carried the key for 133 commits in April,
+`docs/runbooks/1.4-clerk-key-rotation.md` for 1,780. Those two spans do **not** simply
+add — the union counted directly is **1,915 of 2,655 commits on `main` (72%)**. An
+earlier draft of this entry said 2,211, which is the count across *all* refs, not
+`main`; quoting it against a `main` denominator was an error, corrected here.
+`14a64e12`, `907cd1c9`, `82eb42a7` do not contain it.
+
+**Other secrets from the same leaked file, re-probed rather than assumed:** historical
+`DATABASE_URL` credential DEAD (connection refused auth); `.vscode/settings.json`
+Railway password DEAD; **but** the full live `SESSION_SECRET` is in `.env.example` at
+`74c9f4e74` (2026-04-16, 2,184 commits back) and is still the production value — inert
+today for want of a consumer, and now single-point rotatable since both workers
+reference it. Flagged, not rotated: it needs a value placed, which is the owner's call.
+
+**One review finding declined, with the measurement behind the decline.** Review asked
+for `validateEnv()` (or an equivalent guard) to run at worker startup, so a malformed
+variable fails fast instead of being tolerated. The intent is right and the gap is real,
+but making that change blind right now would break production: `REQUIRED_IN_PRODUCTION`
+lists eleven variables, and the `Worker` service is missing three of them —
+`DB_SSL_REJECT_UNAUTHORIZED`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`. It does not
+fail today only because `NODE_ENV` is unset there, which short-circuits the check. Wiring
+the guard in would therefore turn the worker into a boot-crash the moment anyone
+correctly sets `NODE_ENV=production` — and with the deploy pipeline down (below) it could
+not even be verified. **The finding it actually surfaces is the missing three variables**,
+recorded here as follow-up: provision them on `Worker`, set `NODE_ENV=production`, then
+wire the guard, in that order and each verified.
+
+**Verdict:** VERIFIED for what this entry claims — rotation live, propagation verified by
+read-back, the old key dead at 00:31 UTC with `/api/health` still `clerk: ok` at that
+moment, and both misconfigurations closed and re-verified at the resolved-value level.
+Explicitly NOT closed: the `CLERK_WEBHOOK_SECRET` match (needs a signed delivery), the
+live `SESSION_SECRET` in `.env.example` (needs a rotation), the worker's three missing
+variables, and the deploy pipeline (needs Railway).

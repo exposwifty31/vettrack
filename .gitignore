@@ -133,3 +133,10 @@ android/keystore.properties
 /scripts/build-sha.js
 /scripts/build-sha.d.ts
 *.tsbuildinfo
+
+# Editor-local config. settings.json held a plaintext DB credential for ~4 months
+# (runbook 1.4, 2026-08-19); it is untracked now so SQLTools "save password"
+# cannot re-commit one. launch.json is credential-free and stays tracked.
+.vscode/*
+!.vscode/launch.json
+!.vscode/settings.json.example
