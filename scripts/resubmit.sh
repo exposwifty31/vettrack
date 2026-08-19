@@ -62,16 +62,29 @@ PKG_VER=$(python3 -c "import json;print(json.load(open('$PKG'))['version'])")
 # between the repo and ASC produce a colliding number that Apple rejects — which is
 # exactly what happened: the repo sat at 26 while builds 26 and 28 were already
 # uploaded, so a plain bump would have proposed 27, below the real maximum.
-LAST_SHIPPED=""
-if [ -f "$LAST_SHIPPED_FILE" ]; then
-  LAST_SHIPPED=$(tr -d '[:space:]' < "$LAST_SHIPPED_FILE")
-fi
+# Fail closed on a baseline we cannot trust. The app is LIVE, so a missing or
+# unreadable marker is misconfiguration, not a first submission — the same posture
+# verify-resubmission-static.sh takes.
+[ -f "$LAST_SHIPPED_FILE" ] || {
+  echo "FAIL: $LAST_SHIPPED_FILE is missing — record the last build uploaded to App Store Connect there before bumping"; exit 2; }
+LAST_SHIPPED=$(<"$LAST_SHIPPED_FILE")
+# Trim SURROUNDING whitespace only, matching verify-resubmission-static.sh:83-84.
+# `tr -d '[:space:]'` would collapse an internally-malformed "2 8" into a plausible
+# "28" and hand back a wrong baseline as if it were valid.
+LAST_SHIPPED="${LAST_SHIPPED#"${LAST_SHIPPED%%[![:space:]]*}"}"
+LAST_SHIPPED="${LAST_SHIPPED%"${LAST_SHIPPED##*[![:space:]]}"}"
+[[ "$LAST_SHIPPED" =~ ^[0-9]+$ ]] || {
+  echo "FAIL: $LAST_SHIPPED_FILE is not a decimal integer (got '$LAST_SHIPPED') — fix it before bumping"; exit 2; }
+
+# Force base 10 everywhere: a zero-padded "08" satisfies ^[0-9]+$ but shell
+# arithmetic reads it as octal and aborts with "value too great for base".
+LAST_SHIPPED=$((10#$LAST_SHIPPED))
+CUR_BUILD=$((10#$CUR_BUILD))
+
 FLOOR="$CUR_BUILD"
-if [[ "$LAST_SHIPPED" =~ ^[0-9]+$ ]] && [ "$LAST_SHIPPED" -gt "$FLOOR" ]; then
+if [ "$LAST_SHIPPED" -gt "$FLOOR" ]; then
   echo "  note: ios/.last-shipped-build ($LAST_SHIPPED) is ahead of the repo ($CUR_BUILD) — bumping from the baseline"
   FLOOR="$LAST_SHIPPED"
-elif [ -n "$LAST_SHIPPED" ] && ! [[ "$LAST_SHIPPED" =~ ^[0-9]+$ ]]; then
-  echo "FAIL: ios/.last-shipped-build is not a number (got '$LAST_SHIPPED') — fix it before bumping"; exit 2
 fi
 NEW_BUILD=$((FLOOR + 1))
 if [ "$MODE" = "resubmit" ]; then NEW_MKT="$PKG_VER"; else NEW_MKT="$TARGET"; fi
