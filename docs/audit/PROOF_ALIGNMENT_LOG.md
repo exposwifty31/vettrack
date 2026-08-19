@@ -8728,6 +8728,14 @@ design. A test now covers it, and the ADR item is restated rather than ticked.
   `shift-handover-*`) running against the dummy `DATABASE_URL` that `tests/vitest-setup.ts:10`
   supplies. Environmental, present on `main`, untouched here and not claimed as fixed.
 
+**Side effect of the export, and one place it was deliberately left standing:** the added doc
+comment moved the `outboxRowToSse` declaration from line 131 to 137, which staled every `:131`
+citation of it. The three in ADR-011 were corrected by dropping the number rather than bumping it —
+a citation pointing into the file a change edits goes stale again on the next edit. The fourth lives
+in the merged 2026-08-19 Tier-2-owner-decisions entry above (`realtime.ts:131`), and was **not**
+touched: this log forbids retroactive edits, and the remedy for a later change contradicting an older
+entry is a note in the new one. This is that note.
+
 **Not done, deliberately:** no browser drill was written, and the ADR item stays **open**. What is
 still unverified is the live transport — no test drives a real `EventSource` against a real publisher
 and asserts a browser observes contiguous `clinicSeq` across interleaved clinics. The ADR now says

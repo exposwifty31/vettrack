@@ -13,7 +13,7 @@
 the third one is unsound.
 
 **Job 1 — durable ordering and resume.** The SSE frame carries `id: ${row.id}`
-(`server/routes/realtime.ts:131`), the browser echoes it back as `Last-Event-ID`, and
+(`server/routes/realtime.ts`), the browser echoes it back as `Last-Event-ID`, and
 `replayPublishedOutboxAfter` (`server/routes/realtime.ts:164`) replays rows after it.
 This works and is a frozen surface. Nothing below changes it.
 
@@ -107,7 +107,7 @@ emergency path. Not worth saving one table.
 
 ### 2. Envelope
 
-`outboxRowToSse` (`server/routes/realtime.ts:131`) adds `clinicSeq: row.clinic_seq`.
+`outboxRowToSse` (`server/routes/realtime.ts`) adds `clinicSeq: row.clinic_seq`.
 The `id:` line and the `id` / `outboxId` fields are **unchanged**.
 
 ### 3. Client
@@ -184,7 +184,7 @@ any second clinic, and it degrades exactly when the product succeeds commerciall
   2,147,483,647 and turned the recovery endpoint into a 500 exactly when a clinic had run
   long enough to need it. Selected as text, range-checked against `Number.MAX_SAFE_INTEGER`.
 - [x] **The server→client seam is now covered — `tests/realtime-sse-envelope-clinic-seq.test.ts`.**
-  `outboxRowToSse` (`server/routes/realtime.ts:131`) is the only place `clinicSeq` enters the
+  `outboxRowToSse` (`server/routes/realtime.ts`) is the only place `clinicSeq` enters the
   frame the browser receives, and nothing asserted it. That gap was worse than an ordinary
   uncovered function because **its failure is silent by design**: §3 above requires the client
   to apply an event and skip the contiguity check when `clinicSeq` is absent, so dropping the
