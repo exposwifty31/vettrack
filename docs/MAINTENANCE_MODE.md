@@ -6,10 +6,15 @@ This repository is the **production monolith**: React web app, Express API, Post
 
 **Current native release:** derive it, don't read it here — this line has been wrong before
 (it said "1.0.1 (Build 20)" long after 1.2.0 shipped), and a number copied into prose always
-drifts while a command does not. Note which side of the release each command answers: the
-first three describe the **candidate** in this working tree, and `pnpm resubmit:release`
-moves them *before* upload, so they can name a version that never shipped. Only App Store
-Connect knows what is live:
+drifts while a command does not. Note which side of the release each command answers — the
+four below are not interchangeable:
+
+1. `asc builds list` — the **live** App Store version. The only authoritative answer.
+2. `node -p …version` and `grep CURRENT_PROJECT_VERSION` — the **candidate** in this
+   working tree. `pnpm resubmit:release` moves them *before* upload, so they can name a
+   version that never shipped.
+3. `cat ios/.last-shipped-build` — the **last build uploaded**, a build number only. It
+   carries no marketing version, so it cannot answer "which version is live" on its own.
 
 ```bash
 asc builds list --app 6778937527 --limit 5                              # LIVE / in review — the real answer

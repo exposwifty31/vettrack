@@ -42,13 +42,36 @@ repo-scoping these is the finding, and moving them is the fix. Two environments 
 one shared `staging`, because a single environment would have to trust both `staging` and
 `main`, which is the weaker rule.
 
-Reviewer's aid, since "did anyone actually do it" is the part that rots:
+The two workflows need **different** secret sets, so each environment holds only what its
+own job reads — an environment carrying the other's secrets re-opens the finding at a
+smaller scale:
+
+| Secret | `staging-e2e` | `staging-simulation` |
+|---|:--:|:--:|
+| `DATABASE_URL_STAGING` | ✅ (seed/cleanup write to it) | — |
+| `CLERK_SECRET_KEY_STAGING` | ✅ | ✅ |
+| `VITE_CLERK_PUBLISHABLE_KEY_STAGING` | ✅ | ✅ |
+| `STAGING_E2E_PASSWORD_STAGING` | ✅ | ✅ |
+| `TEST_BASE_URL_STAGING` | ✅ | ✅ |
+
+Reviewer's aid, since "did anyone actually do it" is the part that rots. All four checks
+must pass, not just the first:
 
 ```bash
-gh api repos/exposwifty31/vettrack/environments -q '.environments[].name'
-gh api repos/exposwifty31/vettrack/environments/staging-e2e/deployment-branch-policies
-gh api repos/exposwifty31/vettrack/actions/secrets -q '.secrets[].name'   # should list no *_STAGING
+R=exposwifty31/vettrack
+gh api repos/$R/environments -q '.environments[].name'            # both must be listed
+for e in staging-e2e staging-simulation; do
+  echo "== $e =="
+  gh api repos/$R/environments/$e/deployment-branch-policies -q '.branch_policies[].name'
+  gh api repos/$R/environments/$e/secrets -q '.secrets[].name'
+done
+gh api repos/$R/actions/secrets -q '.secrets[].name' | grep '_STAGING$'   # must print NOTHING
 ```
+
+Expected: `staging-e2e` → branch policy `staging`; `staging-simulation` → branch policy
+`main`; each environment listing exactly its column above; and the last command silent. A
+repository-scoped `_STAGING` secret surviving the migration means every workflow in the repo
+can still read it, which is the finding restated rather than fixed.
 
 Steps (in order): `pnpm staging:seed` → `pnpm test:staging:e2e` → `pnpm test:staging:walkthrough` → `pnpm staging:cleanup` (cleanup runs with `if: always()`).
 
