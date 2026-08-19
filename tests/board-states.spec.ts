@@ -256,8 +256,15 @@ test.describe("TV board phase 1 — visual board states", () => {
     // during load, and only the explicit `runFor` calls below advance them after.
     await page.clock.install({ time: new Date("2026-08-13T10:18:00.000Z") });
     let served = false;
+    // Counts the FAILED polls. It is the only deterministic signal that a driven tick
+    // actually produced a request — see the loop below, which waits on it instead of on
+    // real time.
+    let abortedPolls = 0;
     await page.route("**/api/display/snapshot", (route) => {
-      if (served) return route.abort("connectionrefused");
+      if (served) {
+        abortedPolls++;
+        return route.abort("connectionrefused");
+      }
       served = true;
       return route.fulfill({
         status: 200,
@@ -279,13 +286,24 @@ test.describe("TV board phase 1 — visual board states", () => {
     // failed cycle costs more than the bare 5 s poll interval), so 40 ticks of 8 s
     // leaves real margin over the observed floor without adding wall-clock cost.
     for (let i = 0; i < 40; i++) {
-      const state = await page
-        .getByTestId("board-state-strip")
-        .getAttribute("data-state")
-        .catch(() => null);
+      // No `.catch(() => null)`: a locator timeout or a closed page is a real failure and
+      // must surface here, at its source. Swallowing it read as "not stale yet", so the
+      // loop span another 39 ticks and the run died 40 iterations later on the final
+      // assertion, pointing at the wrong line.
+      const state = await page.getByTestId("board-state-strip").getAttribute("data-state");
       if (state === "stale") break;
+
+      const before = abortedPolls;
       await page.clock.runFor(8_000);
-      await page.waitForTimeout(120);
+      // The tick is only finished once the poll it drove has actually reached the route
+      // handler. The previous `waitForTimeout(120)` was REAL wall-clock — a guess at how
+      // long an aborted fetch plus its retry backoff take, and the one wall-clock
+      // dependency left in a test whose whole purpose is not to have any. Polling the
+      // counter is the same wait expressed as a fact instead of an estimate; it also
+      // returns as soon as the request lands rather than always costing the full budget.
+      await expect
+        .poll(() => abortedPolls, { timeout: 5_000, intervals: [5, 10, 25, 50] })
+        .toBeGreaterThan(before);
     }
 
     await expect(page.getByTestId("board-state-strip")).toHaveAttribute("data-state", "stale");

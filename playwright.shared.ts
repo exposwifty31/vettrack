@@ -88,9 +88,13 @@ export function sharedPlaywrightConfig(
     workers: process.env.PW_WORKERS || (process.env.CI ? '50%' : undefined),
     timeout: 30_000,
     globalTimeout: 12 * 60 * 1000,
-    // `html` on CI wrote a full report directory on every run; the workflow only
-    // uploads it on failure now, so generating it always was pure overhead. `blob`
-    // is not needed — shards are reported independently.
+    // `list` gives readable step output; `html` still WRITES `playwright-report/` on
+    // every CI run — `open: 'never'` only suppresses the viewer, it does not skip
+    // generation. Kept deliberately: the workflow uploads that directory `if: failure()`
+    // (.github/workflows/playwright.yml), and a trace-linked HTML report is what makes a
+    // red shard diagnosable. `blob` would be cheaper but needs a `merge-reports` step to
+    // become readable, which trades a cost paid on green runs for friction paid on red
+    // ones — the wrong way round. Shards are reported independently, so nothing is merged.
     reporter: process.env.CI ? [['list'], ['html', { open: 'never' }]] : 'html',
     // Visual-regression baselines are platform-specific (font rendering) and
     // the repo had none before board-states.spec.ts. `toHaveScreenshot`
