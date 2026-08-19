@@ -10,19 +10,6 @@
       "ssl": false,
       "previewLimit": 50,
       "askForPassword": true
-    },
-    {
-      "name": "VetTrack Railway",
-      "driver": "PostgreSQL",
-      "server": "mainline.proxy.rlwy.net",
-      "port": 34576,
-      "database": "railway",
-      "username": "postgres",
-      "ssl": {
-        "rejectUnauthorized": false
-      },
-      "previewLimit": 50,
-      "askForPassword": true
     }
   ]
 }

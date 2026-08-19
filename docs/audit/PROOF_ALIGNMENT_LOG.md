@@ -7929,8 +7929,14 @@ the missing `source.repo` on the production service instances either — that is
 *deliberate* (auto-deploy disconnected 2026-07-10, CI-driven since; staging keeps its
 repo source as a mirror), though it does mean a Railway-initiated redeploy after a
 variable change can never succeed, which is exactly what happened at 23:31 and is worth
-knowing as a permanent property: **always pass `skip_deploys` when changing a production
-variable.** The actual failure is Railway-side: CI's `railway up --ci` uploaded
+knowing as a permanent property. The rule that follows is **not** "always pass
+`skip_deploys`" on its own — a credential written but never loaded is a variable change
+that silently does nothing, and with a grace window running that is the worst state to
+be in. The rule is: pass `skip_deploys` so the doomed auto-redeploy cannot consume the
+window, then **immediately** deploy a known-good image
+(`deploymentRedeploy(usePreviousImageTag: true)`) and verify runtime health *before* the
+window closes. Batching several variable writes behind `skip_deploys` is fine; ending
+the batch without that explicit redeploy is not. The actual failure is Railway-side: CI's `railway up --ci` uploaded
 successfully (`Indexing... Uploading...`), the build was scheduled on Metal builder
 `builder-bzuwqj`, and then failed with `Failed to snapshot repository. Please try again
 in a few minutes.`
@@ -7985,9 +7991,14 @@ only presence-checked in `envValidation.ts` and reported as a boolean by
 **Finding 3 — `CLERK_WEBHOOK_SECRET` disagreed across production services**
 (`VetTrack` vs `Worker`). Only `server/routes/webhooks.ts`, mounted in
 `server/index.ts`, reads it — the worker's copy was vestigial. Consolidated to
-`${{VetTrack.CLERK_WEBHOOK_SECRET}}`. Whether *that* value matches Clerk's endpoint
-is unverifiable from the API (Clerk exposes only create/delete for the Svix app, no
-read) — left for a dashboard check.
+`${{VetTrack.CLERK_WEBHOOK_SECRET}}`, which removes the disagreement but does **not**
+establish that the surviving value is right. **This finding stays OPEN.** The evidence
+so far shows only that one secret is now present on both services and that the handler
+verifies signatures; it does not show that the value matches the endpoint Clerk actually
+signs with, and the API cannot answer it (Clerk exposes create/delete for the Svix app,
+no read). Closing it requires a *successful signed delivery accepted by
+`POST /api/webhooks/clerk`* — send a test event from the Clerk dashboard and record the
+2xx. Until that evidence exists, treat Clerk→`vt_users` lifecycle sync as unproven.
 
 **Final state, resolved values, every slot fingerprinted:** production pairs match
 each other, staging pairs match each other, and no staging slot holds a production
@@ -7995,7 +8006,10 @@ value on any of the eight variables checked.
 
 **Corrected exposure map** (the audit's five commits were wrong; verified against the
 object store): `.env.production` carried the key for 133 commits in April,
-`docs/runbooks/1.4-clerk-key-rotation.md` for 1,780 — 2,211 of 2,655 commits on `main`.
+`docs/runbooks/1.4-clerk-key-rotation.md` for 1,780. Those two spans do **not** simply
+add — the union counted directly is **1,915 of 2,655 commits on `main` (72%)**. An
+earlier draft of this entry said 2,211, which is the count across *all* refs, not
+`main`; quoting it against a `main` denominator was an error, corrected here.
 `14a64e12`, `907cd1c9`, `82eb42a7` do not contain it.
 
 **Other secrets from the same leaked file, re-probed rather than assumed:** historical
@@ -8005,6 +8019,22 @@ Railway password DEAD; **but** the full live `SESSION_SECRET` is in `.env.exampl
 today for want of a consumer, and now single-point rotatable since both workers
 reference it. Flagged, not rotated: it needs a value placed, which is the owner's call.
 
-**Verdict:** VERIFIED — rotation live, propagation verified by read-back, production
-healthy on fresh deployments carrying the new key, both misconfigurations closed and
-re-verified at the resolved-value level.
+**One review finding declined, with the measurement behind the decline.** Review asked
+for `validateEnv()` (or an equivalent guard) to run at worker startup, so a malformed
+variable fails fast instead of being tolerated. The intent is right and the gap is real,
+but making that change blind right now would break production: `REQUIRED_IN_PRODUCTION`
+lists eleven variables, and the `Worker` service is missing three of them —
+`DB_SSL_REJECT_UNAUTHORIZED`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`. It does not
+fail today only because `NODE_ENV` is unset there, which short-circuits the check. Wiring
+the guard in would therefore turn the worker into a boot-crash the moment anyone
+correctly sets `NODE_ENV=production` — and with the deploy pipeline down (below) it could
+not even be verified. **The finding it actually surfaces is the missing three variables**,
+recorded here as follow-up: provision them on `Worker`, set `NODE_ENV=production`, then
+wire the guard, in that order and each verified.
+
+**Verdict:** VERIFIED for what this entry claims — rotation live, propagation verified by
+read-back, the old key dead at 00:31 UTC with `/api/health` still `clerk: ok` at that
+moment, and both misconfigurations closed and re-verified at the resolved-value level.
+Explicitly NOT closed: the `CLERK_WEBHOOK_SECRET` match (needs a signed delivery), the
+live `SESSION_SECRET` in `.env.example` (needs a rotation), the worker's three missing
+variables, and the deploy pipeline (needs Railway).
