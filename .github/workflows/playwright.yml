@@ -16,7 +16,10 @@ concurrency:
 jobs:
   test:
     name: 🎭 Playwright E2E (shard ${{ matrix.shard }})
-    timeout-minutes: 45
+    # Was 45. The suite's own globalTimeout is 12 min and a healthy shard finishes
+    # in ~2; 45 only ever bought a hung run the right to burn 45 minutes of runner
+    # time before anyone noticed (run 32217586129 did exactly that).
+    timeout-minutes: 20
     runs-on: ubuntu-latest
 
     # Split the allowlisted CI suite across parallel shards to cut PR
@@ -37,9 +40,9 @@ jobs:
           - 5432:5432
         options: >-
           --health-cmd="pg_isready -U vettrack -d vettrack_test"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=5
+          --health-interval=2s
+          --health-timeout=3s
+          --health-retries=20
 
     env:
       NODE_ENV: test
@@ -57,12 +60,12 @@ jobs:
           persist-credentials: false
 
       - name: 📦 pnpm
-        uses: pnpm/action-setup@v6.0.10
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
         with:
           run_install: false
 
       - name: 🟢 Node.js
-        uses: actions/setup-node@v7.0.0
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version-file: ".nvmrc"
           cache: "pnpm"
@@ -70,8 +73,29 @@ jobs:
       - name: 📥 Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # Chromium + its OS deps were reinstalled from scratch on every shard of every
+      # run (~20s each). Key on the resolved @playwright/test version so a version
+      # bump busts it and nothing else does.
+      - name: 🔎 Resolve Playwright version
+        id: pw
+        run: echo "version=$(pnpm exec playwright --version | awk '{print $2}')" >> "$GITHUB_OUTPUT"
+
+      - name: ♻️ Cache Playwright browsers
+        id: pw-cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.pw.outputs.version }}
+
+      # On a cache hit only the apt-level deps are (re)asserted, which is the cheap
+      # half; the browser download — the expensive half — is skipped.
       - name: 🌐 Install Playwright Browsers
+        if: steps.pw-cache.outputs.cache-hit != 'true'
         run: pnpm exec playwright install --with-deps chromium
+
+      - name: 🌐 Install Playwright OS deps (cached browser)
+        if: steps.pw-cache.outputs.cache-hit == 'true'
+        run: pnpm exec playwright install-deps chromium
 
       - name: 🏗️ Build frontend
         run: |
@@ -111,17 +135,20 @@ jobs:
           TEST_BASE_URL: http://127.0.0.1:3001
 
       - name: 📤 Upload dev log on failure
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: ${{ failure() }}
         with:
           name: vettrack-playwright-dev-log-shard-${{ matrix.shard }}
           path: /tmp/vettrack-playwright.log
           retention-days: 30
 
+      # Was `!cancelled()` — uploading (and retaining for 30 days) the HTML report
+      # of a fully green shard costs time on every run and is read by nobody. On
+      # failure it is exactly what you want, so keep it there.
       - name: 📊 Upload Playwright report
-        uses: actions/upload-artifact@v7
-        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: ${{ failure() }}
         with:
           name: playwright-report-shard-${{ matrix.shard }}
           path: playwright-report/
-          retention-days: 30
+          retention-days: 14

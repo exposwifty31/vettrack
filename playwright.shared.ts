@@ -80,10 +80,18 @@ export function sharedPlaywrightConfig(
     fullyParallel: true,
     forbidOnly: !!process.env.CI,
     retries: process.env.CI ? 2 : 0,
-    workers: process.env.CI ? 1 : undefined,
+    // CI ran single-worker on a 4-vCPU runner, so the suite was serialized for no
+    // reason: the mutating specs each create uniquely-suffixed fixtures and delete
+    // them in a `finally`, so they do not contend. `50%` (2 workers on the standard
+    // runner) leaves headroom for the API server + Postgres sharing the box.
+    // Override with PW_WORKERS if a shard ever proves contended.
+    workers: process.env.PW_WORKERS || (process.env.CI ? '50%' : undefined),
     timeout: 30_000,
     globalTimeout: 12 * 60 * 1000,
-    reporter: process.env.CI ? [['list'], ['html']] : 'html',
+    // `html` on CI wrote a full report directory on every run; the workflow only
+    // uploads it on failure now, so generating it always was pure overhead. `blob`
+    // is not needed — shards are reported independently.
+    reporter: process.env.CI ? [['list'], ['html', { open: 'never' }]] : 'html',
     // Visual-regression baselines are platform-specific (font rendering) and
     // the repo had none before board-states.spec.ts. `toHaveScreenshot`
     // comparisons therefore run only when PW_VISUAL=1 is set — functional
