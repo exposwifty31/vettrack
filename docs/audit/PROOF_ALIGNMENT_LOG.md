@@ -8240,11 +8240,13 @@ default `vitest run` does — `vite.config.ts` excludes every DB-backed file.
 
 ### Commits
 
-Explicit pathspecs per commit. Three of the four vettrack commits map one-to-one to a lane
-and can be reverted alone; `f98c2e56` is the exception — it combines **T3** (tsconfig) and
-**T4** (CI/docs), so reverting it takes both. Stated rather than left implied, since a
-rollback plan that assumes a boundary the commits do not have is worse than no plan. Nothing pushed, no PR
-opened, no `--amend` / `--force` / `--no-verify`.
+Explicit pathspecs per commit. Four vettrack lanes landed as three vettrack commits: **T1**
+and **T2** map one-to-one and can be reverted alone, while `f98c2e56` carries both **T3**
+(tsconfig) and **T4** (CI/docs), so reverting it takes both. The RN lane (**T5**) is its own
+commit in its own repo. Stated rather than left implied, since a rollback plan that assumes a
+boundary the commits do not have is worse than no plan. At the time of this land pass: nothing
+pushed, no PR opened, no `--amend` / `--force` / `--no-verify`. (These commits were pushed
+later as PR #198.)
 
 - `b26e06d89` `fix(realtime): route task lifecycle events through the outbox` — 3 files,
   +397/−26.

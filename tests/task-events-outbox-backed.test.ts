@@ -364,13 +364,82 @@ describe("no legacy broadcast emitters remain in the task services", () => {
     for (const e of seq) expect(e.firstArg).toBe("clinicId");
   });
 
-  it("emitTaskEvent is the only path from this service to the outbox", () => {
-    // If a future emit site calls insertRealtimeDomainEvent directly it would bypass
-    // the helper's category:"TASK" tagging and its non-fatal error handling, so the
-    // per-operation sequences above would stop covering it.
+  /**
+   * Structural, not line-based. The previous version filtered source LINES containing
+   * `insertRealtimeDomainEvent(` and asserted the single hit also contained
+   * `category: "TASK"` on that same line. Two ways that lies: prettier splitting the
+   * call across lines breaks it without any behaviour changing, and — the one that
+   * matters — a call MOVED out of `emitTaskEvent` into another function still passes,
+   * which is precisely the claim in this test's name.
+   *
+   * This walks the AST for `insertRealtimeDomainEvent` call expressions and records the
+   * function each one sits in, so both the count and the containment are real.
+   */
+  function directOutboxCalls(): Array<{ enclosingFunction: string | null; category: string | null }> {
     const source = readFileSync("server/services/appointments.service.ts", "utf8");
-    const direct = source.split("\n").filter((l) => l.includes("insertRealtimeDomainEvent("));
-    expect(direct).toHaveLength(1);
-    expect(direct[0]).toContain("category: \"TASK\"");
+    const sf = ts.createSourceFile(
+      "appointments.service.ts",
+      source,
+      ts.ScriptTarget.Latest,
+      true,
+    );
+    const found: Array<{ enclosingFunction: string | null; category: string | null }> = [];
+
+    const walk = (node: ts.Node, enclosing: string | null): void => {
+      let current = enclosing;
+      if (ts.isFunctionDeclaration(node) && node.name) current = node.name.text;
+      else if (
+        ts.isVariableDeclaration(node) &&
+        ts.isIdentifier(node.name) &&
+        node.initializer &&
+        (ts.isArrowFunction(node.initializer) || ts.isFunctionExpression(node.initializer))
+      ) {
+        current = node.name.text;
+      } else if (ts.isMethodDeclaration(node) && ts.isIdentifier(node.name)) {
+        current = node.name.text;
+      }
+
+      if (
+        ts.isCallExpression(node) &&
+        ts.isIdentifier(node.expression) &&
+        node.expression.text === "insertRealtimeDomainEvent"
+      ) {
+        const options = node.arguments[1];
+        const categoryProp = options && ts.isObjectLiteralExpression(options)
+          ? options.properties.find(
+              (prop) =>
+                ts.isPropertyAssignment(prop) &&
+                ts.isIdentifier(prop.name) &&
+                prop.name.text === "category",
+            )
+          : undefined;
+        found.push({
+          enclosingFunction: current,
+          category:
+            categoryProp &&
+            ts.isPropertyAssignment(categoryProp) &&
+            ts.isStringLiteral(categoryProp.initializer)
+              ? categoryProp.initializer.text
+              : null,
+        });
+      }
+
+      ts.forEachChild(node, (child) => walk(child, current));
+    };
+    ts.forEachChild(sf, (node) => walk(node, null));
+    return found;
+  }
+
+  it("emitTaskEvent is the only path from this service to the outbox", () => {
+    // A future emit site calling insertRealtimeDomainEvent directly would bypass the
+    // helper's category:"TASK" tagging and its non-fatal error handling, so the
+    // per-operation sequences above would stop covering it.
+    const calls = directOutboxCalls();
+    expect(
+      calls.map((c) => c.enclosingFunction),
+      `appointments.service.ts must reach the outbox only through emitTaskEvent; ` +
+        `found calls in: ${calls.map((c) => c.enclosingFunction ?? "<top level>").join(", ")}`,
+    ).toEqual(["emitTaskEvent"]);
+    expect(calls[0]!.category, `the single outbox call must tag category "TASK"`).toBe("TASK");
   });
 });
