@@ -11,12 +11,11 @@ export function warnIfUnsafePlaywrightBaseUrl(baseURL: string): void {
   const lower = baseURL.toLowerCase();
   if (
     lower.includes('vettrack.uk') ||
-    lower.includes('vettrack-staging') ||
     lower.includes('production.railway.app')
   ) {
     console.warn(
-      '[playwright] WARNING: TEST_BASE_URL looks like production or staging. ' +
-        'Default Playwright is for local/CI only (127.0.0.1:3001). ' +
+      '[playwright] WARNING: TEST_BASE_URL looks like production. ' +
+        'Default Playwright is for local/CI only (127.0.0.1:3001).',
     );
   }
 }
