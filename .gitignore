@@ -100,8 +100,23 @@ ds-bundle/
 # Xcode SwiftPM resolution (local machine noise)
 ios/**/xcshareddata/swiftpm/
 
-# Agent-session tooling artifacts (recreated by CLIs; never app code)
-.agents/
+# Agent-session tooling artifacts (recreated by CLIs; never app code).
+# 2026-08-19: the VetTrack-authored skills that had accumulated here were moved to
+# .claude/skills/ (where nothing ignores them) and the vendored ones deleted, so this
+# rule and the tracked contents finally agree. One directory is deliberately kept and
+# re-included: scripts/scan-secrets.ts allowlists a PEM-header validation line by the
+# exact path .agents/skills/publish-mobile-app/scripts/bootstrap-app-store-key.ts, so
+# moving it would silently break the secret-scan gate in `pnpm validate:prod`.
+# Written in the progressive form because a bare `.agents/` stops git descending, which
+# makes any `!` re-include below it inert.
+# NOTE: the re-include is currently overridden by a bare `.agents/` line in this repo's
+# uncommitted .git/info/exclude, which is evaluated after .gitignore. Already-tracked
+# files there are unaffected; clear that line if you want NEW files under
+# publish-mobile-app/ to show up in `git status`.
+.agents/*
+!.agents/skills/
+.agents/skills/*
+!.agents/skills/publish-mobile-app/
 .codex/
 .design-sync/previews/
 .design-sync/preview-provider.tsx
