@@ -57,7 +57,23 @@ CUR_BUILD=$(grep -m1 'CURRENT_PROJECT_VERSION = ' "$PBXPROJ" | grep -oE '[0-9]+'
 [[ "${CUR_BUILD:-}" =~ ^[0-9]+$ ]] || { echo "FAIL: could not parse CURRENT_PROJECT_VERSION from pbxproj (got '${CUR_BUILD:-<empty>}')"; exit 2; }
 CUR_MKT=$(grep -m1 'MARKETING_VERSION = ' "$PBXPROJ" | sed -E 's/.*MARKETING_VERSION = ([^;]+);.*/\1/')
 PKG_VER=$(python3 -c "import json;print(json.load(open('$PKG'))['version'])")
-NEW_BUILD=$((CUR_BUILD + 1))
+# The next build must clear BOTH the repo's own number and the last one uploaded to
+# App Store Connect. Deriving it from CUR_BUILD alone (as this did) makes any drift
+# between the repo and ASC produce a colliding number that Apple rejects — which is
+# exactly what happened: the repo sat at 26 while builds 26 and 28 were already
+# uploaded, so a plain bump would have proposed 27, below the real maximum.
+LAST_SHIPPED=""
+if [ -f "$LAST_SHIPPED_FILE" ]; then
+  LAST_SHIPPED=$(tr -d '[:space:]' < "$LAST_SHIPPED_FILE")
+fi
+FLOOR="$CUR_BUILD"
+if [[ "$LAST_SHIPPED" =~ ^[0-9]+$ ]] && [ "$LAST_SHIPPED" -gt "$FLOOR" ]; then
+  echo "  note: ios/.last-shipped-build ($LAST_SHIPPED) is ahead of the repo ($CUR_BUILD) — bumping from the baseline"
+  FLOOR="$LAST_SHIPPED"
+elif [ -n "$LAST_SHIPPED" ] && ! [[ "$LAST_SHIPPED" =~ ^[0-9]+$ ]]; then
+  echo "FAIL: ios/.last-shipped-build is not a number (got '$LAST_SHIPPED') — fix it before bumping"; exit 2
+fi
+NEW_BUILD=$((FLOOR + 1))
 if [ "$MODE" = "resubmit" ]; then NEW_MKT="$PKG_VER"; else NEW_MKT="$TARGET"; fi
 
 echo "== resubmit ($MODE) =="
