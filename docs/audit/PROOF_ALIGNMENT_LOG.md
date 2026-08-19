@@ -8542,8 +8542,11 @@ planned. Per this log's own rule, neither superseded line was edited.
 
 **Evidence:**
 
-- `LICENSE` in the RN repo (`exposwifty31/VetTrack---RN-Migration-`, blob at `03c522c43`) — fetched
-  this session via `gh api repos/exposwifty31/VetTrack---RN-Migration-/contents/LICENSE`. Reads
+- `LICENSE` in the RN repo (`exposwifty31/VetTrack---RN-Migration-`) — fetched this session
+  **ref-pinned**, `gh api "repos/exposwifty31/VetTrack---RN-Migration-/contents/LICENSE?ref=03c522c43"`
+  → blob `e8d1c9094f9241093d8d07d9a6039c62d224d3d0`. The first draft of this entry recorded the
+  unpinned command, which reads the default branch and therefore could not have proved the claim it
+  was attached to; corrected before merge. Reads
   `VetTrack — Proprietary Software` / `Copyright (c) 2026 Dan Erez. All rights reserved.`, and in the
   body `proprietary and confidential to Dan Erez`. `VetTrack` on the title line is the product name,
   not the holder — which is precisely the confusion the earlier entry recorded.
@@ -8556,8 +8559,15 @@ planned. Per this log's own rule, neither superseded line was edited.
 - `gh api repos/exposwifty31/VetTrack---RN-Migration-` → `license.spdx_id = NOASSERTION`. GitHub does
   not match the file to a recognised SPDX licence. That is the expected result for a bespoke
   proprietary notice, not a defect.
-- RN `package.json` → `license` and `author` both absent, `private: true`. No second, contradicting
-  declaration of a holder anywhere in that repo.
+- RN `package.json` → `license` and `author` both absent, `private: true`.
+- **Only one holder declaration exists in that repo, and it was checked repo-wide rather than
+  inferred.** `gh api ".../git/trees/03c522c43?recursive=1"` → **590 entries, `truncated: false`**,
+  filtered to licence-shaped paths (`licen[cs]e|copying|notice`) → exactly one: `LICENSE`.
+  `gh search code --repo … 'Copyright'` → the same single file. The two other files that mention an
+  owner or licence at all were opened: `README.md`, where all four hits are the English word "owner"
+  in prose, and `app.json:116` → `"owner": "exposwifty31"`, which is the **Expo/EAS account field** —
+  the same class of adjacent fact as the App Store Connect copyright value, and equally not a
+  statement about who holds the licence.
 - Owner decision, 2026-08-19, given in-session: the holder is a natural person; there is no
   registered company and none is planned. There is no further name to record.
 - React Native's own MIT licence (`Copyright (c) Meta Platforms, Inc. and affiliates`) governs the
@@ -8576,8 +8586,11 @@ planned. Per this log's own rule, neither superseded line was edited.
 - Neither prior line was edited. Both stand as written.
 
 **Not established — and newly opened by this check:** the **vettrack** repo carries no `LICENSE` file
-at all (`gh api repos/exposwifty31/vettrack` → `license: null`; no licence-shaped file in the root
-listing). The RN repo's proprietary notice does not reach it. That is a separate question this entry
+at all. `gh api repos/exposwifty31/vettrack` → `license: null`, and the full tree at `main`
+(`git/trees/<sha>?recursive=1` → **3709 entries, `truncated: false`**) contains zero licence-shaped
+paths. This is a whole-tree scan, not a root listing — the first draft of this entry claimed the
+absence from the root listing alone, which does not support it. The RN repo's proprietary notice does
+not reach this repo. That is a separate question this entry
 does not close and does not claim to.
 
 **Verdict:** VERIFIED — every item above was observed this session by direct `gh api` output, not
