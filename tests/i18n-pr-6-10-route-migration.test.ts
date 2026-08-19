@@ -92,6 +92,10 @@ function makeReqRes(locale: "en" | "he", method = "POST", url = "/draft"): {
     getHeader() {
       return undefined;
     },
+    // Partial double: the route touches only status/json, and sendError adds
+    // setHeader/getHeader via resolveRequestId. Casting a 4-method object to Response
+    // keeps the fixture readable; anything else the route reaches for throws rather
+    // than silently returning undefined.
   } as unknown as Response;
 
   const req = {
@@ -104,6 +108,8 @@ function makeReqRes(locale: "en" | "he", method = "POST", url = "/draft"): {
     body: {},
     params: {},
     query: {},
+    // Same shape of double for Request. `locale` is what apiError reads to pick the
+    // dictionary — the single field this test actually depends on.
   } as unknown as Request;
   return { req, res, captured };
 }
@@ -117,12 +123,17 @@ async function dispatchDispense(req: Request, res: Response): Promise<void> {
       settled = true;
       done();
     };
+    // The router signals completion by writing a body, so wrap json() to resolve the
+    // promise. `payload`/`p` stay `unknown` because the envelope shape is what the test
+    // asserts on afterwards — narrowing here would presume the answer.
     const origJson = res.json.bind(res);
     (res as Response).json = (payload: unknown) => {
       const ret = (origJson as (p: unknown) => Response)(payload);
       setImmediate(finish);
       return ret;
     };
+    // An Express Router IS callable as (req, res, next) at runtime, but its exported
+    // type does not express that, so the cast states the real contract.
     (router as unknown as (r: Request, s: Response, cb: (err?: unknown) => void) => void)(
       req,
       res,
@@ -169,6 +180,7 @@ describe("Phase 6 PR 6.10 CORRECTION 2 — dispense.ts integration (representati
     expect(captured.statusCode).toBe(500);
     expect(captured.body.code).toBe("errors.dispense.internalError");
     expect(captured.body.error).toBeTruthy();
+    // `error` is optional on Captured; the assertion above already proved it is set.
     const english = captured.body.error as string;
     expect(/[֐-׿]/.test(english)).toBe(false);
   });
@@ -179,6 +191,7 @@ describe("Phase 6 PR 6.10 CORRECTION 2 — dispense.ts integration (representati
     expect(captured.statusCode).toBe(500);
     expect(captured.body.code).toBe("errors.dispense.internalError");
     // The point of the whole PR-6.10 migration: same code, locale-dependent body.
+    // Same narrowing as the en case — the status/code assertions above prove it is set.
     expect(/[֐-׿]/.test(captured.body.error as string)).toBe(true);
   });
 });
