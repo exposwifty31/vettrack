@@ -1,5 +1,21 @@
 # Manual staging E2E only — never triggered on push/PR.
 # Requires GitHub Actions secrets: *_STAGING (see docs/staging-e2e-runbook.md).
+#
+# CURRENTLY NOT DISPATCHABLE (documented 2026-08-19, not a defect in this file).
+# `workflow_dispatch` makes you pick a ref, and `refuse-wrong-branch` below accepts only
+# `refs/heads/staging`. There is no `staging` branch on origin — `git ls-remote --heads origin`
+# returns none — so no dispatch can ever reach the `staging-e2e` job. Run history: zero runs.
+#
+# The branch guard is deliberate and stays: this workflow runs `pnpm staging:seed` and
+# `pnpm staging:cleanup` against a real staging database, and dispatching it from `main` would
+# point that seed/cleanup at the wrong environment. Weakening the guard to make the workflow
+# "runnable" would be the dangerous fix.
+#
+# TO RE-ENABLE: create the `staging` branch on origin and set the *_STAGING secrets, then
+# dispatch this workflow with `staging` selected as the ref.
+# Meanwhile the same suites run locally against a real staging deployment, independent of git
+# branch state: `pnpm test:staging:e2e` and `pnpm test:staging:walkthrough`
+# (see docs/staging-e2e-runbook.md).
 name: Staging E2E (manual)
 
 on:
@@ -17,7 +33,10 @@ jobs:
     steps:
       - name: Require staging branch
         run: |
-          echo "::error::Staging E2E must be run via workflow_dispatch on branch 'staging' (current ref: ${{ github.ref }})."
+          echo "::error::Staging E2E must be dispatched on branch 'staging' (current ref: ${{ github.ref }})."
+          if ! git ls-remote --exit-code --heads "https://github.com/${{ github.repository }}.git" staging >/dev/null 2>&1; then
+            echo "::error::branch 'staging' does not exist on origin, so this workflow is not dispatchable at all right now - create it (and the *_STAGING secrets) first; see docs/staging-e2e-runbook.md"
+          fi
           exit 1
 
   staging-e2e:
@@ -26,6 +45,14 @@ jobs:
     timeout-minutes: 45
     needs: [refuse-wrong-branch]
     if: always() && needs.refuse-wrong-branch.result == 'skipped' && github.ref == 'refs/heads/staging'
+    # Environment-scoped, not repository-scoped. A repository secret is readable by EVERY
+    # workflow in the repo, including one added later by a PR; an environment secret is
+    # readable only by a job that names the environment, and its deployment-branch policy
+    # is enforced by GitHub rather than by the `if:` above. The branch guard stays as
+    # defence in depth — it fails faster and with a clearer message.
+    # Requires the `staging-e2e` environment to exist with branch policy = `staging` only;
+    # see docs/staging-e2e-runbook.md.
+    environment: staging-e2e
 
     env:
       STAGING_E2E_CONFIRM: "yes"

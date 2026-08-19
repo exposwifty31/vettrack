@@ -2,12 +2,39 @@
 
 ## Supported Versions
 
-Only the current production release of VetTrack receives security fixes.
+Only the **current production release** of VetTrack receives security fixes. Anything
+older is unsupported — upgrade before reporting.
 
 | Version | Supported |
 |---------|-----------|
-| 1.0.x (current) | ✅ |
-| < 1.0  | ❌ |
+| The version currently live on the App Store | ✅ |
+| Any earlier release | ❌ |
+
+This file deliberately does **not** name the version number. Hand-copied version numbers
+drift (this table said `1.0.x` long after the app shipped 1.2.0); numbers re-derived at
+read time do not.
+
+**`package.json` is the release TARGET, not proof of what shipped.** `pnpm resubmit:release`
+bumps it before the archive is uploaded, and an upload can be rejected — so between the bump
+and a successful review this repo names a version that is not live anywhere. Do not read the
+supported version out of the working tree. The App Store is the only record of what shipped:
+
+```bash
+asc builds list --app 6778937527 --limit 5     # what is actually live / in review
+```
+
+The repo-side numbers are the candidate, useful for checking the two are consistent with each
+other before a submission — not for answering "what is supported":
+
+```bash
+node -p "require('./package.json').version"                        # candidate marketing version
+grep -m1 MARKETING_VERSION ios/App/App.xcodeproj/project.pbxproj   # iOS, must match
+grep -m1 CURRENT_PROJECT_VERSION ios/App/App.xcodeproj/project.pbxproj
+cat ios/.last-shipped-build                                        # last build uploaded (build only, no marketing version)
+```
+
+There is deliberately no `ios/.last-shipped-version` file: a second hand-maintained record
+would drift the same way the old table did. Ask App Store Connect.
 
 ## Reporting a Vulnerability
 

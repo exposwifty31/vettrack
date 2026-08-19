@@ -32,7 +32,7 @@ inventory/containers/dispense, shifts & scheduling, and external PMS integration
                 │ HTTPS (REST) + SSE (/api/realtime/stream)
                 ▼
 ┌──────────────────────────────────────────────────────────────────────┐
-│  Express API (server/index.ts → server/app/routes.ts, ~45 routers)    │
+│  Express API (server/index.ts → server/app/routes.ts, 60 mounts)      │
 │   middleware chain: helmet/CSP → cors → compression → clerk →         │
 │     global rate-limit → i18n → tenantContext → sessionContext         │
 │   domain services · authority+enforcement · realtime outbox publisher │
@@ -42,7 +42,7 @@ inventory/containers/dispense, shifts & scheduling, and external PMS integration
 ┌────────────┐        ┌─────────────────┐    ┌────────────────────┐
 │ PostgreSQL │        │ Redis (BullMQ)  │    │ External PMS        │
 │ Drizzle ORM│        │ workers +       │    │ adapters (priza,    │
-│ ~100 vt_*  │        │ schedulers      │    │ vendor-x, generic)  │
+│ 75 vt_*    │        │ schedulers      │    │ vendor-x, generic)  │
 │ tables     │        │ (optional dev)  │    │ inbound/outbound    │
 └────────────┘        └─────────────────┘    └────────────────────┘
 ```
@@ -58,7 +58,7 @@ BullMQ 5 + ioredis · Clerk (auth) · Capacitor 8 (native) · Sentry · Vitest +
 | Entrypoint | File | Role |
 |---|---|---|
 | **API server** | `server/index.ts` | Express bootstrap. Imports `env-bootstrap` **first**, then Sentry (`instrument.ts`), validates env, builds middleware chain, registers routes, runs migrations, starts schedulers. Listens on `PORT` (default 3001). |
-| **Route registration** | `server/app/routes.ts` | `registerApiRoutes(app)` mounts ~45 routers in 6 groups (order is significant). |
+| **Route registration** | `server/app/routes.ts` | `registerApiRoutes(app)` mounts 60 routers in 6 groups (order is significant). Re-derive with `grep -c 'app\.use(' server/app/routes.ts` — every `app.use(` in that file is a router mount (57 distinct routers; a few, e.g. `healthRoutes` and `createDisplayRouter()`, are mounted at more than one path). |
 | **Schedulers/workers** | `server/app/start-schedulers.ts` | `startBackgroundSchedulers()` — runs after migrations, skipped in `NODE_ENV=test`. |
 | **Frontend** | `src/main.tsx` → `src/App.tsx` → `src/app/routes.tsx` | React root, provider stack, SW registration, Clerk (native vs web), lazy route table. |
 | **Notification worker (CLI)** | `server/workers/notification.worker.ts` | `pnpm worker` — standalone push fan-out (requires Redis). |
@@ -194,7 +194,8 @@ All registered in `server/app/start-schedulers.ts`. Redis optional in dev
 |---|---|---|
 | **Bootstrap** | React root, provider stack, SW registration (build-tag versioned), Clerk native vs web instance, chunk-load recovery. | `src/main.tsx`, `src/App.tsx`, `src/instrument.ts` |
 | **Routing** | wouter `<Switch>`, all pages lazy-loaded, `AuthGuard`/`WebOnlyGuard`, legacy-path redirects. | `src/app/routes.tsx` |
-| **Platform split** | `resolvePlatformTarget()`/`usePlatformTarget()` → `"mobile" \| "desktop" \| "marketing"` (Capacitor native or narrow touch viewport → mobile; auth/landing routes → marketing; else desktop). `PlatformRouter` wraps the route tree: `mobile` → `NativeShell` (safe-area, tab bar, scan FAB); `desktop`/`marketing` → passthrough (per-page web chrome). ⚠ note: prefer `@/app/platform` helpers over ad-hoc `isCapacitorNative()` in new code; `src/shared` is now just a redirect stub. | `src/app/platform/{index.ts,PlatformRouter.tsx}`, `src/native/*`, `src/desktop/*`, `src/shell/*` |
+| **Platform split** | `resolvePlatformTarget()` (sync) / `usePlatformTarget()` (reactive) → `"mobile" \| "desktop" \| "marketing" \| "board"`. Resolution order is significant: Capacitor native → `mobile`; marketing path → `marketing`; **`/board` or `/board/*` → `board`**; narrow touch viewport → `mobile`; else `desktop`. `board` is checked *after* native (a native build on `/board` stays `mobile`) and *before* touch-narrow (a coarse-pointer tablet/TV browser at `/board` gets the kiosk, not the mobile shell). `PlatformRouter` wraps the route tree: `mobile` → `NativeShell` (safe-area, tab bar, scan FAB); `board` → `BoardShell`; `desktop`/`marketing` → passthrough (per-page web chrome). ⚠ note: prefer `@/app/platform` helpers over ad-hoc `isCapacitorNative()` in new code; `src/shared/` no longer exists at all — it was removed in mid-2026 (`33c7596f3`, `3df859145`). | `src/app/platform/{index.ts,PlatformRouter.tsx}`, `src/native/*`, `src/board/*`, `src/desktop/*`, `src/shell/*` |
+| **Command Center board** | `/board` kiosk platform target (canonical since PRs #178/#181). `BoardShell` owns the dark full-bleed kiosk chrome — wake-lock, night dim, error boundary, auto-reload, co-presence overlay; `CommandBoardScreen` stays the single data-path owner (SSE-driven, cache-denylisted). `/equipment/board`, `/display` and `/equipment-board` are redirect aliases **to** `/board`. `/board/pair` redeems a pairing code for a device token (no Clerk session). | `src/board/*` (`BoardShell.tsx`, `KioskAwake.tsx`, `BoardErrorBoundary.tsx`, `useBoardAutoReload.ts`, `useBoardCoPresence.ts`, `use-night-dim.ts`), `src/features/command-board/*`, `src/pages/board-pair.tsx` |
 | **API client** | All server calls go through one typed module; emergency-endpoint classifier; auth-fetch. | `src/lib/api.ts` (~1090 LOC), `src/lib/api/`, `auth-fetch.ts`, `request-core.ts` |
 | **Server state** | TanStack Query (`queryClient`, `query-keys/`). | `src/lib/queryClient.ts`, `src/lib/query-keys/` |
 | **Offline / PWA** | Dexie cache + FIFO sync queue + circuit breaker; emergency-block; telemetry. | `src/lib/offline-db.ts`, `sync-engine.ts`, `offline-*.ts`, `public/sw.js` |
@@ -207,7 +208,7 @@ All registered in `server/app/start-schedulers.ts`. Redis optional in dev
 ## 4. Database schema (PostgreSQL, all tables `vt_`)
 
 Definitions in `server/schema/*.ts` (barrel `server/schema/index.ts`, re-exported from
-`server/db.ts`). **158 SQL migrations** in `migrations/` applied in order at startup.
+`server/db.ts`). **187 SQL migrations** applied in order at startup (188 `*.sql` files on disk; `server/migrate.ts:65` excludes the single `*.down.sql`).
 
 | Schema file | Domain | Representative tables |
 |---|---|---|
@@ -305,7 +306,8 @@ and **knip** (dead code). Run via `pnpm architecture:gates`.
 - **Emerging hexagonal layer** (`src/core`, `src/infrastructure`, `server/domain`) coexists
   with the older `src/lib` / `server/services` style — migration is partial.
 - **`src/shell` is a thin re-export/alias layer** over `src/native` + `src/desktop` (legacy);
-  `src/shared/index.ts` is now only a redirect comment pointing at `@/app/platform`.
+  `src/shared/` was deleted in mid-2026 (`33c7596f3`, `3df859145`); its consumers now import
+  `@/app/platform` directly.
 - **`cursor-bug-fixer` / `cursor-cloud-agents-client`** (`routes/cursor-bug-fixer.ts`,
   `lib/cursor-cloud-agents-client.ts`) are internal AI-agent tooling endpoints, not core product.
 
@@ -313,10 +315,20 @@ and **knip** (dead code). Run via `pnpm architecture:gates`.
 
 ## 8. Verification notes
 
-- Module list and route mounts verified against `server/app/routes.ts` (45 `app.use` mounts)
+- Module list and route mounts verified against `server/app/routes.ts` (**60** `app.use` mounts, 57 distinct routers)
   and `server/index.ts` middleware order.
+- **Re-derive these counts before trusting them** (they drift with every merge, and the numbers written
+  into this doc have been wrong at the very commit that claimed to verify them):
+  `grep -c 'app\.use(' server/app/routes.ts` · `ls migrations/*.sql | grep -v '\.down\.sql' | wc -l` (what the runner actually applies; drop the `grep -v` for the raw file count) ·
+  `pnpm docs:audit` (regenerates `docs/audit/{routes,frontend-routes,db}.md` — parses source only, no DB needed).
 - Scheduler list verified against `server/app/start-schedulers.ts`.
-- Table names extracted from `server/schema/*.ts` (`vt_*` literals); 158 files in `migrations/`.
+- Table names extracted from `server/schema/*.ts` (`vt_*` literals); **188** `*.sql` files in
+  `migrations/`, of which **187** are applied (the runner skips `0018_striped_valkyrie.down.sql`).
+  Highest leading number is `185_rls_role_precondition_guard.sql`. The arithmetic: 175 distinct
+  leading numbers are present (185 minus the 10 never used — 78 and 81–89) and 13 files share a
+  leading number with another file (6 letter-suffixed — `018b 019b 035b 076b 093b 096a`; 6 legacy
+  four-digit drizzle files `0018`–`0022`, one with a `.down.sql` twin; and the duplicated `141`).
+  175 + 13 = 188.
 - Frontend routes + guards verified against `src/app/routes.tsx`; bootstrap against `src/main.tsx`.
 - Frozen-surface and enforcement semantics cross-checked against `CLAUDE.md` and confirmed
   present in `server/lib/authority/enforcement/*`, `server/lib/event-publisher.ts`,

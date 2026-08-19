@@ -21,10 +21,6 @@ export const ALLOWLIST_BY_PATTERN: Record<string, Array<{ path: RegExp; line: Re
       path: /^tests\/.*$/,
       line: /postgres:\/\/[^\s"']+@(?:localhost|127\.0\.0\.1):\d+\/[A-Za-z0-9_-]+/i,
     },
-    {
-      path: /^setup-vm\.sh$/,
-      line: /DATABASE_URL=postgres:\/\/[^\s"']+@localhost:5432\/vettrack/i,
-    },
   ],
   // The App Store Connect key bootstrapper validates a user-supplied .p8 by
   // checking its PEM header prefix — the marker is a startsWith() comparison,

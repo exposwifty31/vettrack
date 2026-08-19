@@ -4,7 +4,27 @@
 
 This repository is the **production monolith**: React web app, Express API, PostgreSQL, PWA/offline sync, and **Capacitor** native shell (iOS/Android). Active mobile strategy and Expo/RN work live elsewhere.
 
-**Current native release:** 1.0.1 (Build 20) — App Store approved. See `ios/App/App.xcodeproj/project.pbxproj` and locales `whatsNew.*`.
+**Current native release:** derive it, don't read it here — this line has been wrong before
+(it said "1.0.1 (Build 20)" long after 1.2.0 shipped), and a number copied into prose always
+drifts while a command does not. Note which side of the release each command answers — the
+four below are not interchangeable:
+
+1. `asc builds list` — the **live** App Store version. The only authoritative answer.
+2. `node -p …version` and `grep CURRENT_PROJECT_VERSION` — the **candidate** in this
+   working tree. `pnpm resubmit:release` moves them *before* upload, so they can name a
+   version that never shipped.
+3. `cat ios/.last-shipped-build` — the **last build uploaded**, a build number only. It
+   carries no marketing version, so it cannot answer "which version is live" on its own.
+
+```bash
+asc builds list --app 6778937527 --limit 5                              # LIVE / in review — the real answer
+node -p "require('./package.json').version"                             # candidate marketing version
+grep -m1 CURRENT_PROJECT_VERSION ios/App/App.xcodeproj/project.pbxproj  # candidate build number
+cat ios/.last-shipped-build                                             # last build uploaded (build number only)
+```
+
+Release notes live in `locales/*.json` under `whatsNew.*`. The full ship procedure is
+[`RESUBMISSION_RUNBOOK.md`](../RESUBMISSION_RUNBOOK.md).
 
 ## In scope (this repo)
 
@@ -32,12 +52,32 @@ This repository is the **production monolith**: React web app, Express API, Post
 
 Clone and setup: [`docs/devops/github-setup.md`](devops/github-setup.md), [`docs/setup/environment.md`](setup/environment.md).
 
-**Worktrees:**
+**Worktrees** (local, per-machine — a clone does not give you these):
 
-| Path | Branch | Purpose |
-|------|--------|---------|
-| `/Users/dan/vettrack` | `main-sync` | Dev lane |
-| `/Users/dan/vettrack-ship` | `main` | Ship lane (App Store releases) |
+| Path | Branch | Purpose | State |
+|------|--------|---------|-------|
+| `/Users/dan/vettrack` | `main` (plus feature branches) | Dev lane | The primary checkout |
+| `/Users/dan/vettrack-ship` | `main` | Ship lane (App Store archives, clean tree only) | **Created on demand — often absent** |
+
+Neither row is guaranteed on a given machine; run `git worktree list` to see the truth. The
+ship lane in particular is created when needed and removed afterwards:
+
+**Precondition: the dev lane must not itself be on `main`.** Git refuses the same branch in
+two worktrees — `fatal: 'main' is already used by worktree at '/Users/dan/vettrack'` — and the
+dev lane sits on `main` between feature branches, which is exactly when someone reaches for
+this command. Check out a branch there first, or point the ship lane at the commit instead of
+the branch (`git worktree add --detach ../vettrack-ship main`), which needs no branch at all
+and is what an archive wants anyway.
+
+```bash
+git -C /Users/dan/vettrack branch --show-current   # must NOT print `main`
+ls -d /Users/dan/vettrack-ship 2>/dev/null || \
+  (cd /Users/dan/vettrack && git worktree add ../vettrack-ship main)
+```
+
+`scripts/archive-from-clean-tree.sh` blocks with that same command if the ship lane is
+missing. There is **no `main-sync` branch** — this table named one for a while, and it
+exists neither locally nor on `origin`.
 
 ## CI status
 
