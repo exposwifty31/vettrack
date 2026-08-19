@@ -213,6 +213,16 @@ jobs:
   # contract-bearing surface (signed batches to POST /api/rfid/events). Neither
   # script was reachable from any workflow, so its tests and types were enforced
   # by nothing. No DB/Redis: the package has no runtime deps.
+  #
+  # DELIBERATELY IN THIS WORKFLOW, not a separate paths-filtered one. Splitting it out
+  # was suggested to save CI time; measured, it saves none. The job runs 33-41s in
+  # PARALLEL with jobs whose critical path is ~132s (Tests shard 4/4), so it adds zero
+  # wall-clock. Against that, a separate workflow cannot be referenced by this file's
+  # `needs:`, so the merge gate below would lose the very enforcement this job exists to
+  # add; and a `paths:`-filtered required check never reports on PRs that miss the
+  # filter, leaving them waiting on a status that will never arrive. The `if:` variant is
+  # no better — the job reports `skipped`, so the gate has to accept `skipped` as a pass,
+  # which is a gate that passes when it did not run. Leave it here.
   rfid-controller:
     name: 📡 RFID controller
     runs-on: ubuntu-latest
