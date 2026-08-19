@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { existsSync, readFileSync, readdirSync, statSync } from "fs";
-import { dirname, join } from "path";
+import { dirname, join, resolve } from "path";
 
 /**
  * CLASS GUARD — a tsconfig `include` glob that matches zero files is silent.
@@ -38,12 +38,68 @@ const CONFIGS = [...CI_CHECKED, "tsconfig.node.json"];
 
 const SKIP_DIRS = new Set(["node_modules", ".git", "dist", "artifacts", "coverage"]);
 
-/** Strip JSONC comments (all four root tsconfigs in this repo use them). */
-function parseJsonc(source: string): Record<string, unknown> {
+/**
+ * Strip JSONC comments (all four root tsconfigs in this repo use them). Returns `unknown`
+ * on purpose: `JSON.parse` can yield null, a number, a string or an array, and a
+ * `Record<string, unknown>` annotation here is a lie the callers then pay for — a literal
+ * `null` config would surface as "Cannot read properties of null (reading 'include')",
+ * naming neither the file nor the field.
+ */
+function parseJsonc(source: string): unknown {
   const stripped = source
     .replace(/("(?:\\.|[^"\\])*")|\/\*[\s\S]*?\*\/|\/\/[^\n]*/g, (match, str) => str ?? "")
     .replace(/,(\s*[}\]])/g, "$1");
-  return JSON.parse(stripped) as Record<string, unknown>;
+  return JSON.parse(stripped);
+}
+
+/** The parsed root, proven to be a plain object before any field is read off it. */
+function readConfig(config: string): Record<string, unknown> {
+  const root = parseJsonc(readFileSync(config, "utf8"));
+  if (typeof root !== "object" || root === null || Array.isArray(root)) {
+    throw new Error(
+      `${config} does not parse to a JSON object (got ${Array.isArray(root) ? "an array" : String(root)}). ` +
+        `tsc would reject it, so the gate that runs against it is already broken.`,
+    );
+  }
+  return root as Record<string, unknown>;
+}
+
+/**
+ * `compilerOptions` after following `extends`, parent first. Only
+ * `tsconfig.server-check.json` extends anything today, but the whole point of this file
+ * is that a config can quietly stop meaning what it says — reading the inherited options
+ * costs one recursion and removes a way for that to happen here too.
+ */
+function effectiveCompilerOptions(config: string, seen = new Set<string>()): Record<string, unknown> {
+  const resolved = resolve(config);
+  if (seen.has(resolved)) return {}; // cyclic extends — tsc errors on it; do not hang here
+  seen.add(resolved);
+  const root = readConfig(config);
+  const own = (typeof root.compilerOptions === "object" && root.compilerOptions !== null
+    ? root.compilerOptions
+    : {}) as Record<string, unknown>;
+  if (typeof root.extends !== "string") return own;
+  const parentPath = join(dirname(config), root.extends);
+  if (!existsSync(parentPath)) return own; // a broken `extends` is tsc's error to report
+  return { ...effectiveCompilerOptions(parentPath, seen), ...own };
+}
+
+/**
+ * The extensions `tsc` will actually accept as ROOT FILES for this config.
+ *
+ * Without this, `resolvesToAtLeastOneFile` counted any regular file — so an include
+ * pointing at a directory of nothing but `.css` or `.md` passed while tsc received zero
+ * inputs and exited 0. That is the identical silent-pass this file exists to catch, just
+ * one level in: the glob resolves, the type-check still checks nothing.
+ */
+function supportedExtensions(config: string): string[] {
+  const opts = effectiveCompilerOptions(config);
+  const exts = [".ts", ".tsx", ".mts", ".cts"];
+  if (opts.allowJs === true) exts.push(".js", ".jsx", ".mjs", ".cjs");
+  // tsc takes .json as a root input only with resolveJsonModule; mirror that rather than
+  // counting a JSON-only directory as satisfying an include.
+  if (opts.resolveJsonModule === true) exts.push(".json");
+  return exts;
 }
 
 /**
@@ -52,7 +108,7 @@ function parseJsonc(source: string): Record<string, unknown> {
  * naming neither the config nor the value. Fail here instead, with both.
  */
 function globList(config: string, field: "include" | "exclude"): string[] {
-  const raw: unknown = parseJsonc(readFileSync(config, "utf8"))[field] ?? [];
+  const raw: unknown = readConfig(config)[field] ?? [];
   if (!Array.isArray(raw) || !raw.every((glob): glob is string => typeof glob === "string")) {
     throw new Error(
       `${config} declares a "${field}" that is not an array of strings: ` +
@@ -109,17 +165,20 @@ function baseDirOf(glob: string): string {
  * the root would match the frontend's `src/` — a pass for entirely the wrong directory,
  * which is the exact failure mode this file exists to catch.
  */
-function resolvesToAtLeastOneFile(glob: string, configDir: string): boolean {
+function resolvesToAtLeastOneFile(glob: string, configDir: string, exts: string[]): boolean {
+  const supported = (file: string): boolean => exts.some((ext) => file.endsWith(ext));
   const rooted = join(configDir, glob);
   if (!rooted.includes("*") && !rooted.includes("?")) {
     // tsconfig allows a bare directory, which means "every supported file under it".
     if (!existsSync(rooted)) return false;
-    return statSync(rooted).isDirectory() ? anyFileUnder(rooted, () => true) : true;
+    return statSync(rooted).isDirectory()
+      ? anyFileUnder(rooted, supported)
+      : supported(rooted);
   }
   const base = baseDirOf(rooted);
   if (!existsSync(base)) return false;
   const pattern = globToRegExp(rooted);
-  return anyFileUnder(base, (file) => pattern.test(file));
+  return anyFileUnder(base, (file) => supported(file) && pattern.test(file));
 }
 
 describe("tsconfig include globs resolve to real files", () => {
@@ -133,10 +192,11 @@ describe("tsconfig include globs resolve to real files", () => {
 
   it.each(CONFIGS)("%s — every include glob matches at least one file", (config) => {
     const configDir = dirname(config);
+    const exts = supportedExtensions(config);
     const includes = globList(config, "include");
     expect(includes.length, `${config} declares no include globs`).toBeGreaterThan(0);
 
-    const dead = includes.filter((glob) => !resolvesToAtLeastOneFile(glob, configDir));
+    const dead = includes.filter((glob) => !resolvesToAtLeastOneFile(glob, configDir, exts));
     expect(
       dead,
       `${config} include globs matching ZERO files: ${dead.join(", ")}. ` +
@@ -152,8 +212,9 @@ describe("tsconfig include globs resolve to real files", () => {
     // matching zero files is either a stale path or a misunderstanding of the include
     // set — both worth failing on.
     const configDir = dirname(config);
+    const exts = supportedExtensions(config);
     const excludes = globList(config, "exclude");
-    const dead = excludes.filter((glob) => !resolvesToAtLeastOneFile(glob, configDir));
+    const dead = excludes.filter((glob) => !resolvesToAtLeastOneFile(glob, configDir, exts));
     expect(
       dead,
       `${config} exclude globs matching ZERO files: ${dead.join(", ")}. ` +
