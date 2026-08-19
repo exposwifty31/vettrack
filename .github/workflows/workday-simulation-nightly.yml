@@ -37,6 +37,11 @@ jobs:
     # Scheduled runs fire on the default branch, so `github.ref` is never
     # `refs/heads/staging` for a cron trigger - gate by event name instead.
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    # Separate environment from the manual E2E lane because the trusted ref differs: a cron
+    # fires on the DEFAULT branch, so this one's branch policy is `main`, not `staging`.
+    # One shared environment would have to trust both refs, which is the weaker rule.
+    # Requires the `staging-simulation` environment; see docs/staging-e2e-runbook.md.
+    environment: staging-simulation
 
     env:
       STAGING_E2E_CONFIRM: "yes"

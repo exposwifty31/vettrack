@@ -103,11 +103,14 @@ sips -g hasAlpha -g pixelWidth ios/App/App/Assets.xcassets/AppIcon.appiconset/Ap
 
 # Build number must be STRICTLY GREATER than the last shipped build (the app is
 # live — App Store Connect rejects a duplicate CFBundleVersion within a version).
-# verify-resubmission.sh checks CURRENT_PROJECT_VERSION > ios/.last-shipped-build.
-PBX=$(grep -m1 CURRENT_PROJECT_VERSION ios/App/App.xcodeproj/project.pbxproj | tr -dc '0-9')
-SHIPPED=$(cat ios/.last-shipped-build)
-echo "pbxproj=$PBX last-shipped=$SHIPPED"; [ "$PBX" -gt "$SHIPPED" ] && echo "BUILD GATE: ok" || echo "BUILD GATE: FAIL - run pnpm resubmit"
-#   EXPECT: BUILD GATE: ok   (if FAIL, `pnpm resubmit` bumps the build past the last shipped one)
+# Call the verifier rather than re-implementing it: it FAILS CLOSED on a missing or
+# non-numeric ios/.last-shipped-build (a hand-rolled `cat` treats both as "0" and waves an
+# unshippable build through) and it honours the LAST_SHIPPED_BUILD override for a one-off
+# check. It also prints the recovery line for each failure mode, which `pnpm resubmit`
+# alone does not do — resubmit bumps the build, it does not repair a broken baseline.
+bash scripts/verify-resubmission-static.sh
+#   EXPECT: exit 0. On failure, read the printed reason — a bad baseline is fixed by
+#   correcting ios/.last-shipped-build, a low build number by `pnpm resubmit`.
 
 # Shell is a BUNDLED app (no server.url) and carries the native OAuth transport
 python3 -c "import json;c=json.load(open('ios/App/App/capacitor.config.json'));print('BUNDLED:', 'server' not in c or not c.get('server',{}).get('url'))"
@@ -122,7 +125,15 @@ If you changed any frontend code, rebuild + re-sync BEFORE archiving. Use the **
 per-machine state, not something a clone gives you — it is absent on a fresh machine and
 after anyone runs `git worktree remove`. Check, and create it if missing:
 
+**Precondition: the dev lane must not itself be on `main`.** Git refuses the same branch in
+two worktrees — `fatal: 'main' is already used by worktree at '/Users/dan/vettrack'` — and the
+dev lane sits on `main` between feature branches, which is exactly when someone reaches for
+this command. Check out a branch there first, or point the ship lane at the commit instead of
+the branch (`git worktree add --detach ../vettrack-ship main`), which needs no branch at all
+and is what an archive wants anyway.
+
 ```bash
+git -C /Users/dan/vettrack branch --show-current   # must NOT print `main`
 ls -d /Users/dan/vettrack-ship 2>/dev/null || \
   (cd /Users/dan/vettrack && git worktree add ../vettrack-ship main)
 ```

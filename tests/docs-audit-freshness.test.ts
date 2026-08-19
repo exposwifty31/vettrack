@@ -105,4 +105,27 @@ describe("docs/audit generated inventories are current", () => {
     const missing = [...declared].filter((p) => !listed.has(p));
     expect(missing, `routes declared in source but absent from the inventory: ${missing.join(", ")}`).toEqual([]);
   });
+
+  /**
+   * The mirror of the test above, and the half it was missing. That one compares
+   * SETS, so a route printed twice is invisible to it — and that is what happened:
+   * `section()` recorded each route it emitted but never consulted the record, so
+   * `/admin/code-blue-history` printed under both Emergency and Admin, and
+   * `/admin/medication-integrity` under both Admin and Legacy redirects. An
+   * inventory whose purpose is to be a faithful count listing 92 rows for 90 routes
+   * is wrong in the direction nobody checks. Sections are ordered by ownership:
+   * first predicate to match owns the route.
+   */
+  it("lists every route exactly once", () => {
+    const doc = generateFrontendRoutesMarkdown();
+    const listed = [...doc.matchAll(/^\| `([^`]+)` \|/gm)].map((m) => m[1]);
+    const seen = new Map<string, number>();
+    for (const path of listed) seen.set(path, (seen.get(path) ?? 0) + 1);
+    const duplicated = [...seen.entries()].filter(([, n]) => n > 1).map(([p, n]) => `${p} (${n}×)`);
+    expect(
+      duplicated,
+      `routes printed in more than one section: ${duplicated.join(", ")}. ` +
+        `section() must skip entries an earlier section already claimed.`,
+    ).toEqual([]);
+  });
 });

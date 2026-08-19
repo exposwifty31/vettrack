@@ -45,6 +45,14 @@ jobs:
     timeout-minutes: 45
     needs: [refuse-wrong-branch]
     if: always() && needs.refuse-wrong-branch.result == 'skipped' && github.ref == 'refs/heads/staging'
+    # Environment-scoped, not repository-scoped. A repository secret is readable by EVERY
+    # workflow in the repo, including one added later by a PR; an environment secret is
+    # readable only by a job that names the environment, and its deployment-branch policy
+    # is enforced by GitHub rather than by the `if:` above. The branch guard stays as
+    # defence in depth — it fails faster and with a clearer message.
+    # Requires the `staging-e2e` environment to exist with branch policy = `staging` only;
+    # see docs/staging-e2e-runbook.md.
+    environment: staging-e2e
 
     env:
       STAGING_E2E_CONFIRM: "yes"

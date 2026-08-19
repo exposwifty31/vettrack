@@ -15,7 +15,7 @@ Workflow: **Staging E2E (manual)** (`.github/workflows/staging-e2e-manual.yml`)
 
 - **Trigger:** `workflow_dispatch` only (not on push/PR).
 - **Branch:** must select branch **`staging`** in the Actions UI; other refs fail the branch guard job.
-- **Secrets:** repository secrets suffixed `_STAGING` only (never production `DATABASE_URL` / `CLERK_SECRET_KEY`):
+- **Secrets:** suffixed `_STAGING` only (never production `DATABASE_URL` / `CLERK_SECRET_KEY`):
 
 | GitHub secret | Maps to runtime env |
 |---------------|---------------------|
@@ -24,6 +24,31 @@ Workflow: **Staging E2E (manual)** (`.github/workflows/staging-e2e-manual.yml`)
 | `VITE_CLERK_PUBLISHABLE_KEY_STAGING` | `VITE_CLERK_PUBLISHABLE_KEY` |
 | `STAGING_E2E_PASSWORD_STAGING` | `STAGING_E2E_PASSWORD` |
 | `TEST_BASE_URL_STAGING` | `TEST_BASE_URL` |
+
+### Where these secrets must live — owner action, not yet done
+
+Both staging workflows now declare an `environment:`, but **an environment with no protection
+rules is not a gate.** Until the two below are configured in *Settings → Environments*, the
+`if:` branch guards are the only thing standing between a dispatch and the staging database.
+
+| Environment | Used by | Deployment branch policy | Why that ref |
+|---|---|---|---|
+| `staging-e2e` | `staging-e2e-manual.yml` | selected branches → `staging` | dispatch-only; the workflow refuses any other ref |
+| `staging-simulation` | `workday-simulation-nightly.yml` | selected branches → `main` | a `schedule:` trigger always fires on the default branch |
+
+Hold the `_STAGING` secrets **on those environments, not on the repository.** A repository
+secret is readable by every workflow in the repo — including one added by a future PR — so
+repo-scoping these is the finding, and moving them is the fix. Two environments rather than
+one shared `staging`, because a single environment would have to trust both `staging` and
+`main`, which is the weaker rule.
+
+Reviewer's aid, since "did anyone actually do it" is the part that rots:
+
+```bash
+gh api repos/exposwifty31/vettrack/environments -q '.environments[].name'
+gh api repos/exposwifty31/vettrack/environments/staging-e2e/deployment-branch-policies
+gh api repos/exposwifty31/vettrack/actions/secrets -q '.secrets[].name'   # should list no *_STAGING
+```
 
 Steps (in order): `pnpm staging:seed` → `pnpm test:staging:e2e` → `pnpm test:staging:walkthrough` → `pnpm staging:cleanup` (cleanup runs with `if: always()`).
 
