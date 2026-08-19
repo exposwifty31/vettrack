@@ -22,7 +22,6 @@ const analytics = fs.readFileSync(path.join(repoRoot, "server", "routes", "analy
 const auditLogs = fs.readFileSync(path.join(repoRoot, "server", "routes", "audit-logs.ts"), "utf8");
 const activity = fs.readFileSync(path.join(repoRoot, "server", "routes", "activity.ts"), "utf8");
 const alertAcks = fs.readFileSync(path.join(repoRoot, "server", "routes", "alert-acks.ts"), "utf8");
-const stability = fs.readFileSync(path.join(repoRoot, "server", "routes", "stability.ts"), "utf8");
 const testRoute = fs.readFileSync(path.join(repoRoot, "server", "routes", "test.ts"), "utf8");
 const storage = fs.readFileSync(path.join(repoRoot, "server", "routes", "storage.ts"), "utf8");
 const push = fs.readFileSync(path.join(repoRoot, "server", "routes", "push.ts"), "utf8");
@@ -189,20 +188,6 @@ describe("Phase 5 route error contract checks (static)", () => {
         // ALERT_ACK_DELETE_FAILED removed — DELETE endpoint replaced by PATCH /:id/resolve
         (alertAcks.includes("reason: \"ALERT_ACK_DELETE_FAILED\"") ||
           alertAcks.includes("reason: \"ALERT_RESOLVE_FAILED\"")),
-    ).toBe(true);
-  });
-
-  it("Stability route emits standardized guard and validation errors (post-PR-6.10 light adoption)", () => {
-    // Phase 6 PR 6.10 light adoption: the `requireNotProduction` 403
-    // branch was migrated from the legacy envelope (`reason:
-    // "NOT_AVAILABLE_IN_PRODUCTION"`) to the i18n-aware `apiError`.
-    // Remaining 4xx branches in stability.ts (`TEST_RUN_ALREADY_IN_PROGRESS`,
-    // `INVALID_TEST_MODE_ENABLED`) keep the legacy envelope until a
-    // future migration PR.
-    expect(
-      stability.includes("resolveRequestId") &&
-        stability.includes("reason: \"TEST_RUN_ALREADY_IN_PROGRESS\"") &&
-        stability.includes("reason: \"INVALID_TEST_MODE_ENABLED\""),
     ).toBe(true);
   });
 

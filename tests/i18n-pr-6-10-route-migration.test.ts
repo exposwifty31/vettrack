@@ -1,12 +1,24 @@
 /**
  * Phase 6 PR 6.10 CORRECTION 2 — representative migration coverage for
- * remaining migrated server routes (stability.ts, dispense.ts).
+ * remaining migrated server routes (dispense.ts).
  *
  * er-admin.ts and formulary.ts were removed with their admin surfaces.
- * Combines static-analysis assertions with a representative integration
- * test for stability.ts (Hebrew vs English body on x-locale switch).
+ *
+ * stability.ts was removed in the tier-2 audit remediation (docs/audit/
+ * route-consumer-triage.md §C.1): /stability had already been reduced to a
+ * redirect stub in src/app/routes.tsx, so the whole /api/stability family had
+ * no consumer. Its static assertion and its two-case en/he integration test
+ * went with it, along with the test-runner and stability-log mocks they needed.
+ *
+ * What those cases actually proved was that a migrated route renders its
+ * localized body per `x-locale`. That property is re-established below for
+ * dispense.ts — against its REAL localized path, which is the 500 catch-all
+ * (`errors.dispense.internalError`, dispense.ts:85), NOT a 403: this router has
+ * no route-local 403 at all (`grep -c 403 server/routes/dispense.ts` → 0). An
+ * earlier revision of this header claimed 403 coverage; that was wrong, and the
+ * static assertions alone would not have caught the regression the removed
+ * integration cases did.
  */
-
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import type { NextFunction, Request, Response } from "express";
 import { readFileSync } from "fs";
@@ -14,109 +26,128 @@ import { resolve } from "path";
 
 vi.mock("../server/middleware/auth.js", () => ({
   requireAuth: (req: Request, _res: Response, next: NextFunction) => {
-    (req as Request & { authUser?: unknown }).authUser = {
+    (req as Request & { authUser?: unknown; clinicId?: string }).authUser = {
       id: "admin-user",
       email: "admin@clinic.test",
       clinicId: "clinic-1",
       role: "admin",
     };
+    (req as Request & { clinicId?: string }).clinicId = "clinic-1";
     next();
   },
   requireEffectiveRole: () => (_req: Request, _res: Response, next: NextFunction) => next(),
 }));
 
-vi.mock("../server/lib/test-runner.js", () => ({
-  runAllTests: vi.fn(),
-  getReport: vi.fn(() => ({ runs: [], summary: { total: 0, passed: 0, failed: 0 } })),
-  isTestRunning: vi.fn(() => false),
-  setTestMode: vi.fn(),
-  setSchedule: vi.fn(),
-  getScheduleHours: vi.fn(() => 24),
-  testModeEnabled: vi.fn(() => false),
+vi.mock("../server/middleware/validate.js", () => ({
+  validateBody: () => (_req: Request, _res: Response, next: NextFunction) => next(),
+  validateUuid: () => (_req: Request, _res: Response, next: NextFunction) => next(),
 }));
 
-vi.mock("../server/lib/stability-log.js", () => ({
-  getActionLogs: vi.fn(() => []),
-  clearActionLogs: vi.fn(),
-  logAction: vi.fn(),
+vi.mock("../server/lib/audit.js", () => ({
+  logAudit: vi.fn(),
+  resolveAuditActorRole: vi.fn(() => "admin"),
 }));
+
+// The unexpected failure that must reach the localized 500 catch-all.
+vi.mock("../server/services/dispense.service.js", () => {
+  // The route narrows on these two classes before reaching the catch-all, so the
+  // mock must export them or the module fails to load. A plain Error is neither,
+  // which is exactly the "unexpected failure" path under test.
+  class DispenseError extends Error {}
+  class ClinicalInvariantDenyError extends Error {}
+  return {
+    DispenseError,
+    ClinicalInvariantDenyError,
+    createDraftDispense: vi.fn(async () => {
+      throw new Error("forced failure — exercising the i18n 500 catch-all");
+    }),
+    confirmDispense: vi.fn(),
+    createEmergencyDispense: vi.fn(),
+  };
+});
 
 interface Captured {
   statusCode: number;
   body: { error?: string; code?: string };
 }
 
-function makeReqRes(locale: "en" | "he", method = "GET", url = "/api/sample"): {
+function makeReqRes(locale: "en" | "he", method = "POST", url = "/draft"): {
   req: Request;
   res: Response;
   captured: Captured;
 } {
   const captured: Captured = { statusCode: 0, body: {} };
-  const headers = new Map<string, string>();
   const res = {
     status(code: number) {
       captured.statusCode = code;
       return this;
     },
-    json(payload: Captured["body"]) {
-      captured.body = payload;
+    json(payload: unknown) {
+      captured.body = payload as Captured["body"];
       return this;
     },
-    setHeader(name: string, value: string) {
-      headers.set(name.toLowerCase(), value);
+    setHeader() {
+      return this;
     },
-    getHeader(name: string) {
-      return headers.get(name.toLowerCase());
+    getHeader() {
+      return undefined;
     },
+    // Partial double: the route touches only status/json, and sendError adds
+    // setHeader/getHeader via resolveRequestId. Casting a 4-method object to Response
+    // keeps the fixture readable; anything else the route reaches for throws rather
+    // than silently returning undefined.
   } as unknown as Response;
+
   const req = {
-    locale,
     method,
     url,
-    originalUrl: url,
-    headers: {},
+    originalUrl: `/api/dispense${url}`,
+    path: url,
+    headers: { "x-locale": locale },
+    locale,
     body: {},
     params: {},
     query: {},
+    // Same shape of double for Request. `locale` is what apiError reads to pick the
+    // dictionary — the single field this test actually depends on.
   } as unknown as Request;
   return { req, res, captured };
 }
 
-async function dispatchStability(req: Request, res: Response): Promise<void> {
-  const { default: router } = await import("../server/routes/stability.js");
-  await new Promise<void>((resolve) => {
+async function dispatchDispense(req: Request, res: Response): Promise<void> {
+  const { default: router } = await import("../server/routes/dispense.js");
+  await new Promise<void>((done) => {
     let settled = false;
     const finish = () => {
       if (settled) return;
       settled = true;
-      resolve();
+      done();
     };
+    // The router signals completion by writing a body, so wrap json() to resolve the
+    // promise. `payload`/`p` stay `unknown` because the envelope shape is what the test
+    // asserts on afterwards — narrowing here would presume the answer.
     const origJson = res.json.bind(res);
     (res as Response).json = (payload: unknown) => {
       const ret = (origJson as (p: unknown) => Response)(payload);
       setImmediate(finish);
       return ret;
     };
-    (router as unknown as (
-      r: Request,
-      s: Response,
-      cb: (err?: unknown) => void,
-    ) => void)(req, res, (err?: unknown) => {
-      if (err) console.error("router next error:", err);
-      finish();
-    });
+    // An Express Router IS callable as (req, res, next) at runtime, but its exported
+    // type does not express that, so the cast states the real contract.
+    (router as unknown as (r: Request, s: Response, cb: (err?: unknown) => void) => void)(
+      req,
+      res,
+      (err?: unknown) => {
+        if (err) console.error("router next error:", err);
+        finish();
+      },
+    );
     setTimeout(finish, 200);
   });
 }
 
 describe("Phase 6 PR 6.10 CORRECTION 2 — static coverage for migrated routes", () => {
-  const stability = readFileSync(resolve(process.cwd(), "server/routes/stability.ts"), "utf-8");
   const dispense = readFileSync(resolve(process.cwd(), "server/routes/dispense.ts"), "utf-8");
-
-  it("stability.ts imports + uses i18nApiError with errors.stability.* key", () => {
-    expect(stability).toMatch(/apiError as i18nApiError/);
-    expect(stability).toMatch(/i18nApiError\(req,\s*res,\s*"errors\.stability\.notAvailableInProduction"/);
-  });
 
   it("dispense.ts imports + uses i18nApiError with errors.dispense.* key (sendError catch-all)", () => {
     expect(dispense).toMatch(/apiError as i18nApiError/);
@@ -126,34 +157,41 @@ describe("Phase 6 PR 6.10 CORRECTION 2 — static coverage for migrated routes",
   it("dispense.ts sendError signature now accepts req for locale plumbing", () => {
     expect(dispense).toMatch(/function\s+sendError\(\s*req:\s*Request,\s*res:\s*Response/);
   });
+
+  it("dispense.ts has no route-local 403 — its localized path is the 500 catch-all", () => {
+    // Pins the premise of the integration cases below, so a future 403 branch
+    // cannot silently make them the wrong test.
+    expect(dispense).not.toMatch(/\b403\b/);
+  });
 });
 
-describe("Phase 6 PR 6.10 CORRECTION 2 — stability.ts integration (representative)", () => {
-  const ORIGINAL_NODE_ENV = process.env.NODE_ENV;
-
+describe("Phase 6 PR 6.10 CORRECTION 2 — dispense.ts integration (representative)", () => {
   beforeEach(() => {
-    process.env.NODE_ENV = "production";
+    vi.resetModules();
   });
 
   afterEach(() => {
-    process.env.NODE_ENV = ORIGINAL_NODE_ENV;
+    vi.resetModules();
   });
 
-  it("returns 403 + English body for x-locale=en on requireNotProduction", async () => {
-    // `/test-mode` and `/schedule` are gated by requireNotProduction;
-    // `/run` is not. Hit a gated route to trigger the 403.
-    const { req, res, captured } = makeReqRes("en", "POST", "/test-mode");
-    await dispatchStability(req, res);
-    expect(captured.statusCode).toBe(403);
-    expect(captured.body.error).toBe("Not available in production.");
-    expect(captured.body.code).toBe("errors.stability.notAvailableInProduction");
+  it("returns 500 + English body for x-locale=en on an unexpected failure", async () => {
+    const { req, res, captured } = makeReqRes("en");
+    await dispatchDispense(req, res);
+    expect(captured.statusCode).toBe(500);
+    expect(captured.body.code).toBe("errors.dispense.internalError");
+    expect(captured.body.error).toBeTruthy();
+    // `error` is optional on Captured; the assertion above already proved it is set.
+    const english = captured.body.error as string;
+    expect(/[֐-׿]/.test(english)).toBe(false);
   });
 
-  it("returns 403 + Hebrew body for x-locale=he on requireNotProduction", async () => {
-    const { req, res, captured } = makeReqRes("he", "POST", "/test-mode");
-    await dispatchStability(req, res);
-    expect(captured.statusCode).toBe(403);
-    expect(captured.body.error).toBe("לא זמין בסביבת ייצור.");
-    expect(captured.body.code).toBe("errors.stability.notAvailableInProduction");
+  it("returns 500 + Hebrew body for x-locale=he on the same failure", async () => {
+    const { req, res, captured } = makeReqRes("he");
+    await dispatchDispense(req, res);
+    expect(captured.statusCode).toBe(500);
+    expect(captured.body.code).toBe("errors.dispense.internalError");
+    // The point of the whole PR-6.10 migration: same code, locale-dependent body.
+    // Same narrowing as the en case — the status/code assertions above prove it is set.
+    expect(/[֐-׿]/.test(captured.body.error as string)).toBe(true);
   });
 });

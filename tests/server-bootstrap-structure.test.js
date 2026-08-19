@@ -27,7 +27,6 @@ describe("Server Bootstrap Structure", () => {
     "/api/activity",
     "/api/metrics",
     "/api/folders",
-    "/api/stability",
     "/api/alert-acks",
     "/api/rooms",
     "/api/support",

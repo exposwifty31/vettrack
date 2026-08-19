@@ -6,7 +6,6 @@
 
 1. **`requireAuth`** (`server/middleware/auth.ts`) — authoritative for protected routes; sets `req.authUser`, `req.clinicId`, role from **`vt_users.role`** (not JWT claims)
 2. **`tenantContext`** (`server/middleware/tenant-context.ts`) — **best-effort** hint before handlers; does not replace `requireAuth`
-3. **`ensure-user-clinic-membership`** — verifies user row matches `req.clinicId` where applied
 
 ## Query rules
 
