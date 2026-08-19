@@ -73,9 +73,8 @@ jobs:
       - name: 📥 Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # Chromium + its OS deps were reinstalled from scratch on every shard of every
-      # run (~20s each). Key on the resolved @playwright/test version so a version
-      # bump busts it and nothing else does.
+      # Chromium was re-downloaded on every shard of every run. Key on the resolved
+      # Playwright version so a version bump busts it and nothing else does.
       - name: 🔎 Resolve Playwright version
         id: pw
         run: echo "version=$(pnpm exec playwright --version | awk '{print $2}')" >> "$GITHUB_OUTPUT"
@@ -87,15 +86,15 @@ jobs:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ steps.pw.outputs.version }}
 
-      # On a cache hit only the apt-level deps are (re)asserted, which is the cheap
-      # half; the browser download — the expensive half — is skipped.
+      # Only on a cache MISS, and this is the step that actually costs: `--with-deps`
+      # shells out to apt, which measured 232s on its own when run separately. The
+      # ubuntu-latest image already ships chromium's shared libraries, so on a cache
+      # hit we deliberately run NOTHING here rather than re-asserting apt packages
+      # that are already present — that reasserting was slower than the download it
+      # replaced (measured: browser install 0s, install-deps 232s).
       - name: 🌐 Install Playwright Browsers
         if: steps.pw-cache.outputs.cache-hit != 'true'
         run: pnpm exec playwright install --with-deps chromium
-
-      - name: 🌐 Install Playwright OS deps (cached browser)
-        if: steps.pw-cache.outputs.cache-hit == 'true'
-        run: pnpm exec playwright install-deps chromium
 
       - name: 🏗️ Build frontend
         run: |
