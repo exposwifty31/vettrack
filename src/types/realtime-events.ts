@@ -56,5 +56,13 @@ export type RealtimeEvent = {
   id?: number;
   /** @deprecated Use `id` — kept for older payloads. */
   outboxId?: number;
+  /**
+   * ADR-011. Per-clinic sequence — what gap detection asserts contiguity on. `id` above is
+   * a GLOBAL outbox id while delivery is per clinic, so `id` is not contiguous from any one
+   * client's view and asserting on it produced a permanent false-gap loop once a second
+   * clinic existed. Absent on rows written before migration 186 and on any frame from a
+   * server that predates it — the ingestor applies those without a contiguity check.
+   */
+  clinicSeq?: number | null;
   eventVersion?: number;
 };

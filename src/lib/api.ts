@@ -1243,7 +1243,10 @@ export const api = {
     },
   },
   realtime: {
-    outboxHead: () => request<{ maxPublishedId: number }>("/api/realtime/outbox-head"),
+    outboxHead: () =>
+      request<{ maxPublishedId: number; maxPublishedClinicSeq?: number }>(
+        "/api/realtime/outbox-head",
+      ),
     replay: (fromId: number) =>
       request<{
         events: Array<{
