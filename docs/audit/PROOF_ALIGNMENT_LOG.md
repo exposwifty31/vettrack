@@ -8,6 +8,7 @@ Append-only log of implementation claims backed by verified evidence. Purpose: p
 - Evidence must be things actually observed this session: `Read`/`grep` output pointing at real `file:line`, actual test run output, actual command output. Do not restate a commit message, PR description, or prior summary as evidence.
 - If a claim can't be verified, say so (`PARTIAL` / `NOT FOUND`) rather than omitting the entry or rounding up to `VERIFIED`.
 - Entries are never edited or deleted retroactively — if a later check contradicts an earlier one, add a new entry that supersedes it and note the discrepancy.
+- Entry dates are the **author's local date, Asia/Jerusalem** — the repo's own default clinic timezone (`server/schema/core.ts`). Local is UTC+3, so an entry written after 21:00 UTC carries the *following* day's date while `git log` in UTC still shows the previous one. That is the convention, not a drift; a review round was already spent on it once.
 
 ## Entry format
 
@@ -8600,3 +8601,82 @@ entry does not close and does not claim to.
 **Verdict:** VERIFIED — every item above was observed this session by direct `gh api` output, not
 restated from a commit message or a prior entry. The one non-observable item, the absence of a
 registered company, is recorded as an owner statement and labelled as such.
+
+---
+
+## 2026-08-20 — Architecture invariants in `.coderabbit.yaml` and `.cursorrules` corrected against live code (chore/rule-invariants-drift)
+
+**Claim:** The `**/*` path instruction CodeRabbit applies to every file in every vettrack PR carried
+seven architecture invariants. Three were wrong. All seven were checked against live code and the
+block was rewritten. Two contradicting lines in `.cursorrules` were aligned with the two in the same
+file that were already correct.
+
+**Evidence:**
+
+- **The config is live, not inert.** Review comments on PRs #197, #199 and #200 each report
+  `Configuration used: Path: .coderabbit.yaml`. (The RN repo's PR #81 reports `Organization UI` — a
+  different repo with a different source. The two must not be conflated.)
+- **`server/db.ts` holds no schema.** 23 lines: the pool, `drizzle(pool)`,
+  `export * from "./schema/index.js"`, and a legacy `initDb()` stub. `grep -c pgTable server/db.ts`
+  → `0`.
+- Tables are declared with `vtTable(...)` in `server/schema/*.ts`. `server/schema/helpers.ts:5` →
+  `export const vtTable = pgTable;`, whose own comment reads "identical table names as the original
+  db.ts monolith" — the helper documents the split that the instruction had not caught up with.
+- **The staleness is datable.** `git log --diff-filter=A -- server/schema/core.ts` → `c1780d8f7`,
+  2026-05-24, `refactor: modularize server/db.ts into domain schema files (#421)`.
+  `git log -1 -- .coderabbit.yaml` → `27975124a`, 2026-07-28. The file was edited **two months after**
+  the split and the wrong line survived that edit.
+- **No 100 ml limit is enforced, on three independent searches.** `grep -rnE '\b100\b' server src
+  shared` filtered to `ml|volume|liquid` → no matches; a search for a named bound
+  (`(MAX|LIMIT|THRESHOLD)[A-Z_]*(VOLUME|ML|LIQUID)` and the reverse) → no matches; and the only two
+  occurrences of `volumeMl` in the tree are type declarations that are never compared to anything —
+  `server/queues/inventory-deduction.queue.ts:12` and `src/types/inventory.ts:188`. The narrow claim
+  is what is recorded: **no volume bound of any value is enforced anywhere**, so the invariant gave
+  the reviewer nothing to check. This does not assert that the clinical rule is wrong or that no
+  future code should carry it.
+- **There is no billing ledger to insert into — but billing-adjacent code does survive, and the
+  first draft of this entry blurred the two.** What is absent: no billing/ledger/invoice table
+  (`grep 'vtTable("' server/schema/*.ts` filtered to those words → none), no billing route
+  (`ls server/routes/` → none), and no insert path at all
+  (`grep -rniE 'insert\([a-z]*(billing|ledger)' server/` → none).
+  `server/services/shadow-inventory.service.ts:2` states it outright: "billing ledger removed".
+  What survives: the integrations layer still carries billing types and adapters, and
+  `server/workers/integration.worker.ts:82-87` defines `assertBillingExportIdempotency`, which throws
+  when a `VetTrackBillingEntry` reaches **export** without an `idempotencyKey`. That is a real, live
+  rule — but it governs an outbound export, not a ledger insert, and it is enforced by a `throw` in
+  code rather than by review. So the invariant was removed for a narrower reason than "billing is
+  gone": the insert path it described does not exist, and the adjacent rule that does exist needs no
+  reviewer instruction because the code already refuses.
+- **The realtime invariant was correct but incomplete.** It read "do not introduce parallel polling
+  transports" with no carve-out, while CLAUDE.md's frozen-surfaces section documents the `/collab-ws`
+  Socket.io channel as the one sanctioned additive exception. As written, a correct change under
+  `server/lib/realtime-collab/` would have read to the reviewer as a violation.
+- **`.cursorrules` contradicted itself.** Lines 30 and 110 name `server/schema/*.ts` correctly. Line
+  15 said "New `pgTable` definitions in `server/db.ts`", and the section heading at line 151 read
+  `## Schema (server/db.ts)`. A reader going top-down met the wrong statement first, and nothing in
+  the file established precedence. Both corrected.
+- **Enums are declared separately from tables, and the first draft of this fix got that wrong.**
+  `vtTable` is `pgTable` (helpers.ts:5) and declares tables only; enums use `pgEnum` directly at 8
+  call sites across `server/schema/{equipment,inventory,ops}.ts` (`grep -rn 'pgEnum(' server/`). The
+  replacement invariant initially said table *and enum* definitions were "declared via the `vtTable`
+  alias", which is false. Corrected to name both mechanisms. `grep pgEnum server/db.ts` → no match,
+  so the stronger claim — db.ts defines neither a table nor an enum — is the one recorded.
+- **`server/db.ts` also holds a legacy no-op `initDb()`**, which the first draft's "holds only the
+  pool, the drizzle instance and that re-export" omitted. The enumeration is now complete. The stub
+  logs a string and defines nothing schema-related, so "defines no tables" was not weakened — a
+  review suggestion to soften it on the stub's account was declined with that reason.
+- **The edited YAML was re-parsed, not assumed.** `ruby -ryaml` → 5 `path_instructions` blocks, and
+  the rendered invariants text was read back to confirm what the reviewer actually receives.
+
+**Not done, deliberately — no drift gate was added.** The obvious gate ("every path named in a rule
+file must exist") would **not** have caught this bug: `server/db.ts` exists, it simply no longer holds
+what the rule claimed. A gate that passes green on the exact defect it was written for is the failure
+mode this week's audit found nine separate times, and shipping one here would have added the
+appearance of coverage and none of it. A narrow assertion covering only this instance was judged not
+to earn its maintenance.
+
+**Also observed, not fixed:** `CLAUDE.md:123` still lists `server/lib/` as holding "Business logic
+(billing, …)" though no billing file exists. Out of scope for this change; recorded so it is not lost.
+
+**Verdict:** VERIFIED — every claim above comes from direct command output run this session, not from
+a commit message or a prior entry.

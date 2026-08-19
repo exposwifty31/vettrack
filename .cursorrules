@@ -12,7 +12,7 @@ These rules govern all AI-assisted work on this repository. They extend the focu
 - Never satisfy tenancy by joining alone if the target row’s table is not also filtered by `clinicId`.
 - **Never** hardcode `dev-clinic-default` in production-only code paths; it is the dev-bypass default clinic on `AuthUser` in `server/middleware/auth.ts` (`DEV_USER`) and `ensureDevUserRecord`.
 - Cross-clinic access is a **defect**, not a style issue.
-- New `pgTable` definitions in `server/db.ts` must include tenant scope: `clinicId` is **not null** and references `clinics` where the rest of the schema does; place it **immediately after the primary key** for new tables unless an existing table family uses a different column order (match neighbors).
+- New table definitions in `server/schema/*.ts` (declared via the `vtTable` alias) must include tenant scope: `clinicId` is **not null** and references `clinics` where the rest of the schema does; place it **immediately after the primary key** for new tables unless an existing table family uses a different column order (match neighbors).
 
 ## Auth
 
@@ -148,7 +148,7 @@ These rules govern all AI-assisted work on this repository. They extend the focu
 
 - Exported functions must be called from at least one route, worker, scheduler, or other service. Subset-only imports: remove unused named exports.
 
-## Schema (`server/db.ts`)
+## Schema (`server/schema/*.ts`, re-exported from `server/db.ts`)
 
 - New columns need at least one **query** in the same PR (select/insert/update/where). Before dropping a column, check **`migrations/`**, **`src/lib/offline-db.ts`**, and **`server/integrations/`**.
 
