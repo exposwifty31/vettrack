@@ -13,7 +13,7 @@ import {
   getClinicTimezone,
 } from "../lib/clinic-timezone.js";
 import { incrementMetric } from "../lib/metrics.js";
-import { broadcast } from "../lib/realtime.js";
+import { insertRealtimeDomainEvent } from "../lib/realtime-outbox.js";
 import { sendTaskNotification } from "../lib/task-notification.js";
 import {
   resolveStaleTaskOwnershipEnforcementMode,
@@ -765,6 +765,47 @@ function auditTaskChange(
   });
 }
 
+type TaskRealtimeEventType =
+  | "TASK_CREATED"
+  | "TASK_UPDATED"
+  | "TASK_CANCELLED"
+  | "TASK_STARTED"
+  | "TASK_COMPLETED";
+
+/**
+ * Task lifecycle realtime emission. Writes to `vt_event_outbox` (the frozen
+ * outbox-backed transport) so the event carries a monotonic `id:` cursor and is
+ * covered by `GET /api/realtime/replay` — durability and replay coverage the
+ * legacy in-memory broadcast did not provide.
+ *
+ * NOT a cross-instance fan-out. `outboxEmitter` (`server/lib/event-publisher.ts`)
+ * is a bare in-process `EventEmitter` with no Redis adapter, and
+ * `publishOneBatch` claims each row with `FOR UPDATE SKIP LOCKED`. With more than
+ * one API replica the live frame reaches only the replica that claimed the row;
+ * clients on the other replicas pick the event up on reconnect replay, not live.
+ * Do not describe this path as cross-instance delivery.
+ *
+ * Best-effort, exactly like the broadcast it replaces: a realtime failure must
+ * never fail the clinical mutation. Awaited rather than fire-and-forget so
+ * paired emissions (e.g. TASK_CANCELLED then TASK_UPDATED) keep their relative
+ * order in the outbox id sequence.
+ */
+async function emitTaskEvent(
+  clinicId: string,
+  type: TaskRealtimeEventType,
+  payload: unknown,
+): Promise<void> {
+  try {
+    await insertRealtimeDomainEvent(db, { clinicId, type, payload, category: "TASK" });
+  } catch (err) {
+    console.error("[appointments] task realtime outbox emit failed (non-fatal):", {
+      type,
+      clinicId,
+      err: err instanceof Error ? err.message : err,
+    });
+  }
+}
+
 function serializeAppointment(row: AppointmentRecord) {
   const col =
     typeof row.containerId === "string" && row.containerId.trim().length > 0 ? row.containerId.trim() : null;
@@ -922,7 +963,7 @@ export async function createAppointment(clinicIdInput: string, payload: Appointm
     }
   }
   void sendTaskNotification("TASK_CREATED", serialized, actor).catch(() => {});
-  broadcast(clinicId, { type: "TASK_CREATED", payload: serialized });
+  await emitTaskEvent(clinicId, "TASK_CREATED", serialized);
   return serialized;
 }
 
@@ -1110,7 +1151,7 @@ export async function updateAppointment(
       });
     }
   }
-  broadcast(clinicId, { type: "TASK_UPDATED", payload: serialized });
+  await emitTaskEvent(clinicId, "TASK_UPDATED", serialized);
   return serialized;
 }
 
@@ -1146,8 +1187,8 @@ export async function cancelAppointment(clinicIdInput: string, appointmentId: st
     auditTaskChange("task_cancelled", clinicId, actor, appointmentId, previousSnapshot, { ...serialized });
   }
   void sendTaskNotification("TASK_CANCELLED", serialized, actor).catch(() => {});
-  broadcast(clinicId, { type: "TASK_CANCELLED", payload: serialized });
-  broadcast(clinicId, { type: "TASK_UPDATED", payload: serialized });
+  await emitTaskEvent(clinicId, "TASK_CANCELLED", serialized);
+  await emitTaskEvent(clinicId, "TASK_UPDATED", serialized);
   return serialized;
 }
 
@@ -1260,8 +1301,8 @@ export async function startTask(clinicIdInput: string, taskId: string, actor: Ta
     metadata: { previousState: previousSnapshot, newState: { ...serialized } },
   });
   void sendTaskNotification("TASK_STARTED", serialized, actor).catch(() => {});
-  broadcast(clinicId, { type: "TASK_STARTED", payload: serialized });
-  broadcast(clinicId, { type: "TASK_UPDATED", payload: serialized });
+  await emitTaskEvent(clinicId, "TASK_STARTED", serialized);
+  await emitTaskEvent(clinicId, "TASK_UPDATED", serialized);
   return serialized;
 }
 
@@ -1348,8 +1389,8 @@ export async function completeTask(
     metadata: { previousState: previousSnapshot, newState: { ...serialized } },
   });
   void sendTaskNotification("TASK_COMPLETED", serialized, actor).catch(() => {});
-  broadcast(clinicId, { type: "TASK_COMPLETED", payload: serialized });
-  broadcast(clinicId, { type: "TASK_UPDATED", payload: serialized });
+  await emitTaskEvent(clinicId, "TASK_COMPLETED", serialized);
+  await emitTaskEvent(clinicId, "TASK_UPDATED", serialized);
   return { task: serialized };
 }
 
