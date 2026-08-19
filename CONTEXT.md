@@ -27,8 +27,8 @@ Staff-facing **Tasks / משימות** on `vt_appointments`, canonical route `/eq
 **Code Blue session**  
 Equipment-centric emergency log (`vt_code_blue_sessions`, log entries, presence). No patient/hospitalization FKs after migration 142.
 
-**Ward board**  
-Live display at `/equipment/board` (`/api/display/snapshot`). SSE-driven; never cached in service worker.
+**Ward board / Command Center**  
+Live display at **`/board`** (`BoardRoute` → `BoardShell` kiosk shell, backed by `/api/display/snapshot`). SSE-driven; never cached in service worker. The legacy paths `/equipment/board`, `/display` and `/equipment-board` are all redirect aliases **to** `/board` (`src/app/routes.tsx`); `/board/pair` redeems a pairing code for a headless device token.
 
 **Dispense**  
 Cabinet dispense events (`vt_dispense_events`). Orphan-vs-order validation in `server/lib/dispense-order-validation.ts` currently returns no blocks (medication appointment path removed).

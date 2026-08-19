@@ -14,7 +14,7 @@ Migrations **142** and **143** narrowed VetTrack to an **equipment-first** hospi
 - **Equipment:** lifecycle, operational state, waitlist, staging, docks, rooms/radar, RFID, WhatsApp alerts
 - **Asset Copilot:** `POST /api/equipment/:id/copilot/explain`
 - **Tasks:** unified model on `vt_appointments` at `/equipment/tasks` (user-facing copy: Tasks / משימות)
-- **Code Blue + crash cart + ward board:** `/code-blue`, `/code-blue/display`, `/equipment/board`
+- **Code Blue + crash cart + ward board:** `/code-blue`, `/code-blue/display`, `/board` (Command Center kiosk; `/equipment/board` is now only a redirect alias to it)
 - **Inventory:** containers, restock, dispense, procurement
 - **Shifts, shift chat, clinical check-in, authority evaluators**
 - **Integrations, push, SSE realtime, PWA offline-first**
@@ -36,15 +36,15 @@ Removed pages redirect in [`src/app/routes.tsx`](../src/app/routes.tsx):
 | Old path | Redirects to |
 |----------|--------------|
 | `/appointments`, `/meds`, `/pharmacy-forecast` | `/equipment/tasks` |
-| `/display`, `/equipment-board` | `/equipment/board` |
+| `/display`, `/equipment-board`, `/equipment/board` | `/board` |
 | `/patients`, `/patients/:id`, `/pending`, `/pending-emergencies` | `/equipment` |
 | `/billing`, `/billing/:rest*` | `/equipment` |
 | `/er`, `/er/:rest*`, `/shift-handover` | `/equipment` |
 | `/stability`, `/app-tour` | `/home` |
 | `/admin/medication-integrity` | `/admin` |
 
-Canonical equipment paths: `/equipment`, `/equipment/tasks`, `/equipment/board`.
+Canonical equipment paths: `/equipment`, `/equipment/tasks`. The ward/Command-Center board is **`/board`** (its own `"board"` platform target + `BoardShell`); `/equipment/board` is no longer canonical, it redirects to `/board`.
 
 ## API route count
 
-~**44** route modules in [`server/app/routes.ts`](../server/app/routes.ts); `webhooks` and `rfid` also mount from [`server/index.ts`](../server/index.ts). Regenerate inventory: `pnpm docs:audit`.
+**60** router mounts in [`server/app/routes.ts`](../server/app/routes.ts) (57 distinct routers — a few are mounted at more than one path); `webhooks` and `rfid` also mount from [`server/index.ts`](../server/index.ts). Do not trust this number on sight — re-derive it with `grep -c 'app\.use(' server/app/routes.ts`, and regenerate the inventory with `pnpm docs:audit`.

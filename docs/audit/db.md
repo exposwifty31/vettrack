@@ -2,7 +2,7 @@
 
 All tables prefixed `vt_`. Schema source of truth: `server/schema/` (re-exported from `server/schema/index.ts` and `server/db.ts`).
 
-Generated 2026-07-08.
+Generated 2026-08-19.
 
 ---
 
@@ -21,14 +21,19 @@ Generated 2026-07-08.
 | `vt_alert_acks` |
 | `vt_asset_type_conditions` |
 | `vt_asset_types` |
+| `vt_damage_events` |
 | `vt_docks` |
 | `vt_equipment` |
+| `vt_equipment_anchors` |
 | `vt_equipment_readiness_config` |
 | `vt_equipment_returns` |
 | `vt_equipment_rfid_reads` |
 | `vt_equipment_waitlist` |
 | `vt_folders` |
 | `vt_operational_metrics` |
+| `vt_rfid_egress_signals` |
+| `vt_rfid_readers` |
+| `vt_rfid_secret_rotations` |
 | `vt_rooms` |
 | `vt_scan_logs` |
 | `vt_staging_queue` |
@@ -45,6 +50,7 @@ Generated 2026-07-08.
 | `vt_code_blue_log_entries` |
 | `vt_code_blue_presence` |
 | `vt_code_blue_sessions` |
+| `vt_code_blue_start_claims` |
 | `vt_crash_cart_checks` |
 | `vt_crash_cart_items` |
 
@@ -73,9 +79,12 @@ Generated 2026-07-08.
 
 | Table |
 |-------|
+| `vt_action_proposal` |
+| `vt_action_proposal_decision` |
 | `vt_audit_logs` |
 | `vt_bulk_audit_log` |
 | `vt_clinical_check_ins` |
+| `vt_display_devices` |
 | `vt_doctor_shifts` |
 | `vt_event_outbox` |
 | `vt_idempotency_keys` |
@@ -83,6 +92,8 @@ Generated 2026-07-08.
 | `vt_scheduled_notifications` |
 | `vt_server_config` |
 | `vt_shift_adjustments` |
+| `vt_shift_equipment_coordinator` |
+| `vt_shift_handover` |
 | `vt_shift_imports` |
 | `vt_shift_message_acks` |
 | `vt_shift_message_reactions` |
@@ -107,4 +118,4 @@ Generated 2026-07-08.
 
 ---
 
-**Total tables:** 64
+**Total tables:** 75

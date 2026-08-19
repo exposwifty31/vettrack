@@ -39,73 +39,7 @@
   Clients (PWA · Capacitor native · display kiosks)
           │  REST + SSE
           ▼
-  Express API  (server/index.ts → server/app/routes.ts, ~55 routers)
-    middleware: helmet/CSP → cors → compression → clerk → rate-limit
-                → i18n → tenantContext → sessionContext
-    ├─ routes/      one file per API resource
-    ├─ services/    domain logic (equipment, dispense, waitlist, tasks…)
-    ├─ domain/      hexagonal evidence-graph + Asset Copilot
-    ├─ lib/         authority+enforcement, realtime outbox, audit, metrics…
-    ├─ integrations/ external PMS adapters (inbound/outbound, sync, conflicts)
-    └─ workers/+jobs/+queues/  BullMQ workers & schedulers
-          │                 │                    │
-          ▼                 ▼                    ▼
-     PostgreSQL         Redis/BullMQ        External PMS
-     Drizzle, vt_*      (jobs, push,        (priza, vendor-x,
-     tables             integrations)        generic adapters)
-  ```
-
-  **Request lifecycle (mutation):** typed client call (`src/lib/api.ts`) → emergency-endpoint
-  classifier → Express middleware chain → router → Zod validation → authority/enforcement →
-  domain service → `clinicId`-scoped Drizzle write → `vt_event_outbox` row (+ fire-and-forget
-  audit) → outbox publisher → SSE broadcast → client cache invalidation.
-
-  Hard rules: **every query filters by `clinicId`**; **role is read from `vt_users.role`, never
-  JWT**; the **realtime (SSE+outbox)**, **PWA build-tag cache**, **emergency-endpoint cache
-  denylist**, and **authority `off|shadow|enforce` envelope** are frozen contracts.
-
-  ---
-
-  ## Core modules
-
-  | Domain | What it does | Entry points |
-  |---|---|---|
-  | **Equipment** | Asset CRUD, custody/checkout/return, waitlist + reservation, operational-state lifecycle, RFID/scan location inference, ward/equipment display board, Asset Copilot (evidence-graph explanations) | `routes/equipment*.ts`,
-  `routes/rooms.ts`, `routes/returns.ts`, `routes/display.ts`, `services/equipment-*.ts`, `domain/equipment/**` |
-  | **Code Blue / safety** | Emergency sessions (online-only, server-confirmed), presence, crash-cart checks, reconciliation scanner | `routes/code-blue.ts`, `routes/crash-cart.ts`, `lib/code-blue-*.ts` |
-  - **Phase 9 realtime/PWA:** deterministic counter contracts in `tests/phase-9-deterministic-drills.test.ts`
-    + browser harness `tests/phase-9-drills.spec.ts`.
-  > "Tasks / משימות". Legacy routes (`/patients`, `/er`, `/billing`, `/meds`) survive only as
-  > redirects to equipment surfaces.
-
-  For the full reverse-engineered design see **[`ARCHITECTURE.md`](ARCHITECTURE.md)**; for
-  the operating doctrine and frozen-surface contracts see **[`CLAUDE.md`](CLAUDE.md)**.
-
-  ---
-
-  ## Project overview
-
-  | | |
-  |---|---|
-  | **Frontend** | React 18 · Vite 7 · TypeScript · wouter routing · TanStack Query · Zustand · Tailwind/shadcn · RTL (Hebrew default) · PWA/offline-first (Dexie + service worker) |
-  | **Backend** | Express 4 · TypeScript · Drizzle ORM 0.45 · PostgreSQL (`pg`) · Server-Sent Events realtime (+ an additive Socket.io collaboration channel) |
-  | **Jobs** | BullMQ 5 + Redis (ioredis) — workers & schedulers; Redis optional in dev, required in prod |
-  | **Auth** | Clerk (required in production) or dev-bypass (non-production only — no Clerk secret, or explicit `CLERK_ENABLED=false`) |
-  | **Native** | Capacitor 8 (`ios/`, `android/`) wrapping the built web bundle |
-  | **Observability** | Sentry (`@sentry/node`, `@sentry/react`) |
-  | **Deploy** | Railway (`railway.json`, `Dockerfile`, `nixpacks.toml`) |
-
-  Runtime: Node ≥ 22.12, pnpm 9.15.9.
-
-  ---
-
-  ## Architecture summary
-
-  ```
-  Clients (PWA · Capacitor native · display kiosks)
-          │  REST + SSE
-          ▼
-  Express API  (server/index.ts → server/app/routes.ts, ~55 routers)
+  Express API  (server/index.ts → server/app/routes.ts, 60 router mounts)
     middleware: helmet/CSP → cors → compression → clerk → rate-limit
                 → i18n → tenantContext → sessionContext
     ├─ routes/      one file per API resource
@@ -298,7 +232,7 @@
   server/
     index.ts           Express entry (env-bootstrap first)
     app/               routes.ts (route registration) + start-schedulers.ts
-    routes/            one file per API resource (~55)
+    routes/            one file per API resource (60)
     schema/            Drizzle pgTable definitions (barrel index.ts, re-exported via db.ts)
     services/          domain services
     domain/            hexagonal equipment evidence-graph + Asset Copilot

@@ -2,7 +2,7 @@
 
 All routes from `src/app/routes.tsx`. Page components are lazy-loaded via `React.lazy()` unless noted.
 
-Generated 2026-07-08.
+Generated 2026-08-19.
 
 ---
 
@@ -19,7 +19,6 @@ Generated 2026-07-08.
 | `/equipment` | `AuthGuard` | AuthGuard |
 | `/equipment/new` | `AuthGuard` | AuthGuard |
 | `/equipment/tasks` | `AuthGuard` | AuthGuard |
-| `/equipment/board` | `AuthGuard` | AuthGuard |
 | `/equipment/:id/edit` | `AuthGuard` | AuthGuard |
 | `/equipment/:id/qr` | `AuthGuard` | AuthGuard |
 | `/equipment/:id?` | `AuthGuard` | AuthGuard |
@@ -36,14 +35,15 @@ Generated 2026-07-08.
 
 | Path | Component | Notes |
 |------|-----------|-------|
-| `/appointments` | Redirect | → `/equipment/tasks` |
-| `/equipment-tasks` | Redirect | → `/equipment/tasks` |
-| `/display` | Redirect | → `/equipment/board` |
-| `/equipment-board` | Redirect | → `/equipment/board` |
-| `/scan` | `AuthGuard` | AuthGuard |
+| `/equipment/board` | Redirect | → `/board` |
 | `/equipment/scan` | Redirect | → `/equipment?scan=1` |
 | `/equipment/maintenance` | Redirect | → `/equipment?status=maintenance` |
 | `/equipment/intelligence` | Redirect | → `/equipment` |
+| `/appointments` | Redirect | → `/equipment/tasks` |
+| `/equipment-tasks` | Redirect | → `/equipment/tasks` |
+| `/display` | Redirect | → `/board` |
+| `/equipment-board` | Redirect | → `/board` |
+| `/scan` | `AuthGuard` | AuthGuard |
 
 ## Emergency & safety
 
@@ -68,11 +68,17 @@ Generated 2026-07-08.
 | `/admin/shifts` | `AuthGuard` | AuthGuard |
 | `/admin/asset-types` | `AuthGuard` | AuthGuard |
 | `/admin/docks` | `AuthGuard` | AuthGuard |
+| `/admin/home-assignment` | `AuthGuard` | AuthGuard |
 | `/admin/metrics` | `AuthGuard` | AuthGuard |
 | `/admin/integrations` | `AuthGuard` | AuthGuard |
 | `/admin/webhooks` | `AuthGuard` | AuthGuard |
 | `/admin/notifications` | `AuthGuard` | AuthGuard |
 | `/admin/rfid-readers` | `AuthGuard` | AuthGuard |
+| `/admin/governance` | `AuthGuard` | AuthGuard |
+| `/admin/audit-log` | `AuthGuard` | AuthGuard |
+| `/admin/inventory` | `AuthGuard` | AuthGuard |
+| `/admin/people` | `AuthGuard` | AuthGuard |
+| `/admin/displays` | `AuthGuard` | AuthGuard |
 | `/settings` | `AuthGuard` | AuthGuard |
 | `/help` | `AuthGuard` | AuthGuard |
 | `/audit-log` | `AuthGuard` | AuthGuard |
