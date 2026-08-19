@@ -127,8 +127,14 @@ function parseFromIdQuery(raw: unknown): number | undefined {
   return n;
 }
 
-/** SSE JSON: `id` matches `vt_event_outbox.id` / SSE `id:` for resume and client ordering. */
-function outboxRowToSse(row: PublishedOutboxRow): string {
+/**
+ * SSE JSON: `id` matches `vt_event_outbox.id` / SSE `id:` for resume and client ordering.
+ *
+ * Exported for `tests/realtime-sse-envelope-clinic-seq.test.ts` only — the ADR-011
+ * `clinicSeq` field is emitted here and nowhere else, and its absence is silent at the
+ * client by design. Export is additive; behaviour and every call site are unchanged.
+ */
+export function outboxRowToSse(row: PublishedOutboxRow): string {
   const envelope = {
     type: row.type,
     payload: row.payload,

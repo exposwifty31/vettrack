@@ -8680,3 +8680,59 @@ to earn its maintenance.
 
 **Verdict:** VERIFIED — every claim above comes from direct command output run this session, not from
 a commit message or a prior entry.
+
+---
+
+## 2026-08-20 — ADR-011's open compliance item: the drills cannot verify it, and the seam they were standing in for was untested (docs/adr011-drills)
+
+**Claim:** ADR-011's one open compliance item read "NOT RUN — Playwright `tests/phase-9-drills.spec.ts`",
+implying the drills were the missing verification. They are not: the only realtime-gap drill posts
+telemetry directly and cannot observe gap detection at all. The genuinely uncovered thing was the
+server→client seam — `outboxRowToSse`, the sole emitter of `clinicSeq` — whose failure is silent by
+design. A test now covers it, and the ADR item is restated rather than ticked.
+
+**Evidence:**
+
+- **Drill 1 does not exercise gap detection.** `tests/phase-9-drills.spec.ts:125-135` calls
+  `postTelemetry(request, { gapResync: true })` twice and asserts `/api/metrics` moved by ≥2. Its own
+  header comment says why: *"The full SSE outbox-pause harness is server-side infrastructure"*
+  (`:119-121`). It would pass identically before ADR-011, after it, and with `EventIngestor` deleted.
+  Running it would have produced a green tick against this ADR that proved nothing.
+- **Nothing asserted the emitted envelope.** `grep -rln clinicSeq tests/` returned exactly one file,
+  the client-side unit suite, which constructs its own stub events. `grep -rn outboxRowToSse server/
+  tests/` → three hits, all in `server/routes/realtime.ts` (definition + two call sites), none in a
+  test.
+- **Why that gap is worse than an ordinary uncovered function.** ADR-011 §3 requires the client to
+  apply an event and skip the contiguity check when `clinicSeq` is absent — the rolling-deploy path.
+  So the field disappearing produces no error, no resync and no gap report: gap detection silently
+  stops. The safety valve that makes a rolling deploy safe is the same mechanism that hides the
+  regression.
+- **Demonstrated, not asserted.** With `clinicSeq` removed from the envelope in `outboxRowToSse`:
+  the new `tests/realtime-sse-envelope-clinic-seq.test.ts` fails **3 of 4**, while
+  `tests/realtime-per-clinic-sequence.test.ts` and `tests/phase-9-deterministic-drills.test.ts` both
+  stay green at **20/20**. The regression was then reverted and the file confirmed to differ from
+  `origin/main` only by the added export and its doc comment (`git diff` = 8 insertions, 2 deletions,
+  no executable line changed).
+- **RED before GREEN.** The new suite was written first and run against the unexported function →
+  `TypeError: outboxRowToSse is not a function`, 4 failed. The export was added after.
+- Gates: `pnpm typecheck:server` → exit 0. `pnpm architecture:gates` → exit 0, "All G1 checks passed",
+  cycles match baseline.
+- **Full-suite delta measured against a real baseline, not assumed.** With the change:
+  `15 failed | 724 passed (739)` files, `64 failed | 6650 passed | 11 skipped (6725)` tests. The three
+  changed artefacts were then parked (patch saved, new test moved out, tracked files checked out —
+  `git status --porcelain` = 0) and the same command re-run on clean `main`:
+  `15 failed | 723 passed (738)`, `64 failed | 6646 passed | 11 skipped (6721)`. **Identical failure
+  counts; the delta is exactly one file and four tests, which is this change.** `git stash` was
+  deliberately not used — it is repo-global and another agent shares this checkout.
+- The 15 pre-existing failures are all DB-backed suites (`rfid-*`, `*.integration.test.ts`,
+  `shift-handover-*`) running against the dummy `DATABASE_URL` that `tests/vitest-setup.ts:10`
+  supplies. Environmental, present on `main`, untouched here and not claimed as fixed.
+
+**Not done, deliberately:** no browser drill was written, and the ADR item stays **open**. What is
+still unverified is the live transport — no test drives a real `EventSource` against a real publisher
+and asserts a browser observes contiguous `clinicSeq` across interleaved clinics. The ADR now says
+that in those words, so the next reader cannot close the item by running a suite that cannot fail on
+it.
+
+**Verdict:** VERIFIED — every number above is from a command run this session, including both sides
+of the baseline comparison.
