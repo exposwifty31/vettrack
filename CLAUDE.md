@@ -41,8 +41,9 @@ pnpm i18n:check              # locales/en.json ⟷ locales/he.json parity
 
 # Database
 pnpm db:migrate             # apply pending migrations on demand (same path runs at server startup)
-npx drizzle-kit generate    # author the next migration after schema changes in server/db.ts
-npx drizzle-kit push        # push schema directly (dev only)
+# Migrations are HAND-AUTHORED SQL — after a schema change, write the next
+# migrations/NNN_description.sql yourself. drizzle-kit generate / push (pnpm db:push)
+# are non-functional in this repo; see docs/migrations.md for why.
 
 # Native shell (Capacitor — ios/ + android/ wrap the built web bundle). The iOS app is LIVE.
 pnpm cap:build:native       # scripts/build-native-shell.sh --ios (use --android / --all via cap:build:native:android / :all)
@@ -115,7 +116,7 @@ server/
   schema/         pgTable definitions (core, equipment, inventory, tasks, ops, er, integrations)
   migrate.ts      Migration runner (exports runMigrations())
   app/
-    routes.ts     Registers ~56 API route modules
+    routes.ts     Registers 60 API route mounts (57 distinct routers)
     start-schedulers.ts  Starts all BullMQ workers + background schedulers
   routes/         One file per API resource (incl. rfid, admin-rfid-*, shift-handover, clinic-join, whatsapp)
   services/       Domain services (appointments, equipment, waitlist, inventory, restock, dispense, code-blue…)
@@ -202,7 +203,7 @@ All tables prefixed `vt_`. Table definitions live in `server/schema/*.ts` (re-ex
 
 **Removed (migrations 142–143):** ER/patient/hospitalization tables, medication tasks, drug formulary, pharmacy forecast. See `docs/scope-change-2026.md`.
 
-After editing schema files, run `npx drizzle-kit generate` → commit SQL → `pnpm db:migrate`.
+After editing schema files, hand-write the next `migrations/NNN_description.sql` (check `migrations/` for the current tail, and make every statement idempotent) → commit it → `pnpm db:migrate`. `drizzle-kit generate` is **not** the authoring path here — see [`docs/migrations.md`](docs/migrations.md).
 
 ### Realtime (Phase 9)
 
@@ -316,7 +317,7 @@ E2E tests use Playwright: `pnpm test:signup` (requires Chromium). The Phase 9 dr
 
 ### Adding a new feature (checklist)
 
-1. Schema change in `server/schema/*.ts` (via `server/db.ts`) → `npx drizzle-kit generate` → commit the generated SQL (the runtime applies it at startup; `pnpm db:migrate` runs the same path on demand).
+1. Schema change in `server/schema/*.ts` (via `server/db.ts`) → hand-write `migrations/NNN_description.sql` → commit it (the runtime applies it at startup; `pnpm db:migrate` runs the same path on demand). See [`docs/migrations.md`](docs/migrations.md) — `drizzle-kit generate` is non-functional in this repo.
 2. Route file in `server/routes/` → register in `server/app/routes.ts`.
 3. If adding a BullMQ worker / scheduler → register in `server/app/start-schedulers.ts`.
 4. API function in `src/lib/api.ts` + type in `src/types/`.
