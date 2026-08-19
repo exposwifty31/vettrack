@@ -428,7 +428,7 @@ server/index.ts
 | Auth mode | `server/lib/auth-mode.ts` (config) vs `middleware/auth.ts` (runtime) |
 | Feature flags | `server/lib/feature-flags.ts`, `server/integrations/feature-flags.ts` |
 | Enforcement modes | `server/lib/authority/enforcement/config.ts` per clinic TTL |
-| Drizzle schema | `server/schema/*.ts` → `drizzle-kit generate` → `migrations/` |
+| Drizzle schema | `server/schema/*.ts` → hand-written `migrations/NNN_*.sql` (see `docs/migrations.md`) |
 | CI gates | `scripts/ci/contracts-gate.sh`, `pnpm routes:contract`, architecture scripts |
 | Knip dead code | `knip.json` |
 

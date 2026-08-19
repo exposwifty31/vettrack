@@ -57,7 +57,7 @@
 
 ## Schema Changes (when applicable)
 
-- [ ] `npx drizzle-kit generate` run after schema edits → SQL file committed
+- [ ] `migrations/NNN_description.sql` hand-written after schema edits → committed (idempotent; NOT `drizzle-kit generate`, see `docs/migrations.md`)
 - [ ] Migration tested via `pnpm db:migrate`
 - [ ] Migration is backward-compatible, or a deployment plan exists
 - [ ] New table has a `clinicId` column

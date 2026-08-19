@@ -66,7 +66,7 @@ src/
 ```
 
 **Adding a new feature:**
-1. Schema → `server/schema/*.ts` → `npx drizzle-kit generate` → commit SQL
+1. Schema → `server/schema/*.ts` → hand-write `migrations/NNN_description.sql` (idempotent) → commit it
 2. Route → `server/routes/` → register in `server/app/routes.ts`
 3. Worker (if needed) → register in `server/app/start-schedulers.ts`
 4. API function → `src/lib/api.ts` + type in `src/types/`
@@ -131,7 +131,7 @@ Every DB table has a `clinicId` column. **Every query must filter by `clinicId`.
 ## Database
 
 - All tables prefixed `vt_`, defined in `server/schema/*.ts`, re-exported from `server/db.ts`
-- After schema edits: `npx drizzle-kit generate` → commit generated SQL → `pnpm db:migrate`
+- After schema edits: hand-write the next `migrations/NNN_description.sql` → commit it → `pnpm db:migrate`. `drizzle-kit` is not installed and never worked against this schema barrel — see `docs/migrations.md`
 - Do not use raw SQL unless Drizzle ORM cannot express the query
 - Migrations also run at server startup — `pnpm db:migrate` runs the same path on demand
 

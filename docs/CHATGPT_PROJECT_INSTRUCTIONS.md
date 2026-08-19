@@ -15,7 +15,7 @@ Use this as **Custom Instructions**, **Project knowledge**, or paste the summary
 1. **Multi-tenancy:** Nearly all data is scoped by **`clinicId`**. Every new query must filter by the authenticated clinic; never leak rows across clinics.
 2. **Naming:** **English only** for identifiers, files, types, and APIs. **Hebrew (and other locale strings)** belong in UI/copy via the app's i18n catalogs in `locales/*.json`—not hardcoded in source. User-facing copy uses **Tasks / משימות**; the `vt_appointments` table, `/api/appointments` route, and `appointmentsPage.*` i18n key namespace are intentionally **not** renamed (Phase 6 §17).
 3. **Scope:** Implement **only what was asked**. No drive-by refactors, no unrelated files, no extra docs unless requested.
-4. **Schema-first:** Tables live in **`server/schema/*.ts`** (re-exported from `server/db.ts`). After schema edits, run `npx drizzle-kit generate` and commit SQL.
+4. **Schema-first:** Tables live in **`server/schema/*.ts`** (re-exported from `server/db.ts`). After schema edits, hand-write the next `migrations/NNN_description.sql` (idempotent statements) and commit it — `drizzle-kit` is not the authoring path here, see `docs/migrations.md`.
 5. **API surface:** Prefer **`src/lib/api.ts`** for client-server contracts; keep **`src/types/`** aligned with API shapes when adding endpoints.
 6. **Workers:** Background jobs live under **`server/workers/`** and schedulers/bootstrapping are wired from **`server/app/start-schedulers.ts`** (verify imports when adding queues).
 7. **Offline:** IndexedDB changes require **Dexie version bumps + migrations** in the Dexie setup—do not silently extend tables without a migration path. **Code Blue mutations are never queued offline** — they fail loud and increment a bounded counter (`src/lib/offline-emergency-block.ts`).
@@ -54,7 +54,7 @@ Use this as **Custom Instructions**, **Project knowledge**, or paste the summary
 - **Frontend (Vite):** dev server on **port 5000** (`pnpm dev` runs both via `concurrently`).
 - **Database:** PostgreSQL; connection via **`DATABASE_URL`** (and related `PG*` vars if used).
 - **Dotenv:** Server loads **`dotenv/config`** in `server/index.ts`, so a root **`.env`** is supported for backend vars. Vite still only auto-exposes `VITE_*` to the client.
-- **Migrations:** **`runMigrations()`** is invoked during server startup in `server/index.ts` and applies any pending SQL files in `migrations/`. You can also use **`pnpm db:migrate`** / **`pnpm migrate`** to run the same path on demand. After schema edits in `server/db.ts`, run **`npx drizzle-kit generate`** and commit the new SQL file.
+- **Migrations:** **`runMigrations()`** is invoked during server startup in `server/index.ts` and applies any pending SQL files in `migrations/`. You can also use **`pnpm db:migrate`** / **`pnpm migrate`** to run the same path on demand. After schema edits in `server/db.ts`, **hand-write** the next `migrations/NNN_description.sql` and commit it — `drizzle-kit` is not installed, see `docs/migrations.md`.
 
 **Dev (Unix-style env):**
 

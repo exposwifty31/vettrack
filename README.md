@@ -151,7 +151,7 @@
 
   ## Development workflow
 
-  1. **Schema change** → edit `server/schema/*.ts` → `npx drizzle-kit generate` → commit SQL → `pnpm db:migrate`.
+  1. **Schema change** → edit `server/schema/*.ts` → hand-write `migrations/NNN_description.sql` (idempotent statements; check `migrations/` for the current tail) → commit it → `pnpm db:migrate`. `drizzle-kit` is **not** the authoring path and is not installed — see [`docs/migrations.md`](docs/migrations.md).
   2. **New API route** → add `server/routes/<x>.ts` → register in `server/app/routes.ts`.
   3. **New worker/scheduler** → register in `server/app/start-schedulers.ts`.
   4. **API surface** → typed function in `src/lib/api.ts` + type in `src/types/`.

@@ -9,13 +9,40 @@ Staging-only infrastructure for temporary Clerk test users, `vt_users` mapping, 
 - Staging `DATABASE_URL` (internal or approved staging host)
 - `CLERK_WEBHOOK_SECRET` configured on staging (webhook validation passed)
 
-## GitHub Actions (manual)
+## GitHub Actions — removed 2026-08-19, and why
 
-Workflow: **Staging E2E (manual)** (`.github/workflows/staging-e2e-manual.yml`)
+**There is no CI automation for staging any more.** Two workflows used to exist —
+`staging-e2e-manual.yml` and `workday-simulation-nightly.yml` — and both were deleted.
+Everything they did is available locally, from this runbook, against the same real staging
+deployment. Nothing was lost; a false coverage signal was.
 
-- **Trigger:** `workflow_dispatch` only (not on push/PR).
-- **Branch:** must select branch **`staging`** in the Actions UI; other refs fail the branch guard job.
-- **Secrets:** repository secrets suffixed `_STAGING` only (never production `DATABASE_URL` / `CLERK_SECRET_KEY`):
+**What went wrong, recorded so it is not rebuilt the same way.** Both workflows hard-depended
+on a `staging` **git branch** that has never existed on origin (`git ls-remote --heads origin`
+returns none), plus `*_STAGING` repository secrets that were never set.
+
+- The nightly ran **every night and reported success while executing nothing**. Its preflight
+  "skip" step ran `exit 0`, which succeeds a *step* but does not skip a *job*, so the run fell
+  through to `actions/checkout` with `ref: staging`, failed there, and `continue-on-error: true`
+  painted the whole run green. Run `32100016045` (2026-08-18): run conclusion *success*, job
+  conclusion *failure*, 40 seconds, zero simulation. A gate that silently no-ops is worse than
+  no gate, because it gets counted as coverage.
+- The manual workflow had **zero runs ever**. `workflow_dispatch` makes you choose a ref, and
+  its guard accepted only `refs/heads/staging`, so no dispatch could reach the job.
+
+**If staging CI is rebuilt, three constraints carry over.**
+
+1. **Do not key it on a git branch.** The Playwright suites reach staging through
+   `TEST_BASE_URL`, not through a checkout, so branch state was never load-bearing — it was
+   the accidental precondition that made both workflows unrunnable.
+2. **Keep an environment guard of some kind.** The old branch guard was crude but it existed
+   for a real reason: these jobs run `pnpm staging:seed` and `pnpm staging:cleanup` against a
+   live database. Dispatching from `main` would have pointed seed and cleanup at the wrong
+   environment. Weakening that guard to make a workflow "runnable" is the dangerous fix.
+3. **Never pair a soft-fail preflight with `continue-on-error`.** That combination is exactly
+   what produced a year of green nights over a job that never ran.
+
+**Secrets a rebuild would need** (`*_STAGING` only — never production `DATABASE_URL` /
+`CLERK_SECRET_KEY`):
 
 | GitHub secret | Maps to runtime env |
 |---------------|---------------------|
@@ -25,16 +52,11 @@ Workflow: **Staging E2E (manual)** (`.github/workflows/staging-e2e-manual.yml`)
 | `STAGING_E2E_PASSWORD_STAGING` | `STAGING_E2E_PASSWORD` |
 | `TEST_BASE_URL_STAGING` | `TEST_BASE_URL` |
 
-Steps (in order): `pnpm staging:seed` → `pnpm test:staging:e2e` → `pnpm test:staging:walkthrough` → `pnpm staging:cleanup` (cleanup runs with `if: always()`).
+Order, if rebuilt: `pnpm staging:seed` → `pnpm test:staging:e2e` → `pnpm test:staging:walkthrough`
+→ `pnpm staging:cleanup` (cleanup with `if: always()`).
 
-### Run manually
-
-1. Open **Actions** → **Staging E2E (manual)**.
-2. Click **Run workflow**.
-3. Set **Use workflow from** to branch **`staging`**.
-4. Run workflow.
-
-Concurrency: one run per ref (`staging-e2e-manual-refs/heads/staging`); a new run cancels an in-progress one.
+**Until then, run it locally** — the sections below are the supported path and are what the
+workflows wrapped.
 
 ## Environment (local shell — do not commit)
 
