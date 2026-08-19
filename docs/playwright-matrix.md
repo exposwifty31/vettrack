@@ -29,7 +29,6 @@ VetTrack uses **allowlist-only** discovery in `playwright.config.ts` (`PW_SUITE`
 
 | Spec / area | Script | Reason |
 |-------------|--------|--------|
-| `tests/example.spec.ts` | — (ignored) | Upstream Playwright template; hits `playwright.dev` |
 | `tests/signup-flow.spec.ts` | `pnpm test:playwright:signup` | Creates/deletes Clerk + `vt_users` |
 | `tests/ui-smoke.spec.ts` | `pnpm test:playwright:ui-smoke` | Route screenshots; separate UI config |
 | `tests/staging-*.spec.ts`, `staging-walkthrough.spec.ts` | `pnpm test:staging:e2e`, `test:staging:walkthrough` | Mutates staging |

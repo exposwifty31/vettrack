@@ -56,7 +56,7 @@ export function EquipmentActions({ equipment }: Props) {
   const returnMut = useMutation({
     mutationFn: (values: { isPluggedIn: boolean; plugInDeadlineMinutes?: number }) =>
       api.equipment.return(equipment.id, values),
-    onSuccess: (res) => {
+    onSuccess: (res, values) => {
       haptics.tap();
       queryClient.setQueryData([`/api/equipment/${equipment.id}`], res.equipment);
       queryClient.invalidateQueries({ queryKey: [`/api/equipment/${equipment.id}`] });
@@ -66,6 +66,17 @@ export function EquipmentActions({ equipment }: Props) {
           ? t.equipmentDetail.toast.savedOffline
           : t.equipmentDetail.toast.returned,
       );
+      // Same echo the desktop EquipmentDetailPageDesktop return path emits. The
+      // dialog warns before confirming, but the post-return confirmation must not
+      // be weaker on the mobile surface than on desktop. Suppressed offline —
+      // nothing is scheduled until the queued mutation reaches the server.
+      if (
+        res.pendingSyncId === undefined &&
+        !values.isPluggedIn &&
+        values.plugInDeadlineMinutes !== undefined
+      ) {
+        toast.warning(t.equipmentDetail.toast.chargeAlertScheduled(values.plugInDeadlineMinutes));
+      }
     },
     onError: () => toast.error(t.equipmentDetail.toast.returnFailed("")),
   });
