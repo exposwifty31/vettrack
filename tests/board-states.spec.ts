@@ -243,9 +243,18 @@ test.describe("TV board phase 1 — visual board states", () => {
   test("stale — connection loss escalates to the last-known takeover", async ({ page }) => {
     // The tracker flips to `stale` after STALE_AFTER_MISSED_POLLS (15) consecutive
     // missed poll cycles (pinned in tests/use-display-connection.test.ts) — ≈2 min at
-    // the ~8 s failed-cycle cadence. Slow by design (cadence-aware, exit-only); the
-    // 180 s test budget + 150 s assertion timeout leave margin over the ~2 min floor.
-    test.setTimeout(180_000);
+    // the ~8 s failed-cycle cadence.
+    //
+    // That escalation is driven purely by timers (poll interval + TanStack retry
+    // backoff), so observing it does not require two REAL minutes of CI wall-clock:
+    // this one test was 120 s of a 126 s shard. Playwright's clock drives those
+    // timers instead. Measured locally: 2.0 min -> 5.5 s, same assertions.
+    //
+    // `install({ time })` — not a bare `install()`. A bare install freezes time
+    // before any app script runs and `page.goto` then never settles (verified: the
+    // navigation itself times out). Seeding a start time lets timers fire normally
+    // during load, and only the explicit `runFor` calls below advance them after.
+    await page.clock.install({ time: new Date("2026-08-13T10:18:00.000Z") });
     let served = false;
     await page.route("**/api/display/snapshot", (route) => {
       if (served) return route.abort("connectionrefused");
@@ -261,10 +270,25 @@ test.describe("TV board phase 1 — visual board states", () => {
 
     // First (only) successful poll renders a quiet board…
     await expect(page.getByTestId("board-state-strip")).toHaveAttribute("data-state", "all_clear");
+
     // …then missed polls escalate live → delayed → stale (exit-only takeover).
-    await expect(page.getByTestId("board-state-strip")).toHaveAttribute("data-state", "stale", {
-      timeout: 150_000,
-    });
+    // Advance one failed-cycle (~8 s) at a time, yielding the event loop between
+    // ticks so each aborted fetch and its retry backoff actually resolve — a single
+    // large jump collapses the cycles and the counter never advances.
+    // The escalation lands at ~232 s of driven time (the retry backoff means a
+    // failed cycle costs more than the bare 5 s poll interval), so 40 ticks of 8 s
+    // leaves real margin over the observed floor without adding wall-clock cost.
+    for (let i = 0; i < 40; i++) {
+      const state = await page
+        .getByTestId("board-state-strip")
+        .getAttribute("data-state")
+        .catch(() => null);
+      if (state === "stale") break;
+      await page.clock.runFor(8_000);
+      await page.waitForTimeout(120);
+    }
+
+    await expect(page.getByTestId("board-state-strip")).toHaveAttribute("data-state", "stale");
     const takeover = page.getByTestId("board-takeover");
     await expect(takeover).toHaveAttribute("data-kind", "stale");
     // Last-known state stays on screen, labeled — never silently zeroed.
