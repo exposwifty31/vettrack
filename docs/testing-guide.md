@@ -30,7 +30,7 @@ Tests live in `tests/` and are organized by phase/feature:
 | `phase-9-metrics-cardinality.test.ts` | Phase 9 counters are bounded enums (no PII / free-form labels) |
 | `offline-phase-7-emergency-surface-parity.test.ts` | Emergency endpoints match offline block + SW denylist manifest |
 | `program-v2-hardening-ci-governance.test.ts` | Asserts the three gates above are not vitest-excluded (CD-05) |
-| `phase-5-error-shape.test.js` | Error responses use `{ code, error, reason, message }` shape |
+| `phase-5-error-shape-guard.test.js` | Error responses use `{ code, error, reason, message }` shape (siblings: `phase-5-error-contract.test.js`, `phase-5-route-error-contract.test.js`, `phase-5-pr-5-6-error-shape.test.ts`) |
 | `phase-3-4-automation.test.js` | Automation engine feature flag wiring |
 | `phase-8-mobile-pwa.test.js` | PWA manifest, `dvh` viewport units, `inputMode` attributes |
 | `user-auth-lifecycle.test.js` | User delete/restore, Clerk webhook, purge endpoints |
@@ -60,18 +60,35 @@ After every phase/batch that adds new routes, changes auth patterns, or introduc
 
 Some tests are excluded from the default `pnpm test` run because they require live infrastructure:
 
+`vite.config.ts` `test.exclude` is the source of truth. All 13 entries, and how each is run:
+
 ```
-tests/restock.service.test.ts         — requires DATABASE_URL + migrations
-tests/migrations/**                   — requires DATABASE_URL + migrations
-tests/phase-2-3-medication-package-integration.test.ts — requires DATABASE_URL
-tests/charge-alert-worker.test.js     — requires dev server on :3001
-tests/code-blue-mode-equipment.test.js — requires dev server on :3001
-tests/expiry-api.test.js              — requires dev server on :3001
-tests/expiry-check-worker.test.js     — requires dev server on :3001
-tests/returns-api.test.js             — requires dev server on :3001
+tests/restock.service.test.ts             — DATABASE_URL + migrations; pnpm exec tsx <file>
+tests/migrations/**                       — DATABASE_URL + migrations; pnpm exec tsx <file>
+tests/equipment-operational-state.integration.test.ts — pnpm test:db-integration / test:integration:ops
+tests/shift-chat-window.integration.test.ts — DATABASE_URL; pnpm exec tsx <file>
+tests/seed-reviewer-demo.integration.test.ts — pnpm test:db-integration
+tests/doctor-shift-gate.integration.test.ts  — pnpm test:db-integration
+tests/tenant-pooling-isolation.integration.test.ts — pnpm test:rls-pooling (real DDL, see below)
+tests/charge-alert-worker.test.js         — requires dev server on :3001
+tests/code-blue-mode-equipment.test.js    — requires dev server on :3001
+tests/equipment-scan-e2e.test.js          — requires dev server on :3001
+tests/expiry-api.test.js                  — requires dev server on :3001
+tests/expiry-check-worker.test.js         — requires dev server on :3001
+tests/returns-api.test.js                 — requires dev server on :3001
 ```
 
-To run infrastructure tests, start the dev server first and set `DATABASE_URL`, then run:
+Dedicated runners:
+
+```bash
+pnpm test:db-integration    # vitest.db-integration.config.ts
+pnpm test:integration:ops   # vitest.integration.ops.config.ts (operational-state + waitlist)
+pnpm test:rls-pooling       # vitest.rls-pooling.config.ts — runs CREATE TABLE + RLS DDL.
+                            # Needs RLS_POOLING_PROBE=1 and RLS_PROBE_DATABASE_URL
+                            # (NOT DATABASE_URL) pointed at a throwaway database.
+```
+
+For the live-server suites, start the dev server first, then run the file directly:
 
 ```bash
 npx vitest run tests/expiry-api.test.js

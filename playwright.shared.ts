@@ -29,7 +29,6 @@ export function warnIfUnsafePlaywrightBaseUrl(baseURL: string): void {
 export const PLAYWRIGHT_BASE_IGNORE = [
   'staging-*.spec.ts',
   'staging-walkthrough.spec.ts',
-  'example.spec.ts',
   'signup-flow.spec.ts',
   'ui-smoke.spec.ts',
   'e2e/simulation/**',
