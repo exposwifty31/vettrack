@@ -39,7 +39,6 @@ const EXPECTED_MOUNT_PATHS = [
   "/api/activity",
   "/api/home",
   "/api/display",
-  "/api/equipment-board",
   "/api/docking", // dockingRoutes (T1.4)
   "/api/code-blue",
   "/api/crash-cart",
@@ -52,7 +51,6 @@ const EXPECTED_MOUNT_PATHS = [
   "/api/admin", // adminWebhooksRoutes (7b)
   "/api/admin", // adminNotificationsRoutes (7b)
   "/api/admin/cursor-bug-fixer",
-  "/api/stability",
   "/api/platform",
   "/api/analytics",
   "/api/shifts",

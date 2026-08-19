@@ -18,10 +18,14 @@ describe("equipment readiness wedge smoke", () => {
     expect(routes).toMatch(/path="\/equipment\/board"><RedirectPreserveSearch to="\/board"/);
   });
 
-  it("mounts equipment-board API alias via router factory", () => {
+  it("mounts the display API via router factory", () => {
     const appRoutes = fs.readFileSync("server/app/routes.ts", "utf8");
-    expect(appRoutes).toContain('app.use("/api/equipment-board", createDisplayRouter())');
     expect(appRoutes).toContain('app.use("/api/display", createDisplayRouter())');
+    // The /api/equipment-board alias was removed: it re-mounted the same
+    // createDisplayRouter() under a second prefix that no client ever called,
+    // and its /snapshot twin sat outside the emergency cache denylist, which
+    // keys on the /api/display name only.
+    expect(appRoutes).not.toContain('/api/equipment-board');
   });
 
   it("snapshot includes commandBoard field", () => {

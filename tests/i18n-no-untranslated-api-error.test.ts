@@ -73,7 +73,6 @@ const KNOWN_DEBT_ALLOWLIST = new Set<string>([
   "server/routes/rooms.ts", // owner: rooms
   "server/routes/shift-chat.ts", // owner: shift-chat
   "server/routes/shifts.ts", // owner: shifts
-  "server/routes/stability.ts", // owner: stability (PR 6.10 target)
   "server/routes/storage.ts", // owner: storage
   "server/routes/support.ts", // owner: support
   "server/routes/tasks.ts", // owner: tasks

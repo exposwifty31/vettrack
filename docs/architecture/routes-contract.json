@@ -1,9 +1,49 @@
 {
   "contractVersion": 2,
-  "generatedAt": "2026-06-16T00:13:45.916Z",
+  "generatedAt": "2026-08-19T03:41:29.504Z",
   "generator": "scripts/architecture/extract-express-routes.mjs",
-  "routeCount": 239,
+  "routeCount": 284,
   "routes": [
+    {
+      "method": "GET",
+      "path": "/api/action-proposals",
+      "mountPath": "/api/action-proposals",
+      "routePath": "/",
+      "sourceFile": "server/routes/action-proposals.ts",
+      "sourceLine": 81,
+      "mountSourceFile": "server/app/routes.ts",
+      "mountLine": 156
+    },
+    {
+      "method": "POST",
+      "path": "/api/action-proposals/:id/approve",
+      "mountPath": "/api/action-proposals",
+      "routePath": "/:id/approve",
+      "sourceFile": "server/routes/action-proposals.ts",
+      "sourceLine": 102,
+      "mountSourceFile": "server/app/routes.ts",
+      "mountLine": 156
+    },
+    {
+      "method": "POST",
+      "path": "/api/action-proposals/:id/edit",
+      "mountPath": "/api/action-proposals",
+      "routePath": "/:id/edit",
+      "sourceFile": "server/routes/action-proposals.ts",
+      "sourceLine": 124,
+      "mountSourceFile": "server/app/routes.ts",
+      "mountLine": 156
+    },
+    {
+      "method": "POST",
+      "path": "/api/action-proposals/:id/reject",
+      "mountPath": "/api/action-proposals",
+      "routePath": "/:id/reject",
+      "sourceFile": "server/routes/action-proposals.ts",
+      "sourceLine": 152,
+      "mountSourceFile": "server/app/routes.ts",
+      "mountLine": 156
+    },
     {
       "method": "GET",
       "path": "/api/activity",
@@ -12,7 +52,7 @@
       "sourceFile": "server/routes/activity.ts",
       "sourceLine": 25,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 86
+      "mountLine": 107
     },
     {
       "method": "GET",
@@ -22,7 +62,27 @@
       "sourceFile": "server/routes/activity.ts",
       "sourceLine": 138,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 86
+      "mountLine": 107
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/clinic-join-code",
+      "mountPath": "/api",
+      "routePath": "/admin/clinic-join-code",
+      "sourceFile": "server/routes/clinic-join.ts",
+      "sourceLine": 173,
+      "mountSourceFile": "server/app/routes.ts",
+      "mountLine": 72
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/clinic-join-code/rotate",
+      "mountPath": "/api",
+      "routePath": "/admin/clinic-join-code/rotate",
+      "sourceFile": "server/routes/clinic-join.ts",
+      "sourceLine": 190,
+      "mountSourceFile": "server/app/routes.ts",
+      "mountLine": 72
     },
     {
       "method": "GET",
@@ -32,7 +92,7 @@
       "sourceFile": "server/routes/cursor-bug-fixer.ts",
       "sourceLine": 210,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 101
+      "mountLine": 129
     },
     {
       "method": "GET",
@@ -42,7 +102,7 @@
       "sourceFile": "server/routes/cursor-bug-fixer.ts",
       "sourceLine": 228,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 101
+      "mountLine": 129
     },
     {
       "method": "GET",
@@ -52,7 +112,7 @@
       "sourceFile": "server/routes/cursor-bug-fixer.ts",
       "sourceLine": 76,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 101
+      "mountLine": 129
     },
     {
       "method": "POST",
@@ -62,7 +122,7 @@
       "sourceFile": "server/routes/cursor-bug-fixer.ts",
       "sourceLine": 80,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 101
+      "mountLine": 129
     },
     {
       "method": "POST",
@@ -72,7 +132,37 @@
       "sourceFile": "server/routes/cursor-bug-fixer.ts",
       "sourceLine": 125,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 101
+      "mountLine": 129
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/equipment/readiness-rules",
+      "mountPath": "/api/admin",
+      "routePath": "/equipment/readiness-rules",
+      "sourceFile": "server/routes/admin-equipment-governance.ts",
+      "sourceLine": 28,
+      "mountSourceFile": "server/app/routes.ts",
+      "mountLine": 126
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/admin/equipment/readiness-rules",
+      "mountPath": "/api/admin",
+      "routePath": "/equipment/readiness-rules",
+      "sourceFile": "server/routes/admin-equipment-governance.ts",
+      "sourceLine": 45,
+      "mountSourceFile": "server/app/routes.ts",
+      "mountLine": 126
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/notifications",
+      "mountPath": "/api/admin",
+      "routePath": "/notifications",
+      "sourceFile": "server/routes/admin-notifications.ts",
+      "sourceLine": 14,
+      "mountSourceFile": "server/app/routes.ts",
+      "mountLine": 128
     },
     {
       "method": "GET",
@@ -82,7 +172,7 @@
       "sourceFile": "server/routes/admin-outbox-health.ts",
       "sourceLine": 14,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 98
+      "mountLine": 121
     },
     {
       "method": "GET",
@@ -92,7 +182,7 @@
       "sourceFile": "server/routes/admin-outbox-dlq.ts",
       "sourceLine": 71,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 99
+      "mountLine": 122
     },
     {
       "method": "POST",
@@ -102,7 +192,7 @@
       "sourceFile": "server/routes/admin-outbox-dlq.ts",
       "sourceLine": 255,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 99
+      "mountLine": 122
     },
     {
       "method": "POST",
@@ -112,7 +202,97 @@
       "sourceFile": "server/routes/admin-outbox-dlq.ts",
       "sourceLine": 166,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 99
+      "mountLine": 122
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/rfid-provisioning/ack",
+      "mountPath": "/api/admin",
+      "routePath": "/rfid-provisioning/ack",
+      "sourceFile": "server/routes/admin-rfid-provisioning.ts",
+      "sourceLine": 97,
+      "mountSourceFile": "server/app/routes.ts",
+      "mountLine": 125
+    },
+    {
+      "method": "PUT",
+      "path": "/api/admin/rfid-provisioning/ingest",
+      "mountPath": "/api/admin",
+      "routePath": "/rfid-provisioning/ingest",
+      "sourceFile": "server/routes/admin-rfid-provisioning.ts",
+      "sourceLine": 115,
+      "mountSourceFile": "server/app/routes.ts",
+      "mountLine": 125
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/rfid-provisioning/rollback",
+      "mountPath": "/api/admin",
+      "routePath": "/rfid-provisioning/rollback",
+      "sourceFile": "server/routes/admin-rfid-provisioning.ts",
+      "sourceLine": 78,
+      "mountSourceFile": "server/app/routes.ts",
+      "mountLine": 125
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/rfid-provisioning/rotate",
+      "mountPath": "/api/admin",
+      "routePath": "/rfid-provisioning/rotate",
+      "sourceFile": "server/routes/admin-rfid-provisioning.ts",
+      "sourceLine": 58,
+      "mountSourceFile": "server/app/routes.ts",
+      "mountLine": 125
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/rfid-readers",
+      "mountPath": "/api/admin",
+      "routePath": "/rfid-readers",
+      "sourceFile": "server/routes/admin-rfid-readers.ts",
+      "sourceLine": 49,
+      "mountSourceFile": "server/app/routes.ts",
+      "mountLine": 124
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/rfid-readers",
+      "mountPath": "/api/admin",
+      "routePath": "/rfid-readers",
+      "sourceFile": "server/routes/admin-rfid-readers.ts",
+      "sourceLine": 103,
+      "mountSourceFile": "server/app/routes.ts",
+      "mountLine": 124
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/admin/rfid-readers/:id",
+      "mountPath": "/api/admin",
+      "routePath": "/rfid-readers/:id",
+      "sourceFile": "server/routes/admin-rfid-readers.ts",
+      "sourceLine": 136,
+      "mountSourceFile": "server/app/routes.ts",
+      "mountLine": 124
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/rfid-readers/:id/deactivate",
+      "mountPath": "/api/admin",
+      "routePath": "/rfid-readers/:id/deactivate",
+      "sourceFile": "server/routes/admin-rfid-readers.ts",
+      "sourceLine": 168,
+      "mountSourceFile": "server/app/routes.ts",
+      "mountLine": 124
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/rfid-readers/managed",
+      "mountPath": "/api/admin",
+      "routePath": "/rfid-readers/managed",
+      "sourceFile": "server/routes/admin-rfid-readers.ts",
+      "sourceLine": 83,
+      "mountSourceFile": "server/app/routes.ts",
+      "mountLine": 124
     },
     {
       "method": "POST",
@@ -122,7 +302,7 @@
       "sourceFile": "server/routes/admin-task-ownership.ts",
       "sourceLine": 42,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 100
+      "mountLine": 123
     },
     {
       "method": "GET",
@@ -132,7 +312,7 @@
       "sourceFile": "server/routes/admin-task-ownership.ts",
       "sourceLine": 95,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 100
+      "mountLine": 123
     },
     {
       "method": "GET",
@@ -142,7 +322,7 @@
       "sourceFile": "server/routes/admin-task-ownership.ts",
       "sourceLine": 142,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 100
+      "mountLine": 123
     },
     {
       "method": "POST",
@@ -152,7 +332,7 @@
       "sourceFile": "server/routes/admin-task-ownership.ts",
       "sourceLine": 369,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 100
+      "mountLine": 123
     },
     {
       "method": "POST",
@@ -162,7 +342,7 @@
       "sourceFile": "server/routes/admin-task-ownership.ts",
       "sourceLine": 380,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 100
+      "mountLine": 123
     },
     {
       "method": "POST",
@@ -172,7 +352,7 @@
       "sourceFile": "server/routes/admin-task-ownership.ts",
       "sourceLine": 389,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 100
+      "mountLine": 123
     },
     {
       "method": "GET",
@@ -182,7 +362,17 @@
       "sourceFile": "server/routes/admin-task-ownership.ts",
       "sourceLine": 169,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 100
+      "mountLine": 123
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/webhooks",
+      "mountPath": "/api/admin",
+      "routePath": "/webhooks",
+      "sourceFile": "server/routes/admin-webhooks.ts",
+      "sourceLine": 14,
+      "mountSourceFile": "server/app/routes.ts",
+      "mountLine": 127
     },
     {
       "method": "GET",
@@ -190,9 +380,9 @@
       "mountPath": "/api/alert-acks",
       "routePath": "/",
       "sourceFile": "server/routes/alert-acks.ts",
-      "sourceLine": 40,
+      "sourceLine": 65,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 85
+      "mountLine": 106
     },
     {
       "method": "POST",
@@ -200,9 +390,9 @@
       "mountPath": "/api/alert-acks",
       "routePath": "/",
       "sourceFile": "server/routes/alert-acks.ts",
-      "sourceLine": 71,
+      "sourceLine": 97,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 85
+      "mountLine": 106
     },
     {
       "method": "PATCH",
@@ -210,9 +400,9 @@
       "mountPath": "/api/alert-acks",
       "routePath": "/:id/resolve",
       "sourceFile": "server/routes/alert-acks.ts",
-      "sourceLine": 184,
+      "sourceLine": 214,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 85
+      "mountLine": 106
     },
     {
       "method": "GET",
@@ -220,9 +410,9 @@
       "mountPath": "/api/analytics",
       "routePath": "/",
       "sourceFile": "server/routes/analytics.ts",
-      "sourceLine": 28,
+      "sourceLine": 34,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 110
+      "mountLine": 137
     },
     {
       "method": "GET",
@@ -230,19 +420,19 @@
       "mountPath": "/api/analytics",
       "routePath": "/billing",
       "sourceFile": "server/routes/analytics.ts",
-      "sourceLine": 153,
+      "sourceLine": 201,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 110
+      "mountLine": 137
     },
     {
       "method": "GET",
-      "path": "/api/analytics/outcome-kpi-roi",
+      "path": "/api/analytics/readiness-forecast",
       "mountPath": "/api/analytics",
-      "routePath": "/outcome-kpi-roi",
+      "routePath": "/readiness-forecast",
       "sourceFile": "server/routes/analytics.ts",
-      "sourceLine": 194,
+      "sourceLine": 329,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 110
+      "mountLine": 137
     },
     {
       "method": "GET",
@@ -250,9 +440,9 @@
       "mountPath": "/api/analytics",
       "routePath": "/shift-completion",
       "sourceFile": "server/routes/analytics.ts",
-      "sourceLine": 218,
+      "sourceLine": 245,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 110
+      "mountLine": 137
     },
     {
       "method": "GET",
@@ -262,7 +452,7 @@
       "sourceFile": "server/routes/appointments.ts",
       "sourceLine": 208,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 112
+      "mountLine": 140
     },
     {
       "method": "POST",
@@ -272,7 +462,7 @@
       "sourceFile": "server/routes/appointments.ts",
       "sourceLine": 142,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 112
+      "mountLine": 140
     },
     {
       "method": "DELETE",
@@ -282,7 +472,7 @@
       "sourceFile": "server/routes/appointments.ts",
       "sourceLine": 443,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 112
+      "mountLine": 140
     },
     {
       "method": "PATCH",
@@ -292,7 +482,7 @@
       "sourceFile": "server/routes/appointments.ts",
       "sourceLine": 360,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 112
+      "mountLine": 140
     },
     {
       "method": "GET",
@@ -302,7 +492,7 @@
       "sourceFile": "server/routes/appointments.ts",
       "sourceLine": 253,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 112
+      "mountLine": 140
     },
     {
       "method": "GET",
@@ -310,9 +500,9 @@
       "mountPath": "/api",
       "routePath": "/asset-types",
       "sourceFile": "server/routes/equipment-operational-state.ts",
-      "sourceLine": 594,
+      "sourceLine": 653,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 80
+      "mountLine": 101
     },
     {
       "method": "POST",
@@ -320,9 +510,9 @@
       "mountPath": "/api",
       "routePath": "/asset-types",
       "sourceFile": "server/routes/equipment-operational-state.ts",
-      "sourceLine": 67,
+      "sourceLine": 101,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 80
+      "mountLine": 101
     },
     {
       "method": "GET",
@@ -330,9 +520,9 @@
       "mountPath": "/api",
       "routePath": "/asset-types/:assetTypeId/conditions",
       "sourceFile": "server/routes/equipment-operational-state.ts",
-      "sourceLine": 110,
+      "sourceLine": 144,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 80
+      "mountLine": 101
     },
     {
       "method": "POST",
@@ -340,9 +530,9 @@
       "mountPath": "/api",
       "routePath": "/asset-types/:assetTypeId/conditions",
       "sourceFile": "server/routes/equipment-operational-state.ts",
-      "sourceLine": 87,
+      "sourceLine": 121,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 80
+      "mountLine": 101
     },
     {
       "method": "GET",
@@ -352,57 +542,77 @@
       "sourceFile": "server/routes/audit-logs.ts",
       "sourceLine": 13,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 65
+      "mountLine": 80
     },
     {
       "method": "POST",
-      "path": "/api/clinical/check-in",
-      "mountPath": "/api/clinical",
+      "path": "/api/auth/join-clinic",
+      "mountPath": "/api",
+      "routePath": "/auth/join-clinic",
+      "sourceFile": "server/routes/clinic-join.ts",
+      "sourceLine": 166,
+      "mountSourceFile": "server/app/routes.ts",
+      "mountLine": 72
+    },
+    {
+      "method": "POST",
+      "path": "/api/clinical-check-in/check-in",
+      "mountPath": "/api/clinical-check-in",
       "routePath": "/check-in",
       "sourceFile": "server/routes/clinical-check-in.ts",
-      "sourceLine": 103,
+      "sourceLine": 120,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 118
+      "mountLine": 151
     },
     {
       "method": "POST",
-      "path": "/api/clinical/check-ins/:id/admin-force-close",
-      "mountPath": "/api/clinical",
+      "path": "/api/clinical-check-in/check-ins/:id/admin-force-close",
+      "mountPath": "/api/clinical-check-in",
       "routePath": "/check-ins/:id/admin-force-close",
       "sourceFile": "server/routes/clinical-check-in.ts",
-      "sourceLine": 186,
+      "sourceLine": 252,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 118
+      "mountLine": 151
     },
     {
       "method": "POST",
-      "path": "/api/clinical/check-out",
-      "mountPath": "/api/clinical",
+      "path": "/api/clinical-check-in/check-out",
+      "mountPath": "/api/clinical-check-in",
       "routePath": "/check-out",
       "sourceFile": "server/routes/clinical-check-in.ts",
-      "sourceLine": 146,
+      "sourceLine": 212,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 118
+      "mountLine": 151
     },
     {
       "method": "GET",
-      "path": "/api/clinical/me/active",
-      "mountPath": "/api/clinical",
+      "path": "/api/clinical-check-in/me/active",
+      "mountPath": "/api/clinical-check-in",
       "routePath": "/me/active",
       "sourceFile": "server/routes/clinical-check-in.ts",
-      "sourceLine": 159,
+      "sourceLine": 225,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 118
+      "mountLine": 151
     },
     {
       "method": "GET",
-      "path": "/api/clinical/me/operational-roles",
-      "mountPath": "/api/clinical",
+      "path": "/api/clinical-check-in/me/operational-roles",
+      "mountPath": "/api/clinical-check-in",
       "routePath": "/me/operational-roles",
       "sourceFile": "server/routes/clinical-check-in.ts",
-      "sourceLine": 169,
+      "sourceLine": 235,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 118
+      "mountLine": 151
+    },
+    {
+      "method": "POST",
+      "path": "/api/clinical-check-in/switch",
+      "mountPath": "/api/clinical-check-in",
+      "routePath": "/switch",
+      "sourceFile": "server/routes/clinical-check-in.ts",
+      "sourceLine": 166,
+      "mountSourceFile": "server/app/routes.ts",
+      "mountLine": 151
     },
     {
       "method": "GET",
@@ -410,9 +620,9 @@
       "mountPath": "/api/code-blue",
       "routePath": "/events",
       "sourceFile": "server/routes/code-blue.ts",
-      "sourceLine": 197,
+      "sourceLine": 212,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 93
+      "mountLine": 116
     },
     {
       "method": "POST",
@@ -420,9 +630,9 @@
       "mountPath": "/api/code-blue",
       "routePath": "/events",
       "sourceFile": "server/routes/code-blue.ts",
-      "sourceLine": 84,
+      "sourceLine": 99,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 93
+      "mountLine": 116
     },
     {
       "method": "PATCH",
@@ -430,9 +640,9 @@
       "mountPath": "/api/code-blue",
       "routePath": "/events/:id",
       "sourceFile": "server/routes/code-blue.ts",
-      "sourceLine": 142,
+      "sourceLine": 157,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 93
+      "mountLine": 116
     },
     {
       "method": "GET",
@@ -440,9 +650,19 @@
       "mountPath": "/api/code-blue",
       "routePath": "/history",
       "sourceFile": "server/routes/code-blue.ts",
-      "sourceLine": 994,
+      "sourceLine": 1196,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 93
+      "mountLine": 116
+    },
+    {
+      "method": "POST",
+      "path": "/api/code-blue/one-tap",
+      "mountPath": "/api/code-blue",
+      "routePath": "/one-tap",
+      "sourceFile": "server/routes/code-blue.ts",
+      "sourceLine": 547,
+      "mountSourceFile": "server/app/routes.ts",
+      "mountLine": 116
     },
     {
       "method": "GET",
@@ -450,9 +670,9 @@
       "mountPath": "/api/code-blue",
       "routePath": "/reconciliation",
       "sourceFile": "server/routes/code-blue.ts",
-      "sourceLine": 1020,
+      "sourceLine": 1222,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 93
+      "mountLine": 116
     },
     {
       "method": "POST",
@@ -460,9 +680,9 @@
       "mountPath": "/api/code-blue",
       "routePath": "/sessions",
       "sourceFile": "server/routes/code-blue.ts",
-      "sourceLine": 275,
+      "sourceLine": 288,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 93
+      "mountLine": 116
     },
     {
       "method": "GET",
@@ -470,9 +690,9 @@
       "mountPath": "/api/code-blue",
       "routePath": "/sessions/:id/dispenses",
       "sourceFile": "server/routes/code-blue.ts",
-      "sourceLine": 1062,
+      "sourceLine": 1264,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 93
+      "mountLine": 116
     },
     {
       "method": "PATCH",
@@ -480,9 +700,9 @@
       "mountPath": "/api/code-blue",
       "routePath": "/sessions/:id/end",
       "sourceFile": "server/routes/code-blue.ts",
-      "sourceLine": 769,
+      "sourceLine": 966,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 93
+      "mountLine": 116
     },
     {
       "method": "POST",
@@ -490,9 +710,9 @@
       "mountPath": "/api/code-blue",
       "routePath": "/sessions/:id/logs",
       "sourceFile": "server/routes/code-blue.ts",
-      "sourceLine": 600,
+      "sourceLine": 797,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 93
+      "mountLine": 116
     },
     {
       "method": "POST",
@@ -500,9 +720,9 @@
       "mountPath": "/api/code-blue",
       "routePath": "/sessions/:id/manual-billing",
       "sourceFile": "server/routes/code-blue.ts",
-      "sourceLine": 1173,
+      "sourceLine": 1375,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 93
+      "mountLine": 116
     },
     {
       "method": "PATCH",
@@ -510,9 +730,9 @@
       "mountPath": "/api/code-blue",
       "routePath": "/sessions/:id/presence",
       "sourceFile": "server/routes/code-blue.ts",
-      "sourceLine": 700,
+      "sourceLine": 897,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 93
+      "mountLine": 116
     },
     {
       "method": "PATCH",
@@ -520,9 +740,9 @@
       "mountPath": "/api/code-blue",
       "routePath": "/sessions/:id/reconcile",
       "sourceFile": "server/routes/code-blue.ts",
-      "sourceLine": 1111,
+      "sourceLine": 1313,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 93
+      "mountLine": 116
     },
     {
       "method": "GET",
@@ -530,9 +750,9 @@
       "mountPath": "/api/code-blue",
       "routePath": "/sessions/active",
       "sourceFile": "server/routes/code-blue.ts",
-      "sourceLine": 514,
+      "sourceLine": 711,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 93
+      "mountLine": 116
     },
     {
       "method": "GET",
@@ -540,9 +760,9 @@
       "mountPath": "/api/containers",
       "routePath": "/",
       "sourceFile": "server/routes/containers.ts",
-      "sourceLine": 108,
+      "sourceLine": 109,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 114
+      "mountLine": 142
     },
     {
       "method": "POST",
@@ -550,9 +770,9 @@
       "mountPath": "/api/containers",
       "routePath": "/",
       "sourceFile": "server/routes/containers.ts",
-      "sourceLine": 183,
+      "sourceLine": 184,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 114
+      "mountLine": 142
     },
     {
       "method": "POST",
@@ -560,9 +780,9 @@
       "mountPath": "/api/containers",
       "routePath": "/:id/blind-audit",
       "sourceFile": "server/routes/containers.ts",
-      "sourceLine": 257,
+      "sourceLine": 258,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 114
+      "mountLine": 142
     },
     {
       "method": "POST",
@@ -570,9 +790,9 @@
       "mountPath": "/api/containers",
       "routePath": "/:id/dispense",
       "sourceFile": "server/routes/containers.ts",
-      "sourceLine": 304,
+      "sourceLine": 310,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 114
+      "mountLine": 142
     },
     {
       "method": "POST",
@@ -580,9 +800,9 @@
       "mountPath": "/api/containers",
       "routePath": "/:id/restock",
       "sourceFile": "server/routes/containers.ts",
-      "sourceLine": 238,
+      "sourceLine": 239,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 114
+      "mountLine": 142
     },
     {
       "method": "POST",
@@ -590,9 +810,9 @@
       "mountPath": "/api/containers",
       "routePath": "/bootstrap-defaults",
       "sourceFile": "server/routes/containers.ts",
-      "sourceLine": 89,
+      "sourceLine": 88,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 114
+      "mountLine": 142
     },
     {
       "method": "PATCH",
@@ -600,9 +820,9 @@
       "mountPath": "/api/containers",
       "routePath": "/emergency/:eventId/complete",
       "sourceFile": "server/routes/containers.ts",
-      "sourceLine": 938,
+      "sourceLine": 944,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 114
+      "mountLine": 142
     },
     {
       "method": "POST",
@@ -612,7 +832,7 @@
       "sourceFile": "server/routes/crash-cart.ts",
       "sourceLine": 181,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 94
+      "mountLine": 117
     },
     {
       "method": "GET",
@@ -622,7 +842,7 @@
       "sourceFile": "server/routes/crash-cart.ts",
       "sourceLine": 208,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 94
+      "mountLine": 117
     },
     {
       "method": "GET",
@@ -632,7 +852,7 @@
       "sourceFile": "server/routes/crash-cart.ts",
       "sourceLine": 49,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 94
+      "mountLine": 117
     },
     {
       "method": "POST",
@@ -642,7 +862,7 @@
       "sourceFile": "server/routes/crash-cart.ts",
       "sourceLine": 90,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 94
+      "mountLine": 117
     },
     {
       "method": "DELETE",
@@ -652,7 +872,7 @@
       "sourceFile": "server/routes/crash-cart.ts",
       "sourceLine": 158,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 94
+      "mountLine": 117
     },
     {
       "method": "PATCH",
@@ -662,7 +882,7 @@
       "sourceFile": "server/routes/crash-cart.ts",
       "sourceLine": 129,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 94
+      "mountLine": 117
     },
     {
       "method": "POST",
@@ -670,9 +890,9 @@
       "mountPath": "/api/dispense",
       "routePath": "/:id/confirm",
       "sourceFile": "server/routes/dispense.ts",
-      "sourceLine": 115,
+      "sourceLine": 116,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 119
+      "mountLine": 152
     },
     {
       "method": "POST",
@@ -680,9 +900,9 @@
       "mountPath": "/api/dispense",
       "routePath": "/draft",
       "sourceFile": "server/routes/dispense.ts",
-      "sourceLine": 84,
+      "sourceLine": 89,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 119
+      "mountLine": 152
     },
     {
       "method": "POST",
@@ -690,9 +910,99 @@
       "mountPath": "/api/dispense",
       "routePath": "/emergency",
       "sourceFile": "server/routes/dispense.ts",
-      "sourceLine": 154,
+      "sourceLine": 152,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 119
+      "mountLine": 152
+    },
+    {
+      "method": "GET",
+      "path": "/api/docking/coordinator",
+      "mountPath": "/api/docking",
+      "routePath": "/coordinator",
+      "sourceFile": "server/routes/docking.ts",
+      "sourceLine": 691,
+      "mountSourceFile": "server/app/routes.ts",
+      "mountLine": 112
+    },
+    {
+      "method": "POST",
+      "path": "/api/docking/coordinator",
+      "mountPath": "/api/docking",
+      "routePath": "/coordinator",
+      "sourceFile": "server/routes/docking.ts",
+      "sourceLine": 749,
+      "mountSourceFile": "server/app/routes.ts",
+      "mountLine": 112
+    },
+    {
+      "method": "POST",
+      "path": "/api/docking/equipment/:id/citizen-anchor",
+      "mountPath": "/api/docking",
+      "routePath": "/equipment/:id/citizen-anchor",
+      "sourceFile": "server/routes/docking.ts",
+      "sourceLine": 322,
+      "mountSourceFile": "server/app/routes.ts",
+      "mountLine": 112
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/docking/equipment/:id/home",
+      "mountPath": "/api/docking",
+      "routePath": "/equipment/:id/home",
+      "sourceFile": "server/routes/docking.ts",
+      "sourceLine": 51,
+      "mountSourceFile": "server/app/routes.ts",
+      "mountLine": 112
+    },
+    {
+      "method": "POST",
+      "path": "/api/docking/equipment/:id/not-found-here",
+      "mountPath": "/api/docking",
+      "routePath": "/equipment/:id/not-found-here",
+      "sourceFile": "server/routes/docking.ts",
+      "sourceLine": 387,
+      "mountSourceFile": "server/app/routes.ts",
+      "mountLine": 112
+    },
+    {
+      "method": "POST",
+      "path": "/api/docking/equipment/home/bulk",
+      "mountPath": "/api/docking",
+      "routePath": "/equipment/home/bulk",
+      "sourceFile": "server/routes/docking.ts",
+      "sourceLine": 98,
+      "mountSourceFile": "server/app/routes.ts",
+      "mountLine": 112
+    },
+    {
+      "method": "GET",
+      "path": "/api/docking/reconciliation",
+      "mountPath": "/api/docking",
+      "routePath": "/reconciliation",
+      "sourceFile": "server/routes/docking.ts",
+      "sourceLine": 229,
+      "mountSourceFile": "server/app/routes.ts",
+      "mountLine": 112
+    },
+    {
+      "method": "GET",
+      "path": "/api/docking/rooms/:roomId/sweep",
+      "mountPath": "/api/docking",
+      "routePath": "/rooms/:roomId/sweep",
+      "sourceFile": "server/routes/docking.ts",
+      "sourceLine": 441,
+      "mountSourceFile": "server/app/routes.ts",
+      "mountLine": 112
+    },
+    {
+      "method": "POST",
+      "path": "/api/docking/rooms/:roomId/sweep",
+      "mountPath": "/api/docking",
+      "routePath": "/rooms/:roomId/sweep",
+      "sourceFile": "server/routes/docking.ts",
+      "sourceLine": 517,
+      "mountSourceFile": "server/app/routes.ts",
+      "mountLine": 112
     },
     {
       "method": "GET",
@@ -700,9 +1010,9 @@
       "mountPath": "/api",
       "routePath": "/docks",
       "sourceFile": "server/routes/equipment-operational-state.ts",
-      "sourceLine": 54,
+      "sourceLine": 76,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 80
+      "mountLine": 101
     },
     {
       "method": "POST",
@@ -710,9 +1020,9 @@
       "mountPath": "/api",
       "routePath": "/docks",
       "sourceFile": "server/routes/equipment-operational-state.ts",
-      "sourceLine": 41,
+      "sourceLine": 46,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 80
+      "mountLine": 101
     },
     {
       "method": "GET",
@@ -720,9 +1030,9 @@
       "mountPath": "/api/equipment",
       "routePath": "/",
       "sourceFile": "server/routes/equipment.ts",
-      "sourceLine": 235,
+      "sourceLine": 266,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 76
+      "mountLine": 94
     },
     {
       "method": "POST",
@@ -730,9 +1040,9 @@
       "mountPath": "/api/equipment",
       "routePath": "/",
       "sourceFile": "server/routes/equipment.ts",
-      "sourceLine": 256,
+      "sourceLine": 287,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 76
+      "mountLine": 94
     },
     {
       "method": "GET",
@@ -740,9 +1050,9 @@
       "mountPath": "/api",
       "routePath": "/equipment/:equipmentId/condition-states",
       "sourceFile": "server/routes/equipment-operational-state.ts",
-      "sourceLine": 602,
+      "sourceLine": 661,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 80
+      "mountLine": 101
     },
     {
       "method": "GET",
@@ -750,9 +1060,9 @@
       "mountPath": "/api",
       "routePath": "/equipment/:equipmentId/deployability",
       "sourceFile": "server/routes/equipment-operational-state.ts",
-      "sourceLine": 128,
+      "sourceLine": 162,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 80
+      "mountLine": 101
     },
     {
       "method": "POST",
@@ -760,9 +1070,9 @@
       "mountPath": "/api",
       "routePath": "/equipment/:equipmentId/dock-return",
       "sourceFile": "server/routes/equipment-operational-state.ts",
-      "sourceLine": 176,
+      "sourceLine": 210,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 80
+      "mountLine": 101
     },
     {
       "method": "DELETE",
@@ -770,9 +1080,9 @@
       "mountPath": "/api",
       "routePath": "/equipment/:equipmentId/procedure-bind",
       "sourceFile": "server/routes/equipment-operational-state.ts",
-      "sourceLine": 657,
+      "sourceLine": 716,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 80
+      "mountLine": 101
     },
     {
       "method": "POST",
@@ -780,9 +1090,9 @@
       "mountPath": "/api",
       "routePath": "/equipment/:equipmentId/procedure-bind",
       "sourceFile": "server/routes/equipment-operational-state.ts",
-      "sourceLine": 647,
+      "sourceLine": 706,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 80
+      "mountLine": 101
     },
     {
       "method": "POST",
@@ -790,9 +1100,9 @@
       "mountPath": "/api",
       "routePath": "/equipment/:equipmentId/stage",
       "sourceFile": "server/routes/equipment-operational-state.ts",
-      "sourceLine": 390,
+      "sourceLine": 449,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 80
+      "mountLine": 101
     },
     {
       "method": "DELETE",
@@ -800,9 +1110,9 @@
       "mountPath": "/api",
       "routePath": "/equipment/:equipmentId/stage/:claimId",
       "sourceFile": "server/routes/equipment-operational-state.ts",
-      "sourceLine": 497,
+      "sourceLine": 556,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 80
+      "mountLine": 101
     },
     {
       "method": "GET",
@@ -810,9 +1120,9 @@
       "mountPath": "/api",
       "routePath": "/equipment/:equipmentId/staging-queue",
       "sourceFile": "server/routes/equipment-operational-state.ts",
-      "sourceLine": 573,
+      "sourceLine": 632,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 80
+      "mountLine": 101
     },
     {
       "method": "DELETE",
@@ -820,9 +1130,9 @@
       "mountPath": "/api/equipment",
       "routePath": "/:id",
       "sourceFile": "server/routes/equipment.ts",
-      "sourceLine": 277,
+      "sourceLine": 308,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 76
+      "mountLine": 94
     },
     {
       "method": "GET",
@@ -830,9 +1140,9 @@
       "mountPath": "/api/equipment",
       "routePath": "/:id",
       "sourceFile": "server/routes/equipment.ts",
-      "sourceLine": 254,
+      "sourceLine": 285,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 76
+      "mountLine": 94
     },
     {
       "method": "PATCH",
@@ -840,9 +1150,9 @@
       "mountPath": "/api/equipment",
       "routePath": "/:id",
       "sourceFile": "server/routes/equipment.ts",
-      "sourceLine": 266,
+      "sourceLine": 297,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 76
+      "mountLine": 94
     },
     {
       "method": "POST",
@@ -850,9 +1160,9 @@
       "mountPath": "/api/equipment",
       "routePath": "/:id/checkout",
       "sourceFile": "server/routes/equipment.ts",
-      "sourceLine": 480,
+      "sourceLine": 491,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 76
+      "mountLine": 94
     },
     {
       "method": "POST",
@@ -860,9 +1170,9 @@
       "mountPath": "/api/equipment",
       "routePath": "/:id/confirm-in-room",
       "sourceFile": "server/routes/equipment.ts",
-      "sourceLine": 245,
+      "sourceLine": 276,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 76
+      "mountLine": 94
     },
     {
       "method": "POST",
@@ -872,7 +1182,27 @@
       "sourceFile": "server/routes/equipment-copilot.ts",
       "sourceLine": 30,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 77
+      "mountLine": 95
+    },
+    {
+      "method": "POST",
+      "path": "/api/equipment/:id/damage",
+      "mountPath": "/api/equipment",
+      "routePath": "/:id/damage",
+      "sourceFile": "server/routes/equipment-damage.ts",
+      "sourceLine": 24,
+      "mountSourceFile": "server/app/routes.ts",
+      "mountLine": 98
+    },
+    {
+      "method": "GET",
+      "path": "/api/equipment/:id/location-inference",
+      "mountPath": "/api/equipment",
+      "routePath": "/:id/location-inference",
+      "sourceFile": "server/routes/equipment-inference.ts",
+      "sourceLine": 8,
+      "mountSourceFile": "server/app/routes.ts",
+      "mountLine": 96
     },
     {
       "method": "GET",
@@ -880,9 +1210,9 @@
       "mountPath": "/api/equipment",
       "routePath": "/:id/logs",
       "sourceFile": "server/routes/equipment.ts",
-      "sourceLine": 1020,
+      "sourceLine": 1031,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 76
+      "mountLine": 94
     },
     {
       "method": "POST",
@@ -890,9 +1220,9 @@
       "mountPath": "/api/equipment",
       "routePath": "/:id/restore",
       "sourceFile": "server/routes/equipment.ts",
-      "sourceLine": 288,
+      "sourceLine": 319,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 76
+      "mountLine": 94
     },
     {
       "method": "POST",
@@ -900,9 +1230,9 @@
       "mountPath": "/api/equipment",
       "routePath": "/:id/return",
       "sourceFile": "server/routes/equipment.ts",
-      "sourceLine": 712,
+      "sourceLine": 723,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 76
+      "mountLine": 94
     },
     {
       "method": "POST",
@@ -910,9 +1240,9 @@
       "mountPath": "/api/equipment",
       "routePath": "/:id/revert",
       "sourceFile": "server/routes/equipment.ts",
-      "sourceLine": 1018,
+      "sourceLine": 1029,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 76
+      "mountLine": 94
     },
     {
       "method": "POST",
@@ -920,9 +1250,9 @@
       "mountPath": "/api/equipment",
       "routePath": "/:id/scan",
       "sourceFile": "server/routes/equipment.ts",
-      "sourceLine": 845,
+      "sourceLine": 856,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 76
+      "mountLine": 94
     },
     {
       "method": "POST",
@@ -930,9 +1260,9 @@
       "mountPath": "/api/equipment",
       "routePath": "/:id/seen",
       "sourceFile": "server/routes/equipment.ts",
-      "sourceLine": 798,
+      "sourceLine": 809,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 76
+      "mountLine": 94
     },
     {
       "method": "POST",
@@ -940,9 +1270,9 @@
       "mountPath": "/api/equipment",
       "routePath": "/:id/toggle",
       "sourceFile": "server/routes/equipment.ts",
-      "sourceLine": 374,
+      "sourceLine": 407,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 76
+      "mountLine": 94
     },
     {
       "method": "GET",
@@ -950,9 +1280,9 @@
       "mountPath": "/api/equipment",
       "routePath": "/:id/transfers",
       "sourceFile": "server/routes/equipment.ts",
-      "sourceLine": 1022,
+      "sourceLine": 1033,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 76
+      "mountLine": 94
     },
     {
       "method": "GET",
@@ -960,9 +1290,9 @@
       "mountPath": "/api/equipment",
       "routePath": "/:id/truth",
       "sourceFile": "server/routes/equipment.ts",
-      "sourceLine": 243,
+      "sourceLine": 274,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 76
+      "mountLine": 94
     },
     {
       "method": "POST",
@@ -970,9 +1300,9 @@
       "mountPath": "/api/equipment",
       "routePath": "/bulk-delete",
       "sourceFile": "server/routes/equipment.ts",
-      "sourceLine": 1028,
+      "sourceLine": 1039,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 76
+      "mountLine": 94
     },
     {
       "method": "POST",
@@ -980,9 +1310,9 @@
       "mountPath": "/api/equipment",
       "routePath": "/bulk-move",
       "sourceFile": "server/routes/equipment.ts",
-      "sourceLine": 1030,
+      "sourceLine": 1041,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 76
+      "mountLine": 94
     },
     {
       "method": "POST",
@@ -990,9 +1320,9 @@
       "mountPath": "/api/equipment",
       "routePath": "/bulk-verify-room",
       "sourceFile": "server/routes/equipment.ts",
-      "sourceLine": 1033,
+      "sourceLine": 1044,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 76
+      "mountLine": 94
     },
     {
       "method": "GET",
@@ -1000,9 +1330,9 @@
       "mountPath": "/api/equipment",
       "routePath": "/critical",
       "sourceFile": "server/routes/equipment.ts",
-      "sourceLine": 241,
+      "sourceLine": 272,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 76
+      "mountLine": 94
     },
     {
       "method": "GET",
@@ -1010,9 +1340,9 @@
       "mountPath": "/api/equipment",
       "routePath": "/deleted",
       "sourceFile": "server/routes/equipment.ts",
-      "sourceLine": 238,
+      "sourceLine": 269,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 76
+      "mountLine": 94
     },
     {
       "method": "POST",
@@ -1020,9 +1350,19 @@
       "mountPath": "/api/equipment",
       "routePath": "/import",
       "sourceFile": "server/routes/equipment.ts",
-      "sourceLine": 1026,
+      "sourceLine": 1037,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 76
+      "mountLine": 94
+    },
+    {
+      "method": "GET",
+      "path": "/api/equipment/locate",
+      "mountPath": "/api/equipment",
+      "routePath": "/locate",
+      "sourceFile": "server/routes/equipment-locate.ts",
+      "sourceLine": 19,
+      "mountSourceFile": "server/app/routes.ts",
+      "mountLine": 91
     },
     {
       "method": "GET",
@@ -1030,9 +1370,9 @@
       "mountPath": "/api/equipment",
       "routePath": "/my",
       "sourceFile": "server/routes/equipment.ts",
-      "sourceLine": 233,
+      "sourceLine": 264,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 76
+      "mountLine": 94
     },
     {
       "method": "POST",
@@ -1040,9 +1380,9 @@
       "mountPath": "/api/equipment",
       "routePath": "/scan",
       "sourceFile": "server/routes/equipment.ts",
-      "sourceLine": 293,
+      "sourceLine": 324,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 76
+      "mountLine": 94
     },
     {
       "method": "GET",
@@ -1052,7 +1392,7 @@
       "sourceFile": "server/routes/folders.ts",
       "sourceLine": 14,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 83
+      "mountLine": 104
     },
     {
       "method": "POST",
@@ -1062,7 +1402,7 @@
       "sourceFile": "server/routes/folders.ts",
       "sourceLine": 61,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 83
+      "mountLine": 104
     },
     {
       "method": "DELETE",
@@ -1072,7 +1412,7 @@
       "sourceFile": "server/routes/folders.ts",
       "sourceLine": 171,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 83
+      "mountLine": 104
     },
     {
       "method": "PATCH",
@@ -1082,7 +1422,7 @@
       "sourceFile": "server/routes/folders.ts",
       "sourceLine": 107,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 83
+      "mountLine": 104
     },
     {
       "method": "GET",
@@ -1092,7 +1432,7 @@
       "sourceFile": "server/routes/health.ts",
       "sourceLine": 118,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 68
+      "mountLine": 83
     },
     {
       "method": "GET",
@@ -1102,7 +1442,7 @@
       "sourceFile": "server/routes/health.ts",
       "sourceLine": 178,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 68
+      "mountLine": 83
     },
     {
       "method": "GET",
@@ -1112,7 +1452,7 @@
       "sourceFile": "server/routes/health.ts",
       "sourceLine": 14,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 68
+      "mountLine": 83
     },
     {
       "method": "GET",
@@ -1122,7 +1462,7 @@
       "sourceFile": "server/routes/health.ts",
       "sourceLine": 118,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 69
+      "mountLine": 84
     },
     {
       "method": "GET",
@@ -1132,7 +1472,7 @@
       "sourceFile": "server/routes/health.ts",
       "sourceLine": 178,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 69
+      "mountLine": 84
     },
     {
       "method": "GET",
@@ -1142,7 +1482,7 @@
       "sourceFile": "server/routes/health.ts",
       "sourceLine": 14,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 69
+      "mountLine": 84
     },
     {
       "method": "GET",
@@ -1152,7 +1492,7 @@
       "sourceFile": "server/routes/health.ts",
       "sourceLine": 18,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 69
+      "mountLine": 84
     },
     {
       "method": "GET",
@@ -1162,7 +1502,7 @@
       "sourceFile": "server/routes/health.ts",
       "sourceLine": 18,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 68
+      "mountLine": 83
     },
     {
       "method": "GET",
@@ -1170,9 +1510,9 @@
       "mountPath": "/api/home",
       "routePath": "/dashboard",
       "sourceFile": "server/routes/home-dashboard.ts",
-      "sourceLine": 16,
+      "sourceLine": 27,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 87
+      "mountLine": 108
     },
     {
       "method": "POST",
@@ -1182,7 +1522,7 @@
       "sourceFile": "server/integrations/webhooks/inbound.router.ts",
       "sourceLine": 58,
       "mountSourceFile": "server/index.ts",
-      "mountLine": 235
+      "mountLine": 256
     },
     {
       "method": "GET",
@@ -1192,7 +1532,7 @@
       "sourceFile": "server/routes/integrations.ts",
       "sourceLine": 202,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 66
+      "mountLine": 81
     },
     {
       "method": "GET",
@@ -1202,7 +1542,7 @@
       "sourceFile": "server/routes/integrations.ts",
       "sourceLine": 187,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 66
+      "mountLine": 81
     },
     {
       "method": "GET",
@@ -1212,7 +1552,7 @@
       "sourceFile": "server/routes/integrations.ts",
       "sourceLine": 88,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 66
+      "mountLine": 81
     },
     {
       "method": "GET",
@@ -1222,7 +1562,7 @@
       "sourceFile": "server/routes/integrations.ts",
       "sourceLine": 216,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 66
+      "mountLine": 81
     },
     {
       "method": "POST",
@@ -1232,7 +1572,7 @@
       "sourceFile": "server/routes/integrations.ts",
       "sourceLine": 243,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 66
+      "mountLine": 81
     },
     {
       "method": "DELETE",
@@ -1242,7 +1582,7 @@
       "sourceFile": "server/routes/integrations.ts",
       "sourceLine": 392,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 66
+      "mountLine": 81
     },
     {
       "method": "GET",
@@ -1252,7 +1592,7 @@
       "sourceFile": "server/routes/integrations.ts",
       "sourceLine": 317,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 66
+      "mountLine": 81
     },
     {
       "method": "PATCH",
@@ -1262,7 +1602,7 @@
       "sourceFile": "server/routes/integrations.ts",
       "sourceLine": 348,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 66
+      "mountLine": 81
     },
     {
       "method": "POST",
@@ -1272,7 +1612,7 @@
       "sourceFile": "server/routes/integrations.ts",
       "sourceLine": 422,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 66
+      "mountLine": 81
     },
     {
       "method": "GET",
@@ -1282,7 +1622,7 @@
       "sourceFile": "server/routes/integrations.ts",
       "sourceLine": 684,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 66
+      "mountLine": 81
     },
     {
       "method": "POST",
@@ -1292,7 +1632,7 @@
       "sourceFile": "server/routes/integrations.ts",
       "sourceLine": 635,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 66
+      "mountLine": 81
     },
     {
       "method": "POST",
@@ -1302,7 +1642,7 @@
       "sourceFile": "server/routes/integrations.ts",
       "sourceLine": 579,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 66
+      "mountLine": 81
     },
     {
       "method": "POST",
@@ -1312,7 +1652,7 @@
       "sourceFile": "server/routes/integrations.ts",
       "sourceLine": 508,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 66
+      "mountLine": 81
     },
     {
       "method": "POST",
@@ -1322,7 +1662,7 @@
       "sourceFile": "server/routes/integrations.ts",
       "sourceLine": 460,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 66
+      "mountLine": 81
     },
     {
       "method": "GET",
@@ -1332,7 +1672,7 @@
       "sourceFile": "server/routes/integrations.ts",
       "sourceLine": 79,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 66
+      "mountLine": 81
     },
     {
       "method": "GET",
@@ -1342,7 +1682,7 @@
       "sourceFile": "server/routes/integrations.ts",
       "sourceLine": 194,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 66
+      "mountLine": 81
     },
     {
       "method": "PATCH",
@@ -1352,7 +1692,7 @@
       "sourceFile": "server/routes/integrations.ts",
       "sourceLine": 132,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 66
+      "mountLine": 81
     },
     {
       "method": "GET",
@@ -1362,7 +1702,7 @@
       "sourceFile": "server/routes/integrations.ts",
       "sourceLine": 112,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 66
+      "mountLine": 81
     },
     {
       "method": "POST",
@@ -1372,7 +1712,7 @@
       "sourceFile": "server/integrations/routes/ops.routes.ts",
       "sourceLine": 58,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 66
+      "mountLine": 81
     },
     {
       "method": "POST",
@@ -1382,7 +1722,7 @@
       "sourceFile": "server/integrations/routes/ops.routes.ts",
       "sourceLine": 208,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 66
+      "mountLine": 81
     },
     {
       "method": "POST",
@@ -1392,7 +1732,7 @@
       "sourceFile": "server/integrations/routes/ops.routes.ts",
       "sourceLine": 141,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 66
+      "mountLine": 81
     },
     {
       "method": "GET",
@@ -1402,7 +1742,7 @@
       "sourceFile": "server/routes/integrations.ts",
       "sourceLine": 155,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 66
+      "mountLine": 81
     },
     {
       "method": "GET",
@@ -1410,9 +1750,9 @@
       "mountPath": "/api/inventory-items",
       "routePath": "/",
       "sourceFile": "server/routes/inventory-items.ts",
-      "sourceLine": 43,
+      "sourceLine": 59,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 116
+      "mountLine": 144
     },
     {
       "method": "POST",
@@ -1420,9 +1760,9 @@
       "mountPath": "/api/inventory-items",
       "routePath": "/",
       "sourceFile": "server/routes/inventory-items.ts",
-      "sourceLine": 69,
+      "sourceLine": 178,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 116
+      "mountLine": 144
     },
     {
       "method": "PATCH",
@@ -1430,9 +1770,9 @@
       "mountPath": "/api/inventory-items",
       "routePath": "/:id",
       "sourceFile": "server/routes/inventory-items.ts",
-      "sourceLine": 122,
+      "sourceLine": 237,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 116
+      "mountLine": 144
     },
     {
       "method": "PATCH",
@@ -1440,9 +1780,19 @@
       "mountPath": "/api/inventory-items",
       "routePath": "/:id/deactivate",
       "sourceFile": "server/routes/inventory-items.ts",
-      "sourceLine": 174,
+      "sourceLine": 291,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 116
+      "mountLine": 144
+    },
+    {
+      "method": "GET",
+      "path": "/api/inventory-items/:id/detail",
+      "mountPath": "/api/inventory-items",
+      "routePath": "/:id/detail",
+      "sourceFile": "server/routes/inventory-items.ts",
+      "sourceLine": 103,
+      "mountSourceFile": "server/app/routes.ts",
+      "mountLine": 144
     },
     {
       "method": "GET",
@@ -1450,9 +1800,9 @@
       "mountPath": "/api/inventory-items",
       "routePath": "/:id/prices",
       "sourceFile": "server/routes/inventory-items.ts",
-      "sourceLine": 270,
+      "sourceLine": 388,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 116
+      "mountLine": 144
     },
     {
       "method": "POST",
@@ -1460,9 +1810,19 @@
       "mountPath": "/api/inventory-items",
       "routePath": "/:id/prices",
       "sourceFile": "server/routes/inventory-items.ts",
-      "sourceLine": 213,
+      "sourceLine": 330,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 116
+      "mountLine": 144
+    },
+    {
+      "method": "GET",
+      "path": "/api/inventory-items/low-stock",
+      "mountPath": "/api/inventory-items",
+      "routePath": "/low-stock",
+      "sourceFile": "server/routes/inventory-items.ts",
+      "sourceLine": 88,
+      "mountSourceFile": "server/app/routes.ts",
+      "mountLine": 144
     },
     {
       "method": "GET",
@@ -1472,7 +1832,17 @@
       "sourceFile": "server/routes/metrics.ts",
       "sourceLine": 19,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 60
+      "mountLine": 75
+    },
+    {
+      "method": "GET",
+      "path": "/api/nudges",
+      "mountPath": "/api/nudges",
+      "routePath": "/",
+      "sourceFile": "server/routes/nudges.ts",
+      "sourceLine": 14,
+      "mountSourceFile": "server/app/routes.ts",
+      "mountLine": 145
     },
     {
       "method": "GET",
@@ -1482,7 +1852,7 @@
       "sourceFile": "server/routes/operational-metrics.ts",
       "sourceLine": 16,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 81
+      "mountLine": 102
     },
     {
       "method": "GET",
@@ -1492,7 +1862,7 @@
       "sourceFile": "server/routes/platform-capabilities.ts",
       "sourceLine": 7,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 106
+      "mountLine": 133
     },
     {
       "method": "GET",
@@ -1502,7 +1872,7 @@
       "sourceFile": "server/routes/procurement.ts",
       "sourceLine": 44,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 117
+      "mountLine": 146
     },
     {
       "method": "POST",
@@ -1512,7 +1882,7 @@
       "sourceFile": "server/routes/procurement.ts",
       "sourceLine": 132,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 117
+      "mountLine": 146
     },
     {
       "method": "GET",
@@ -1522,7 +1892,7 @@
       "sourceFile": "server/routes/procurement.ts",
       "sourceLine": 96,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 117
+      "mountLine": 146
     },
     {
       "method": "PATCH",
@@ -1530,9 +1900,9 @@
       "mountPath": "/api/procurement",
       "routePath": "/:id/cancel",
       "sourceFile": "server/routes/procurement.ts",
-      "sourceLine": 423,
+      "sourceLine": 456,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 117
+      "mountLine": 146
     },
     {
       "method": "PATCH",
@@ -1540,9 +1910,9 @@
       "mountPath": "/api/procurement",
       "routePath": "/:id/receive",
       "sourceFile": "server/routes/procurement.ts",
-      "sourceLine": 248,
+      "sourceLine": 243,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 117
+      "mountLine": 146
     },
     {
       "method": "PATCH",
@@ -1552,7 +1922,7 @@
       "sourceFile": "server/routes/procurement.ts",
       "sourceLine": 201,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 117
+      "mountLine": 146
     },
     {
       "method": "DELETE",
@@ -1560,9 +1930,9 @@
       "mountPath": "/api/push",
       "routePath": "/subscribe",
       "sourceFile": "server/routes/push.ts",
-      "sourceLine": 249,
+      "sourceLine": 314,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 63
+      "mountLine": 78
     },
     {
       "method": "PATCH",
@@ -1570,9 +1940,9 @@
       "mountPath": "/api/push",
       "routePath": "/subscribe",
       "sourceFile": "server/routes/push.ts",
-      "sourceLine": 203,
+      "sourceLine": 261,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 63
+      "mountLine": 78
     },
     {
       "method": "POST",
@@ -1580,9 +1950,9 @@
       "mountPath": "/api/push",
       "routePath": "/subscribe",
       "sourceFile": "server/routes/push.ts",
-      "sourceLine": 71,
+      "sourceLine": 88,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 63
+      "mountLine": 78
     },
     {
       "method": "POST",
@@ -1590,9 +1960,9 @@
       "mountPath": "/api/push",
       "routePath": "/test",
       "sourceFile": "server/routes/push.ts",
-      "sourceLine": 279,
+      "sourceLine": 351,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 63
+      "mountLine": 78
     },
     {
       "method": "GET",
@@ -1600,9 +1970,9 @@
       "mountPath": "/api/push",
       "routePath": "/vapid-public-key",
       "sourceFile": "server/routes/push.ts",
-      "sourceLine": 55,
+      "sourceLine": 69,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 63
+      "mountLine": 78
     },
     {
       "method": "GET",
@@ -1612,7 +1982,7 @@
       "sourceFile": "server/routes/queue.ts",
       "sourceLine": 94,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 59
+      "mountLine": 74
     },
     {
       "method": "POST",
@@ -1622,7 +1992,7 @@
       "sourceFile": "server/routes/queue.ts",
       "sourceLine": 127,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 59
+      "mountLine": 74
     },
     {
       "method": "GET",
@@ -1632,7 +2002,7 @@
       "sourceFile": "server/routes/queue.ts",
       "sourceLine": 17,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 59
+      "mountLine": 74
     },
     {
       "method": "GET",
@@ -1640,9 +2010,9 @@
       "mountPath": "/api/realtime",
       "routePath": "/",
       "sourceFile": "server/routes/realtime.ts",
-      "sourceLine": 662,
+      "sourceLine": 819,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 58
+      "mountLine": 73
     },
     {
       "method": "GET",
@@ -1650,9 +2020,9 @@
       "mountPath": "/api/realtime",
       "routePath": "/outbox-head",
       "sourceFile": "server/routes/realtime.ts",
-      "sourceLine": 212,
+      "sourceLine": 309,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 58
+      "mountLine": 73
     },
     {
       "method": "GET",
@@ -1660,9 +2030,9 @@
       "mountPath": "/api/realtime",
       "routePath": "/replay",
       "sourceFile": "server/routes/realtime.ts",
-      "sourceLine": 129,
+      "sourceLine": 226,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 58
+      "mountLine": 73
     },
     {
       "method": "GET",
@@ -1670,9 +2040,9 @@
       "mountPath": "/api/realtime",
       "routePath": "/stream",
       "sourceFile": "server/routes/realtime.ts",
-      "sourceLine": 573,
+      "sourceLine": 721,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 58
+      "mountLine": 73
     },
     {
       "method": "POST",
@@ -1680,9 +2050,9 @@
       "mountPath": "/api/realtime",
       "routePath": "/telemetry",
       "sourceFile": "server/routes/realtime.ts",
-      "sourceLine": 349,
+      "sourceLine": 467,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 58
+      "mountLine": 73
     },
     {
       "method": "POST",
@@ -1690,9 +2060,9 @@
       "mountPath": "/api/restock",
       "routePath": "/cancel",
       "sourceFile": "server/routes/restock.ts",
-      "sourceLine": 250,
+      "sourceLine": 273,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 115
+      "mountLine": 143
     },
     {
       "method": "POST",
@@ -1700,9 +2070,9 @@
       "mountPath": "/api/restock",
       "routePath": "/container-items",
       "sourceFile": "server/routes/restock.ts",
-      "sourceLine": 271,
+      "sourceLine": 294,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 115
+      "mountLine": 143
     },
     {
       "method": "POST",
@@ -1710,9 +2080,9 @@
       "mountPath": "/api/restock",
       "routePath": "/finish",
       "sourceFile": "server/routes/restock.ts",
-      "sourceLine": 229,
+      "sourceLine": 252,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 115
+      "mountLine": 143
     },
     {
       "method": "POST",
@@ -1720,9 +2090,19 @@
       "mountPath": "/api/restock",
       "routePath": "/scan",
       "sourceFile": "server/routes/restock.ts",
-      "sourceLine": 187,
+      "sourceLine": 210,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 115
+      "mountLine": 143
+    },
+    {
+      "method": "GET",
+      "path": "/api/restock/sessions",
+      "mountPath": "/api/restock",
+      "routePath": "/sessions",
+      "sourceFile": "server/routes/restock.ts",
+      "sourceLine": 28,
+      "mountSourceFile": "server/app/routes.ts",
+      "mountLine": 143
     },
     {
       "method": "POST",
@@ -1730,9 +2110,9 @@
       "mountPath": "/api/restock",
       "routePath": "/start",
       "sourceFile": "server/routes/restock.ts",
-      "sourceLine": 166,
+      "sourceLine": 189,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 115
+      "mountLine": 143
     },
     {
       "method": "POST",
@@ -1742,7 +2122,7 @@
       "sourceFile": "server/routes/returns.ts",
       "sourceLine": 52,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 84
+      "mountLine": 105
     },
     {
       "method": "PATCH",
@@ -1752,7 +2132,7 @@
       "sourceFile": "server/routes/returns.ts",
       "sourceLine": 134,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 84
+      "mountLine": 105
     },
     {
       "method": "GET",
@@ -1760,9 +2140,9 @@
       "mountPath": "/api/rooms",
       "routePath": "/",
       "sourceFile": "server/routes/rooms.ts",
-      "sourceLine": 40,
+      "sourceLine": 97,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 82
+      "mountLine": 103
     },
     {
       "method": "POST",
@@ -1770,9 +2150,9 @@
       "mountPath": "/api/rooms",
       "routePath": "/",
       "sourceFile": "server/routes/rooms.ts",
-      "sourceLine": 214,
+      "sourceLine": 340,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 82
+      "mountLine": 103
     },
     {
       "method": "DELETE",
@@ -1780,9 +2160,9 @@
       "mountPath": "/api/rooms",
       "routePath": "/:id",
       "sourceFile": "server/routes/rooms.ts",
-      "sourceLine": 359,
+      "sourceLine": 485,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 82
+      "mountLine": 103
     },
     {
       "method": "GET",
@@ -1790,9 +2170,9 @@
       "mountPath": "/api/rooms",
       "routePath": "/:id",
       "sourceFile": "server/routes/rooms.ts",
-      "sourceLine": 101,
+      "sourceLine": 216,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 82
+      "mountLine": 103
     },
     {
       "method": "PATCH",
@@ -1800,9 +2180,9 @@
       "mountPath": "/api/rooms",
       "routePath": "/:id",
       "sourceFile": "server/routes/rooms.ts",
-      "sourceLine": 279,
+      "sourceLine": 405,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 82
+      "mountLine": 103
     },
     {
       "method": "GET",
@@ -1810,9 +2190,49 @@
       "mountPath": "/api/rooms",
       "routePath": "/:id/activity",
       "sourceFile": "server/routes/rooms.ts",
-      "sourceLine": 162,
+      "sourceLine": 288,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 82
+      "mountLine": 103
+    },
+    {
+      "method": "GET",
+      "path": "/api/shift-adjustments",
+      "mountPath": "/api/shift-adjustments",
+      "routePath": "/",
+      "sourceFile": "server/routes/shift-adjustments.ts",
+      "sourceLine": 145,
+      "mountSourceFile": "server/app/routes.ts",
+      "mountLine": 139
+    },
+    {
+      "method": "POST",
+      "path": "/api/shift-adjustments",
+      "mountPath": "/api/shift-adjustments",
+      "routePath": "/",
+      "sourceFile": "server/routes/shift-adjustments.ts",
+      "sourceLine": 28,
+      "mountSourceFile": "server/app/routes.ts",
+      "mountLine": 139
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/shift-adjustments/:id",
+      "mountPath": "/api/shift-adjustments",
+      "routePath": "/:id",
+      "sourceFile": "server/routes/shift-adjustments.ts",
+      "sourceLine": 183,
+      "mountSourceFile": "server/app/routes.ts",
+      "mountLine": 139
+    },
+    {
+      "method": "POST",
+      "path": "/api/shift-adjustments/:id/cancel",
+      "mountPath": "/api/shift-adjustments",
+      "routePath": "/:id/cancel",
+      "sourceFile": "server/routes/shift-adjustments.ts",
+      "sourceLine": 257,
+      "mountSourceFile": "server/app/routes.ts",
+      "mountLine": 139
     },
     {
       "method": "GET",
@@ -1820,9 +2240,9 @@
       "mountPath": "/api/shift-chat",
       "routePath": "/archive/:shiftId",
       "sourceFile": "server/routes/shift-chat.ts",
-      "sourceLine": 546,
+      "sourceLine": 554,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 120
+      "mountLine": 153
     },
     {
       "method": "GET",
@@ -1830,9 +2250,9 @@
       "mountPath": "/api/shift-chat",
       "routePath": "/messages",
       "sourceFile": "server/routes/shift-chat.ts",
-      "sourceLine": 43,
+      "sourceLine": 53,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 120
+      "mountLine": 153
     },
     {
       "method": "POST",
@@ -1840,9 +2260,9 @@
       "mountPath": "/api/shift-chat",
       "routePath": "/messages",
       "sourceFile": "server/routes/shift-chat.ts",
-      "sourceLine": 163,
+      "sourceLine": 172,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 120
+      "mountLine": 153
     },
     {
       "method": "POST",
@@ -1850,9 +2270,9 @@
       "mountPath": "/api/shift-chat",
       "routePath": "/messages/:id/ack",
       "sourceFile": "server/routes/shift-chat.ts",
-      "sourceLine": 300,
+      "sourceLine": 309,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 120
+      "mountLine": 153
     },
     {
       "method": "POST",
@@ -1860,9 +2280,9 @@
       "mountPath": "/api/shift-chat",
       "routePath": "/messages/:id/pin",
       "sourceFile": "server/routes/shift-chat.ts",
-      "sourceLine": 394,
+      "sourceLine": 403,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 120
+      "mountLine": 153
     },
     {
       "method": "POST",
@@ -1870,9 +2290,9 @@
       "mountPath": "/api/shift-chat",
       "routePath": "/reactions",
       "sourceFile": "server/routes/shift-chat.ts",
-      "sourceLine": 461,
+      "sourceLine": 469,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 120
+      "mountLine": 153
     },
     {
       "method": "POST",
@@ -1880,9 +2300,39 @@
       "mountPath": "/api/shift-chat",
       "routePath": "/typing",
       "sourceFile": "server/routes/shift-chat.ts",
-      "sourceLine": 582,
+      "sourceLine": 636,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 120
+      "mountLine": 153
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/shift-handover/:id/acknowledge",
+      "mountPath": "/api/shift-handover",
+      "routePath": "/:id/acknowledge",
+      "sourceFile": "server/routes/shift-handover.ts",
+      "sourceLine": 73,
+      "mountSourceFile": "server/app/routes.ts",
+      "mountLine": 154
+    },
+    {
+      "method": "POST",
+      "path": "/api/shift-handover/:id/acknowledge",
+      "mountPath": "/api/shift-handover",
+      "routePath": "/:id/acknowledge",
+      "sourceFile": "server/routes/shift-handover.ts",
+      "sourceLine": 55,
+      "mountSourceFile": "server/app/routes.ts",
+      "mountLine": 154
+    },
+    {
+      "method": "GET",
+      "path": "/api/shift-handover/current",
+      "mountPath": "/api/shift-handover",
+      "routePath": "/current",
+      "sourceFile": "server/routes/shift-handover.ts",
+      "sourceLine": 44,
+      "mountSourceFile": "server/app/routes.ts",
+      "mountLine": 154
     },
     {
       "method": "GET",
@@ -1890,9 +2340,9 @@
       "mountPath": "/api/shifts",
       "routePath": "/",
       "sourceFile": "server/routes/shifts.ts",
-      "sourceLine": 784,
+      "sourceLine": 954,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 111
+      "mountLine": 138
     },
     {
       "method": "POST",
@@ -1900,9 +2350,9 @@
       "mountPath": "/api/shifts",
       "routePath": "/import",
       "sourceFile": "server/routes/shifts.ts",
-      "sourceLine": 657,
+      "sourceLine": 822,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 111
+      "mountLine": 138
     },
     {
       "method": "POST",
@@ -1910,9 +2360,9 @@
       "mountPath": "/api/shifts",
       "routePath": "/import/confirm",
       "sourceFile": "server/routes/shifts.ts",
-      "sourceLine": 544,
+      "sourceLine": 642,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 111
+      "mountLine": 138
     },
     {
       "method": "POST",
@@ -1920,9 +2370,19 @@
       "mountPath": "/api/shifts",
       "routePath": "/import/preview",
       "sourceFile": "server/routes/shifts.ts",
-      "sourceLine": 505,
+      "sourceLine": 577,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 111
+      "mountLine": 138
+    },
+    {
+      "method": "GET",
+      "path": "/api/shifts/import/shift-names",
+      "mountPath": "/api/shifts",
+      "routePath": "/import/shift-names",
+      "sourceFile": "server/routes/shifts.ts",
+      "sourceLine": 569,
+      "mountSourceFile": "server/app/routes.ts",
+      "mountLine": 138
     },
     {
       "method": "GET",
@@ -1930,79 +2390,9 @@
       "mountPath": "/api/shifts",
       "routePath": "/imports",
       "sourceFile": "server/routes/shifts.ts",
-      "sourceLine": 471,
+      "sourceLine": 529,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 111
-    },
-    {
-      "method": "DELETE",
-      "path": "/api/stability/logs",
-      "mountPath": "/api/stability",
-      "routePath": "/logs",
-      "sourceFile": "server/routes/stability.ts",
-      "sourceLine": 68,
-      "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 102
-    },
-    {
-      "method": "GET",
-      "path": "/api/stability/logs",
-      "mountPath": "/api/stability",
-      "routePath": "/logs",
-      "sourceFile": "server/routes/stability.ts",
-      "sourceLine": 62,
-      "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 102
-    },
-    {
-      "method": "GET",
-      "path": "/api/stability/results",
-      "mountPath": "/api/stability",
-      "routePath": "/results",
-      "sourceFile": "server/routes/stability.ts",
-      "sourceLine": 58,
-      "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 102
-    },
-    {
-      "method": "POST",
-      "path": "/api/stability/run",
-      "mountPath": "/api/stability",
-      "routePath": "/run",
-      "sourceFile": "server/routes/stability.ts",
-      "sourceLine": 40,
-      "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 102
-    },
-    {
-      "method": "POST",
-      "path": "/api/stability/schedule",
-      "mountPath": "/api/stability",
-      "routePath": "/schedule",
-      "sourceFile": "server/routes/stability.ts",
-      "sourceLine": 91,
-      "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 102
-    },
-    {
-      "method": "GET",
-      "path": "/api/stability/status",
-      "mountPath": "/api/stability",
-      "routePath": "/status",
-      "sourceFile": "server/routes/stability.ts",
-      "sourceLine": 28,
-      "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 102
-    },
-    {
-      "method": "POST",
-      "path": "/api/stability/test-mode",
-      "mountPath": "/api/stability",
-      "routePath": "/test-mode",
-      "sourceFile": "server/routes/stability.ts",
-      "sourceLine": 74,
-      "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 102
+      "mountLine": 138
     },
     {
       "method": "POST",
@@ -2012,7 +2402,7 @@
       "sourceFile": "server/routes/storage.ts",
       "sourceLine": 41,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 61
+      "mountLine": 76
     },
     {
       "method": "GET",
@@ -2022,7 +2412,7 @@
       "sourceFile": "server/routes/support.ts",
       "sourceLine": 101,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 64
+      "mountLine": 79
     },
     {
       "method": "POST",
@@ -2032,7 +2422,7 @@
       "sourceFile": "server/routes/support.ts",
       "sourceLine": 45,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 64
+      "mountLine": 79
     },
     {
       "method": "PATCH",
@@ -2042,7 +2432,7 @@
       "sourceFile": "server/routes/support.ts",
       "sourceLine": 148,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 64
+      "mountLine": 79
     },
     {
       "method": "GET",
@@ -2052,7 +2442,7 @@
       "sourceFile": "server/routes/support.ts",
       "sourceLine": 125,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 64
+      "mountLine": 79
     },
     {
       "method": "POST",
@@ -2062,7 +2452,7 @@
       "sourceFile": "server/routes/tasks.ts",
       "sourceLine": 147,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 113
+      "mountLine": 141
     },
     {
       "method": "POST",
@@ -2072,7 +2462,7 @@
       "sourceFile": "server/routes/tasks.ts",
       "sourceLine": 97,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 113
+      "mountLine": 141
     },
     {
       "method": "GET",
@@ -2082,7 +2472,7 @@
       "sourceFile": "server/routes/tasks.ts",
       "sourceLine": 227,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 113
+      "mountLine": 141
     },
     {
       "method": "GET",
@@ -2092,7 +2482,7 @@
       "sourceFile": "server/routes/tasks.ts",
       "sourceLine": 57,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 113
+      "mountLine": 141
     },
     {
       "method": "GET",
@@ -2102,7 +2492,7 @@
       "sourceFile": "server/routes/tasks.ts",
       "sourceLine": 197,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 113
+      "mountLine": 141
     },
     {
       "method": "GET",
@@ -2112,7 +2502,7 @@
       "sourceFile": "server/routes/tasks.ts",
       "sourceLine": 247,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 113
+      "mountLine": 141
     },
     {
       "method": "POST",
@@ -2122,7 +2512,7 @@
       "sourceFile": "server/routes/test.ts",
       "sourceLine": 158,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 67
+      "mountLine": 82
     },
     {
       "method": "POST",
@@ -2132,7 +2522,7 @@
       "sourceFile": "server/routes/test.ts",
       "sourceLine": 43,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 67
+      "mountLine": 82
     },
     {
       "method": "POST",
@@ -2142,7 +2532,7 @@
       "sourceFile": "server/routes/test.ts",
       "sourceLine": 135,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 67
+      "mountLine": 82
     },
     {
       "method": "GET",
@@ -2152,7 +2542,7 @@
       "sourceFile": "server/routes/test.ts",
       "sourceLine": 114,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 67
+      "mountLine": 82
     },
     {
       "method": "GET",
@@ -2162,7 +2552,7 @@
       "sourceFile": "server/routes/test.ts",
       "sourceLine": 178,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 67
+      "mountLine": 82
     },
     {
       "method": "POST",
@@ -2172,7 +2562,17 @@
       "sourceFile": "server/routes/test.ts",
       "sourceLine": 36,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 67
+      "mountLine": 82
+    },
+    {
+      "method": "POST",
+      "path": "/api/uploads/avatar",
+      "mountPath": "/api/uploads",
+      "routePath": "/avatar",
+      "sourceFile": "server/routes/uploads.ts",
+      "sourceLine": 127,
+      "mountSourceFile": "server/app/routes.ts",
+      "mountLine": 77
     },
     {
       "method": "POST",
@@ -2180,9 +2580,9 @@
       "mountPath": "/api/uploads",
       "routePath": "/fault-image",
       "sourceFile": "server/routes/uploads.ts",
-      "sourceLine": 39,
+      "sourceLine": 69,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 62
+      "mountLine": 77
     },
     {
       "method": "GET",
@@ -2190,9 +2590,9 @@
       "mountPath": "/api/users",
       "routePath": "/",
       "sourceFile": "server/routes/users.ts",
-      "sourceLine": 179,
+      "sourceLine": 242,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 57
+      "mountLine": 70
     },
     {
       "method": "PATCH",
@@ -2200,9 +2600,9 @@
       "mountPath": "/api/users",
       "routePath": "/:id/delete",
       "sourceFile": "server/routes/users.ts",
-      "sourceLine": 543,
+      "sourceLine": 804,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 57
+      "mountLine": 70
     },
     {
       "method": "PATCH",
@@ -2210,9 +2610,19 @@
       "mountPath": "/api/users",
       "routePath": "/:id/display_name",
       "sourceFile": "server/routes/users.ts",
-      "sourceLine": 460,
+      "sourceLine": 721,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 57
+      "mountLine": 70
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/users/:id/equipment-coordinator",
+      "mountPath": "/api/users",
+      "routePath": "/:id/equipment-coordinator",
+      "sourceFile": "server/routes/users.ts",
+      "sourceLine": 490,
+      "mountSourceFile": "server/app/routes.ts",
+      "mountLine": 70
     },
     {
       "method": "PATCH",
@@ -2220,9 +2630,9 @@
       "mountPath": "/api/users",
       "routePath": "/:id/restore",
       "sourceFile": "server/routes/users.ts",
-      "sourceLine": 648,
+      "sourceLine": 909,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 57
+      "mountLine": 70
     },
     {
       "method": "PATCH",
@@ -2230,9 +2640,9 @@
       "mountPath": "/api/users",
       "routePath": "/:id/role",
       "sourceFile": "server/routes/users.ts",
-      "sourceLine": 276,
+      "sourceLine": 347,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 57
+      "mountLine": 70
     },
     {
       "method": "PATCH",
@@ -2240,9 +2650,19 @@
       "mountPath": "/api/users",
       "routePath": "/:id/secondary-role",
       "sourceFile": "server/routes/users.ts",
-      "sourceLine": 353,
+      "sourceLine": 424,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 57
+      "mountLine": 70
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/users/:id/senior-doctor-eligible",
+      "mountPath": "/api/users",
+      "routePath": "/:id/senior-doctor-eligible",
+      "sourceFile": "server/routes/users.ts",
+      "sourceLine": 559,
+      "mountSourceFile": "server/app/routes.ts",
+      "mountLine": 70
     },
     {
       "method": "PATCH",
@@ -2250,9 +2670,19 @@
       "mountPath": "/api/users",
       "routePath": "/:id/status",
       "sourceFile": "server/routes/users.ts",
-      "sourceLine": 406,
+      "sourceLine": 614,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 57
+      "mountLine": 70
+    },
+    {
+      "method": "POST",
+      "path": "/api/users/apple-link",
+      "mountPath": "/api/users",
+      "routePath": "/apple-link",
+      "sourceFile": "server/routes/users.ts",
+      "sourceLine": 1353,
+      "mountSourceFile": "server/app/routes.ts",
+      "mountLine": 70
     },
     {
       "method": "POST",
@@ -2260,9 +2690,19 @@
       "mountPath": "/api/users",
       "routePath": "/backfill-clerk",
       "sourceFile": "server/routes/users.ts",
-      "sourceLine": 955,
+      "sourceLine": 1216,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 57
+      "mountLine": 70
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/users/delete-account",
+      "mountPath": "/api/users",
+      "routePath": "/delete-account",
+      "sourceFile": "server/routes/users.ts",
+      "sourceLine": 1440,
+      "mountSourceFile": "server/app/routes.ts",
+      "mountLine": 70
     },
     {
       "method": "GET",
@@ -2270,9 +2710,9 @@
       "mountPath": "/api/users",
       "routePath": "/deleted",
       "sourceFile": "server/routes/users.ts",
-      "sourceLine": 156,
+      "sourceLine": 219,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 57
+      "mountLine": 70
     },
     {
       "method": "GET",
@@ -2280,9 +2720,9 @@
       "mountPath": "/api/users",
       "routePath": "/managers",
       "sourceFile": "server/routes/users.ts",
-      "sourceLine": 925,
+      "sourceLine": 1186,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 57
+      "mountLine": 70
     },
     {
       "method": "GET",
@@ -2290,9 +2730,19 @@
       "mountPath": "/api/users",
       "routePath": "/me",
       "sourceFile": "server/routes/users.ts",
-      "sourceLine": 98,
+      "sourceLine": 114,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 57
+      "mountLine": 70
+    },
+    {
+      "method": "GET",
+      "path": "/api/users/me/shift-activity",
+      "mountPath": "/api/users",
+      "routePath": "/me/shift-activity",
+      "sourceFile": "server/routes/users.ts",
+      "sourceLine": 188,
+      "mountSourceFile": "server/app/routes.ts",
+      "mountLine": 70
     },
     {
       "method": "GET",
@@ -2300,9 +2750,9 @@
       "mountPath": "/api/users",
       "routePath": "/pending",
       "sourceFile": "server/routes/users.ts",
-      "sourceLine": 253,
+      "sourceLine": 318,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 57
+      "mountLine": 70
     },
     {
       "method": "GET",
@@ -2310,9 +2760,9 @@
       "mountPath": "/api/users",
       "routePath": "/purge-candidates",
       "sourceFile": "server/routes/users.ts",
-      "sourceLine": 873,
+      "sourceLine": 1134,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 57
+      "mountLine": 70
     },
     {
       "method": "POST",
@@ -2320,9 +2770,9 @@
       "mountPath": "/api/users",
       "routePath": "/purge-deleted",
       "sourceFile": "server/routes/users.ts",
-      "sourceLine": 898,
+      "sourceLine": 1159,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 57
+      "mountLine": 70
     },
     {
       "method": "POST",
@@ -2330,9 +2780,9 @@
       "mountPath": "/api/users",
       "routePath": "/sync",
       "sourceFile": "server/routes/users.ts",
-      "sourceLine": 724,
+      "sourceLine": 985,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 57
+      "mountLine": 70
     },
     {
       "method": "POST",
@@ -2342,7 +2792,7 @@
       "sourceFile": "server/routes/webhooks.ts",
       "sourceLine": 60,
       "mountSourceFile": "server/index.ts",
-      "mountLine": 232
+      "mountLine": 253
     },
     {
       "method": "POST",
@@ -2352,7 +2802,7 @@
       "sourceFile": "server/routes/whatsapp.ts",
       "sourceLine": 93,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 121
+      "mountLine": 155
     },
     {
       "method": "GET",
@@ -2362,7 +2812,7 @@
       "sourceFile": "server/routes/health.ts",
       "sourceLine": 118,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 70
+      "mountLine": 85
     },
     {
       "method": "GET",
@@ -2372,7 +2822,7 @@
       "sourceFile": "server/routes/health.ts",
       "sourceLine": 178,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 70
+      "mountLine": 85
     },
     {
       "method": "GET",
@@ -2382,7 +2832,7 @@
       "sourceFile": "server/routes/health.ts",
       "sourceLine": 14,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 70
+      "mountLine": 85
     },
     {
       "method": "GET",
@@ -2392,7 +2842,7 @@
       "sourceFile": "server/routes/health.ts",
       "sourceLine": 18,
       "mountSourceFile": "server/app/routes.ts",
-      "mountLine": 70
+      "mountLine": 85
     }
   ]
 }

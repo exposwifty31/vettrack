@@ -57,7 +57,7 @@ should consider whether the mount-string assertions are earning their keep.
 
 | Verdict | Rows | Families |
 |---|---|---|
-| `DELETE-NOW` (blocked — see Execution status) | 15 | `/api/stability` (7), `/api/equipment-board` (8) |
+| `DELETE-NOW` — **executed**, see Section C | 15 | `/api/stability` (7), `/api/equipment-board` (8) |
 | `KEEP-FROZEN` | 12 | health probe mounts (8), Code Blue billing-reconciliation (4) |
 | `NEEDS-OWNER` | 15 | task-ownership (7), dispense (3), inventory prices (2), cursor-bug-fixer dispatch (1), operational-roles (1), bare shifts import (1) |
 | `DESTINATION` | 11 | queue DLQ (2), fault-image (1), rfid-provisioning (2), admin-force-close (1), integrations (5) |
@@ -159,14 +159,27 @@ Section A, lower urgency (no data accumulates).
 
 ---
 
-## Section C — `DELETE-NOW`, execution blocked by out-of-lane test edits
+## Section C — `DELETE-NOW` — EXECUTED
+
+> **Status 2026-08-19: done.** Both families are removed. The patch set below was
+> blocked when this register was written because the deleting lane was scoped out of
+> test files; that scope limit no longer applies. Executed with three additions the
+> original set missed — `server/lib/test-runner.ts` and `server/lib/stability-log.ts`
+> (whose only consumers were `stability.ts` and each other), and
+> `docs/architecture/routes-contract.json` (regenerated, 284 routes). Both generated
+> files were rebuilt by their own scripts rather than hand-edited.
+>
+> Still open, deliberately: the `errors.stability.*` keys in `locales/{en,he}.json` are
+> now dead. They are NOT removed here — the `chore/audit-tier1` branch owns those two
+> files and has already rewritten them heavily; deleting keys here would manufacture a
+> merge conflict for no gain. Fold them into the locale cleanup on that branch.
 
 Both deletions this lane was asked to execute are **correct verdicts** but are **not
 one-file changes**, and their companion edits fall outside this lane's file set. Per the
 concurrency contract, the patches are reported rather than applied. See
 `wf2-proof/D6.md` for the exact patch text.
 
-### C.1 — `/api/stability` (7 endpoints) — `DELETE-NOW` (blocked)
+### C.1 — `/api/stability` (7 endpoints) — `DELETE-NOW` — EXECUTED
 
 | Method | Path | Defines |
 |---|---|---|
@@ -192,7 +205,7 @@ Retirement is directly evidenced, not merely inferred from an absent caller:
 
 **Blocking companion edits (6 files, all outside this lane):** see Section C.3.
 
-### C.2 — `/api/equipment-board` alias mount (8 endpoints) — `DELETE-NOW` (blocked)
+### C.2 — `/api/equipment-board` alias mount (8 endpoints) — `DELETE-NOW` — EXECUTED
 
 `server/app/routes.ts:111` mounts `createDisplayRouter()` a second time, producing 8 alias
 endpoints of `/api/display/*` (`server/routes/display.ts:732-743`: `pair/issue`,

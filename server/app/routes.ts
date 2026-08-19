@@ -47,7 +47,6 @@ import adminEquipmentGovernanceRoutes from "../routes/admin-equipment-governance
 import adminWebhooksRoutes from "../routes/admin-webhooks.js";
 import adminNotificationsRoutes from "../routes/admin-notifications.js";
 import cursorBugFixerRoutes from "../routes/cursor-bug-fixer.js";
-import stabilityRoutes from "../routes/stability.js";
 
 // --- Platform (scheduling, inventory, clinical) ---
 import analyticsRoutes from "../routes/analytics.js";
@@ -108,7 +107,6 @@ function registerEquipmentCoreRoutes(app: express.Express) {
   app.use("/api/activity", activityRoutes);
   app.use("/api/home", homeDashboardRoutes);
   app.use("/api/display", createDisplayRouter());
-  app.use("/api/equipment-board", createDisplayRouter());
   // Docking ownership (T1.4) — Home Room assignment + reconciliation reads.
   // Own /api/docking prefix: no path collision with /api/equipment/* above.
   app.use("/api/docking", dockingRoutes);
@@ -129,7 +127,6 @@ function registerAdminConfigRoutes(app: express.Express) {
   app.use("/api/admin", adminWebhooksRoutes);
   app.use("/api/admin", adminNotificationsRoutes);
   app.use("/api/admin/cursor-bug-fixer", cursorBugFixerRoutes);
-  app.use("/api/stability", stabilityRoutes);
 }
 
 function registerPlatformCapabilitiesRoutes(app: express.Express) {
