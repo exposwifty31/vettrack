@@ -84,12 +84,18 @@ export default function MyEquipmentPage() {
   const returnMut = useMutation({
     mutationFn: ({ id, isPluggedIn, plugInDeadlineMinutes }: { id: string; isPluggedIn: boolean; plugInDeadlineMinutes?: number }) =>
       api.equipment.return(id, { isPluggedIn, plugInDeadlineMinutes }),
-    onSuccess: () => {
+    onSuccess: (result, { isPluggedIn, plugInDeadlineMinutes }) => {
       haptics.tap();
       queryClient.invalidateQueries({ queryKey: ["/api/equipment/my"] });
       queryClient.invalidateQueries({ queryKey: ["/api/equipment"] });
       queryClient.invalidateQueries({ queryKey: ["/api/activity"] });
       toast.success(t.myEquipment.toast.returnSuccess);
+      // Mirror the equipment-detail return flow: an unplugged return schedules a
+      // charge alert, so say so. Suppressed offline (pendingSyncId set) because
+      // nothing is scheduled until the queued mutation actually reaches the server.
+      if (result.pendingSyncId === undefined && !isPluggedIn && plugInDeadlineMinutes !== undefined) {
+        toast.warning(t.myEquipment.toast.chargeAlertScheduled(plugInDeadlineMinutes));
+      }
     },
     onError: () => toast.error(t.myEquipment.toast.returnError),
   });

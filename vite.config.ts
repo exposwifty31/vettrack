@@ -149,7 +149,6 @@ export default defineConfig(({ mode }) => {
         "**/node_modules/**",
         "tests/restock.service.test.ts",
         "tests/migrations/**",
-        "tests/phase-2-3-medication-package-integration.test.ts",
         "tests/equipment-operational-state.integration.test.ts",
         "tests/shift-chat-window.integration.test.ts",
         "tests/seed-reviewer-demo.integration.test.ts",
