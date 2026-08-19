@@ -89,6 +89,6 @@ If a mapped resource isn't installed in the current environment (remote/CI sessi
 | Memory Keeper | session continuity, instincts, memory files | `references/memory-keeper.md` |
 | The Documentarian | docs sync, codemaps, proof log | `references/the-documentarian.md` |
 
-## Benched (available but unrouted)
+## Benched (removed)
 
-Language reviewers/build-resolvers for languages not in this repo (`cpp-*`, `rust-*`, `go-*`, `java-*`, `kotlin-*`, `dart-*`, `php-*`, `django-*`, `fastapi-*`, `fsharp-*`, `csharp-*`, `pytorch-*`, `flutter-*`), `network-*` agents, `homelab-architect`, `mle-reviewer`, `chief-of-staff`, `opensource-*` trio, `harmonyos-app-resolver`, `conversation-analyzer`. Use only on explicit user request.
+Removed 2026-08-19: the off-stack agents this section used to bench (`cpp-*`, `rust-*`, `go-*`, `java-*`, `kotlin-*`, `dart-*`, `php-*`, `python-*`, `django-*`, `fastapi-*`, `fsharp-*`, `csharp-*`, `pytorch-*`, `flutter-*`, `network-*`, `homelab-architect`, `mle-reviewer`, `chief-of-staff`, `opensource-*`, `harmonyos-app-resolver`, `conversation-analyzer`, `loop-operator`) were vendored ECC personas for languages and domains this repo does not use, and were deleted along with the rest of the ECC plugin tree. Recover from git history if one is ever genuinely needed.
