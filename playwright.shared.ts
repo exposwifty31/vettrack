@@ -34,7 +34,9 @@ export const PLAYWRIGHT_BASE_IGNORE = [
 
 /**
  * Explicit suite allowlists. Default (`ci`) is what `.github/workflows/playwright.yml` runs.
- * UI smoke uses `playwright.ui.config.ts`.
+ * UI smoke runs from `playwright.ui.config.ts` because it needs a different base URL and
+ * timeout profile than the CI suite; sharing this file's config would force one of the two
+ * to run under settings tuned for the other.
  */
 export const PLAYWRIGHT_SUITE_MATCH: Record<string, string[]> = {
   ci: [

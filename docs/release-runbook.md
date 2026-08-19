@@ -39,7 +39,16 @@ production verification in Phase 2 below is not optional.
 
 ### 2.2 Production deploy
 
-Merging to `main` triggers production deployment (Railway connected to `main`, and optionally `.github/workflows/ci.yml` deploy job when `RAILWAY_USE_CLI_DEPLOY` is enabled).
+Merging to `main` triggers production deployment. **Exactly one path should be live at a
+time** — two would mean one merge starts two concurrent production deploys:
+
+- **CI-driven (the active one):** the `deploy` job in `.github/workflows/ci.yml`, gated on
+  `vars.RAILWAY_USE_CLI_DEPLOY == 'true'` (currently `true`) plus a push to `main`.
+- **Railway auto-deploy from `main`:** disconnected since 2026-07-10 in favour of the above.
+  If it is ever reconnected, turn `RAILWAY_USE_CLI_DEPLOY` off in the same change.
+
+Confirm which is live before relying on either: `gh api repos/exposwifty31/vettrack/actions/variables`
+for the flag, and the Railway service's source settings for the trigger.
 
 1. Watch Railway → **production** service → latest deployment → **SUCCESS**.
 2. **Release Gate** (`.github/workflows/release-gate.yml`) also runs on push to `main` — all gates must pass; treat a failed gate as a release blocker even if Railway shows success.
@@ -79,7 +88,7 @@ Sign in once in the browser and spot-check a critical path (dashboard or equipme
 ### Application rollback (preferred)
 
 1. Railway → **production** service → **Deployments**.
-2. Select the last deployment that passed [Phase 3.3](#33-post-deploy-production-verification).
+2. Select the last deployment that passed [Phase 2.3](#23-post-deploy-production-verification).
 3. **Rollback** / redeploy that artifact.
 4. Re-run production health checks (`/api/healthz`, `/api/version`, `/api/health/startup`).
 
@@ -93,7 +102,10 @@ Sign in once in the browser and spot-check a critical path (dashboard or equipme
 
 If the deploy failed during or after migrations:
 
-- The seed/cleanup scripts are gone with the staging lane; nothing in the repo creates Clerk test users any more.
+- The **staging** seed/cleanup scripts are gone with that lane, so nothing seeds Clerk fixtures
+  on a schedule any more. That is **not** the same as "nothing creates users": `signup-flow`
+  and the destructive Playwright suites still create real Clerk users and DB rows when pointed
+  at a live environment — see the forbidden-actions table below. Never point them at production.
 - Follow [migrations.md](migrations.md) and coordinate manual DB recovery with a repo owner.
 - Roll back the **application** first to stop bad code paths; migration rollback is a separate, explicit decision.
 
@@ -143,7 +155,7 @@ Copy for PR comments or release tickets:
 | Role | Responsibility |
 |------|----------------|
 | **Author** | Feature PR → `main`, fix CI failures |
-| **Release owner** | Production Railway deploy SUCCESS, Release Gate green, verify healthz |
+| **Release owner** | Production Railway deploy SUCCESS, Release Gate green, and **all three** post-deploy checks: `/api/healthz`, `/api/version`, `/api/health/startup` |
 | **Reviewer** | Block a merge to `main` without green required checks |
 | **On-call / owner** | Production rollback in Railway, migration incidents |
 
