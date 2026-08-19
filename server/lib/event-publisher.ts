@@ -22,6 +22,12 @@ export type PublishedOutboxRow = {
   /** Monotonic BIGSERIAL — deterministic processing order with ORDER BY id ASC. */
   id: number;
   clinicId: string;
+  /**
+   * ADR-011. Per-clinic sequence — what the client asserts contiguity on. `id` above is
+   * global and this publisher emits per clinic, so `id` is not contiguous from any one
+   * client's view. `null` only for rows written before migration 186.
+   */
+  clinicSeq: number | null;
   type: string;
   payload: unknown;
   occurredAt: Date;
@@ -59,7 +65,7 @@ async function publishOneBatch(): Promise<void> {
   try {
     const rows = await db.transaction(async (tx) => {
       const locked = await tx.execute(sql`
-        SELECT id, clinic_id, type, payload, occurred_at, event_version, level, category
+        SELECT id, clinic_id, clinic_seq, type, payload, occurred_at, event_version, level, category
         FROM vt_event_outbox
         WHERE published_at IS NULL
           AND (error_type IS NULL OR error_type <> 'permanent')
@@ -72,6 +78,7 @@ async function publishOneBatch(): Promise<void> {
       const raw = locked.rows as Array<{
         id: string | number;
         clinic_id: string;
+        clinic_seq: string | number | null;
         type: string;
         payload: unknown;
         occurred_at: Date | string;
@@ -94,6 +101,7 @@ async function publishOneBatch(): Promise<void> {
       return raw.map((r) => ({
         id: Number(r.id),
         clinicId: r.clinic_id,
+        clinicSeq: r.clinic_seq === null ? null : Number(r.clinic_seq),
         type: r.type,
         payload: r.payload,
         occurredAt: parseOccurredAt(r.occurred_at),

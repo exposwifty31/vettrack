@@ -318,7 +318,7 @@ current versions, and branch-side PROOF_ALIGNMENT_LOG entries append to main's l
   page — operational fields only, denylist enforced visually (no clinical-looking chrome); offline/sync
   staleness affordances visible; mobile + console; board case-aware later.
 - **Execute:** (1) Write `docs/plans/2.0/task-1.2-case-spine.md` from 0.1 spec + 0.2 findings (exact
-  schema, migration via `npx drizzle-kit generate`, per-path binding order, Dexie store names).
+  schema, hand-written migration per `docs/migrations.md`, per-path binding order, Dexie store names).
   (2) Execute TDD; migration committed per repo convention; one event-path binding per slice.
   (3) Visual evidence: timeline + patient page, 3 breakpoints, RTL+EN, offline-state shots.
 - **Verify:** Binding tests green per path; offline reconcile test green; typecheck 0; frozen-file diff
@@ -385,7 +385,7 @@ current versions, and branch-side PROOF_ALIGNMENT_LOG entries append to main's l
 - **Build order (this task's own internal phases — do not confuse with the roadmap's Phase 0–4 above):**
   - *Sub-phase 0 · Spine (critical path):* create/extend `vt_cases` (`clinicId`, `externalPatientRef` —
     opaque PMS id, no PHI —, `nfcTagId` unique, `status`, `openedBy`, timestamps) + nullable `caseId` FK
-    on `vt_dispense_events`. Migration via `npx drizzle-kit generate` → commit SQL → `pnpm db:migrate`.
+    on `vt_dispense_events`. Hand-written migration per `docs/migrations.md` → commit SQL → `pnpm db:migrate`.
   - *Sub-phase 1 · Ambient scan-to-case (critical path):* branch the scan resolver on tag type
     (case | item | equipment); ambient-case context (tab-scoped) with a **persistent, unmissable
     banner**, a short idle TTL forcing re-scan, and auto-clear on tab/shift change; stamp `caseId` on

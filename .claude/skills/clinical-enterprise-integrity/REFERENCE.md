@@ -47,7 +47,6 @@ pnpm test
 
 # Database + Drizzle alignment (requires DATABASE_URL and a reachable DB)
 if ($env:DATABASE_URL) {
-    pnpm exec drizzle-kit check
     pnpm db:migrate   # if migrations pending — manual per AGENTS.md / CLAUDE.md
     pnpm test -- tests/integrations/
 }

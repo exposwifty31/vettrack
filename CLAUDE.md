@@ -41,8 +41,9 @@ pnpm i18n:check              # locales/en.json ⟷ locales/he.json parity
 
 # Database
 pnpm db:migrate             # apply pending migrations on demand (same path runs at server startup)
-npx drizzle-kit generate    # author the next migration after schema changes in server/db.ts
-npx drizzle-kit push        # push schema directly (dev only)
+# Migrations are HAND-AUTHORED SQL — after a schema change, write the next
+# migrations/NNN_description.sql yourself. drizzle-kit generate / push (pnpm db:push)
+# are non-functional in this repo; see docs/migrations.md for why.
 
 # Native shell (Capacitor — ios/ + android/ wrap the built web bundle). The iOS app is LIVE.
 pnpm cap:build:native       # scripts/build-native-shell.sh --ios (use --android / --all via cap:build:native:android / :all)
@@ -115,7 +116,7 @@ server/
   schema/         pgTable definitions (core, equipment, inventory, tasks, ops, er, integrations)
   migrate.ts      Migration runner (exports runMigrations())
   app/
-    routes.ts     Registers ~56 API route modules
+    routes.ts     Registers 60 API route mounts (57 distinct routers)
     start-schedulers.ts  Starts all BullMQ workers + background schedulers
   routes/         One file per API resource (incl. rfid, admin-rfid-*, shift-handover, clinic-join, whatsapp)
   services/       Domain services (appointments, equipment, waitlist, inventory, restock, dispense, code-blue…)
@@ -196,17 +197,17 @@ All tables prefixed `vt_`. Table definitions live in `server/schema/*.ts` (re-ex
 **Tasks:** `vt_appointments` (unified task model; UI route `/equipment/tasks`)  
 **Emergency:** `vt_code_blue_sessions`, `vt_code_blue_log_entries`, `vt_crash_cart_*`  
 **Inventory:** `vt_containers`, `vt_items`, `vt_dispense_events`, `vt_restock_*`, `vt_purchase_orders`  
-**Ops:** `vt_shifts`, `vt_shift_sessions`, `vt_shift_handover` (migration 177), `vt_event_outbox`, `vt_clinical_check_ins`, `vt_audit_logs`  
+**Ops:** `vt_shifts`, `vt_shift_sessions`, `vt_shift_handover` (migration 177), `vt_event_outbox` + `vt_event_outbox_seq` (migration 186, ADR-011), `vt_clinical_check_ins`, `vt_audit_logs`  
 **RFID:** `vt_equipment_rfid_reads` (migration 138), `vt_rfid_readers` (migration 172; amended 174), `vt_rfid_secret_rotations` (migration 173; amended 176), `vt_rfid_egress_signals` (migration 175) — migration SQL is the source of truth for the composite-FK details  
 **Integrations:** `vt_integration_configs`, sync log/conflict tables  
 
 **Removed (migrations 142–143):** ER/patient/hospitalization tables, medication tasks, drug formulary, pharmacy forecast. See `docs/scope-change-2026.md`.
 
-After editing schema files, run `npx drizzle-kit generate` → commit SQL → `pnpm db:migrate`.
+After editing schema files, hand-write the next `migrations/NNN_description.sql` (check `migrations/` for the current tail, and make every statement idempotent) → commit it → `pnpm db:migrate`. `drizzle-kit generate` is **not** the authoring path here — see [`docs/migrations.md`](docs/migrations.md).
 
 ### Realtime (Phase 9)
 
-- One SSE connection per clinic: `GET /api/realtime/stream` (auth + `clinicId` required). Events carry an `id:` cursor sourced from `vt_event_outbox.id`.
+- One SSE connection per clinic: `GET /api/realtime/stream` (auth + `clinicId` required). Events carry an `id:` cursor sourced from `vt_event_outbox.id`, **and a `clinicSeq` from `vt_event_outbox.clinic_seq`** (ADR-011). `id` is global and drives ordering, `Last-Event-ID` resume and replay; `clinicSeq` is per-clinic and is the ONLY field gap detection may assert contiguity on — a client sees just its own clinic's subset of the global id, so that subset is never contiguous. `clinic_seq` is assigned by a BEFORE INSERT trigger (migration 186), not by application code, because two insert paths exist.
 - Replay: on reconnect, the server replays missed outbox rows after `Last-Event-ID`; if that id was pruned the server emits `reset_state:last_event_pruned` and the client triggers a full snapshot resync. `GET /api/realtime/replay` exposes the same path over HTTP.
 - `KEEPALIVE` events (~10 s) carry `{ activeCodeBlueSessionId, stormHint }`. They are routed to keepalive subscribers only — they do **not** invalidate query caches. ≥50 connects per clinic in 5 s flips `stormHint=elevated` for 30 s.
 - `useRealtimeReconciliation` wires `visibilitychange`, `pageshow` (BFCache), `online`, and Page Lifecycle `freeze`/`resume` to one debounced reconciliation path (replay + `forceResyncWardErCaches`).
@@ -316,7 +317,7 @@ E2E tests use Playwright: `pnpm test:signup` (requires Chromium). The Phase 9 dr
 
 ### Adding a new feature (checklist)
 
-1. Schema change in `server/schema/*.ts` (via `server/db.ts`) → `npx drizzle-kit generate` → commit the generated SQL (the runtime applies it at startup; `pnpm db:migrate` runs the same path on demand).
+1. Schema change in `server/schema/*.ts` (via `server/db.ts`) → hand-write `migrations/NNN_description.sql` → commit it (the runtime applies it at startup; `pnpm db:migrate` runs the same path on demand). See [`docs/migrations.md`](docs/migrations.md) — `drizzle-kit generate` is non-functional in this repo.
 2. Route file in `server/routes/` → register in `server/app/routes.ts`.
 3. If adding a BullMQ worker / scheduler → register in `server/app/start-schedulers.ts`.
 4. API function in `src/lib/api.ts` + type in `src/types/`.

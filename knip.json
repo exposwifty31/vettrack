@@ -12,7 +12,6 @@
     "android/**",
     "ios/**",
     "src/design-system-entry.ts",
-    "drizzle.config.ts",
     "server/tests/**",
     "scripts/**",
     "tests/ui-smoke-*.ts",

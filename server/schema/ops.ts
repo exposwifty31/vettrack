@@ -1,7 +1,7 @@
 import { sql } from "drizzle-orm";
 import {
   text, timestamp, integer, boolean, varchar, jsonb,
-  date, time, uuid, index, uniqueIndex, primaryKey, bigserial, pgEnum,
+  date, time, uuid, index, uniqueIndex, primaryKey, bigserial, bigint, pgEnum,
 } from "drizzle-orm/pg-core";
 import type { PushPlatform } from "@vettrack/contracts";
 import { vtTable } from "./helpers.js";
@@ -303,11 +303,31 @@ export const eventOutbox = vtTable(
     errorType: varchar("error_type", { length: 20 }),
     level: varchar("level", { length: 10 }).notNull().default("INFO"),
     category: varchar("category", { length: 20 }).notNull().default("SYSTEM"),
+    /**
+     * ADR-011. Per-clinic sequence used for client gap detection. `id` above is a GLOBAL
+     * BIGSERIAL, but the publisher fans out per clinic, so a client sees only a subset of
+     * it and cannot assert contiguity on it. Assigned by the BEFORE INSERT trigger in
+     * migration 186 — NOT by application code, because two insert paths exist
+     * (insertRealtimeDomainEvent and the direct audit-row insert in server/lib/audit.ts).
+     * Nullable in the type only for rows written before migration 186.
+     */
+    clinicSeq: bigint("clinic_seq", { mode: "number" }),
   },
   (table) => ({
     unpublishedIdx: index("idx_vt_event_outbox_unpublished").on(table.id).where(sql`${table.publishedAt} IS NULL`),
+    clinicSeqUq: uniqueIndex("uq_vt_event_outbox_clinic_seq").on(table.clinicId, table.clinicSeq),
   }),
 );
+
+/**
+ * ADR-011. Per-clinic counter behind `vt_event_outbox.clinic_seq`. Written only by the
+ * BEFORE INSERT trigger from migration 186; no application code reads or writes it. Defined
+ * here so the generated schema inventory (docs/audit/db.md) stays complete.
+ */
+export const eventOutboxSeq = vtTable("vt_event_outbox_seq", {
+  clinicId: text("clinic_id").primaryKey().references(() => clinics.id, { onDelete: "cascade" }),
+  nextSeq: bigint("next_seq", { mode: "number" }).notNull().default(0),
+});
 
 export const shiftMessages = vtTable(
   "vt_shift_messages",
