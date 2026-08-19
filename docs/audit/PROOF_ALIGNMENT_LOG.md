@@ -8600,3 +8600,58 @@ entry does not close and does not claim to.
 **Verdict:** VERIFIED — every item above was observed this session by direct `gh api` output, not
 restated from a commit message or a prior entry. The one non-observable item, the absence of a
 registered company, is recorded as an owner statement and labelled as such.
+
+---
+
+## 2026-08-20 — Architecture invariants in `.coderabbit.yaml` and `.cursorrules` corrected against live code (chore/rule-invariants-drift)
+
+**Claim:** The `**/*` path instruction CodeRabbit applies to every file in every vettrack PR carried
+seven architecture invariants. Three were wrong. All seven were checked against live code and the
+block was rewritten. Two contradicting lines in `.cursorrules` were aligned with the two in the same
+file that were already correct.
+
+**Evidence:**
+
+- **The config is live, not inert.** Review comments on PRs #197, #199 and #200 each report
+  `Configuration used: Path: .coderabbit.yaml`. (The RN repo's PR #81 reports `Organization UI` — a
+  different repo with a different source. The two must not be conflated.)
+- **`server/db.ts` holds no schema.** 23 lines: the pool, `drizzle(pool)`,
+  `export * from "./schema/index.js"`, and a legacy `initDb()` stub. `grep -c pgTable server/db.ts`
+  → `0`.
+- Tables are declared with `vtTable(...)` in `server/schema/*.ts`. `server/schema/helpers.ts:5` →
+  `export const vtTable = pgTable;`, whose own comment reads "identical table names as the original
+  db.ts monolith" — the helper documents the split that the instruction had not caught up with.
+- **The staleness is datable.** `git log --diff-filter=A -- server/schema/core.ts` → `c1780d8f7`,
+  2026-05-24, `refactor: modularize server/db.ts into domain schema files (#421)`.
+  `git log -1 -- .coderabbit.yaml` → `27975124a`, 2026-07-28. The file was edited **two months after**
+  the split and the wrong line survived that edit.
+- **Medication < 100 ml is enforced nowhere.** `grep -rnE '\b100\b' server src shared` filtered to
+  `ml|volume|liquid` → no matches.
+- **The billing ledger is gone.** `find server src shared -iname '*billing*'` → no results.
+  `server/services/shadow-inventory.service.ts:2` → "Shadow inventory — billing ledger removed;
+  orphan-stock scan is a no-op." A residual guard survives at
+  `server/workers/integration.worker.ts:85` and was left alone; this entry does **not** claim the
+  removal is complete.
+- **The realtime invariant was correct but incomplete.** It read "do not introduce parallel polling
+  transports" with no carve-out, while CLAUDE.md's frozen-surfaces section documents the `/collab-ws`
+  Socket.io channel as the one sanctioned additive exception. As written, a correct change under
+  `server/lib/realtime-collab/` would have read to the reviewer as a violation.
+- **`.cursorrules` contradicted itself.** Lines 30 and 110 name `server/schema/*.ts` correctly. Line
+  15 said "New `pgTable` definitions in `server/db.ts`", and the section heading at line 151 read
+  `## Schema (server/db.ts)`. A reader going top-down met the wrong statement first, and nothing in
+  the file established precedence. Both corrected.
+- **The edited YAML was re-parsed, not assumed.** `ruby -ryaml` → 5 `path_instructions` blocks, and
+  the rendered invariants text was read back to confirm what the reviewer actually receives.
+
+**Not done, deliberately — no drift gate was added.** The obvious gate ("every path named in a rule
+file must exist") would **not** have caught this bug: `server/db.ts` exists, it simply no longer holds
+what the rule claimed. A gate that passes green on the exact defect it was written for is the failure
+mode this week's audit found nine separate times, and shipping one here would have added the
+appearance of coverage and none of it. A narrow assertion covering only this instance was judged not
+to earn its maintenance.
+
+**Also observed, not fixed:** `CLAUDE.md:123` still lists `server/lib/` as holding "Business logic
+(billing, …)" though no billing file exists. Out of scope for this change; recorded so it is not lost.
+
+**Verdict:** VERIFIED — every claim above comes from direct command output run this session, not from
+a commit message or a prior entry.
