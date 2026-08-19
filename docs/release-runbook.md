@@ -1,5 +1,25 @@
 # Production release runbook
 
+> ## ⚠ The hosted staging gate this runbook is built around does not exist
+>
+> **`Staging E2E (manual)` was deleted** (2026-08-19) — it had zero runs in its lifetime,
+> because `workflow_dispatch` requires you to pick a ref and its guard accepted only
+> `refs/heads/staging`. **That branch has never existed on origin**, and no `*_STAGING`
+> secret was ever created. So every step below that says "GitHub → Actions → Staging E2E",
+> "dispatch from branch `staging`", or "re-run the workflow" describes automation that was
+> never available, not automation that broke.
+>
+> Until a replacement is built, the supported path is the **local** procedure in
+> [staging-e2e-runbook.md](staging-e2e-runbook.md), which also records what a rebuild must
+> get right — chiefly that its credentials belong on GitHub *environments*, never on the
+> repository.
+>
+> The rest of this document is left intact rather than rewritten: the promotion *shape*
+> (feature → staging → production), the health checks and the rollback reasoning are still
+> what we want. Replacing them with a local-only flow I invented would trade a documented
+> gap for an undocumented guess. **Fixing this properly is a decision about whether the
+> staging lane gets rebuilt — an owner call, not a doc edit.**
+
 Safe promotion path for VetTrack: **feature branch → staging → production**. Staging E2E on Clerk test keys is the gate before any merge to `main`.
 
 | Environment | App URL | Git branch | Railway service |
@@ -36,7 +56,7 @@ flowchart TD
   L --> M[Verify production health endpoints]
 ```
 
-**Rule:** Do not open or merge a **staging → main** PR until staging deploy is green **and** **Staging E2E (manual)** has passed on branch `staging`.
+**Rule:** Do not open or merge a **staging → main** PR until staging deploy is green **and** the staging E2E suite has passed. That gate is currently the **local** procedure in [staging-e2e-runbook.md](staging-e2e-runbook.md) — the hosted `Staging E2E (manual)` workflow was deleted (see the banner at the top). The rule stands; only the mechanism changed.
 
 ---
 
@@ -85,9 +105,9 @@ curl -sfS -o /dev/null -w "%{http_code}\n" \
 
 If this fails, stop — do not run E2E or promote to production. Fix the staging deploy first.
 
-### 2.2 Run **Staging E2E (manual)** on branch `staging`
+### 2.2 Run **Staging E2E (manual)** on branch `staging` — ⚠ UNAVAILABLE, see the banner at the top
 
-The workflow file lives on `main` (so GitHub registers it), but the job **only runs** when you dispatch it **from branch `staging`**.
+~~The workflow file lives on `main` (so GitHub registers it), but the job **only runs** when you dispatch it **from branch `staging`**.~~ The workflow was deleted and the `staging` branch does not exist; run the local procedure in [staging-e2e-runbook.md](staging-e2e-runbook.md) instead. The steps below are kept as the record of what the gate was meant to do.
 
 | Step | Action |
 |------|--------|
@@ -287,4 +307,3 @@ Copy for PR comments or release tickets:
 
 ---
 
-*The staging E2E gate workflow it referenced (`.github/workflows/staging-e2e-manual.yml`) has been deleted — it could never run. [staging-e2e-runbook.md](staging-e2e-runbook.md) is now the local, supported path for E2E specifics.*

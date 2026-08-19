@@ -67,7 +67,6 @@ Pilot/demo readiness: typecheck, full vitest, i18n parity, RTL/mobile/PWA, offli
 | Workflow | Time (UTC) | Target |
 |----------|------------|--------|
 | Flake detection | 03:00 | Repeat vitest suite (`FLAKE_REPEAT_COUNT`) |
-| Workday (staging) | 04:00 | Deployed staging (`TEST_BASE_URL_STAGING`; skips if unset) |
 | E2E simulation | 05:00 | Local build + `e2e/simulation` suite |
 
 All nightlies are **non-blocking** (`continue-on-error` or observational only).
