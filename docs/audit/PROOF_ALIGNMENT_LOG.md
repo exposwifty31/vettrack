@@ -8586,12 +8586,16 @@ planned. Per this log's own rule, neither superseded line was edited.
 - Neither prior line was edited. Both stand as written.
 
 **Not established — and newly opened by this check:** the **vettrack** repo carries no `LICENSE` file
-at all. `gh api repos/exposwifty31/vettrack` → `license: null`, and the full tree at `main`
-(`git/trees/<sha>?recursive=1` → **3709 entries, `truncated: false`**) contains zero licence-shaped
-paths. This is a whole-tree scan, not a root listing — the first draft of this entry claimed the
-absence from the root listing alone, which does not support it. The RN repo's proprietary notice does
-not reach this repo. That is a separate question this entry
-does not close and does not claim to.
+at all. `gh api repos/exposwifty31/vettrack` → `license: null`, and
+`gh api "repos/exposwifty31/vettrack/git/trees/5710a7efd3231f67f76a34ed2fe39251b56d84ca?recursive=1"`
+→ **3709 entries, `truncated: false`**, zero licence-shaped paths. A whole-tree scan, not a root
+listing: the first draft claimed the absence from the root listing alone, which does not support it.
+The commit is named rather than written `<sha>` for the same reason the RN fetch above is `?ref=`-pinned
+— a command that resolves to a moving branch cannot be re-run to reproduce the result it is offered as
+evidence for. Both halves of this entry had that defect; the RN half was fixed first and this one was
+left behind for a round, which is the ordinary shape of an instance fix that was not carried to its
+sibling. The RN repo's proprietary notice does not reach this repo. That is a separate question this
+entry does not close and does not claim to.
 
 **Verdict:** VERIFIED — every item above was observed this session by direct `gh api` output, not
 restated from a commit message or a prior entry. The one non-observable item, the absence of a
