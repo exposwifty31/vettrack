@@ -2,7 +2,7 @@
 
 Routes derived from `server/app/routes.ts`, `server/index.ts`, and `server/routes/*.ts`.
 
-Generated 2026-08-19. **291** unique method+path pairs.
+Generated 2026-08-19. **284** unique method+path pairs.
 
 ---
 
@@ -18,7 +18,6 @@ Generated 2026-08-19. **291** unique method+path pairs.
 | `push.ts` | `DELETE /api/push/subscribe`, `PATCH /api/push/subscribe`, `POST /api/push/subscribe`, `POST /api/push/test`, `GET /api/push/vapid-public-key` |
 | `queue.ts` | `GET /api/queue/dlq`, `POST /api/queue/dlq/:jobId/replay`, `GET /api/queue/metrics` |
 | `realtime.ts` | `GET /api/realtime`, `GET /api/realtime/outbox-head`, `GET /api/realtime/replay`, `GET /api/realtime/stream`, `POST /api/realtime/telemetry` |
-| `stability.ts` | `DELETE /api/stability/logs`, `GET /api/stability/logs`, `GET /api/stability/results`, `POST /api/stability/run`, `POST /api/stability/schedule`, `GET /api/stability/status` (+1 more) |
 | `storage.ts` | `POST /api/storage/upload-url` |
 | `support.ts` | `GET /api/support`, `POST /api/support`, `PATCH /api/support/:id`, `GET /api/support/unresolved-count` |
 | `test.ts` | `POST /api/test/charge-alert/run`, `POST /api/test/create-scenario`, `POST /api/test/expiry-check/run`, `GET /api/test/notifications`, `GET /api/test/returns/:id`, `POST /api/test/run-scheduler` |
