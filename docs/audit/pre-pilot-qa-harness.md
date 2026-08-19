@@ -154,7 +154,7 @@ Catches "a pre-pilot fix regressed something." All are existing suites — run, 
 | L1-6 | `pnpm dev:walk` then `pnpm test:playwright:flow-walk` | owner/CI (browser + app) | ≥ 2026-07-16 baseline (145 pass / 0 broken); **any new `broken` blocks** |
 | L1-7 | `pnpm test:playwright:ci` · `:pwa` · `:ui-smoke` | owner/CI (browser) | green |
 | L1-8 | `pnpm test:playwright:phase9` | owner/CI (browser) | 8 realtime/PWA drills green (frozen-surface proof) |
-| L1-9 | `pnpm test:staging:e2e` + `pnpm test:staging:walkthrough` | owner (live staging) | green against live staging |
+| L1-9 | ~~`pnpm test:staging:e2e` + `pnpm test:staging:walkthrough`~~ — **removed 2026-08-19 with the staging tier** | — | n/a until a staging lane is rebuilt |
 
 > Note: L1-6/-7 use `dev:walk` (= `PLAYWRIGHT_E2E=true pnpm dev:bypass`; `PLAYWRIGHT_E2E==="true"`
 > relaxes the 100/min limiter at `server/middleware/rate-limiters.ts:27`). Plain `pnpm dev` bounces

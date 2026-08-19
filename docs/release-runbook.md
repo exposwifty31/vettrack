@@ -29,15 +29,15 @@ production verification in Phase 2 below is not optional.
 
 ---
 
-## Phase 2 — Production deploy
+## Phase 1 — Ship to production
 
-### 2.1 Pull request into `main`
+### 1.1 Pull request into `main`
 
 1. Open the PR against `main`.
 2. Confirm every required check is green — there is no staging run to cite in its place.
 3. Merge when reviewers approve and CI on the PR is green.
 
-### 2.2 Production deploy
+### 1.2 Production deploy
 
 Merging to `main` triggers production deployment. **Exactly one path should be live at a
 time** — two would mean one merge starts two concurrent production deploys:
@@ -53,7 +53,7 @@ for the flag, and the Railway service's source settings for the trigger.
 1. Watch Railway → **production** service → latest deployment → **SUCCESS**.
 2. **Release Gate** (`.github/workflows/release-gate.yml`) also runs on push to `main` — all gates must pass; treat a failed gate as a release blocker even if Railway shows success.
 
-### 2.3 Post-deploy production verification
+### 1.3 Post-deploy production verification
 
 Run against **production** (`https://vettrack.uk`):
 
@@ -88,7 +88,7 @@ Sign in once in the browser and spot-check a critical path (dashboard or equipme
 ### Application rollback (preferred)
 
 1. Railway → **production** service → **Deployments**.
-2. Select the last deployment that passed [Phase 2.3](#23-post-deploy-production-verification).
+2. Select the last deployment that passed [Phase 1.3](#13-post-deploy-production-verification).
 3. **Rollback** / redeploy that artifact.
 4. Re-run production health checks (`/api/healthz`, `/api/version`, `/api/health/startup`).
 
