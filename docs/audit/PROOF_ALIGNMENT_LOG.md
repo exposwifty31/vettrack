@@ -8531,3 +8531,55 @@ ADR-011; the legal-entity name on the RN licence (**answered this session — Ap
 `© 2026 Dan Erez` on all three versions incl. the live 1.2.0; `chore/license-and-cleanup` `03c522c`**);
 the fate of `admin-task-ownership`; long-lived SSE/collab connection revalidation; and the NEEDS-OWNER
 rows in the route register.
+
+---
+
+## 2026-08-19 — RN licence holder resolved: a natural person, no registered entity (docs/rn-licence-holder)
+
+**Claim:** The legal-entity question carried forward by the two preceding entries is closed. The RN
+repository's licence names a natural person — Dan Erez — and no registered company exists or is
+planned. Per this log's own rule, neither superseded line was edited.
+
+**Evidence:**
+
+- `LICENSE` in the RN repo (`exposwifty31/VetTrack---RN-Migration-`, blob at `03c522c43`) — fetched
+  this session via `gh api repos/exposwifty31/VetTrack---RN-Migration-/contents/LICENSE`. Reads
+  `VetTrack — Proprietary Software` / `Copyright (c) 2026 Dan Erez. All rights reserved.`, and in the
+  body `proprietary and confidential to Dan Erez`. `VetTrack` on the title line is the product name,
+  not the holder — which is precisely the confusion the earlier entry recorded.
+- `gh api ".../commits?path=LICENSE"` → three commits: `dfbf83658` (2026-07-31, Expo scaffold, MIT)
+  → `cf179831d` (2026-08-19T02:36:40Z, `chore(legal): replace the Expo scaffold MIT licence with a
+  proprietary notice`) → `03c522c43` (2026-08-19T03:21:21Z, `chore(legal): name the actual copyright
+  holder in LICENSE`). The window in which the licence named `VetTrack` and no person was **45
+  minutes**. That is why the Tier-1 entry's "`VetTrack` alone today" was accurate when written and
+  stale by the time it was read.
+- `gh api repos/exposwifty31/VetTrack---RN-Migration-` → `license.spdx_id = NOASSERTION`. GitHub does
+  not match the file to a recognised SPDX licence. That is the expected result for a bespoke
+  proprietary notice, not a defect.
+- RN `package.json` → `license` and `author` both absent, `private: true`. No second, contradicting
+  declaration of a holder anywhere in that repo.
+- Owner decision, 2026-08-19, given in-session: the holder is a natural person; there is no
+  registered company and none is planned. There is no further name to record.
+- React Native's own MIT licence (`Copyright (c) Meta Platforms, Inc. and affiliates`) governs the
+  framework as a dependency. It is already covered by the closing clause of our LICENSE —
+  `Third-party components incorporated into or used by the Software remain subject to their own
+  respective licences` — and is not evidence about VetTrack's holder. It was not treated as such.
+
+**Discrepancy with the superseded entries:**
+
+- The Tier-2 entry answered this question from App Store Connect's `© 2026 Dan Erez`. That is a
+  copyright field on a distribution page: it identifies the Apple developer account holder, and does
+  not establish the licence holder of record or the existence of a registered entity. CodeRabbit's
+  objection on PR #197 (review comment `3810299244`) was correct on that narrow point, and the thread
+  was deliberately left open rather than resolved on adjacent evidence. The `03c522c` citation in the
+  same parenthetical is the load-bearing evidence; the App Store Connect citation is not.
+- Neither prior line was edited. Both stand as written.
+
+**Not established — and newly opened by this check:** the **vettrack** repo carries no `LICENSE` file
+at all (`gh api repos/exposwifty31/vettrack` → `license: null`; no licence-shaped file in the root
+listing). The RN repo's proprietary notice does not reach it. That is a separate question this entry
+does not close and does not claim to.
+
+**Verdict:** VERIFIED — every item above was observed this session by direct `gh api` output, not
+restated from a commit message or a prior entry. The one non-observable item, the absence of a
+registered company, is recorded as an owner statement and labelled as such.
