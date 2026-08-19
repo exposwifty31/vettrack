@@ -2,12 +2,23 @@
 
 ## Supported Versions
 
-Only the current production release of VetTrack receives security fixes.
+Only the **current production release** of VetTrack receives security fixes. Anything
+older is unsupported — upgrade before reporting.
 
 | Version | Supported |
 |---------|-----------|
-| 1.0.x (current) | ✅ |
-| < 1.0  | ❌ |
+| Current production release (`package.json` `version`) | ✅ |
+| Any earlier release | ❌ |
+
+This file deliberately does **not** name the version number. Hand-copied version numbers
+drift (this table said `1.0.x` long after the app shipped 1.2.0); numbers re-derived at
+read time do not. Derive it:
+
+```bash
+node -p "require('./package.json').version"                        # marketing version of record
+grep -m1 MARKETING_VERSION ios/App/App.xcodeproj/project.pbxproj   # iOS, must match
+grep -m1 CURRENT_PROJECT_VERSION ios/App/App.xcodeproj/project.pbxproj
+```
 
 ## Reporting a Vulnerability
 

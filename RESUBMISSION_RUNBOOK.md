@@ -3,8 +3,20 @@
 **Audience:** a future Claude session (or Dan) executing the resubmission cold.
 **Goal:** ship an App Store **update** to the live VetTrack app.
 > **Historical origin (resolved):** this runbook was first written to clear the **5.1.1(v)** rejection of build 15 and land **1.0.1 (20)** — submission `a0758d36-14b9-49c0-bf20-eb337ffcb8c6`. That rejection is **resolved and the app is LIVE**, so every run of this runbook is now an update / re-upload, not a first submission.
-**Current version fields:** marketing **1.1.2** (`package.json` = source of truth), build **25** (`CURRENT_PROJECT_VERSION`; `ios/.last-shipped-build` records the last build uploaded). Bump only via `pnpm resubmit` (§B.1) — never by hand.
-**Last verified:** 2026-07-10, version fields single-sourced + reconciled to 1.1.2 / build 25 (tooling in §B.1); production includes account deletion + native Apple token link.
+**Current version fields — do NOT copy a number into this file. Re-derive them, every time:**
+```bash
+node -p "require('./package.json').version"                             # marketing version of record
+grep -m1 CURRENT_PROJECT_VERSION ios/App/App.xcodeproj/project.pbxproj  # build number
+cat ios/.last-shipped-build                                             # last build actually uploaded
+```
+`package.json` `version` is the source of truth for the marketing version; `CURRENT_PROJECT_VERSION` is the build; `ios/.last-shipped-build` records the last build uploaded. Bump only via `pnpm resubmit` (§B.1) — never by hand.
+
+> **Why there is no version number written here.** Every hand-copied number in this repo's
+> docs went stale (this line once said "1.1.2 / build 25" through a whole 1.1.2 → 1.2.0
+> release); §C, which re-derives its values live at read time, has stayed correct the whole
+> time. When you are tempted to write a number into prose, write the command instead.
+
+**Last verified:** 2026-08-19 — the *procedure* below (not any version number) re-checked against the tree; production includes account deletion + native Apple token link.
 
 > Secrets: this file never contains the live Clerk key. Export it from Railway first:
 > `export CLERK_SECRET_KEY=$(cd /Users/dan/.vt-deploy 2>/dev/null && railway variables --json 2>/dev/null | python3 -c "import json,sys;print(json.load(sys.stdin)['CLERK_SECRET_KEY'])")`
@@ -26,7 +38,7 @@
 - **Code:** account deletion + Playwright CI fixes merged to `github/main` (PR #1). Local `main` synced. Deploy to Railway before App Review (§K).
 - **Production web** (`https://vettrack.uk`): serving the current bundle. The iOS shell is a **bundled app** (no `server.url`) — it does NOT depend on production for the frontend, but the API + Clerk it calls are production.
 - **Clerk (production instance `clerk.vettrack.uk`):** redirect URLs, allowed origins, Apple+Google OAuth, demo account, Client Trust — all configured (verify in §C).
-- **Version:** the app is **LIVE on the App Store**, so every submission is an update. Version fields are single-sourced (`package.json` = the marketing version of record = **1.1.2**; iOS `MARKETING_VERSION` reconciled to match; `CURRENT_PROJECT_VERSION` = **25**; `Info.plist CFBundleVersion` = `$(CURRENT_PROJECT_VERSION)`, no literal). **Do not hand-edit version fields — use `pnpm resubmit` / `pnpm resubmit:release` (§B.1).**
+- **Version:** the app is **LIVE on the App Store**, so every submission is an update. Version fields are single-sourced: `package.json` `version` is the marketing version of record, iOS `MARKETING_VERSION` is reconciled to match it, `CURRENT_PROJECT_VERSION` is the build, and `Info.plist CFBundleVersion` = `$(CURRENT_PROJECT_VERSION)` (no literal). Read the live values with the commands at the top of this file. **Do not hand-edit version fields — use `pnpm resubmit` / `pnpm resubmit:release` (§B.1).**
 - **Synced shell:** `npx cap sync ios` already run from HEAD. `dist/public` == `ios/App/App/public`.
 - **Legal pages:** `/privacy`, `/terms`, and `/support` are implemented — verify all three on production after deploy before setting App Store / Play Console URLs. See `docs/legal-pages.md`.
 
@@ -44,7 +56,7 @@ then runs the §C verification. It edits version fields only — no app logic.
 - **New product version** (new work shipped — you pick patch/minor/major; reserve
   major for releases that warrant it, no auto-increment):
   ```bash
-  pnpm resubmit:release 1.2.0     # sets marketing 1.2.0 + seeds build n+1
+  pnpm resubmit:release <MAJOR.MINOR.PATCH>   # sets that marketing version + seeds build n+1
   ```
 
 Then `pnpm cap:build:native` and archive (§C/§D). After a **successful** App Store
@@ -92,9 +104,10 @@ sips -g hasAlpha -g pixelWidth ios/App/App/Assets.xcassets/AppIcon.appiconset/Ap
 # Build number must be STRICTLY GREATER than the last shipped build (the app is
 # live — App Store Connect rejects a duplicate CFBundleVersion within a version).
 # verify-resubmission.sh checks CURRENT_PROJECT_VERSION > ios/.last-shipped-build.
-grep -m1 CURRENT_PROJECT_VERSION ios/App/App.xcodeproj/project.pbxproj
-#   EXPECT: CURRENT_PROJECT_VERSION greater than $(cat ios/.last-shipped-build)
-#   (currently pbxproj=25 and last-shipped=25 → run `pnpm resubmit` to bump to 26 first)
+PBX=$(grep -m1 CURRENT_PROJECT_VERSION ios/App/App.xcodeproj/project.pbxproj | tr -dc '0-9')
+SHIPPED=$(cat ios/.last-shipped-build)
+echo "pbxproj=$PBX last-shipped=$SHIPPED"; [ "$PBX" -gt "$SHIPPED" ] && echo "BUILD GATE: ok" || echo "BUILD GATE: FAIL - run pnpm resubmit"
+#   EXPECT: BUILD GATE: ok   (if FAIL, `pnpm resubmit` bumps the build past the last shipped one)
 
 # Shell is a BUNDLED app (no server.url) and carries the native OAuth transport
 python3 -c "import json;c=json.load(open('ios/App/App/capacitor.config.json'));print('BUNDLED:', 'server' not in c or not c.get('server',{}).get('url'))"
@@ -103,7 +116,22 @@ ls ios/App/App/public/assets/clerk-native-instance-*.js >/dev/null 2>&1 && echo 
 ```
 
 If you changed any frontend code, rebuild + re-sync BEFORE archiving. Use the **ship worktree**
-(`/Users/dan/vettrack-ship`, clean tree only) — not the dev lane if it has uncommitted WIP:
+(`/Users/dan/vettrack-ship`, clean tree only) — not the dev lane if it has uncommitted WIP.
+
+**FIRST: the ship worktree is not guaranteed to exist.** It is a git worktree, so it is
+per-machine state, not something a clone gives you — it is absent on a fresh machine and
+after anyone runs `git worktree remove`. Check, and create it if missing:
+
+```bash
+ls -d /Users/dan/vettrack-ship 2>/dev/null || \
+  (cd /Users/dan/vettrack && git worktree add ../vettrack-ship main)
+```
+
+That is the exact recovery `scripts/archive-from-clean-tree.sh` prints when it blocks —
+`ship worktree missing — run: cd $DEV_LANE && git worktree add ../vettrack-ship main`
+(defaults: `DEV_LANE` = repo root, `SHIP_LANE` = `$DEV_LANE/../vettrack-ship`; both are
+env-overridable). The script fails safely rather than archiving from the wrong tree, so
+hitting that blocker costs nothing but a re-run.
 
 ```bash
 cd /Users/dan/vettrack
@@ -137,8 +165,8 @@ Simulator smoke before archive:
 
 ## E. Resubmit in App Store Connect
 
-1. Open the app → the current marketing version (**1.1.2**), or create the new version if you ran `pnpm resubmit:release <target>`.
-2. **Build** → select the freshly uploaded build — the `build=<n> marketing=<v>` values `pnpm resubmit` printed (e.g. **1.1.2 (26)**).
+1. Open the app → the current marketing version (`node -p "require('./package.json').version"`), or create the new version if you ran `pnpm resubmit:release <target>`.
+2. **Build** → select the freshly uploaded build — the `build=<n> marketing=<v>` values `pnpm resubmit` printed.
 3. **App Review Information**:
    - Sign-In required: **Yes**.
    - Username: `reviewer@vettrack.uk`  Password: *(from your password manager — paste it into this App Store Connect field; never commit it to the repo)*

@@ -1,37 +1,8 @@
-#!/usr/bin/env bash
-set -eu
-
-if ! command -v psql >/dev/null 2>&1 || ! command -v pg_ctlcluster >/dev/null 2>&1; then
-  sudo apt-get update
-  sudo apt-get install -y postgresql-16 postgresql-client-16
-fi
-
-if ! command -v pg_lsclusters >/dev/null 2>&1; then
-  echo "pg_lsclusters is not available after PostgreSQL install" >&2
-  exit 1
-fi
-
-if pg_lsclusters | awk '$1=="16" && $2=="main" { found=1; status=$4 } END { exit(found ? 0 : 1) }'; then
-  if pg_lsclusters | awk '$1=="16" && $2=="main" && $4=="online" { found=1 } END { exit(found ? 0 : 1) }'; then
-    echo "PostgreSQL cluster 16/main already online"
-  else
-    sudo pg_ctlcluster 16 main start
-  fi
-else
-  sudo pg_createcluster 16 main --start
-fi
-
-role_exists="$(sudo -u postgres psql -tAc "SELECT 1 FROM pg_roles WHERE rolname='vettrack'" | tr -d '[:space:]')"
-if [ "$role_exists" != "1" ]; then
-  sudo -u postgres psql -c "CREATE USER vettrack WITH PASSWORD 'vettrack';"
-fi
-
-db_exists="$(sudo -u postgres psql -tAc "SELECT 1 FROM pg_database WHERE datname='vettrack'" | tr -d '[:space:]')"
-if [ "$db_exists" != "1" ]; then
-  sudo -u postgres psql -c "CREATE DATABASE vettrack OWNER vettrack;"
-fi
-
-pnpm install
-
-DATABASE_URL=postgres://vettrack:vettrack@localhost:5432/vettrack pnpm exec vitest --version
-DATABASE_URL=postgres://vettrack:vettrack@localhost:5432/vettrack npx tsc --version
+# INTENTIONALLY EMPTY — this file runs as root on cloud/VM session start, so it carries no
+# commands. Environment bootstrapping lives in the `SessionStart` hook in `.claude/settings.json`
+# (guarded by `CLAUDE_CODE_REMOTE`, runs `pnpm install --frozen-lockfile` as the normal user).
+# It previously ran `sudo apt-get install postgresql-16`, `sudo pg_createcluster`, and
+# `sudo -u postgres psql -c "CREATE USER ..."` — unreviewed root commands are exactly what
+# the empty-file rule exists to prevent. Do not add commands here. Local Postgres is set up
+# by hand per `docs/setup/environment.md`; DB-integration suites are excluded from `pnpm test`
+# by default and are run deliberately (`pnpm test:db-integration`, `pnpm test:integration:ops`).

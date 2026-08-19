@@ -157,7 +157,17 @@ Every DB table has a `clinicId` column. **Every query must filter by `clinicId`.
 ## Exports
 
 - Named exports preferred throughout — avoid default exports except for React page components loaded by the router (lazy import pattern requires a default export)
-- Never `export *` — explicit exports only
+- `export *` is for **barrel/index modules only** — a file whose entire job is to re-export a
+  set of sibling modules under one import specifier, or a compatibility shim that forwards a
+  moved module to its new home. Everywhere else, list exports explicitly.
+  Nine files do this today — do not memorise the list, re-derive it:
+  `git ls-files '*.ts' '*.tsx' | xargs grep -ln 'export \*'`
+  As of this writing they are the barrels `server/schema/index.ts`, `shared/index.ts`,
+  `src/types/index.ts`, `src/design-system-entry.ts`, `packages/contracts/src/index.ts`,
+  `packages/rfid-controller/src/index.ts`; `server/db.ts`, which re-exports the schema
+  barrel; and the two forwarding shims `src/lib/design-tokens.ts` and
+  `src/lib/offline-emergency-block.ts` (both point at `src/core/`). Adding `export *` to a
+  file that is not one of those shapes is the thing to avoid.
 
 ---
 
@@ -203,5 +213,10 @@ Types: feat | fix | refactor | test | docs | chore | perf
 ## What Is Deliberately Not Listed Here
 
 - No Husky git hooks (too much friction; pre-commit checks are manual)
-- No barrel (`index.ts`) files in `server/routes/` or `server/schema/` — they cause confusion
+- No barrel (`index.ts`) file in `server/routes/` — route modules are registered explicitly in
+  `server/app/routes.ts`, and a barrel there would hide that registration. (`server/schema/`
+  is the opposite case and **does** have one: `server/schema/index.ts` is the load-bearing
+  barrel that `server/db.ts` re-exports from, described as such in both `CLAUDE.md` and
+  `ARCHITECTURE.md`. This bullet used to forbid both; only the `server/routes/` half was ever
+  true.)
 - No `any` type escape hatches without an inline comment explaining why the type system cannot handle the case

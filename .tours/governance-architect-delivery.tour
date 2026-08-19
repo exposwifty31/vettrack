@@ -6,37 +6,37 @@
       "title": "1a. Auth entry point — resolveAuthUser",
       "description": "Every API request flows through `resolveAuthUser`. In **dev-bypass** mode (no `CLERK_SECRET_KEY`) the hardcoded `DEV_USER` is returned immediately. In production the Clerk JWT is validated and the DB row is upserted. Either way, the returned `AuthUser` carries `clinicId`, `role`, and `status`. **Role is always taken from `vt_users.role` — never from the JWT claim.**\n\nLook for the mode branch here: dev bypass first, then Clerk token validation below.",
       "file": "server/middleware/auth.ts",
-      "line": 240
+      "line": 329
     },
     {
       "title": "1b. clinicId extraction and security boundary",
       "description": "The `clinicId` set here becomes `req.clinicId` for the lifetime of the request. In dev-bypass mode it is `DEV_USER.clinicId` (or an override header). In Clerk mode it is taken from the DB row — `vt_users.clinicId` is authoritative; Clerk org membership is advisory only.\n\nThis is the **security boundary**. Every subsequent Drizzle query must constrain the target table with `eq(<table>.clinicId, clinicId)` — joining alone is insufficient.",
       "file": "server/middleware/auth.ts",
-      "line": 263
+      "line": 352
     },
     {
       "title": "1c. sessionContextMiddleware sets req.authUser and req.clinicId",
       "description": "After `resolveAuthUser` returns, `sessionContextMiddleware` (the exported wrapper) writes `req.authUser` and `req.clinicId`. Downstream route handlers read these values. Protected routes then call `requireAuth` or `requireRole` — those guards re-check the same resolved values and block `pending` / `blocked` accounts.",
       "file": "server/middleware/auth.ts",
-      "line": 505
+      "line": 653
     },
     {
       "title": "2a. Equipment checkout — route declaration",
       "description": "The `POST /:id/checkout` route is the canonical equipment checkout path. It is gated by `requireAuth`, `checkoutLimiter` (20/min), `requireEffectiveRole('student')` (minimum role), UUID validation, body validation, and replay idempotency middleware — all before the handler runs.\n\nNotice that `clinicId` is the first thing extracted from the validated `req.clinicId!` inside the handler.",
       "file": "server/routes/equipment.ts",
-      "line": 480
+      "line": 492
     },
     {
       "title": "2b. clinicId-scoped DB query in checkout",
       "description": "The equipment lookup constrains **both** `equipment.clinicId` and `equipment.id` — a textbook example of the multi-tenancy invariant. Satisfying tenant isolation via join alone would be a defect; here the target table (`vt_equipment`) is directly filtered.\n\nThe `isNull(equipment.deletedAt)` guard implements soft-delete filtering, which is the default pattern for this table family.",
       "file": "server/routes/equipment.ts",
-      "line": 506
+      "line": 517
     },
     {
       "title": "2c. logAudit on emergency checkout",
       "description": "`logAudit` is called **fire-and-forget** (`void logAudit(...)`) on the emergency checkout path. Without a `tx` argument the call schedules an outbox insert asynchronously — do not `await` it here; a failure in the audit write must not roll back the clinical write. For writes where audit must be atomic with the domain change, pass `tx` to `logAudit`.",
       "file": "server/routes/equipment.ts",
-      "line": 579
+      "line": 590
     },
     {
       "title": "3a. insertRealtimeDomainEvent — outbox write contract",
@@ -60,13 +60,13 @@
       "title": "4a. SSE stream route — the ward board transport",
       "description": "`GET /api/realtime/stream` is the single SSE connection per clinic. After auth + clinicId validation, it sets `Content-Type: text/event-stream` and subscribes to `outboxEmitter` on the `clinic:<clinicId>` channel. Each published outbox row is serialised with its `id:` field set to `vt_event_outbox.id` — this is the monotonic cursor that clients send back as `Last-Event-ID` on reconnect.\n\nThe transport is **SSE only**. Do not introduce WebSockets, long-polling, or shared workers.",
       "file": "server/routes/realtime.ts",
-      "line": 573
+      "line": 721
     },
     {
       "title": "4b. Last-Event-ID replay and reset_state on pruned cursor",
       "description": "On reconnect with a `Last-Event-ID` header the handler checks whether that outbox row still exists for the clinic. If it does, `replayPublishedOutboxAfter` replays all missed rows. If it was pruned (outbox janitor removed it), the server emits `reset_state:last_event_pruned` and the client triggers a full snapshot resync.\n\nThis is the recovery contract: never assume a cursor is still valid; always check before replaying.",
       "file": "server/routes/realtime.ts",
-      "line": 598
+      "line": 743
     },
     {
       "title": "4c. Service worker — emergency endpoint cache denylist",

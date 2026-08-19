@@ -4,7 +4,18 @@
 
 This repository is the **production monolith**: React web app, Express API, PostgreSQL, PWA/offline sync, and **Capacitor** native shell (iOS/Android). Active mobile strategy and Expo/RN work live elsewhere.
 
-**Current native release:** 1.0.1 (Build 20) — App Store approved. See `ios/App/App.xcodeproj/project.pbxproj` and locales `whatsNew.*`.
+**Current native release:** derive it, don't read it here — this line has been wrong before
+(it said "1.0.1 (Build 20)" long after 1.2.0 shipped), and a number copied into prose always
+drifts while a command does not:
+
+```bash
+node -p "require('./package.json').version"                             # marketing version of record
+grep -m1 CURRENT_PROJECT_VERSION ios/App/App.xcodeproj/project.pbxproj  # build number
+cat ios/.last-shipped-build                                             # last build uploaded to App Store Connect
+```
+
+Release notes live in `locales/*.json` under `whatsNew.*`. The full ship procedure is
+[`RESUBMISSION_RUNBOOK.md`](../RESUBMISSION_RUNBOOK.md).
 
 ## In scope (this repo)
 
@@ -32,12 +43,24 @@ This repository is the **production monolith**: React web app, Express API, Post
 
 Clone and setup: [`docs/devops/github-setup.md`](devops/github-setup.md), [`docs/setup/environment.md`](setup/environment.md).
 
-**Worktrees:**
+**Worktrees** (local, per-machine — a clone does not give you these):
 
-| Path | Branch | Purpose |
-|------|--------|---------|
-| `/Users/dan/vettrack` | `main-sync` | Dev lane |
-| `/Users/dan/vettrack-ship` | `main` | Ship lane (App Store releases) |
+| Path | Branch | Purpose | State |
+|------|--------|---------|-------|
+| `/Users/dan/vettrack` | `main` (plus feature branches) | Dev lane | The primary checkout |
+| `/Users/dan/vettrack-ship` | `main` | Ship lane (App Store archives, clean tree only) | **Created on demand — often absent** |
+
+Neither row is guaranteed on a given machine; run `git worktree list` to see the truth. The
+ship lane in particular is created when needed and removed afterwards:
+
+```bash
+ls -d /Users/dan/vettrack-ship 2>/dev/null || \
+  (cd /Users/dan/vettrack && git worktree add ../vettrack-ship main)
+```
+
+`scripts/archive-from-clean-tree.sh` blocks with that same command if the ship lane is
+missing. There is **no `main-sync` branch** — this table named one for a while, and it
+exists neither locally nor on `origin`.
 
 ## CI status
 

@@ -24,10 +24,15 @@ src/lib/offline-emergency-block.ts          @exposwifty31
 # CODEOWNERS itself
 .github/CODEOWNERS                          @exposwifty31
 
-# Six-domain ownership
+# Six-domain ownership.
+# `/shared/` is leading-slash-anchored to the ROOT shared/ dir (authority.ts,
+# code-blue-authority.ts). It was written `src/shared/`, which did exist from 2026-04-22
+# (`c113b9924`) until it was removed in mid-2026 (`33c7596f3`, `3df859145`) — so the rule
+# has matched nothing since. Unanchored it would also capture any future nested
+# `shared/` directory.
 src/core/                                   @exposwifty31
 src/native/                                 @exposwifty31
 src/desktop/                                @exposwifty31
-src/shared/                                 @exposwifty31
+/shared/                                    @exposwifty31
 lib/                                        @exposwifty31
 server/workers/                             @exposwifty31
