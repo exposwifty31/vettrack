@@ -135,6 +135,7 @@ function outboxRowToSse(row: PublishedOutboxRow): string {
     timestamp: row.occurredAt.toISOString(),
     id: row.id,
     outboxId: row.id,
+    clinicSeq: row.clinicSeq,
     eventVersion: row.eventVersion,
     level: row.level ?? "INFO",
     category: row.category ?? "SYSTEM",
@@ -170,6 +171,7 @@ async function replayPublishedOutboxAfter(
     .select({
       id: eventOutbox.id,
       clinicId: eventOutbox.clinicId,
+      clinicSeq: eventOutbox.clinicSeq,
       type: eventOutbox.type,
       payload: eventOutbox.payload,
       occurredAt: eventOutbox.occurredAt,
@@ -195,6 +197,7 @@ async function replayPublishedOutboxAfter(
     const published: PublishedOutboxRow = {
       id: row.id,
       clinicId: row.clinicId,
+      clinicSeq: row.clinicSeq,
       type: row.type,
       payload: row.payload,
       occurredAt: row.occurredAt,
@@ -256,6 +259,7 @@ router.get("/replay", requireAuth, async (req, res) => {
       .select({
         id: eventOutbox.id,
         clinicId: eventOutbox.clinicId,
+        clinicSeq: eventOutbox.clinicSeq,
         type: eventOutbox.type,
         payload: eventOutbox.payload,
         occurredAt: eventOutbox.occurredAt,
@@ -281,6 +285,7 @@ router.get("/replay", requireAuth, async (req, res) => {
       payload: row.payload,
       timestamp: row.occurredAt.toISOString(),
       outboxId: row.id,
+      clinicSeq: row.clinicSeq,
       eventVersion: row.eventVersion,
       level: row.level ?? "INFO",
       category: row.category ?? "SYSTEM",
@@ -325,12 +330,17 @@ router.get("/outbox-head", requireAuth, async (req, res) => {
     const rows = await db
       .select({
         maxPublishedId: sql<number>`coalesce(max(${eventOutbox.id}), 0)::int`,
+        maxPublishedClinicSeq: sql<number>`coalesce(max(${eventOutbox.clinicSeq}), 0)::int`,
       })
       .from(eventOutbox)
       .where(and(eq(eventOutbox.clinicId, clinicId), isNotNull(eventOutbox.publishedAt)));
 
     const maxPublishedId = Number(rows[0]?.maxPublishedId ?? 0);
-    res.status(200).json({ maxPublishedId, requestId });
+    // ADR-011: the client re-seeds BOTH cursors from here — `id` for Last-Event-ID resume,
+    // `clinicSeq` for contiguity. Seeding only the first is what made every recovery land
+    // on a stale sequence cursor and immediately re-trip gap detection.
+    const maxPublishedClinicSeq = Number(rows[0]?.maxPublishedClinicSeq ?? 0);
+    res.status(200).json({ maxPublishedId, maxPublishedClinicSeq, requestId });
   } catch (err) {
     console.error("[realtime-route] outbox-head failed", err);
     res.status(500).json(

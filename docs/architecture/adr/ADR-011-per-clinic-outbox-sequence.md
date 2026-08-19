@@ -3,7 +3,7 @@
 | Field | Value |
 |-------|--------|
 | **Date** | 2026-08-19 |
-| **Status** | proposed |
+| **Status** | accepted — implemented in migration 186 |
 | **Tags** | `#realtime` `#tenancy` |
 
 ## Context
@@ -80,15 +80,25 @@ WHERE e.id = s.id;
 ```
 
 Assignment for new rows is a per-clinic counter row, taken under a row lock so
-concurrent inserts for one clinic serialize while different clinics do not contend:
+concurrent inserts for one clinic serialize while different clinics do not contend.
+
+> **Correction, made during implementation.** This section originally said the assignment
+> would live in `insertRealtimeDomainEvent` (`server/lib/realtime-outbox.ts`), "the single
+> choke point for all 16 emit sites". **It is not the single choke point.** `server/lib/
+> audit.ts:398` inserts into `vt_event_outbox` directly for every `logAudit()` call, so an
+> application-level assignment would have left every `audit_log` event unsequenced — and
+> since a missing `clinicSeq` makes the client skip the contiguity check, the failure would
+> have been silent rather than loud. The assignment is therefore a **BEFORE INSERT
+> trigger** (`vt_event_outbox_assign_clinic_seq`, migration 186), which covers both paths
+> and any third one added later, and puts the invariant in the database rather than in a
+> convention every future caller has to remember. The unique index is the backstop.
 
 ```sql
-UPDATE vt_event_outbox_seq SET next_seq = next_seq + 1
-WHERE clinic_id = $1 RETURNING next_seq;
+INSERT INTO vt_event_outbox_seq AS s (clinic_id, next_seq)
+VALUES (NEW.clinic_id, 1)
+ON CONFLICT (clinic_id) DO UPDATE SET next_seq = s.next_seq + 1
+RETURNING s.next_seq INTO NEW.clinic_seq;
 ```
-
-`insertRealtimeDomainEvent` (`server/lib/realtime-outbox.ts`) is the single choke point
-for all 16 emit sites, so the assignment lives there and nothing else changes.
 
 **Rejected alternative:** `SELECT COALESCE(MAX(clinic_seq),0)+1 … WHERE clinic_id = $1`
 inline in the insert. It needs no new table, but two concurrent inserts for one clinic
@@ -148,13 +158,13 @@ any second clinic, and it degrades exactly when the product succeeds commerciall
 
 ## Compliance
 
-- [ ] `pnpm architecture:gates`
-- [ ] `npx tsc --noEmit`
-- [ ] Schema migration + `pnpm db:migrate` — new column, unique index, backfill, counter table
-- [ ] Backfill verified: zero `clinic_seq IS NULL` rows, and `(clinic_id, clinic_seq)` contiguous from 1 per clinic
-- [ ] A test that two clinics interleaving writes produce contiguous per-clinic sequences and **zero** `gapResync`
-- [ ] A test that a genuinely skipped `clinicSeq` still fires `gapResync`
-- [ ] A test that an event with no `clinicSeq` is applied without a gap
-- [ ] `tests/phase-9-deterministic-drills.test.ts` counter contracts still hold
-- [ ] Playwright `tests/phase-9-drills.spec.ts` — the live transport, per CLAUDE.md's rule that realtime work needs browser verification
-- [ ] i18n parity — not applicable, no user-facing copy
+- [x] `pnpm architecture:gates` — exit 0
+- [x] `npx tsc --noEmit` — all three tsconfigs exit 0
+- [x] Schema migration + `pnpm db:migrate` — `migrations/186_vt_event_outbox_clinic_seq.sql`, applied on the full 1–185 chain against a throwaway database, and re-applied verbatim to prove idempotency
+- [x] Backfill verified: rows inserted with the trigger disabled, migration re-run, `clinic_seq IS NULL` count 0, sequences contiguous from 1, and the counter re-seeded so the next insert continued rather than colliding
+- [x] Two clinics interleaving writes → contiguous per-clinic sequences: `tests/migrations/event-outbox-clinic-seq.test.ts` (DB) and zero `gapResync`: `tests/realtime-per-clinic-sequence.test.ts` (client)
+- [x] A genuinely skipped `clinicSeq` still fires `gapResync` — asserted in the client test
+- [x] An event with no `clinicSeq` is applied without a gap (rolling-deploy path) — asserted in the client test
+- [x] `tests/phase-9-deterministic-drills.test.ts` counter contracts still hold — full suite green
+- [ ] **NOT RUN — Playwright `tests/phase-9-drills.spec.ts`.** CLAUDE.md requires browser verification for realtime work and this needs a running app; it is the one compliance item this change did not satisfy.
+- [x] i18n parity — not applicable, no user-facing copy (`pnpm i18n:check` green regardless)

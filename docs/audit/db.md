@@ -87,6 +87,7 @@ Generated 2026-08-19.
 | `vt_display_devices` |
 | `vt_doctor_shifts` |
 | `vt_event_outbox` |
+| `vt_event_outbox_seq` |
 | `vt_idempotency_keys` |
 | `vt_push_subscriptions` |
 | `vt_scheduled_notifications` |
@@ -118,4 +119,4 @@ Generated 2026-08-19.
 
 ---
 
-**Total tables:** 75
+**Total tables:** 76

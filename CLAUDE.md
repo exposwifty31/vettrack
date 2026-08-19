@@ -197,7 +197,7 @@ All tables prefixed `vt_`. Table definitions live in `server/schema/*.ts` (re-ex
 **Tasks:** `vt_appointments` (unified task model; UI route `/equipment/tasks`)  
 **Emergency:** `vt_code_blue_sessions`, `vt_code_blue_log_entries`, `vt_crash_cart_*`  
 **Inventory:** `vt_containers`, `vt_items`, `vt_dispense_events`, `vt_restock_*`, `vt_purchase_orders`  
-**Ops:** `vt_shifts`, `vt_shift_sessions`, `vt_shift_handover` (migration 177), `vt_event_outbox`, `vt_clinical_check_ins`, `vt_audit_logs`  
+**Ops:** `vt_shifts`, `vt_shift_sessions`, `vt_shift_handover` (migration 177), `vt_event_outbox` + `vt_event_outbox_seq` (migration 186, ADR-011), `vt_clinical_check_ins`, `vt_audit_logs`  
 **RFID:** `vt_equipment_rfid_reads` (migration 138), `vt_rfid_readers` (migration 172; amended 174), `vt_rfid_secret_rotations` (migration 173; amended 176), `vt_rfid_egress_signals` (migration 175) — migration SQL is the source of truth for the composite-FK details  
 **Integrations:** `vt_integration_configs`, sync log/conflict tables  
 
@@ -207,7 +207,7 @@ After editing schema files, hand-write the next `migrations/NNN_description.sql`
 
 ### Realtime (Phase 9)
 
-- One SSE connection per clinic: `GET /api/realtime/stream` (auth + `clinicId` required). Events carry an `id:` cursor sourced from `vt_event_outbox.id`.
+- One SSE connection per clinic: `GET /api/realtime/stream` (auth + `clinicId` required). Events carry an `id:` cursor sourced from `vt_event_outbox.id`, **and a `clinicSeq` from `vt_event_outbox.clinic_seq`** (ADR-011). `id` is global and drives ordering, `Last-Event-ID` resume and replay; `clinicSeq` is per-clinic and is the ONLY field gap detection may assert contiguity on — a client sees just its own clinic's subset of the global id, so that subset is never contiguous. `clinic_seq` is assigned by a BEFORE INSERT trigger (migration 186), not by application code, because two insert paths exist.
 - Replay: on reconnect, the server replays missed outbox rows after `Last-Event-ID`; if that id was pruned the server emits `reset_state:last_event_pruned` and the client triggers a full snapshot resync. `GET /api/realtime/replay` exposes the same path over HTTP.
 - `KEEPALIVE` events (~10 s) carry `{ activeCodeBlueSessionId, stormHint }`. They are routed to keepalive subscribers only — they do **not** invalidate query caches. ≥50 connects per clinic in 5 s flips `stormHint=elevated` for 30 s.
 - `useRealtimeReconciliation` wires `visibilitychange`, `pageshow` (BFCache), `online`, and Page Lifecycle `freeze`/`resume` to one debounced reconciliation path (replay + `forceResyncWardErCaches`).

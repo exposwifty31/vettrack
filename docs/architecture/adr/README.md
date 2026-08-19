@@ -27,7 +27,7 @@ See **[TRIGGERS.md](./TRIGGERS.md)** for the full table (mirrors [architecture-h
 | ADR-007 | Clinic join codes | proposed | [ADR-007-clinic-join-codes.md](./ADR-007-clinic-join-codes.md) |
 | ADR-009 | Native push & Code Blue emergency alerting | proposed | [ADR-009-native-push-and-emergency-alerting.md](./ADR-009-native-push-and-emergency-alerting.md) |
 | ADR-010 | Gate the dev clinic-override header behind dev-bypass in `tenantContext` | proposed | [ADR-010-dev-tenant-header-gating.md](./ADR-010-dev-tenant-header-gating.md) |
-| ADR-011 | Gap-check realtime events on a per-clinic sequence, not the global outbox id | proposed | [ADR-011-per-clinic-outbox-sequence.md](./ADR-011-per-clinic-outbox-sequence.md) |
+| ADR-011 | Gap-check realtime events on a per-clinic sequence, not the global outbox id | accepted | [ADR-011-per-clinic-outbox-sequence.md](./ADR-011-per-clinic-outbox-sequence.md) |
 
 New ADRs use **`docs/architecture/adr/NNN-slug.md`**. Legacy files stay in place until an optional move PR; do not renumber without team agreement.
 

@@ -356,6 +356,17 @@ function resolveOutboxId(ev: RealtimeEvent): number | undefined {
   return undefined;
 }
 
+/**
+ * ADR-011. The per-clinic sequence, when the server supplied one. Returns `undefined` for a
+ * pre-migration-186 row or a server that predates the column — the caller then applies the
+ * event WITHOUT a contiguity check rather than falling back to the global id, because
+ * asserting contiguity on the global id is precisely the defect this replaced.
+ */
+function resolveClinicSeq(ev: RealtimeEvent): number | undefined {
+  const v = ev.clinicSeq;
+  return typeof v === "number" && Number.isFinite(v) ? v : undefined;
+}
+
 function resolveEventVersion(ev: RealtimeEvent): number {
   if (typeof ev.eventVersion === "number" && Number.isFinite(ev.eventVersion)) {
     return ev.eventVersion;
@@ -381,6 +392,7 @@ export function mapReplayApiRowToRealtimeEvent(row: {
   timestamp: string;
   outboxId: number;
   eventVersion: number;
+  clinicSeq?: number | null;
 }): RealtimeEvent {
   const oid = Number(row.outboxId ?? row.id);
   return {
@@ -389,6 +401,7 @@ export function mapReplayApiRowToRealtimeEvent(row: {
     timestamp: row.timestamp,
     id: oid,
     outboxId: oid,
+    clinicSeq: row.clinicSeq ?? null,
     eventVersion: row.eventVersion,
   };
 }
@@ -398,6 +411,14 @@ export function mapReplayApiRowToRealtimeEvent(row: {
  */
 export class EventIngestor {
   private lastAppliedEventId: number | null;
+
+  /**
+   * ADR-011. Contiguity cursor. Separate from {@link lastAppliedEventId}, which stays the
+   * resume/replay cursor: `id` is a global BIGSERIAL and this client sees only its own
+   * clinic's subset of it, so it can order events but cannot prove none were dropped.
+   * Seeded from `outbox-head`'s clinic-scoped max, or by the first sequenced event.
+   */
+  private lastAppliedClinicSeq: number | null = null;
 
   /**
    * While HTTP replay is applied, live SSE may still deliver the same ids; drop those until replay
@@ -437,6 +458,11 @@ export class EventIngestor {
 
   getLastAppliedEventId(): number | null {
     return this.lastAppliedEventId;
+  }
+
+  /** ADR-011 — the per-clinic contiguity cursor. */
+  getLastAppliedClinicSeq(): number | null {
+    return this.lastAppliedClinicSeq;
   }
 
   private onPeerStorage(ev: StorageEvent): void {
@@ -663,6 +689,11 @@ export class EventIngestor {
       if (!Number.isFinite(id) || id < 0) return;
       this.lastAppliedEventId = id;
       writeStoredLastOutboxId(id);
+      // ADR-011. Re-seed the contiguity cursor too. Recovery that restored only the id
+      // cursor left this one stale, so the very next event tripped gap detection again —
+      // which is why the false-gap loop never converged.
+      const seq = Number(head.maxPublishedClinicSeq);
+      this.lastAppliedClinicSeq = Number.isFinite(seq) && seq >= 0 ? seq : null;
     } catch {
       // Keep prior cursor if head fetch fails.
     }
@@ -699,28 +730,47 @@ export class EventIngestor {
       return;
     }
 
-    if (this.lastAppliedEventId !== null) {
-      if (oid <= this.lastAppliedEventId) {
-        reportRealtimeTelemetry({ duplicateDrop: true });
-        return;
-      }
-      if (oid !== this.lastAppliedEventId + 1) {
-        if (!this.gapRecoveryInFlight) {
-          this.gapRecoveryInFlight = (async () => {
-            try {
-              reportRealtimeTelemetry({ gapResync: true });
-              await this.establishBaselineAfterFullRefresh();
-            } finally {
-              this.gapRecoveryInFlight = null;
-            }
-          })();
+    // ADR-011. Duplicate suppression and gap detection run on the PER-CLINIC sequence.
+    // `oid` remains the resume/replay cursor below, but it is a GLOBAL BIGSERIAL and this
+    // client only ever receives its own clinic's subset of it — so it is not contiguous
+    // here, and asserting `oid === last + 1` on it reported every event as a dropped one
+    // as soon as a second clinic wrote.
+    const cseq = resolveClinicSeq(ev);
+    if (cseq !== undefined) {
+      if (this.lastAppliedClinicSeq !== null) {
+        if (cseq <= this.lastAppliedClinicSeq) {
+          reportRealtimeTelemetry({ duplicateDrop: true });
+          return;
         }
-        return;
+        if (cseq !== this.lastAppliedClinicSeq + 1) {
+          if (!this.gapRecoveryInFlight) {
+            this.gapRecoveryInFlight = (async () => {
+              try {
+                reportRealtimeTelemetry({ gapResync: true });
+                await this.establishBaselineAfterFullRefresh();
+              } finally {
+                this.gapRecoveryInFlight = null;
+              }
+            })();
+          }
+          return;
+        }
       }
+      this.lastAppliedClinicSeq = cseq;
+    } else if (this.lastAppliedEventId !== null && oid <= this.lastAppliedEventId) {
+      // No sequence on this envelope: a row written before migration 186, or a frame from
+      // a server that predates it. Redelivery is still suppressed by id, but there is
+      // deliberately NO contiguity check — falling back to the global id here would
+      // reintroduce the exact false-gap loop this replaced.
+      reportRealtimeTelemetry({ duplicateDrop: true });
+      return;
     }
 
-    this.lastAppliedEventId = oid;
-    writeStoredLastOutboxId(oid);
+    // Resume cursor advances only (never regresses), matching applyReplayBatch below.
+    if (this.lastAppliedEventId === null || oid > this.lastAppliedEventId) {
+      this.lastAppliedEventId = oid;
+      writeStoredLastOutboxId(oid);
+    }
     void applyEvent(this.queryClient, ev);
   }
 
@@ -770,6 +820,16 @@ export class EventIngestor {
         if (shouldAdvance) {
           this.lastAppliedEventId = oid;
           writeStoredLastOutboxId(oid);
+        }
+        // ADR-011 — same monotonic rule for the contiguity cursor, for the same reason:
+        // a replay batch overlapping live SSE must not regress it and make the next live
+        // event look like a gap.
+        const replayCseq = resolveClinicSeq(ev);
+        if (
+          replayCseq !== undefined &&
+          (this.lastAppliedClinicSeq === null || replayCseq > this.lastAppliedClinicSeq)
+        ) {
+          this.lastAppliedClinicSeq = replayCseq;
         }
         await applyEvent(this.queryClient, ev);
       }
