@@ -8041,10 +8041,10 @@ variables, and the deploy pipeline (needs Railway).
 
 ---
 
-## 2026-08-19 — Tier-1 audit remediation: three vettrack lanes + one RN docs lane, after adversarial review (b26e06d89, c59549e12, f98c2e56c; RN 2578849)
+## 2026-08-19 — Tier-1 audit remediation: four vettrack lanes + one RN docs lane, after adversarial review (b26e06d89, c59549e12, f98c2e56c; RN 2578849)
 
-**Task.** Land the tier-1 audit remediation produced by four implementer lanes (T1 realtime,
-T2 i18n, T3 tsconfig, T4 CI/docs, T5 RN docs) after three adversarial reviewers returned
+**Task.** Land the tier-1 audit remediation produced by **five** implementer lanes — four in
+vettrack (T1 realtime, T2 i18n, T3 tsconfig, T4 CI/docs) plus T5 in the RN repo after three adversarial reviewers returned
 `INCOMPLETE`, `DEFECTIVE` and `INCOMPLETE`. This entry records what the land pass actually
 re-checked and changed, not what the lane proofs asserted. Where a lane proof and a
 reviewer disagreed, the disagreement was settled by running the thing.
@@ -8204,8 +8204,8 @@ tree. Logs in the session scratchpad (`gate-*.log`).
 | `pnpm i18n:check` | 0 | `✓ locales/en.json and locales/he.json are in deep key parity.` |
 | `pnpm architecture:gates` | 0 | `✔ no dependency violations found (1000 modules, 5203 dependencies cruised)`; `10 known violations ignored`; `OK — server: 2 cycle(s), src: 0 cycle(s) (matches baseline)`; `All G1 checks passed.` |
 | `pnpm contracts:typecheck` | 0 | pass |
-| `pnpm test:rfid-controller` | 0 | `Tests 145 passed | 6 skipped (151)` |
-| `pnpm test` | **1** | `Test Files 3 failed | 734 passed (737)`, `Tests 4 failed | 6686 passed | 11 skipped (6701)` — see below |
+| `pnpm test:rfid-controller` | 0 | `Tests 145 passed \| 6 skipped (151)` |
+| `pnpm test` | **1** | `Test Files 3 failed \| 734 passed (737)`, `Tests 4 failed \| 6686 passed \| 11 skipped (6701)` — see below |
 
 **`pnpm test` is red, and it is red on `main` too. Both causes were verified against the base
 commit before being called pre-existing, using a throwaway detached worktree at `e3472e63e`
@@ -8240,7 +8240,10 @@ default `vitest run` does — `vite.config.ts` excludes every DB-backed file.
 
 ### Commits
 
-Separate per lane, explicit pathspecs, so one lane can be reverted alone. Nothing pushed, no PR
+Explicit pathspecs per commit. Three of the four vettrack commits map one-to-one to a lane
+and can be reverted alone; `f98c2e56` is the exception — it combines **T3** (tsconfig) and
+**T4** (CI/docs), so reverting it takes both. Stated rather than left implied, since a
+rollback plan that assumes a boundary the commits do not have is worse than no plan. Nothing pushed, no PR
 opened, no `--amend` / `--force` / `--no-verify`.
 
 - `b26e06d89` `fix(realtime): route task lifecycle events through the outbox` — 3 files,

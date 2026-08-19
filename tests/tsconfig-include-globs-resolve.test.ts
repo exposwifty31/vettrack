@@ -14,12 +14,14 @@ import { join } from "path";
  * Fixing that config was the instance. This is the class: every include glob in
  * every tracked tsconfig must resolve to at least one real file.
  */
-const CONFIGS = [
-  "tsconfig.json",
-  "tsconfig.server.json",
-  "tsconfig.server-check.json",
-  "tsconfig.node.json",
-].filter((file) => existsSync(file));
+/**
+ * Every config a CI gate type-checks against. NOT filtered by existsSync: dropping a
+ * missing file would turn a renamed or deleted config into a silent pass here while the
+ * gate that runs `tsc --project` on it breaks — the same shape of failure this whole
+ * test exists to catch.
+ */
+const CI_CHECKED = ["tsconfig.json", "tsconfig.server.json", "tsconfig.server-check.json"];
+const CONFIGS = [...CI_CHECKED, "tsconfig.node.json"];
 
 const SKIP_DIRS = new Set(["node_modules", ".git", "dist", "artifacts", "coverage"]);
 
@@ -84,6 +86,14 @@ function resolvesToAtLeastOneFile(glob: string): boolean {
 }
 
 describe("tsconfig include globs resolve to real files", () => {
+  it.each(CI_CHECKED)("%s exists — a CI gate type-checks against it", (config) => {
+    expect(
+      existsSync(config),
+      `${config} is missing but a CI gate runs tsc against it; renaming a config must ` +
+        `update the workflow, not silently skip this check.`,
+    ).toBe(true);
+  });
+
   it.each(CONFIGS)("%s — every include glob matches at least one file", (config) => {
     const includes = (parseJsonc(readFileSync(config, "utf8")).include ?? []) as string[];
     expect(includes.length, `${config} declares no include globs`).toBeGreaterThan(0);
@@ -94,6 +104,21 @@ describe("tsconfig include globs resolve to real files", () => {
       `${config} include globs matching ZERO files: ${dead.join(", ")}. ` +
         `tsc exits 0 on an empty glob, so this silently removes files from a CI gate. ` +
         `Fix the path or delete the entry.`,
+    ).toEqual([]);
+  });
+
+  it.each(CONFIGS)("%s — every exclude glob matches at least one file", (config) => {
+    // Dead excludes were half of the original defect: tsconfig.server-check.json
+    // excluded two paths its (also-dead) includes had never matched, so the file read
+    // as if it were narrowing a real check when it was narrowing nothing. An exclude
+    // matching zero files is either a stale path or a misunderstanding of the include
+    // set — both worth failing on.
+    const excludes = (parseJsonc(readFileSync(config, "utf8")).exclude ?? []) as string[];
+    const dead = excludes.filter((glob) => !resolvesToAtLeastOneFile(glob));
+    expect(
+      dead,
+      `${config} exclude globs matching ZERO files: ${dead.join(", ")}. ` +
+        `A dead exclude misrepresents what the gate skips. Fix the path or delete the entry.`,
     ).toEqual([]);
   });
 });

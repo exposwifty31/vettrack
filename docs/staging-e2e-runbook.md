@@ -141,7 +141,12 @@ export PLAYWRIGHT_E2E=true
 pnpm test:playwright:ci
 ```
 
-Includes: `pwa.spec.ts`, `phase-9-drills.spec.ts`, `signup-flow.spec.ts` (not `staging-*.spec.ts`).
+`PW_SUITE=ci` includes exactly `pwa.spec.ts` and `phase-9-drills.spec.ts`.
+
+`signup-flow.spec.ts` is a **separate** suite (`pnpm test:playwright:signup`), as are
+`ui-smoke.spec.ts` (`test:playwright:ui-smoke`) and `e2e/simulation/workday.spec.ts`
+(`PW_SUITE=workday`). `staging-*.spec.ts` runs under `playwright.staging.config.ts` via
+`pnpm test:staging:e2e` / `test:staging:walkthrough` — never under `ci`.
 
 ## Clerk dashboard test delivery
 

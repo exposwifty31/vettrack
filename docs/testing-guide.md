@@ -91,7 +91,9 @@ pnpm test:rls-pooling       # vitest.rls-pooling.config.ts — runs CREATE TABLE
 For the live-server suites, start the dev server first, then run the file directly:
 
 ```bash
-npx vitest run tests/expiry-api.test.js
+# These six are standalone Node scripts (main() + process.exit), NOT vitest suites —
+# `vitest run` on them collects zero tests and exits 0, which reads as a pass.
+node tests/expiry-api.test.js          # or any of the other five
 ```
 
 ---

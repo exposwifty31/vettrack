@@ -27,6 +27,7 @@
  * No database is touched: `server/db.js` and the outbox helper are module-mocked.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import ts from "typescript";
 import { readdirSync, readFileSync } from "fs";
 import { join } from "path";
 
@@ -293,17 +294,83 @@ describe("no legacy broadcast emitters remain in the task services", () => {
     ).toEqual([]);
   });
 
-  it("appointments.service emits all five TASK_* kinds via the outbox helper", () => {
+  /**
+   * Per-operation, not per-file. The previous version of this test read the whole
+   * source and asserted the five type literals appeared SOMEWHERE in it, which passes
+   * unchanged if createAppointment, updateAppointment, startTask or completeTask stops
+   * calling the emitter altogether — the literals would still be present in the other
+   * operations. It proved the strings exist, not that the events fire.
+   *
+   * This walks the AST and extracts the emitTaskEvent(...) calls inside each named
+   * function body, in source order, so a lost or reordered emission fails here.
+   */
+  function emitSequenceFor(fnName: string): Array<{ type: string; firstArg: string }> {
     const source = readFileSync("server/services/appointments.service.ts", "utf8");
-    expect(source).toContain("insertRealtimeDomainEvent");
-    for (const type of [
-      "TASK_CREATED",
-      "TASK_UPDATED",
-      "TASK_CANCELLED",
-      "TASK_STARTED",
-      "TASK_COMPLETED",
-    ]) {
-      expect(source).toContain(`"${type}"`);
-    }
+    const sf = ts.createSourceFile(
+      "appointments.service.ts",
+      source,
+      ts.ScriptTarget.Latest,
+      true,
+    );
+    const found: Array<{ type: string; firstArg: string }> = [];
+    let inside = false;
+
+    const collect = (node: ts.Node): void => {
+      if (
+        inside &&
+        ts.isCallExpression(node) &&
+        ts.isIdentifier(node.expression) &&
+        node.expression.text === "emitTaskEvent"
+      ) {
+        const [arg0, arg1] = node.arguments;
+        found.push({
+          type: arg1 && ts.isStringLiteral(arg1) ? arg1.text : "<non-literal>",
+          firstArg: arg0 && ts.isIdentifier(arg0) ? arg0.text : "<non-identifier>",
+        });
+      }
+      ts.forEachChild(node, collect);
+    };
+
+    const visit = (node: ts.Node): void => {
+      if (ts.isFunctionDeclaration(node) && node.name?.text === fnName) {
+        inside = true;
+        if (node.body) ts.forEachChild(node.body, collect);
+        inside = false;
+        return;
+      }
+      ts.forEachChild(node, visit);
+    };
+    ts.forEachChild(sf, visit);
+    return found;
+  }
+
+  it.each([
+    ["createAppointment", ["TASK_CREATED"]],
+    ["updateAppointment", ["TASK_UPDATED"]],
+    // The two paired emitters: the state change first, then the generic TASK_UPDATED
+    // that list views subscribe to. Order matters — the outbox id sequence is what the
+    // client applies them in, so a swap would show the row updated before it cancelled.
+    ["cancelAppointment", ["TASK_CANCELLED", "TASK_UPDATED"]],
+    ["startTask", ["TASK_STARTED", "TASK_UPDATED"]],
+    ["completeTask", ["TASK_COMPLETED", "TASK_UPDATED"]],
+  ] as const)("%s emits %j through the outbox helper, in that order", (fn, expected) => {
+    const seq = emitSequenceFor(fn);
+    expect(
+      seq.map((e) => e.type),
+      `${fn} no longer emits the expected task events in order`,
+    ).toEqual([...expected]);
+    // Every emission must be scoped by the resolved clinicId local, never a raw
+    // request field — the multi-tenancy rule that applies to every write path.
+    for (const e of seq) expect(e.firstArg).toBe("clinicId");
+  });
+
+  it("emitTaskEvent is the only path from this service to the outbox", () => {
+    // If a future emit site calls insertRealtimeDomainEvent directly it would bypass
+    // the helper's category:"TASK" tagging and its non-fatal error handling, so the
+    // per-operation sequences above would stop covering it.
+    const source = readFileSync("server/services/appointments.service.ts", "utf8");
+    const direct = source.split("\n").filter((l) => l.includes("insertRealtimeDomainEvent("));
+    expect(direct).toHaveLength(1);
+    expect(direct[0]).toContain("category: \"TASK\"");
   });
 });
