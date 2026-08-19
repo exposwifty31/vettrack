@@ -379,6 +379,8 @@ const translations = {
     recoveryAttentionCalloutVeryStale: d.equipmentDetail.recoveryAttentionCalloutVeryStale,
     recoveryAttentionCalloutCheckedOutLong: d.equipmentDetail.recoveryAttentionCalloutCheckedOutLong,
     toast: {
+      chargeAlertScheduled: (minutes: number) =>
+        tr(d.equipmentDetail.toast.chargeAlertScheduled, { minutes }),
       undone: d.equipmentDetail.toast.undone,
       undoFailed: d.equipmentDetail.toast.undoFailed,
       savedOffline: d.equipmentDetail.toast.savedOffline,
@@ -437,7 +439,6 @@ const translations = {
     ariaEditFloorNote: d.equipmentDetail.ariaEditFloorNote,
   },
 
-
   newEquipment: {
     heading: d.newEquipment.heading,
     fields: d.newEquipment.fields,
@@ -455,6 +456,8 @@ const translations = {
   myEquipment: {
     toast: {
       returnSuccess: d.myEquipment.toast.returnSuccess,
+      chargeAlertScheduled: (minutes: number) =>
+        tr(d.myEquipment.toast.chargeAlertScheduled, { minutes }),
       returnError: d.myEquipment.toast.returnError,
       returnAllSuccess: (count: number) => tr(d.myEquipment.toast.returnAllSuccess, { count }),
       returnAllPartialError: d.myEquipment.toast.returnAllPartialError,
@@ -720,13 +723,6 @@ const translations = {
     next: d.onboarding.next,
   },
 
-  moveRoomSheet: {
-    movedTo: (roomName: string) => tr(d.moveRoomSheet.movedTo, { roomName }),
-    movedToDefaultRoom: d.moveRoomSheet.movedToDefaultRoom,
-    removedFromRoom: d.moveRoomSheet.removedFromRoom,
-    moveFailed: d.moveRoomSheet.moveFailed,
-  },
-
   moveRoom: {
     toast: {
       movedTo: (roomName: string) => tr(d.moveRoom.toast.movedTo, { roomName }),
@@ -789,8 +785,6 @@ const translations = {
       tr(d.monthlyReport.footer, { total, generatedAt }),
   },
 
-  outcomeKpiDashboard: d.outcomeKpiDashboard,
-
   myEquipmentPage: d.myEquipmentPage,
 
   notFoundPage: d.notFoundPage,
@@ -835,13 +829,7 @@ const translations = {
 
   scanCelebration: d.scanCelebration,
 
-  landingPage: {
-    ...d.landingPage,
-    howStepLabel: (stepNum: string) => tr(d.landingPage.howStepLabel, { stepNum }),
-  },
-
   helpPage: d.helpPage,
-
 
   roomRadarPage: {
     ...d.roomRadarPage,
@@ -881,8 +869,6 @@ const translations = {
   pwa: d.pwa,
 
   qrPrintPage: d.qrPrintPage,
-
-  stabilityPage: d.stabilityPage,
 
   handoverPage: d.handoverPage,
 
@@ -927,8 +913,6 @@ const translations = {
     alertAria: (count: number) => tr(d.layoutHebrew.alertAria, { count }),
   },
 
-  conflictModal: d.conflictModal,
-
   updateBanner: {
     newVersion: (version: string) => tr(d.updateBanner.newVersion, { version }),
     seeWhatsNew: d.updateBanner.seeWhatsNew,
@@ -936,10 +920,6 @@ const translations = {
   },
 
   pageErrorBoundary: d.pageErrorBoundary,
-
-
-  patientDetail: d.patientDetail,
-
 
   inventoryItemsPage: d.inventoryItemsPage,
 
@@ -951,8 +931,6 @@ const translations = {
   },
 
   procurementPage: d.procurementPage,
-
-
 
   appointmentsPage: {
     ...d.appointmentsPage,
@@ -974,14 +952,6 @@ const translations = {
     adminNoDispenseDetail: (params: { taskId: string; hours: number }) =>
       tr(d.cop.adminNoDispenseDetail, { taskId: params.taskId, hours: params.hours }),
   },
-
-
-  adminOpsDashboard: d.adminOpsDashboard,
-
-  er: d.er,
-
-
-
 
   shiftChat: {
     ...d.shiftChat,
@@ -1014,14 +984,6 @@ const translations = {
     noteLabel: d.whatsAppMessage.noteLabel,
     actionRequired: d.whatsAppMessage.actionRequired,
     statusReport: (name: string) => tr(d.whatsAppMessage.statusReport, { name }),
-  },
-
-  leakageReport: d.leakageReport,
-
-  inventoryJobsPage: {
-    ...d.inventoryJobsPage,
-    loadError: (params: { message: string }) => tr(d.inventoryJobsPage.loadError, params),
-    empty: (params: { status: string }) => tr(d.inventoryJobsPage.empty, params),
   },
 
   crashCart: {
@@ -1185,6 +1147,7 @@ const translations = {
     WAITLIST_SELF_CHECKOUT: d.equipmentWaitlist.WAITLIST_SELF_CHECKOUT,
     WAITLIST_ALREADY_JOINED: d.equipmentWaitlist.WAITLIST_ALREADY_JOINED,
     WAITLIST_NOT_ON_WAITLIST: d.equipmentWaitlist.WAITLIST_NOT_ON_WAITLIST,
+    WAITLIST_RESERVATION_HELD_BY_OTHER: d.equipmentWaitlist.WAITLIST_RESERVATION_HELD_BY_OTHER,
     EQUIPMENT_NOT_FOUND: d.equipmentWaitlist.EQUIPMENT_NOT_FOUND,
   },
 

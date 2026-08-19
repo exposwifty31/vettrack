@@ -57,6 +57,44 @@ secrets that were never set.
 Order, if rebuilt: `pnpm staging:seed` → `pnpm test:staging:e2e` → `pnpm test:staging:walkthrough`
 → `pnpm staging:cleanup` (cleanup with `if: always()`).
 
+### If it is rebuilt: scope the secrets to environments, never to the repository
+
+This is the one piece of the deleted workflows worth keeping. They held their `_STAGING`
+credentials as **repository** secrets, which every workflow in the repo can read — including
+one added by a future PR. That was a real finding against them, and deleting the workflows
+closes it only for as long as nothing replaces them.
+
+A rebuild uses two GitHub environments, not one, because the trusted refs differ — a
+`workflow_dispatch` E2E run comes from `staging`, while a `schedule:` trigger always fires on
+the default branch. One shared environment would have to trust both, which is the weaker rule.
+
+| Environment | For | Deployment branch policy |
+|---|---|---|
+| `staging-e2e` | the dispatch-only E2E lane | selected branches → `staging` |
+| `staging-simulation` | a scheduled simulation | selected branches → `main` |
+
+Each holds only what its own job reads — an environment carrying the other's secrets re-opens
+the finding at a smaller scale. Only the E2E lane touches `DATABASE_URL_STAGING`, because only
+it runs `staging:seed` / `staging:cleanup` against a live database; a simulation reaches
+staging over HTTP and needs none.
+
+**An environment with no protection rules is not a gate.** Verify all four, not just the first:
+
+```bash
+R=exposwifty31/vettrack
+gh api repos/$R/environments -q '.environments[].name'            # both listed
+for e in staging-e2e staging-simulation; do
+  echo "== $e =="
+  gh api repos/$R/environments/$e/deployment-branch-policies -q '.branch_policies[].name'
+  gh api repos/$R/environments/$e/secrets -q '.secrets[].name'
+done
+gh api repos/$R/actions/secrets -q '.secrets[].name' | grep '_STAGING$'   # must print NOTHING
+```
+
+A repository-scoped `_STAGING` secret surviving the migration is the finding restated, not
+fixed. As of 2026-08-19 that last command is silent for the right reason: no `_STAGING` secret
+was ever created.
+
 **Until then, run it locally** — the sections below are the supported path and are what the
 workflows wrapped.
 
@@ -149,7 +187,6 @@ Playwright refuses non-staging `TEST_BASE_URL` and non-test Clerk keys.
 | `tests/pwa.spec.ts` | default config | Local/CI API | **Local/CI only** |
 | `tests/phase-9-drills.spec.ts` | default config | Local/CI API (`/api/metrics` needs dev bypass) | **Local/CI only** |
 | `tests/ui-smoke.spec.ts` | `playwright.ui.config.ts` | Documented for prod URL; needs real session | **Needs mocks** / prod-oriented |
-| `tests/example.spec.ts` | (excluded) | N/A — not VetTrack | **Excluded** |
 
 ### Warnings
 
@@ -166,7 +203,12 @@ export PLAYWRIGHT_E2E=true
 pnpm test:playwright:ci
 ```
 
-Includes: `pwa.spec.ts`, `phase-9-drills.spec.ts`, `signup-flow.spec.ts` (not `staging-*.spec.ts` or `example.spec.ts`).
+`PW_SUITE=ci` includes exactly `pwa.spec.ts` and `phase-9-drills.spec.ts`.
+
+`signup-flow.spec.ts` is a **separate** suite (`pnpm test:playwright:signup`), as are
+`ui-smoke.spec.ts` (`test:playwright:ui-smoke`) and `e2e/simulation/workday.spec.ts`
+(`PW_SUITE=workday`). `staging-*.spec.ts` runs under `playwright.staging.config.ts` via
+`pnpm test:staging:e2e` / `test:staging:walkthrough` — never under `ci`.
 
 ## Clerk dashboard test delivery
 

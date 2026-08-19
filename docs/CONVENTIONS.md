@@ -186,6 +186,11 @@ Every DB table has a `clinicId` column. **Every query must filter by `clinicId`.
 - `export *` is for **barrel/index modules only** — a file whose entire job is to re-export a
   set of sibling modules under one import specifier, or a compatibility shim that forwards a
   moved module to its new home. Everywhere else, list exports explicitly.
+  **One documented exception: `server/db.ts`.** It is not a barrel — it creates the PostgreSQL pool
+  (`new Pool`) and the Drizzle client (`drizzle(pool)`) — and it also re-exports
+  `server/schema/`, which many call sites import from. Read strictly, the rule above says to remove that re-export; do not. It stays for
+  compatibility. Anything else combining real work with `export *` is still the thing to
+  avoid.
   Nine files do this today — do not memorise the list, re-derive it:
   `git ls-files '*.ts' '*.tsx' | xargs grep -ln 'export \*'`
   As of this writing they are the barrels `server/schema/index.ts`, `shared/index.ts`,

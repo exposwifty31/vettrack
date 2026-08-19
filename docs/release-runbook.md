@@ -287,4 +287,4 @@ Copy for PR comments or release tickets:
 
 ---
 
-*Last updated for the staging E2E gate workflow (`.github/workflows/staging-e2e-manual.yml`). Workflow and script behavior on `staging` may evolve — if this doc and the branch diverge, prefer the `staging` branch copy of [staging-e2e-runbook.md](staging-e2e-runbook.md) for E2E specifics.*
+*The staging E2E gate workflow it referenced (`.github/workflows/staging-e2e-manual.yml`) has been deleted — it could never run. [staging-e2e-runbook.md](staging-e2e-runbook.md) is now the local, supported path for E2E specifics.*

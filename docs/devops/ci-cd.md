@@ -23,8 +23,9 @@ Maintenance scope: [`docs/MAINTENANCE_MODE.md`](../MAINTENANCE_MODE.md)
 | [`release-gate.yml`](../../.github/workflows/release-gate.yml) | Manual only | No (pilot readiness) |
 | [`flake-detection.yml`](../../.github/workflows/flake-detection.yml) | Nightly 03:00 UTC; manual | No |
 | [`e2e-simulation-nightly.yml`](../../.github/workflows/e2e-simulation-nightly.yml) | Nightly 05:00 UTC; manual | No |
-| [`workday-simulation-nightly.yml`](../../.github/workflows/workday-simulation-nightly.yml) | Nightly 04:00 UTC; manual | No |
-| [`staging-e2e-manual.yml`](../../.github/workflows/staging-e2e-manual.yml) | Manual on `staging` | No |
+
+> The two staging workflows (`staging-e2e-manual.yml`, `workday-simulation-nightly.yml`) were
+> deleted — neither could ever run. See [staging-e2e-runbook.md](../staging-e2e-runbook.md).
 
 ---
 
