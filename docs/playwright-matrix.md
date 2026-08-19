@@ -10,7 +10,7 @@ VetTrack uses **allowlist-only** discovery in `playwright.config.ts` (`PW_SUITE`
 | `pnpm test:playwright:phase9` | same | `phase-9-drills.spec.ts` only | `:3001` | Phase 9 drills only |
 | `pnpm test:playwright:signup` | same | `signup-flow.spec.ts` only | `:3001` / optional `:5000` | Clerk + DB mutations — **not** default CI |
 | `pnpm test:playwright:ui-smoke` | `playwright.ui.config.ts` | `ui-smoke.spec.ts` | `:5000` or HTTPS | Manual UI audit; needs Clerk session for full auth routes |
-| `playwright.staging.config.ts` | staging specs | `staging-*.spec.ts` | Staging Railway | **Local only** — `pnpm test:staging:e2e`; the manual workflow was deleted (see `docs/staging-e2e-runbook.md`) |
+| `playwright.staging.config.ts` | staging specs | `staging-auth-smoke.spec.ts`, `staging-code-blue-gating.spec.ts` (the walkthrough is a separate command — see row below) | Staging Railway | **Local only** — `pnpm test:staging:e2e`; the manual workflow was deleted (see `docs/staging-e2e-runbook.md`) |
 | `PW_SUITE=workday` | same | `e2e/simulation/workday.spec.ts` | Staging URL + `STAGING_E2E_CONFIRM=yes` | Local only — the nightly workflow was deleted |
 
 ## Default CI scope (`pnpm test:playwright:ci`)

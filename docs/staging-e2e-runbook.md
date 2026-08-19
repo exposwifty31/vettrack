@@ -140,13 +140,17 @@ Writes `.staging-e2e-manifest.json` (gitignored) for tests and cleanup.
 pnpm test:staging:e2e
 ```
 
-Specs:
+Specs it runs — exactly two, both named explicitly in the script:
 
 - `tests/staging-auth-smoke.spec.ts` — health, `/api/users/me` role/status matrix
 - `tests/staging-code-blue-gating.spec.ts` — Code Blue API auth gates on staging
-- `tests/staging-walkthrough.spec.ts` — full UI walkthrough (routes, permissions, screenshots, matrix)
 
-Full UI walkthrough only:
+`tests/staging-walkthrough.spec.ts` was listed here and **is not run by this command** —
+`test:staging:e2e` passes the two paths above to Playwright, which overrides the config's
+`staging-*.spec.ts` match. It has its own command below; reading it as covered here is how a
+walkthrough gets skipped while the runbook says it ran.
+
+Full UI walkthrough — a separate command, not covered above:
 
 ```bash
 pnpm test:staging:walkthrough
