@@ -17,8 +17,10 @@ Everything they did is available locally, from this runbook, against the same re
 deployment. Nothing was lost; a false coverage signal was.
 
 **What went wrong, recorded so it is not rebuilt the same way.** Both workflows hard-depended
-on a `staging` **git branch** that has never existed on origin (`git ls-remote --heads origin`
-returns none), plus `*_STAGING` repository secrets that were never set.
+on a `staging` **git branch** that has never existed on origin
+(`git ls-remote --heads origin staging` prints nothing; it exits 0 whether or not the ref
+exists, so the evidence is the empty output, never the status), plus `*_STAGING` repository
+secrets that were never set.
 
 - The nightly ran **every night and reported success while executing nothing**. Its preflight
   "skip" step ran `exit 0`, which succeeds a *step* but does not skip a *job*, so the run fell
