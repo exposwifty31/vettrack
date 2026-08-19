@@ -166,5 +166,22 @@ any second clinic, and it degrades exactly when the product succeeds commerciall
 - [x] A genuinely skipped `clinicSeq` still fires `gapResync` — asserted in the client test
 - [x] An event with no `clinicSeq` is applied without a gap (rolling-deploy path) — asserted in the client test
 - [x] `tests/phase-9-deterministic-drills.test.ts` counter contracts still hold — full suite green
+- [x] **Three defects found in review, each reproduced before fixing** (round 1 on PR #197):
+  - The trigger returned early on an explicit `clinic_seq` without advancing the counter.
+    Reproduced on a live DB: after a restore row at `500`, the next automatic insert got
+    **3**, which a client that had applied 500 drops as a duplicate — silent event loss.
+    Counter now moves to `GREATEST(next_seq, NEW.clinic_seq)`; same probe returns 501.
+  - `handleResetState` (the `reset_state:last_event_pruned` and peer-prune path) cleared
+    only `lastAppliedEventId`, leaving the sequence cursor pre-reset — so the first event
+    after a reset failed contiguity and was dropped into gap recovery instead of applied.
+    `establishBaselineAfterFullRefresh` (gap recovery) was already correct; only this path
+    was not. Regression test asserts the event is APPLIED, not the gapResync count —
+    `gapRecoveryInFlight` suppresses a second telemetry post, so a count-based assertion
+    passed with the bug present.
+  - An applied unsequenced (pre-186) event left the cursor stale by one, so the next
+    sequenced event reported a gap that never happened. The cursor is now invalidated.
+- [x] `/outbox-head` no longer casts BIGINT cursors to `::int` — that overflowed at
+  2,147,483,647 and turned the recovery endpoint into a 500 exactly when a clinic had run
+  long enough to need it. Selected as text, range-checked against `Number.MAX_SAFE_INTEGER`.
 - [ ] **NOT RUN — Playwright `tests/phase-9-drills.spec.ts`.** CLAUDE.md requires browser verification for realtime work and this needs a running app; it is the one compliance item this change did not satisfy.
 - [x] i18n parity — not applicable, no user-facing copy (`pnpm i18n:check` green regardless)

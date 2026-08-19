@@ -95,18 +95,49 @@ async function main() {
     );
     assert.strictEqual(direct.rows[0].s, 4, "expected the direct insert path to continue the sequence");
 
+    // --- an explicit clinic_seq PUSHES THE COUNTER, it does not just pass through ---
+    // Without this the next automatic insert gets a LOWER sequence than a row already
+    // written, and the client drops that event as a duplicate — silent data loss.
+    await pool.query(
+      `insert into vt_event_outbox (clinic_id, type, payload, clinic_seq)
+       values ($1, 'RESTORE', '{}'::jsonb, 500)`,
+      [clinicA],
+    );
+    const afterExplicit = await pool.query(
+      `insert into vt_event_outbox (clinic_id, type, payload)
+       values ($1, 'PROBE', '{}'::jsonb) returning clinic_seq::bigint::text as s`,
+      [clinicA],
+    );
+    assert.strictEqual(
+      afterExplicit.rows[0].s,
+      "501",
+      "expected the automatic insert after an explicit clinic_seq=500 to continue at 501",
+    );
+
     // --- unique index rejects a duplicate ---
-    let rejected = false;
+    // Narrowed to the EXACT violation: a bare `catch {}` passes on any database error at
+    // all — a typo in the statement, an unrelated trigger failure — so it could report
+    // success while proving nothing about the constraint it names.
+    let rejectedCode: string | undefined;
+    let rejectedConstraint: string | undefined;
     try {
       await pool.query(
         `insert into vt_event_outbox (clinic_id, type, payload, clinic_seq)
          values ($1, 'DUP', '{}'::jsonb, 1)`,
         [clinicA],
       );
-    } catch {
-      rejected = true;
+    } catch (err) {
+      const pgErr = err as { code?: string; constraint?: string };
+      if (pgErr.code !== "23505") throw err; // not a unique violation - a real failure
+      rejectedCode = pgErr.code;
+      rejectedConstraint = pgErr.constraint;
     }
-    assert.strictEqual(rejected, true, "expected a duplicate (clinic_id, clinic_seq) to be rejected");
+    assert.strictEqual(rejectedCode, "23505", "expected a unique_violation (SQLSTATE 23505)");
+    assert.strictEqual(
+      rejectedConstraint,
+      "uq_vt_event_outbox_clinic_seq",
+      `expected the violation to name uq_vt_event_outbox_clinic_seq, got ${rejectedConstraint}`,
+    );
 
     console.log("✅ event-outbox clinic_seq migration test passed");
   } finally {

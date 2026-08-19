@@ -757,13 +757,22 @@ export class EventIngestor {
         }
       }
       this.lastAppliedClinicSeq = cseq;
-    } else if (this.lastAppliedEventId !== null && oid <= this.lastAppliedEventId) {
+    } else {
       // No sequence on this envelope: a row written before migration 186, or a frame from
       // a server that predates it. Redelivery is still suppressed by id, but there is
       // deliberately NO contiguity check — falling back to the global id here would
       // reintroduce the exact false-gap loop this replaced.
-      reportRealtimeTelemetry({ duplicateDrop: true });
-      return;
+      if (this.lastAppliedEventId !== null && oid <= this.lastAppliedEventId) {
+        reportRealtimeTelemetry({ duplicateDrop: true });
+        return;
+      }
+      // Applying an unsequenced event advances clinic state that the sequence cursor
+      // knows nothing about, so the cursor is now stale by one. Leaving it set made the
+      // next SEQUENCED event fail `cseq === last + 1` and report a gap that never
+      // happened. Dropping to null costs one skipped contiguity check — the next
+      // sequenced event re-establishes the baseline — and that is the right trade: a
+      // missed check is recoverable, a false gap storm is not.
+      this.lastAppliedClinicSeq = null;
     }
 
     // Resume cursor advances only (never regresses), matching applyReplayBatch below.
@@ -863,6 +872,11 @@ export class EventIngestor {
   private async handleResetState(): Promise<void> {
     clearStoredLastOutboxId();
     this.lastAppliedEventId = null;
+    // BOTH cursors. Clearing only the id left `lastAppliedClinicSeq` holding a
+    // pre-reset value, so the very next event failed `cseq === last + 1`, fired another
+    // gapResync, reset again — the non-convergent loop ADR-011 exists to remove,
+    // reintroduced inside the recovery path itself.
+    this.lastAppliedClinicSeq = null;
     await resetRealtimeCaches(this.queryClient);
     try {
       const head = await api.realtime.outboxHead();
@@ -870,8 +884,13 @@ export class EventIngestor {
       if (!Number.isFinite(id) || id < 0) return;
       this.lastAppliedEventId = id;
       writeStoredLastOutboxId(id);
+      // Re-seed the sequence cursor from the same snapshot. An old server omits this
+      // field; leaving it null then means the next sequenced event establishes the
+      // baseline without a gap check, which is the correct rolling-deploy behaviour.
+      const cseq = Number(head.maxPublishedClinicSeq);
+      if (Number.isFinite(cseq) && cseq >= 0) this.lastAppliedClinicSeq = cseq;
     } catch {
-      // Cursor stays cleared if head fetch fails.
+      // Cursors stay cleared if head fetch fails.
     }
   }
 }

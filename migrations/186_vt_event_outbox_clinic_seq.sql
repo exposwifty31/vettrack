@@ -63,8 +63,16 @@ CREATE OR REPLACE FUNCTION vt_event_outbox_assign_clinic_seq() RETURNS trigger
 LANGUAGE plpgsql
 AS $$
 BEGIN
-  -- An explicit value wins (backfill, restore, or a test fixture asserting a sequence).
+  -- An explicit value wins (backfill, restore, or a test fixture asserting a sequence) —
+  -- but it must also PUSH THE COUNTER FORWARD. Returning early without doing so let an
+  -- explicit clinic_seq exceed next_seq, so the following automatic insert got a LOWER
+  -- sequence; the client then read it as `cseq <= lastAppliedClinicSeq` and dropped it as a
+  -- duplicate. A silently discarded domain event is the worst failure this table can have.
   IF NEW.clinic_seq IS NOT NULL THEN
+    INSERT INTO vt_event_outbox_seq AS s (clinic_id, next_seq)
+    VALUES (NEW.clinic_id, NEW.clinic_seq)
+    ON CONFLICT (clinic_id) DO UPDATE
+      SET next_seq = GREATEST(s.next_seq, EXCLUDED.next_seq);
     RETURN NEW;
   END IF;
 
