@@ -1,8 +1,20 @@
 # Route consumer triage — the 43 no-consumer server routes
 
-**Source finding:** `AUDIT-repo-b.md` ROUTE-MATRIX — 311 method+path pairs enumerated,
-241 consumed, 43 with no consumer in web / RN / `scripts/` / `tests/` / `packages/rfid-controller`,
-plus 6 suspected. Top-10 action was *"triage: delete or name a destination per route"*.
+**Source finding:** `AUDIT-repo-b.md` ROUTE-MATRIX — 311 method+path pairs enumerated across
+nine verdicts: 241 consumed, **43 with no consumer** in web / RN / `scripts/` / `tests/` /
+`packages/rfid-controller`, 7 dev-only, **6 suspected**, 6 test-only, 3 operator,
+2 contract-surface, 1 stub, 1 staged. Top-10 action was *"triage: delete or name a destination
+per route"*.
+
+Two arithmetic notes, stated rather than quietly reconciled:
+
+- **The source does not sum to its own total.** Those nine categories add to **310**, against a
+  stated 311. The missing row cannot be identified from this document; it is inherited from
+  `AUDIT-repo-b.md`'s ROUTE-MATRIX and is flagged there, not silently absorbed here.
+- **This register triages 57 rows, not 49.** The extra 8 are the `/api/equipment-board` alias
+  family: the ROUTE-MATRIX counted those against `/api/display` (which IS consumed) and raised
+  the alias separately as its own Medium finding, so they are not inside the 43. 43 + 6 + 8 = 57,
+  which is what the verdict table below totals.
 
 **Verified against:** worktree `chore/audit-tier2` @ `e3472e63ec20446916a6f3a566742590d55b0cd9`
 (based on `origin/main`), web `src/`, RN repo `/Users/dan/VetTrack-RN-Migration` @ `a06cbb5`
@@ -59,9 +71,10 @@ should consider whether the mount-string assertions are earning their keep.
 |---|---|---|
 | `DELETE-NOW` — **executed**, see Section C | 15 | `/api/stability` (7), `/api/equipment-board` (8) |
 | `KEEP-FROZEN` | 12 | health probe mounts (8), Code Blue billing-reconciliation (4) |
-| `NEEDS-OWNER` | 15 | task-ownership (7), dispense (3), inventory prices (2), cursor-bug-fixer dispatch (1), operational-roles (1), bare shifts import (1) |
+| `NEEDS-OWNER` | 16 | task-ownership (7), dispense (3), inventory prices (2), cursor-bug-fixer dispatch (1), operational-roles (1), bare shifts import (1) |
 | `DESTINATION` | 11 | queue DLQ (2), fault-image (1), rfid-provisioning (2), admin-force-close (1), integrations (5) |
 | `OPERATOR` | 3 | users purge/backfill (3) |
+| **Total** | **57** | 43 no-consumer + 6 suspected + 8 `/api/equipment-board` alias rows |
 
 ---
 

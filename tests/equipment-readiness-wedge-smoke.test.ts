@@ -13,20 +13,19 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import type { Express } from "express";
 import fs from "node:fs";
 
-/** Every path passed to `app.use(...)` by the real registration, in order. */
 async function recordMountPaths(): Promise<string[]> {
   const { registerApiRoutes } = await import("../server/app/routes.js");
   const paths: string[] = [];
-  // A one-method double is enough, and the cast is safe for a specific reason rather
-  // than by convenience: registerApiRoutes calls `app.use(...)` and nothing else on the
-  // Express instance — no `get`, `listen`, `set` or `locals`. If it ever grows another
-  // call, this double throws a TypeError on the missing method rather than passing
-  // quietly, so the assumption fails loudly instead of rotting.
   const app = {
     use(path: string, ..._routers: unknown[]) {
       paths.push(path);
       return app;
     },
+    // Safe for a specific reason rather than by convenience: registerApiRoutes calls
+    // `app.use(...)` and nothing else on the Express instance — no `get`, `listen`,
+    // `set` or `locals`. If it ever grows another call, this one-method recorder throws
+    // a TypeError on the missing method rather than passing quietly, so the assumption
+    // fails loudly instead of rotting.
   } as unknown as Express;
   registerApiRoutes(app);
   return paths;
