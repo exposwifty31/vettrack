@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import ts from "typescript";
 import { existsSync, readFileSync, readdirSync, statSync } from "fs";
 import { dirname, join, resolve } from "path";
 
@@ -65,23 +66,34 @@ function readConfig(config: string): Record<string, unknown> {
 }
 
 /**
- * `compilerOptions` after following `extends`, parent first. Only
- * `tsconfig.server-check.json` extends anything today, but the whole point of this file
- * is that a config can quietly stop meaning what it says — reading the inherited options
- * costs one recursion and removes a way for that to happen here too.
+ * `compilerOptions` after `extends` is fully resolved — delegated to TypeScript's own
+ * parser rather than reimplemented.
+ *
+ * A hand-rolled `join(dirname(config), root.extends)` only handles the one form this repo
+ * happens to use today. `extends` also accepts an extensionless relative path
+ * (`"./base"` → `./base.json`), a bare package specifier (`"@tsconfig/node22/tsconfig.json"`),
+ * and — since TS 5.0 — an array of any of those. Guessing at that is how a checker ends up
+ * silently reading the wrong options, which is the failure mode this file exists to catch,
+ * so it does not get hand-rolled here either. `typescript` is already a direct dependency.
  */
-function effectiveCompilerOptions(config: string, seen = new Set<string>()): Record<string, unknown> {
-  const resolved = resolve(config);
-  if (seen.has(resolved)) return {}; // cyclic extends — tsc errors on it; do not hang here
-  seen.add(resolved);
-  const root = readConfig(config);
-  const own = (typeof root.compilerOptions === "object" && root.compilerOptions !== null
-    ? root.compilerOptions
-    : {}) as Record<string, unknown>;
-  if (typeof root.extends !== "string") return own;
-  const parentPath = join(dirname(config), root.extends);
-  if (!existsSync(parentPath)) return own; // a broken `extends` is tsc's error to report
-  return { ...effectiveCompilerOptions(parentPath, seen), ...own };
+function effectiveCompilerOptions(config: string): Record<string, unknown> {
+  const read = ts.readConfigFile(config, (path) => readFileSync(path, "utf8"));
+  if (read.error) {
+    throw new Error(
+      `${config} failed to parse: ${ts.flattenDiagnosticMessageText(read.error.messageText, " ")}`,
+    );
+  }
+  // parseJsonConfigFileContent walks `extends` with tsc's real resolution rules and
+  // returns the merged options. Its file-enumeration side is unused on purpose: the glob
+  // attribution below has to name WHICH entry is dead, and a merged file list cannot.
+  const parsed = ts.parseJsonConfigFileContent(
+    read.config,
+    ts.sys,
+    resolve(dirname(config)),
+    undefined,
+    resolve(config),
+  );
+  return parsed.options as unknown as Record<string, unknown>;
 }
 
 /**
