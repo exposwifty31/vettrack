@@ -81,14 +81,27 @@ staging over HTTP and needs none.
 **An environment with no protection rules is not a gate.** Verify all four, not just the first:
 
 ```bash
+#!/usr/bin/env bash
+# fail CLOSED: without this, a gh api that errors prints nothing, and "nothing" is
+# indistinguishable from "no such secret" — the check would pass because it never ran.
+set -euo pipefail
+
 R=exposwifty31/vettrack
-gh api repos/$R/environments -q '.environments[].name'            # both listed
+gh api "repos/$R/environments" -q '.environments[].name'          # both must be listed
 for e in staging-e2e staging-simulation; do
   echo "== $e =="
-  gh api repos/$R/environments/$e/deployment-branch-policies -q '.branch_policies[].name'
-  gh api repos/$R/environments/$e/secrets -q '.secrets[].name'
+  gh api "repos/$R/environments/$e/deployment-branch-policies" -q '.branch_policies[].name'
+  gh api "repos/$R/environments/$e/secrets" -q '.secrets[].name'
 done
-gh api repos/$R/actions/secrets -q '.secrets[].name' | grep '_STAGING$'   # must print NOTHING
+
+# Capture first (so an API failure aborts under `set -e`), THEN test the captured value.
+repo_secrets="$(gh api "repos/$R/actions/secrets" -q '.secrets[].name')"
+if grep -q '_STAGING$' <<<"$repo_secrets"; then
+  echo "FAIL: repository-scoped _STAGING secrets still present:" >&2
+  grep '_STAGING$' <<<"$repo_secrets" >&2
+  exit 1
+fi
+echo "OK: no repository-scoped _STAGING secret"
 ```
 
 A repository-scoped `_STAGING` secret surviving the migration is the finding restated, not
