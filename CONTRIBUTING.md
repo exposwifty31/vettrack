@@ -57,7 +57,23 @@ does not provide. They must be run deliberately, with that infrastructure:
 
 - **DB integration** (require `DATABASE_URL` + applied migrations):
   `tests/restock.service.test.ts`, `tests/migrations/**`,
-  `tests/phase-2-3-medication-package-integration.test.ts`.
+  `tests/equipment-operational-state.integration.test.ts`,
+  `tests/shift-chat-window.integration.test.ts`,
+  `tests/seed-reviewer-demo.integration.test.ts`,
+  `tests/doctor-shift-gate.integration.test.ts`,
+  `tests/tenant-pooling-isolation.integration.test.ts`.
+  Dedicated runners: `pnpm test:db-integration`, `pnpm test:integration:ops`, and
+  `pnpm test:rls-pooling`. The last one issues **real DDL** and will not run without two
+  explicit opt-ins — it reads `RLS_PROBE_DATABASE_URL` **instead of** `DATABASE_URL`, with
+  no fallback, so a configured staging URL cannot be reached by omission:
+
+  ```bash
+  RLS_POOLING_PROBE=1 \
+  RLS_PROBE_DATABASE_URL=postgres://.../a_throwaway_db \
+  pnpm test:rls-pooling
+  ```
+
+  The rest are invoked directly with `pnpm exec tsx <file>`.
 - **Live-server integration** (require the dev server on `:3001`):
   `tests/charge-alert-worker.test.js`, `tests/code-blue-mode-equipment.test.js`,
   `tests/equipment-scan-e2e.test.js`, `tests/expiry-api.test.js`,

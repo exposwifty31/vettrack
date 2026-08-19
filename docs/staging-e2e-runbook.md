@@ -9,40 +9,13 @@ Staging-only infrastructure for temporary Clerk test users, `vt_users` mapping, 
 - Staging `DATABASE_URL` (internal or approved staging host)
 - `CLERK_WEBHOOK_SECRET` configured on staging (webhook validation passed)
 
-## GitHub Actions — removed 2026-08-19, and why
+## GitHub Actions (manual)
 
-**There is no CI automation for staging any more.** Two workflows used to exist —
-`staging-e2e-manual.yml` and `workday-simulation-nightly.yml` — and both were deleted.
-Everything they did is available locally, from this runbook, against the same real staging
-deployment. Nothing was lost; a false coverage signal was.
+Workflow: **Staging E2E (manual)** (`.github/workflows/staging-e2e-manual.yml`)
 
-**What went wrong, recorded so it is not rebuilt the same way.** Both workflows hard-depended
-on a `staging` **git branch** that has never existed on origin (`git ls-remote --heads origin`
-returns none), plus `*_STAGING` repository secrets that were never set.
-
-- The nightly ran **every night and reported success while executing nothing**. Its preflight
-  "skip" step ran `exit 0`, which succeeds a *step* but does not skip a *job*, so the run fell
-  through to `actions/checkout` with `ref: staging`, failed there, and `continue-on-error: true`
-  painted the whole run green. Run `32100016045` (2026-08-18): run conclusion *success*, job
-  conclusion *failure*, 40 seconds, zero simulation. A gate that silently no-ops is worse than
-  no gate, because it gets counted as coverage.
-- The manual workflow had **zero runs ever**. `workflow_dispatch` makes you choose a ref, and
-  its guard accepted only `refs/heads/staging`, so no dispatch could reach the job.
-
-**If staging CI is rebuilt, three constraints carry over.**
-
-1. **Do not key it on a git branch.** The Playwright suites reach staging through
-   `TEST_BASE_URL`, not through a checkout, so branch state was never load-bearing — it was
-   the accidental precondition that made both workflows unrunnable.
-2. **Keep an environment guard of some kind.** The old branch guard was crude but it existed
-   for a real reason: these jobs run `pnpm staging:seed` and `pnpm staging:cleanup` against a
-   live database. Dispatching from `main` would have pointed seed and cleanup at the wrong
-   environment. Weakening that guard to make a workflow "runnable" is the dangerous fix.
-3. **Never pair a soft-fail preflight with `continue-on-error`.** That combination is exactly
-   what produced a year of green nights over a job that never ran.
-
-**Secrets a rebuild would need** (`*_STAGING` only — never production `DATABASE_URL` /
-`CLERK_SECRET_KEY`):
+- **Trigger:** `workflow_dispatch` only (not on push/PR).
+- **Branch:** must select branch **`staging`** in the Actions UI; other refs fail the branch guard job.
+- **Secrets:** suffixed `_STAGING` only (never production `DATABASE_URL` / `CLERK_SECRET_KEY`):
 
 | GitHub secret | Maps to runtime env |
 |---------------|---------------------|
@@ -52,11 +25,64 @@ returns none), plus `*_STAGING` repository secrets that were never set.
 | `STAGING_E2E_PASSWORD_STAGING` | `STAGING_E2E_PASSWORD` |
 | `TEST_BASE_URL_STAGING` | `TEST_BASE_URL` |
 
-Order, if rebuilt: `pnpm staging:seed` → `pnpm test:staging:e2e` → `pnpm test:staging:walkthrough`
-→ `pnpm staging:cleanup` (cleanup with `if: always()`).
+### Where these secrets must live — owner action, not yet done
 
-**Until then, run it locally** — the sections below are the supported path and are what the
-workflows wrapped.
+Both staging workflows now declare an `environment:`, but **an environment with no protection
+rules is not a gate.** Until the two below are configured in *Settings → Environments*, the
+`if:` branch guards are the only thing standing between a dispatch and the staging database.
+
+| Environment | Used by | Deployment branch policy | Why that ref |
+|---|---|---|---|
+| `staging-e2e` | `staging-e2e-manual.yml` | selected branches → `staging` | dispatch-only; the workflow refuses any other ref |
+| `staging-simulation` | `workday-simulation-nightly.yml` | selected branches → `main` | a `schedule:` trigger always fires on the default branch |
+
+Hold the `_STAGING` secrets **on those environments, not on the repository.** A repository
+secret is readable by every workflow in the repo — including one added by a future PR — so
+repo-scoping these is the finding, and moving them is the fix. Two environments rather than
+one shared `staging`, because a single environment would have to trust both `staging` and
+`main`, which is the weaker rule.
+
+The two workflows need **different** secret sets, so each environment holds only what its
+own job reads — an environment carrying the other's secrets re-opens the finding at a
+smaller scale:
+
+| Secret | `staging-e2e` | `staging-simulation` |
+|---|:--:|:--:|
+| `DATABASE_URL_STAGING` | ✅ (seed/cleanup write to it) | — |
+| `CLERK_SECRET_KEY_STAGING` | ✅ | ✅ |
+| `VITE_CLERK_PUBLISHABLE_KEY_STAGING` | ✅ | ✅ |
+| `STAGING_E2E_PASSWORD_STAGING` | ✅ | ✅ |
+| `TEST_BASE_URL_STAGING` | ✅ | ✅ |
+
+Reviewer's aid, since "did anyone actually do it" is the part that rots. All four checks
+must pass, not just the first:
+
+```bash
+R=exposwifty31/vettrack
+gh api repos/$R/environments -q '.environments[].name'            # both must be listed
+for e in staging-e2e staging-simulation; do
+  echo "== $e =="
+  gh api repos/$R/environments/$e/deployment-branch-policies -q '.branch_policies[].name'
+  gh api repos/$R/environments/$e/secrets -q '.secrets[].name'
+done
+gh api repos/$R/actions/secrets -q '.secrets[].name' | grep '_STAGING$'   # must print NOTHING
+```
+
+Expected: `staging-e2e` → branch policy `staging`; `staging-simulation` → branch policy
+`main`; each environment listing exactly its column above; and the last command silent. A
+repository-scoped `_STAGING` secret surviving the migration means every workflow in the repo
+can still read it, which is the finding restated rather than fixed.
+
+Steps (in order): `pnpm staging:seed` → `pnpm test:staging:e2e` → `pnpm test:staging:walkthrough` → `pnpm staging:cleanup` (cleanup runs with `if: always()`).
+
+### Run manually
+
+1. Open **Actions** → **Staging E2E (manual)**.
+2. Click **Run workflow**.
+3. Set **Use workflow from** to branch **`staging`**.
+4. Run workflow.
+
+Concurrency: one run per ref (`staging-e2e-manual-refs/heads/staging`); a new run cancels an in-progress one.
 
 ## Environment (local shell — do not commit)
 
@@ -147,7 +173,6 @@ Playwright refuses non-staging `TEST_BASE_URL` and non-test Clerk keys.
 | `tests/pwa.spec.ts` | default config | Local/CI API | **Local/CI only** |
 | `tests/phase-9-drills.spec.ts` | default config | Local/CI API (`/api/metrics` needs dev bypass) | **Local/CI only** |
 | `tests/ui-smoke.spec.ts` | `playwright.ui.config.ts` | Documented for prod URL; needs real session | **Needs mocks** / prod-oriented |
-| `tests/example.spec.ts` | (excluded) | N/A — not VetTrack | **Excluded** |
 
 ### Warnings
 
@@ -164,7 +189,12 @@ export PLAYWRIGHT_E2E=true
 pnpm test:playwright:ci
 ```
 
-Includes: `pwa.spec.ts`, `phase-9-drills.spec.ts`, `signup-flow.spec.ts` (not `staging-*.spec.ts` or `example.spec.ts`).
+`PW_SUITE=ci` includes exactly `pwa.spec.ts` and `phase-9-drills.spec.ts`.
+
+`signup-flow.spec.ts` is a **separate** suite (`pnpm test:playwright:signup`), as are
+`ui-smoke.spec.ts` (`test:playwright:ui-smoke`) and `e2e/simulation/workday.spec.ts`
+(`PW_SUITE=workday`). `staging-*.spec.ts` runs under `playwright.staging.config.ts` via
+`pnpm test:staging:e2e` / `test:staging:walkthrough` — never under `ci`.
 
 ## Clerk dashboard test delivery
 

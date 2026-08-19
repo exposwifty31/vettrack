@@ -97,8 +97,15 @@ function parseRoutes(source, lazyImports) {
   return entries;
 }
 
+/**
+ * `emitted` is claim-tracking, not bookkeeping: the FIRST section whose predicate matches
+ * a route owns it. Without the `!emitted.has` guard, a route matching two predicates was
+ * printed in both — `/admin/code-blue-history` appeared under Emergency AND Admin, and
+ * `/admin/medication-integrity` under Admin AND Legacy redirects — which reads as two
+ * separate routes in an inventory whose whole job is to be a faithful count.
+ */
 function section(lines, title, entries, pred, imports, emitted) {
-  const filtered = entries.filter(pred);
+  const filtered = entries.filter((entry) => !emitted.has(entry) && pred(entry));
   if (filtered.length === 0) return;
   lines.push(`## ${title}`, "", "| Path | Component | Notes |", "|------|-----------|-------|");
   for (const e of filtered) {

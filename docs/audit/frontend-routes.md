@@ -71,7 +71,6 @@ Generated 2026-08-19.
 
 | Path | Component | Notes |
 |------|-----------|-------|
-| `/admin/code-blue-history` | `pages/code-blue-history` | AuthGuard |
 | `/admin` | `pages/admin` | AuthGuard |
 | `/admin/shifts` | `pages/admin-shifts` | AuthGuard |
 | `/admin/asset-types` | `pages/AdminAssetTypesPage` | AuthGuard |
@@ -109,7 +108,6 @@ Generated 2026-08-19.
 
 | Path | Component | Notes |
 |------|-----------|-------|
-| `/admin/medication-integrity` | Redirect | → `/admin` |
 | `/analytics/outcome-kpi` | Redirect | → `/analytics` |
 | `/stability` | Redirect | → `/home` |
 | `/app-tour` | Redirect | → `/home` |

@@ -685,7 +685,7 @@ function EquipmentDetailPageDesktop() {
 
       invalidateAll();
       if (!usedPluggedIn) {
-        toast.warning(`An alert will be sent after ${usedDeadline} minute${usedDeadline !== 1 ? "s" : ""} if not plugged in.`);
+        toast.warning(t.equipmentDetail.toast.chargeAlertScheduled(usedDeadline));
       }
 
       // T-24d (owner override) — "returned damaged" releases custody through
