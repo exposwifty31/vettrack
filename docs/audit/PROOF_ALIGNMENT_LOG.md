@@ -8,6 +8,7 @@ Append-only log of implementation claims backed by verified evidence. Purpose: p
 - Evidence must be things actually observed this session: `Read`/`grep` output pointing at real `file:line`, actual test run output, actual command output. Do not restate a commit message, PR description, or prior summary as evidence.
 - If a claim can't be verified, say so (`PARTIAL` / `NOT FOUND`) rather than omitting the entry or rounding up to `VERIFIED`.
 - Entries are never edited or deleted retroactively — if a later check contradicts an earlier one, add a new entry that supersedes it and note the discrepancy.
+- Entry dates are the **author's local date, Asia/Jerusalem** — the repo's own default clinic timezone (`server/schema/core.ts`). Local is UTC+3, so an entry written after 21:00 UTC carries the *following* day's date while `git log` in UTC still shows the previous one. That is the convention, not a drift; a review round was already spent on it once.
 
 ## Entry format
 
@@ -8625,13 +8626,27 @@ file that were already correct.
   2026-05-24, `refactor: modularize server/db.ts into domain schema files (#421)`.
   `git log -1 -- .coderabbit.yaml` → `27975124a`, 2026-07-28. The file was edited **two months after**
   the split and the wrong line survived that edit.
-- **Medication < 100 ml is enforced nowhere.** `grep -rnE '\b100\b' server src shared` filtered to
-  `ml|volume|liquid` → no matches.
-- **The billing ledger is gone.** `find server src shared -iname '*billing*'` → no results.
-  `server/services/shadow-inventory.service.ts:2` → "Shadow inventory — billing ledger removed;
-  orphan-stock scan is a no-op." A residual guard survives at
-  `server/workers/integration.worker.ts:85` and was left alone; this entry does **not** claim the
-  removal is complete.
+- **No 100 ml limit is enforced, on three independent searches.** `grep -rnE '\b100\b' server src
+  shared` filtered to `ml|volume|liquid` → no matches; a search for a named bound
+  (`(MAX|LIMIT|THRESHOLD)[A-Z_]*(VOLUME|ML|LIQUID)` and the reverse) → no matches; and the only two
+  occurrences of `volumeMl` in the tree are type declarations that are never compared to anything —
+  `server/queues/inventory-deduction.queue.ts:12` and `src/types/inventory.ts:188`. The narrow claim
+  is what is recorded: **no volume bound of any value is enforced anywhere**, so the invariant gave
+  the reviewer nothing to check. This does not assert that the clinical rule is wrong or that no
+  future code should carry it.
+- **There is no billing ledger to insert into — but billing-adjacent code does survive, and the
+  first draft of this entry blurred the two.** What is absent: no billing/ledger/invoice table
+  (`grep 'vtTable("' server/schema/*.ts` filtered to those words → none), no billing route
+  (`ls server/routes/` → none), and no insert path at all
+  (`grep -rniE 'insert\([a-z]*(billing|ledger)' server/` → none).
+  `server/services/shadow-inventory.service.ts:2` states it outright: "billing ledger removed".
+  What survives: the integrations layer still carries billing types and adapters, and
+  `server/workers/integration.worker.ts:82-87` defines `assertBillingExportIdempotency`, which throws
+  when a `VetTrackBillingEntry` reaches **export** without an `idempotencyKey`. That is a real, live
+  rule — but it governs an outbound export, not a ledger insert, and it is enforced by a `throw` in
+  code rather than by review. So the invariant was removed for a narrower reason than "billing is
+  gone": the insert path it described does not exist, and the adjacent rule that does exist needs no
+  reviewer instruction because the code already refuses.
 - **The realtime invariant was correct but incomplete.** It read "do not introduce parallel polling
   transports" with no carve-out, while CLAUDE.md's frozen-surfaces section documents the `/collab-ws`
   Socket.io channel as the one sanctioned additive exception. As written, a correct change under
