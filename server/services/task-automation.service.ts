@@ -9,7 +9,7 @@ import { logAudit } from "../lib/audit.js";
 import { checkIdempotentAsync, markIdempotentAsync } from "../lib/idempotency.js";
 import { postSystemMessage } from "../lib/shift-chat-presence.js";
 import { incrementMetric } from "../lib/metrics.js";
-import { broadcast } from "../lib/realtime.js";
+import { insertRealtimeDomainEvent } from "../lib/realtime-outbox.js";
 import {
   enqueueAutomationExecuteJob,
   enqueueAutomationNotificationJobs,
@@ -47,6 +47,39 @@ function automationDebugLog(...args: unknown[]): void {
 /** Operational failures — always visible (not gated by ENABLE_AUTOMATION_DEBUG). */
 function automationErrorLog(...args: unknown[]): void {
   console.error(...args);
+}
+
+/**
+ * Automation-rule realtime emission. Writes to `vt_event_outbox` (the frozen
+ * outbox-backed transport) so the event gets a monotonic `id:` cursor and replay
+ * coverage via `GET /api/realtime/replay`, and — the load-bearing part here —
+ * reaches SSE clients at all. `scanAndEnqueueAutomationJobs` runs only inside
+ * `server/workers/notification.worker.ts`, a process that holds no SSE
+ * connections and does not start the outbox publisher, so the legacy in-memory
+ * broadcast it replaces reached zero clients. Outbox rows are drained by
+ * `startEventOutboxPublisher()`, started from `server/app/start-schedulers.ts`
+ * in the API process, which is where the clients are attached.
+ *
+ * That is process-crossing delivery, not cross-instance fan-out: `outboxEmitter`
+ * is an in-process `EventEmitter`, so with more than one API replica only the
+ * replica that claims the row emits it live; the rest recover on reconnect replay.
+ *
+ * Best-effort: a realtime failure must never abort the automation scan.
+ */
+async function emitAutomationTriggered(clinicId: string, payload: unknown): Promise<void> {
+  try {
+    await insertRealtimeDomainEvent(db, {
+      clinicId,
+      type: "AUTOMATION_TRIGGERED",
+      payload,
+      category: "TASK",
+    });
+  } catch (err) {
+    automationErrorLog("[automation] realtime outbox emit failed (non-fatal):", {
+      clinicId,
+      err: err instanceof Error ? err.message : err,
+    });
+  }
 }
 
 /** Pick first active admin in clinic (escalation notify target — does not replace vet_id). */
@@ -138,10 +171,7 @@ async function enqueueOverdueEscalations(): Promise<void> {
   for (const row of rows) {
     automationDebugLog("AUTOMATION_RULE_TRIGGERED", { rule: "overdue_escalation", taskId: row.id, clinicId: row.clinicId, reason: "candidate" });
     incrementMetric("automation_triggered");
-    broadcast(row.clinicId, {
-      type: "AUTOMATION_TRIGGERED",
-      payload: { rule: "overdue_escalation", taskId: row.id, clinicId: row.clinicId, reason: "candidate" },
-    });
+    await emitAutomationTriggered(row.clinicId, { rule: "overdue_escalation", taskId: row.id, clinicId: row.clinicId, reason: "candidate" });
     await enqueueAutomationExecuteJob({ kind: "escalate_overdue", taskId: row.id, clinicId: row.clinicId });
   }
 }
@@ -164,10 +194,7 @@ async function enqueueUnassignedAutoAssign(): Promise<void> {
   for (const row of rows) {
     automationDebugLog("AUTOMATION_RULE_TRIGGERED", { rule: "auto_assign_unassigned", taskId: row.id, clinicId: row.clinicId, reason: "candidate" });
     incrementMetric("automation_triggered");
-    broadcast(row.clinicId, {
-      type: "AUTOMATION_TRIGGERED",
-      payload: { rule: "auto_assign_unassigned", taskId: row.id, clinicId: row.clinicId, reason: "candidate" },
-    });
+    await emitAutomationTriggered(row.clinicId, { rule: "auto_assign_unassigned", taskId: row.id, clinicId: row.clinicId, reason: "candidate" });
     await enqueueAutomationExecuteJob({ kind: "auto_assign_unassigned", taskId: row.id, clinicId: row.clinicId });
   }
 }
@@ -191,10 +218,7 @@ async function enqueueStuckRecovery(): Promise<void> {
   for (const row of rows) {
     automationDebugLog("AUTOMATION_RULE_TRIGGERED", { rule: "stuck_recovery", taskId: row.id, clinicId: row.clinicId, reason: "candidate" });
     incrementMetric("automation_triggered");
-    broadcast(row.clinicId, {
-      type: "AUTOMATION_TRIGGERED",
-      payload: { rule: "stuck_recovery", taskId: row.id, clinicId: row.clinicId, reason: "candidate" },
-    });
+    await emitAutomationTriggered(row.clinicId, { rule: "stuck_recovery", taskId: row.id, clinicId: row.clinicId, reason: "candidate" });
     await enqueueAutomationExecuteJob({ kind: "stuck_recovery", taskId: row.id, clinicId: row.clinicId });
   }
 }
@@ -220,10 +244,7 @@ async function enqueuePrestartReminders(): Promise<void> {
   for (const row of rows) {
     automationDebugLog("AUTOMATION_RULE_TRIGGERED", { rule: "prestart_reminder", taskId: row.id, clinicId: row.clinicId, reason: "candidate" });
     incrementMetric("automation_triggered");
-    broadcast(row.clinicId, {
-      type: "AUTOMATION_TRIGGERED",
-      payload: { rule: "prestart_reminder", taskId: row.id, clinicId: row.clinicId, reason: "candidate" },
-    });
+    await emitAutomationTriggered(row.clinicId, { rule: "prestart_reminder", taskId: row.id, clinicId: row.clinicId, reason: "candidate" });
     await enqueueAutomationExecuteJob({ kind: "prestart_reminder", taskId: row.id, clinicId: row.clinicId });
   }
 }

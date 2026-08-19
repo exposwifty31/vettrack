@@ -209,6 +209,51 @@ jobs:
       - name: 🔌 Integration ops suite
         run: pnpm test:integration:ops
 
+  # packages/rfid-controller ships its own vitest config + tsconfig and is a
+  # contract-bearing surface (signed batches to POST /api/rfid/events). Neither
+  # script was reachable from any workflow, so its tests and types were enforced
+  # by nothing. No DB/Redis: the package has no runtime deps.
+  #
+  # DELIBERATELY IN THIS WORKFLOW, not a separate paths-filtered one. Splitting it out
+  # was suggested to save CI time; measured, it saves none. The job runs 33-41s in
+  # PARALLEL with jobs whose critical path is ~132s (Tests shard 4/4), so it adds zero
+  # wall-clock. Against that, a separate workflow cannot be referenced by this file's
+  # `needs:`, so the merge gate below would lose the very enforcement this job exists to
+  # add; and a `paths:`-filtered required check never reports on PRs that miss the
+  # filter, leaving them waiting on a status that will never arrive. The `if:` variant is
+  # no better — the job reports `skipped`, so the gate has to accept `skipped` as a pass,
+  # which is a gate that passes when it did not run. Leave it here.
+  rfid-controller:
+    name: 📡 RFID controller
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: ⬇️ Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: 📦 pnpm
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v4.4.0
+        with:
+          run_install: false
+
+      - name: 🟢 Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: ".nvmrc"
+          cache: "pnpm"
+
+      - name: 📥 Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: 🔷 TypeScript (rfid-controller)
+        run: pnpm rfid-controller:typecheck
+
+      - name: 🧪 RFID controller tests
+        run: pnpm test:rfid-controller
+
   architecture-gates:
     name: 🏛️ Architecture gates (G1)
     runs-on: ubuntu-latest
@@ -269,7 +314,7 @@ jobs:
     name: 🚢 Deploy to Railway
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    needs: [typecheck, build, test, integration-ops, architecture-gates]
+    needs: [typecheck, build, test, integration-ops, rfid-controller, architecture-gates]
     # vars.RAILWAY_USE_CLI_DEPLOY (repo *variable*, not secret) is the deploy kill-switch.
     # workflow_dispatch on main = "redeploy main" recovery button.
     if: >-
@@ -369,7 +414,7 @@ jobs:
     name: ✅ Merge gate
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    needs: [typecheck, build, test, integration-ops, architecture-gates, deploy, verify-deploy]
+    needs: [typecheck, build, test, integration-ops, rfid-controller, architecture-gates, deploy, verify-deploy]
     if: always()
 
     steps:
@@ -389,6 +434,10 @@ jobs:
           fi
           if [[ "${{ needs.integration-ops.result }}" != "success" ]]; then
             echo "❌ Integration ops failed — blocking merge"
+            exit 1
+          fi
+          if [[ "${{ needs.rfid-controller.result }}" != "success" ]]; then
+            echo "❌ RFID controller tests/typecheck failed — blocking merge"
             exit 1
           fi
           if [[ "${{ needs.architecture-gates.result }}" != "success" ]]; then

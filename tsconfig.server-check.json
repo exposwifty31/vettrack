@@ -7,15 +7,28 @@
     "module": "Node16",
     "moduleDetection": "force"
   },
+  // Mirrors tsconfig.server.json's include set (server + shared + lib), re-checked under
+  // Node16 resolution so missing ".js" extensions in server-side ESM imports fail here.
+  //
+  // Deliberate include/exclude differences from tsconfig.server.json:
+  //   - src/types/index.ts is added (shared API-response types re-exported to the server side).
+  //   - server/tests/** is NOT excluded, so the test sources are checked too.
+  //
+  // Inherited differences, because this config `extends` tsconfig.json while
+  // tsconfig.server.json is standalone. These are NOT deliberate — they are what
+  // extending the frontend config drags in, listed so the next reader does not
+  // mistake this for a server-shaped compiler configuration:
+  //   - lib: ["ES2020","DOM","DOM.Iterable"] (server.json leaves lib unset → no DOM),
+  //     which makes THIS config strictly LOOSER on DOM globals. `pnpm typecheck:server`
+  //     runs the stricter one in the same CI job set, which is what actually catches
+  //     a stray `window`/`document` in server code.
+  //   - jsx: react-jsx, useDefineForClassFields, noFallthroughCasesInSwitch: true.
+  //   - paths: the "@/*" and "@assets/*" aliases on top of server.json's bare "*".
   "include": [
     "server/**/*.ts",
-    "src/types/index.ts",
-    "src/shared/**/*.ts",
-    "src/lib/constants/**/*.ts",
-    "src/lib/forecast/**/*.ts"
+    "shared/**/*.ts",
+    "lib/**/*.ts",
+    "src/types/index.ts"
   ],
-  "exclude": [
-    "src/lib/forecast/approveGate.ts",
-    "src/shared/**"
-  ]
+  "exclude": ["node_modules"]
 }

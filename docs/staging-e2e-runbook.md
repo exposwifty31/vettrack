@@ -125,7 +125,6 @@ Playwright refuses non-staging `TEST_BASE_URL` and non-test Clerk keys.
 | `tests/pwa.spec.ts` | default config | Local/CI API | **Local/CI only** |
 | `tests/phase-9-drills.spec.ts` | default config | Local/CI API (`/api/metrics` needs dev bypass) | **Local/CI only** |
 | `tests/ui-smoke.spec.ts` | `playwright.ui.config.ts` | Documented for prod URL; needs real session | **Needs mocks** / prod-oriented |
-| `tests/example.spec.ts` | (excluded) | N/A — not VetTrack | **Excluded** |
 
 ### Warnings
 
@@ -142,7 +141,12 @@ export PLAYWRIGHT_E2E=true
 pnpm test:playwright:ci
 ```
 
-Includes: `pwa.spec.ts`, `phase-9-drills.spec.ts`, `signup-flow.spec.ts` (not `staging-*.spec.ts` or `example.spec.ts`).
+`PW_SUITE=ci` includes exactly `pwa.spec.ts` and `phase-9-drills.spec.ts`.
+
+`signup-flow.spec.ts` is a **separate** suite (`pnpm test:playwright:signup`), as are
+`ui-smoke.spec.ts` (`test:playwright:ui-smoke`) and `e2e/simulation/workday.spec.ts`
+(`PW_SUITE=workday`). `staging-*.spec.ts` runs under `playwright.staging.config.ts` via
+`pnpm test:staging:e2e` / `test:staging:walkthrough` — never under `ci`.
 
 ## Clerk dashboard test delivery
 
