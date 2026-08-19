@@ -4,7 +4,7 @@
  * Requires:
  *   STAGING_E2E_CONFIRM=yes
  *   TEST_BASE_URL=https://vettrack-staging.up.railway.app (or staging secret)
- *   Staging seed personas (pnpm staging:seed on staging branch)
+ *   Seeded local fixtures (the staging lane was removed 2026-08-19)
  *
  * Never run against production. CI: see .github/workflows/workday-simulation-nightly.yml
  */

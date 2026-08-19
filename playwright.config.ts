@@ -16,7 +16,6 @@ import {
  * Also listed in `PLAYWRIGHT_BASE_IGNORE` (defense in depth).
  *
  * Never discovered by default:
- *   - `tests/staging-*.spec.ts`, `tests/staging-walkthrough.spec.ts` → `playwright.staging.config.ts` + `pnpm test:staging:e2e` / `test:staging:walkthrough`
  *   - `tests/signup-flow.spec.ts` → `pnpm test:playwright:signup`
  *   - `tests/ui-smoke.spec.ts` → `pnpm test:playwright:ui-smoke` (`playwright.ui.config.ts`)
  *   - `tests/e2e/simulation/workday.spec.ts` → `PW_SUITE=workday` / nightly workflow

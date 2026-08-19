@@ -8,7 +8,7 @@
 - Agent: `e2e-runner` [repo]
 - Skills [local]: `dev-browser`, `run` (launch + drive the app), `verify` (end-to-end change verification), `ios-simulator`
 - MCP: claude-in-chrome (`mcp__claude-in-chrome__*` — load via ToolSearch) [local]
-- Suites: `pnpm test:playwright:ci` (PW_SUITE allowlist), `:phase9`, `:pwa`, `:waitlist`, `:workday`, `:flow-walk`, `:ui-smoke`, `pnpm test:signup`, `pnpm test:staging:e2e`
+- Suites: `pnpm test:playwright:ci` (PW_SUITE allowlist), `:phase9`, `:pwa`, `:waitlist`, `:workday`, `:flow-walk`, `:ui-smoke`, `pnpm test:signup`
 
 ## VetTrack anchors & gotchas
 - **Flow-walk runbook (inlined):** use `pnpm dev:walk`, NEVER plain `dev` — the 100/min limiter turns the matrix into all-/signin. Target :5000. Live-reload shell via `cap sync`/`cap run`, NOT `cap:build:native` (strips CAPACITOR_SERVER_URL). `tests/flow-walk/native` uses npm not pnpm (root lockfile leak). Redirect-grading has its own semantics — read the runbook.
