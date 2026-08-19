@@ -165,9 +165,31 @@ function baseDirOf(glob: string): string {
  * the root would match the frontend's `src/` — a pass for entirely the wrong directory,
  * which is the exact failure mode this file exists to catch.
  */
+/**
+ * Whether the walker refuses to enumerate this path.
+ *
+ * `anyFileUnder` skips `SKIP_DIRS` for speed, which means it can never PROVE a glob
+ * pointing at or into one of them is empty — it simply cannot see inside. Reporting
+ * "unprovable" as "dead" is a false failure, and this one bit in CI: every config
+ * excluding `node_modules` passed locally and failed on the runner, because a clean
+ * pnpm install puts every real file behind a NESTED `node_modules` that the walk skips,
+ * while a warm local tree happens to leave some real directories at the top level. A
+ * gate whose verdict depends on which machine ran it is worse than no gate — which is
+ * the thesis of this whole file, so it does not get an exception here.
+ */
+function walkerRefusesToEnter(rooted: string): boolean {
+  return rooted.split("/").some((segment) => SKIP_DIRS.has(segment));
+}
+
 function resolvesToAtLeastOneFile(glob: string, configDir: string, exts: string[]): boolean {
   const supported = (file: string): boolean => exts.some((ext) => file.endsWith(ext));
   const rooted = join(configDir, glob);
+  // Inside a skipped directory only existence is decidable — assert that much and stop.
+  // `exclude: ["node_modules"]` is a real, meaningful entry; a stale path there still
+  // fails, because the directory itself would not exist.
+  if (walkerRefusesToEnter(rooted)) {
+    return existsSync(baseDirOf(rooted) === "." ? rooted : baseDirOf(rooted));
+  }
   if (!rooted.includes("*") && !rooted.includes("?")) {
     // tsconfig allows a bare directory, which means "every supported file under it".
     if (!existsSync(rooted)) return false;
