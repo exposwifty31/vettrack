@@ -7933,9 +7933,29 @@ knowing as a permanent property: **always pass `skip_deploys` when changing a pr
 variable.** The actual failure is Railway-side: CI's `railway up --ci` uploaded
 successfully (`Indexing... Uploading...`), the build was scheduled on Metal builder
 `builder-bzuwqj`, and then failed with `Failed to snapshot repository. Please try again
-in a few minutes.` — Railway's own wording for a transient. Three occurrences: 21:19 and
-21:42 UTC (CI runs on `main`, both `ci.yml` `deploy` job failures) and 23:31 (the
-variable-triggered redeploy).
+in a few minutes.`
+
+**Railway calls it transient; five attempts say otherwise.** 21:19 and 21:42 UTC (CI
+`deploy` job on `main`), 23:31 (variable-triggered redeploy) — all three with that
+`configErrors` string. Then two CI reruns at 00:19 and 00:35 with a *different*
+signature: the upload succeeded, a deployment record was created, and it sat in
+`INITIALIZING` for 15+ minutes with `statusUpdatedAt: null` and `buildLogs` answering
+`Deployment does not have an associated build` — Railway's builder never picked the
+work up at all. Clearing the queue between attempts (`deploymentCancel` on the zombie)
+changed nothing. Both zombies were cancelled; production was never affected, since a
+deployment that never builds cannot replace the running one.
+
+Ruled out with evidence, not assumption: repo size (`.railwayignore` already excludes
+`docs/`, `.claude/`, `ios/`, `android/`; GitHub archives `main` in 16 s / 81 MB), the
+absent `source.repo` (deliberate, and the CLI upload path does not use it), and a
+blocked queue. What remains is Railway-side and needs Railway: escalate with deployment
+ids `4fb83cb3`, `a4e698c0`, `acc8cf44`, `5f82c578`, `bebf71a0`.
+
+**Urgency, measured rather than assumed:** `git diff --name-only 3f5fc8a2 adfa4ac3`
+touches `TASKS.md`, this log, `package.json`/`pnpm-lock.yaml` (a devDependency bump),
+and two test files — **zero** files under `server/`, `src/`, `shared/`, `migrations/` or
+`packages/`. Production is not missing any runtime change. The pipeline must be fixed
+before the next real change ships; nothing is degraded tonight.
 
 **Consequence found while tracing it:** production is behind `main` by two merges. The
 last green CI deploy was `3f5fc8a2` at 19:51 UTC; `887e87c1` (PR #190) and `adfa4ac3`
