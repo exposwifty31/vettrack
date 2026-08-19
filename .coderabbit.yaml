@@ -48,7 +48,7 @@ reviews:
         - Caching emergency or realtime endpoints in the service worker
 
         Architecture invariants (see .cursorrules, CLAUDE.md, AGENTS.md):
-        - Drizzle table and enum definitions live in server/schema/*.ts, declared via the `vtTable` alias, and are re-exported from server/db.ts. server/db.ts itself holds only the pool, the drizzle instance and that re-export — it defines no tables. Never ask for a table definition to be moved or added there.
+        - Drizzle table definitions live in server/schema/*.ts, declared with the `vtTable` alias of `pgTable`; enums live alongside them and are declared with `pgEnum` directly. Both are re-exported from server/db.ts, which owns the pool, the drizzle instance, that re-export, and a legacy no-op `initDb()` stub — and defines no table or enum itself. Never ask for a table or enum definition to be moved or added there.
         - New workers and recurring schedulers register in server/app/start-schedulers.ts
         - API client traffic goes through src/lib/api.ts; no raw fetch() in feature code
         - i18n user-facing copy only in locales/en.json and locales/he.json (paired keys)

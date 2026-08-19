@@ -8640,6 +8640,16 @@ file that were already correct.
   15 said "New `pgTable` definitions in `server/db.ts`", and the section heading at line 151 read
   `## Schema (server/db.ts)`. A reader going top-down met the wrong statement first, and nothing in
   the file established precedence. Both corrected.
+- **Enums are declared separately from tables, and the first draft of this fix got that wrong.**
+  `vtTable` is `pgTable` (helpers.ts:5) and declares tables only; enums use `pgEnum` directly at 8
+  call sites across `server/schema/{equipment,inventory,ops}.ts` (`grep -rn 'pgEnum(' server/`). The
+  replacement invariant initially said table *and enum* definitions were "declared via the `vtTable`
+  alias", which is false. Corrected to name both mechanisms. `grep pgEnum server/db.ts` → no match,
+  so the stronger claim — db.ts defines neither a table nor an enum — is the one recorded.
+- **`server/db.ts` also holds a legacy no-op `initDb()`**, which the first draft's "holds only the
+  pool, the drizzle instance and that re-export" omitted. The enumeration is now complete. The stub
+  logs a string and defines nothing schema-related, so "defines no tables" was not weakened — a
+  review suggestion to soften it on the stub's account was declined with that reason.
 - **The edited YAML was re-parsed, not assumed.** `ruby -ryaml` → 5 `path_instructions` blocks, and
   the rendered invariants text was read back to confirm what the reviewer actually receives.
 
