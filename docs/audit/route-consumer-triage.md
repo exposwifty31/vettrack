@@ -300,8 +300,16 @@ file the patch set above must carry, and it is positive evidence that a consumer
 class of signal §4 asserted it had ruled out. Treat the "five ways" claim as five ways over *application*
 source, not over generated inventories.
 
-Follow-ups the same change should carry (not blockers): the `stabilityPage` (20 keys) and
-`errors.stability.*` namespaces in `locales/{en,he}.json`, and `src/lib/i18n.ts:885`.
+**Locale follow-ups — owned by `chore/audit-tier1`, deliberately NOT in this change.** An
+earlier revision of this line said "the same change should carry" them, which contradicted
+the Section C note above: that branch owns `locales/{en,he}.json` and `src/lib/i18n.ts` and
+has already rewritten them heavily, so touching those keys here would manufacture a merge
+conflict for no gain.
+
+- `stabilityPage` (20 keys) — **already removed** on `chore/audit-tier1`; nothing to do.
+- `errors.stability.*` — dead once `server/routes/stability.ts` is gone (its only reader).
+  Still present on both branches. Fold into the locale cleanup on `chore/audit-tier1`.
+- `src/lib/i18n.ts:885` — the `stabilityPage` accessor entry, same owner, same follow-up.
 
 ---
 
