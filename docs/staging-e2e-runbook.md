@@ -9,13 +9,52 @@ Staging-only infrastructure for temporary Clerk test users, `vt_users` mapping, 
 - Staging `DATABASE_URL` (internal or approved staging host)
 - `CLERK_WEBHOOK_SECRET` configured on staging (webhook validation passed)
 
-## GitHub Actions (manual)
+## GitHub Actions — removed 2026-08-19, and why
 
-Workflow: **Staging E2E (manual)** (`.github/workflows/staging-e2e-manual.yml`)
+**There is no CI automation for staging any more.** Two workflows used to exist —
+`staging-e2e-manual.yml` and `workday-simulation-nightly.yml` — and both were deleted.
+Nothing was lost; a false coverage signal was. But the replacements are **not both here**,
+and they do not share a target:
 
-- **Trigger:** `workflow_dispatch` only (not on push/PR).
-- **Branch:** must select branch **`staging`** in the Actions UI; other refs fail the branch guard job.
-- **Secrets:** suffixed `_STAGING` only (never production `DATABASE_URL` / `CLERK_SECRET_KEY`):
+- **Staging seed / E2E / walkthrough** — this runbook, run locally against the real staging
+  deployment. That is what `staging-e2e-manual.yml` wrapped.
+- **The workday simulation** — *not* in this runbook, and *not* against staging. It runs
+  against a **locally built app** at `http://127.0.0.1:3001`, and
+  `.github/workflows/e2e-simulation-nightly.yml` still runs it nightly. See
+  [playwright-matrix.md](playwright-matrix.md) for the command and target.
+
+Treating the second as staging coverage is the mistake to avoid: it never touched the
+deployed environment, so a green workday run says nothing about staging.
+
+**What went wrong, recorded so it is not rebuilt the same way.** Both workflows hard-depended
+on a `staging` **git branch** that has never existed on origin
+(`git ls-remote --heads origin staging` prints nothing; it exits 0 whether or not the ref
+exists, so the evidence is the empty output, never the status), plus `*_STAGING` repository
+secrets that were never set.
+
+- The nightly ran **every night and reported success while executing nothing**. Its preflight
+  "skip" step ran `exit 0`, which succeeds a *step* but does not skip a *job*, so the run fell
+  through to `actions/checkout` with `ref: staging`, failed there, and `continue-on-error: true`
+  painted the whole run green. Run `32100016045` (2026-08-18): run conclusion *success*, job
+  conclusion *failure*, 40 seconds, zero simulation. A gate that silently no-ops is worse than
+  no gate, because it gets counted as coverage.
+- The manual workflow had **zero runs ever**. `workflow_dispatch` makes you choose a ref, and
+  its guard accepted only `refs/heads/staging`, so no dispatch could reach the job.
+
+**If staging CI is rebuilt, three constraints carry over.**
+
+1. **Do not key it on a git branch.** The Playwright suites reach staging through
+   `TEST_BASE_URL`, not through a checkout, so branch state was never load-bearing — it was
+   the accidental precondition that made both workflows unrunnable.
+2. **Keep an environment guard of some kind.** The old branch guard was crude but it existed
+   for a real reason: these jobs run `pnpm staging:seed` and `pnpm staging:cleanup` against a
+   live database. Dispatching from `main` would have pointed seed and cleanup at the wrong
+   environment. Weakening that guard to make a workflow "runnable" is the dangerous fix.
+3. **Never pair a soft-fail preflight with `continue-on-error`.** That combination is exactly
+   what produced a year of green nights over a job that never ran.
+
+**Secrets a rebuild would need** (`*_STAGING` only — never production `DATABASE_URL` /
+`CLERK_SECRET_KEY`):
 
 | GitHub secret | Maps to runtime env |
 |---------------|---------------------|
@@ -25,64 +64,74 @@ Workflow: **Staging E2E (manual)** (`.github/workflows/staging-e2e-manual.yml`)
 | `STAGING_E2E_PASSWORD_STAGING` | `STAGING_E2E_PASSWORD` |
 | `TEST_BASE_URL_STAGING` | `TEST_BASE_URL` |
 
-### Where these secrets must live — owner action, not yet done
+Order, if rebuilt: `pnpm staging:seed` → `pnpm test:staging:e2e` → `pnpm test:staging:walkthrough`
+→ `pnpm staging:cleanup` (cleanup with `if: always()`).
 
-Both staging workflows now declare an `environment:`, but **an environment with no protection
-rules is not a gate.** Until the two below are configured in *Settings → Environments*, the
-`if:` branch guards are the only thing standing between a dispatch and the staging database.
+### If it is rebuilt: scope the secrets to environments, never to the repository
 
-| Environment | Used by | Deployment branch policy | Why that ref |
-|---|---|---|---|
-| `staging-e2e` | `staging-e2e-manual.yml` | selected branches → `staging` | dispatch-only; the workflow refuses any other ref |
-| `staging-simulation` | `workday-simulation-nightly.yml` | selected branches → `main` | a `schedule:` trigger always fires on the default branch |
+This is the one piece of the deleted workflows worth keeping. They held their `_STAGING`
+credentials as **repository** secrets, which every workflow in the repo can read — including
+one added by a future PR. That was a real finding against them, and deleting the workflows
+closes it only for as long as nothing replaces them.
 
-Hold the `_STAGING` secrets **on those environments, not on the repository.** A repository
-secret is readable by every workflow in the repo — including one added by a future PR — so
-repo-scoping these is the finding, and moving them is the fix. Two environments rather than
-one shared `staging`, because a single environment would have to trust both `staging` and
-`main`, which is the weaker rule.
+A rebuild uses two GitHub environments, not one, because the trusted refs differ — a
+`workflow_dispatch` E2E run comes from `staging`, while a `schedule:` trigger always fires on
+the default branch. One shared environment would have to trust both, which is the weaker rule.
 
-The two workflows need **different** secret sets, so each environment holds only what its
-own job reads — an environment carrying the other's secrets re-opens the finding at a
-smaller scale:
+| Environment | For | Deployment branch policy |
+|---|---|---|
+| `staging-e2e` | the dispatch-only E2E lane | selected branches → `staging` |
+| `staging-simulation` | a scheduled simulation | selected branches → `main` |
 
-| Secret | `staging-e2e` | `staging-simulation` |
-|---|:--:|:--:|
-| `DATABASE_URL_STAGING` | ✅ (seed/cleanup write to it) | — |
-| `CLERK_SECRET_KEY_STAGING` | ✅ | ✅ |
-| `VITE_CLERK_PUBLISHABLE_KEY_STAGING` | ✅ | ✅ |
-| `STAGING_E2E_PASSWORD_STAGING` | ✅ | ✅ |
-| `TEST_BASE_URL_STAGING` | ✅ | ✅ |
+Each holds only what its own job reads — an environment carrying the other's secrets re-opens
+the finding at a smaller scale. Only the E2E lane touches `DATABASE_URL_STAGING`, because only
+it runs `staging:seed` / `staging:cleanup` against a live database; a simulation reaches
+staging over HTTP and needs none.
 
-Reviewer's aid, since "did anyone actually do it" is the part that rots. All four checks
-must pass, not just the first:
+**An environment with no protection rules is not a gate.** Verify all four, not just the first:
 
 ```bash
+#!/usr/bin/env bash
+# fail CLOSED: without this, a gh api that errors prints nothing, and "nothing" is
+# indistinguishable from "no such secret" — the check would pass because it never ran.
+set -euo pipefail
+
 R=exposwifty31/vettrack
-gh api repos/$R/environments -q '.environments[].name'            # both must be listed
+fail() { echo "FAIL: $*" >&2; exit 1; }
+
+# Expected, exactly — not a subset. An environment holding the OTHER lane's secrets
+# re-opens the finding at a smaller scale, so an extra name fails as loudly as a missing one.
+expect_policy_staging_e2e=staging
+expect_policy_staging_simulation=main
+expect_secrets_staging_e2e=$'CLERK_SECRET_KEY_STAGING\nDATABASE_URL_STAGING\nSTAGING_E2E_PASSWORD_STAGING\nTEST_BASE_URL_STAGING\nVITE_CLERK_PUBLISHABLE_KEY_STAGING'
+expect_secrets_staging_simulation=$'CLERK_SECRET_KEY_STAGING\nSTAGING_E2E_PASSWORD_STAGING\nTEST_BASE_URL_STAGING\nVITE_CLERK_PUBLISHABLE_KEY_STAGING'
+
 for e in staging-e2e staging-simulation; do
-  echo "== $e =="
-  gh api repos/$R/environments/$e/deployment-branch-policies -q '.branch_policies[].name'
-  gh api repos/$R/environments/$e/secrets -q '.secrets[].name'
+  policy="$(gh api "repos/$R/environments/$e/deployment-branch-policies" -q '.branch_policies[].name' | sort)"
+  secrets="$(gh api "repos/$R/environments/$e/secrets" -q '.secrets[].name' | sort)"
+  eval "want_policy=\$expect_policy_$(tr - _ <<<"$e")"
+  eval "want_secrets=\$expect_secrets_$(tr - _ <<<"$e")"
+  [ "$policy" = "$want_policy" ] || fail "$e branch policy is '$policy', expected exactly '$want_policy'"
+  [ "$secrets" = "$(sort <<<"$want_secrets")" ] || fail "$e secrets differ from the allowlist:"$'\n'"$(diff <(sort <<<"$want_secrets") <(echo "$secrets") || true)"
+  echo "OK: $e"
 done
-gh api repos/$R/actions/secrets -q '.secrets[].name' | grep '_STAGING$'   # must print NOTHING
+
+# Capture first (so an API failure aborts under `set -e`), THEN test the captured value.
+repo_secrets="$(gh api "repos/$R/actions/secrets" -q '.secrets[].name')"
+if grep -q '_STAGING$' <<<"$repo_secrets"; then
+  echo "FAIL: repository-scoped _STAGING secrets still present:" >&2
+  grep '_STAGING$' <<<"$repo_secrets" >&2
+  exit 1
+fi
+echo "OK: no repository-scoped _STAGING secret"
 ```
 
-Expected: `staging-e2e` → branch policy `staging`; `staging-simulation` → branch policy
-`main`; each environment listing exactly its column above; and the last command silent. A
-repository-scoped `_STAGING` secret surviving the migration means every workflow in the repo
-can still read it, which is the finding restated rather than fixed.
+A repository-scoped `_STAGING` secret surviving the migration is the finding restated, not
+fixed. As of 2026-08-19 that last command is silent for the right reason: no `_STAGING` secret
+was ever created.
 
-Steps (in order): `pnpm staging:seed` → `pnpm test:staging:e2e` → `pnpm test:staging:walkthrough` → `pnpm staging:cleanup` (cleanup runs with `if: always()`).
-
-### Run manually
-
-1. Open **Actions** → **Staging E2E (manual)**.
-2. Click **Run workflow**.
-3. Set **Use workflow from** to branch **`staging`**.
-4. Run workflow.
-
-Concurrency: one run per ref (`staging-e2e-manual-refs/heads/staging`); a new run cancels an in-progress one.
+**Until then, run it locally** — the sections below are the supported path and are what the
+workflows wrapped.
 
 ## Environment (local shell — do not commit)
 
@@ -126,13 +175,17 @@ Writes `.staging-e2e-manifest.json` (gitignored) for tests and cleanup.
 pnpm test:staging:e2e
 ```
 
-Specs:
+Specs it runs — exactly two, both named explicitly in the script:
 
 - `tests/staging-auth-smoke.spec.ts` — health, `/api/users/me` role/status matrix
 - `tests/staging-code-blue-gating.spec.ts` — Code Blue API auth gates on staging
-- `tests/staging-walkthrough.spec.ts` — full UI walkthrough (routes, permissions, screenshots, matrix)
 
-Full UI walkthrough only:
+`tests/staging-walkthrough.spec.ts` was listed here and **is not run by this command** —
+`test:staging:e2e` passes the two paths above to Playwright, which overrides the config's
+`staging-*.spec.ts` match. It has its own command below; reading it as covered here is how a
+walkthrough gets skipped while the runbook says it ran.
+
+Full UI walkthrough — a separate command, not covered above:
 
 ```bash
 pnpm test:staging:walkthrough

@@ -132,7 +132,33 @@ Every DB table has a `clinicId` column. **Every query must filter by `clinicId`.
 
 - All tables prefixed `vt_`, defined in `server/schema/*.ts`, re-exported from `server/db.ts`
 - After schema edits: hand-write the next `migrations/NNN_description.sql` → commit it → `pnpm db:migrate`. `drizzle-kit` is not installed and never worked against this schema barrel — see `docs/migrations.md`
-- Do not use raw SQL unless Drizzle ORM cannot express the query
+- Application queries go through the Drizzle query builder. What needs justifying is a whole
+  raw statement — ``db.execute(sql`…`)`` — each a construct Drizzle has no
+  builder for (`FOR UPDATE SKIP LOCKED`, `DISTINCT ON`, `pg_advisory_xact_lock`). Re-derive
+  rather than memorise, and note the generic parameter — `git grep -nE '\.execute(<[^>]*>)?\(sql' -- server`.
+  The obvious `git grep 'execute(sql'` returns 15, missing `db.execute<LatestAnchorRow>(sql`
+  and `db.execute<LastSweptRow>(sql` — both `DISTINCT ON`, i.e. the exact construct this
+  sentence cites as the example.
+- **Raw statements are where the multi-tenancy backstop stops.** The tenant lint cannot see
+  inside a raw string — it is listed under "Not detected" in
+  `docs/architecture/governance-known-limitations.md` — so `pnpm tenant:lint:touched` stays
+  silent whether or not the statement is scoped. A raw statement that reads or writes
+  clinic-owned rows on behalf of a request must therefore filter `clinic_id` in the SQL
+  itself, and nothing will tell you if it does not.
+  This is **not** an absolute, and most of the 17 correctly do not filter. A large share are
+  pure `pg_advisory_xact_lock` calls that touch no table at all — re-derive with
+  `git grep -nE '\.execute(<[^>]*>)?\(sql' -- server | ...` and read each one rather than
+  trusting a count here; the "15" this bullet used to assert is why. The outbox
+  publisher (`server/lib/event-publisher.ts`) and the janitor (`server/lib/outbox-janitor.ts`)
+  are deliberately cross-clinic — the publisher selects every clinic's unpublished rows and
+  returns `clinic_id` as a column to fan out on; scoping it to one clinic would break realtime
+  delivery for the rest. `governance-known-limitations.md` carves these out as
+  "Cross-clinic / system workers". The rule is per-request scoping, not a blanket `WHERE`.
+- Three kinds of raw SQL are permanent and need no justification: `migrations/*.sql`,
+  hand-written by definition per the bullet above; DDL in `server/schema/*.ts` that Drizzle's
+  typed builders do not express — partial-index predicates, `check()` constraints and `jsonb`
+  defaults; and `sql<T>` fragments inside an otherwise-typed query (aggregates, casts,
+  `COALESCE`).
 - Migrations also run at server startup — `pnpm db:migrate` runs the same path on demand
 
 ---

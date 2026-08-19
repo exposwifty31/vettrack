@@ -23,8 +23,9 @@ Maintenance scope: [`docs/MAINTENANCE_MODE.md`](../MAINTENANCE_MODE.md)
 | [`release-gate.yml`](../../.github/workflows/release-gate.yml) | Manual only | No (pilot readiness) |
 | [`flake-detection.yml`](../../.github/workflows/flake-detection.yml) | Nightly 03:00 UTC; manual | No |
 | [`e2e-simulation-nightly.yml`](../../.github/workflows/e2e-simulation-nightly.yml) | Nightly 05:00 UTC; manual | No |
-| [`workday-simulation-nightly.yml`](../../.github/workflows/workday-simulation-nightly.yml) | Nightly 04:00 UTC; manual | No |
-| [`staging-e2e-manual.yml`](../../.github/workflows/staging-e2e-manual.yml) | Manual on `staging` | No |
+
+> The two staging workflows (`staging-e2e-manual.yml`, `workday-simulation-nightly.yml`) were
+> deleted — neither could ever run. See [staging-e2e-runbook.md](../staging-e2e-runbook.md).
 
 ---
 
@@ -66,7 +67,6 @@ Pilot/demo readiness: typecheck, full vitest, i18n parity, RTL/mobile/PWA, offli
 | Workflow | Time (UTC) | Target |
 |----------|------------|--------|
 | Flake detection | 03:00 | Repeat vitest suite (`FLAKE_REPEAT_COUNT`) |
-| Workday (staging) | 04:00 | Deployed staging (`TEST_BASE_URL_STAGING`; skips if unset) |
 | E2E simulation | 05:00 | Local build + `e2e/simulation` suite |
 
 All nightlies are **non-blocking** (`continue-on-error` or observational only).
