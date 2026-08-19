@@ -8038,3 +8038,224 @@ moment, and both misconfigurations closed and re-verified at the resolved-value 
 Explicitly NOT closed: the `CLERK_WEBHOOK_SECRET` match (needs a signed delivery), the
 live `SESSION_SECRET` in `.env.example` (needs a rotation), the worker's three missing
 variables, and the deploy pipeline (needs Railway).
+
+---
+
+## 2026-08-19 — Tier-1 audit remediation: three vettrack lanes + one RN docs lane, after adversarial review (b26e06d89, c59549e12, f98c2e56c; RN 2578849)
+
+**Task.** Land the tier-1 audit remediation produced by four implementer lanes (T1 realtime,
+T2 i18n, T3 tsconfig, T4 CI/docs, T5 RN docs) after three adversarial reviewers returned
+`INCOMPLETE`, `DEFECTIVE` and `INCOMPLETE`. This entry records what the land pass actually
+re-checked and changed, not what the lane proofs asserted. Where a lane proof and a
+reviewer disagreed, the disagreement was settled by running the thing.
+
+### What the reviewers refuted, and what happened to each
+
+**Fixed here (7 of the 18 refutations):**
+
+1. *T1 — "cross-instance SSE delivery" is false, in two shipped doc comments and a test
+   docblock.* Confirmed by reading the code, not by accepting the claim:
+   `grep -rn outboxEmitter server/ --include='*.ts'` returns exactly three files —
+   `server/lib/event-publisher.ts` (`:37 export const outboxEmitter = new EventEmitter()`,
+   no Redis adapter anywhere) and `server/routes/realtime.ts:791,801`. So a row claimed by
+   one API replica is emitted only to that replica's clients. All three comments now say
+   "durable + replayable, NOT cross-instance fan-out" and name the mechanism.
+   The *automation* half of the claim survived: `grep -rn scanAndEnqueueAutomationJobs
+   server/` shows the scan runs only in `server/workers/notification.worker.ts:479,509`, and
+   `grep -rn startEventOutboxPublisher server/` shows the publisher starts only in
+   `server/app/start-schedulers.ts:54` (the API process). Those four broadcasts genuinely
+   reached zero clients before; that wording was kept and made precise.
+2. *T1 — the static guard reads two hardcoded paths, so the class stays reopenable.*
+   Replaced with a walk of every `.ts` under `server/`, allowing `broadcast(` only in
+   `server/lib/realtime.ts`. Baseline confirmed first:
+   `grep -rn '\bbroadcast\s*(' server/ --include='*.ts'` → one line, the definition itself.
+   Falsifiability proven, not asserted: a temporary `server/lib/__t1_falsify_probe.ts`
+   calling `broadcast(...)` produced
+   `AssertionError: ... expected [ 'server/lib/__t1_falsify_probe.ts' ] to deeply equal []`;
+   deleting it restored `Tests 1 passed | 7 skipped (8)`.
+3. *T2 (HIGH) — the namespace guard could not have caught any of the three bugs it was
+   written for.* Correct, and measured: all three are leaf keys inside namespaces that were
+   already reachable. Built the leaf-level guard the lane declined as "materially larger".
+   Two naive designs were tried and rejected by measurement before the third was kept —
+   a runtime walk of `t` reports 13 false positives (keys consumed through composing
+   accessors, e.g. `d.equipmentDetail.toast.scanFailedDefault` at `src/lib/i18n.ts:389`), and
+   a spread-only source scan reports 1329 (it misses `common: d.common`-shaped whole-subtree
+   assignments). The kept rule — a leaf is covered if `d.<any prefix>` appears followed by a
+   character that is not `.` — measures **0 unread leaves of 3476** on the fixed tree and,
+   run against `git show HEAD:src/lib/i18n.ts` + `git show HEAD:locales/en.json`, **74 of
+   3895**, broken down as `equipmentIntelligence:27, forecastEmail:43, metrics:1` (the three
+   never-wired dead namespaces) plus exactly `equipmentDetail.toast.chargeAlertScheduled`,
+   `myEquipment.toast.chargeAlertScheduled`,
+   `equipmentWaitlist.WAITLIST_RESERVATION_HELD_BY_OTHER`. Zero false positives, catches all
+   three bugs.
+4. *T2 (HIGH) — the charge-alert fix landed on desktop and missed the mobile surface.*
+   Verified against the code: `src/pages/equipment-detail.tsx:128` routes
+   `useMobileShellContext()` to `EquipmentDetailScreen`, whose `:302` renders
+   `EquipmentActions`, whose `returnMut.onSuccess` emitted only `savedOffline`/`returned`.
+   `src/pages/room-radar.tsx` had the same shape. Both now emit the echo, offline-suppressed.
+   One correction to the reviewer's framing, found by reading further: neither surface was
+   *silent* — `src/components/return-plug-dialog.tsx:125` renders
+   `t.returnPlugDialog.plugAlertWarning(deadlineMinutes)` inline before confirming, on all
+   four surfaces. What was missing is the post-return confirmation, which desktop had and
+   mobile did not. Fixed in the mobile-is-source-of-truth direction anyway, because a
+   two-of-four split is worse than either consistent state.
+5. *T2 — a knowingly-shipped EN/HE divergence.* Reproduced: `locales/he.json:639` was an ICU
+   plural naming the deadline while `locales/en.json:636` said only "Charge alert will be sent
+   if still unplugged". EN raised to match HE and its own sibling key at `:485`.
+   `pnpm i18n:check` → `✓ deep key parity` (it is key-parity only and never would have caught
+   this).
+6. *T2 — the `myEquipment` instance guard cannot fail for the property it names, and the
+   namespace check is defeated by prototype names.* Both confirmed by inspection: the
+   templates contain `{minutes,` (with a comma), never the literal `{minutes}`, so
+   `not.toContain("{minutes}")` is vacuously true. Positive assertions added;
+   `accessor[ns] === undefined` replaced with `Object.prototype.hasOwnProperty.call`.
+7. *T4 — F8 was closed in one Playwright config while a sibling carried the same defect.*
+   Reproduced: `playwright.staging.config.ts:16 testIgnore: ["**/example.spec.ts"]` (doubly
+   dead — its `testMatch` is `staging-*.spec.ts`), plus `docs/playwright-matrix.md:32` and
+   `docs/staging-e2e-runbook.md:128,145`. All removed. `git ls-files | grep example.spec` →
+   exit 1, file absent. Surviving mentions are `docs/archive/**` (frozen) and the
+   forbidden-token list in `scripts/run-safe-tests.sh:9,80` (a forbidden name that no longer
+   exists cannot match; left deliberately).
+
+**Also fixed, beyond the refutations:**
+
+- *T3 had no class fix.* `tsc` exits 0 when an `include` glob matches zero files, which is the
+  entire reason the broken `src/shared/**` globs survived in a config gating every PR and
+  every release. Added `tests/tsconfig-include-globs-resolve.test.ts` over all four tracked
+  tsconfigs. Falsifiability proven twice (once per matcher implementation) by restoring the
+  original glob: `AssertionError: tsconfig.server-check.json include globs matching ZERO
+  files: src/shared/**/*.ts`. The matcher short-circuits at the first hit (14ms → 4ms) after
+  the first version measurably added filesystem contention to a suite that already has a
+  full-tree walker sitting near the 5s default timeout.
+- *T3's comment claimed "two deliberate differences" from `tsconfig.server.json`.* There are
+  more, because it `extends` `tsconfig.json` while server.json is standalone: `lib` gains
+  `DOM`/`DOM.Iterable` (server.json has none — making server-check strictly **looser** on DOM
+  globals), plus `jsx`, `useDefineForClassFields`, `noFallthroughCasesInSwitch`, and the
+  `@/*` / `@assets/*` aliases. Comment now separates deliberate from inherited.
+- *`docs/audit/IMPROVEMENT_LOG.md:34` (IMP-008) still listed `patientDetail` under "verified
+  NOT dead, do not remove — used by Tasks.tsx".* The deletion is right —
+  `grep -rn patientDetail src/ server/ lib/ shared/ scripts/ tests/` (excluding the generated
+  `.d.ts`) returns nothing, and `git log -1 22c167a4e` is "fix: remove dead Tasks → /patients
+  chart links" dated 2026-07-08, the same day the log claimed it live. The record is corrected
+  rather than contradicted in silence.
+- *T5's ota-acceptance fix replaced one unevidenced claim with another* ("a stray `pnpm
+  install` episode whose lockfile has since been cleaned up"). `git log --all --
+  pnpm-lock.yaml` is empty — the file was never tracked, so no cleanup is observable. The row
+  now records the `57.0.12` figure's origin as unexplained.
+- *T5's `.gitignore` rule was `.claude/*` + one negation.* `git check-ignore -v` confirms the
+  reviewer: `.claude/agents/foo.md` would be ignored, while
+  `git ls-files .claude/` in the sibling vettrack repo returns hundreds of tracked files under
+  `.claude/.agents/skills/**`. Narrowed to `.claude/worktrees/` + `.claude/settings.local.json`.
+  Proven both directions: probe files under `worktrees/` and `settings.local.json` → ignored
+  (`.gitignore:60`, `:61`); `.claude/settings.json` and a probe `.claude/agents/foo.md` →
+  `git check-ignore` exit 1, and `git add -An` lists the agents file as stageable. Probes removed.
+
+**Recorded, NOT fixed — the owner decisions:**
+
+- **The multi-clinic gap-resync amplification (T1, the most consequential item in the whole
+  audit).** Verified in code, not taken on trust: `migrations/090_vt_event_outbox.sql:4` makes
+  `vt_event_outbox.id` a **global** `BIGSERIAL PRIMARY KEY`, `server/lib/event-publisher.ts:113`
+  emits per-clinic (`clinic:${row.clinicId}`), `src/lib/realtime.ts:706` gap-checks with a
+  strict `oid !== this.lastAppliedEventId + 1`, and the recovery it calls reseeds the cursor
+  from `/api/realtime/outbox-head`, which is itself clinic-scoped
+  (`server/routes/realtime.ts:330` `eq(eventOutbox.clinicId, clinicId)`). On a database with
+  more than one active clinic, every row written by another clinic between two of yours is a
+  false gap: the event is not applied, a `gapResync` telemetry POST fires,
+  `forceResyncWardErCaches()` refetches `/api/display/snapshot` and invalidates
+  `/api/containers`, and the condition repeats. **This is pre-existing** — it already affects
+  equipment and code-blue events — and is NOT introduced by this lane. What the lane does is
+  move the highest-frequency domain event class onto that path; before it, TASK_* frames
+  carried no id and took the `oid === undefined` fast path at `src/lib/realtime.ts:679`.
+  Fixing it properly means a per-clinic sequence, which is a frozen-surface change and not a
+  land-agent decision. **Do not deploy this to a multi-clinic database without deciding on it
+  first.**
+- **T1's delivery-path reasoning is argued, not tested.** `server/lib/realtime-outbox.js` is
+  `vi.mock`ed in the behavioural tests (correct scope for an emit-site change), so nothing
+  downstream of the call — outbox row → `publishOneBatch` → `outboxEmitter` → `outboxRowToSse`
+  — is exercised for a TASK_* type, and no test asserts exactly-once delivery.
+- **The outbox envelope carries `level` and `category`, which `src/types/realtime-events.ts`
+  does not declare.** Harmless on web (unknown fields ignored) and NOT new to this lane —
+  every outbox-backed event already carries them today, so an RN decoder strict enough to
+  reject them would already be failing on equipment events. Left alone; the RN consumer was
+  never observed from this repo.
+- **Hardcoded English string literals in source have no guard.**
+  `tests/i18n-no-hebrew-in-source.test.ts` rejects Hebrew only. Six literals remain, including
+  `src/pages/equipment-list.tsx:304` — `` `Deleted ${ids.length} item${ids.length !== 1 ? "s" : ""}` ``
+  — a byte-for-byte clone of the anti-pattern removed from `equipment-detail.tsx:688`. Not
+  fixed here because closing it requires authoring new Hebrew copy for six call sites, which
+  is a native-speaker call, not a land-agent one.
+- **A false statement in the T4 proof file, corrected for the record:**
+  `docs/governance/PRODUCT_DRIVEN_IMPROVEMENT_PLAN.md:421` does **not** reference
+  `phase-2-3-medication-package-integration.test.ts` (it is a P3-3 row about
+  `tests/migrations/**` and `restock.service.test.ts`). Repo-wide, the only surviving hit is
+  `docs/archive/2026/root-docs/TEST_AUDIT.md:75`. Over-reporting residue, but an unverified
+  assertion inside a proof file.
+
+### Gate results — verbatim, including the failure
+
+Run in `/Users/dan/Developer/active/vettrack-worktrees/audit-tier1` on the fully remediated
+tree. Logs in the session scratchpad (`gate-*.log`).
+
+| Command | Exit | Result |
+|---|---|---|
+| `pnpm typecheck` | 0 | pass (frontend + server tsconfigs) |
+| `pnpm typecheck:server` | 0 | pass |
+| `pnpm exec tsc --noEmit --project tsconfig.server-check.json` | 0 | pass |
+| `pnpm i18n:check` | 0 | `✓ locales/en.json and locales/he.json are in deep key parity.` |
+| `pnpm architecture:gates` | 0 | `✔ no dependency violations found (1000 modules, 5203 dependencies cruised)`; `10 known violations ignored`; `OK — server: 2 cycle(s), src: 0 cycle(s) (matches baseline)`; `All G1 checks passed.` |
+| `pnpm contracts:typecheck` | 0 | pass |
+| `pnpm test:rfid-controller` | 0 | `Tests 145 passed | 6 skipped (151)` |
+| `pnpm test` | **1** | `Test Files 3 failed | 734 passed (737)`, `Tests 4 failed | 6686 passed | 11 skipped (6701)` — see below |
+
+**`pnpm test` is red, and it is red on `main` too. Both causes were verified against the base
+commit before being called pre-existing, using a throwaway detached worktree at `e3472e63e`
+with `node_modules` symlinked and the same `.env` copied in.**
+
+*Cause 1 — the local `.env`, three deterministic failures.* `tests/dev-role-override.test.ts`
+(×2) and `tests/display-token-header.test.ts` (×1) all throw `AUTH_INVALID` from
+`src/lib/auth-fetch.ts:152`, because `isClerkEnabled()` also reads
+`processEnv?.VITE_CLERK_PUBLISHABLE_KEY`, `.env` in this worktree defines it, and
+`vite.config.ts:12-19 applyViteEnvFiles()` merges `.env` into `process.env` for the vitest run.
+The tests assume a dev-bypass build. At base commit `e3472e63e` with the same `.env`:
+`Tests 3 failed | 6 passed (9)` — **byte-identical failures, so not a lane regression.** With
+`VITE_CLERK_PUBLISHABLE_KEY=""` they pass at base (`9 passed`) and in the remediated tree.
+`.env` is untracked (`git ls-files .env` → empty), so CI is unaffected. It is nonetheless a real
+coverage hole: `display-token-header.test.ts` never stubs the Clerk env at all and silently
+depends on ambient state. Left for a follow-up because it belongs to no lane's file set.
+
+*Cause 2 — machine load, a rotating `Test timed out in 5000ms`.* Four full-suite runs on the
+remediated tree with `VITE_CLERK_PUBLISHABLE_KEY=""` failed on a **different** file each time —
+`xlsx-write-only-guard` + `return-damaged`, then `rfid-ingest`, then `equipment-version-occ` +
+`xlsx-write-only-guard` — every one of them the same 5000ms timeout, and every one green when
+run alone (`xlsx` 2.15s of a 5s budget; `return-damaged` 5/5 twice; `equipment-version-occ` +
+`xlsx` 9/9 together). `uptime` during these runs reported load averages of **24.75–28.79**. The
+base commit was green in one run (`Test Files 734 passed`, `6671 passed | 11 skipped`) and then
+flaked on the second under the same load, on `equipment-version-occ.integration.test.ts`, with
+the same 5000ms timeout. **Pre-existing, load-dependent, not introduced here.** Best remediated
+run: `Test Files 1 failed | 736 passed (737)`, the single failure being one of these
+base-reproducible timeouts.
+
+No DB-integration suite was run and no `DATABASE_URL` connection was made beyond what the
+default `vitest run` does — `vite.config.ts` excludes every DB-backed file.
+
+### Commits
+
+Separate per lane, explicit pathspecs, so one lane can be reverted alone. Nothing pushed, no PR
+opened, no `--amend` / `--force` / `--no-verify`.
+
+- `b26e06d89` `fix(realtime): route task lifecycle events through the outbox` — 3 files,
+  +397/−26.
+- `c59549e12` `fix(i18n): wire the three unreachable keys and drop dead namespaces` — 10 files,
+  +244/−1392.
+- `f98c2e56c` `fix(ci): realign tsconfig.server-check and drop references to deleted tests` —
+  13 files, +198/−32.
+- RN repo `/Users/dan/rn-wt-audit-tier1` (`chore/audit-tier1-docs`), `2578849`
+  `docs(rn): correct the frozen-stack persistence claim and promote two orphaned plans` —
+  8 files, +898/−7.
+
+**Verdict:** VERIFIED for the seven refutations fixed, each with a command and its real output
+above, and for the seven gates that pass. **PARTIAL** on `pnpm test`: it exits 1 on this
+machine, and both causes were reproduced at base commit `e3472e63e` rather than asserted to be
+pre-existing. **NOT CLOSED, needs an owner decision before any multi-clinic deploy:** the global
+`BIGSERIAL` / per-clinic-cursor mismatch that turns every task transition into a client resync
+on a multi-clinic database.
