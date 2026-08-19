@@ -13,7 +13,7 @@
 the third one is unsound.
 
 **Job 1 — durable ordering and resume.** The SSE frame carries `id: ${row.id}`
-(`server/routes/realtime.ts:131`), the browser echoes it back as `Last-Event-ID`, and
+(`server/routes/realtime.ts`), the browser echoes it back as `Last-Event-ID`, and
 `replayPublishedOutboxAfter` (`server/routes/realtime.ts:164`) replays rows after it.
 This works and is a frozen surface. Nothing below changes it.
 
@@ -107,7 +107,7 @@ emergency path. Not worth saving one table.
 
 ### 2. Envelope
 
-`outboxRowToSse` (`server/routes/realtime.ts:131`) adds `clinicSeq: row.clinic_seq`.
+`outboxRowToSse` (`server/routes/realtime.ts`) adds `clinicSeq: row.clinic_seq`.
 The `id:` line and the `id` / `outboxId` fields are **unchanged**.
 
 ### 3. Client
@@ -183,5 +183,24 @@ any second clinic, and it degrades exactly when the product succeeds commerciall
 - [x] `/outbox-head` no longer casts BIGINT cursors to `::int` — that overflowed at
   2,147,483,647 and turned the recovery endpoint into a 500 exactly when a clinic had run
   long enough to need it. Selected as text, range-checked against `Number.MAX_SAFE_INTEGER`.
-- [ ] **NOT RUN — Playwright `tests/phase-9-drills.spec.ts`.** CLAUDE.md requires browser verification for realtime work and this needs a running app; it is the one compliance item this change did not satisfy.
+- [x] **The server→client seam is now covered — `tests/realtime-sse-envelope-clinic-seq.test.ts`.**
+  `outboxRowToSse` (`server/routes/realtime.ts`) is the only place `clinicSeq` enters the
+  frame the browser receives, and nothing asserted it. That gap was worse than an ordinary
+  uncovered function because **its failure is silent by design**: §3 above requires the client
+  to apply an event and skip the contiguity check when `clinicSeq` is absent, so dropping the
+  field does not error, resync, or report a gap — it quietly disables gap detection while every
+  other test stays green. Demonstrated, not asserted: with `clinicSeq` removed from the envelope,
+  the new suite fails 3 of 4, and `tests/realtime-per-clinic-sequence.test.ts` +
+  `tests/phase-9-deterministic-drills.test.ts` both stay green at **20/20**. The function is now
+  exported for that test; the export is additive and no call site changed.
+- [ ] **Playwright `tests/phase-9-drills.spec.ts` — still NOT RUN, and running it would not have
+  closed this item.** The earlier version of this line implied the drills were the missing
+  verification. They are not: drill 1, the only realtime-gap drill, POSTs
+  `api.realtime.telemetry({gapResync: true})` and asserts the counter moves. Its own header says
+  so — *"The full SSE outbox-pause harness is server-side infrastructure"* — and it would pass
+  identically before this ADR, after it, and with `EventIngestor` deleted. What is genuinely
+  still unverified is the **live transport**: no test drives a real `EventSource` against a real
+  publisher and asserts a browser observes contiguous `clinicSeq` across interleaved clinics.
+  Closing it means writing that drill, not running the existing ones. Left open deliberately and
+  described precisely, so the next reader does not close it with a green tick that proves nothing.
 - [x] i18n parity — not applicable, no user-facing copy (`pnpm i18n:check` green regardless)
