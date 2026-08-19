@@ -178,8 +178,6 @@ function baseDirOf(glob: string): string {
  * which is the exact failure mode this file exists to catch.
  */
 /**
- * Whether the walker refuses to enumerate this path.
- *
  * `anyFileUnder` skips `SKIP_DIRS` for speed, which means it can never PROVE a glob
  * pointing at or into one of them is empty — it simply cannot see inside. Reporting
  * "unprovable" as "dead" is a false failure, and this one bit in CI: every config
@@ -193,14 +191,30 @@ function walkerRefusesToEnter(rooted: string): boolean {
   return rooted.split("/").some((segment) => SKIP_DIRS.has(segment));
 }
 
-function resolvesToAtLeastOneFile(glob: string, configDir: string, exts: string[]): boolean {
+function resolvesToAtLeastOneFile(
+  glob: string,
+  configDir: string,
+  exts: string[],
+  config: string,
+): boolean {
   const supported = (file: string): boolean => exts.some((ext) => file.endsWith(ext));
   const rooted = join(configDir, glob);
-  // Inside a skipped directory only existence is decidable — assert that much and stop.
-  // `exclude: ["node_modules"]` is a real, meaningful entry; a stale path there still
-  // fails, because the directory itself would not exist.
   if (walkerRefusesToEnter(rooted)) {
-    return existsSync(baseDirOf(rooted) === "." ? rooted : baseDirOf(rooted));
+    // A WILDCARD below a skipped directory is undecidable, and the first version of this
+    // branch accepted every one of them on the strength of the static base existing —
+    // `node_modules/**/*.does-not-exist.ts` returned true because `node_modules` does.
+    // That is a dead glob waved through by the very guard meant to catch dead globs.
+    // Neither verdict is honest here, so fail and say why rather than pick one.
+    if (glob.includes("*") || glob.includes("?")) {
+      throw new Error(
+        `${config} declares "${glob}", a wildcard below a directory this check does not ` +
+          `traverse (${[...SKIP_DIRS].join(", ")}). It cannot be proven live or dead here. ` +
+          `Narrow it to a literal path, or drop the entry.`,
+      );
+    }
+    // A literal skipped directory IS decidable: it exists or it does not.
+    // `exclude: ["node_modules"]` is a real, meaningful entry; a stale one still fails.
+    return existsSync(rooted) && statSync(rooted).isDirectory();
   }
   if (!rooted.includes("*") && !rooted.includes("?")) {
     // tsconfig allows a bare directory, which means "every supported file under it".
@@ -230,7 +244,7 @@ describe("tsconfig include globs resolve to real files", () => {
     const includes = globList(config, "include");
     expect(includes.length, `${config} declares no include globs`).toBeGreaterThan(0);
 
-    const dead = includes.filter((glob) => !resolvesToAtLeastOneFile(glob, configDir, exts));
+    const dead = includes.filter((glob) => !resolvesToAtLeastOneFile(glob, configDir, exts, config));
     expect(
       dead,
       `${config} include globs matching ZERO files: ${dead.join(", ")}. ` +
@@ -248,7 +262,7 @@ describe("tsconfig include globs resolve to real files", () => {
     const configDir = dirname(config);
     const exts = supportedExtensions(config);
     const excludes = globList(config, "exclude");
-    const dead = excludes.filter((glob) => !resolvesToAtLeastOneFile(glob, configDir, exts));
+    const dead = excludes.filter((glob) => !resolvesToAtLeastOneFile(glob, configDir, exts, config));
     expect(
       dead,
       `${config} exclude globs matching ZERO files: ${dead.join(", ")}. ` +
