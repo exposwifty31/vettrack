@@ -8158,3 +8158,150 @@ with no console page to drain it); authorising the 10-file `stability` + `equipm
 at all (devDependency + config + `db:push` all present and all inert); whether to retire the two stale
 always-on `ecc` rules now restored; and the remaining 76 `.claude/commands/**` files, whose removal was
 reverted for want of a valid liveness test rather than proved wrong.
+
+---
+
+## 2026-08-19 — Tier-2 owner decisions executed: ADR-011, the two route deletions, the docs freshness gate, three retirements
+
+**Scope:** four owner-directed items on `chore/audit-tier2`, each closing an item the previous entry
+carried forward as an open decision. Commits `fd10a84ef`, `c43747e6e`, `9ea19a2b6`, `5fb7494d1`
+(plus `4d8a3f265`, logged inline below). Local commits only — nothing pushed, no PR.
+
+**Evidence — ADR-011 (`fd10a84ef`), the outbox sequence mismatch:**
+
+- Every citation re-derived by hand before writing, not taken from the review that raised it:
+  `migrations/090_vt_event_outbox.sql:4` = `id BIGSERIAL PRIMARY KEY` (global, no per-clinic column —
+  `grep` for `clinicSeq|clinic_seq` across `server/schema/` and `migrations/` returns nothing);
+  `server/lib/event-publisher.ts:113` emits `clinic:${row.clinicId}` (per-clinic fan-out);
+  `server/routes/realtime.ts:131` `outboxRowToSse` sends `id: row.id` verbatim;
+  `src/lib/realtime.ts:703,707` gap-check `oid <= last` / `oid !== last + 1`;
+  `server/routes/realtime.ts:330` scopes `outbox-head` with `eq(eventOutbox.clinicId, clinicId)`.
+- Conclusion recorded: a subset of a shared monotonic sequence is not contiguous, so with ≥2 clinics
+  writing, every event reads as a dropped one and the recovery it triggers re-establishes a
+  clinic-scoped cursor, so it does not converge. Latent because production runs one active clinic.
+- Decision is additive (global `id` keeps resume/replay/prune; a new `clinic_seq` takes contiguity),
+  which is why it is an ADR and not a doctrine change. Two alternatives are recorded as rejected with
+  their costs, not omitted. Status `proposed` — **not implemented here.**
+- Also backfilled ADR-007 and ADR-009 into `docs/architecture/adr/README.md`, whose own note recorded
+  them as missing; "next suggested number" advanced to ADR-012.
+
+**Evidence — stability + equipment-board removed (`c43747e6e`), closing the previous entry's largest
+"NOT done":**
+
+- Baseline first: the 7 pinning test files ran green before any edit — `Test Files 7 passed`,
+  `Tests 77 passed`. After: `7 passed`, `71 passed` (the 6 removed are the stability-specific cases).
+- The register's patch set was 10 files; a repo-wide sweep found **three more it missed** —
+  `server/lib/test-runner.ts` and `server/lib/stability-log.ts` (`grep` shows their only consumers
+  were `stability.ts` and each other) and `docs/architecture/routes-contract.json`. Both generated
+  artefacts were rebuilt by their own scripts (`collect-query-keys.mjs --write-registry` → 95
+  signatures; `extract-express-routes.mjs --write-contract` → 284 routes, down from 291), never
+  hand-edited.
+- `/api/display` verified untouched (`server/app/routes.ts:109` intact). The alias removal is what
+  closes the latent frozen-surface hole: `isEmergencyBypass` matches `=== p || startsWith(p + "/")`
+  against `/api/display/snapshot` only, so `/api/equipment-board/snapshot` — the identical
+  `createDisplayRouter()` handler — sat outside the denylist in both `public/sw.js` and
+  `packages/contracts/src/emergency.ts`.
+- `tests/equipment-readiness-wedge-smoke.test.ts` keeps its `/api/display` assertion and **inverts**
+  the alias one into `not.toContain('/api/equipment-board')`, so re-adding the alias fails.
+- `tests/i18n-pr-6-10-route-migration.test.ts` was rewritten rather than hacked: with stability gone
+  its router-dispatch helper, two module mocks and express type imports were all orphaned. Its header
+  records what the deleted en/he integration cases covered and where that coverage still lives.
+- Gates: `pnpm typecheck`, `typecheck:server`, and `tsc --project tsconfig.server-check.json` all
+  exit 0. Full suite `733 files / 6655 passed`, single failure `tests/xlsx-write-only-guard.test.ts`
+  = `Test timed out in 5000ms`, passes 5/5 standalone, and `git diff origin/main --name-only | grep -ci
+  xlsx` = 0. Same rotating load-flake the previous entry characterised.
+
+**Evidence — docs freshness gate (`9ea19a2b6`):**
+
+- **Falsifiability proven, not asserted.** Deleted one `| \`vt_…` row from `docs/audit/db.md` → the
+  gate failed with `docs/audit/db.md is stale — it no longer matches its generator. Run \`pnpm
+  docs:audit\``; restored the file → `5 passed`. A gate that cannot fail is not a gate.
+- The previous entry left `frontend-routes.md` omitting `/board` and 8 others, diagnosed as one
+  defect (8 predicates, no catch-all). Measuring found **two independent** defects: the route regex
+  also required a closing tag, so all 9 self-closing `<Route path="…" component={X} />` forms were
+  invisible (/home, /privacy, /terms, /support, /account-deletion, signin/signup wildcards). 83
+  matched by the old regex, 90 `<Route path=` in source, 76 rows emitted.
+- A **third** defect surfaced only once coverage could be measured: the parser took the first
+  `<Word>` in a route body as its component, which for a guarded route is the guard — **59 of 90 rows
+  named `AuthGuard` instead of the page.** Fixed by preferring the `lazy()` import map, which is the
+  authoritative signal. Gating a 65%-wrong file would have locked the wrongness in.
+- Verified after: 90 unique source paths vs 90 unique doc paths, `MISSING from doc: none`; rows naming
+  a guard as component = 0.
+- Second test asserts every `<Route path="…">` in `src/app/routes.tsx` appears in the inventory,
+  checked against the **source**, so a future bug inside the generator cannot make it pass.
+- Also removed the dead `setup-vm.sh` entry from `ALLOWLIST_BY_PATTERN` in `scripts/scan-secrets.ts`
+  (that script was emptied earlier on this branch; `grep -c "DATABASE_URL=postgres" setup-vm.sh` = 0).
+  Scanner behaviour verified unchanged by A/B: the **same 2 hits before and after**, both in
+  `tests/scripts/scan-secrets.test.ts` — the scanner's own deliberate fixtures — and both reproduce
+  with the original allowlist restored from `origin/main`, so they pre-exist this branch.
+- No CI wiring needed: the gate is in `tests/`, absent from `vite.config.ts`'s exclude list, so
+  `pnpm test` runs it and `ci.yml`'s test job runs that.
+
+**Evidence — three retirements (`5fb7494d1`):**
+
+- **drizzle-kit** removed as *proven broken*, not merely unused: `docs/migrations.md:26` documents the
+  `Cannot find module './core.js'` failure, and this log records at least six prior occasions where
+  someone hit it and hand-authored SQL instead. Removed the devDependency, `db:push`,
+  `drizzle.config.ts`, and its `knip.json` ignore entry. **`drizzle-orm` (the runtime ORM) kept** —
+  verified `node_modules/drizzle-orm` present, `node_modules/drizzle-kit` absent.
+  `pnpm install --frozen-lockfile` — what CI runs — exits 0 against the updated lockfile (−517 lines).
+- Nine documents still instructed running it. **Seven live, operative sites corrected**; three
+  categories deliberately left: `PROOF_ALIGNMENT_LOG.md`, `docs/plans/**` spike findings, and
+  `docs/archive/**` all *record* the failure and are evidence, not instructions.
+- **Two always-on `ecc` rules deleted** — `common/performance.md` (superseded model roster) and
+  `web/hooks.md` (prettier/eslint/stylelint hooks for three tools absent from `package.json`). Both
+  are injected as project instructions every session; zero citations outside their own tree. The other
+  16 files under `rules/ecc/{common,web}` stay — they were restored earlier on this branch precisely
+  because they ARE load-bearing.
+- **Both staging workflows deleted.** The previous round disabled them; this removes them, and the
+  reason is stronger than "unused": `workday-simulation-nightly.yml` ran nightly and reported
+  **success while executing nothing** — its preflight `exit 0` succeeds a step but does not skip a
+  job, so it fell through to `checkout` with `ref: staging`, failed, and `continue-on-error: true`
+  painted the run green. Run `32100016045` (2026-08-18): run conclusion *success*, job conclusion
+  *failure*, 40s, zero simulation. `staging-e2e-manual.yml` had zero runs ever.
+  Nothing is discarded with the files: `docs/staging-e2e-runbook.md`'s Actions section now carries the
+  mechanism with its run id, the secret table, and three constraints for a rebuild (do not key on a
+  git branch; keep an environment guard, since these jobs run seed/cleanup against a live database;
+  never pair a soft-fail preflight with `continue-on-error`).
+- Gates: `frozen-lockfile`, `typecheck`, `typecheck:server`, `architecture:gates`, `i18n:check` all
+  exit 0. `knip` reports **no** Unresolved-import and **no** Unlisted/Unused-dependency sections, so
+  the deletions orphaned nothing. Full suite `734 files / 6660 passed`, same single xlsx load-flake.
+
+**Evidence — `ios/.last-shipped-build` (`4d8a3f265`), an App Store Connect check the audit could only
+mark Suspected:**
+
+- Read-only via `asc` (no console state changed). App `6778937527` = `VetTrack` / `uk.vettrack.app`.
+  Uploaded builds: `1, 3–26, 28` — **27 is a gap, 28 is present** (2026-08-13, VALID).
+- The file said `25` while the repo's own `CURRENT_PROJECT_VERSION` is `26`, so
+  `scripts/verify-resubmission-static.sh` was returning "build 26 > last shipped 25 — PASS" for a
+  build number that **already exists upstream**. The gate that exists to catch a duplicate build
+  number was passing the duplicate. Baseline moved to 28; the guard now blocks anything ≤ 28.
+- Same session established, and recorded to memory rather than here: **no git ref anywhere sets
+  `CURRENT_PROJECT_VERSION = 28`** (`git log --all -S` on the pbxproj returns nothing) and no checkout
+  on disk has it (all ten read `26 / 1.2.0`). The only 1.3.0 bump commit, `f25da7323`, says build
+  **27** and lives solely on the local-only branch `parked/nfc-grabbag-proof-2026-07-31` (203 commits
+  behind main). Build 28 is therefore **not reproducible from source**; rebuild from `main`, next
+  build ≥ 29. No feature work is stranded on that branch — ADR-009, the `@vettrack/shared` packaging,
+  the resubmission ripcord and the emergency-manifest correction all reached main by other routes.
+
+**Evidence — what was NOT done, and why:**
+
+- **ADR-011 is `proposed`, not implemented.** No migration, no schema change, no client change. The
+  commit `b26e06d89` on `chore/audit-tier1` that routes `TASK_*` through the outbox must not reach a
+  multi-clinic database until it is.
+- **`errors.stability.*` in `locales/{en,he}.json` is now dead and was left in place.** The
+  `chore/audit-tier1` branch owns those two files and has already rewritten them heavily; deleting
+  keys here would manufacture a merge conflict for no gain. Recorded in the register instead.
+- **`docs/audit/codebase-relevance-classification.json`** still lists the newly deleted paths, for the
+  same reason the previous entry gave: `pnpm docs:audit` does not regenerate it. Unchanged, cosmetic.
+- **The remaining 76 `.claude/commands/**`** were not revisited. The previous entry left this open for
+  want of a valid liveness test; the cost of a false positive (silently breaking a documented route)
+  still exceeds the benefit of deleting 76 inert markdown files.
+
+**Verdict:** VERIFIED for what this entry claims — five commits on `chore/audit-tier2`, working tree
+clean, every gate exit code stated above observed directly, and the single test failure reproduced
+standalone as green and shown to touch none of the changed files. Carried forward: implementing
+ADR-011; the legal-entity name on the RN licence (**answered this session — App Store Connect carries
+`© 2026 Dan Erez` on all three versions incl. the live 1.2.0; `chore/license-and-cleanup` `03c522c`**);
+the fate of `admin-task-ownership`; long-lived SSE/collab connection revalidation; and the NEEDS-OWNER
+rows in the route register.
