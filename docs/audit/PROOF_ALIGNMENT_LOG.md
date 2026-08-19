@@ -8038,3 +8038,123 @@ moment, and both misconfigurations closed and re-verified at the resolved-value 
 Explicitly NOT closed: the `CLERK_WEBHOOK_SECRET` match (needs a signed delivery), the
 live `SESSION_SECRET` in `.env.example` (needs a rotation), the worker's three missing
 variables, and the deploy pipeline (needs Railway).
+
+## 2026-08-19 — Tier-2 codebase audit remediation: seven lanes landed as six vettrack commits + one RN commit (0cef5cce2, b388bc1eb, 821be0766, 4dd879b6a, 9e486fedc, 3227a35d8; RN cf17983)
+
+**Claim:** Seven parallel audit lanes (D1–D7) were adversarially re-reviewed, two lanes came back
+DEFECTIVE, the wrongly-deleted files were restored from `origin/main`, every critical/high refutation
+was fixed, and the work landed as six per-lane revertible commits on `chore/audit-tier2` plus one on
+the RN repo's `chore/license-and-cleanup`. Net: 405 tracked files removed from the vettrack repo,
+none of them application code beyond one never-wired middleware and its test.
+
+**Evidence — the gate table, run at land time on the post-fix tree, verbatim:**
+
+| # | Command | Exit |
+|---|---|---|
+| 1 | `pnpm typecheck` | 0 |
+| 2 | `pnpm typecheck:server` | 0 |
+| 3 | `pnpm i18n:check` | 0 |
+| 4 | `pnpm contracts:typecheck` | 0 |
+| 5 | `pnpm architecture:gates` | 0 |
+| 6 | `pnpm depcruise:check` | 0 |
+| 7 | `pnpm test` (worktree `.env` as-is) | **1** |
+| 7b | `VITE_CLERK_PUBLISHABLE_KEY= pnpm test` | 0 |
+| 8 | `pnpm knip` | 1 (its normal "found something" exit) |
+
+Gate 5: `[compare-cycles] OK — server: 2 cycle(s), src: 0 cycle(s) (matches baseline).`
+`[architecture-gates] All G1 checks passed.`
+Gate 6: `✔ no dependency violations found (999 modules, 5200 dependencies cruised)`, 10 known
+baseline violations ignored.
+Gate 7 as-is: `Tests 3 failed | 6663 passed | 11 skipped (6677)`, 184.85s.
+Gate 7b: `Test Files 733 passed (733) / Tests 6666 passed | 11 skipped (6677)`, 206.72s, exit 0.
+Gate 8: 120 unused files / 256 unused exports / 253 unused exported types — and, the part that
+matters after a 405-file deletion, **zero** "Unresolved imports" and **zero** "Unlisted
+dependencies" sections (`grep -cE 'Unresolved imports|Unlisted dependencies'` → 0). 74 of the 120
+are `docs/design-handoff` artifacts and the named `src/` entries are the known pre-existing
+false-positive set; nothing is newly orphaned.
+
+**The one red gate is environmental and pre-existing, proved by A/B rather than asserted.**
+The 3 failures are `tests/dev-role-override.test.ts` (2) and `tests/display-token-header.test.ts` (1),
+all `AUTH_INVALID` thrown at `src/lib/auth-fetch.ts:152` or `isDevBypassBuild()` returning false.
+
+- `git diff origin/main --name-status -- src/ tests/` → exactly one line, `D tests/ensure-user-clinic-membership.test.ts`.
+- `git diff origin/main --name-only -- src/lib/auth-fetch.ts tests/dev-role-override.test.ts tests/display-token-header.test.ts` → **0 lines**. All three files in the failure path are byte-identical to `origin/main`, so running them here *is* running the `origin/main` version.
+- `git check-ignore -v .env` → `.gitignore:9:.env`, and `git ls-files --error-unmatch .env` → `did not match any file(s) known to git`. The trigger is this worktree's untracked, gitignored `.env`, which carries a live `VITE_CLERK_PUBLISHABLE_KEY=pk_…`; `isClerkEnabled()` reads it out of `import.meta.env`, so the dev-bypass branch under test never activates.
+- A/B on those two files alone: as-is → `Test Files 2 failed (2) / Tests 3 failed | 6 passed (9)`; with `VITE_CLERK_PUBLISHABLE_KEY=` → `Test Files 2 passed (2) / Tests 9 passed (9)`, exit 0.
+
+The earlier gate run also showed 4 additional failures (`clinical-check-in.routes`, `rfid-ingest`,
+`xlsx-write-only-guard` timing out at 5000ms, and an ordering-sensitive `rfid-provisioning`
+assertion). They did **not** recur in this run — 3 failures, not 7 — which confirms the load-flake
+diagnosis rather than resting on it. Nothing in the branch touches any of those files.
+
+**Hard constraint honoured:** no DB-integration suite was run and nothing connected to
+`DATABASE_URL`. `pnpm test` excludes them by `vite.config.ts`.
+
+**Evidence — the two DEFECTIVE verdicts and what was restored.**
+
+Lane D1 justified deleting all 84 `.claude/commands/**` by cross-checking command basenames against
+`package.json` scripts (`commands: 84 | pnpm scripts: 72 | name matches: []`). That is a category
+error: slash commands are not npm scripts. The tests that matter were run at land time and both fail:
+
+- `ls ~/.claude/commands/` → `ccg` and `ship-phase.md`, nothing else.
+- `find /Users/dan/.claude /Users/dan/.agents -name 'harness-audit.md' -o -name 'cost-report.md' -o -name 'prune.md' -o -name 'save-session.md' -o -name 'skill-health.md'` → **no output**.
+- `/Users/dan/.claude/plugins/` contains `cache data installed_plugins.json known_marketplaces.json marketplaces plugin-catalog-cache.json presence` — no `commands` directory.
+- `ls /Users/dan/vettrack/.claude/commands` → the files exist there, i.e. **this repo is their only definition site on this machine**, and the same names appear in this session's live available-skills listing.
+- Eight are named in the owner's always-on global rules: `~/.claude/rules/skill-routing.md:128` (`prune`), `:130` (`harness-audit`, `cost-report`, `skill-health`), `:133` (`sessions`, `save-session`, `resume-session`), and `~/.claude/rules/ccg-skill-routing.md` (`security-scan`).
+
+All 84 restored: `git checkout origin/main -- .claude/commands/`, then
+`git diff origin/main --name-only -- .claude/commands | wc -l` → **0**.
+
+D1 also deleted 16 of the 18 files under `.claude/rules/ecc/{README.md,common/**,web/**}` after gating
+them on "does anything outside the tree cite them". Wrong oracle: those files are auto-injected by the
+harness into every session in this repo as "(project instructions, checked into the codebase)" —
+observable verbatim in this session's system prompt, independent of any citation. D1's own proof calls
+them "the 18 always-on files" and then gates on something else. All 16 restored, plus a revert of D1's
+one-line relink of `web/design-quality.md` (its `../common/patterns.md` target is back), leaving
+`git diff origin/main --stat -- .claude/rules/` showing **only** the 86 off-stack language-pack files
+as deleted and the 18 always-on files byte-identical.
+
+**Evidence — file-count delta after restoration (`git ls-tree -r --name-only origin/main` vs `git ls-files`):**
+
+```
+                 BEFORE   AFTER   DELTA
+.claude tracked     808     463    -345
+.agents tracked      63      10     -53
+repo tracked       3672    3267    -405
+```
+
+Kept under `.claude/`: 316 skills, 84 commands, 33 agents, 19 rules, 8 PRPs, `settings.json`,
+`launch.json`. `.cursor/**` untouched (`git status --porcelain -- .cursor/` empty).
+`.agents/skills/publish-mobile-app/**` (10 files) deliberately left in place — a live
+store-submission skill with real TypeScript scripts, not part of either vendored pack.
+
+**Evidence — the other refutations fixed, each re-derived from source, not from the proof files:**
+
+- **D4 / `docs/architecture/tenant-enforcement.md:9`** still listed `ensure-user-clinic-membership` as tenant-enforcement layer 3 after its file was deleted. Line removed (821be0766). This was the single must-fix flagged by the reviewer.
+- **D6 / `docs/audit/route-consumer-triage.md`** was **untracked**, not staged (`?? docs/audit/route-consumer-triage.md`, and `git check-ignore -v` exit 1). Every sibling lane staged by side-effect of `git rm`; this lane's only deliverable would have vanished under `git add -u`. Explicitly `git add`-ed (9e486fedc).
+- **D5 / `ARCHITECTURE.md:211`** said "188 SQL migrations applied in order at startup". Re-derived: `ls migrations/*.sql | wc -l` = 188, `… | grep -v '\.down\.sql' | wc -l` = 187, and `server/migrate.ts:65` reads `.filter((f) => f.endsWith(".sql") && !f.endsWith(".down.sql") && !f.startsWith("meta/"))` with `migrations/0018_striped_valkyrie.down.sql` present. Corrected to 187 applied / 188 files, and the published recipe `ls migrations/*.sql | wc -l` — which would have enshrined the error permanently — now carries the `grep -v`.
+- **D5 / `ARCHITECTURE.md` §8** explained 188 as "185 plus a few letter-suffixed numbers", which yields 191, not 188. Replaced with arithmetic derived by script: 175 distinct leading numbers present (185 minus the 10 never used — 78 and 81–89) + 13 files sharing a leading number with another (6 letter-suffixed `018b 019b 035b 076b 093b 096a`; 6 legacy four-digit `0018`–`0022`, one with a `.down.sql` twin; duplicate `141`) = 188. Verified: `distinct leading numbers: 175 extras: 13 total: 188`.
+- **D5 / `README.md:235`** still read `one file per API resource (~55)` — the same stale number the lane went out of scope to fix elsewhere in the same file. `ls server/routes/*.ts | wc -l` = 60, `grep -c '^\s*app\.use(' server/app/routes.ts` = 60. Corrected.
+- **D5 / `ARCHITECTURE.md:197` and `:309`** both claimed `src/shared` "is now just a redirect stub". `ls -d src/shared` → `No such file or directory`. Both cells now record that it existed from `c113b9924` (2026-04-22) until `33c7596f3` / `3df859145`.
+- **D7 / `.github/CODEOWNERS`** comment asserted `src/shared/` "has never existed" — a fabricated historical claim committed by the lane whose thesis is that hand-written facts must be re-derived, and directly contradicting D5's cell about the same path. Rewritten to the verifiable claim (existed, then removed; the rule has matched nothing since).
+- **D3 / `docs/migrations.md`** said the directory "grew to 185 files" (185 is the tail file's ordinal, not a count → now 188 files / 187 applied); said "everything from `0021` onward is hand-written" while naming 0018/0019 as the last drizzle output, leaving `0020_abnormal_iron_monger.sql` — journal idx 20, no `--> statement-breakpoint` markers — outside both claims (now named); and recorded only the smaller half of the hazard its own deletion created. With `migrations/meta/_journal.json` gone, drizzle-kit treats the project as fresh and a repaired `generate` would emit a **full baseline of every table** into `./migrations`, which `server/migrate.ts` would apply at startup as an unguarded CREATE-everything file — not the partial diff the doc described. Latent only because `generate` cannot run: reproduced independently with a throwaway probe config and an unroutable `DATABASE_URL`, failing at `Cannot find module './core.js'` from `server/schema/index.ts:2`.
+- **D6 / §4** claimed the no-consumer search was run "five ways" with zero product hits. A sixth method finds `src/lib/query-keys/registry.ts:95-98`, registering four `/api/stability/*` query-key shapes. It does not overturn the `DELETE-NOW` verdict — that file's own header says "Do not import from application code" and `.github/workflows/ci.yml:255-257` runs its collector `--warn-only` with `continue-on-error: true` — but it is a 10th file the register's 9-file patch set omitted, and it is positive evidence a consumer once existed. Both a table row and a dated correction note were added to the register before committing it.
+- **Cross-lane:** `CLAUDE.md:119` said "Registers ~56 API route modules" while three sibling docs were being canonicalised to 60. Corrected in the D3 commit (disclosed in its body) so the repo does not ship four numbers for one fact.
+
+**Evidence — what was NOT done, and why:**
+
+- **`server/routes/stability.ts` was not deleted.** The land instruction's suggested commit shape named it, but D6 deliberately did not delete it and the reason survives scrutiny: it is pinned as *source text* by 6 test files (plus 2 more for the `/api/equipment-board` alias), including a module-scope `readFileSync` that errors at collection and an i18n allowlist with a "no stale entries" test that fails on a missing file. Deleting it as a one-file change turns the suite red. The exact 9-file (now 10-file) patch set is written into the register instead. `server/routes/stability.ts` is still on disk, still imported at `server/app/routes.ts:50`, still mounted at `:132`.
+- **`docs/audit/codebase-relevance-classification.json`** still lists all six deleted paths (lines 9553/9560/9567/9574 for `migrations/meta/*`; 11611/16147 for the middleware and its test). Both D3 and D4 prescribed `pnpm docs:audit` as the remedy — **that does not work**: `scripts/docs/generate-audit-inventories.mjs` produces `db.md` / `routes.md` / `frontend-routes.md` and never touches the classification JSON. No test pins the file, so this is cosmetic, but the prescribed follow-up would not have closed it and the record should say so.
+- **`docs/audit/frontend-routes.md` still omits `/board`** and 8 other routes after regeneration, because `scripts/docs/extract-frontend-routes.mjs` emits through 8 hard-coded section predicates with no catch-all (83 `<Route>` entries in source, 76 rows emitted). Closing it needs a `scripts/` change — left as an owner decision rather than hand-editing a generated file.
+- **The 86 off-stack `.claude/rules/ecc/<language>/**` files stay deleted**, including `react/` and `typescript/`, which are on-stack. They are not auto-injected (they do not appear in the session's project-instruction payload) and nothing outside the generated relevance inventory cites them. Flagged rather than silently assumed correct.
+
+**Verdict:** VERIFIED for what this entry claims — six vettrack commits and one RN commit, working tree
+clean, six of seven gate commands exit 0, and the seventh proved environmental by A/B against
+byte-identical `origin/main` files. Explicitly NOT closed and carried forward as owner decisions: the
+legal-entity name on the new RN licence (`VetTrack` alone today, no registered entity stated anywhere in
+that repo); the fate of `admin-task-ownership` (7 endpoints, `vt_task_ownership_confirm_queue` filling
+with no console page to drain it); authorising the 10-file `stability` + `equipment-board` deletion;
+`/api/equipment-board/snapshot` sitting outside the emergency cache denylist; whether drizzle-kit is kept
+at all (devDependency + config + `db:push` all present and all inert); whether to retire the two stale
+always-on `ecc` rules now restored; and the remaining 76 `.claude/commands/**` files, whose removal was
+reverted for want of a valid liveness test rather than proved wrong.
