@@ -174,10 +174,11 @@ Section A, lower urgency (no data accumulates).
 > files and has already rewritten them heavily; deleting keys here would manufacture a
 > merge conflict for no gain. Fold them into the locale cleanup on that branch.
 
-Both deletions this lane was asked to execute are **correct verdicts** but are **not
-one-file changes**, and their companion edits fall outside this lane's file set. Per the
-concurrency contract, the patches are reported rather than applied. See
-`wf2-proof/D6.md` for the exact patch text.
+Both deletions are **correct verdicts** and neither was a one-file change: each needed
+companion edits across eight test files that pin the routes as source text. That is why
+the register originally reported the patches instead of applying them — the lane that
+wrote it was scoped out of test files. Both patch sets have since been applied in full;
+`wf2-proof/D6.md` retains the original patch text for reference.
 
 ### C.1 — `/api/stability` (7 endpoints) — `DELETE-NOW` — EXECUTED
 
