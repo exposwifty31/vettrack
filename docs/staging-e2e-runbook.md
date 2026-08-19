@@ -13,8 +13,18 @@ Staging-only infrastructure for temporary Clerk test users, `vt_users` mapping, 
 
 **There is no CI automation for staging any more.** Two workflows used to exist —
 `staging-e2e-manual.yml` and `workday-simulation-nightly.yml` — and both were deleted.
-Everything they did is available locally, from this runbook, against the same real staging
-deployment. Nothing was lost; a false coverage signal was.
+Nothing was lost; a false coverage signal was. But the replacements are **not both here**,
+and they do not share a target:
+
+- **Staging seed / E2E / walkthrough** — this runbook, run locally against the real staging
+  deployment. That is what `staging-e2e-manual.yml` wrapped.
+- **The workday simulation** — *not* in this runbook, and *not* against staging. It runs
+  against a **locally built app** at `http://127.0.0.1:3001`, and
+  `.github/workflows/e2e-simulation-nightly.yml` still runs it nightly. See
+  [playwright-matrix.md](playwright-matrix.md) for the command and target.
+
+Treating the second as staging coverage is the mistake to avoid: it never touched the
+deployed environment, so a green workday run says nothing about staging.
 
 **What went wrong, recorded so it is not rebuilt the same way.** Both workflows hard-depended
 on a `staging` **git branch** that has never existed on origin
@@ -87,11 +97,23 @@ staging over HTTP and needs none.
 set -euo pipefail
 
 R=exposwifty31/vettrack
-gh api "repos/$R/environments" -q '.environments[].name'          # both must be listed
+fail() { echo "FAIL: $*" >&2; exit 1; }
+
+# Expected, exactly — not a subset. An environment holding the OTHER lane's secrets
+# re-opens the finding at a smaller scale, so an extra name fails as loudly as a missing one.
+expect_policy_staging_e2e=staging
+expect_policy_staging_simulation=main
+expect_secrets_staging_e2e=$'CLERK_SECRET_KEY_STAGING\nDATABASE_URL_STAGING\nSTAGING_E2E_PASSWORD_STAGING\nTEST_BASE_URL_STAGING\nVITE_CLERK_PUBLISHABLE_KEY_STAGING'
+expect_secrets_staging_simulation=$'CLERK_SECRET_KEY_STAGING\nSTAGING_E2E_PASSWORD_STAGING\nTEST_BASE_URL_STAGING\nVITE_CLERK_PUBLISHABLE_KEY_STAGING'
+
 for e in staging-e2e staging-simulation; do
-  echo "== $e =="
-  gh api "repos/$R/environments/$e/deployment-branch-policies" -q '.branch_policies[].name'
-  gh api "repos/$R/environments/$e/secrets" -q '.secrets[].name'
+  policy="$(gh api "repos/$R/environments/$e/deployment-branch-policies" -q '.branch_policies[].name' | sort)"
+  secrets="$(gh api "repos/$R/environments/$e/secrets" -q '.secrets[].name' | sort)"
+  eval "want_policy=\$expect_policy_$(tr - _ <<<"$e")"
+  eval "want_secrets=\$expect_secrets_$(tr - _ <<<"$e")"
+  [ "$policy" = "$want_policy" ] || fail "$e branch policy is '$policy', expected exactly '$want_policy'"
+  [ "$secrets" = "$(sort <<<"$want_secrets")" ] || fail "$e secrets differ from the allowlist:"$'\n'"$(diff <(sort <<<"$want_secrets") <(echo "$secrets") || true)"
+  echo "OK: $e"
 done
 
 # Capture first (so an API failure aborts under `set -e`), THEN test the captured value.
