@@ -1,166 +1,59 @@
 # Production release runbook
 
-> ## ⚠ The hosted staging gate this runbook is built around does not exist
->
-> **`Staging E2E (manual)` was deleted** (2026-08-19) — it had zero runs in its lifetime,
-> because `workflow_dispatch` requires you to pick a ref and its guard accepted only
-> `refs/heads/staging`. **That branch has never existed on origin**, and no `*_STAGING`
-> secret was ever created. So every step below that says "GitHub → Actions → Staging E2E",
-> "dispatch from branch `staging`", or "re-run the workflow" describes automation that was
-> never available, not automation that broke.
->
-> Until a replacement is built, the supported path is the **local** procedure in
-> [staging-e2e-runbook.md](staging-e2e-runbook.md), which also records what a rebuild must
-> get right — chiefly that its credentials belong on GitHub *environments*, never on the
-> repository.
->
-> The rest of this document is left intact rather than rewritten: the promotion *shape*
-> (feature → staging → production), the health checks and the rollback reasoning are still
-> what we want. Replacing them with a local-only flow I invented would trade a documented
-> gap for an undocumented guess. **Fixing this properly is a decision about whether the
-> staging lane gets rebuilt — an owner call, not a doc edit.**
+> **The staging lane was removed on 2026-08-19** — the Railway environment, the branch that
+> never existed, the workflows, the seed/cleanup scripts and the specs are all gone. It was
+> not a lane that broke; nothing ever ran in it. Releases go **feature branch → PR → `main`
+> → production**, which is what has actually been happening. If a staging tier is wanted
+> later it gets built deliberately, from scratch, and this runbook gains a phase back.
 
-Safe promotion path for VetTrack: **feature branch → staging → production**. Staging E2E on Clerk test keys is the gate before any merge to `main`.
-
-| Environment | App URL | Git branch | Railway service |
-|-------------|---------|------------|-----------------|
-| **Staging** | `https://vettrack-staging.up.railway.app` | `staging` | Staging (separate from production) |
-| **Production** | `https://vettrack.uk` | `main` | Production |
-
-**Related docs**
-
-- [Staging E2E checklist](staging-e2e-runbook.md) — short pre-promotion checklist and workflow trigger steps
-- [Staging E2E detail](staging-e2e-runbook.md) (full seed/spec/cleanup reference on the `staging` branch)
-- [Release Gate workflow](../.github/workflows/release-gate.yml) — automated gates on merge to `main`
-- [Clerk key rotation](runbooks/1.4-clerk-key-rotation.md) — emergency key rotation only
-
----
+Promotion path: **feature branch → PR into `main` → production**.
 
 ## Release flow (overview)
 
 ```mermaid
 flowchart TD
-  A[Feature branch] --> B[PR into staging]
-  B --> C[Merge to staging]
-  C --> D{Railway staging deploy SUCCESS?}
-  D -->|No| E[Fix and redeploy staging]
-  E --> D
-  D -->|Yes| F["/api/healthz on staging"]
-  F --> G[Run Staging E2E manual on branch staging]
-  G --> H{E2E green?}
-  H -->|No| I[Rollback / fix staging — see below]
-  I --> C
-  H -->|Yes| J[PR staging → main]
-  J --> K[Merge to main]
-  K --> L[Production Railway deploy]
-  L --> M[Verify production health endpoints]
+  A[Feature branch] --> B[PR into main]
+  B --> C{PR checks green?}
+  C -->|No| D[Fix on the branch]
+  D --> C
+  C -->|Yes| E[Merge to main]
+  E --> F[Production Railway deploy]
+  F --> G{Release Gate + deploy SUCCESS?}
+  G -->|No| H[Rollback - see below]
+  G -->|Yes| I[Verify production health endpoints]
 ```
 
-**Rule:** Do not open or merge a **staging → main** PR until staging deploy is green **and** the staging E2E suite has passed. That gate is currently the **local** procedure in [staging-e2e-runbook.md](staging-e2e-runbook.md) — the hosted `Staging E2E (manual)` workflow was deleted (see the banner at the top). The rule stands; only the mechanism changed.
+**Rule:** the PR's own checks are the gate. There is no pre-production environment to verify
+against, so a change is exercised locally and by CI before it reaches production — and the
+production verification in Phase 2 below is not optional.
 
 ---
 
-## Phase 1 — Feature work → staging
+## Phase 1 — Ship to production
 
-### 1.1 Open a feature branch
+### 1.1 Pull request into `main`
 
-```bash
-git checkout staging
-git pull origin staging
-git checkout -b cursor/<short-description>-a0a4
-```
-
-Implement and validate locally (`pnpm test`, `npx tsc --noEmit`). Do not point Playwright or staging seed scripts at production (see [Forbidden actions](#forbidden-actions-never-do-these)).
-
-### 1.2 Pull request into `staging`
-
-1. Push the feature branch and open a **PR: `<feature>` → `staging`**.
-2. Wait for PR CI (`.github/workflows/ci.yml`) — typecheck, tests, build.
-3. Address review; merge when green.
-
-### 1.3 Confirm Railway staging deploy
-
-After merge to `staging`, Railway deploys the staging service automatically.
-
-1. Open **Railway** → staging VetTrack service → **Deployments**.
-2. Confirm the latest deployment status is **SUCCESS** (not building, failed, or crashed).
-3. If deploy failed: read build/runtime logs, fix on a branch targeting `staging`, merge, and wait for a new **SUCCESS** before continuing.
-
----
-
-## Phase 2 — Staging verification (required gate)
-
-Complete these steps **in order** before opening **staging → main**.
-
-### 2.1 Liveness: `/api/healthz`
-
-From any machine with network access to staging:
-
-```bash
-curl -sfS -o /dev/null -w "%{http_code}\n" \
-  https://vettrack-staging.up.railway.app/api/healthz
-```
-
-**Pass:** HTTP `200` and body `ok`.
-
-If this fails, stop — do not run E2E or promote to production. Fix the staging deploy first.
-
-### 2.2 Run **Staging E2E (manual)** on branch `staging` — ⚠ UNAVAILABLE, see the banner at the top
-
-~~The workflow file lives on `main` (so GitHub registers it), but the job **only runs** when you dispatch it **from branch `staging`**.~~ The workflow was deleted and the `staging` branch does not exist; run the local procedure in [staging-e2e-runbook.md](staging-e2e-runbook.md) instead. The steps below are kept as the record of what the gate was meant to do.
-
-| Step | Action |
-|------|--------|
-| 1 | GitHub → **Actions** → **Staging E2E (manual)** |
-| 2 | **Run workflow** |
-| 3 | **Use workflow from:** branch **`staging`** (required — other refs fail the branch guard) |
-| 4 | Run workflow |
-
-The job runs: `pnpm staging:seed` → `pnpm test:staging:e2e` → `pnpm staging:cleanup` (cleanup always runs).
-
-**Pass criteria**
-
-- Workflow conclusion: **success** (all jobs green).
-- No failed step in seed, Playwright, or cleanup.
-
-**Secrets (repository, staging only):** `DATABASE_URL_STAGING`, `CLERK_SECRET_KEY_STAGING`, `VITE_CLERK_PUBLISHABLE_KEY_STAGING`, `STAGING_E2E_PASSWORD_STAGING`, `TEST_BASE_URL_STAGING` — must map to staging DB and `sk_test_*` / `pk_test_*` Clerk, never production values.
-
-Details: [staging-e2e-runbook.md](staging-e2e-runbook.md).
-
-### 2.3 Optional deeper staging checks
-
-After E2E passes, optional manual smoke:
-
-```bash
-curl -sS https://vettrack-staging.up.railway.app/api/version | jq .
-curl -sS https://vettrack-staging.up.railway.app/api/health/startup | jq .
-```
-
-`/api/health/startup` should return `200` with `databaseReachable: true` when `DATABASE_URL` is set on staging.
-
----
-
-## Phase 3 — Promote staging → production
-
-### 3.1 Pull request: `staging` → `main`
-
-Only after **Phase 2** is complete:
-
-1. Open **PR: `staging` → `main`**.
-2. Confirm the PR description lists:
-   - Staging Railway deploy **SUCCESS** (link or deployment ID)
-   - Staging E2E workflow run URL (green)
-   - Staging `/api/healthz` verified
+1. Open the PR against `main`.
+2. Confirm every required check is green — there is no staging run to cite in its place.
 3. Merge when reviewers approve and CI on the PR is green.
 
-### 3.2 Production deploy
+### 1.2 Production deploy
 
-Merging to `main` triggers production deployment (Railway connected to `main`, and optionally `.github/workflows/ci.yml` deploy job when `RAILWAY_USE_CLI_DEPLOY` is enabled).
+Merging to `main` triggers production deployment. **Exactly one path should be live at a
+time** — two would mean one merge starts two concurrent production deploys:
+
+- **CI-driven (the active one):** the `deploy` job in `.github/workflows/ci.yml`, gated on
+  `vars.RAILWAY_USE_CLI_DEPLOY == 'true'` (currently `true`) plus a push to `main`.
+- **Railway auto-deploy from `main`:** disconnected since 2026-07-10 in favour of the above.
+  If it is ever reconnected, turn `RAILWAY_USE_CLI_DEPLOY` off in the same change.
+
+Confirm which is live before relying on either: `gh api repos/exposwifty31/vettrack/actions/variables`
+for the flag, and the Railway service's source settings for the trigger.
 
 1. Watch Railway → **production** service → latest deployment → **SUCCESS**.
 2. **Release Gate** (`.github/workflows/release-gate.yml`) also runs on push to `main` — all gates must pass; treat a failed gate as a release blocker even if Railway shows success.
 
-### 3.3 Post-deploy production verification
+### 1.3 Post-deploy production verification
 
 Run against **production** (`https://vettrack.uk`):
 
@@ -190,47 +83,18 @@ Sign in once in the browser and spot-check a critical path (dashboard or equipme
 
 ---
 
-## Rollback: staging E2E failed
-
-**Do not** merge **staging → main** while E2E is red or staging health is failing.
-
-### Immediate actions
-
-1. **Block promotion** — close or mark the production PR as blocked; do not merge `staging` → `main`.
-2. **Inspect the failed run** — GitHub Actions → failed **Staging E2E** run → logs for `staging:seed`, `test:staging:e2e`, or `staging:cleanup`.
-3. **Confirm staging still serves traffic** — `curl` `/api/healthz` on staging. If deploy is down, fix Railway staging first.
-
-### If seed ran but tests failed
-
-- Re-run the workflow after a fix (cleanup runs `if: always()` on the failed run, but verify no orphaned `staging-e2e-*@vettrack-e2e.example.com` users in the **staging** Clerk dashboard).
-- Locally (staging credentials only): `pnpm staging:cleanup` with the same env vars as CI — see [staging-e2e-runbook.md](staging-e2e-runbook.md).
-
-### If the bad change is already on `staging`
-
-1. Revert the merge commit on `staging` **or** ship a fix PR into `staging`.
-2. Wait for Railway staging deploy **SUCCESS**.
-3. Re-run `/api/healthz` and **Staging E2E (manual)** from branch `staging`.
-
-### If staging deploy itself is bad
-
-1. Railway → staging service → **Deployments** → **Rollback** to the last known-good deployment.
-2. Verify `/api/healthz`.
-3. Re-run E2E when ready.
-
----
-
 ## Rollback: production deploy failed
 
 ### Application rollback (preferred)
 
 1. Railway → **production** service → **Deployments**.
-2. Select the last deployment that passed [Phase 3.3](#33-post-deploy-production-verification).
+2. Select the last deployment that passed [Phase 1.3](#13-post-deploy-production-verification).
 3. **Rollback** / redeploy that artifact.
 4. Re-run production health checks (`/api/healthz`, `/api/version`, `/api/health/startup`).
 
 ### Bad release already merged on `main`
 
-1. Revert the merge commit on `main` (or hotfix forward on `staging`, then repeat the full staging gate before a new **staging → main** PR).
+1. Revert the merge commit on `main`, or fix forward on a branch and re-open a PR against `main`.
 2. Wait for production Railway **SUCCESS**.
 3. Re-verify all three production health endpoints.
 
@@ -238,7 +102,10 @@ Sign in once in the browser and spot-check a critical path (dashboard or equipme
 
 If the deploy failed during or after migrations:
 
-- Do **not** run `pnpm staging:seed` or staging cleanup against production.
+- The **staging** seed/cleanup scripts are gone with that lane, so nothing seeds Clerk fixtures
+  on a schedule any more. That is **not** the same as "nothing creates users": `signup-flow`
+  and the destructive Playwright suites still create real Clerk users and DB rows when pointed
+  at a live environment — see the forbidden-actions table below. Never point them at production.
 - Follow [migrations.md](migrations.md) and coordinate manual DB recovery with a repo owner.
 - Roll back the **application** first to stop bad code paths; migration rollback is a separate, explicit decision.
 
@@ -255,15 +122,9 @@ If auth breaks after deploy (live keys only on production):
 
 | Forbidden | Why |
 |-----------|-----|
-| **`pnpm staging:seed` on production** | Creates Clerk test users and `vt_users` fixtures. Scripts live on branch **`staging`** only (`scripts/staging/*`); they call `scripts/staging/guard.ts` (requires `STAGING_E2E_CONFIRM=yes`, refuses `sk_live_*` / production DB hosts). There is **no** repo script guard on `main` today — prevention is operational: never point `DATABASE_URL` / Clerk env at production when seeding. Production **server** startup also rejects `sk_test_*` via `server/lib/envValidation.ts`. |
-| **`pnpm staging:cleanup` on production** | Deletes users against the configured `DATABASE_URL` / Clerk — same staging-only scripts and guards as seed; never run with production env. |
 | **`sk_test_*` / `pk_test_*` on production Railway** | `validateEnv()` in `server/lib/envValidation.ts` rejects Clerk key mismatch at process start; production must use **live** keys only. |
-| **`sk_live_*` on staging E2E or staging Railway** | Staging GitHub secrets must use `*_STAGING` test keys; on the `staging` branch, `scripts/staging/guard.ts` refuses live keys before seed/cleanup runs. |
-| **Production Clerk users in automated tests** | E2E personas are `staging-e2e-*@vettrack-e2e.example.com` on the **staging** Clerk app only. |
-| **Default Playwright (`playwright.config.ts`) against production or staging URLs** | `TEST_BASE_URL` must be `http://127.0.0.1:3001` (CI) or localhost for default config; production URL is not a CI target. |
-| **`pnpm test:staging:e2e` without prior staging seed** | Tests expect seeded personas and manifest. |
+| **Default Playwright (`playwright.config.ts`) against a production URL** | `TEST_BASE_URL` must be `http://127.0.0.1:3001` (CI) or localhost for default config; production URL is not a CI target. |
 | **`signup-flow` / destructive Playwright against production** | Creates real users and DB rows. |
-| **Merging `staging` → `main` without green Staging E2E** | Bypasses the only hosted Clerk E2E gate before production. |
 | **Using production `DATABASE_URL` in `*_STAGING` GitHub secrets** | Cross-environment data corruption risk. |
 
 **Allowed targets**
@@ -272,8 +133,6 @@ If auth breaks after deploy (live keys only on production):
 |--------------------|--------|
 | `pnpm test` / PR CI | Ephemeral CI Postgres |
 | `pnpm exec playwright test --project=chromium` | Local or [Playwright CI](../.github/workflows/playwright.yml): `TEST_BASE_URL=http://127.0.0.1:3001`, `PLAYWRIGHT_E2E=true` |
-| `pnpm test:staging:e2e` | Branch **`staging`** only (`package.json` script); `https://vettrack-staging.up.railway.app` via `playwright.staging.config.ts` |
-| **Staging E2E (manual)** | Branch `staging`, secrets `*_STAGING` |
 
 ---
 
@@ -282,11 +141,6 @@ If auth breaks after deploy (live keys only on production):
 Copy for PR comments or release tickets:
 
 ```
-[ ] Feature PR merged to staging
-[ ] Railway staging deploy: SUCCESS
-[ ] curl staging /api/healthz → 200
-[ ] GitHub Actions: Staging E2E (manual), branch staging → success
-[ ] PR staging → main opened only after above
 [ ] Railway production deploy: SUCCESS after merge
 [ ] curl production /api/healthz → 200
 [ ] curl production /api/version → 200, expected version
@@ -300,9 +154,9 @@ Copy for PR comments or release tickets:
 
 | Role | Responsibility |
 |------|----------------|
-| **Author** | Feature PR → `staging`, fix CI failures |
-| **Release owner** | Railway staging SUCCESS, trigger Staging E2E, verify healthz |
-| **Reviewer** | Block **staging → main** without E2E link + staging health |
+| **Author** | Feature PR → `main`, fix CI failures |
+| **Release owner** | Production Railway deploy SUCCESS, Release Gate green, and **all three** post-deploy checks: `/api/healthz`, `/api/version`, `/api/health/startup` |
+| **Reviewer** | Block a merge to `main` without green required checks |
 | **On-call / owner** | Production rollback in Railway, migration incidents |
 
 ---

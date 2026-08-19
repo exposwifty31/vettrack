@@ -195,7 +195,6 @@
     Chromium is pre-provisioned in the cloud environment — do not run `playwright install`.
   - **Phase 9 realtime/PWA:** deterministic counter contracts in `tests/phase-9-deterministic-drills.test.ts`
     + browser harness `tests/phase-9-drills.spec.ts`.
-  - **Staging:** `pnpm test:staging:e2e`, `pnpm staging:seed`.
 
   Coverage target is 80%+ (see `.claude/rules/ecc/common/testing.md`); prefer the AAA pattern.
 

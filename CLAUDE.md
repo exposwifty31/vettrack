@@ -27,7 +27,6 @@ pnpm test:playwright:ci     # Playwright CI suite (Chromium). Suite selection is
 pnpm test:playwright:phase9 # Phase 9 realtime/PWA drills (needs running app)
 pnpm test:playwright:pwa    # PWA suite; also: :waitlist, :workday, :flow-walk, :ui-smoke
 pnpm test:signup            # signup E2E flow
-pnpm test:staging:e2e       # staging smoke (playwright.staging.config.ts; staging:seed / staging:cleanup manage data)
 
 # Architecture gates (server/schema, module boundaries, dead code)
 pnpm architecture:gates      # tsc (frontend + tsconfig.server-check.json) + depcruise + madge cycles
@@ -313,7 +312,7 @@ Use `logAudit()` from `server/lib/audit.ts` for all critical actions. It is fire
 - Live-server tests (require dev server on :3001): `tests/charge-alert-worker.test.js`, `tests/code-blue-mode-equipment.test.js`, `tests/equipment-scan-e2e.test.js`, `tests/expiry-api.test.js`, `tests/expiry-check-worker.test.js`, `tests/returns-api.test.js`
 - Phase 9 deterministic drills: `tests/phase-9-deterministic-drills.test.ts` covers bounded-counter contracts in unit form; `tests/phase-9-drills.spec.ts` is the Playwright browser harness for the eight realtime/PWA drills.
 
-E2E tests use Playwright: `pnpm test:signup` (requires Chromium). The Phase 9 drills also use Playwright and require a running app — invoke through the dedicated `playwright.ui.config.ts` / `playwright.config.ts` runners. Playwright discovery is allowlist-only via the `PW_SUITE` env var (default `ci`); staging E2E uses `playwright.staging.config.ts`. Server-side smoke tests run via `pnpm test:server:smoke` (tsx-executed, not vitest). The `packages/rfid-controller` tests run separately via `pnpm test:rfid-controller`.
+E2E tests use Playwright: `pnpm test:signup` (requires Chromium). The Phase 9 drills also use Playwright and require a running app — invoke through the dedicated `playwright.ui.config.ts` / `playwright.config.ts` runners. Playwright discovery is allowlist-only via the `PW_SUITE` env var (default `ci`). Server-side smoke tests run via `pnpm test:server:smoke` (tsx-executed, not vitest). The `packages/rfid-controller` tests run separately via `pnpm test:rfid-controller`.
 
 ### Adding a new feature (checklist)
 

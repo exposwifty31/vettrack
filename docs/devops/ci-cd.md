@@ -25,7 +25,8 @@ Maintenance scope: [`docs/MAINTENANCE_MODE.md`](../MAINTENANCE_MODE.md)
 | [`e2e-simulation-nightly.yml`](../../.github/workflows/e2e-simulation-nightly.yml) | Nightly 05:00 UTC; manual | No |
 
 > The two staging workflows (`staging-e2e-manual.yml`, `workday-simulation-nightly.yml`) were
-> deleted — neither could ever run. See [staging-e2e-runbook.md](../staging-e2e-runbook.md).
+> deleted — neither could ever run — and the whole staging tier followed on 2026-08-19,
+> Railway environment included. See [release-runbook.md](../release-runbook.md).
 
 ---
 

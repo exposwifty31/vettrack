@@ -104,7 +104,6 @@ Consult before extending existing surfaces. Update in phase PRs.
 | [governance/CI_CD_GOVERNANCE.md](./governance/CI_CD_GOVERNANCE.md) | CI/CD governance audit |
 | [infra/branch-protection.md](./infra/branch-protection.md) | Branch protection notes |
 | [release-runbook.md](./release-runbook.md) | Release promotion |
-| [staging-e2e-runbook.md](./staging-e2e-runbook.md) | Staging E2E |
 | [playwright-matrix.md](./playwright-matrix.md) | Playwright suite split |
 | [demo-rollback.md](./demo-rollback.md) | Emergency demo rollback |
 

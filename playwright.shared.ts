@@ -11,13 +11,11 @@ export function warnIfUnsafePlaywrightBaseUrl(baseURL: string): void {
   const lower = baseURL.toLowerCase();
   if (
     lower.includes('vettrack.uk') ||
-    lower.includes('vettrack-staging') ||
     lower.includes('production.railway.app')
   ) {
     console.warn(
-      '[playwright] WARNING: TEST_BASE_URL looks like production or staging. ' +
-        'Default Playwright is for local/CI only (127.0.0.1:3001). ' +
-        'For staging E2E use: pnpm test:staging:e2e (playwright.staging.config.ts).',
+      '[playwright] WARNING: TEST_BASE_URL looks like production. ' +
+        'Default Playwright is for local/CI only (127.0.0.1:3001).',
     );
   }
 }
@@ -36,7 +34,9 @@ export const PLAYWRIGHT_BASE_IGNORE = [
 
 /**
  * Explicit suite allowlists. Default (`ci`) is what `.github/workflows/playwright.yml` runs.
- * UI smoke uses `playwright.ui.config.ts`; staging uses `playwright.staging.config.ts`.
+ * UI smoke runs from `playwright.ui.config.ts` because it needs a different base URL and
+ * timeout profile than the CI suite; sharing this file's config would force one of the two
+ * to run under settings tuned for the other.
  */
 export const PLAYWRIGHT_SUITE_MATCH: Record<string, string[]> = {
   ci: [
