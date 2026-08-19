@@ -163,11 +163,21 @@ export function RadarEquipmentCard({ equipment: eq, justVerified, staleMs }: Rad
   const returnMut = useMutation({
     mutationFn: (payload: { isPluggedIn: boolean; plugInDeadlineMinutes?: number }) =>
       api.equipment.return(eq.id, payload),
-    onSuccess: () => {
+    onSuccess: (res, payload) => {
       queryClient.invalidateQueries({ queryKey: ["/api/equipment"] });
       queryClient.invalidateQueries({ queryKey: ["/api/equipment/my"] });
       queryClient.invalidateQueries({ queryKey: ["/api/activity"] });
       toast.success(`${t.roomRadarPage.returnSuccess} — ${displayName}`);
+      // Fourth unplugged-return surface — same post-return echo as the two
+      // equipment-detail paths and my-equipment. Reuses the ReturnPlugDialog's
+      // own already-wired key rather than adding a fourth copy of the sentence.
+      if (
+        res.pendingSyncId === undefined &&
+        !payload.isPluggedIn &&
+        payload.plugInDeadlineMinutes !== undefined
+      ) {
+        toast.warning(t.returnPlugDialog.plugAlertWarning(payload.plugInDeadlineMinutes));
+      }
     },
     onError: () => toast.error(t.roomRadarPage.returnError),
     onSettled: () => { busyRef.current = false; },
