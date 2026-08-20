@@ -67,9 +67,30 @@ say(`\n-- evidence run --\n  tree ${String(treeHash).slice(0, 12)}${dirty ? " (D
  * deleted. Output is buffered rather than inherited so two concurrent
  * compilers do not interleave into an unreadable log.
  */
+/**
+ * Tokens a declared gate may contain. The command comes from
+ * verify.config.json — a file — so it is validated at the boundary rather than
+ * trusted. `shell: false` already means no shell parses it; this is about not
+ * handing an unexamined file-sourced string to a process spawn at all, and it
+ * fails LOUD instead of quietly running something unexpected.
+ */
+const GATE_TOKEN = /^[\w./:@=-]+$/;
+
 function runGate(gate) {
   return new Promise((resolve) => {
-    const [command, ...args] = gate.command.split(/\s+/);
+    const tokens = gate.command.split(/\s+/).filter(Boolean);
+    const bad = tokens.find((token) => !GATE_TOKEN.test(token));
+    if (tokens.length === 0 || bad !== undefined) {
+      resolve({
+        id: gate.id,
+        command: gate.command,
+        exitCode: 1,
+        durationMs: 0,
+        output: `refused: gate command contains an unexpected token (${bad ?? "empty command"})`,
+      });
+      return;
+    }
+    const [command, ...args] = tokens;
     const started = Date.now();
     const child = spawn(command, args, { cwd: ROOT, shell: false });
     let output = "";

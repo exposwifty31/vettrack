@@ -12,6 +12,23 @@
 
 const { spawnSync } = require("node:child_process");
 
+/**
+ * Shapes allowed to reach a git argv, checked HERE rather than trusted from the
+ * caller.
+ *
+ * Everything below is derived from files: a sha or a PR number scraped out of a
+ * Markdown document, a branch name read from verify.config.json. `shell: false`
+ * with an argv array already makes injection impossible, but "the scanner only
+ * ever produces good values" is an assumption about another module, not a
+ * property of this one — and it is exactly the assumption that stops being true
+ * the day someone adds an extraction rule. A leading `-` is rejected for the
+ * same reason: it is not a shell problem, it is git reading an argument as a
+ * flag.
+ */
+const SHA = /^[0-9a-f]{7,40}$/i;
+const REF = /^[A-Za-z0-9_][\w./-]*$/;
+const REPO_PATH = /^[^\0\-][^\0]*$/;
+
 function git(root, args) {
   const result = spawnSync("git", args, { cwd: root, encoding: "utf8", shell: false });
   return {
@@ -43,6 +60,11 @@ function createGitFacts(root, defaultBranch) {
 
   // Prefer the remote-tracking ref: on a PR checkout the local branch is the PR
   // branch, and `main` may exist only as origin/main.
+  if (!REF.test(String(defaultBranch))) {
+    problems.push(`defaultBranch in verify.config.json is not a valid ref name: ${defaultBranch}`);
+    return { ready: false, problems, facts: null, ref: null };
+  }
+
   const candidates = [`refs/remotes/origin/${defaultBranch}`, `refs/heads/${defaultBranch}`];
   const ref = candidates.find(
     (candidate) => git(root, ["rev-parse", "--verify", "--quiet", candidate]).ok,
@@ -60,6 +82,7 @@ function createGitFacts(root, defaultBranch) {
 
   const facts = {
     commitExists(sha) {
+      if (!SHA.test(String(sha))) return false;
       if (!commitCache.has(sha)) {
         commitCache.set(sha, git(root, ["cat-file", "-e", `${sha}^{commit}`]).ok);
       }
@@ -67,7 +90,7 @@ function createGitFacts(root, defaultBranch) {
     },
 
     commitIsAncestorOfDefault(sha) {
-      if (!ref) return false;
+      if (!ref || !SHA.test(String(sha))) return false;
       const key = `${sha}->${ref}`;
       if (!ancestorCache.has(key)) {
         ancestorCache.set(key, git(root, ["merge-base", "--is-ancestor", sha, ref]).ok);
@@ -81,6 +104,7 @@ function createGitFacts(root, defaultBranch) {
      * would report every low-numbered PR as landed.
      */
     mergeCommitForPr(number) {
+      if (!Number.isInteger(number) || number <= 0 || number > 999999) return null;
       if (!prCache.has(number)) {
         const search = git(root, [
           "log",
@@ -150,4 +174,4 @@ function createGitFacts(root, defaultBranch) {
   return { ready: problems.length === 0, problems, facts, ref };
 }
 
-module.exports = { createGitFacts, git };
+module.exports = { createGitFacts, git, SHA, REF, REPO_PATH };

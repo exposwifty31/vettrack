@@ -28,6 +28,31 @@ const SHELL_LANGS = new Set(["bash", "sh", "shell", "console", "zsh"]);
 const FILE_EXT = "ts|tsx|js|jsx|mjs|cjs|json|jsonc|md|css|svg|png|jpg|ya?ml|sql|sh|html|txt|lock|xml|plist";
 
 const CODE_SPAN = /`([^`\n]+)`/g;
+
+/**
+ * A scoped npm package named in PROSE rather than in a code span.
+ *
+ * WHY THIS RULE EXISTS. `SCAFFOLD-PLAN.md` carried the frozen auth SDK as
+ * **@clerk/clerk-expo** — bold, not backticked — and it stayed wrong through the
+ * swap to `@clerk/expo` because this scanner only read code spans. CodeRabbit
+ * caught it on PR #85; the gate did not. A frozen-stack line is exactly where a
+ * package gets named in prose, so prose is exactly where it has to be read.
+ *
+ * SCOPED ONLY, for the same reason the code-span rule is scoped only: an
+ * unscoped pattern would claim ordinary hyphenated words as packages. The
+ * lookbehind keeps it off e-mail addresses, `~~struck~~` text handled below, and
+ * anything already inside a code span (those are blanked before this runs).
+ */
+const PROSE_PACKAGE = /(?<![\w@/~-])(@[a-z0-9][\w.-]*\/[a-z0-9][\w.-]*)/gi;
+
+/** Character ranges covered by `~~strikethrough~~` — retracted text is not a claim. */
+function struckRanges(line) {
+  const ranges = [];
+  for (const m of line.matchAll(/~~[\s\S]*?~~/g)) {
+    ranges.push([m.index, m.index + m[0].length]);
+  }
+  return ranges;
+}
 const MARKER = /<!--\s*vt-claim:\s*([^>]*?)\s*-->/g;
 
 /**
@@ -269,6 +294,29 @@ function extractFromMarkdown(text, where, policy) {
       );
     }
 
+    // Blank out code spans (keeping offsets) so a package already claimed as a
+    // span is not claimed twice, then read what prose alone still names.
+    const proseOnly = line.replace(CODE_SPAN, (match) => " ".repeat(match.length));
+    const struck = struckRanges(line);
+    for (const m of proseOnly.matchAll(PROSE_PACKAGE)) {
+      const start = m.index;
+      if (struck.some(([from, to]) => start >= from && start < to)) {
+        decline(i, m[1], "former-name");
+        continue;
+      }
+      const before = proseOnly.slice(0, start);
+      const after = proseOnly.slice(start + m[1].length);
+      if (FORMER_BEFORE.test(before) || RENAME_ARROW.test(after)) {
+        decline(i, m[1], "former-name");
+        continue;
+      }
+      if (NEGATED_AFTER.test(after) || NEGATED_BEFORE.test(before)) {
+        decline(i, m[1], "package-declared-absent");
+        continue;
+      }
+      push(i, { kind: "package", raw: m[1], name: m[1] });
+    }
+
     if (aliasPattern) {
       const prose = plainProse(line);
       for (const m of prose.matchAll(aliasPattern)) {
@@ -502,6 +550,8 @@ module.exports = {
   parseMarker,
   pathExclusion,
   SHELL_LANGS,
+  PROSE_PACKAGE,
+  struckRanges,
   LANDING_STRICT,
   MERGE_CONTEXT,
 };
