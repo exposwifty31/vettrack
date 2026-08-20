@@ -149,6 +149,16 @@ const POLICY = {
   treeBlocks: [{ file: "PLAN.md", afterHeading: "## Structure" }],
 };
 
+/**
+ * The clock the LAYER 4 UNIT CASES are measured against — pinned on purpose, so a
+ * staleness budget can be tested without waiting ninety days. Named rather than
+ * repeated seven times: an edit that moved one occurrence and not the rest would
+ * leave the cases silently measuring different days, which is the drift these
+ * very tests exist to catch. The repository-wide run at the bottom deliberately
+ * does NOT use this — it uses the real date, so attestations can actually expire.
+ */
+const OBSERVED_ON = "2026-08-20";
+
 const extract = (markdown: string, file = "PLAN.md") =>
   scan.extractFromMarkdown(markdown, { file }, POLICY).claims;
 
@@ -394,19 +404,19 @@ describe("layer 4 — what the repository cannot prove is vouched for, dated, an
     const verdict = rules.attestationVerdict(sound, "2026-12-31", helpers);
     expect(verdict.ok).toBe(false);
     expect(verdict.problems.join(" ")).toContain("stale");
-    expect(rules.attestationVerdict(sound, "2026-08-20", helpers).ok).toBe(true);
+    expect(rules.attestationVerdict(sound, OBSERVED_ON, helpers).ok).toBe(true);
   });
 
   it("refuses a missing field, an unknown target, and a future date", () => {
     expect(
-      rules.attestationVerdict({ ...sound, attestedBy: "" }, "2026-08-20", helpers).problems,
+      rules.attestationVerdict({ ...sound, attestedBy: "" }, OBSERVED_ON, helpers).problems,
     ).toContain("missing field: attestedBy");
     expect(
-      rules.attestationVerdict({ ...sound, target: "vibes" }, "2026-08-20", helpers).problems.join(" "),
+      rules.attestationVerdict({ ...sound, target: "vibes" }, OBSERVED_ON, helpers).problems.join(" "),
     ).toContain("unknown target");
     expect(
       rules
-        .attestationVerdict({ ...sound, attestedAt: "2027-01-01" }, "2026-08-20", helpers)
+        .attestationVerdict({ ...sound, attestedAt: "2027-01-01" }, OBSERVED_ON, helpers)
         .problems.join(" "),
     ).toContain("in the future");
   });
@@ -414,7 +424,7 @@ describe("layer 4 — what the repository cannot prove is vouched for, dated, an
   it("refuses a re-verify recipe nobody can follow", () => {
     expect(
       rules
-        .attestationVerdict({ ...sound, reverifyWith: "npm run nope" }, "2026-08-20", {
+        .attestationVerdict({ ...sound, reverifyWith: "npm run nope" }, OBSERVED_ON, {
           ...helpers,
           scriptExists: () => false,
         })
@@ -423,7 +433,7 @@ describe("layer 4 — what the repository cannot prove is vouched for, dated, an
 
     expect(
       rules
-        .attestationVerdict({ ...sound, reverifyWith: "docs/gone.md" }, "2026-08-20", {
+        .attestationVerdict({ ...sound, reverifyWith: "docs/gone.md" }, OBSERVED_ON, {
           ...helpers,
           fileExists: () => false,
         })
@@ -434,7 +444,7 @@ describe("layer 4 — what the repository cannot prove is vouched for, dated, an
   it("refuses a document that points at an attestation the ledger does not hold", () => {
     const verdict = rules.evaluateRule({ kind: "attested", id: "ghost" }, factsWith(), {
       attestations: { entries: [] },
-      now: "2026-08-20",
+      now: OBSERVED_ON,
     });
     expect(verdict.disposition).toBe("fail");
     expect(verdict.detail).toContain("no attestation with id");
