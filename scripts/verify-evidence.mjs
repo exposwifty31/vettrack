@@ -105,19 +105,22 @@ function runGate(gate) {
     }
     const [command, ...args] = tokens;
     const started = Date.now();
-    const child = spawn(command, args, { cwd: ROOT, shell: false });
+    // POSIX: its own process GROUP, so the timeout below can signal the whole
+    // tree. A gate is an `npm`/`pnpm` script, which spawns descendants; killing
+    // only the direct child leaves those holding the output pipes open, `close`
+    // never fires, and `Promise.all` waits forever — the hang the timeout exists
+    // to convert into a recorded FAIL.
+    const ownGroup = process.platform !== "win32";
+    const child = spawn(command, args, { cwd: ROOT, shell: false, detached: ownGroup });
     let output = "";
-    const timer = setTimeout(() => {
-      output += `\nrefused: gate exceeded ${GATE_TIMEOUT_MS}ms and was killed`;
-      child.kill("SIGKILL");
-    }, GATE_TIMEOUT_MS);
-    child.stdout.on("data", (chunk) => {
-      output += chunk;
-    });
-    child.stderr.on("data", (chunk) => {
-      output += chunk;
-    });
+
+    // SETTLE EXACTLY ONCE, and on timeout settle IMMEDIATELY rather than waiting
+    // for a `close` that a surviving descendant can withhold. The kill is
+    // best-effort; the report is not.
+    let settled = false;
     const settle = (code) => {
+      if (settled) return;
+      settled = true;
       clearTimeout(timer);
       resolve({
         id: gate.id,
@@ -129,6 +132,25 @@ function runGate(gate) {
         output,
       });
     };
+
+    const timer = setTimeout(() => {
+      output += `\nrefused: gate exceeded ${GATE_TIMEOUT_MS}ms and was killed`;
+      try {
+        if (ownGroup && child.pid) process.kill(-child.pid, "SIGKILL");
+        else child.kill("SIGKILL");
+      } catch {
+        // Already gone, or the group cannot be signalled. The FAIL is recorded
+        // either way — a gate this tool could not stop is still a failed gate.
+      }
+      settle(1);
+    }, GATE_TIMEOUT_MS);
+
+    child.stdout.on("data", (chunk) => {
+      output += chunk;
+    });
+    child.stderr.on("data", (chunk) => {
+      output += chunk;
+    });
     child.on("error", (err) => {
       output += String(err?.message ?? err);
       settle(1);

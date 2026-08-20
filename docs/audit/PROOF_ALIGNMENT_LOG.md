@@ -8898,6 +8898,24 @@ itself.
   masks, reported as `marker-retracted`; inside a fence the struck mask is empty, because `~~` in a shell
   block is two tildes. Reproduced before the fix and refused after, for the same-line and the across-lines
   case.
+- Second re-review round, five more findings, three of them the same family again. A line-range claim on a
+  file that STATS but cannot be READ reported `verified` — the identical silent pass this session had just
+  fixed in `grepCount` (NaN -> fail) and left standing in the sibling rule; the two now agree. The
+  re-entrancy predicate anchored each alternative at the start of a token, so `node --test` produced `--test`
+  and passed: running it starts the Node test runner, which runs the suite that reads this report. And the
+  gate timeout killed only the direct child, while a gate is an `npm`/`pnpm` script whose descendants hold the
+  output pipes open — `close` never fires and `Promise.all` waits forever, which is the hang the timeout was
+  added to convert into a recorded FAIL. Gates now run in their own process group, the timeout signals the
+  group, and the promise settles exactly once and immediately rather than waiting for a `close` a survivor can
+  withhold. Proven with a child that leaves a background `sleep 60` behind: settles at 1507 ms with exit 1,
+  not at 60 s.
+- Two of the engine's own guards were themselves not guarding. The control-byte scan filtered one extension,
+  so a `.cjs` module carrying a NUL — the exact defect it was written for — went unread. And "hashes every
+  module, so a new one cannot slip in unhashed" compared `files.length` to `ENGINE_MODULES.length`, both
+  derived from the same list: a module added to the directory and left out of the list kept the lengths equal
+  and the test passed while the module sat outside the fingerprint. It now compares the hashed set against
+  the directory listing. `git()` also discarded `result.error`, so a timeout or a maxBuffer kill arrived with
+  an empty stderr and was reported as "cannot diff" — the wrong cause the bounds exist to prevent.
 - Declined, with reasons: the suggestion to keep the struck-range check in the prose scan — the check was
   unreachable because the text was already blanked, so it was replaced with a struck-range MASK, which both
   makes it reachable and reports the exclusion instead of dropping it silently. `struckRanges` itself is
@@ -8912,7 +8930,7 @@ collection.
 **Superseded by this round.** The fingerprint quoted above as ~~`2a8f510951c78d2b…`~~ was the value before
 the review; the engine changed, so the recorded value changed with it, which is the mechanism working rather
 than a problem. Current, and identical in both repositories:
-`81937dbc5720cb28fe537398140b4432fffa0be73c2c9d2832fe7a8b41006338`. The counts quoted above as
+`b8a4873ea5a00344d1d900d4a47e6351454e16fbfb6ae87821803c42de30fec3`. The counts quoted above as
 ~~`1000 claims … 40 excluded by rule`~~ and ~~`Tests 38 passed (38)`~~ are likewise superseded.
 
 **Commands run on this tree after the round:**

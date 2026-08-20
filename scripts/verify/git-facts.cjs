@@ -79,7 +79,11 @@ function git(root, args) {
     ok: result.status === 0,
     status: result.status,
     stdout: (result.stdout ?? "").trim(),
-    stderr: (result.stderr ?? "").trim(),
+    // A timeout or a maxBuffer kill sets `error` and leaves `stderr` EMPTY, so
+    // dropping it makes those two indistinguishable from a plain non-zero exit —
+    // and the caller then reports "cannot diff", which is the wrong cause the
+    // bounds above exist to prevent. Fold it in.
+    stderr: [(result.stderr ?? "").trim(), result.error?.message ?? ""].filter(Boolean).join(" — "),
   };
 }
 

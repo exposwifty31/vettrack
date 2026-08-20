@@ -751,15 +751,20 @@ function classifySpan(span, index, policy, push, decline, after = "", before = "
     return;
   }
 
+  // One context object rather than a six-argument tail repeated at both call
+  // sites: the two helpers took eight parameters each, over the limit, and the
+  // plumbing was identical in both.
+  const at = { index, policy, push, decline, after, before };
+
   const asPath = PATH_SPAN.exec(span);
   if (asPath) {
-    classifyPathSpan(asPath, span, index, policy, push, decline, after, before);
+    classifyPathSpan(asPath, span, at);
     return;
   }
 
   const asDir = DIR_SPAN.exec(span);
   if (asDir) {
-    classifyDirSpan(asDir, span, index, policy, push, decline, after, before);
+    classifyDirSpan(asDir, span, at);
     return;
   }
 
@@ -769,7 +774,9 @@ function classifySpan(span, index, policy, push, decline, after = "", before = "
   decline(index, span, "not-claim-shaped");
 }
 
-function classifyPathSpan(asPath, span, index, policy, push, decline, after, before) {
+/** A path-shaped span, read in the context of the prose around it. */
+function classifyPathSpan(asPath, span, at) {
+  const { index, policy, push, decline, after, before } = at;
   const target = asPath[1];
   const exclusion = pathExclusion(target, policy);
   if (exclusion) {
@@ -803,7 +810,9 @@ function classifyPathSpan(asPath, span, index, policy, push, decline, after, bef
   push(index, { kind: "path", raw: span, target, bare });
 }
 
-function classifyDirSpan(asDir, span, index, policy, push, decline, after, before) {
+/** A directory-shaped span, read in the same three ways as a file reference. */
+function classifyDirSpan(asDir, span, at) {
+  const { index, policy, push, decline, after, before } = at;
   const target = asDir[1].replace(/\/$/, "");
   const exclusion = pathExclusion(target, policy);
   if (exclusion) {

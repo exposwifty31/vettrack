@@ -42,7 +42,11 @@ type Rules = {
   attestationVerdict(
     entry: unknown,
     now: string,
-    helpers?: { scriptExists?(name: string): boolean; fileExists?(path: string): boolean },
+    helpers?: {
+      scriptExists?(name: string): boolean;
+      fileExists?(path: string): boolean;
+      packageManager?: string;
+    },
   ): { ok: boolean; problems: string[] };
   evidenceVerdict(input: {
     report: unknown;
@@ -685,6 +689,27 @@ describe("the engine refuses what it says it refuses", () => {
     expect(real).toContainEqual(expect.objectContaining({ kind: "attested", id: "some-id" }));
   });
 
+  it("refuses a gate that names a test runner with a flag", () => {
+    // `REENTRANT_TOKEN` anchored each alternative at the start of a token, so
+    // `node --test` produced `--test` and passed the filter — and running it
+    // starts the Node test runner, which runs the suite that reads this report.
+    expect(rules.isReentrantGate("node --test")).toBe(true);
+    expect(rules.isReentrantGate("node --test-reporter=spec app.test.js")).toBe(true);
+  });
+
+  it("refuses a line-range claim on a file it cannot read", () => {
+    // `lineCount` returns null when the read fails, and the comparison used to
+    // be skipped in that case — reporting `verified` for a range nothing
+    // checked. The sibling rule (`grepCount` -> NaN -> fail) already refused it.
+    const unreadable = factsWith({ fileExists: () => true, lineCount: () => null });
+    const verdict = rules.evaluateRule(
+      { kind: "path-lines", target: "src/lib/api.ts", from: 1, to: 15 },
+      unreadable,
+    );
+    expect(verdict.disposition).toBe("fail");
+    expect(verdict.detail).toContain("cannot read");
+  });
+
   it("does not read a marker the document struck out", () => {
     // Every other rule honours `~~retracted~~`; markers did not, because they
     // were collected before the retraction pass ran. Worst case is the same as
@@ -828,7 +853,7 @@ describe("the engine's own source", () => {
     // leaving twenty glob claims failing against a fix that looked applied.
     const offenders = fs
       .readdirSync(ENGINE_DIR)
-      .filter((name) => name.endsWith(".cjs"))
+      .filter((name) => name.endsWith(".js") || name.endsWith(".cjs"))
       .filter((name) => /[\u0000-\u0008\u000b\u000c\u000e-\u001f]/.test(
         fs.readFileSync(path.join(ENGINE_DIR, name), "utf8"),
       ));
@@ -850,8 +875,17 @@ describe("the shared engine", () => {
   });
 
   it("hashes every module, so a new one cannot slip in unhashed", () => {
+    // Both sides used to derive from ENGINE_MODULES — `fingerprintEngine`
+    // iterates that same list to build `files` — so a module added to the
+    // directory and left out of the list kept the lengths equal and the test
+    // passed while the module sat outside the fingerprint. That is the case this
+    // test is named for, so it compares against what is actually on disk.
     const { files } = fingerprint.fingerprintEngine(ENGINE_DIR);
-    expect(files).toHaveLength(fingerprint.ENGINE_MODULES.length);
+    const onDisk = fs
+      .readdirSync(ENGINE_DIR)
+      .filter((name) => name.endsWith(".js") || name.endsWith(".cjs"));
+    expect(onDisk).not.toEqual([]);
+    expect([...files].sort()).toEqual([...onDisk].sort());
   });
 });
 

@@ -185,7 +185,12 @@ const PACKAGE_MANAGER_VERBS = new Set([
  * regex complexity, so the rule is expressed the way a reader would state it
  * instead: split the command and look at each TOKEN. A runner prefix does not
  * need enumerating at all, and `npm run release:preflight:offline` is untouched
- * because none of its tokens name a test runner.
+ * because none of its tokens name a test runner. A leading `-` counts too:
+ * `node --test` is the Node test runner, and its token is `--test`.
+ *
+ * The bias is deliberate. A false refusal is a loud configuration error a human
+ * fixes in a minute; a false acceptance runs the suite that reads this report
+ * and hangs the job.
  *
  * GATE_TOKEN: the command comes out of `verify.config.json`, a file, and reaches
  * a process spawn. `shell: false` already means nothing parses it as shell; this
@@ -193,11 +198,18 @@ const PACKAGE_MANAGER_VERBS = new Set([
  */
 const REENTRANT_TOKEN = /^(?:test(?:[:-][\w:-]+)?|verify:[\w:-]+|jest|vitest)$/;
 
-/** Would running this declared gate re-enter the verifier? */
+/**
+ * Would running this declared gate re-enter the verifier?
+ *
+ * A leading dash run and a trailing `=value` are STRIPPED before the test rather
+ * than encoded in the pattern: `node --test` is the Node test runner and its
+ * token is `--test`, and folding that into the regex pushed it past the
+ * complexity limit for no gain in what it recognises.
+ */
 function isReentrantGate(command) {
   return String(command)
     .split(/\s+/)
-    .some((token) => REENTRANT_TOKEN.test(token));
+    .some((token) => REENTRANT_TOKEN.test(token.replace(/^-+/, "").split("=")[0]));
 }
 
 const GATE_TOKEN = /^[\w./:@=-]+$/;
@@ -335,7 +347,17 @@ function pathLinesRule(claim, facts) {
   if (claim.from < 1 || claim.to < claim.from) {
     return { disposition: "fail", detail: `line range is malformed: ${claim.from}-${claim.to}` };
   }
-  if (total !== null && claim.to > total) {
+  // A file that stats but cannot be read is not a verified line range — it is a
+  // range this run could not check. `null` used to skip the comparison and fall
+  // through to `verified`, which is the same silent pass `grepCount` was changed
+  // to refuse one commit ago; the two rules now agree.
+  if (total === null) {
+    return {
+      disposition: "fail",
+      detail: `cannot read ${claim.target} to check that it has line ${claim.to}`,
+    };
+  }
+  if (claim.to > total) {
     return {
       disposition: "fail",
       detail: `cites lines ${claim.from}-${claim.to} but ${claim.target} has ${total}`,
