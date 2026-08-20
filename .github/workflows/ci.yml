@@ -136,6 +136,11 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          # Full history: tests/claims-ledger.test.ts resolves every commit and
+          # pull-request citation in the governed docs against real history. On a
+          # shallow clone those objects are absent and scripts/verify/git-facts.cjs
+          # fails loud rather than passing a check it could not perform.
+          fetch-depth: 0
 
       - name: 📦 pnpm
         uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
@@ -151,12 +156,56 @@ jobs:
       - name: 📥 Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: 🌿 Fetch default branch (claim verification, layer 2)
+        run: git fetch --no-tags origin main:refs/remotes/origin/main || true
+
       # Apply all `migrations/*.sql` via `server/migrate.ts` (tracks `vt_migrations`).
       - name: 🗄️ Database migrations
         run: pnpm migrate
 
       - name: 🧪 Test suite (shard ${{ matrix.shard }}/4)
         run: pnpm exec vitest run --shard=${{ matrix.shard }}/4 --reporter=dot
+
+  # Layer 3 of the claim gate: run the gates the documentation claims are green,
+  # then refuse any documented "green" the recorded run does not support. It is a
+  # separate job because the evidence report is bound to the tree and to the
+  # runner that produced it — a sharded test job on another runner could not have
+  # one, which is why VT_ENFORCE_EVIDENCE is set HERE and nowhere else.
+  claims:
+    name: 📎 Claim verification (evidence)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: ⬇️ Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: 📦 pnpm
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+        with:
+          run_install: false
+
+      - name: 🟢 Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: ".nvmrc"
+          cache: "pnpm"
+
+      - name: 📥 Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: 🌿 Fetch default branch
+        run: git fetch --no-tags origin main:refs/remotes/origin/main || true
+
+      - name: 🧾 Evidence gates (typecheck + i18n parity + depcruise)
+        run: pnpm verify:evidence
+
+      - name: 📎 Claim gate (all four layers)
+        run: pnpm verify:claims
+        env:
+          VT_ENFORCE_EVIDENCE: "1"
 
   integration-ops:
     name: 🔌 Integration ops

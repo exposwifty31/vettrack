@@ -8744,3 +8744,96 @@ it.
 
 **Verdict:** VERIFIED — every number above is from a command run this session, including both sides
 of the baseline comparison.
+
+## 2026-08-20 — Claim verification gate: the repo's own prose is now machine-checked (branches `claude/verify-docs-drift-99i5lj` → `claude/verify-engine-99i5lj` → `claude/verify-ci-99i5lj`)
+
+**Claim:** A four-layer claim-verification gate landed in both repos. Every statement in a governed document
+resolves to `verified` / `registered` / `attested` / `excluded by rule` / FAIL — there is no silent skip.
+It runs as `pnpm verify:claims`, inside `pnpm test` (`tests/claims-ledger.test.ts`), and as the last step of
+`pnpm architecture:gates`. Both repos are green, and the gate found real drift in each on its first run.
+
+**Evidence:**
+- `scripts/verify/claims.cjs`, `scripts/verify/scan.cjs`, `scripts/verify/facts.cjs`,
+  `scripts/verify/git-facts.cjs`, `scripts/verify/run.cjs` — the engine, shared with the RN migration repo
+  (which carries it as plain `.js`; this package is `"type": "module"`, hence `.cjs`). Decisions are pure
+  functions over plain data, so a deliberately FALSE claim can be handed to them directly.
+- Command: `node scripts/verify-claims.mjs` → `395 claims: 387 verified, 7 registered, 1 attested,
+  18 excluded by rule, 0 FAILED` / `All claims accounted for.`
+- Command: `pnpm verify:evidence` → `PASS typecheck (38s)`, `PASS i18n-parity (1s)`, `PASS depcruise (7s)`,
+  `all declared gates passed`. Report written to `docs/audit/evidence-run.json` (gitignored; bound to a tree
+  hash, so a committed copy would be stale at the next commit).
+- Command: `pnpm architecture:gates` → the new `[architecture-gates] claim verification` step ran last and
+  the run ended `All G1 checks passed.`
+- Test: `pnpm exec vitest run tests/claims-ledger.test.ts` → `Test Files 1 passed (1)`, `Tests 38 passed (38)`.
+  Every block leads with a fabricated FALSE claim and asserts refusal, then asserts the healthy case.
+- RED probes run against this working tree, each restored afterwards, all four bit:
+  ~~`server/does-not-exist.ts`~~ appended to `CLAUDE.md` → `[path] path does not exist`;
+  `drizzle-kit` re-added to `devDependencies` → `[absence] claims "drizzle-kit" is absent from deps, found 1
+  occurrence(s)`; a fabricated 40-hex sha cited as landed → `[commit] no such commit in this repository`;
+  an unused registry entry → `[registry-orphan] ... matches no claim in any governed document`.
+- Real drift this gate found here, now fixed: `docs/migrations.md` described ~~`drizzle.config.ts`~~ in the
+  present tense, five days after commit `b043585de` ("chore: retire drizzle-kit, ...") deleted it —
+  confirmed with `git log --diff-filter=D -- drizzle.config.ts`. The paragraph is retained with a dated
+  correction rather than rewritten, and the now-moot "repoint `out`" advice is marked as such.
+- Also corrected here: `CLAUDE.md` cited the Express middleware as ~~`express.json`~~ (a file-shaped
+  reference to a function call) — now `express.json()`.
+- `docs/audit/PROOF_ALIGNMENT_LOG.md` is governed as APPEND-ONLY: the gate checks only the lines a branch
+  adds (`addedLines` in `scripts/verify/git-facts.cjs`, via `git diff --unified=0 origin/main`). The 348
+  historical entries are left as the record they are, which this file's own first rule requires. This entry
+  was itself checked by that path.
+- Layer 3's ACCEPTING path was observed end-to-end, not just unit-asserted. The working copy here is dirty
+  by construction while the work is uncommitted, so it was reproduced in a throwaway clone of the RN repo
+  outside both working trees: changes committed there, `git status --porcelain` empty, `origin/main` pointed
+  at the real `c866dbc`. `verify-evidence.mjs` wrote `dirty: false` with all three gates at exit 0, and
+  `VT_ENFORCE_EVIDENCE=1 node scripts/verify-claims.mjs` then reported `470 claims ... 0 FAILED` with no
+  `[evidence]` failure and no unenforced-note — the shape CI produces. The clone was deleted afterwards.
+- Found while doing that, and now fixed: a STALE default-branch ref changes the verdict silently. Run against
+  an `origin/main` 19 merges behind, the same tree produced 11 failures, every one a true sentence about work
+  that had landed. The gate now prints `layer 2 measured against <ref> -> <head>` on every run, and both CI
+  workflows fetch the ref explicitly before the gate runs.
+
+- Governance widened from 7 documents to 21 (`README.md`, `ARCHITECTURE.md`, `CONTEXT.md`, `FLOW_MATRIX.md`,
+  `SECURITY.md`, `PLAN.md`, `TASKS.md`, `RESUBMISSION_RUNBOOK.md`, `docs/README.md`,
+  `docs/capacitor-native-app.md`, `docs/release-runbook.md`, `docs/dev-signin-runbook.md`,
+  `docs/integrations-guide.md`, `docs/engineering-rules-rollout.md` added). Command:
+  `node scripts/verify-claims.mjs` → `1000 claims: 990 verified, 9 registered, 1 attested,
+  40 excluded by rule, 0 FAILED`.
+- Four more pieces of real drift the widened scope found, all fixed here:
+  (a) `README.md` and `ARCHITECTURE.md` both routed the reader to a rollout directory that commit
+  `6504be25a` ("chore: remove verified-dead server + client modules") deleted — confirmed with
+  `git log --diff-filter=D`; rollout gating actually lives in `server/integrations/feature-flags.ts` and
+  `server/integrations/vendor-x-rollout.ts`, and `server/integrations/resilience/` (three files) is intact.
+  (b) `ARCHITECTURE.md` still named the tasks page by its pre-2026-07-04 filename, six weeks after the
+  sanctioned rename to `src/pages/Tasks.tsx` that `CLAUDE.md` records.
+  (c) `docs/capacitor-native-app.md` said ~~`capacitor.config.json`~~; the file is `capacitor.config.ts`.
+  (d) `docs/README.md` indexed a row as ~~"Capacitor 1.0.1"~~, where `1.0.1` is the stale APP version
+  `docs/MAINTENANCE_MODE.md` is about, not a Capacitor version — reworded so neither a reader nor the
+  version check can misread it.
+- Config defect found and fixed: `ios/` and `android/` had been copied into `ignoredPathPrefixes` from the
+  RN repo's config, where prebuild generates and gitignores them. Here they are TRACKED, and the copied
+  exclusion hid every reference into the native projects. `git ls-files ios/` is what settled it.
+- Defect in the gate's own source, found while investigating why a fix had not taken: `globToRegExp`
+  substituted a sentinel for `**` and substituted it back, and the sentinel it shipped with was a literal
+  NUL. Nothing failed — the transformation worked — but the file read as binary to `grep`, and a later edit
+  that matched on the intended character silently did nothing, leaving twenty glob claims failing against a
+  fix that looked applied. Rewritten to tokenise with no placeholder at all, and
+  `tests/claims-ledger.test.ts` now fails if any engine file carries a control byte.
+- The engine exists as two copies in two repositories and nothing offline can compare them, so a fingerprint
+  contract was added: `scripts/verify/fingerprint.cjs` hashes the six engine modules with the one sanctioned
+  difference (the module extension inside internal `require` calls) normalised away, and each repo records
+  the result as `engineFingerprint` in `verify.config.json`. Both repos independently computed
+  `2a8f510951c78d2b…` — identical, which is the evidence that the copies agree today. It cannot prove they
+  agree tomorrow; what it does is make editing one of them impossible to do quietly, since the gate fails
+  until the recorded value is deliberately updated, and the message names the sibling. The hash covers the
+  fingerprint module itself, so the rule that decides what counts as drift cannot drift for free.
+- That guard immediately earned itself: the control-byte check written earlier in this session failed on the
+  brand-new `fingerprint` module for the SAME defect it was written for — a separator typed into a template
+  literal arrived as a literal NUL, for the second time in one session. Caught before it could reach the
+  sibling repo; the separator is now an explicit `\u0020`.
+- Process error made and repaired in this session, recorded because this file's own rule is about exactly
+  it: the addendum above was first inserted into a HISTORICAL entry (a scripted replace matched the first
+  `**Verdict:** VERIFIED.` in the file, not this entry's). `git diff HEAD --unified=0` showed the stray
+  27-line hunk at line 629; it was moved here and the historical entry restored, leaving one hunk in the
+  diff. No historical entry is modified by this session's work.
+
+**Verdict:** VERIFIED.
