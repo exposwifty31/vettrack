@@ -289,7 +289,6 @@ function extractFromMarkdown(text, where, policy) {
       classifySpan(
         m[1].trim(),
         i,
-        m[0],
         policy,
         push,
         decline,
@@ -377,8 +376,22 @@ function collectLandingClaims(line, index, push, requireCitation, policy) {
     // ANOTHER repository's PR. Checking it against this repo's history would
     // report a defect for a sentence that is both correct and explicitly
     // qualified — so the qualifier is honoured.
-    const qualifier = /(\w[\w-]*)\s+(?:PRs?\s+)?$/.exec(line.slice(0, m.index));
-    const repo = qualifier?.[1];
+    // Read the qualifier by splitting, not by matching backwards over the whole
+    // prefix: `(\w[\w-]*)\s+(?:PRs?\s+)?$` has overlapping alternatives and
+    // backtracks super-linearly on a long line that does not end in a qualifier —
+    // which is most lines. Same rule, linear cost.
+    const prefix = line.slice(0, m.index);
+    const words = /\s$/.test(prefix) ? prefix.trimEnd().split(/\s+/) : [];
+    let candidate = words[words.length - 1] ?? "";
+    if (/^PRs?$/i.test(candidate)) candidate = words[words.length - 2] ?? "";
+    // Trailing word run only: the token before "PR" is often "(vettrack", and an
+    // earlier version captured `vettrack` because it matched word characters
+    // rather than a whole whitespace-delimited token. Done with a split rather
+    // than `(\w[\w-]*)$` — that pattern's two halves overlap, so it backtracks
+    // from every start position on a token that does not end in a word run.
+    const parts = candidate.split(/[^\w-]+/);
+    const tail = parts[parts.length - 1] ?? "";
+    const repo = /^\w/.test(tail) ? tail : undefined;
     if (repo && (policy.crossRepoNames ?? []).includes(repo)) {
       push(index, { kind: "pull-request-cross-repo", raw: m[0], number: Number(m[1]), repo });
       continue;
@@ -465,7 +478,7 @@ function inDeletionClause(before) {
 }
 
 /** One inline code span -> at most one claim, or one reported exclusion. */
-function classifySpan(span, index, raw, policy, push, decline, after = "", before = "") {
+function classifySpan(span, index, policy, push, decline, after = "", before = "") {
   if (!span || span.length > 200) return;
 
   // A span with whitespace is a shell fragment, not a path:

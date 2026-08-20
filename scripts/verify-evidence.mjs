@@ -27,14 +27,24 @@ import path from "node:path";
 import process from "node:process";
 import { spawn, spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { createRequire } from "node:module";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const config = JSON.parse(fs.readFileSync(path.join(ROOT, "verify.config.json"), "utf8"));
+const { resolveGitBinary } = createRequire(import.meta.url)("./verify/git-facts.cjs");
 
 const say = (line) => process.stdout.write(`${line}\n`);
 
+// Resolved from a fixed list of absolute paths, not searched on PATH — same
+// reasoning as scripts/verify/git-facts.js, and the same resolver so the two
+// cannot disagree about which git they ran. The gate commands below are a
+// different case: npm and pnpm legitimately live wherever nvm or corepack put
+// them, and pinning those to absolute paths would break more than it protects.
+const GIT_BINARY = resolveGitBinary();
+
 function git(args) {
-  const result = spawnSync("git", args, { cwd: ROOT, encoding: "utf8", shell: false });
+  if (!GIT_BINARY) return null;
+  const result = spawnSync(GIT_BINARY, args, { cwd: ROOT, encoding: "utf8", shell: false });
   return result.status === 0 ? (result.stdout ?? "").trim() : null;
 }
 

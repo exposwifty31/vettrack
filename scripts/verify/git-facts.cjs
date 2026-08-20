@@ -11,6 +11,31 @@
  */
 
 const { spawnSync } = require("node:child_process");
+const fs = require("node:fs");
+const path = require("node:path");
+
+/**
+ * Absolute path to git, resolved from a fixed list rather than searched on PATH.
+ *
+ * A PATH lookup runs whichever `git` the environment happens to offer first, and
+ * a writable directory early in PATH turns every call in this file into
+ * arbitrary execution. That is a real property of CI runners and shared dev
+ * machines, not a theoretical one, and this module exists to be trusted about
+ * what history says. `VT_GIT_BINARY` is the escape hatch for an unusual install,
+ * and it must itself be absolute — accepting a bare name there would put the
+ * PATH search straight back.
+ */
+function resolveGitBinary() {
+  const override = process.env.VT_GIT_BINARY;
+  if (override) return path.isAbsolute(override) && fs.existsSync(override) ? override : null;
+  return (
+    ["/usr/bin/git", "/usr/local/bin/git", "/opt/homebrew/bin/git", "/bin/git"].find((candidate) =>
+      fs.existsSync(candidate),
+    ) ?? null
+  );
+}
+
+const GIT_BINARY = resolveGitBinary();
 
 /**
  * Shapes allowed to reach a git argv, checked HERE rather than trusted from the
@@ -26,11 +51,14 @@ const { spawnSync } = require("node:child_process");
  * flag.
  */
 const SHA = /^[0-9a-f]{7,40}$/i;
-const REF = /^[A-Za-z0-9_][\w./-]*$/;
+const REF = /^\w[\w./-]*$/;
 const REPO_PATH = /^[^\0\-][^\0]*$/;
 
 function git(root, args) {
-  const result = spawnSync("git", args, { cwd: root, encoding: "utf8", shell: false });
+  if (!GIT_BINARY) {
+    return { ok: false, status: null, stdout: "", stderr: "git binary not found at a known absolute path" };
+  }
+  const result = spawnSync(GIT_BINARY, args, { cwd: root, encoding: "utf8", shell: false });
   return {
     ok: result.status === 0,
     status: result.status,
@@ -45,6 +73,14 @@ function git(root, args) {
  */
 function createGitFacts(root, defaultBranch) {
   const problems = [];
+
+  if (!GIT_BINARY) {
+    problems.push(
+      "git was not found at any known absolute path (/usr/bin/git, /usr/local/bin/git, " +
+        "/opt/homebrew/bin/git, /bin/git). Set VT_GIT_BINARY to an absolute path.",
+    );
+    return { ready: false, problems, facts: null, ref: null };
+  }
 
   if (!git(root, ["rev-parse", "--git-dir"]).ok) {
     problems.push("not a git repository — layer 2 (executed) cannot be checked here");
@@ -174,4 +210,4 @@ function createGitFacts(root, defaultBranch) {
   return { ready: problems.length === 0, problems, facts, ref };
 }
 
-module.exports = { createGitFacts, git, SHA, REF, REPO_PATH };
+module.exports = { createGitFacts, git, resolveGitBinary, SHA, REF, REPO_PATH };
