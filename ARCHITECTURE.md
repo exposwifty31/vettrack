@@ -157,7 +157,7 @@ Clerk middleware (conditional) → `/api` limiter → i18n → tenant context �
 | **Adapter layer** | Per-vendor adapters over a common `base`. | `server/integrations/adapters/{base,priza,vendor-x,generic-pms,local-sandbox,vendor-stubs}.ts` |
 | **Inbound webhooks** | HMAC-over-raw-body verification, CIDR allowlist, idempotent processing. | `integrations/webhooks/{inbound.router,verify-signature,cidr,repository}.ts` (mounted before `express.json()`) |
 | **Sync/conflict** | Canonical mapping + conflict engine + sync log/conflict tables. | `integrations/mappers/*`, `conflicts/{conflict-engine,repository}.ts`, schema `vt_integration_*` |
-| **Resilience/rollout** | Circuit breaker, rate limits, guarded calls, staged rollout policy. | `integrations/resilience/*`, `integrations/vendor-x-rollout.ts` |
+| **Resilience/rollout** | Circuit breaker, rate limits, guarded calls, staged rollout policy. | `integrations/resilience/*`, `integrations/feature-flags.ts`, `integrations/vendor-x-rollout.ts` |
 | **Dashboard/health** | Integration health + dashboard cache. | `integrations/health/*`, `integrations/dashboard/*`, `routes/integrations.ts` |
 
 ### 3.9 Auth, account, push, support, storage
