@@ -15,7 +15,7 @@ Entry point for engineers, operators, and agents. **Canonical remote:** GitHub `
 | [../TASKS.md](../TASKS.md) | Task queue and acceptance criteria |
 | [CONVENTIONS.md](./CONVENTIONS.md) | Naming, patterns, error handling |
 | [**scope-change-2026.md**](./scope-change-2026.md) | **Required** — removed features (migrations 142–143), redirects |
-| [MAINTENANCE_MODE.md](./MAINTENANCE_MODE.md) | Repo vs the RN successor repo; ship lane; Capacitor 1.0.1 |
+| [MAINTENANCE_MODE.md](./MAINTENANCE_MODE.md) | Repo vs the RN successor repo; ship lane; the stale `1.0.1` version string |
 | [testing-guide.md](./testing-guide.md) | Test suites, exclusions, when to run what |
 | [../BUG_REGISTER.md](../BUG_REGISTER.md) | Known defects |
 

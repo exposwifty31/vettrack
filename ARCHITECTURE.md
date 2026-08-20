@@ -145,7 +145,7 @@ Clerk middleware (conditional) → `/api` limiter → i18n → tenant context �
 | Submodule | Key files |
 |---|---|
 | **Shifts/scheduling** | `routes/shifts.ts`, `admin-shifts.tsx`, schema `vt_shifts`, `vt_shift_sessions`, `vt_doctor_shifts` |
-| **Tasks (unified model)** | `routes/tasks.ts`, `routes/appointments.ts`, `services/appointments.service.ts`, `task-intelligence.service.ts`, `task-automation.service.ts`, `task-recall.service.ts`; schema `vt_appointments`, `vt_tasks`; UI `pages/appointments.tsx` (`/equipment/tasks`) |
+| **Tasks (unified model)** | `routes/tasks.ts`, `routes/appointments.ts`, `services/appointments.service.ts`, `task-intelligence.service.ts`, `task-automation.service.ts`, `task-recall.service.ts`; schema `vt_appointments`, `vt_tasks`; UI `src/pages/Tasks.tsx` (`/equipment/tasks`; renamed from ~~`pages/appointments.tsx`~~ 2026-07-04) |
 | **Clinical check-in** | `routes/clinical-check-in.ts`, `services/clinical-check-in.ts`, `vt_clinical_check_ins` |
 | **Shift chat** | `routes/shift-chat.ts`, `lib/shift-chat-presence.ts`, `features/shift-chat/*`, schema `vt_shift_messages*` |
 | **Alerts** | `lib/alert-engine.ts`, `alert-reminder.ts`, `routes/alert-acks.ts`, `pages/alerts.tsx`, `vt_alert_acks` |
@@ -157,7 +157,7 @@ Clerk middleware (conditional) → `/api` limiter → i18n → tenant context �
 | **Adapter layer** | Per-vendor adapters over a common `base`. | `server/integrations/adapters/{base,priza,vendor-x,generic-pms,local-sandbox,vendor-stubs}.ts` |
 | **Inbound webhooks** | HMAC-over-raw-body verification, CIDR allowlist, idempotent processing. | `integrations/webhooks/{inbound.router,verify-signature,cidr,repository}.ts` (mounted before `express.json()`) |
 | **Sync/conflict** | Canonical mapping + conflict engine + sync log/conflict tables. | `integrations/mappers/*`, `conflicts/{conflict-engine,repository}.ts`, schema `vt_integration_*` |
-| **Resilience/rollout** | Circuit breaker, rate limits, guarded calls, staged rollout policy. | `integrations/resilience/*`, `integrations/rollout/*` |
+| **Resilience/rollout** | Circuit breaker, rate limits, guarded calls, staged rollout policy. | `integrations/resilience/*`, `integrations/vendor-x-rollout.ts` |
 | **Dashboard/health** | Integration health + dashboard cache. | `integrations/health/*`, `integrations/dashboard/*`, `routes/integrations.ts` |
 
 ### 3.9 Auth, account, push, support, storage

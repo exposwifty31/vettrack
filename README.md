@@ -207,7 +207,9 @@
     (`server/integrations/adapters/*`). Inbound webhooks are HMAC-verified over raw body with a
     CIDR allowlist (`/api/integration-webhooks/:adapterId`); outbound sync + conflict resolution
     via canonical mappers and a conflict engine. Circuit breaker, rate limits, and staged rollout
-    policy live in `server/integrations/resilience/*` and `rollout/*`.
+    policy live in `server/integrations/resilience/*`, with rollout gating in
+    `server/integrations/feature-flags.ts` and `server/integrations/vendor-x-rollout.ts`
+    (~~`server/integrations/rollout/*`~~ was deleted in `6504be25a`).
   - **Redis / BullMQ** — job runtime, push fan-out, integration sync.
   - **AWS S3** — uploads/storage (`@aws-sdk/client-s3`, multer).
   - **Web Push (VAPID)** — push notifications.
