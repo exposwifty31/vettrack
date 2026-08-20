@@ -1,0 +1,4 @@
+{
+  "$comment": "Pull requests that landed WITHOUT a merge commit (rebase or squash merge). The entry supplies only the head sha someone read off the GitHub API; the proof stays local - that sha must be an ancestor of the default branch.",
+  "entries": []
+}

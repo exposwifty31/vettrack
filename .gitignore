@@ -155,3 +155,8 @@ android/keystore.properties
 .vscode/*
 !.vscode/launch.json
 !.vscode/settings.json.example
+
+# Claim-verification evidence (scripts/verify-evidence.mjs). Deliberately NOT
+# committed: the report is bound to a tree hash, so a committed one would be
+# stale the moment the next commit lands. CI regenerates it before the gate runs.
+docs/audit/evidence-run.json

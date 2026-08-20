@@ -1,0 +1,50 @@
+{
+  "$comment": "Claims that cannot be checked against THIS tree, each with a reason a reader can audit. Two rules keep the file from becoming the place claims go to stop being checked: an entry that no live claim matches FAILS the gate (orphan), and an entry whose claim would now verify on its own FAILS the gate too (obsolete). See scripts/verify/claims.cjs.",
+  "entries": [
+    {
+      "kind": "script",
+      "match": "db:push",
+      "reason": "deliberately absent: CLAUDE.md and docs/migrations.md name `pnpm db:push` in order to say drizzle-kit push is NOT wired here. Defining the script would be the defect."
+    },
+    {
+      "kind": "dir",
+      "match": "migrations/meta",
+      "reason": "deleted 2026-08-19 (docs/migrations.md records the deletion and why); its absence is the documented state"
+    },
+    {
+      "kind": "path",
+      "match": "_journal.json",
+      "reason": "drizzle-kit journal inside the deleted migrations/meta/; same deletion, same reason"
+    },
+    {
+      "kind": "path",
+      "match": "EquipmentCard.tsx",
+      "reason": "illustrative example in the naming-convention table in docs/CONVENTIONS.md, not a file in the tree"
+    },
+    {
+      "kind": "path",
+      "match": "EquipmentPage.tsx",
+      "reason": "illustrative example in the naming-convention table in docs/CONVENTIONS.md, not a file in the tree"
+    },
+    {
+      "kind": "path",
+      "match": "equipment.test.ts",
+      "reason": "illustrative example in the naming-convention table in docs/CONVENTIONS.md, not a file in the tree"
+    },
+    {
+      "kind": "path",
+      "match": "tests/restock.service.unit.test.ts",
+      "reason": "planned artifact of TASK-002 in TASKS.md (add restock-service test coverage); not written yet. The obsolescence rule deletes this entry the day the file lands."
+    },
+    {
+      "kind": "package",
+      "match": "@capacitor/keyboard",
+      "reason": "proposed, not installed: RESUBMISSION_RUNBOOK.md names it as the likely fix for a deferred Shift-Chat keyboard item that needs a device repro first"
+    },
+    {
+      "kind": "glob",
+      "match": "scripts/verify/*.js",
+      "reason": "the SIBLING repo's copy of the shared engine — the RN migration repo carries it under that extension; this repo carries .cjs. Named here to explain the fingerprint contract, and verifiable only from that repo."
+    }
+  ]
+}
