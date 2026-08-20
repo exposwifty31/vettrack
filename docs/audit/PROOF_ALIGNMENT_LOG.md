@@ -8890,6 +8890,14 @@ itself.
   any span, which is how it was found. The reader is now a linear scan that matches an opening fence to a
   closing fence of the same width, with no backtracking, for the same reason `inDeletionClause` is written
   that way: it runs on every line of every governed document.
+- Third defect in the same family, found by CodeRabbit's re-review of the fix commits: marker extraction ran
+  BEFORE the retraction pass and masked only code spans, so `~~<!-- vt-claim: attested x -->~~` — a marker the
+  author struck out — still produced a live claim, and so did one inside a multi-line struck run. Same worst
+  case as the code-span hole: a retracted `attested <id>` satisfied the "referenced by a governed document"
+  rule by itself, which is what keeps a stale attestation from ever being reported. Markers now take both
+  masks, reported as `marker-retracted`; inside a fence the struck mask is empty, because `~~` in a shell
+  block is two tildes. Reproduced before the fix and refused after, for the same-line and the across-lines
+  case.
 - Declined, with reasons: the suggestion to keep the struck-range check in the prose scan — the check was
   unreachable because the text was already blanked, so it was replaced with a struck-range MASK, which both
   makes it reachable and reports the exclusion instead of dropping it silently. `struckRanges` itself is
@@ -8904,7 +8912,7 @@ collection.
 **Superseded by this round.** The fingerprint quoted above as ~~`2a8f510951c78d2b…`~~ was the value before
 the review; the engine changed, so the recorded value changed with it, which is the mechanism working rather
 than a problem. Current, and identical in both repositories:
-`af19a9b1bf4fb190f53187a8d42d580b5e456f338727bfdcf72a4d6a946f9b87`. The counts quoted above as
+`81937dbc5720cb28fe537398140b4432fffa0be73c2c9d2832fe7a8b41006338`. The counts quoted above as
 ~~`1000 claims … 40 excluded by rule`~~ and ~~`Tests 38 passed (38)`~~ are likewise superseded.
 
 **Commands run on this tree after the round:**

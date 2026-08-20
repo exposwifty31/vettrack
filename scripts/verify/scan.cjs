@@ -260,18 +260,31 @@ function handleFence(state, line, ctx) {
  * fence — a fenced block is exactly where an absence claim about config text
  * wants to sit.
  *
- * A MARKER INSIDE AN INLINE CODE SPAN IS AN EXAMPLE, NOT A CLAIM. `AGENTS.md`
+ * TWO MASKS, BOTH FOR THE SAME REASON: a marker the document is only SHOWING is
+ * not a marker the document is MAKING.
+ *
+ * `spans` — a marker inside an inline code span is an example. `AGENTS.md`
  * documents the syntax by showing it, and reading that demonstration as live
- * made the documentation itself a claim: the `absent` example pushed a real
- * absence claim, and — worse — an `attested <id>` example would satisfy the
- * "referenced by a governed document" rule all on its own, which is what stops
- * a stale attestation from ever being reported.
+ * made the documentation itself a claim.
+ *
+ * `struck` — a marker inside `~~retracted~~` text was written and then taken
+ * back. Every other rule in this file honours that; markers did not, because
+ * they were read before the retraction pass ran. Both holes have the same worst
+ * case: an `attested <id>` marker that is only being shown or has been retracted
+ * still satisfies the "referenced by a governed document" rule on its own, which
+ * is exactly what stops a stale attestation from ever being reported.
+ *
+ * Inside a fence `struck` is empty, because `~~` in a shell block is two tildes.
  */
-function collectMarkerClaims(rawLine, index, ctx) {
+function collectMarkerClaims(rawLine, index, ctx, struck = []) {
   const spans = codeSpanRanges(rawLine);
   for (const m of rawLine.matchAll(MARKER)) {
     if (within(spans, m.index)) {
       ctx.decline(index, m[0], "marker-is-an-example");
+      continue;
+    }
+    if (within(struck, m.index)) {
+      ctx.decline(index, m[0], "marker-retracted");
       continue;
     }
     const parsed = parseMarker(m[1]);
@@ -457,7 +470,11 @@ function collectSpanClaims(line, index, ctx) {
 /** Everything read from a line of ordinary prose, in the order it is read. */
 function collectProseClaims(state, rawLine, index, ctx) {
   if (/^\s*#{1,6}\s/.test(rawLine)) state.lastHeading = rawLine.trim();
+  // The retraction pass runs FIRST because the marker scan needs its mask. It is
+  // also the only thing here that advances `state.retracted`, so it must happen
+  // exactly once per prose line whatever else does or does not fire.
   const { line, struck } = blankRetracted(state, rawLine, index);
+  collectMarkerClaims(rawLine, index, ctx, struck);
   collectScriptClaims(line, index, ctx.policy, ctx.push);
   collectSpanClaims(line, index, ctx);
   collectStruckSpans(rawLine, struck, index, ctx);
@@ -509,9 +526,12 @@ function extractFromMarkdown(text, where, policy) {
   for (let i = 0; i < lines.length; i += 1) {
     const rawLine = lines[i];
     if (handleFence(state, rawLine, ctx)) continue;
-    collectMarkerClaims(rawLine, i, ctx);
-    if (state.fenceLang !== null) collectFencedClaims(state, rawLine, i, ctx);
-    else collectProseClaims(state, rawLine, i, ctx);
+    if (state.fenceLang !== null) {
+      collectMarkerClaims(rawLine, i, ctx);
+      collectFencedClaims(state, rawLine, i, ctx);
+    } else {
+      collectProseClaims(state, rawLine, i, ctx);
+    }
   }
 
   // AN ODD NUMBER OF `~~` RUNS BLANKS THE REST OF THE FILE. Every line after it

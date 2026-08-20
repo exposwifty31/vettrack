@@ -685,6 +685,43 @@ describe("the engine refuses what it says it refuses", () => {
     expect(real).toContainEqual(expect.objectContaining({ kind: "attested", id: "some-id" }));
   });
 
+  it("does not read a marker the document struck out", () => {
+    // Every other rule honours `~~retracted~~`; markers did not, because they
+    // were collected before the retraction pass ran. Worst case is the same as
+    // the code-span hole: a retracted `attested <id>` still satisfied the
+    // "referenced by a governed document" rule on its own, which is what stops a
+    // stale attestation from ever being reported.
+    const sameLine = scan.extractFromMarkdown(
+      "~~<!-- vt-claim: attested old-device-check -->~~",
+      { file: "PLAN.md" },
+      POLICY,
+    );
+    expect(sameLine.claims).toEqual([]);
+    expect(sameLine.excluded.map((e) => e.reason)).toContain("marker-retracted");
+
+    // The run carries across lines, so the marker need not sit on the `~~` line.
+    const acrossLines = scan.extractFromMarkdown(
+      ["~~this note was withdrawn", "<!-- vt-claim: absent sqlite scope=deps -->", "still struck~~"].join(
+        "\n",
+      ),
+      { file: "PLAN.md" },
+      POLICY,
+    );
+    expect(acrossLines.claims).toEqual([]);
+    expect(acrossLines.excluded.map((e) => e.reason)).toContain("marker-retracted");
+
+    // A live marker still counts, and so does one inside a fence — `~~` in a
+    // shell block is two tildes, not a strikethrough.
+    expect(extract("The shell is live. <!-- vt-claim: attested some-id -->")).toContainEqual(
+      expect.objectContaining({ kind: "attested", id: "some-id" }),
+    );
+    expect(
+      extract(["```bash", "# <!-- vt-claim: absent sqlite scope=deps -->", "```"].join("\n")).map(
+        (c) => c.kind,
+      ),
+    ).toContain("absence");
+  });
+
   it("reports an unterminated ~~ run instead of silently blanking the rest of the file", () => {
     // `retracted` carries across lines by design. An odd number of runs left it
     // true to the end of the document, so every later line was read as struck and
