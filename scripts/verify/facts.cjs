@@ -16,7 +16,12 @@ function globToRegExp(pattern, { suffix = false } = {}) {
   // up carrying was a literal NUL, which made the file read as binary to grep
   // and silently defeated a later edit that matched on the intended character.
   // Splitting is the same transformation with nothing to smuggle.
-  const escape = (part) => part.replace(/[.+^${}()|[\]\\]/g, "\\$&");
+  // `?` is escaped as a LITERAL rather than expanded to `[^/]`: an unescaped `?`
+  // is a regex quantifier on the token before it, so `foo?.ts` would compile to
+  // /foo?\.ts/ and match `fo.ts` — a glob claim verifying against a file it does
+  // not name. No governed document uses `?` as a wildcard; several name files
+  // that contain one.
+  const escape = (part) => part.replace(/[.+?^${}()|[\]\\]/g, String.raw`\$&`);
   const body = pattern
     .split("**")
     .map((chunk) => chunk.split("*").map(escape).join("[^/]*"))
@@ -149,7 +154,14 @@ function createFacts(root, policy) {
       }
       const target = stat(scope);
       if (target?.isFile()) {
-        return fs.readFileSync(path.join(root, scope), "utf8").split(pattern).length - 1;
+        // A file that stats but cannot be read (permissions, a broken symlink)
+        // is not evidence of absence — it is a scope this run could not check,
+        // and NaN is how that reaches the caller as a failure rather than a 0.
+        try {
+          return fs.readFileSync(path.join(root, scope), "utf8").split(pattern).length - 1;
+        } catch {
+          return Number.NaN;
+        }
       }
       if (target?.isDirectory()) {
         return list(scope).filter((relative) => {

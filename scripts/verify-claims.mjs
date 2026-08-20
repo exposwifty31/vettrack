@@ -36,10 +36,8 @@
  *   --enforce-evidence   bind layer 3 (VT_ENFORCE_EVIDENCE=1 does the same in CI).
  */
 
-import path from "node:path";
 import process from "node:process";
 import { createRequire } from "node:module";
-import { fileURLToPath } from "node:url";
 
 const require = createRequire(import.meta.url);
 const { verify } = require("./verify/run.cjs");
@@ -48,8 +46,37 @@ const asJson = process.argv.includes("--json");
 const enforceEvidence =
   process.argv.includes("--enforce-evidence") || process.env.VT_ENFORCE_EVIDENCE === "1";
 
+const say = (line) => process.stdout.write(`${line}\n`);
+
+/** How many spans each extraction rule declined, as one line. */
+function excludedByRule(result) {
+  const byRule = new Map();
+  for (const item of result.excluded) byRule.set(item.reason, (byRule.get(item.reason) ?? 0) + 1);
+  return [...byRule]
+    .sort((a, b) => b[1] - a[1])
+    .map(([reason, n]) => `${reason} x${n}`)
+    .join(", ");
+}
+
+/** Failures, grouped by the document that carries them. */
+function reportFailures(result) {
+  if (result.failures.length === 0) return;
+  say("\n-- failures --");
+  const byFile = new Map();
+  for (const failure of result.failures) {
+    byFile.set(failure.file, [...(byFile.get(failure.file) ?? []), failure]);
+  }
+  for (const [file, items] of byFile) {
+    say(`\n  ${file}  (${items.length})`);
+    for (const item of items) {
+      const where = item.line > 0 ? `:${item.line}` : "";
+      say(`    ${where.padEnd(6)} [${item.kind}] ${item.detail}`);
+      if (item.raw) say(`           claimed: ${item.raw}`);
+    }
+  }
+}
+
 function report(result) {
-  const say = (line) => process.stdout.write(`${line}\n`);
   say("\n-- claim verification --");
   say(
     `  ${result.counts.claims} claims: ` +
@@ -58,41 +85,32 @@ function report(result) {
       `${result.counts.fail} FAILED`,
   );
 
-  const byRule = new Map();
-  for (const item of result.excluded) byRule.set(item.reason, (byRule.get(item.reason) ?? 0) + 1);
-  if (byRule.size > 0) {
-    say(`  excluded: ${[...byRule].map(([reason, n]) => `${reason} x${n}`).join(", ")}`);
-  }
-  if (result.ref) {
-    say(`  layer 2 measured against ${result.ref} -> ${result.refHead ?? "?"}`);
-  }
+  const excluded = excludedByRule(result);
+  if (excluded) say(`  excluded: ${excluded}`);
+  if (result.ref) say(`  layer 2 measured against ${result.ref} -> ${result.refHead ?? "?"}`);
   for (const note of result.notes) say(`  note: ${note}`);
 
-  if (result.failures.length > 0) {
-    say("\n-- failures --");
-    const byFile = new Map();
-    for (const failure of result.failures) {
-      byFile.set(failure.file, [...(byFile.get(failure.file) ?? []), failure]);
-    }
-    for (const [file, items] of byFile) {
-      say(`\n  ${file}  (${items.length})`);
-      for (const item of items) {
-        const where = item.line > 0 ? `:${item.line}` : "";
-        say(`    ${where.padEnd(6)} [${item.kind}] ${item.detail}`);
-        if (item.raw) say(`           claimed: ${item.raw}`);
-      }
-    }
-  }
+  reportFailures(result);
 
   say(result.ok ? "\nAll claims accounted for.\n" : `\n${result.failures.length} unaccounted claim(s).\n`);
 }
 
-const invokedDirectly =
-  process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
-
-if (invokedDirectly) {
-  const result = verify({ enforceEvidence });
-  if (asJson) process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
-  else report(result);
-  process.exit(result.ok ? 0 : 1);
+// No `invokedDirectly` guard. This file is a bin script and nothing imports it,
+// so the guard could only ever do one thing: on the day its own assumption about
+// `process.argv[1]` stopped holding — a symlinked bin, a wrapper, a different
+// working directory — it would exit 0 having verified nothing, and every caller
+// would read that as a pass. A gate that can silently succeed is the failure
+// this whole tool exists to prevent.
+let result;
+try {
+  result = verify({ enforceEvidence });
+} catch (error) {
+  // A configuration problem is not a claim verdict: it is reported as itself,
+  // with exit 2, so a broken config is never mistaken for a clean run.
+  say(`\nverify:claims cannot run: ${error.message}\n`);
+  process.exit(2);
 }
+
+if (asJson) process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
+else report(result);
+process.exit(result.ok ? 0 : 1);

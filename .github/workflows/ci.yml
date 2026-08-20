@@ -157,7 +157,8 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: 🌿 Fetch default branch (claim verification, layer 2)
-        run: git fetch --no-tags origin main:refs/remotes/origin/main || true
+        run: git fetch --no-tags origin main:refs/remotes/origin/main
+          || echo "::warning::could not fetch origin/main — claim verification will report layer 2 as unavailable"
 
       # Apply all `migrations/*.sql` via `server/migrate.ts` (tracks `vt_migrations`).
       - name: 🗄️ Database migrations
@@ -197,7 +198,8 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: 🌿 Fetch default branch
-        run: git fetch --no-tags origin main:refs/remotes/origin/main || true
+        run: git fetch --no-tags origin main:refs/remotes/origin/main
+          || echo "::warning::could not fetch origin/main — claim verification will report layer 2 as unavailable"
 
       - name: 🧾 Evidence gates (typecheck + i18n parity + depcruise)
         run: pnpm verify:evidence

@@ -3,9 +3,9 @@
  *
  * WHY EXTRACTION IS ITS OWN MODULE
  * The verifier's failure mode is not "misses a lie" — it is "reports a lie that
- * is not there". `src/__tests__/manifest-vs-code.test.ts` spends fifty lines on
- * exactly this: "a false alarm in a safety net is worse than no safety net,
- * because it burns the signal the net exists to carry." Every rule below is
+ * is not there". The RN migration repo's `manifest-vs-code.test.ts` spends fifty
+ * lines on exactly this: "a false alarm in a safety net is worse than no safety
+ * net, because it burns the signal the net exists to carry." Every rule below is
  * therefore narrow on purpose, and everything a rule declines to claim is
  * REPORTED as an explicit exclusion with the rule that excluded it — never
  * dropped on the floor. A silent skip and a passing check look identical from
@@ -21,13 +21,81 @@
  * which changes nothing about how the document renders.
  */
 
+/** Exclusion reasons written in more than one place, so the two cannot diverge. */
+const FORMER_NAME = "former-name";
+const DELETION_RECORD = "deletion-record";
+
 /** Fences whose contents are shell commands (script claims are read from these). */
 const SHELL_LANGS = new Set(["bash", "sh", "shell", "console", "zsh"]);
 
 /** Extensions that make a code span a file reference rather than prose. */
 const FILE_EXT = "ts|tsx|js|jsx|mjs|cjs|json|jsonc|md|css|svg|png|jpg|ya?ml|sql|sh|html|txt|lock|xml|plist";
 
-const CODE_SPAN = /`([^`\n]+)`/g;
+/**
+ * Inline code spans, as a linear scan rather than a regex.
+ *
+ * MULTI-BACKTICK DELIMITERS ARE WHY. Markdown writes a span that itself contains
+ * a backtick with a longer fence: these documents cite files as `` `src/lib/api.ts` ``
+ * in exactly that form. A single-backtick regex read that line as two spans each
+ * containing one space, and the path between them fell into prose — never
+ * claimed, never declined, invisible. It also left the `~~` in `` `~~` ``
+ * outside any span, so the strikethrough scanner treated a literal as a
+ * delimiter and opened a run that never closed.
+ *
+ * Linear, with no backtracking, for the same reason `inDeletionClause` is: this
+ * runs on every line of every governed document.
+ *
+ * @returns {{ index: number, length: number, text: string }[]} in source order
+ */
+/** Index of the next run of EXACTLY `width` backticks at or after `from`, or -1. */
+function closingFence(line, from, width) {
+  let j = from;
+  while (j < line.length) {
+    if (line[j] !== "`") {
+      j += 1;
+      continue;
+    }
+    let k = j;
+    while (line[k] === "`") k += 1;
+    if (k - j === width) return j;
+    j = k;
+  }
+  return -1;
+}
+
+function codeSpans(line) {
+  const spans = [];
+  let i = 0;
+  while (i < line.length) {
+    if (line[i] !== "`") {
+      i += 1;
+      continue;
+    }
+    const open = i;
+    while (line[i] === "`") i += 1;
+    const width = i - open;
+    const close = closingFence(line, i, width);
+    // An opener with no matching closer is not a span; scanning resumes after it
+    // rather than restarting, so this stays linear.
+    if (close === -1) continue;
+    spans.push({ index: open, length: close + width - open, text: line.slice(i, close) });
+    i = close + width;
+  }
+  return spans;
+}
+
+/** Replace every code span with `render(span)`, keeping everything else. */
+function replaceSpans(line, render) {
+  const spans = codeSpans(line);
+  if (spans.length === 0) return line;
+  let out = "";
+  let cursor = 0;
+  for (const span of spans) {
+    out += line.slice(cursor, span.index) + render(span);
+    cursor = span.index + span.length;
+  }
+  return out + line.slice(cursor);
+}
 
 /**
  * A scoped npm package named in PROSE rather than in a code span.
@@ -45,14 +113,6 @@ const CODE_SPAN = /`([^`\n]+)`/g;
  */
 const PROSE_PACKAGE = /(?<![\w@/~-])(@[a-z0-9][\w.-]*\/[a-z0-9][\w.-]*)/gi;
 
-/** Character ranges covered by `~~strikethrough~~` — retracted text is not a claim. */
-function struckRanges(line) {
-  const ranges = [];
-  for (const m of line.matchAll(/~~[\s\S]*?~~/g)) {
-    ranges.push([m.index, m.index + m[0].length]);
-  }
-  return ranges;
-}
 // The body is captured wholesale and trimmed in `parseMarker`, rather than
 // with `\\s*([^>]*?)\\s*`: that shape lets the engine split the padding many
 // ways on a non-matching line, which is a backtracking cost paid on every
@@ -127,7 +187,7 @@ function pathExclusion(target, policy) {
 
 /** Strip inline code, links and emphasis so a prose scan sees plain words. */
 function plainProse(line) {
-  return line.replace(CODE_SPAN, " $1 ").replace(/\*\*|__|\*/g, "");
+  return replaceSpans(line, (span) => ` ${span.text} `).replace(/\*\*|__|\*/g, "");
 }
 
 /**
@@ -149,8 +209,9 @@ function buildAliasPattern(aliases) {
 
 /**
  * Parse one marker body: `absent op-sqlite scope=package.json`.
- * Returns `{ verb, value, opts }`, or null when the verb is unknown — an
- * unknown verb is a defect the caller reports, never a silent no-op.
+ * Returns `{ verb, value, opts }`, or null when the body is EMPTY. An unknown
+ * verb comes back as a `verb` the caller does not recognise and is reported as a
+ * `marker-unknown` claim — a defect either way, never a silent no-op.
  */
 function parseMarker(body) {
   const parts = body.split(/\s+/).filter(Boolean);
@@ -166,8 +227,253 @@ function parseMarker(body) {
   return { verb, value: values.join(" "), opts };
 }
 
+/** Character ranges covered by an inline `code span` on this line. */
+function codeSpanRanges(line) {
+  return codeSpans(line).map((span) => [span.index, span.index + span.length]);
+}
+
+/** Is `index` inside any of these ranges? */
+function within(ranges, index) {
+  return ranges.some(([from, to]) => index >= from && index < to);
+}
+
+/**
+ * Fence state. Returns true when the line IS the fence marker and the caller
+ * should move on.
+ */
+function handleFence(state, line, ctx) {
+  const fence = /^\s*```+\s*(\S*)/.exec(line);
+  if (!fence) return false;
+  if (state.fenceLang === null) {
+    state.fenceLang = fence[1].toLowerCase();
+    state.treeArmed = ctx.treeBlocks.some((b) => b.afterHeading === state.lastHeading);
+    state.treeStack = [];
+  } else {
+    state.fenceLang = null;
+    state.treeArmed = false;
+  }
+  return true;
+}
+
+/**
+ * Markers are HTML comments and are honoured everywhere, including inside a
+ * fence — a fenced block is exactly where an absence claim about config text
+ * wants to sit.
+ *
+ * A MARKER INSIDE AN INLINE CODE SPAN IS AN EXAMPLE, NOT A CLAIM. `AGENTS.md`
+ * documents the syntax by showing it, and reading that demonstration as live
+ * made the documentation itself a claim: the `absent` example pushed a real
+ * absence claim, and — worse — an `attested <id>` example would satisfy the
+ * "referenced by a governed document" rule all on its own, which is what stops
+ * a stale attestation from ever being reported.
+ */
+function collectMarkerClaims(rawLine, index, ctx) {
+  const spans = codeSpanRanges(rawLine);
+  for (const m of rawLine.matchAll(MARKER)) {
+    if (within(spans, m.index)) {
+      ctx.decline(index, m[0], "marker-is-an-example");
+      continue;
+    }
+    const parsed = parseMarker(m[1]);
+    if (!parsed) {
+      ctx.decline(index, m[0], "marker-empty");
+      continue;
+    }
+    const { verb, value, opts } = parsed;
+    if (verb === "absent") {
+      ctx.push(index, { kind: "absence", raw: m[0], pattern: value, scope: opts.scope ?? "package.json" });
+    } else if (verb === "attested") {
+      ctx.push(index, { kind: "attested", raw: m[0], id: value });
+    } else if (verb === "absent-file") {
+      ctx.push(index, { kind: "absent-path", raw: m[0], target: value });
+    } else if (verb === "green") {
+      ctx.push(index, { kind: "green", raw: m[0], command: value });
+    } else {
+      ctx.push(index, { kind: "marker-unknown", raw: m[0], verb });
+    }
+  }
+}
+
+/**
+ * One line of a STRUCTURE TREE fence.
+ *
+ * INDENTATION IS THE PATH. A structure tree nests by indent, so the bare token
+ * `app/` under `src/` means `src/app/`, not a top-level `app/`. Reading tokens
+ * flat reported eleven non-existent directories on this repo's own AGENTS.md —
+ * every one of them a real directory, just at the wrong depth.
+ */
+function collectTreeClaim(state, line, index, ctx) {
+  const indent = line.length - line.trimStart().length;
+  const token = line.trim().split(/\s+/)[0];
+  if (!token || !(DIR_SPAN.test(token) || PATH_SPAN.test(token))) return;
+  while (state.treeStack.length > 0 && state.treeStack[state.treeStack.length - 1].indent >= indent) {
+    state.treeStack.pop();
+  }
+  const prefix = state.treeStack.length > 0 ? state.treeStack[state.treeStack.length - 1].prefix : "";
+  const full = prefix + token;
+  if (token.endsWith("/")) state.treeStack.push({ indent, prefix: full });
+  const target = full.replace(/\/$/, "");
+  const exclusion = pathExclusion(target, ctx.policy);
+  if (exclusion) ctx.decline(index, full, exclusion);
+  else ctx.push(index, { kind: token.endsWith("/") ? "dir" : "path", raw: full, target });
+}
+
+/**
+ * Blank `~~struck-through~~` text, and report which ranges were struck.
+ *
+ * RETRACTED TEXT IS NOT A CLAIM. "~~An untracked pnpm-lock.yaml sits beside the
+ * tracked package-lock.json~~" is a statement the author struck out; reading it
+ * as live reports a defect for a correction — the most demoralising false alarm
+ * available, since it punishes exactly the behaviour the gate wants. The state
+ * is carried ACROSS lines because this repo's corrections routinely span three
+ * (docs/ota-acceptance.md:156-158). Struck text is blanked rather than deleted
+ * so `m.index` still lines up with the source, and the RANGES come back so the
+ * prose scan can report a struck package as excluded instead of dropping it.
+ */
+function blankRetracted(state, rawLine, index) {
+  // DELIMITERS ARE `~~` OUTSIDE AN INLINE CODE SPAN. Inside one it is literal
+  // text — markdown renders `` `~~` `` as two tildes — and splitting on it
+  // regardless opened a run that never closed on the first document to DOCUMENT
+  // the syntax. Found by the unterminated-run check below, on the very paragraph
+  // describing that check.
+  const spans = codeSpanRanges(rawLine);
+  const marks = [];
+  for (let i = 0; i + 1 < rawLine.length; i += 1) {
+    if (rawLine[i] === "~" && rawLine[i + 1] === "~" && !within(spans, i)) {
+      marks.push(i);
+      i += 1;
+    }
+  }
+
+  let rebuilt = "";
+  const struck = [];
+  let cursor = 0;
+  const take = (from, to) => {
+    if (state.retracted) {
+      rebuilt += " ".repeat(to - from);
+      struck.push([from, to]);
+    } else {
+      rebuilt += rawLine.slice(from, to);
+    }
+  };
+  for (const mark of marks) {
+    take(cursor, mark);
+    state.retracted = !state.retracted;
+    state.retractedFrom = state.retracted ? index : null;
+    rebuilt += "  ";
+    struck.push([mark, mark + 2]);
+    cursor = mark + 2;
+  }
+  take(cursor, rawLine.length);
+  return { line: rebuilt, struck };
+}
+
+/**
+ * Scoped packages named in prose. Read from the RAW line with only code spans
+ * blanked, so a struck package is REPORTED as excluded rather than disappearing:
+ * blanking it first made the exclusion branch below unreachable, which is a
+ * silent skip wearing the costume of a rule.
+ */
+function collectProsePackages(rawLine, struck, index, ctx) {
+  const proseOnly = replaceSpans(rawLine, (span) => " ".repeat(span.length));
+  for (const m of proseOnly.matchAll(PROSE_PACKAGE)) {
+    const start = m.index;
+    if (within(struck, start)) {
+      ctx.decline(index, m[1], FORMER_NAME);
+      continue;
+    }
+    const before = proseOnly.slice(0, start);
+    const after = proseOnly.slice(start + m[1].length);
+    if (FORMER_BEFORE.test(before) || RENAME_ARROW.test(after)) {
+      ctx.decline(index, m[1], FORMER_NAME);
+      continue;
+    }
+    if (NEGATED_AFTER.test(after) || NEGATED_BEFORE.test(before)) {
+      ctx.decline(index, m[1], "package-declared-absent");
+      continue;
+    }
+    ctx.push(index, { kind: "package", raw: m[1], name: m[1] });
+  }
+}
+
+/** Versions written as prose ("React Native 0.86.2"), via the declared aliases. */
+function collectAliasVersions(line, index, ctx) {
+  if (!ctx.aliasPattern) return;
+  const prose = plainProse(line);
+  for (const m of prose.matchAll(ctx.aliasPattern)) {
+    const pkg = ctx.policy.dependencyAliases[m[1]];
+    if (pkg) ctx.push(index, { kind: "dependency", raw: `${m[1]} ${m[2]}`, name: pkg, range: m[2] });
+  }
+}
+
+/** Landing citations on a status document; bare commit shas everywhere else. */
+function collectCitations(line, index, ctx) {
+  if (ctx.isStatusDoc && MERGE_CONTEXT.test(line)) {
+    collectLandingClaims(line, index, ctx.push, LANDING_STRICT.test(line), ctx.policy);
+    return;
+  }
+  if (!COMMIT_CONTEXT.test(line)) return;
+  for (const { text } of codeSpans(line)) {
+    const sha = text.trim();
+    if (/^[0-9a-f]{7,40}$/.test(sha)) ctx.push(index, { kind: "commit", raw: sha, sha });
+  }
+}
+
+/** Inside a fence: a structure tree, a shell block, or nothing readable. */
+function collectFencedClaims(state, rawLine, index, ctx) {
+  if (state.treeArmed) collectTreeClaim(state, rawLine, index, ctx);
+  else if (SHELL_LANGS.has(state.fenceLang)) collectScriptClaims(rawLine, index, ctx.policy, ctx.push);
+  // no prose/inline-span scanning inside any other fence
+}
+
+/**
+ * A code span inside struck text was blanked before `classifySpan` could see it,
+ * so it produced neither a claim nor an exclusion. Retracted is the right
+ * reading; invisible is not — "`old/path.ts` -> `new/path.ts`" should say it
+ * declined the left-hand side, the same way the prose scan does.
+ */
+function collectStruckSpans(rawLine, struck, index, ctx) {
+  if (struck.length === 0) return;
+  for (const span of codeSpans(rawLine)) {
+    if (within(struck, span.index)) ctx.decline(index, span.text.trim(), FORMER_NAME);
+  }
+}
+
+/** Every inline code span on a line, classified. */
+function collectSpanClaims(line, index, ctx) {
+  for (const span of codeSpans(line)) {
+    classifySpan(
+      span.text.trim(),
+      index,
+      ctx.policy,
+      ctx.push,
+      ctx.decline,
+      line.slice(span.index + span.length),
+      line.slice(0, span.index),
+    );
+  }
+}
+
+/** Everything read from a line of ordinary prose, in the order it is read. */
+function collectProseClaims(state, rawLine, index, ctx) {
+  if (/^\s*#{1,6}\s/.test(rawLine)) state.lastHeading = rawLine.trim();
+  const { line, struck } = blankRetracted(state, rawLine, index);
+  collectScriptClaims(line, index, ctx.policy, ctx.push);
+  collectSpanClaims(line, index, ctx);
+  collectStruckSpans(rawLine, struck, index, ctx);
+  collectProsePackages(rawLine, struck, index, ctx);
+  collectAliasVersions(line, index, ctx);
+  collectCitations(line, index, ctx);
+}
+
 /**
  * Extract every claim (and every declined span) from one markdown document.
+ *
+ * The loop is a list of STAGES in a fixed order, each its own function. It was
+ * one 165-line body scoring 97 on cognitive complexity — a quality-gate failure,
+ * and more to the point a function nobody could hold in their head while
+ * deciding whether a rule was too broad, which is the only question that matters
+ * in this file.
  *
  * @param {string} text
  * @param {{ file: string }} where
@@ -178,164 +484,46 @@ function extractFromMarkdown(text, where, policy) {
   const claims = [];
   const excluded = [];
   const lines = text.split("\n");
-  const aliasPattern = buildAliasPattern(policy.dependencyAliases ?? {});
-  const treeBlocks = (policy.treeBlocks ?? []).filter((b) => b.file === where.file);
-  const isStatusDoc = (policy.statusDocs ?? []).includes(where.file);
-
-  let fenceLang = null;
-  let lastHeading = "";
-  let treeArmed = false;
-  /** Indentation stack for the structure tree — see the tree branch below. */
-  let treeStack = [];
-  /** Inside a `~~struck-through~~` run, which may span several lines. */
-  let retracted = false;
 
   const at = (line) => ({ file: where.file, line: line + 1 });
-  const push = (line, claim) => claims.push({ ...at(line), ...claim });
-  const decline = (line, raw, reason) => excluded.push({ ...at(line), raw, reason });
+  const ctx = {
+    policy,
+    push: (line, claim) => claims.push({ ...at(line), ...claim }),
+    decline: (line, raw, reason) => excluded.push({ ...at(line), raw, reason }),
+    aliasPattern: buildAliasPattern(policy.dependencyAliases ?? {}),
+    treeBlocks: (policy.treeBlocks ?? []).filter((b) => b.file === where.file),
+    isStatusDoc: (policy.statusDocs ?? []).includes(where.file),
+  };
+
+  const state = {
+    fenceLang: null,
+    lastHeading: "",
+    treeArmed: false,
+    /** Indentation stack for the structure tree — see `collectTreeClaim`. */
+    treeStack: [],
+    /** Inside a `~~struck-through~~` run, which may span several lines. */
+    retracted: false,
+    retractedFrom: null,
+  };
 
   for (let i = 0; i < lines.length; i += 1) {
-    let line = lines[i];
-    const fence = /^\s*```+\s*(\S*)/.exec(line);
+    const rawLine = lines[i];
+    if (handleFence(state, rawLine, ctx)) continue;
+    collectMarkerClaims(rawLine, i, ctx);
+    if (state.fenceLang !== null) collectFencedClaims(state, rawLine, i, ctx);
+    else collectProseClaims(state, rawLine, i, ctx);
+  }
 
-    if (fence) {
-      if (fenceLang === null) {
-        fenceLang = fence[1].toLowerCase();
-        treeArmed = treeBlocks.some((b) => b.afterHeading === lastHeading);
-        treeStack = [];
-      } else {
-        fenceLang = null;
-        treeArmed = false;
-      }
-      continue;
-    }
-
-    // Markers are HTML comments and are honoured everywhere, including inside a
-    // fence — a fenced block is exactly where an absence claim about config text
-    // wants to sit.
-    for (const m of line.matchAll(MARKER)) {
-      const parsed = parseMarker(m[1]);
-      if (!parsed) {
-        decline(i, m[0], "marker-empty");
-        continue;
-      }
-      const { verb, value, opts } = parsed;
-      if (verb === "absent") {
-        push(i, { kind: "absence", raw: m[0], pattern: value, scope: opts.scope ?? "package.json" });
-      } else if (verb === "attested") {
-        push(i, { kind: "attested", raw: m[0], id: value });
-      } else if (verb === "absent-file") {
-        push(i, { kind: "absent-path", raw: m[0], target: value });
-      } else if (verb === "green") {
-        push(i, { kind: "green", raw: m[0], command: value });
-      } else {
-        push(i, { kind: "marker-unknown", raw: m[0], verb });
-      }
-    }
-
-    if (fenceLang !== null) {
-      if (treeArmed) {
-        // INDENTATION IS THE PATH. A structure tree nests by indent, so the
-        // bare token `app/` under `src/` means `src/app/`, not a top-level
-        // `app/`. Reading tokens flat reported eleven non-existent directories
-        // on this repo's own AGENTS.md — every one of them a real directory,
-        // just at the wrong depth.
-        const indent = line.length - line.trimStart().length;
-        const token = line.trim().split(/\s+/)[0];
-        if (!token || !(DIR_SPAN.test(token) || PATH_SPAN.test(token))) continue;
-        while (treeStack.length > 0 && treeStack[treeStack.length - 1].indent >= indent) {
-          treeStack.pop();
-        }
-        const prefix = treeStack.length > 0 ? treeStack[treeStack.length - 1].prefix : "";
-        const full = prefix + token;
-        if (token.endsWith("/")) treeStack.push({ indent, prefix: full });
-        const target = full.replace(/\/$/, "");
-        const exclusion = pathExclusion(target, policy);
-        if (exclusion) decline(i, full, exclusion);
-        else push(i, { kind: token.endsWith("/") ? "dir" : "path", raw: full, target });
-        continue;
-      }
-      if (SHELL_LANGS.has(fenceLang)) {
-        collectScriptClaims(line, i, policy, push);
-      }
-      continue; // no prose/inline-span scanning inside any other fence
-    }
-
-    if (/^\s*#{1,6}\s/.test(line)) lastHeading = line.trim();
-
-    // RETRACTED TEXT IS NOT A CLAIM. "~~An untracked pnpm-lock.yaml sits beside
-    // the tracked package-lock.json~~" is a statement the author struck out;
-    // reading it as live reports a defect for a correction — the most demoralising
-    // false alarm available, since it punishes exactly the behaviour the gate
-    // wants. The state is carried ACROSS lines because this repo's corrections
-    // routinely span three (docs/ota-acceptance.md:156-158). Struck text is
-    // blanked rather than deleted so `m.index` still lines up with the source.
-    {
-      const segments = line.split("~~");
-      let rebuilt = "";
-      for (let k = 0; k < segments.length; k += 1) {
-        rebuilt += retracted ? " ".repeat(segments[k].length) : segments[k];
-        if (k < segments.length - 1) {
-          retracted = !retracted;
-          rebuilt += "  ";
-        }
-      }
-      line = rebuilt;
-    }
-
-    collectScriptClaims(line, i, policy, push);
-
-    for (const m of line.matchAll(CODE_SPAN)) {
-      classifySpan(
-        m[1].trim(),
-        i,
-        policy,
-        push,
-        decline,
-        line.slice(m.index + m[0].length),
-        line.slice(0, m.index),
-      );
-    }
-
-    // Blank out code spans (keeping offsets) so a package already claimed as a
-    // span is not claimed twice, then read what prose alone still names.
-    const proseOnly = line.replace(CODE_SPAN, (match) => " ".repeat(match.length));
-    const struck = struckRanges(line);
-    for (const m of proseOnly.matchAll(PROSE_PACKAGE)) {
-      const start = m.index;
-      if (struck.some(([from, to]) => start >= from && start < to)) {
-        decline(i, m[1], "former-name");
-        continue;
-      }
-      const before = proseOnly.slice(0, start);
-      const after = proseOnly.slice(start + m[1].length);
-      if (FORMER_BEFORE.test(before) || RENAME_ARROW.test(after)) {
-        decline(i, m[1], "former-name");
-        continue;
-      }
-      if (NEGATED_AFTER.test(after) || NEGATED_BEFORE.test(before)) {
-        decline(i, m[1], "package-declared-absent");
-        continue;
-      }
-      push(i, { kind: "package", raw: m[1], name: m[1] });
-    }
-
-    if (aliasPattern) {
-      const prose = plainProse(line);
-      for (const m of prose.matchAll(aliasPattern)) {
-        const pkg = policy.dependencyAliases[m[1]];
-        if (pkg) push(i, { kind: "dependency", raw: `${m[1]} ${m[2]}`, name: pkg, range: m[2] });
-      }
-    }
-
-    if (isStatusDoc && MERGE_CONTEXT.test(line)) {
-      collectLandingClaims(line, i, push, LANDING_STRICT.test(line), policy);
-    } else if (COMMIT_CONTEXT.test(line)) {
-      for (const m of line.matchAll(CODE_SPAN)) {
-        const span = m[1].trim();
-        if (/^[0-9a-f]{7,40}$/.test(span)) push(i, { kind: "commit", raw: span, sha: span });
-      }
-    }
+  // AN ODD NUMBER OF `~~` RUNS BLANKS THE REST OF THE FILE. Every line after it
+  // is read as retracted, and its claims vanish with no failure and no
+  // exclusion. The vacuous-scan guard in run.js only fires when the total is
+  // zero, so a partial skip like this passed the gate in silence — the one thing
+  // this engine says it does not do.
+  if (state.retracted) {
+    ctx.push(state.retractedFrom ?? lines.length - 1, {
+      kind: "strikethrough-unterminated",
+      raw: "~~",
+    });
   }
 
   return { claims, excluded };
@@ -398,11 +586,11 @@ function collectLandingClaims(line, index, push, requireCitation, policy) {
     }
     push(index, { kind: "pull-request", raw: m[0], number: Number(m[1]) });
   }
-  for (const m of line.matchAll(CODE_SPAN)) {
-    const span = m[1].trim();
-    if (/^[0-9a-f]{7,40}$/.test(span)) {
+  for (const { text } of codeSpans(line)) {
+    const sha = text.trim();
+    if (/^[0-9a-f]{7,40}$/.test(sha)) {
       cited = true;
-      push(index, { kind: "commit", raw: span, sha: span });
+      push(index, { kind: "commit", raw: sha, sha });
     }
   }
   if (!cited && requireCitation) {
@@ -477,13 +665,44 @@ function inDeletionClause(before) {
   return DELETION_VERB.test(breakAt >= 0 ? window.slice(breakAt) : window);
 }
 
-/** One inline code span -> at most one claim, or one reported exclusion. */
+/**
+ * The three readings that turn a path or directory reference into something
+ * OTHER than a live claim, shared by both branches of `classifySpan` because
+ * both need exactly the same three and duplicating them is how the two drift.
+ */
+function contextualReading(before, after) {
+  if (RENAME_ARROW.test(after) || FORMER_BEFORE.test(before)) return FORMER_NAME;
+  if (inDeletionClause(before)) return DELETION_RECORD;
+  if (NEGATED_AFTER.test(after) || NEGATED_BEFORE.test(before)) return "absent";
+  return null;
+}
+
+/**
+ * One inline code span -> at most one claim, or one reported exclusion.
+ *
+ * EVERY PATH OUT OF HERE IS REPORTED. Five of them used to be a bare `return`:
+ * an oversized span, a span containing whitespace, an i18n key namespace written
+ * with a `*`, an empty span, and — the big one — every span that simply is not
+ * path-shaped. The module header promises that a declined span is reported with
+ * the rule that declined it, and five silent exits made that promise false. The
+ * counts are grouped by reason in the CLI, so the volume costs one line.
+ */
 function classifySpan(span, index, policy, push, decline, after = "", before = "") {
-  if (!span || span.length > 200) return;
+  if (!span) {
+    decline(index, "``", "empty-span");
+    return;
+  }
+  if (span.length > 200) {
+    decline(index, `${span.slice(0, 60)}…`, "span-too-long");
+    return;
+  }
 
   // A span with whitespace is a shell fragment, not a path:
   // `plutil -p ios/*/Info.plist`, `find . -name pnpm-lock.yaml …`.
-  if (/\s/.test(span)) return;
+  if (/\s/.test(span)) {
+    decline(index, span, "shell-fragment");
+    return;
+  }
 
   // `@scope/name` (optionally with a subpath) is an npm package reference.
   // Scoped-only on purpose: an unscoped rule would claim `equipment-row-status`
@@ -506,74 +725,83 @@ function classifySpan(span, index, policy, push, decline, after = "", before = "
     // A `/` is required, not just a dot: `common.*`, `appointmentsPage.*` and
     // `home.shift.*` are i18n key namespaces, not file globs, and checking them
     // against the filesystem would fail forever for a non-defect.
-    if (span.includes("/") && !exclusion) push(index, { kind: "glob", raw: span, pattern: span });
-    else if (exclusion) decline(index, span, exclusion);
+    if (exclusion) decline(index, span, exclusion);
+    else if (span.includes("/")) push(index, { kind: "glob", raw: span, pattern: span });
+    else decline(index, span, "not-a-path-glob");
     return;
   }
 
   const asPath = PATH_SPAN.exec(span);
   if (asPath) {
-    const target = asPath[1];
-    const exclusion = pathExclusion(target, policy);
-    if (exclusion) {
-      decline(index, span, exclusion);
-      return;
-    }
-    if (RENAME_ARROW.test(after) || FORMER_BEFORE.test(before)) {
-      decline(index, span, "former-name");
-      return;
-    }
-    if (inDeletionClause(before)) {
-      decline(index, span, "deletion-record");
-      return;
-    }
-    if (NEGATED_AFTER.test(after) || NEGATED_BEFORE.test(before)) {
-      push(index, { kind: "absent-path", raw: span, target });
-      return;
-    }
-    // A reference with no `/` is a SHORTHAND ("`api.ts`", "`RootNavigator.tsx`"),
-    // not a location. Resolving it by basename is the honest reading; demanding
-    // an exact root-relative path would fail on ordinary, correct prose.
-    const bare = !target.includes("/");
-    if (asPath[2]) {
-      push(index, {
-        kind: "path-lines",
-        raw: span,
-        target,
-        bare,
-        from: Number(asPath[2]),
-        to: Number(asPath[3] ?? asPath[2]),
-      });
-    } else {
-      push(index, { kind: "path", raw: span, target, bare });
-    }
+    classifyPathSpan(asPath, span, index, policy, push, decline, after, before);
     return;
   }
 
   const asDir = DIR_SPAN.exec(span);
-  if (asDir && span.includes("/")) {
-    const target = asDir[1].replace(/\/$/, "");
-    const exclusion = pathExclusion(target, policy);
-    if (exclusion) {
-      decline(index, span, exclusion);
-      return;
-    }
-    // Same three readings as a file reference: "`src/shared/` no longer exists"
-    // is a statement that it is GONE, not a claim that it is there.
-    if (RENAME_ARROW.test(after) || FORMER_BEFORE.test(before)) {
-      decline(index, span, "former-name");
-      return;
-    }
-    if (inDeletionClause(before)) {
-      decline(index, span, "deletion-record");
-      return;
-    }
-    if (NEGATED_AFTER.test(after) || NEGATED_BEFORE.test(before)) {
-      push(index, { kind: "absent-dir", raw: span, target });
-      return;
-    }
-    push(index, { kind: "dir", raw: span, target });
+  if (asDir) {
+    classifyDirSpan(asDir, span, index, policy, push, decline, after, before);
+    return;
   }
+
+  // Not path-shaped at all: `useUser`, `clinicId`, `off | shadow | enforce`.
+  // Reported, because "nothing matched" and "nothing was checked" have to be
+  // distinguishable from outside.
+  decline(index, span, "not-claim-shaped");
+}
+
+function classifyPathSpan(asPath, span, index, policy, push, decline, after, before) {
+  const target = asPath[1];
+  const exclusion = pathExclusion(target, policy);
+  if (exclusion) {
+    decline(index, span, exclusion);
+    return;
+  }
+  const reading = contextualReading(before, after);
+  if (reading === FORMER_NAME || reading === DELETION_RECORD) {
+    decline(index, span, reading);
+    return;
+  }
+  if (reading === "absent") {
+    push(index, { kind: "absent-path", raw: span, target });
+    return;
+  }
+  // A reference with no `/` is a SHORTHAND ("`api.ts`", "`RootNavigator.tsx`"),
+  // not a location. Resolving it by basename is the honest reading; demanding
+  // an exact root-relative path would fail on ordinary, correct prose.
+  const bare = !target.includes("/");
+  if (asPath[2]) {
+    push(index, {
+      kind: "path-lines",
+      raw: span,
+      target,
+      bare,
+      from: Number(asPath[2]),
+      to: Number(asPath[3] ?? asPath[2]),
+    });
+    return;
+  }
+  push(index, { kind: "path", raw: span, target, bare });
+}
+
+function classifyDirSpan(asDir, span, index, policy, push, decline, after, before) {
+  const target = asDir[1].replace(/\/$/, "");
+  const exclusion = pathExclusion(target, policy);
+  if (exclusion) {
+    decline(index, span, exclusion);
+    return;
+  }
+  // Same three readings as a file reference: "`src/shared/` no longer exists"
+  // is a statement that it is GONE, not a claim that it is there.
+  const reading = contextualReading(before, after);
+  if (reading === FORMER_NAME || reading === DELETION_RECORD) {
+    decline(index, span, reading);
+    return;
+  }
+  if (reading === "absent") {
+    push(index, { kind: "absent-dir", raw: span, target });
+    return;
+  }
+  push(index, { kind: "dir", raw: span, target });
 }
 
 module.exports = {
@@ -581,10 +809,10 @@ module.exports = {
   buildAliasPattern,
   splitDependencySpan,
   parseMarker,
+  codeSpans,
   pathExclusion,
   SHELL_LANGS,
   PROSE_PACKAGE,
-  struckRanges,
   inDeletionClause,
   LANDING_STRICT,
   MERGE_CONTEXT,

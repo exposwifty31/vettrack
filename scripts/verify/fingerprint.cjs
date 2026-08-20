@@ -2,13 +2,16 @@
  * A fingerprint of the shared verification engine.
  *
  * WHY THIS EXISTS
- * The engine lives as two copies — this repo carries it as `.js`, the Capacitor
- * `vettrack` repo carries the same files as `.cjs` because that package is
- * `"type": "module"`. Two copies of a gate is exactly the rot the gate exists to
- * catch: they drift, both stay green, and they are green about different things.
- * `env-contract.js` names that failure mode in this repo already ("both halves
- * green while asserting different things"), and nothing offline can compare a
- * file in another repository.
+ * The engine lives as two copies, one per repository: the RN migration repo
+ * carries plain CommonJS modules, and the Capacitor `vettrack` repo carries the
+ * same files with a `.cjs` extension because that package is `"type": "module"`.
+ * Two copies of a gate is exactly the rot the gate exists to catch: they drift,
+ * both stay green, and they are green about different things. Nothing offline
+ * can compare a file in another repository.
+ *
+ * THIS COMMENT IS PART OF THE HASHED SOURCE, so it cannot name one repo's
+ * extension as "here" — the port that keeps the copies in step rewrites those,
+ * and the sentence would then read as its own opposite in the other repo.
  *
  * WHAT IT CAN AND CANNOT DO
  * It cannot prove the two copies match — that needs both trees at once. What it
@@ -45,6 +48,22 @@ const ENGINE_MODULES = ["claims", "facts", "fingerprint", "git-facts", "run", "s
 const SEPARATOR = "\u0020";
 
 /**
+ * The internal `require` calls, built FROM `ENGINE_MODULES` rather than from a
+ * second hand-kept list. The two lists drifted the moment they existed: the
+ * literal alternation omitted `fingerprint` itself, so the day one module
+ * requires another the two copies would hash differently while being the same
+ * code — identical files, divergent fingerprints, and a gate red about nothing.
+ * Longest name first so a shorter one cannot claim a prefix of it.
+ */
+const MODULE_REQUIRE = new RegExp(
+  `require\\("\\./(${[...ENGINE_MODULES]
+    .sort((a, b) => b.length - a.length)
+    .map((name) => name.replace(/[.*+?^${}()|[\]\\-]/g, String.raw`\$&`))
+    .join("|")})\\.c?js"\\)`,
+  "g",
+);
+
+/**
  * Hash the engine as it would read in either repo.
  *
  * @param {string} dir directory holding the engine modules
@@ -61,12 +80,12 @@ function fingerprintEngine(dir) {
     const source = fs
       .readFileSync(found, "utf8")
       // The one sanctioned difference between the copies.
-      .replace(/require\("\.\/(claims|facts|git-facts|run|scan)\.c?js"\)/g, 'require("./$1")')
+      .replace(MODULE_REQUIRE, 'require("./$1")')
       // Line endings are a checkout setting, not a change to the logic.
-      .replace(/\r\n/g, "\n");
+      .replaceAll("\r\n", "\n");
     hash.update(name).update(SEPARATOR).update(source);
   }
   return { fingerprint: hash.digest("hex"), files };
 }
 
-module.exports = { ENGINE_MODULES, fingerprintEngine };
+module.exports = { ENGINE_MODULES, MODULE_REQUIRE, fingerprintEngine };

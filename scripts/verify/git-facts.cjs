@@ -54,17 +54,70 @@ const SHA = /^[0-9a-f]{7,40}$/i;
 const REF = /^\w[\w./-]*$/;
 const REPO_PATH = /^[^\0\-][^\0]*$/;
 
+/** No git call may outlive this, and none may be truncated by the default buffer. */
+const GIT_TIMEOUT_MS = 30_000;
+const GIT_MAX_BUFFER = 64 * 1024 * 1024;
+
 function git(root, args) {
   if (!GIT_BINARY) {
     return { ok: false, status: null, stdout: "", stderr: "git binary not found at a known absolute path" };
   }
-  const result = spawnSync(GIT_BINARY, args, { cwd: root, encoding: "utf8", shell: false });
+  // BOUNDED ON BOTH AXES. With Node's defaults a git that waits on a lock or a
+  // credential prompt hangs the verifier with no limit, and a diff larger than
+  // the 1 MB default buffer comes back KILLED — which this module would then
+  // report as "cannot diff", naming the wrong cause on the one document
+  // (`docs/audit/PROOF_ALIGNMENT_LOG.md`, 8,700 lines) most likely to produce a
+  // big diff.
+  const result = spawnSync(GIT_BINARY, args, {
+    cwd: root,
+    encoding: "utf8",
+    shell: false,
+    timeout: GIT_TIMEOUT_MS,
+    maxBuffer: GIT_MAX_BUFFER,
+  });
   return {
     ok: result.status === 0,
     status: result.status,
     stdout: (result.stdout ?? "").trim(),
     stderr: (result.stderr ?? "").trim(),
   };
+}
+
+/**
+ * Line numbers a unified diff ADDS, as a pure function over the diff text.
+ *
+ * Pure so a fabricated diff can be handed to it: the `+++ b/path` header used to
+ * be skipped BY PREFIX, and an added source line whose own text starts with `++`
+ * renders as `+++…`. Skipping that left the cursor one behind for every later
+ * line in the hunk, so claims after it were read at the wrong line number or
+ * dropped from the added set entirely — a silent miscount no test could reach
+ * while this lived inside a git call.
+ */
+function addedLinesFromDiff(stdout) {
+  const added = new Set();
+  let cursor = 0;
+  let inHunk = false;
+  for (const line of stdout.split("\n")) {
+    if (line.startsWith("diff --git ")) {
+      inHunk = false;
+      continue;
+    }
+    const hunk = /^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@/.exec(line);
+    if (hunk) {
+      cursor = Number(hunk[1]);
+      inHunk = true;
+      continue;
+    }
+    // Only lines INSIDE a hunk are counted, so the file header cannot be one.
+    if (!inHunk) continue;
+    if (line.startsWith("+")) {
+      added.add(cursor);
+      cursor += 1;
+    } else if (line.startsWith(" ")) {
+      cursor += 1;
+    }
+  }
+  return added;
 }
 
 /**
@@ -156,8 +209,14 @@ function createGitFacts(root, defaultBranch) {
       return prCache.get(number);
     },
 
-    /** Does `path` exist in the tree of `sha`? Used for append-only log entries. */
+    /**
+     * Does `path` exist in the tree of `sha`? Used for append-only log entries.
+     * Both arguments are checked here, like every other entry point: this module
+     * says it validates shapes rather than trusting callers, and an unvalidated
+     * `sha` beginning with `-` is git reading an argument as a flag.
+     */
     pathExistsAtCommit(sha, filePath) {
+      if (!SHA.test(String(sha)) || !REPO_PATH.test(String(filePath))) return false;
       return git(root, ["cat-file", "-e", `${sha}:${filePath}`]).ok;
     },
 
@@ -177,21 +236,7 @@ function createGitFacts(root, defaultBranch) {
       if (!ref) return null;
       const diff = git(root, ["diff", "--unified=0", "--no-color", ref, "--", filePath]);
       if (!diff.ok) return null;
-      const added = new Set();
-      let cursor = 0;
-      for (const line of diff.stdout.split("\n")) {
-        const hunk = /^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@/.exec(line);
-        if (hunk) {
-          cursor = Number(hunk[1]);
-          continue;
-        }
-        if (line.startsWith("+++")) continue;
-        if (line.startsWith("+")) {
-          added.add(cursor);
-          cursor += 1;
-        }
-      }
-      return added;
+      return addedLinesFromDiff(diff.stdout);
     },
 
     /** The commit the default-branch ref points at — reported, never assumed. */
@@ -210,4 +255,4 @@ function createGitFacts(root, defaultBranch) {
   return { ready: problems.length === 0, problems, facts, ref };
 }
 
-module.exports = { createGitFacts, git, resolveGitBinary, SHA, REF, REPO_PATH };
+module.exports = { addedLinesFromDiff, createGitFacts, git, resolveGitBinary, SHA, REF, REPO_PATH };

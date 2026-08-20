@@ -295,8 +295,12 @@ that matches no live claim fails, and so does one whose claim would now verify o
 
 **Writing claims:** cite files in backticks; a shorthand that resolves as a path suffix is fine. Superseded
 values go in `~~strikethrough~~`, and `X` → `Y` / "renamed from `X`" mark `X` as a former name — so the
-repo's correction style stays safe to write. Two things prose cannot express unambiguously use an HTML
-comment: `<!-- vt-claim: absent drizzle-kit scope=deps -->` and `<!-- vt-claim: attested <id> -->`.
+repo's correction style stays safe to write. Close every strikethrough you open: an unterminated run blanks
+the rest of the document and its claims would vanish, so the gate reports the run instead (a `` `~~` `` inside
+a code span is literal text and opens nothing). Two things prose cannot express unambiguously use an HTML
+comment: `<!-- vt-claim: absent drizzle-kit scope=deps -->` and `<!-- vt-claim: attested <id> -->`. A marker
+inside backticks is an EXAMPLE, not a claim — which is what makes this sentence safe to write, and what stops
+a documented `attested <id>` from satisfying the "referenced by a governed document" rule on its own.
 
 **`docs/audit/PROOF_ALIGNMENT_LOG.md` is append-only, and the gate respects that:** it checks only the lines
 a branch ADDS. A new entry must be verifiable now; the 348 historical entries stay the record they are,

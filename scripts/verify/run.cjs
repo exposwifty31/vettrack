@@ -3,12 +3,12 @@
  *
  * WHY THIS IS COMMONJS AND THE CLI IS NOT
  * Two consumers need the same verdict and must never disagree: the CLI
- * (`scripts/verify-claims.mjs`, for humans and CI) and the jest wrapper
- * (`src/__tests__/claims-ledger.test.ts`, which is what actually blocks a PR).
- * `env-contract.js` already names the failure mode of letting them diverge —
- * "both halves green while asserting different things" — so the decision lives
- * here, once, in the module format jest can require under the repo's
- * `moduleResolution: bundler` tsconfig.
+ * (`scripts/verify-claims.mjs`, for humans and CI) and the claims-ledger test
+ * wrapper, which is what actually blocks a PR — jest in the RN migration repo,
+ * vitest in the Capacitor one. The RN repo's `env-contract.js` already names the
+ * failure mode of letting two halves diverge ("both halves green while asserting
+ * different things"), so the decision lives here, once, in the module format
+ * both runners can require.
  *
  * WHAT IT CHECKS is documented on the CLI; this file is the mechanism.
  */
@@ -24,43 +24,14 @@ const { createGitFacts } = require("./git-facts.cjs");
 const REPO_ROOT = path.resolve(__dirname, "..", "..");
 
 /**
- * @param {{ root?: string, now?: string, enforceEvidence?: boolean }} options
- *   `now` is injected rather than read from the clock so the attestation
- *   staleness rule is testable without waiting ninety days.
+ * Scan every governed document. Returns the claims, the reported exclusions, and
+ * the failures that are about the DOCUMENT SET rather than about a claim (a
+ * governed document that is gone, an append-only log that cannot be diffed).
  */
-function verify({ root = REPO_ROOT, now = new Date().toISOString().slice(0, 10), enforceEvidence } = {}) {
-  const ROOT = root;
-  // Layer 3 binds only where the evidence report is guaranteed fresh, and that
-  // is narrower than "in CI": a sharded test job runs on a different runner from
-  // the job that produced the report, so a bare CI check would demand evidence
-  // that job could not have. The signal is therefore explicit — the one CI step
-  // that runs `verify:evidence` first sets VT_ENFORCE_EVIDENCE=1. Everywhere
-  // else layer 3 reports a note, because failing a developer's local run for not
-  // having run the gates is a false alarm aimed at normal work.
-  const ENFORCE_EVIDENCE = enforceEvidence ?? process.env.VT_ENFORCE_EVIDENCE === "1";
-  const readJson = (relative, fallback) => {
-    try {
-      return JSON.parse(fs.readFileSync(path.join(ROOT, relative), "utf8"));
-    } catch {
-      return fallback;
-    }
-  };
-
-  const config = readJson("verify.config.json", null);
-  if (!config) throw new Error("verify.config.json is missing or unreadable");
-
-  const registry = readJson(config.registry, { entries: [] });
-  const attestations = readJson(config.attestations, { entries: [] });
-  const prLedger = readJson(config.prLedger, { entries: [] });
-  const evidence = readJson(config.evidenceReport, null);
-
-  const facts = createFacts(ROOT, config);
-  const git = createGitFacts(ROOT, config.defaultBranch);
-
+function collectClaims(config, git, ROOT) {
   const claims = [];
   const excluded = [];
   const failures = [];
-  const notes = [];
 
   for (const file of config.governedDocs) {
     const absolute = path.join(ROOT, file);
@@ -94,10 +65,126 @@ function verify({ root = REPO_ROOT, now = new Date().toISOString().slice(0, 10),
     excluded.push(...found.excluded);
   }
 
+  return { claims, excluded, failures };
+}
+
+/**
+ * Reverse checks: a registry entry, a PR-ledger entry or an attestation that no
+ * live claim reaches is an exemption still excusing something that no longer
+ * exists.
+ */
+function reverseCheckFailures(config, context, claims, combinedFacts) {
+  const failures = [];
+  for (const orphan of rules.orphanRegistryEntries(context.registry, claims)) {
+    failures.push({
+      file: config.registry,
+      line: 0,
+      kind: "registry-orphan",
+      detail: `entry "${orphan.match}" (${orphan.kind ?? "any"}) matches no claim in any governed document — delete it`,
+    });
+  }
+  for (const { entry, reason } of rules.obsoletePrLedgerEntries(context.prLedger, claims, combinedFacts)) {
+    failures.push({
+      file: config.prLedger,
+      line: 0,
+      kind: "pr-ledger-obsolete",
+      detail: `entry for #${entry.number}: ${reason} — delete it`,
+    });
+  }
+  for (const orphan of rules.orphanAttestations(context.attestations, claims)) {
+    failures.push({
+      file: config.attestations,
+      line: 0,
+      kind: "attestation-orphan",
+      detail: `attestation "${orphan.id}" is referenced by no governed document — delete it or point a document at it`,
+    });
+  }
+  return failures;
+}
+
+/**
+ * Resolve every claim. Split out of `verify` so that function reads as the stage
+ * list it describes rather than as a loop with a tally inside it.
+ */
+function decideAll(claims, combinedFacts, context, gitReady) {
+  const byDisposition = { verified: 0, registered: 0, attested: 0, fail: 0 };
+  const decided = [];
+  const claimFailures = [];
+  for (const claim of claims) {
+    // A commit or PR claim on a tree where layer 2 cannot run is already reported
+    // as a configuration failure; judging it here as well would say the claim is
+    // false when what is missing is the history to check it against.
+    if ((claim.kind === "commit" || claim.kind === "pull-request") && !gitReady) continue;
+    const verdict = rules.decide(claim, combinedFacts, context);
+    byDisposition[verdict.disposition] = (byDisposition[verdict.disposition] ?? 0) + 1;
+    decided.push({ ...claim, ...verdict });
+    if (verdict.disposition === "fail") {
+      claimFailures.push({
+        file: claim.file,
+        line: claim.line,
+        kind: claim.kind,
+        detail: verdict.detail,
+        raw: claim.raw,
+      });
+    }
+  }
+  return { decided, byDisposition, claimFailures };
+}
+
+/**
+ * @param {{ root?: string, now?: string, enforceEvidence?: boolean }} options
+ *   `now` is injected rather than read from the clock so the attestation
+ *   staleness rule is testable without waiting ninety days.
+ */
+function verify({ root = REPO_ROOT, now = new Date().toISOString().slice(0, 10), enforceEvidence } = {}) {
+  const ROOT = root;
+  // Layer 3 binds only where the evidence report is guaranteed fresh, and that
+  // is narrower than "in CI": a sharded test job runs on a different runner from
+  // the job that produced the report, so a bare CI check would demand evidence
+  // that job could not have. The signal is therefore explicit — the one CI step
+  // that runs `verify:evidence` first sets VT_ENFORCE_EVIDENCE=1. Everywhere
+  // else layer 3 reports a note, because failing a developer's local run for not
+  // having run the gates is a false alarm aimed at normal work.
+  const ENFORCE_EVIDENCE = enforceEvidence ?? process.env.VT_ENFORCE_EVIDENCE === "1";
+  // MISSING AND MALFORMED ARE NOT THE SAME THING. One `catch` around both made a
+  // ledger with a stray comma indistinguishable from a ledger that is not there:
+  // the run continued on `{ entries: [] }`, every registered claim reported
+  // "fail" and every attested claim reported "no attestation with id …", and the
+  // real cause — a JSON syntax error one line long — appeared nowhere. A missing
+  // optional ledger is ordinary; an unparseable one is a configuration error and
+  // is raised as one.
+  const readJson = (relative, fallback) => {
+    let text;
+    try {
+      text = fs.readFileSync(path.join(ROOT, relative), "utf8");
+    } catch {
+      return fallback;
+    }
+    try {
+      return JSON.parse(text);
+    } catch (error) {
+      throw new Error(`${relative} is not valid JSON: ${error.message}`);
+    }
+  };
+
+  const config = readJson("verify.config.json", null);
+  if (!config) throw new Error("verify.config.json is missing or unreadable");
+
+  const registry = readJson(config.registry, { entries: [] });
+  const attestations = readJson(config.attestations, { entries: [] });
+  const prLedger = readJson(config.prLedger, { entries: [] });
+  const evidence = readJson(config.evidenceReport, null);
+
+  const facts = createFacts(ROOT, config);
+  const git = createGitFacts(ROOT, config.defaultBranch);
+
+  const { claims, excluded, failures } = collectClaims(config, git, ROOT);
+  const notes = [];
+
   // GUARD THE GUARD. A scan that found nothing passes every assertion below for
-  // the wrong reason. `manifest-vs-code.test.ts` carries the same check on its
-  // own source walk, and for the same reason: an empty match set makes an
-  // assertion vacuously true.
+  // the wrong reason. The RN migration repo's `manifest-vs-code.test.ts` carries
+  // the same check on its own source walk, and for the same reason: an empty
+  // match set makes an assertion vacuously true.
   if (claims.length === 0) {
     failures.push({
       file: "verify.config.json",
@@ -125,47 +212,14 @@ function verify({ root = REPO_ROOT, now = new Date().toISOString().slice(0, 10),
     prLedger,
     prLedgerPath: config.prLedger,
     defaultBranch: config.defaultBranch,
+    packageManager: config.packageManager ?? "npm",
     now,
   };
 
-  const byDisposition = { verified: 0, registered: 0, attested: 0, fail: 0 };
-  const decided = [];
-  for (const claim of claims) {
-    if ((claim.kind === "commit" || claim.kind === "pull-request") && !git.ready) continue;
-    const verdict = rules.decide(claim, combinedFacts, context);
-    byDisposition[verdict.disposition] = (byDisposition[verdict.disposition] ?? 0) + 1;
-    decided.push({ ...claim, ...verdict });
-    if (verdict.disposition === "fail") {
-      failures.push({ file: claim.file, line: claim.line, kind: claim.kind, detail: verdict.detail, raw: claim.raw });
-    }
-  }
+  const { decided, byDisposition, claimFailures } = decideAll(claims, combinedFacts, context, git.ready);
+  failures.push(...claimFailures);
 
-  // Reverse checks: a registry entry or an attestation that no live claim
-  // reaches is an exemption still excusing something that no longer exists.
-  for (const orphan of rules.orphanRegistryEntries(registry, claims)) {
-    failures.push({
-      file: config.registry,
-      line: 0,
-      kind: "registry-orphan",
-      detail: `entry "${orphan.match}" (${orphan.kind ?? "any"}) matches no claim in any governed document — delete it`,
-    });
-  }
-  for (const { entry, reason } of rules.obsoletePrLedgerEntries(prLedger, claims, combinedFacts)) {
-    failures.push({
-      file: config.prLedger,
-      line: 0,
-      kind: "pr-ledger-obsolete",
-      detail: `entry for #${entry.number}: ${reason} — delete it`,
-    });
-  }
-  for (const orphan of rules.orphanAttestations(attestations, claims)) {
-    failures.push({
-      file: config.attestations,
-      line: 0,
-      kind: "attestation-orphan",
-      detail: `attestation "${orphan.id}" is referenced by no governed document — delete it or point a document at it`,
-    });
-  }
+  failures.push(...reverseCheckFailures(config, context, claims, combinedFacts));
 
   // Layer 3: the declared gates must have run, and passed, on this tree.
   const evidenceResult = rules.evidenceVerdict({

@@ -8836,4 +8836,89 @@ It runs as `pnpm verify:claims`, inside `pnpm test` (`tests/claims-ledger.test.t
   27-line hunk at line 629; it was moved here and the historical entry restored, leaving one hunk in the
   diff. No historical entry is modified by this session's work.
 
+### Review round — CodeRabbit on `#206` (here) and `#86` (RN), 2026-08-20
+
+Two reviews, 35 comments between them, on the same shared engine. Every one was checked against the code
+before anything changed. The ones that were real fell into one family: **places where the engine could pass
+in silence rather than fail out loud** — the failure mode this whole gate exists to remove, found in the gate
+itself.
+
+- `scripts/verify-claims.mjs` guarded its entire body behind an `invokedDirectly` check comparing
+  `process.argv[1]` to its own URL. The day that assumption stopped holding — a symlinked bin, a wrapper, a
+  different working directory — the command would have exited **0 having verified nothing**, and every caller
+  would have read that as a pass. Removed; the CLI now always runs, and a configuration error exits 2 with its
+  own message instead of a stack trace.
+- `verify:evidence`'s re-entrancy guard anchored on `test` followed by a boundary, so `npm run test:ci`,
+  `npm run test:unit`, `jest`, `npx jest` and `pnpm test` all passed the filter and would have been EXECUTED,
+  re-entering the suite that reads the report. It now refuses all of them, and the predicate moved into
+  `scripts/verify/claims.cjs` beside `GATE_TOKEN` so both can be handed a bad command in a test — inside the
+  CLI they were unreachable from any test, which is the same as untested.
+- An unterminated `~~` run blanked every line after it. The claims on those lines vanished with no failure and
+  no exclusion, and the vacuous-scan guard only fires at zero claims, so a partial skip passed the gate. Now
+  reported as `strikethrough-unterminated` at the line the run opened.
+- A `vt-claim` marker inside an inline code span was read as live. An `attested <id>` EXAMPLE in a document
+  therefore satisfied the "referenced by a governed document" rule on its own — which is precisely what stops
+  a stale attestation from ever being reported. Markers in code spans are now excluded as
+  `marker-is-an-example`; `CLAUDE.md`'s own syntax demonstration was one of them.
+- `classifySpan` had five bare `return`s — an oversized span, a span with whitespace, an i18n key namespace
+  written with a `*`, an empty span, and every span that simply is not path-shaped. The module header promises
+  that a declined span is reported with the rule that declined it, and five silent exits made that promise
+  false. All five are reported now, which is why the excluded count moved from 40 to ~1,880: the same spans,
+  previously invisible.
+- `addedLines` skipped every line starting with `+++`, but an added source line whose own text starts with
+  `++` renders that way. The cursor fell one behind for the rest of the hunk — every later claim read at the
+  wrong line, or dropped from the added set — in the append-only path that governs THIS file. Now lifted out
+  as the pure `addedLinesFromDiff` and given a fabricated diff in a test.
+- `readJson` treated a JSON syntax error the same as a missing file, continuing on `{ entries: [] }`: a
+  registry with a stray comma would have made every registered claim report the wrong cause. Malformed input
+  is now a named configuration error.
+- Smaller, same shape: `git()` ran with Node's default `maxBuffer`, so a large diff of this 8,700-line file
+  came back KILLED and was reported as "cannot diff" — the wrong cause; `pathExistsAtCommit` skipped the
+  argument validation its own module header promises; `globToRegExp` left `?` unescaped, so it became a quantifier on the
+  character before it and a glob claim matched a file whose name is one character shorter; a gate that hangs had no timeout; the attestation recipe reader understood only `npm run`, so any
+  `pnpm <script>` recipe here would have been reported as a missing file; and the CI fetch of `origin/main`
+  ended in `|| true`, which hid the reason (the verifier still failed loud, but said nothing about why).
+- The unterminated-run check earned itself before it landed: it failed on the paragraph of THIS entry that
+  describes it, because the scanner split on `~~` even inside an inline code span, where markdown renders it
+  as literal tildes. Any document that documents the syntax would have tripped it — a false alarm produced by
+  a rule written to prevent silent skips. Delimiters are now read outside code spans only. A struck code span
+  is reported as `former-name` in the same pass, rather than being blanked into invisibility.
+- One more defect the unterminated-run check surfaced, in the code-span reader itself: these documents cite
+  files as `` `src/lib/api.ts` `` — a longer backtick fence around a backticked reference — and the
+  single-backtick regex read that as two spans each holding one space, with everything between them falling
+  into prose. Never claimed, never declined, invisible. It also left the tildes in a documented `~~` outside
+  any span, which is how it was found. The reader is now a linear scan that matches an opening fence to a
+  closing fence of the same width, with no backtracking, for the same reason `inDeletionClause` is written
+  that way: it runs on every line of every governed document.
+- Declined, with reasons: the suggestion to keep the struck-range check in the prose scan — the check was
+  unreachable because the text was already blanked, so it was replaced with a struck-range MASK, which both
+  makes it reachable and reports the exclusion instead of dropping it silently. `struckRanges` itself is
+  deleted rather than kept as a tested-but-unused export.
+
+Layer 4's pinned clock was also removed: the repository-wide run in `tests/claims-ledger.test.ts` used
+`verify({ now: "2026-08-20" })`, which froze staleness, so an attestation past its budget still resolved as
+`attested` here and only the CLI's real clock would ever have said otherwise. It now uses the real date, from
+`beforeAll` rather than the describe body so a configuration error fails a named test instead of aborting
+collection.
+
+**Superseded by this round.** The fingerprint quoted above as ~~`2a8f510951c78d2b…`~~ was the value before
+the review; the engine changed, so the recorded value changed with it, which is the mechanism working rather
+than a problem. Current, and identical in both repositories:
+`af19a9b1bf4fb190f53187a8d42d580b5e456f338727bfdcf72a4d6a946f9b87`. The counts quoted above as
+~~`1000 claims … 40 excluded by rule`~~ and ~~`Tests 38 passed (38)`~~ are likewise superseded.
+
+**Commands run on this tree after the round:**
+- `node scripts/verify-claims.mjs` → `1035 claims: 1024 verified, 10 registered, 1 attested,
+  1882 excluded by rule, 0 FAILED` / `All claims accounted for.`
+- `pnpm exec vitest run tests/claims-ledger.test.ts` → `Test Files 1 passed (1)`, `Tests 50 passed (50)`.
+- In the RN repo, the same engine: `477 claims: 416 verified, 58 registered, 3 attested, 1494 excluded by
+  rule, 0 FAILED`, and `Tests: 49 passed, 49 total`.
+- Both repositories independently computed the fingerprint above, which is the evidence the copies still
+  agree after being changed on both sides in the same session.
+
+One claim fewer in each repository than before the round, in both cases exactly the in-code-span marker
+example that should never have been a claim. Every other claim and every disposition is unchanged — checked
+by diffing the `--json` claim sets of the old and new engines against the same working tree, not by comparing
+totals.
+
 **Verdict:** VERIFIED.

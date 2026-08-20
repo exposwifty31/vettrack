@@ -17,9 +17,10 @@
  * a record of some other code passing.
  *
  * WHAT IT REFUSES TO RUN
- * A gate that re-enters this tooling (`npm test`, any `verify:*` script) is
- * rejected outright rather than executed. That is a configuration error with a
- * clear message, not a hang.
+ * A gate that re-enters this tooling (`pnpm test`, `pnpm test:ci`, a bare
+ * `vitest`, any `verify:*` script) is rejected outright rather than executed.
+ * That is a configuration error with a clear message, not a hang. The predicate
+ * lives in scripts/verify/claims.cjs so it can be handed a bad command in a test.
  */
 
 import fs from "node:fs";
@@ -31,7 +32,12 @@ import { createRequire } from "node:module";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const config = JSON.parse(fs.readFileSync(path.join(ROOT, "verify.config.json"), "utf8"));
-const { resolveGitBinary } = createRequire(import.meta.url)("./verify/git-facts.cjs");
+const require = createRequire(import.meta.url);
+const { resolveGitBinary } = require("./verify/git-facts.cjs");
+// The two refusal predicates live in the pure-decisions module so a test can
+// hand them a bad command and assert that they refuse. Inside this CLI they were
+// unreachable from any test, which is the same as untested.
+const { isReentrantGate, GATE_TOKEN } = require("./verify/claims.cjs");
 
 const say = (line) => process.stdout.write(`${line}\n`);
 
@@ -48,11 +54,8 @@ function git(args) {
   return result.status === 0 ? (result.stdout ?? "").trim() : null;
 }
 
-/** A gate must not re-enter the verifier; see the header. */
-const REENTRANT = /(?:^|\s)(?:(?:npm run|pnpm)\s+)?(?:test|test:[\w:-]+|verify:[\w:-]+)(?:\s|$)/;
-
 const gates = config.evidenceGates ?? [];
-const reentrant = gates.filter((gate) => REENTRANT.test(gate.command));
+const reentrant = gates.filter((gate) => isReentrantGate(gate.command));
 if (reentrant.length > 0) {
   say(`\nverify:evidence refuses to run a gate that re-enters the verifier:`);
   for (const gate of reentrant) say(`  ${gate.id}: ${gate.command}`);
@@ -63,28 +66,28 @@ if (reentrant.length > 0) {
   process.exit(2);
 }
 
+// EVIDENCE MUST NAME THE TREE IT COVERS. When git is unavailable or a command
+// fails, `treeHash` is null and `dirty` becomes true because `null !== ""` — and
+// the run went on to write a report saying "tree null, DIRTY". Downstream that
+// reads as two claim failures (dirty tree, tree mismatch) and the real cause,
+// that git never answered, appears nowhere. No tree, no report.
 const treeHash = git(["rev-parse", "HEAD^{tree}"]);
-const dirty = git(["status", "--porcelain"]) !== "";
+const status = git(["status", "--porcelain"]);
+if (treeHash === null || status === null) {
+  say("\nverify:evidence cannot bind a report to a tree: git is unavailable or a git command failed.");
+  say("Evidence has to name the tree it covers, so no report was written.\n");
+  process.exit(2);
+}
+const dirty = status !== "";
 const startedAt = new Date().toISOString();
 
 say(`\n-- evidence run --\n  tree ${String(treeHash).slice(0, 12)}${dirty ? " (DIRTY working copy)" : ""}`);
 
 /**
- * Gates run CONCURRENTLY and their output is buffered, then printed per gate.
- * These replace CI steps that already ran typecheck and lint in parallel;
- * serialising them here would have made the evidence report cost wall-clock
- * that the pipeline was not paying before, which is how a good gate gets
- * deleted. Output is buffered rather than inherited so two concurrent
- * compilers do not interleave into an unreadable log.
+ * A gate that hangs must become a recorded FAIL, not a job that dies on the CI
+ * timeout with no report at all. Generous, because these are real builds.
  */
-/**
- * Tokens a declared gate may contain. The command comes from
- * verify.config.json — a file — so it is validated at the boundary rather than
- * trusted. `shell: false` already means no shell parses it; this is about not
- * handing an unexamined file-sourced string to a process spawn at all, and it
- * fails LOUD instead of quietly running something unexpected.
- */
-const GATE_TOKEN = /^[\w./:@=-]+$/;
+const GATE_TIMEOUT_MS = 15 * 60 * 1000;
 
 function runGate(gate) {
   return new Promise((resolve) => {
@@ -104,13 +107,18 @@ function runGate(gate) {
     const started = Date.now();
     const child = spawn(command, args, { cwd: ROOT, shell: false });
     let output = "";
+    const timer = setTimeout(() => {
+      output += `\nrefused: gate exceeded ${GATE_TIMEOUT_MS}ms and was killed`;
+      child.kill("SIGKILL");
+    }, GATE_TIMEOUT_MS);
     child.stdout.on("data", (chunk) => {
       output += chunk;
     });
     child.stderr.on("data", (chunk) => {
       output += chunk;
     });
-    const settle = (code) =>
+    const settle = (code) => {
+      clearTimeout(timer);
       resolve({
         id: gate.id,
         command: gate.command,
@@ -120,6 +128,7 @@ function runGate(gate) {
         durationMs: Date.now() - started,
         output,
       });
+    };
     child.on("error", (err) => {
       output += String(err?.message ?? err);
       settle(1);
@@ -128,6 +137,14 @@ function runGate(gate) {
   });
 }
 
+/**
+ * Gates run CONCURRENTLY and their output is buffered, then printed per gate.
+ * These replace CI steps that already ran typecheck and lint in parallel;
+ * serialising them here would have made the evidence report cost wall-clock
+ * that the pipeline was not paying before, which is how a good gate gets
+ * deleted. Output is buffered rather than inherited so two concurrent
+ * compilers do not interleave into an unreadable log.
+ */
 const results = (await Promise.all(gates.map(runGate))).map((result) => {
   const verdict = result.exitCode === 0 ? "PASS" : "FAIL";
   say(`\n  ${verdict}  ${result.id}  (${Math.round(result.durationMs / 1000)}s)  ${result.command}`);
