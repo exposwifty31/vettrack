@@ -40,4 +40,9 @@ run("dependency-cruiser", "pnpm", [
 ]);
 run("madge cycle baseline", "node", ["scripts/architecture/compare-cycles.mjs"]);
 
+// Claim verification: every path, version, script, absence, landing citation and
+// attestation in a governed document must be accounted for. Same engine as
+// `pnpm verify:claims` and as the vitest gate in tests/claims-ledger.test.ts.
+run("claim verification", "node", ["scripts/verify-claims.mjs"]);
+
 console.log("\n[architecture-gates] All G1 checks passed.");
