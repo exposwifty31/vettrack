@@ -53,7 +53,11 @@ function struckRanges(line) {
   }
   return ranges;
 }
-const MARKER = /<!--\s*vt-claim:\s*([^>]*?)\s*-->/g;
+// The body is captured wholesale and trimmed in `parseMarker`, rather than
+// with `\\s*([^>]*?)\\s*`: that shape lets the engine split the padding many
+// ways on a non-matching line, which is a backtracking cost paid on every
+// line of every governed document for no expressive gain.
+const MARKER = /<!--\s*vt-claim:([^>]*)-->/g;
 
 /**
  * A LANDING claim ("this work is done and in main") must cite what landed.
@@ -441,8 +445,24 @@ const FORMER_BEFORE = /\b(?:renamed from|renamed|formerly|previously|was called|
  * Declining is reported in the excluded-by-rule counts; asserting would risk
  * calling a live file missing.
  */
-const DELETION_CLAUSE =
-  /\b(?:deleted|removed|dropped|purged)\b(?:(?!\.\s|;|\bsee\b)[\s\S]){0,320}$/i;
+const DELETION_VERB = /\b(?:deleted|removed|dropped|purged)\b/i;
+
+/** How far back a deletion verb may sit from the span it covers. */
+const DELETION_WINDOW = 320;
+
+/**
+ * Is this span inside a deletion clause? Expressed as two linear string
+ * operations rather than one regex: the regex form
+ * `verb(?:(?!\.\s|;|see)[\s\S]){0,320}$` backtracks over every start position
+ * on a line that does not match, and this rule runs on every code span of every
+ * governed document. Same rule, same window, no pathological case.
+ */
+function inDeletionClause(before) {
+  const window = before.slice(-DELETION_WINDOW);
+  const lower = window.toLowerCase();
+  const breakAt = Math.max(lower.lastIndexOf(". "), lower.lastIndexOf(";"), lower.lastIndexOf(" see "));
+  return DELETION_VERB.test(breakAt >= 0 ? window.slice(breakAt) : window);
+}
 
 /** One inline code span -> at most one claim, or one reported exclusion. */
 function classifySpan(span, index, raw, policy, push, decline, after = "", before = "") {
@@ -490,7 +510,7 @@ function classifySpan(span, index, raw, policy, push, decline, after = "", befor
       decline(index, span, "former-name");
       return;
     }
-    if (DELETION_CLAUSE.test(before)) {
+    if (inDeletionClause(before)) {
       decline(index, span, "deletion-record");
       return;
     }
@@ -531,7 +551,7 @@ function classifySpan(span, index, raw, policy, push, decline, after = "", befor
       decline(index, span, "former-name");
       return;
     }
-    if (DELETION_CLAUSE.test(before)) {
+    if (inDeletionClause(before)) {
       decline(index, span, "deletion-record");
       return;
     }
@@ -552,6 +572,7 @@ module.exports = {
   SHELL_LANGS,
   PROSE_PACKAGE,
   struckRanges,
+  inDeletionClause,
   LANDING_STRICT,
   MERGE_CONTEXT,
 };
