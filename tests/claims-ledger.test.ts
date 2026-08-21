@@ -88,7 +88,7 @@ const { verify } = require("../scripts/verify/run.cjs") as {
   verify(options?: { root?: string; now?: string; enforceEvidence?: boolean }): VerifyResult;
 };
 const { globToRegExp, createFacts } = require("../scripts/verify/facts.cjs") as {
-  globToRegExp(pattern: string, options?: { suffix?: boolean }): RegExp;
+  globToRegExp(pattern: string, options?: { suffix?: boolean }): { test(subject: string): boolean };
   createFacts(
     root: string,
     policy: unknown,
@@ -125,7 +125,10 @@ const fs = require("node:fs") as {
   mkdtempSync(prefix: string): string;
   rmSync(target: string, options: { recursive: true; force: true }): void;
 };
-const path = require("node:path") as { join(...parts: string[]): string };
+const path = require("node:path") as {
+  join(...parts: string[]): string;
+  basename(target: string): string;
+};
 const os = require("node:os") as { tmpdir(): string };
 const REPO_ROOT = process.cwd();
 const ENGINE_DIR = path.join(REPO_ROOT, "scripts", "verify");
@@ -718,24 +721,44 @@ describe("the engine refuses what it says it refuses", () => {
     // read escaped — and refused after.
     const osModule = require("node:os") as typeof import("node:os");
     const fsModule = require("node:fs") as typeof import("node:fs");
-    const probe = path.join(REPO_ROOT, ".vt-symlink-probe");
+    // UNIQUE, and cleaned up even if setup throws. The first version used a fixed
+    // name in the repository root and `rm -rf`'d it in `finally`: a pre-existing
+    // untracked directory of that name, or a parallel run of this suite, would
+    // have been deleted. A test that guards against reading outside the tree
+    // should not be the thing that destroys something inside it.
     const outside = fsModule.mkdtempSync(path.join(osModule.tmpdir(), "vt-outside-"));
-    fsModule.writeFileSync(path.join(outside, "secret.md"), "outside-token\n");
-    fsModule.mkdirSync(probe, { recursive: true });
-    fsModule.symlinkSync(path.join(outside, "secret.md"), path.join(probe, "link.md"));
-    fsModule.symlinkSync(outside, path.join(probe, "dir"));
+    let probe: string | undefined;
     try {
+      probe = fsModule.mkdtempSync(path.join(REPO_ROOT, ".vt-symlink-probe-"));
+      const rel = path.basename(probe);
+      fsModule.writeFileSync(path.join(outside, "secret.md"), "outside-token\n");
+      fsModule.symlinkSync(path.join(outside, "secret.md"), path.join(probe, "link.md"));
+      fsModule.symlinkSync(outside, path.join(probe, "dir"));
       const facts = createFacts(REPO_ROOT, POLICY);
-      expect(facts.fileExists(".vt-symlink-probe/link.md")).toBe(false);
-      expect(facts.lineCount(".vt-symlink-probe/link.md")).toBeNull();
-      expect(Number.isNaN(facts.grepCount("outside-token", ".vt-symlink-probe/link.md"))).toBe(true);
-      expect(Number.isNaN(facts.grepCount("outside-token", ".vt-symlink-probe/dir"))).toBe(true);
+      expect(facts.fileExists(`${rel}/link.md`)).toBe(false);
+      expect(facts.lineCount(`${rel}/link.md`)).toBeNull();
+      expect(Number.isNaN(facts.grepCount("outside-token", `${rel}/link.md`))).toBe(true);
+      expect(Number.isNaN(facts.grepCount("outside-token", `${rel}/dir`))).toBe(true);
       // A file genuinely inside the checkout still resolves.
       expect(facts.fileExists("package.json")).toBe(true);
     } finally {
-      fsModule.rmSync(probe, { recursive: true, force: true });
+      if (probe) fsModule.rmSync(probe, { recursive: true, force: true });
       fsModule.rmSync(outside, { recursive: true, force: true });
     }
+  });
+
+  it("matches a wildcard-dense glob in linear time instead of hanging", () => {
+    // The previous translation built a regex whose adjacent `[^/]*` groups
+    // backtracked against each other. Measured on this engine before the change:
+    // `*a` four times matched in 1.1ms, six in 51ms, eight in 996ms, and ten did
+    // not finish in five seconds — from a pattern well under the scanner's
+    // 200-character span cap. A glob is written in a governed document, so a
+    // documentation edit could wedge the gate with no verdict at all.
+    const pattern = `docs/${"*a".repeat(64)}.md`;
+    const subject = `docs/${"a".repeat(40)}X`;
+    const started = Date.now();
+    expect(globToRegExp(pattern).test(subject)).toBe(false);
+    expect(Date.now() - started).toBeLessThan(1000);
   });
 
   it("refuses an absence scope whose listing the walk shortened", () => {

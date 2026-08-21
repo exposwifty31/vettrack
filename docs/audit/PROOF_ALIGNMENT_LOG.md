@@ -9261,3 +9261,55 @@ recomputed independently in both repositories and identical:
 the RN migration repo: `477 claims … 0 FAILED`, ledger `70 passed`, lint and typecheck clean.
 
 **Verdict:** VERIFIED.
+
+### Sixth review round — the glob matcher could hang the gate, 2026-08-21
+
+**Claim under audit:** that `globToRegExp` was safe to run on a pattern taken from a governed document.
+
+**Verdict: it was not, and the failure mode was the worst one available.** The translation built a pattern
+whose adjacent single-segment wildcard groups backtrack against each other, and the cost is exponential.
+(Written out rather than quoted: the regex fragment is glob-shaped, and this gate reads it as a glob claim
+about a file — which it did, on the first draft of this entry.) Measured on this
+engine, matching a non-matching subject:
+
+| wildcards in the pattern | time |
+|---|---|
+| 4 | 1.1 ms |
+| 6 | 51 ms |
+| 8 | 996 ms |
+| 10 | did not finish in 5 s |
+
+Every one of those patterns is well under the scanner's 200-character span cap, and a glob is written in a
+governed document — so an ordinary documentation edit could wedge the gate with no verdict at all. Not a
+wrong answer: **no answer**, which is the one outcome this engine has no label for, in the component whose
+whole job is to produce a disposition for every claim.
+
+**Fixed by removing the regex, not by bounding it.** A cap would have been an arbitrary threshold that also
+refused legitimate patterns. Glob matching is a two-pointer walk with a single re-entry anchor — linear, no
+recursion, no backtracking tree — and the same rule that matches one segment matches the segment list, so a
+`**` costs an anchor rather than a tree. `globToRegExp` now returns a matcher rather than a `RegExp`, which
+every caller already treated it as: nothing asked for anything but `test`.
+
+**Semantics pinned before and after**, eleven cases: a `**` segment matching zero directories and many; a
+single `*` still stopping at a separator; `?` still literal; the `suffix` form still resolving a shorthand
+citation. After the change, 64 wildcards match in 0.01 ms — where 10 had not finished in five seconds.
+
+**A second finding, about a test of mine, and it was destructive.** The symlink fixture used a fixed name in
+the repository root and removed it recursively in `finally`. A pre-existing untracked directory of that name,
+or a parallel run of the suite, would have been deleted. It now uses a unique directory and enters the
+cleanup block before creating anything, so a throw during setup still cleans up. A test that guards against
+reading outside the tree should not be the thing that destroys something inside it.
+
+Two more caught by the repo's own gates while fixing the above: a `**` written inside a block comment closed
+that comment, and the `path` type in both suites declared only `join`.
+
+**Superseded fingerprint:** ~~`a5498cb22a3a1170977794caa6c8fba27fbbca377e436d0435cbc298182eabdd`~~. Current,
+recomputed independently in both repositories and identical:
+`1adb3fb67c1bc52f8de2135caa28e67beeeb279fd3d6ceaed801df4f9c71c0f6`.
+
+**Commands run on the tree before this entry was appended:** `node scripts/verify-claims.mjs` →
+`1065 claims … 0 FAILED`; `pnpm exec vitest run tests/claims-ledger.test.ts` → `Tests 72 passed (72)`;
+`npx tsc --noEmit` → 0 errors; `pnpm architecture:gates` → `All G1 checks passed.`; sonarjs proxy clean. In
+the RN migration repo: `477 claims … 0 FAILED`, ledger `71 passed`, lint and typecheck clean.
+
+**Verdict:** VERIFIED.

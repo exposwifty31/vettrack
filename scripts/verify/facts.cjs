@@ -9,33 +9,97 @@
 const fs = require("node:fs");
 const path = require("node:path");
 
-/** Turn a shell-style glob into an anchored regex. A single `*` stops at `/`. */
+/**
+ * Match one glob SEGMENT, where `*` matches any run of characters within it.
+ *
+ * Two pointers with a single re-entry anchor — linear in the segment, with no
+ * recursion and no backtracking tree. `?` is compared as an ordinary character,
+ * which is this repository's rule: no governed document uses it as a wildcard
+ * and several name files that contain one.
+ */
+function segmentMatches(pattern, text) {
+  let p = 0;
+  let t = 0;
+  let star = -1;
+  let mark = 0;
+  while (t < text.length) {
+    if (p < pattern.length && pattern[p] === "*") {
+      star = p;
+      p += 1;
+      mark = t;
+    } else if (p < pattern.length && pattern[p] === text[t]) {
+      p += 1;
+      t += 1;
+    } else if (star >= 0) {
+      p = star + 1;
+      mark += 1;
+      t = mark;
+    } else {
+      return false;
+    }
+  }
+  while (p < pattern.length && pattern[p] === "*") p += 1;
+  return p === pattern.length;
+}
+
+/**
+ * Match a glob against a path, segment by segment.
+ *
+ * NO REGEX, AND THAT IS THE POINT. The previous version translated the glob into
+ * a pattern whose adjacent `[^/]*` groups backtrack against each other, and the
+ * cost is exponential: measured on this engine, `*a` repeated four times matched
+ * in 1.1 ms, six in 51 ms, eight in 996 ms, and ten did not finish in five
+ * seconds — all from a pattern well under the scanner's 200-character span cap.
+ * A glob is written in a governed document, so an ordinary documentation edit
+ * could wedge the gate with no verdict at all, which is the one outcome this
+ * engine has no label for. The same two-pointer rule that matches a segment
+ * matches the segment LIST, so `**` costs a re-entry anchor rather than a tree.
+ */
+function pathMatches(patternSegments, textSegments) {
+  let p = 0;
+  let t = 0;
+  let star = -1;
+  let mark = 0;
+  while (t < textSegments.length) {
+    if (p < patternSegments.length && patternSegments[p] === "**") {
+      star = p;
+      p += 1;
+      mark = t;
+    } else if (p < patternSegments.length && segmentMatches(patternSegments[p], textSegments[t])) {
+      p += 1;
+      t += 1;
+    } else if (star >= 0) {
+      p = star + 1;
+      mark += 1;
+      t = mark;
+    } else {
+      return false;
+    }
+  }
+  while (p < patternSegments.length && patternSegments[p] === "**") p += 1;
+  return p === patternSegments.length;
+}
+
+/**
+ * Compile a shell-style glob into a matcher. A single `*` stops at `/`; a `**`
+ * segment matches zero or more directories, so a `**` written between `docs/`
+ * and `plan.md` names `docs/plan.md` as well as `docs/g2/plan.md`. `suffix`
+ * allows any leading directories, which is how a shorthand citation resolves.
+ * (Written out rather than shown: the literal would close this comment.)
+ *
+ * Returns an object with `test`, not a `RegExp`: every caller only ever asks
+ * whether a path matches, and a `RegExp` is exactly what could not be made safe.
+ */
 function globToRegExp(pattern, { suffix = false } = {}) {
-  // Tokenised, with NO placeholder character. An earlier version substituted a
-  // sentinel for `**` and substituted it back afterwards; the sentinel it ended
-  // up carrying was a literal NUL, which made the file read as binary to grep
-  // and silently defeated a later edit that matched on the intended character.
-  // Splitting is the same transformation with nothing to smuggle.
-  // `?` is escaped as a LITERAL rather than expanded to `[^/]`: an unescaped `?`
-  // is a regex quantifier on the token before it, so `foo?.ts` would compile to
-  // /foo?\.ts/ and match `fo.ts` — a glob claim verifying against a file it does
-  // not name. No governed document uses `?` as a wildcard; several name files
-  // that contain one.
-  // `**` BETWEEN SEPARATORS MATCHES ZERO DIRECTORIES. `docs/**/plan.md` names
-  // `docs/plan.md` as well as `docs/g2/plan.md`. Translating the whole `/**/`
-  // to `/.*/` demanded a directory in between, so the pattern failed against
-  // the very file it was written for — a glob claim reported as a defect
-  // because of the translation, which is the false alarm this module exists
-  // not to produce.
-  const escape = (part) => part.replace(/[.+?^${}()|[\]\\]/g, String.raw`\$&`);
-  const segment = (chunk) => chunk.split("*").map(escape).join("[^/]*");
-  const ANY_DIRS = "(?:.*/)?";
-  const leading = pattern.startsWith("**/");
-  const body = (leading ? pattern.slice(3) : pattern)
-    .split("/**/")
-    .map((part) => part.split("**").map(segment).join(".*"))
-    .join(`/${ANY_DIRS}`);
-  return new RegExp(`^${suffix ? ANY_DIRS : ""}${leading ? ANY_DIRS : ""}${body}$`);
+  const declared = String(pattern).split("/");
+  // `suffix` is the same freedom `**` already expresses, so it is expressed the
+  // same way rather than as a second mechanism.
+  const segments = suffix ? ["**", ...declared] : declared;
+  return {
+    test(subject) {
+      return pathMatches(segments, String(subject).split("/"));
+    },
+  };
 }
 
 function createFacts(root, policy) {
