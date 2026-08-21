@@ -9333,3 +9333,36 @@ recomputed independently in both repositories and identical:
 the RN migration repo: `477 claims … 0 FAILED`, ledger `71 passed`, lint and typecheck clean.
 
 **Verdict:** VERIFIED.
+
+### Eighth review round — six findings, and half of them were twins, 2026-08-21
+
+**Claim:** the six findings CodeRabbit raised on the sibling repository at `fc1dd46` are real, and the fixes
+are proved rather than asserted.
+
+**Evidence:** each was checked against the code before anything was edited, and the two that could produce a
+silently wrong verdict were also proved RED first — reverted, watched to fail, restored.
+
+| finding | why it mattered |
+|---|---|
+| `globMatches` and `suffixMatches` filtered a listing by NAME | `list` yields names and does not follow them, so a symlink pointing outside the checkout is an ordinary-looking entry. `fileExists` rejected it through `insideRoot`; its twins did not. A glob claim could therefore be **verified from content this repository does not contain** — the highest-severity shape this engine has. RED proved: with the filter removed the probe counts 1 where it must count 0. |
+| `packageManager` was validated, not escaped | The boundary check admits `.`, and `.` is a wildcard, so a manager named `tool.v1` matched `toolXv1` and named a script the manifest never defines. **The comment beside the code described this exact defect while the code left it in place.** Both readers of that field — scanner and claims — carried it. RED proved: the reverted build returns `lint` where the fixed one returns null. |
+| `VT_GIT_BINARY` accepted a directory | `existsSync` is true for one. It reaches `spawnSync`, fails `EACCES`, and comes back out as "not a git repository" — the wrong cause that branch exists to prevent, arriving through the one shape the check never tested. |
+| the Windows branch could not run at all | A `.cmd` is a script, not an executable image, so `spawn` with `shell: false` cannot start `npm.cmd`. Renaming the token **announced a portability the code did not have** — the same shape as calling the matcher linear. It now reaches the command processor explicitly, and the decision moved into a pure function so the suite can ask what Windows would do from a machine that is not Windows. |
+| the timeout killed only the direct child on Windows | The POSIX process-group path was right; its Windows half was never written. `taskkill /T` walks the tree. |
+| output was decoded per chunk | A multibyte character split across two `data` events became two replacement characters. The byte CAP was corrected in an earlier round and the byte DECODE was not — the same mistake at two scales. |
+
+**Three of the six are twins of defects already fixed elsewhere in this engine**, which is now the most
+frequent shape in this work: a rule corrected in one function and left standing in the one beside it. It is
+worth naming as a review heuristic rather than as a run of bad luck — after fixing any guard here, the next
+question is which other function answers the same question a different way.
+
+**Superseded fingerprint:** ~~`489c9b8c960d8dbe1ee9f21da777239288a667fc2c5ccb31f80c8ca9f16c93dd`~~. Current,
+recomputed independently in both repositories and identical:
+`fe21f794338249b9a1365754fe374c0651b755d885d3590ad352e9709460e013`.
+
+**Commands run on the tree before this entry was appended:** `node scripts/verify-claims.mjs` →
+`1066 claims … 0 FAILED`; `pnpm exec vitest run tests/claims-ledger.test.ts` → `Tests 77 passed (77)`;
+`npx tsc --noEmit` → 0 errors; `pnpm architecture:gates` → `All G1 checks passed.` In the RN migration repo:
+`477 claims … 0 FAILED`, ledger `76 passed`, typecheck and lint clean.
+
+**Verdict:** VERIFIED.

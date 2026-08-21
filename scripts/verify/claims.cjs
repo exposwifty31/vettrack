@@ -149,7 +149,10 @@ function scriptNameIn(recipe, packageManager = "npm") {
     // `pnpm typecheck` is a script; `pnpm exec tsx x.ts` and `pnpm install` are
     // CLI verbs, and reading those as scripts would demand a `package.json`
     // entry named "exec".
-    const bare = new RegExp(`^${packageManager}\\s+([a-z][\\w:.-]*)`).exec(recipe);
+    // Shape-checked above, which is not the same as escaped: the class admits
+    // `.`, and `.` is a wildcard. Same fix as the scanner's, for the same field.
+    const literal = packageManager.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const bare = new RegExp(`^${literal}\\s+([a-z][\\w:.-]*)`).exec(recipe);
     if (bare && !PACKAGE_MANAGER_VERBS.has(bare[1])) return bare[1];
   }
   return null;
@@ -222,6 +225,24 @@ function isReentrantGate(command) {
 }
 
 const GATE_TOKEN = /^[\w./:@=-]+$/;
+
+/**
+ * How a validated gate command reaches `spawn`.
+ *
+ * A DECISION RATHER THAN AN INLINE BRANCH, so a test can ask what Windows would
+ * do from a machine that is not Windows. That question had no answer here
+ * before, and the answer the code would have given was wrong: a `.cmd` is a
+ * script, not an executable image, so `spawn` with `shell: false` cannot start
+ * `npm.cmd` at all. The command processor has to be named explicitly. Callers
+ * pass the platform rather than reading it, which is what keeps this module a
+ * pure decision the suite can drive.
+ */
+function gateInvocation(rawCommand, args, platform, comspec) {
+  const shim = platform === "win32" && /^(?:npm|pnpm|yarn|npx)$/.test(rawCommand);
+  if (!shim) return { command: rawCommand, args: [...args] };
+  return { command: comspec || "cmd.exe", args: ["/d", "/s", "/c", `${rawCommand}.cmd`, ...args] };
+}
+
 
 /**
  * Is one attestation still standing? `now` is a parameter, never `Date.now()`,
@@ -587,6 +608,7 @@ module.exports = {
   REENTRANT_TOKEN,
   RULES,
   isReentrantGate,
+  gateInvocation,
   TARGETS,
   attestationVerdict,
   daysBetween,

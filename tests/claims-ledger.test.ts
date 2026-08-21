@@ -63,6 +63,12 @@ type Rules = {
   ): { entry: { number: number }; reason: string }[];
   scriptNameIn(recipe: string, packageManager?: string): string | null;
   isReentrantGate(command: string): boolean;
+  gateInvocation(
+    rawCommand: string,
+    args: string[],
+    platform: string,
+    comspec?: string,
+  ): { command: string; args: string[] };
   GATE_TOKEN: RegExp;
 };
 
@@ -96,6 +102,8 @@ const { globToRegExp, createFacts } = require("../scripts/verify/facts.cjs") as 
     grepCount(pattern: string, scope: string): number;
     fileExists(relative: string): boolean;
     lineCount(relative: string): number | null;
+    globMatches(pattern: string): number;
+    suffixMatches(reference: string): number;
   };
 };
 const gitFacts = require("../scripts/verify/git-facts.cjs") as {
@@ -747,6 +755,40 @@ describe("the engine refuses what it says it refuses", () => {
     }
   });
 
+  it("refuses a glob or suffix match that resolves outside the checkout", () => {
+    // `list` yields NAMES and does not follow them, so a tracked symlink pointing
+    // outside is an ordinary-looking entry. `fileExists` rejected it through
+    // `insideRoot` and `globMatches` did not — the containment rule fixed in one
+    // function and left open in its twin, which is the shape of defect this
+    // engine has now produced often enough to look for on purpose.
+    //
+    // The probe must NOT be a dot directory here: `list` skips those, so a
+    // dot-named fixture would pass this test without ever reaching the code.
+    const osModule = require("node:os") as typeof import("node:os");
+    const fsModule = require("node:fs") as typeof import("node:fs");
+    const outside = fsModule.mkdtempSync(path.join(osModule.tmpdir(), "vt-outside-glob-"));
+    let probe: string | undefined;
+    try {
+      probe = fsModule.mkdtempSync(path.join(REPO_ROOT, "vt-glob-probe-"));
+      const rel = path.basename(probe);
+      fsModule.writeFileSync(path.join(outside, "escaped.md"), "outside\n");
+      fsModule.symlinkSync(path.join(outside, "escaped.md"), path.join(probe, "escaped.md"));
+      const escaped = createFacts(REPO_ROOT, POLICY);
+      expect(escaped.fileExists(`${rel}/escaped.md`)).toBe(false);
+      expect(escaped.globMatches(`${rel}/*.md`)).toBe(0);
+      expect(escaped.suffixMatches(`${rel}/escaped.md`)).toBe(0);
+      // Containment, not a blanket refusal: a real file in the same directory
+      // still counts. A guard that answers 0 to everything is not a guard.
+      fsModule.writeFileSync(path.join(probe, "real.md"), "inside\n");
+      const contained = createFacts(REPO_ROOT, POLICY);
+      expect(contained.globMatches(`${rel}/*.md`)).toBe(1);
+      expect(contained.suffixMatches(`${rel}/real.md`)).toBe(1);
+    } finally {
+      if (probe) fsModule.rmSync(probe, { recursive: true, force: true });
+      fsModule.rmSync(outside, { recursive: true, force: true });
+    }
+  });
+
   it("matches a wildcard-dense glob without building a backtracking tree", () => {
     // The previous translation built a regex whose adjacent `[^/]*` groups
     // backtracked against each other. Measured on this engine before the change:
@@ -829,6 +871,71 @@ describe("the engine refuses what it says it refuses", () => {
       if (previous === undefined) delete process.env.VT_GIT_BINARY;
       else process.env.VT_GIT_BINARY = previous;
     }
+  });
+
+  it("refuses a VT_GIT_BINARY that names a directory", () => {
+    // `existsSync` is TRUE for a directory. One reaches `spawnSync`, fails
+    // EACCES, and comes back out as "not a git repository" — the wrong cause the
+    // override branch exists to prevent, arriving through the one shape the
+    // check never tested for. Twin of the case directly above.
+    const previous = process.env.VT_GIT_BINARY;
+    process.env.VT_GIT_BINARY = REPO_ROOT;
+    try {
+      const resolved = gitFacts.resolveGitBinary();
+      expect(typeof resolved).not.toBe("string");
+      expect((resolved as { problem: string }).problem).toContain("VT_GIT_BINARY");
+    } finally {
+      if (previous === undefined) delete process.env.VT_GIT_BINARY;
+      else process.env.VT_GIT_BINARY = previous;
+    }
+  });
+
+  it("escapes packageManager before it becomes a pattern", () => {
+    // The shape check admits `.`, and `.` is a wildcard, so `tool.v1` matched
+    // `toolXv1` and claimed a script the manifest never defines. VALIDATING A
+    // STRING IS NOT ESCAPING IT, and the comment beside the code said so while
+    // the code did not do it. Both modules that read the field are covered.
+    expect(rules.scriptNameIn("toolXv1 lint", "tool.v1")).toBeNull();
+    expect(rules.scriptNameIn("tool.v1 lint", "tool.v1")).toBe("lint");
+
+    const wrong = scan.extractFromMarkdown("run `toolXv1 run lint`", { file: "doc.md" }, {
+      ...POLICY,
+      packageManager: "tool.v1",
+    });
+    expect(wrong.claims.some((claim) => claim.kind === "script")).toBe(false);
+
+    const right = scan.extractFromMarkdown("run `tool.v1 run lint`", { file: "doc.md" }, {
+      ...POLICY,
+      packageManager: "tool.v1",
+    });
+    expect(
+      right.claims.some(
+        (claim) => claim.kind === "script" && (claim as { script?: string }).script === "lint",
+      ),
+    ).toBe(true);
+  });
+
+  it("routes a Windows command shim through the command processor", () => {
+    // `npm.cmd` with `shell: false` CANNOT START: a `.cmd` is a script, not an
+    // executable image. The branch that renamed the token announced Windows
+    // support the code did not have — the same shape as calling the glob matcher
+    // linear. Asked here from a machine that is not Windows, which is the whole
+    // reason this decision is a pure function rather than an inline branch.
+    expect(rules.gateInvocation("npm", ["run", "typecheck"], "win32", "C:\\cmd.exe")).toEqual({
+      command: "C:\\cmd.exe",
+      args: ["/d", "/s", "/c", "npm.cmd", "run", "typecheck"],
+    });
+    // No COMSPEC in the environment is not a reason to fail to launch.
+    expect(rules.gateInvocation("pnpm", ["test"], "win32", undefined).command).toBe("cmd.exe");
+    // POSIX is untouched, and so is a command that was never a shim.
+    expect(rules.gateInvocation("npm", ["run", "typecheck"], "linux", undefined)).toEqual({
+      command: "npm",
+      args: ["run", "typecheck"],
+    });
+    expect(rules.gateInvocation("node", ["x.mjs"], "win32", "C:\\cmd.exe")).toEqual({
+      command: "node",
+      args: ["x.mjs"],
+    });
   });
 
   it("reads an uppercase object id as a commit citation", () => {

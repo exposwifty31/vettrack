@@ -32,7 +32,17 @@ function resolveGitBinary() {
   // VT_GIT_BINARY — the variable they had already set, wrongly. The cause is
   // carried out so the message can name the one the run actually hit.
   if (override) {
-    if (path.isAbsolute(override) && fs.existsSync(override)) return override;
+    // `existsSync` IS TRUE FOR A DIRECTORY. One reaches `spawnSync`, fails
+    // EACCES, and comes back out as "not a git repository" — the wrong cause
+    // this branch exists to stop reporting, arriving through the one shape the
+    // check never tested for.
+    if (path.isAbsolute(override)) {
+      try {
+        if (fs.statSync(override).isFile()) return override;
+      } catch {
+        // Unreadable or absent: the same invalid override, reported as one.
+      }
+    }
     return { problem: `VT_GIT_BINARY is not an absolute path to an existing file: ${override}` };
   }
   return (

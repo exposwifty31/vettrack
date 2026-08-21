@@ -28,6 +28,7 @@ import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import { spawn, spawnSync } from "node:child_process";
+import { StringDecoder } from "node:string_decoder";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
 
@@ -38,7 +39,7 @@ const { resolveGitBinary } = require("./verify/git-facts.cjs");
 // The two refusal predicates live in the pure-decisions module so a test can
 // hand them a bad command and assert that they refuse. Inside this CLI they were
 // unreachable from any test, which is the same as untested.
-const { isReentrantGate, GATE_TOKEN } = require("./verify/claims.cjs");
+const { isReentrantGate, GATE_TOKEN, gateInvocation } = require("./verify/claims.cjs");
 
 const say = (line) => process.stdout.write(`${line}\n`);
 
@@ -117,14 +118,19 @@ function runGate(gate) {
       return;
     }
     const [rawCommand, ...args] = tokens;
-    // On Windows `npm` and `pnpm` are `.cmd` shims, which `spawn` cannot execute
-    // with `shell: false` — and turning the shell on to fix that would hand the
-    // whole command line to `cmd.exe`. The token has already passed `GATE_TOKEN`,
-    // so appending the extension is the narrow fix; the shell stays off.
-    const command =
-      process.platform === "win32" && /^(?:npm|pnpm|yarn|npx)$/.test(rawCommand)
-        ? `${rawCommand}.cmd`
-        : rawCommand;
+    // On Windows `npm` and `pnpm` are `.cmd` shims. RENAMING THE TOKEN TO
+    // `npm.cmd` WAS NOT A FIX: a `.cmd` is a script, not an executable image, so
+    // `spawn` with `shell: false` cannot start it at all — the gates would have
+    // failed to launch on the one platform that branch existed to support, and
+    // the code claimed a portability it did not have. It has to reach the
+    // command processor explicitly. Every token has already passed `GATE_TOKEN`,
+    // so none carries a space or a metacharacter, and the shell stays off.
+    const { command, args: spawnArgs } = gateInvocation(
+      rawCommand,
+      args,
+      process.platform,
+      process.env.COMSPEC,
+    );
     const started = Date.now();
     // POSIX: its own process GROUP, so the timeout below can signal the whole
     // tree. A gate is an `npm`/`pnpm` script, which spawns descendants; killing
@@ -132,7 +138,7 @@ function runGate(gate) {
     // never fires, and `Promise.all` waits forever — the hang the timeout exists
     // to convert into a recorded FAIL.
     const ownGroup = process.platform !== "win32";
-    const child = spawn(command, args, { cwd: ROOT, shell: false, detached: ownGroup });
+    const child = spawn(command, spawnArgs, { cwd: ROOT, shell: false, detached: ownGroup });
     let output = "";
 
     // SETTLE EXACTLY ONCE, and on timeout settle IMMEDIATELY rather than waiting
@@ -158,7 +164,16 @@ function runGate(gate) {
       output += `\nrefused: gate exceeded ${GATE_TIMEOUT_MS}ms and was killed`;
       try {
         if (ownGroup && child.pid) process.kill(-child.pid, "SIGKILL");
-        else child.kill("SIGKILL");
+        else if (child.pid) {
+          // Windows has no process group to signal, and `kill` reaches only the
+          // direct child — here the `cmd.exe` shim — leaving the npm process and
+          // its descendants running against the checkout after this gate has
+          // already been recorded as failed. `taskkill /T` walks the tree.
+          spawn("taskkill", ["/T", "/F", "/PID", String(child.pid)], {
+            stdio: "ignore",
+            shell: false,
+          }).unref();
+        } else child.kill("SIGKILL");
       } catch {
         // Already gone, or the group cannot be signalled. The FAIL is recorded
         // either way — a gate this tool could not stop is still a failed gate.
@@ -177,24 +192,42 @@ function runGate(gate) {
     // limit for ASCII is the kind of half-true guard this tool exists to refuse.
     let bytes = 0;
     let truncated = false;
-    const collect = (chunk) => {
-      if (truncated) return;
-      const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(String(chunk), "utf8");
-      const room = MAX_OUTPUT_BYTES - bytes;
-      if (buf.length <= room) {
-        bytes += buf.length;
-        output += buf.toString("utf8");
-        return;
-      }
-      truncated = true;
-      // A byte-boundary slice can split a multibyte character; the decoder marks
-      // that as U+FFFD, and dropping a trailing one keeps the tail valid UTF-8
-      // instead of ending the log in a replacement character.
-      output += buf.subarray(0, Math.max(room, 0)).toString("utf8").replace(/\uFFFD$/, "");
-      output += `\n[output truncated at ${MAX_OUTPUT_BYTES} bytes]`;
+    // ONE DECODER PER STREAM, because a chunk boundary is not a character
+    // boundary. `Buffer.toString` decoded every `data` event independently, so a
+    // multibyte character split across two events became two U+FFFD and the gate
+    // log misreported what the gate printed. The byte CAP was corrected earlier
+    // and the byte DECODE was not — the same mistake at two scales.
+    const collectorFor = () => {
+      const decoder = new StringDecoder("utf8");
+      const write = (chunk) => {
+        if (truncated) return;
+        const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(String(chunk), "utf8");
+        const room = MAX_OUTPUT_BYTES - bytes;
+        if (buf.length <= room) {
+          bytes += buf.length;
+          output += decoder.write(buf);
+          return;
+        }
+        truncated = true;
+        // A byte-boundary slice can split a multibyte character. Writing then
+        // flushing keeps the tail valid UTF-8 rather than dropping held bytes.
+        output += decoder.write(buf.subarray(0, Math.max(room, 0)));
+        output += decoder.end();
+        output += `\n[output truncated at ${MAX_OUTPUT_BYTES} bytes]`;
+      };
+      // A stream can end mid-character. Flushing turns the held bytes into the
+      // replacement they actually are instead of dropping them silently.
+      write.flush = () => {
+        if (!truncated) output += decoder.end();
+      };
+      return write;
     };
-    child.stdout.on("data", collect);
-    child.stderr.on("data", collect);
+    const fromStdout = collectorFor();
+    const fromStderr = collectorFor();
+    child.stdout.on("data", fromStdout);
+    child.stderr.on("data", fromStderr);
+    child.stdout.on("end", () => fromStdout.flush());
+    child.stderr.on("end", () => fromStderr.flush());
     child.on("error", (err) => {
       output += String(err?.message ?? err);
       settle(1);

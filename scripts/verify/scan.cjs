@@ -595,7 +595,12 @@ function collectScriptClaims(line, index, policy, push) {
   if (!/^[\w.-]+$/.test(manager)) {
     throw new Error(`packageManager in verify.config.json is not a plain name: ${manager}`);
   }
-  const runPattern = new RegExp(`\\b${manager}\\s+run\\s+([\\w:-]+)`, "g");
+  // VALIDATING THE SHAPE IS NOT ESCAPING IT. The check above admits `.` and `-`,
+  // and `.` is a wildcard, so a manager named `tool.v1` matched `toolXv1` and
+  // claimed a script the manifest never defined. The comment above described
+  // this exact defect while the code left it in place.
+  const literal = manager.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const runPattern = new RegExp(`\\b${literal}\\s+run\\s+([\\w:-]+)`, "g");
   for (const m of line.matchAll(runPattern)) {
     push(index, { kind: "script", raw: m[0], script: m[1] });
   }

@@ -272,7 +272,15 @@ function createFacts(root, policy) {
      */
     globMatches(pattern) {
       const matcher = globToRegExp(pattern, { suffix: true });
-      return list("").filter((entry) => matcher.test(entry.replace(/\/$/, ""))).length;
+      // `stat` FIRST, and that ordering is the whole point. `list` yields NAMES;
+      // it does not follow them. A tracked symlink pointing outside the checkout
+      // is an ordinary-looking entry, so a glob could count it and report a claim
+      // verified from content this repository does not contain — the same escape
+      // `insideRoot` closes for `fileExists`, left open in its twin.
+      return list("").filter((entry) => {
+        const relative = entry.replace(/\/$/, "");
+        return stat(relative) !== null && matcher.test(relative);
+      }).length;
     },
 
     /**
@@ -288,9 +296,13 @@ function createFacts(root, policy) {
     suffixMatches(reference) {
       const needle = `/${reference.replace(/\/$/, "")}`;
       const exact = stat(reference);
+      // Same containment rule as `globMatches`: a name that ends correctly is
+      // not evidence that this repository holds the file it names.
       return (
-        list("").filter((relative) => relative.replace(/\/$/, "").endsWith(needle)).length +
-        (exact ? 1 : 0)
+        list("").filter((relative) => {
+          const trimmed = relative.replace(/\/$/, "");
+          return trimmed.endsWith(needle) && stat(trimmed) !== null;
+        }).length + (exact ? 1 : 0)
       );
     },
 
