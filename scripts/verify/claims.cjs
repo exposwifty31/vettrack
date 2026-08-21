@@ -346,16 +346,44 @@ function pathRule(claim, facts) {
   return { disposition: "fail", detail: `${claim.kind} does not exist: ${claim.target}` };
 }
 
+/**
+ * An absence claim about a target this engine cannot examine.
+ *
+ * Measured before this existed: `absent ../../etc/passwd` came back VERIFIED.
+ * The path escapes the checkout, `insideRoot` refuses it, `fileExists` reports
+ * false, and the rule read that false as confirmation. A document could assert
+ * the absence of anything outside the repository and the gate would agree,
+ * having never been able to look — the exact silent pass this engine exists to
+ * remove, sitting in the rule that was meant to be its sharpest edge.
+ *
+ * A stub that does not model containment (the suite's synthetic facts) answers
+ * `undefined` and keeps its old behaviour; the real contract always provides it,
+ * and a test pins that so the production path cannot quietly lose it.
+ */
+function unexaminable(claim, facts, suffix) {
+  if (facts.withinRoot?.(claim.target) !== false) return null;
+  return {
+    disposition: "fail",
+    detail: `claims ${claim.target}${suffix} does not exist, but it resolves outside the repository and cannot be checked`,
+  };
+}
+
 function absentDirRule(claim, facts) {
-  return facts.dirExists(claim.target)
-    ? { disposition: "fail", detail: `claims ${claim.target}/ does not exist, but it does` }
-    : { disposition: "verified" };
+  return (
+    unexaminable(claim, facts, "/") ??
+    (facts.dirExists(claim.target)
+      ? { disposition: "fail", detail: `claims ${claim.target}/ does not exist, but it does` }
+      : { disposition: "verified" })
+  );
 }
 
 function absentPathRule(claim, facts) {
-  return facts.fileExists(claim.target)
-    ? { disposition: "fail", detail: `claims ${claim.target} does not exist, but it does` }
-    : { disposition: "verified" };
+  return (
+    unexaminable(claim, facts, "") ??
+    (facts.fileExists(claim.target)
+      ? { disposition: "fail", detail: `claims ${claim.target} does not exist, but it does` }
+      : { disposition: "verified" })
+  );
 }
 
 function packageRule(claim, facts) {

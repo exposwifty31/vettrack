@@ -789,6 +789,47 @@ describe("the engine refuses what it says it refuses", () => {
     }
   });
 
+  it("refuses an absence claim about a target it cannot examine", () => {
+    // MEASURED BEFORE THE FIX: `absent ../../etc/passwd` came back VERIFIED. The
+    // path escapes the checkout, `insideRoot` refuses it, `fileExists` reports a
+    // plain false, and the rule read that false as confirmation — so a document
+    // could assert the absence of anything outside the repository and the gate
+    // would agree, having never been able to look.
+    //
+    // Absence is the one rule that turns "no evidence" into a pass, which makes
+    // it the one rule that must tell an unexaminable target from a missing one.
+    // It is also the rule this whole engine was built around: it is what would
+    // have caught the dependency the docs named for months and never had.
+    const facts = createFacts(REPO_ROOT, POLICY);
+
+    expect(rules.decide({ kind: "absent-path", target: "../../etc/passwd", raw: "x" }, facts, {}))
+      .toMatchObject({ disposition: "fail" });
+    expect(rules.decide({ kind: "absent-dir", target: "../../etc", raw: "x" }, facts, {}))
+      .toMatchObject({ disposition: "fail" });
+
+    // A genuinely missing path INSIDE the tree still verifies — the guard is
+    // containment, not a blanket refusal that would make absence unusable.
+    expect(
+      rules.decide({ kind: "absent-path", target: "src/no-such-file.zzz", raw: "x" }, facts, {}),
+    ).toMatchObject({ disposition: "verified" });
+    // And a target that is present still fails, as it always did.
+    expect(rules.decide({ kind: "absent-path", target: "package.json", raw: "x" }, facts, {}))
+      .toMatchObject({ disposition: "fail" });
+  });
+
+  it("exposes withinRoot on the real facts contract", () => {
+    // The absence rules read `facts.withinRoot?.(...)`, which lets the suite's
+    // synthetic stubs keep answering about their synthetic trees. That optional
+    // call is only safe while the REAL contract always provides it — without
+    // this test, deleting `withinRoot` would silently restore the old pass.
+    const facts = createFacts(REPO_ROOT, POLICY) as unknown as {
+      withinRoot?: (relative: string) => boolean;
+    };
+    expect(typeof facts.withinRoot).toBe("function");
+    expect(facts.withinRoot?.("package.json")).toBe(true);
+    expect(facts.withinRoot?.("../../etc/passwd")).toBe(false);
+  });
+
   it("matches a wildcard-dense glob without building a backtracking tree", () => {
     // The previous translation built a regex whose adjacent `[^/]*` groups
     // backtracked against each other. Measured on this engine before the change:

@@ -9366,3 +9366,49 @@ recomputed independently in both repositories and identical:
 `477 claims … 0 FAILED`, ledger `76 passed`, typecheck and lint clean.
 
 **Verdict:** VERIFIED.
+
+### The absence rule verified what it could not see, 2026-08-21
+
+**Claim:** an absence claim about a target outside the checkout resolved as `verified`, and now refuses.
+
+**Evidence:** measured directly against the engine before any edit —
+
+```
+decide({ kind: "absent-path", target: "../../etc/passwd" })  ->  { disposition: "verified" }
+decide({ kind: "absent-dir",  target: "../../etc" })         ->  { disposition: "verified" }
+```
+
+`insideRoot` refuses the escaping path, `stat` turns that refusal into null, `fileExists` reports a plain
+`false`, and the rule read that `false` as confirmation. **A governed document could assert the absence of
+anything outside this repository and the gate would agree, having never been able to look.**
+
+For an EXISTENCE claim the same collapse is harmless — a claim about a file this repository does not contain
+should fail. For an ABSENCE claim it inverts, because absence is the one rule that turns "no evidence" into a
+pass. That makes it the one rule that must distinguish an unexaminable target from a missing one, and it was
+the one rule that did not. It is also the rule this engine was built around: declared absence is what would
+have caught the dependency the frozen-stack bullet named for months and this repository never had.
+
+`withinRoot` is now part of the facts contract and both absence rules refuse when it answers false. Four
+cases pinned: outside-root file and directory both fail; a genuinely missing path INSIDE the tree still
+verifies, so the guard is containment rather than a blanket refusal that would make absence unusable; and a
+target that is present still fails as it always did. A second test pins that the real contract exposes
+`withinRoot` at all — the rules call it optionally so the suite's synthetic stubs keep working, and without
+that test deleting the method would silently restore the old pass.
+
+**Two more from the same review, both wrong-cause defects already fixed once elsewhere in this engine:**
+`verify-evidence` discarded the cause object `resolveGitBinary` returns, so a bad `VT_GIT_BINARY` surfaced as
+the generic "git is unavailable" — the reader sent to look for a missing install rather than at the variable
+they had set wrongly. Demonstrated by running the CLI rather than by a unit test, because the runner is a CLI
+and not a pure module: with the variable pointed at a directory it now prints
+`cannot bind a report to a tree: VT_GIT_BINARY is not an absolute path to an existing file: …`.
+
+**Superseded fingerprint:** ~~`fe21f794338249b9a1365754fe374c0651b755d885d3590ad352e9709460e013`~~. Current,
+recomputed independently in both repositories and identical:
+`28ed7439f5660e82cf530fa017a8bca8f35ef8fc2c174ef9a2ec1a0a0661d7d6`.
+
+**Commands run on the tree before this entry was appended:** `node scripts/verify-claims.mjs` →
+`1067 claims … 0 FAILED`; `pnpm exec vitest run tests/claims-ledger.test.ts` → `Tests 79 passed (79)`;
+`npx tsc --noEmit` → 0 errors; `pnpm architecture:gates` → `All G1 checks passed.` In the RN migration repo:
+`477 claims … 0 FAILED`, ledger `78 passed`, typecheck and lint clean.
+
+**Verdict:** VERIFIED.

@@ -49,10 +49,15 @@ const say = (line) => process.stdout.write(`${line}\n`);
 // different case: npm and pnpm legitimately live wherever nvm or corepack put
 // them, and pinning those to absolute paths would break more than it protects.
 // `resolveGitBinary` reports a bad `VT_GIT_BINARY` as a cause object rather than
-// as a missing install; this runner only needs the path, and a null here already
-// makes `git()` return null, which the tree-hash guard below turns into a refusal.
+// as a missing install — and THIS RUNNER USED TO THROW THAT CAUSE AWAY, keeping
+// only the path. A wrong `VT_GIT_BINARY` then surfaced as the generic "git is
+// unavailable", sending the reader to look for a missing install rather than at
+// the variable they had set wrongly. Same wrong-cause defect already fixed
+// inside `git-facts`, left standing in its caller.
 const RESOLVED_GIT = resolveGitBinary();
 const GIT_BINARY = typeof RESOLVED_GIT === "string" ? RESOLVED_GIT : null;
+const GIT_PROBLEM =
+  RESOLVED_GIT !== null && typeof RESOLVED_GIT === "object" ? RESOLVED_GIT.problem : null;
 
 function git(args) {
   if (!GIT_BINARY) return null;
@@ -80,7 +85,11 @@ if (reentrant.length > 0) {
 const treeHash = git(["rev-parse", "HEAD^{tree}"]);
 const status = git(["status", "--porcelain"]);
 if (treeHash === null || status === null) {
-  say("\nverify:evidence cannot bind a report to a tree: git is unavailable or a git command failed.");
+  say(
+    GIT_PROBLEM
+      ? `\nverify:evidence cannot bind a report to a tree: ${GIT_PROBLEM}`
+      : "\nverify:evidence cannot bind a report to a tree: git is unavailable or a git command failed.",
+  );
   say("Evidence has to name the tree it covers, so no report was written.\n");
   process.exit(2);
 }

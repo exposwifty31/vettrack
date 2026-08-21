@@ -239,6 +239,21 @@ function createFacts(root, policy) {
   };
 
   return {
+    /**
+     * Can this engine examine the target at all?
+     *
+     * "I CANNOT LOOK THERE" IS NOT "IT IS NOT THERE", and every other fact here
+     * collapses the two: `insideRoot` returns null for an escaping path, `stat`
+     * turns that into null, and `fileExists` reports plain `false`. For an
+     * EXISTENCE claim that is harmless — a claim about a file this repository
+     * does not contain should fail. For an ABSENCE claim it inverts: absence is
+     * the one rule that turns "no evidence" into a pass, so the one rule that
+     * must be able to tell an unexaminable target from a missing one.
+     */
+    withinRoot(relative) {
+      return insideRoot(relative) !== null;
+    },
+
     fileExists(relative) {
       return stat(relative)?.isFile() ?? false;
     },
