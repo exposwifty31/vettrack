@@ -48,10 +48,28 @@ function createFacts(root, policy) {
   const manifest = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8"));
   const dependencies = { ...(manifest.devDependencies ?? {}), ...(manifest.dependencies ?? {}) };
 
+  const REPO_ROOT = path.resolve(root);
+
+  /**
+   * Resolve `relative` beneath the checkout, or null when it escapes.
+   *
+   * Every target reaching this module comes out of a DOCUMENT — a path span, or
+   * a marker carrying its own scope (`scope=package.json`). `path.join` happily
+   * resolves `../../etc`, so a claim about this repository could be answered by
+   * a file this repository does not contain: verified, and about the wrong
+   * tree. Checked once here rather than trusted at each call site, which is the
+   * rule `git-facts` already applies to everything it hands to an argv.
+   */
+  const insideRoot = (relative) => {
+    const full = path.resolve(REPO_ROOT, relative);
+    return full === REPO_ROOT || full.startsWith(REPO_ROOT + path.sep) ? full : null;
+  };
+
   const stat = (relative) => {
     if (!statCache.has(relative)) {
+      const full = insideRoot(relative);
       try {
-        statCache.set(relative, fs.statSync(path.join(root, relative)));
+        statCache.set(relative, full === null ? null : fs.statSync(full));
       } catch {
         statCache.set(relative, null);
       }
@@ -108,7 +126,9 @@ function createFacts(root, policy) {
     lineCount(relative) {
       if (!lineCache.has(relative)) {
         try {
-          const text = fs.readFileSync(path.join(root, relative), "utf8");
+          const full = insideRoot(relative);
+          if (full === null) throw new Error("outside the repository root");
+          const text = fs.readFileSync(full, "utf8");
           // A trailing newline terminates the last line; it does not add one.
           lineCache.set(relative, text.replace(/\n$/, "").split("\n").length);
         } catch {
@@ -171,13 +191,17 @@ function createFacts(root, policy) {
       if (scope === "deps") {
         return Object.keys(dependencies).filter((name) => name.includes(pattern)).length;
       }
+      // A scope outside the checkout is not evidence of absence about THIS
+      // repository — `stat` already refuses it, and NaN carries that refusal to
+      // `absenceRule` instead of a 0 that reads as verified.
+      if (insideRoot(scope) === null) return Number.NaN;
       const target = stat(scope);
       if (target?.isFile()) {
         // A file that stats but cannot be read (permissions, a broken symlink)
         // is not evidence of absence — it is a scope this run could not check,
         // and NaN is how that reaches the caller as a failure rather than a 0.
         try {
-          return fs.readFileSync(path.join(root, scope), "utf8").split(pattern).length - 1;
+          return fs.readFileSync(path.join(REPO_ROOT, scope), "utf8").split(pattern).length - 1;
         } catch {
           return Number.NaN;
         }

@@ -23,6 +23,7 @@
  * lives in scripts/verify/claims.cjs so it can be handed a bad command in a test.
  */
 
+import { Buffer } from "node:buffer";
 import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
@@ -158,16 +159,27 @@ function runGate(gate) {
     // memory at once. The cap is marked in the recorded output rather than
     // applied silently: a truncated log that does not say so is a log that
     // lies about being complete.
+    // Counted in BYTES, which is what the constant says. `output.length` counts
+    // UTF-16 code units, so a megabyte of multibyte output measured about a
+    // third of its real size and the cap never fired — a limit that is only a
+    // limit for ASCII is the kind of half-true guard this tool exists to refuse.
+    let bytes = 0;
     let truncated = false;
     const collect = (chunk) => {
-      if (output.length >= MAX_OUTPUT_BYTES) {
-        if (!truncated) {
-          truncated = true;
-          output += `\n[output truncated at ${MAX_OUTPUT_BYTES} bytes]`;
-        }
+      if (truncated) return;
+      const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(String(chunk), "utf8");
+      const room = MAX_OUTPUT_BYTES - bytes;
+      if (buf.length <= room) {
+        bytes += buf.length;
+        output += buf.toString("utf8");
         return;
       }
-      output += chunk;
+      truncated = true;
+      // A byte-boundary slice can split a multibyte character; the decoder marks
+      // that as U+FFFD, and dropping a trailing one keeps the tail valid UTF-8
+      // instead of ending the log in a replacement character.
+      output += buf.subarray(0, Math.max(room, 0)).toString("utf8").replace(/\uFFFD$/, "");
+      output += `\n[output truncated at ${MAX_OUTPUT_BYTES} bytes]`;
     };
     child.stdout.on("data", collect);
     child.stderr.on("data", collect);

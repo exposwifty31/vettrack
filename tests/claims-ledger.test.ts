@@ -89,7 +89,14 @@ const { verify } = require("../scripts/verify/run.cjs") as {
 };
 const { globToRegExp, createFacts } = require("../scripts/verify/facts.cjs") as {
   globToRegExp(pattern: string, options?: { suffix?: boolean }): RegExp;
-  createFacts(root: string, policy: unknown): { grepCount(pattern: string, scope: string): number };
+  createFacts(
+    root: string,
+    policy: unknown,
+  ): {
+    grepCount(pattern: string, scope: string): number;
+    fileExists(relative: string): boolean;
+    lineCount(relative: string): number | null;
+  };
 };
 const gitFacts = require("../scripts/verify/git-facts.cjs") as {
   addedLinesFromDiff(stdout: string): Set<number>;
@@ -686,6 +693,22 @@ describe("the engine refuses what it says it refuses", () => {
     } finally {
       spy.mockRestore();
     }
+  });
+
+  it("refuses a target that resolves outside the checkout", () => {
+    // Every target here comes out of a DOCUMENT — a path span, or a marker
+    // carrying its own scope. `path.join` resolves `../../etc` happily, so a
+    // claim about THIS repository could be answered by a file it does not
+    // contain: verified, and about the wrong tree. The absence case is the
+    // dangerous one, because a 0 there reads as "confirmed absent".
+    const facts = createFacts(REPO_ROOT, POLICY);
+    expect(Number.isNaN(facts.grepCount("root", "../../etc/passwd"))).toBe(true);
+    expect(facts.fileExists("../../etc/passwd")).toBe(false);
+    expect(facts.lineCount("../../etc/passwd")).toBeNull();
+    expect(facts.fileExists("a/../../../etc/passwd")).toBe(false);
+    // A path inside the checkout still resolves, including a harmless `..`.
+    expect(facts.fileExists("package.json")).toBe(true);
+    expect(facts.fileExists("docs/../package.json")).toBe(true);
   });
 
   it("reads an uppercase object id as a commit citation", () => {

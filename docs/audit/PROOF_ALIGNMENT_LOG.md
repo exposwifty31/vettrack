@@ -9127,3 +9127,44 @@ deploy from a feature branch because that job is gated on `github.ref`. The job 
   files, and those citations are claims. Stated, not reconciled away.
 
 **Verdict:** VERIFIED.
+
+### Correction to the round above, and two more findings, 2026-08-21
+
+**The round-three heading classified its own findings wrongly, and the entry contradicted itself.** The
+heading called them ~~"four ways the gate could still pass in silence"~~ and the body said ~~"three are the
+same defect class"~~. Neither survives reading the four:
+
+| finding | what it actually was |
+|---|---|
+| `**` between separators | a **false alarm** — a correct glob claim reported as a defect. The entry's own body says exactly that two paragraphs below the heading, which is the contradiction. |
+| a walk that could not read a directory | a **silent pass** — absence verified over a tree never fully walked |
+| an uppercase object id | a **silent omission** — no claim extracted at all |
+| an unbounded output buffer | a **resource bound**, not a verdict defect at all |
+
+So: two of the four are the silent family, and the other two are a false alarm and a resource limit.
+Reported by the review, and correct. Written down rather than reworded away, because a summary that
+misclassifies its own evidence is the same failure as a document that misstates a file — and this file's
+whole purpose is to be the record that does not do that.
+
+**Two further findings from the same round, both real.**
+
+- **A scope could resolve outside the checkout.** Every target reaching `scripts/verify/facts.cjs` comes
+  from a document — a path span, or a marker carrying its own `scope=` — and `path.join` resolves `../../etc`
+  without complaint. A claim about this repository could therefore be answered by a file this repository does
+  not contain: verified, and about the wrong tree. Containment is now checked once, at the boundary, which is
+  the rule `scripts/verify/git-facts.cjs` already applies to everything it hands to an argv. Absence is the
+  dangerous direction, because a 0 from outside the tree reads as "confirmed absent"; it now returns `NaN`.
+  Proved by refusal: an escaping scope, an escaping path and an escaping line-range all refuse, while
+  `package.json` and a harmless interior `..` still resolve.
+- **The output cap was not counting bytes.** `MAX_OUTPUT_BYTES` was compared against `output.length`, which
+  counts UTF-16 code units, so multibyte output measured about a third of its real size and the cap never
+  fired. A limit that is only a limit for ASCII is the same half-true guard this tool exists to refuse.
+  Now counted in bytes, with the truncation written into the log — measured with the collector itself:
+  1500 bytes fed against a 1000-byte cap retained 999, marked the truncation, and left the tail valid UTF-8,
+  where the previous rule would have kept the whole thing.
+
+**Superseded fingerprint:** ~~`73a81cd34a45934b14ca0cc656eb617eaf5afb5cd3edc77b547a0d19bbcd89d2`~~. Current,
+recomputed independently in both repositories and identical:
+`8065f0383300d7d576af8751488e2483ac9097b4ee8b40c05bc6f91d4dec66e2`.
+
+**Verdict:** VERIFIED.
