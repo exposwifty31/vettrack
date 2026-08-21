@@ -121,6 +121,20 @@ export interface EvaluateCodeBlueManagerOptions {
     clinicId: string,
     endpoint: CodeBlueManagerContext["endpoint"],
   ) => Promise<CodeBlueManagerEnforcementMode>;
+  /**
+   * EMISSION ONLY. `false` suppresses every counter and audit row; the verdict is
+   * bit-identical either way.
+   *
+   * For the DISCOVERY path (`GET /api/code-blue/eligible-managers`), which runs this
+   * evaluator once per candidate, on a GET, repeatedly, during an emergency. Left
+   * observing, a clinic with 12 vets/admins of whom 8 are off-shift writes 8
+   * `shadow_would_have_denied` rows per list fetch — and that counter is the signal the
+   * `off | shadow | enforce` rollout decision is made on. Reads must not vote in it.
+   *
+   * NEVER pass this from a mutation path. `tests/authority-code-blue-manager-observe.test.ts`
+   * asserts the verdict is unchanged; a guard test asserts no mutation call site sets it.
+   */
+  observe?: boolean;
 }
 
 export async function evaluateCodeBlueManagerAuthority(
@@ -130,6 +144,36 @@ export async function evaluateCodeBlueManagerAuthority(
   const resolver = options.modeResolver ?? resolveCodeBlueManagerEnforcementMode;
   const mode = await resolver(ctx.clinicId, ctx.endpoint);
 
+  // One gate, not ten. Guarding each emission inline would make a silently-missed
+  // site the failure mode — and a single missed site defeats the entire purpose,
+  // because one leaked row per candidate is still one leaked row per candidate.
+  const observe = options.observe !== false;
+  const emit = {
+    faultOpen: () => {
+      if (!observe) return;
+      codeBlueManagerMetrics.faultOpen();
+      emitCodeBlueManagerFaultOpen(ctx);
+    },
+    shadowDenied: (reason: CodeBlueManagerDenyReason) => {
+      if (!observe) return;
+      codeBlueManagerMetrics.shadowWouldHaveDenied(reason);
+      emitCodeBlueManagerShadowDenied({ ctx, reason });
+    },
+    denied: (reason: CodeBlueManagerDenyReason) => {
+      if (!observe) return;
+      codeBlueManagerMetrics.denied(reason);
+      emitCodeBlueManagerDenied({ ctx, reason });
+    },
+    allow: () => {
+      if (!observe) return;
+      codeBlueManagerMetrics.allow();
+    },
+    modeInactiveStrategyA: () => {
+      if (!observe) return;
+      codeBlueManagerMetrics.modeInactiveStrategyA();
+    },
+  };
+
   if (mode === "off") {
     return { action: "allow", protected: "MODE_OFF" };
   }
@@ -138,8 +182,7 @@ export async function evaluateCodeBlueManagerAuthority(
   // severity=high audit and counter. Handled before any other branch so the
   // fail-open invariant is observable to tests with a single short path.
   if (ctx.lookup.kind === "resolver_fault") {
-    codeBlueManagerMetrics.faultOpen();
-    emitCodeBlueManagerFaultOpen(ctx);
+    emit.faultOpen();
     return { action: "allow", protected: "FAULT_OPEN" };
   }
 
@@ -148,13 +191,11 @@ export async function evaluateCodeBlueManagerAuthority(
   const lookupReason = lookupToReason(ctx.lookup);
   if (lookupReason !== null) {
     if (mode === "shadow") {
-      codeBlueManagerMetrics.shadowWouldHaveDenied(lookupReason);
-      emitCodeBlueManagerShadowDenied({ ctx, reason: lookupReason });
+      emit.shadowDenied(lookupReason);
       return { action: "allow", protected: "SHADOW_WOULD_HAVE_DENIED" };
     }
     // mode === "enforce"
-    codeBlueManagerMetrics.denied(lookupReason);
-    emitCodeBlueManagerDenied({ ctx, reason: lookupReason });
+    emit.denied(lookupReason);
     return { action: "deny", reason: lookupReason };
   }
 
@@ -162,31 +203,28 @@ export async function evaluateCodeBlueManagerAuthority(
   if (ctx.lookup.kind !== "snapshot") {
     // Exhaustiveness guard — unreachable if the union is well-formed. Treated
     // as fail-open to preserve the master-plan failure-mode contract.
-    codeBlueManagerMetrics.faultOpen();
-    emitCodeBlueManagerFaultOpen(ctx);
+    emit.faultOpen();
     return { action: "allow", protected: "FAULT_OPEN" };
   }
   const snapshotResult = computeCodeBlueManagerSnapshotDeny(ctx.lookup.snapshot);
 
   if (snapshotResult.kind === "mode_inactive") {
-    codeBlueManagerMetrics.modeInactiveStrategyA();
+    emit.modeInactiveStrategyA();
     return { action: "allow", protected: "MODE_INACTIVE_STRATEGY_A" };
   }
 
   if (snapshotResult.kind === "allow") {
-    codeBlueManagerMetrics.allow();
+    emit.allow();
     return { action: "allow", protected: "ALLOWLIST_OK" };
   }
 
   // snapshotResult.kind === "deny"
   const reason = snapshotResult.reason;
   if (mode === "shadow") {
-    codeBlueManagerMetrics.shadowWouldHaveDenied(reason);
-    emitCodeBlueManagerShadowDenied({ ctx, reason });
+    emit.shadowDenied(reason);
     return { action: "allow", protected: "SHADOW_WOULD_HAVE_DENIED" };
   }
   // mode === "enforce"
-  codeBlueManagerMetrics.denied(reason);
-  emitCodeBlueManagerDenied({ ctx, reason });
+  emit.denied(reason);
   return { action: "deny", reason };
 }
