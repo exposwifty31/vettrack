@@ -691,6 +691,56 @@ describe("the engine refuses what it says it refuses", () => {
     expect(real).toContainEqual(expect.objectContaining({ kind: "attested", id: "some-id" }));
   });
 
+  it("does not read a store id beside `SHA-256` as a commit, and still reads a real one", () => {
+    // README cites the App Store Connect app as `6778937527` on a line that also
+    // says "Play App Signing SHA-256". The bare `sha` fired and the gate reported
+    // "no such commit" about a store record. The first attempt refused every
+    // all-decimal token — which silenced `8455807`, a REAL commit cited in
+    // G2-PLAN.md, because roughly one short sha in twenty-five is all digits.
+    expect(
+      extract("no AAB uploaded, so the Play App Signing SHA-256 for ASC app `6778937527` does not exist"),
+    ).toEqual([]);
+    expect(extract("superseded by the pre-reg commit `8455807`")).toContainEqual(
+      expect.objectContaining({ kind: "commit", sha: "8455807" }),
+    );
+    expect(extract("frozen by commit `b043585`")).toContainEqual(
+      expect.objectContaining({ kind: "commit", sha: "b043585" }),
+    );
+  });
+
+  it("reads a package in a code span the way it reads one in prose", () => {
+    // A package inside a code span was asserted live whatever the sentence said,
+    // so "and no `@clerk/clerk-expo` at any version" — a correct statement of
+    // absence — was reported as a missing dependency.
+    const absent = scan.extractFromMarkdown(
+      "carries `@clerk/expo` and no `@clerk/clerk-expo` at any version",
+      { file: "PLAN.md" },
+      POLICY,
+    );
+    expect(absent.claims.map((c) => c.raw)).toEqual(["@clerk/expo"]);
+    expect(absent.excluded.map((e) => e.reason)).toContain("package-declared-absent");
+
+    // "swapped X for the renamed Y" names X as former and Y as live. Reading the
+    // second as gone would leave the auth SDK unchecked — the one thing these
+    // documents were wrong about for months.
+    const swapped = scan.extractFromMarkdown(
+      "PR #75 swapped `@clerk/clerk-expo` 2.x for the renamed `@clerk/expo`",
+      { file: "PLAN.md" },
+      POLICY,
+    );
+    // `PLAN.md` is a status document, so "PR #75" on the same line is correctly a
+    // pull-request claim; this assertion is about the packages.
+    expect(swapped.claims.filter((c) => c.kind === "package").map((c) => c.raw)).toEqual([
+      "@clerk/expo",
+    ]);
+
+    // …and a deletion verb a clause away is NOT a statement about the package:
+    // packages get the two readings prose gets, not the path rule's third one.
+    expect(
+      extract("the positional-array form was removed, and this repo is on `@tanstack/react-query` ^5.101.4"),
+    ).toContainEqual(expect.objectContaining({ kind: "package", raw: "@tanstack/react-query" }));
+  });
+
   it("refuses `npm t`, npm's own alias for the test script", () => {
     expect(rules.isReentrantGate("npm t")).toBe(true);
     expect(rules.isReentrantGate("pnpm t")).toBe(true);

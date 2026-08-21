@@ -8944,6 +8944,33 @@ itself.
   finds nothing on the blanked line and `classifySpan` is never reached. Three shapes were run — one struck
   span, two struck spans on a line, and a span inside a multi-line run — and each produced exactly one
   exclusion, with the right reason.
+- Fourth round, and this one came from pointing the gate at somebody else's pull request rather than at a
+  review. `VetTrack---RN-Migration-#84` and this repo's `#204` are a founder-review pair opened by a different
+  session, touching the same files. Running the gate against #84's documents reported six failures — and the
+  useful half of them were the gate's own false alarms, on sentences that are true:
+  (a) `README.md` cites the App Store Connect app as `6778937527` on a line that also says "Play App Signing
+  SHA-256"; the bare `sha` fired as commit vocabulary, the ten digits fit the hex shape, and the gate reported
+  "no such commit" about a store record. The first fix refused every all-decimal token, which then silenced
+  `8455807` — a REAL commit cited in `G2-PLAN.md`, because roughly one short sha in twenty-five is all digits.
+  The precise fix is to stop reading a hash-ALGORITHM name as a reference to a commit.
+  (b) A package inside a code span was asserted live whatever the sentence said, while the same name in prose
+  was read in context — so "and no `@clerk/clerk-expo` at any version" was reported as a missing dependency.
+  Code spans now get the two readings prose gets. Deliberately not the path rule's third: a deletion verb a
+  clause away is fine for a file and wrong for a package, and using it reported "the positional-array form was
+  removed, and this repo is on `@tanstack/react-query`" as a defect. Also added: "swapped `X` for the renamed
+  `Y`" names `X` as former and `Y` as live — reading the second as gone would have left the auth SDK
+  unchecked, the one thing these documents were wrong about for months.
+- Found while doing that, in the CLI rather than the engine: `verify-claims.mjs --json` was cut at exactly
+  65,536 bytes through a PIPE, because `process.exit()` abandons a pending stdout write. The report is 318,049
+  bytes. Valid-looking output, silently short — the same failure class as everything else in this entry, in
+  the one place a downstream tool would consume it. `process.exitCode` and a natural exit; both figures were
+  measured before and after.
+- Two real problems in #84 that the gate reported and that are NOT the gate's fault, left for that PR's author:
+  its `AGENTS.md` does not fix the frozen-stack line still claiming Gesture Handler 3.x against `~2.32.0` in
+  the manifest, and its `README.md` cites `push-fcm.ts` with no path — the file is real but lives in THIS
+  repo (`server/lib/push-fcm.ts`), so from the RN repo it resolves to nothing. #84 also carries a correction
+  the RN repo's own `#85` makes differently, and the two conflict in `AGENTS.md`; #204 and `#206` conflict in
+  this file, both appending at the tail.
 - Declined, with reasons: the suggestion to keep the struck-range check in the prose scan — the check was
   unreachable because the text was already blanked, so it was replaced with a struck-range MASK, which both
   makes it reachable and reports the exclusion instead of dropping it silently. `struckRanges` itself is
@@ -8958,7 +8985,7 @@ collection.
 **Superseded by this round.** The fingerprint quoted above as ~~`2a8f510951c78d2b…`~~ was the value before
 the review; the engine changed, so the recorded value changed with it, which is the mechanism working rather
 than a problem. Current, and identical in both repositories:
-`0f664f56de934f104da7b03a9024b0d6992bf4a7596b36f7eaa2347b7c93fa07`. The counts quoted above as
+`c7d567f4d5b10a18a00626fea47ea379ea4f3c4299b261dfdce44f34d4f77a64`. The counts quoted above as
 ~~`1000 claims … 40 excluded by rule`~~ and ~~`Tests 38 passed (38)`~~ are likewise superseded.
 
 **Commands run on this tree after the round:**

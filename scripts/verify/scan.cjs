@@ -141,8 +141,24 @@ const LANDING_STRICT = /(?<![\w-])MERGED\b|\bmerged to main\b|\blanded (?:in|as)
  */
 const MERGE_CONTEXT = /(?<![\w-])MERGED\b|\bmerged\b|\blanded\b|\bPRs?\s+#/;
 
-/** Hex that is only read as a commit when the line is talking about commits. */
-const COMMIT_CONTEXT = /\b(?:commit|sha|SHA|revision|pin(?:ned)?)\b/;
+/**
+ * Hex that is only read as a commit when the line is talking about commits.
+ *
+ * `SHA-256` IS NOT COMMIT VOCABULARY. `README.md` cites the App Store Connect
+ * app as `6778937527` on a line that also mentions "Play App Signing SHA-256";
+ * the bare `sha` fired, the ten digits fit the hex shape, and the gate reported
+ * "no such commit" about a store record. The first attempt at this refused an
+ * all-decimal token instead — which silenced `8455807`, a REAL commit cited in
+ * `G2-PLAN.md`, because roughly one short sha in twenty-five happens to be all
+ * digits. The precise fix is to stop reading a hash-algorithm name as a
+ * reference to a commit.
+ */
+const COMMIT_CONTEXT = /\b(?:commit|sha(?![\w-]*\d)|SHA(?![\w-]*\d)|revision|pin(?:ned)?)\b/;
+
+/** A hex run of commit shape. Context above decides whether to read it as one. */
+function isCommitish(token) {
+  return /^[0-9a-f]{7,40}$/.test(token);
+}
 
 /**
  * A path-shaped code span. Anchored: a span is a file reference only if the
@@ -436,7 +452,7 @@ function collectCitations(line, index, ctx) {
   if (!COMMIT_CONTEXT.test(line)) return;
   for (const { text } of codeSpans(line)) {
     const sha = text.trim();
-    if (/^[0-9a-f]{7,40}$/.test(sha)) ctx.push(index, { kind: "commit", raw: sha, sha });
+    if (isCommitish(sha)) ctx.push(index, { kind: "commit", raw: sha, sha });
   }
 }
 
@@ -618,7 +634,7 @@ function collectLandingClaims(line, index, push, requireCitation, policy) {
   }
   for (const { text } of codeSpans(line)) {
     const sha = text.trim();
-    if (/^[0-9a-f]{7,40}$/.test(sha)) {
+    if (isCommitish(sha)) {
       cited = true;
       push(index, { kind: "commit", raw: sha, sha });
     }
@@ -657,8 +673,24 @@ const RENAME_ARROW = /^\s*(?:→|->|=>|➜)\s*`/;
  * The other half of the same idiom, written the other way round: "renamed from
  * `appointments.tsx`", "formerly `src/pages/x.tsx`". The named file is the one
  * that MOVED, so its absence is the point of the sentence.
+ *
+ * "THE renamed `X`" is the opposite and is excluded by the lookbehind: there `X`
+ * is the name it moved TO, and reading it as gone stops the gate checking the
+ * live one. That phrasing appears in this project's own prose — "swapped
+ * `@clerk/clerk-expo` for the renamed `@clerk/expo`" — where the package left
+ * unchecked would have been the auth SDK, the exact thing that was wrong in
+ * these documents for months.
  */
-const FORMER_BEFORE = /\b(?:renamed from|renamed|formerly|previously|was called|used to be)\s+$/i;
+const FORMER_BEFORE =
+  /\b(?:renamed from|(?<!\bthe\s)renamed|formerly|previously|was called|used to be)\s+$/i;
+
+/**
+ * The same idiom in its two-part form: "swapped `X` 2.x **for** `Y`". BOTH halves
+ * are required, because "swapped in `Y`" says the opposite and reading it as a
+ * former name would quietly stop checking a live reference.
+ */
+const SWAP_BEFORE = /\b(?:swapped|replaced|superseded)\s+$/i;
+const SWAP_AFTER = /^\s*(?:\S+\s+){0,2}(?:for|with|by)\b/i;
 
 /**
  * A DELETION RECORD: "deleted root cruft (`Archive.zip`, `all-files.md`, …)",
@@ -700,8 +732,13 @@ function inDeletionClause(before) {
  * OTHER than a live claim, shared by both branches of `classifySpan` because
  * both need exactly the same three and duplicating them is how the two drift.
  */
+function isSwap(before, after) {
+  return SWAP_BEFORE.test(before) && SWAP_AFTER.test(after);
+}
+
 function contextualReading(before, after) {
   if (RENAME_ARROW.test(after) || FORMER_BEFORE.test(before)) return FORMER_NAME;
+  if (isSwap(before, after)) return FORMER_NAME;
   if (inDeletionClause(before)) return DELETION_RECORD;
   if (NEGATED_AFTER.test(after) || NEGATED_BEFORE.test(before)) return "absent";
   return null;
@@ -740,7 +777,7 @@ function classifySpan(span, index, policy, push, decline, after = "", before = "
   // reputation for crying wolf.
   const scoped = /^(@[a-z0-9][\w.-]*\/[a-z0-9][\w.-]*)(?:\/.*)?$/i.exec(span);
   if (scoped && !new RegExp(`\\.(?:${FILE_EXT})$`).test(span)) {
-    push(index, { kind: "package", raw: span, name: scoped[1] });
+    classifyPackageSpan(scoped, span, { index, policy, push, decline, after, before });
     return;
   }
 
@@ -782,6 +819,32 @@ function classifySpan(span, index, policy, push, decline, after = "", before = "
   // Reported, because "nothing matched" and "nothing was checked" have to be
   // distinguishable from outside.
   decline(index, span, "not-claim-shaped");
+}
+
+/**
+ * A scoped package in a code span, read with THE SAME THREE READINGS A PATH GETS.
+ * It used to be asserted live whatever the sentence said, while the very same
+ * name in prose was read in context — so "and no `@clerk/clerk-expo` at any
+ * version", a correct statement of absence, was reported as a missing
+ * dependency. The prose scanner and the span scanner now agree.
+ */
+function classifyPackageSpan(scoped, span, at) {
+  const { index, push, decline, after, before } = at;
+  // THE SAME TWO READINGS `collectProsePackages` USES — deliberately not the
+  // deletion-clause one that paths get. A deletion verb can sit a clause away
+  // from the span, which is fine for a file ("removed X, Y and Z") and wrong for
+  // a package: "the positional-array form was removed, and this repo is on
+  // `@tanstack/react-query` ^5.101.4" asserts the package is THERE. Using the
+  // path reading here reported that sentence as a defect.
+  if (FORMER_BEFORE.test(before) || RENAME_ARROW.test(after) || isSwap(before, after)) {
+    decline(index, span, FORMER_NAME);
+    return;
+  }
+  if (NEGATED_AFTER.test(after) || NEGATED_BEFORE.test(before)) {
+    decline(index, span, "package-declared-absent");
+    return;
+  }
+  push(index, { kind: "package", raw: span, name: scoped[1] });
 }
 
 /** A path-shaped span, read in the context of the prose around it. */

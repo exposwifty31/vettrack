@@ -107,16 +107,26 @@ function report(result) {
 // working directory — it would exit 0 having verified nothing, and every caller
 // would read that as a pass. A gate that can silently succeed is the failure
 // this whole tool exists to prevent.
-let result;
-try {
-  result = verify({ enforceEvidence });
-} catch (error) {
-  // A configuration problem is not a claim verdict: it is reported as itself,
-  // with exit 2, so a broken config is never mistaken for a clean run.
-  say(`\nverify:claims cannot run: ${error.message}\n`);
-  process.exit(2);
+//
+// `process.exitCode` RATHER THAN `process.exit()`, for the same family of reason:
+// `process.exit()` abandons a pending stdout write, and on a PIPE the ~200 KB
+// `--json` report came back cut at the 64 KB buffer — valid-looking output,
+// silently short. Setting the code and returning lets node flush first.
+function main() {
+  let result;
+  try {
+    result = verify({ enforceEvidence });
+  } catch (error) {
+    // A configuration problem is not a claim verdict: it is reported as itself,
+    // with exit 2, so a broken config is never mistaken for a clean run.
+    say(`\nverify:claims cannot run: ${error.message}\n`);
+    process.exitCode = 2;
+    return;
+  }
+
+  if (asJson) process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
+  else report(result);
+  process.exitCode = result.ok ? 0 : 1;
 }
 
-if (asJson) process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
-else report(result);
-process.exit(result.ok ? 0 : 1);
+main();
