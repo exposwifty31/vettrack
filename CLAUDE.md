@@ -29,8 +29,9 @@ pnpm test:playwright:pwa    # PWA suite; also: :waitlist, :workday, :flow-walk, 
 pnpm test:signup            # signup E2E flow
 
 # Architecture gates (server/schema, module boundaries, dead code)
-pnpm architecture:gates      # tsc (frontend + tsconfig.server-check.json) + depcruise + madge cycles
-pnpm tenant:lint:touched     # warn-only: flags queries missing clinicId filter (touched files); NOT part of architecture:gates
+pnpm architecture:gates      # tsc (frontend + tsconfig.server-check.json) + depcruise + madge cycles + tenant scope + claim verification
+pnpm tenant:lint:enforce     # every query filters clinicId. Fails on findings NOT in .tenant-lint-known-violations.json
+pnpm tenant:lint:touched     # warn-only variant (touched files); reports, never fails
 pnpm depcruise:check         # dependency-cruiser boundary check against known-violations baseline
 pnpm architecture:cycles     # import-cycle regression check
 pnpm knip                   # unused files/exports/deps (also not part of architecture:gates)
@@ -162,6 +163,14 @@ ios/ android/     Capacitor native shells (capacitor.config.ts at root) — buil
 ### Multi-tenancy (critical rule)
 
 Every DB table has a `clinicId` column. **Every query must filter by `clinicId`.** No exceptions. Dev-bypass hardcodes `clinicId = "dev-clinic-default"`.
+
+**This is now machine-enforced, and the enforcement is baseline-relative.** `pnpm tenant:lint:enforce`
+runs inside `pnpm architecture:gates` and in CI, and fails on any finding **not** in
+`.tenant-lint-known-violations.json` — a frozen set of ~200 hand-reviewed findings, keyed
+`file::table` with a count rather than `file:line` so an unrelated edit above a finding does not
+read as a regression. A new unscoped `.from(<tenantTable>)` fails the build and names the
+`file:line:column`. If a finding is a genuine false positive, waive it in place with
+`// tenant-lint:scoped <reason>`; regenerate the baseline only to record a deliberate decision.
 
 ### Frozen architecture surfaces (post-Phase-9)
 
@@ -364,7 +373,7 @@ Use `logAudit()` from `server/lib/audit.ts` for all critical actions. It is fire
 ### Tests
 
 `pnpm test` runs vitest. Several test groups are excluded by default in `vite.config.ts`:
-- DB integration tests (require `DATABASE_URL` + applied migrations): `tests/restock.service.test.ts`, `tests/migrations/**`, `tests/equipment-operational-state.integration.test.ts`, `tests/shift-chat-window.integration.test.ts`, `tests/seed-reviewer-demo.integration.test.ts`, `tests/doctor-shift-gate.integration.test.ts`, `tests/tenant-pooling-isolation.integration.test.ts`. Dedicated runners cover only a subset: `pnpm test:db-integration` (`vitest.db-integration.config.ts` — equipment-operational-state, seed-reviewer-demo, doctor-shift-gate), `pnpm test:integration:ops` (operational-state + waitlist), `pnpm test:rls-pooling` (`vitest.rls-pooling.config.ts` — tenant-pooling-isolation; runs real DDL, needs `RLS_POOLING_PROBE=1` + `RLS_PROBE_DATABASE_URL` pointed at a throwaway database); the shift-chat test runs directly via `pnpm exec tsx tests/shift-chat-window.integration.test.ts`. `tests/restock.service.test.ts` and `tests/migrations/**` have no runner — invoke them directly via `pnpm exec tsx <file>`.
+- DB integration tests (require `DATABASE_URL` + applied migrations): `tests/restock.service.test.ts`, `tests/migrations/**`, `tests/equipment-operational-state.integration.test.ts`, `tests/shift-chat-window.integration.test.ts`, `tests/seed-reviewer-demo.integration.test.ts`, `tests/doctor-shift-gate.integration.test.ts`, `tests/tenant-pooling-isolation.integration.test.ts`. Dedicated runners cover only a subset: `pnpm test:db-integration` (`vitest.db-integration.config.ts` — equipment-operational-state, seed-reviewer-demo, doctor-shift-gate; **CI runs the latter two by name** inside the `integration-ops` job rather than this whole config, because equipment-operational-state fails under this config's ordering while passing under the ops one), `pnpm test:integration:ops` (operational-state + waitlist), `pnpm test:rls-pooling` (`vitest.rls-pooling.config.ts` — tenant-pooling-isolation; runs real DDL, needs `RLS_POOLING_PROBE=1` + `RLS_PROBE_DATABASE_URL` pointed at a throwaway database); the shift-chat test runs directly via `pnpm exec tsx tests/shift-chat-window.integration.test.ts`. `tests/restock.service.test.ts` and `tests/migrations/**` have no runner — invoke them directly via `pnpm exec tsx <file>`.
 - Live-server tests (require dev server on :3001): `tests/charge-alert-worker.test.js`, `tests/code-blue-mode-equipment.test.js`, `tests/equipment-scan-e2e.test.js`, `tests/expiry-api.test.js`, `tests/expiry-check-worker.test.js`, `tests/returns-api.test.js`
 - Phase 9 deterministic drills: `tests/phase-9-deterministic-drills.test.ts` covers bounded-counter contracts in unit form; `tests/phase-9-drills.spec.ts` is the Playwright browser harness for the eight realtime/PWA drills.
 
