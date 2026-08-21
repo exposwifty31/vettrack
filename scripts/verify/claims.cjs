@@ -244,13 +244,28 @@ const GATE_TOKEN = /^[\w./:@=-]+$/;
  * stays inside the budget the caller named. A cap exceeded by the note
  * announcing the cap is not a cap.
  */
+/** Room held back so a timeout or spawn-error note survives a truncated gate. */
+const NOTE_RESERVE_BYTES = 200;
+
 function createOutputCollector(maxBytes) {
   const marker = `\n[output truncated at ${maxBytes} bytes]`;
   const markerBytes = Buffer.byteLength(marker, "utf8");
+  // A DIAGNOSTIC MUST OUTLIVE TRUNCATION. The runner's own notes — "gate
+  // exceeded Nms and was killed", a spawn error — are the CAUSE of the failure,
+  // and the previous version routed them through the same budget as the gate's
+  // output. So a gate that filled the budget and then timed out was recorded as
+  // failed with the reason missing: precisely when a hang is most likely, the
+  // word "timeout" disappeared. Measured before this fix — 500 bytes of output
+  // against a 64-byte ceiling, then a timeout note: the note was gone.
+  //
+  // The reserve is carved out of the ceiling rather than added to it, so the
+  // recorded text still never exceeds `maxBytes`. Half the ceiling caps it for
+  // the degenerate tiny budgets the tests pin.
+  const noteReserve = Math.min(NOTE_RESERVE_BYTES, Math.floor(maxBytes / 2));
   // The marker has to fit INSIDE the ceiling, and when the ceiling is smaller
   // than the marker the marker is what gets trimmed. A note that overflows the
   // limit it announces is the defect this whole helper exists to prevent.
-  const budget = Math.max(0, maxBytes - markerBytes);
+  const budget = Math.max(0, maxBytes - markerBytes - noteReserve);
   let text = "";
   let textBytes = 0;
   let truncated = false;
@@ -318,9 +333,18 @@ function createOutputCollector(maxBytes) {
       };
     },
 
-    /** A diagnostic the runner adds itself, bounded by the same budget. */
+    /**
+     * A diagnostic the runner adds itself.
+     *
+     * Deliberately NOT gated on `truncated`: this is the cause of the failure,
+     * and a failure recorded without its cause is the defect this engine keeps
+     * finding in itself. It is still bounded — trimmed to whatever the ceiling
+     * has left, which the reserve above guarantees is not zero.
+     */
     note(line) {
-      add(String(line));
+      const text_ = String(line);
+      if (!text_) return;
+      textBytes += appendUpTo(text_, maxBytes - textBytes);
     },
 
     get text() {

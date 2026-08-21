@@ -9540,3 +9540,51 @@ recomputed independently in both repositories and identical:
 `477 claims … 0 FAILED`, ledger `82 passed`, typecheck and lint clean.
 
 **Verdict:** VERIFIED.
+
+### A failure without its cause, and a detector I taught to look away, 2026-08-21
+
+**Claim:** a timeout diagnostic now survives truncation, and the probe fixtures are no longer hidden from the
+dirty-tree check.
+
+**Evidence — the lost cause.** Routing the runner's own diagnostics through the gate's output budget meant
+they were dropped once the budget filled. Measured before the fix, 500 bytes of output against a 64-byte
+ceiling followed by a timeout note:
+
+```text
+truncated: true
+timeout reason present: false
+recorded: "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\n[output truncated at 64 bytes]"
+```
+
+The gate was still recorded as failed — the exit code is set independently — but **"gate exceeded 600000ms and
+was killed" was gone.** Precisely when a hang is most likely, which is when output is large, the word that
+says *why* disappeared. That is the same wrong-cause family already fixed three times in this engine, and it
+arrived through the fix for the round before it. A reserve is carved out of the ceiling now, so the note
+always has room and the recorded text still never exceeds the limit: the same two inputs record 64 and 10
+bytes, with the reason present.
+
+**Evidence — the detector.** The round above added `.gitignore` entries for the probe fixtures this suite
+creates in the repository root. The reasoning was that a probe left behind by a run killed mid-test would mark
+the tree DIRTY and invalidate the evidence report. That reasoning was backwards, and the review said so:
+`git status --porcelain` does not report ignored paths, so the entries made a checkout **with stray files in
+it report as clean**.
+
+Reverted. A leftover probe *should* read as a dirty tree — invalidating evidence recorded over a tree that
+holds files nobody accounted for is the conservative, correct direction, and it is the direction this whole
+engine argues for everywhere else. **Adding a path to `.gitignore` so a cleanliness check stops mentioning it
+is teaching a detector to look away**, which is the defect class this tool exists to remove, applied by me to
+the tool itself. The test already enters its cleanup block before creating anything, so a leftover needs a
+hard kill; if that happens, the loud signal is the one worth having.
+
+**Superseded fingerprint:** ~~`99a096b7ec77c2cae76e3fef297df5c18ce6a171208600a9d925f7238f0f5a68`~~. Current,
+recomputed independently in both repositories and identical:
+`16ad314a`, in full below.
+
+`16ad314a6f9e3c5f1cdaddc6e650a0bbd96f1b1ab53d09ba45b54ef48e86e7dc`
+
+**Commands run on the tree before this entry was appended:** `node scripts/verify-claims.mjs` →
+`1072 claims … 0 FAILED`; `pnpm exec vitest run tests/claims-ledger.test.ts` → `Tests 83 passed (83)`;
+`npx tsc --noEmit` → 0 errors; `pnpm architecture:gates` → `All G1 checks passed.` In the RN migration repo:
+`477 claims … 0 FAILED`, ledger `82 passed`, typecheck and lint clean.
+
+**Verdict:** VERIFIED.

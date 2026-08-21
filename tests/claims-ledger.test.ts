@@ -996,8 +996,14 @@ describe("the engine refuses what it says it refuses", () => {
     expect(bufferModule.Buffer.byteLength(collector.text, "utf8")).toBeLessThanOrEqual(limit);
     expect(collector.text).toContain("truncated");
 
-    // A note after truncation cannot push it back over the line either.
+    // A note after truncation cannot push it back over the line — AND must
+    // still arrive. Routing diagnostics through the output budget meant a gate
+    // that filled the budget and then timed out was recorded as failed with the
+    // reason missing: exactly when a hang is most likely, the word "timeout"
+    // disappeared. A failure without its cause is the defect this engine keeps
+    // finding in itself, so the note now has reserved room.
     collector.note("\nrefused: gate exceeded 1ms and was killed");
+    expect(collector.text).toContain("refused: gate exceeded");
     expect(bufferModule.Buffer.byteLength(collector.text, "utf8")).toBeLessThanOrEqual(limit);
   });
 

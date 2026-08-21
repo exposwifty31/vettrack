@@ -130,5 +130,5 @@
   "prLedger": "docs/pr-ledger.json",
   "evidenceReport": "docs/audit/evidence-run.json",
   "siblingRepo": "exposwifty31/VetTrack---RN-Migration- (the Expo/RN repo; same engine as scripts/verify/*.js)",
-  "engineFingerprint": "99a096b7ec77c2cae76e3fef297df5c18ce6a171208600a9d925f7238f0f5a68"
+  "engineFingerprint": "16ad314a6f9e3c5f1cdaddc6e650a0bbd96f1b1ab53d09ba45b54ef48e86e7dc"
 }
