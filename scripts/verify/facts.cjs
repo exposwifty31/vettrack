@@ -12,10 +12,25 @@ const path = require("node:path");
 /**
  * Match one glob SEGMENT, where `*` matches any run of characters within it.
  *
- * Two pointers with a single re-entry anchor — linear in the segment, with no
- * recursion and no backtracking tree. `?` is compared as an ordinary character,
- * which is this repository's rule: no governed document uses it as a wildcard
- * and several name files that contain one.
+ * Two pointers with a single re-entry anchor: no recursion and no backtracking
+ * TREE, so the cost is polynomial rather than exponential.
+ *
+ * It is NOT linear, and this comment said it was. A retry after a star rechecks
+ * the literal that follows it, so the bound is O(pattern x text) per segment: a
+ * star, then a 192-character literal, matched against a 768-character subject
+ * costs 111,361 comparisons — 2.5 ms. Caught in review as an overclaim, and the
+ * reviewer's comparison counts reproduced here exactly.
+ *
+ * The bound is acceptable because both factors are small, not because the walk
+ * is cheap per character. A pattern comes from a document span the scanner caps
+ * at 200 characters, and a subject is ONE path segment. Measured on both
+ * repositories carrying this engine, the worst 200-character pattern against
+ * every tracked path segment costs 5.9 ms in total over 11,302 segments and
+ * 2.6 ms over 1,846. The exponential regex it replaced did not finish at all.
+ *
+ * `?` is compared as an ordinary character, which is this repository's rule:
+ * no governed document uses it as a wildcard and several name files that
+ * contain one.
  */
 function segmentMatches(pattern, text) {
   let p = 0;

@@ -747,7 +747,7 @@ describe("the engine refuses what it says it refuses", () => {
     }
   });
 
-  it("matches a wildcard-dense glob in linear time instead of hanging", () => {
+  it("matches a wildcard-dense glob without building a backtracking tree", () => {
     // The previous translation built a regex whose adjacent `[^/]*` groups
     // backtracked against each other. Measured on this engine before the change:
     // `*a` four times matched in 1.1ms, six in 51ms, eight in 996ms, and ten did
@@ -756,6 +756,22 @@ describe("the engine refuses what it says it refuses", () => {
     // documentation edit could wedge the gate with no verdict at all.
     const pattern = `docs/${"*a".repeat(64)}.md`;
     const subject = `docs/${"a".repeat(40)}X`;
+    const started = Date.now();
+    expect(globToRegExp(pattern).test(subject)).toBe(false);
+    expect(Date.now() - started).toBeLessThan(1000);
+  });
+
+  it("stays bounded on a leading star followed by a long near-match suffix", () => {
+    // The shape the wildcard-dense case above does NOT reach, and the reason
+    // the word "linear" was wrong in this suite and in `facts`: one star at the
+    // front and a long literal after it, so every retry rechecks that literal.
+    // The bound is O(pattern x subject) per segment — 111,361 comparisons for
+    // exactly this case, reproduced from the review that caught the overclaim.
+    // Bounded is the property worth pinning, and it holds because both factors
+    // are capped: the scanner truncates a span at 200 characters and a subject
+    // is one path segment.
+    const pattern = `docs/*${"a".repeat(192)}b.md`;
+    const subject = `docs/${"a".repeat(768)}.md`;
     const started = Date.now();
     expect(globToRegExp(pattern).test(subject)).toBe(false);
     expect(Date.now() - started).toBeLessThan(1000);

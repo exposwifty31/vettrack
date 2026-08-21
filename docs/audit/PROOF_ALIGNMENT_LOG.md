@@ -9285,10 +9285,30 @@ wrong answer: **no answer**, which is the one outcome this engine has no label f
 whole job is to produce a disposition for every claim.
 
 **Fixed by removing the regex, not by bounding it.** A cap would have been an arbitrary threshold that also
-refused legitimate patterns. Glob matching is a two-pointer walk with a single re-entry anchor — linear, no
-recursion, no backtracking tree — and the same rule that matches one segment matches the segment list, so a
-`**` costs an anchor rather than a tree. `globToRegExp` now returns a matcher rather than a `RegExp`, which
-every caller already treated it as: nothing asked for anything but `test`.
+refused legitimate patterns. Glob matching is a two-pointer walk with a single re-entry anchor — no recursion
+and no backtracking tree, so the cost is polynomial rather than exponential — and the same rule that matches
+one segment matches the segment list, so a `**` costs an anchor rather than a tree. `globToRegExp` now returns
+a matcher rather than a `RegExp`, which every caller already treated it as: nothing asked for anything but
+`test`.
+
+*Corrected 2026-08-21 (this passage previously read ~~"a two-pointer walk with a single re-entry anchor —
+linear, no recursion, no backtracking tree"~~):* the walk is bounded but **not linear**. A retry after a star
+rechecks the literal that follows it, so the cost is O(pattern x subject) per segment: a star followed by a
+192-character literal, matched against a 768-character subject, costs 111,361 comparisons. CodeRabbit caught
+the overclaim in review, and its comparison counts reproduced here exactly — 12,545 at a 64-character suffix,
+49,665 at 128, 111,361 at 192.
+
+The algorithm did not change and did not need to. The bound is acceptable because both factors are capped, not
+because the walk is cheap per character: a pattern comes from a span the scanner truncates at 200 characters,
+and a subject is ONE path segment. Measured, the worst 200-character pattern run against every tracked path
+segment costs 5.9 ms in total here (11,302 segments) and 2.6 ms in the sibling repository (1,846). The
+exponential regex it replaced did not finish at all. Replacing a bounded algorithm to settle a documentation
+defect would have been the fourth option this repo does not allow itself.
+
+**The finding worth keeping is where the false sentence lived.** It was in this log — a governed document —
+and the four layers that govern this log resolve paths, versions, commits and declared absence. None of them
+resolves a claim about how code *behaves*. The gate would never have caught this, a human reviewer did, and
+that boundary is worth stating plainly rather than discovering later.
 
 **Semantics pinned before and after**, eleven cases: a `**` segment matching zero directories and many; a
 single `*` still stopping at a separator; `?` still literal; the `suffix` form still resolving a shorthand
