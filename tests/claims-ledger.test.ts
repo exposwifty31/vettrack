@@ -1001,6 +1001,35 @@ describe("the engine refuses what it says it refuses", () => {
     expect(bufferModule.Buffer.byteLength(collector.text, "utf8")).toBeLessThanOrEqual(limit);
   });
 
+  it("bounds the recorded text by its own bytes, not the bytes it was fed", () => {
+    // This cap has been wrong THREE times, each by measuring the wrong thing:
+    // `output.length` (UTF-16 code units), then the INPUT byte length. A
+    // malformed input byte decodes to U+FFFD — three bytes out for one byte in
+    // — so a gate emitting invalid bytes inside the budget still blew through
+    // the ceiling. Measured before this fix: a 64-byte cap recorded 130 bytes.
+    const bufferModule = require("node:buffer") as typeof import("node:buffer");
+    const collector = rules.createOutputCollector(64);
+    const stream = collector.stream();
+    stream.write(bufferModule.Buffer.from(new Array(40).fill(0xff)));
+    stream.end();
+    expect(bufferModule.Buffer.byteLength(collector.text, "utf8")).toBeLessThanOrEqual(64);
+    expect(collector.truncated).toBe(true);
+  });
+
+  it("trims the truncation marker when the budget cannot hold it", () => {
+    // A ceiling below the marker's own length used to emit the whole marker and
+    // nothing else — 31 bytes recorded against a 10-byte cap. In that case the
+    // marker is the thing that gets cut: a note overflowing the limit it
+    // announces is precisely the defect this helper exists to prevent.
+    const bufferModule = require("node:buffer") as typeof import("node:buffer");
+    const collector = rules.createOutputCollector(10);
+    const stream = collector.stream();
+    stream.write(bufferModule.Buffer.from("x".repeat(200), "utf8"));
+    stream.end();
+    expect(bufferModule.Buffer.byteLength(collector.text, "utf8")).toBeLessThanOrEqual(10);
+    expect(collector.truncated).toBe(true);
+  });
+
   it("routes a Windows command shim through the command processor", () => {
     // `npm.cmd` with `shell: false` CANNOT START: a `.cmd` is a script, not an
     // executable image. The branch that renamed the token announced Windows

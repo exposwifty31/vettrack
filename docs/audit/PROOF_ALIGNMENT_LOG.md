@@ -9456,3 +9456,45 @@ recomputed independently in both repositories and identical:
 → `all declared gates passed`, which exercises the new collector end to end.
 
 **Verdict:** VERIFIED.
+
+### The byte cap was wrong a third time, and the PATH fix is now confirmed rather than reasoned, 2026-08-21
+
+**Claim:** `createOutputCollector` bounds the text it records, not the bytes it was handed; and the SonarCloud
+regression named in the entry above was in fact the `PATH` lookup.
+
+**Evidence — the cap.** Measured against the collector as it stood, before any edit:
+
+```text
+maxBytes=64, fed 40 malformed input bytes  ->  130 bytes recorded
+maxBytes=10, fed 200 bytes                 ->   31 bytes recorded (the marker alone)
+```
+
+Both are real, and the first is the interesting one. A malformed input byte decodes to `U+FFFD`, which is
+**three bytes out for one byte in**, so a gate emitting invalid bytes inside the budget still blew through the
+ceiling. The second case is simpler: a ceiling below the marker's own length emitted the whole marker anyway.
+
+**This cap has now been wrong three times, each by measuring the wrong thing** — `output.length` (UTF-16 code
+units), then the INPUT byte length, now the decoded byte length. The lesson is not "measure bytes"; it is that
+a limit must be measured on **the artefact it constrains**, which here is the recorded text and nothing else.
+It counts what lands in the text now, and the marker is trimmed rather than exempt: a note that overflows the
+limit it announces is precisely the defect this helper exists to prevent. After the change, the same two
+inputs record 61 and 10 bytes, and a four-byte character split across two writes still returns whole.
+
+**Evidence — the `PATH` fix.** The entry above said SonarCloud's move from passing to a B security rating was
+*explained by* the `spawn("taskkill", …)` lookup, and said plainly that the analysis could not be read from
+here because this environment blocks `sonarcloud.io`. That was a hypothesis, and it is now confirmed: with the
+call resolved from `%SystemRoot%\System32`, the quality gate on the sibling repository returned to **passing**
+with 0 security hotspots. Recording the confirmation next to the hypothesis, because a guess that turns out
+right is still a guess until something checks it.
+
+**Superseded fingerprint:** ~~`8fbfc71960f3a8d5952f183268d490bb51e9dbceab5de51ef7e0738fb1580ed9`~~. Current,
+recomputed independently in both repositories and identical:
+`54550c0097ae2d5fd863d41fa81c6204e72782f60202fcbd32e5de315df455f7`.
+
+**Commands run on the tree before this entry was appended:** `node scripts/verify-claims.mjs` →
+`1070 claims … 0 FAILED`; `pnpm exec vitest run tests/claims-ledger.test.ts` → `Tests 83 passed (83)`;
+`npx tsc --noEmit` → 0 errors; `pnpm architecture:gates` → `All G1 checks passed.` In the RN migration repo:
+`477 claims … 0 FAILED`, ledger `82 passed`, typecheck and lint clean, and `node scripts/verify-evidence.mjs`
+→ `all declared gates passed`.
+
+**Verdict:** VERIFIED.

@@ -246,14 +246,58 @@ const GATE_TOKEN = /^[\w./:@=-]+$/;
  */
 function createOutputCollector(maxBytes) {
   const marker = `\n[output truncated at ${maxBytes} bytes]`;
-  const budget = Math.max(0, maxBytes - Buffer.byteLength(marker, "utf8"));
+  const markerBytes = Buffer.byteLength(marker, "utf8");
+  // The marker has to fit INSIDE the ceiling, and when the ceiling is smaller
+  // than the marker the marker is what gets trimmed. A note that overflows the
+  // limit it announces is the defect this whole helper exists to prevent.
+  const budget = Math.max(0, maxBytes - markerBytes);
   let text = "";
-  let bytes = 0;
+  let textBytes = 0;
   let truncated = false;
+
+  /**
+   * Append at most `room` bytes of `piece`, cutting on a character boundary.
+   * Returns the bytes actually added.
+   */
+  const appendUpTo = (piece, room) => {
+    if (!piece || room <= 0) return 0;
+    const buf = Buffer.from(piece, "utf8");
+    if (buf.length <= room) {
+      text += piece;
+      return buf.length;
+    }
+    // A byte-boundary slice can split a character; dropping the trailing
+    // replacement keeps the recorded text valid UTF-8.
+    const kept = buf.subarray(0, room).toString("utf8").replace(/\uFFFD$/, "");
+    text += kept;
+    return Buffer.byteLength(kept, "utf8");
+  };
 
   const cut = () => {
     truncated = true;
-    text += marker;
+    textBytes += appendUpTo(marker, maxBytes - textBytes);
+  };
+
+  /**
+   * COUNT WHAT LANDS IN THE TEXT, not what came in.
+   *
+   * This cap has now been wrong three times, each time by measuring the wrong
+   * thing: first `output.length`, which counts UTF-16 code units; then the
+   * INPUT byte length, which is not the output byte length either — a malformed
+   * input byte decodes to U+FFFD, three bytes out for one byte in, so a gate
+   * emitting invalid bytes inside the budget still blew through the ceiling.
+   * Measured before this fix: a 64-byte cap recorded 130 bytes.
+   */
+  const add = (piece) => {
+    if (truncated || !piece) return;
+    const bytes = Buffer.byteLength(piece, "utf8");
+    if (textBytes + bytes <= budget) {
+      text += piece;
+      textBytes += bytes;
+      return;
+    }
+    textBytes += appendUpTo(piece, budget - textBytes);
+    cut();
   };
 
   return {
@@ -263,37 +307,20 @@ function createOutputCollector(maxBytes) {
       return {
         write(chunk) {
           if (truncated) return;
-          const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(String(chunk), "utf8");
-          const room = budget - bytes;
-          if (buf.length <= room) {
-            bytes += buf.length;
-            text += decoder.write(buf);
-            return;
-          }
-          text += decoder.write(buf.subarray(0, Math.max(room, 0)));
-          text += decoder.end();
-          cut();
+          add(decoder.write(Buffer.isBuffer(chunk) ? chunk : Buffer.from(String(chunk), "utf8")));
         },
         // A stream can end mid-character. Flushing turns the held bytes into
-        // the replacement they are rather than dropping them silently.
+        // the replacement they are rather than dropping them silently — and
+        // that replacement is three bytes, which is why it goes through `add`.
         end() {
-          if (!truncated) text += decoder.end();
+          if (!truncated) add(decoder.end());
         },
       };
     },
 
     /** A diagnostic the runner adds itself, bounded by the same budget. */
     note(line) {
-      if (truncated) return;
-      const buf = Buffer.from(String(line), "utf8");
-      const room = budget - bytes;
-      if (buf.length > room) {
-        text += buf.subarray(0, Math.max(room, 0)).toString("utf8").replace(/\uFFFD$/, "");
-        cut();
-        return;
-      }
-      bytes += buf.length;
-      text += String(line);
+      add(String(line));
     },
 
     get text() {
