@@ -29,12 +29,20 @@ The body below is the source report's text. Two changes were made to it, listed 
    note's parenthetical, so the leading citation was corrected to match. A path that resolves to
    nothing is not a snapshot of anything.
 
-2. **One internally inconsistent row, FLAGGED not rewritten.** `GET /api/health/ready` carries
-   `other = test (structural)` and a verdict of `NO-CONSUMER`, while this matrix's own legend
-   reserves `TEST-ONLY` for exactly that evidence. It is marked ⚠︎ rather than reclassified:
-   changing it would desync the row from the source's counts table, and this is another author's
-   dated snapshot, not a live document to rebalance. The Lane 4.2 triage gives every row a verdict
-   anyway, and this is one of the rows it must decide.
+2. **One row looked internally inconsistent. It is not — resolved, flag removed.**
+   `GET /api/health/ready` carries `other = test (structural)` with a verdict of `NO-CONSUMER`,
+   while this matrix's legend reserves `TEST-ONLY` for test-only evidence. It was flagged ⚠︎ in
+   PR #209 rather than reclassified, because rewriting it would have desynced the row from the
+   source's counts table.
+
+   The dispute was then settled on that PR, against the reclassification: the cited test is a
+   **structural mount-list assertion** — it checks that the route is registered — not a consumer
+   that calls it. `TEST-ONLY` means "only tests call this route", which is a different claim.
+   `NO-CONSUMER` is correct and the ⚠︎ is gone.
+
+   Recorded rather than silently un-flagged, because "a test references it" and "a test consumes
+   it" are the distinction the whole NO-CONSUMER column turns on, and the next row that raises
+   this question deserves the answer rather than the argument.
 
 **Counts, recomputed mechanically from the table rows in this file** rather than quoted from the
 header — 311 rows total:
@@ -248,7 +256,7 @@ Consumer evidence: mechanical extraction of every `/api/*`-shaped string/templat
 | GET | `/api/health` | - | - | ops runbook + audit script (docs/release-runbook.md, docs/vettrack-safari-audit.json) | operator-surface |
 | GET | `/api/health/data-integrity` | - | - | none found | SUSPECTED NO-CONSUMER |
 | GET | `/api/health/live` | - | - | audit script (docs/vettrack-safari-audit.json) | operator-surface |
-| GET | `/api/health/ready` | - | - | test (structural) | NO-CONSUMER ⚠︎ |
+| GET | `/api/health/ready` | - | - | test (structural) | NO-CONSUMER |
 | GET | `/api/health/ready/data-integrity` | - | - | none found | NO-CONSUMER |
 | GET | `/api/health/ready/live` | - | - | none found | NO-CONSUMER |
 | GET | `/api/health/ready/startup` | - | - | none found | NO-CONSUMER |
