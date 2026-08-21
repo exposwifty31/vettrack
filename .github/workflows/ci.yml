@@ -270,6 +270,25 @@ jobs:
       - name: 🔌 Integration ops suite
         run: pnpm test:integration:ops
 
+      # doctor-shift-gate and seed-reviewer-demo are excluded from `pnpm test` by
+      # vite.config.ts (both need a real database) and were named by NO workflow, so
+      # the cross-repo contract they pin — migrations 181-184 and the
+      # `source: "doctor_gate"` shape the RN app and the TV ward board both consume —
+      # was enforced by nothing, on either side of the seam.
+      #
+      # NAMED FILES, deliberately, rather than `pnpm test:db-integration`. That
+      # script's config also includes equipment-operational-state, which the step
+      # above already covers via test:integration:ops. Adding the whole config would
+      # run that file twice per PR, and measured on a clean database it FAILS in this
+      # config's ordering (10 of 49 — worker sweeps and operational metrics) while
+      # passing in the ops one. Importing a known instability to buy coverage that
+      # already exists is a bad trade. These two pass clean: 15 tests, ~30s.
+      - name: 🩺 Cross-repo contract suites (doctor gate + reviewer seed)
+        run: >-
+          pnpm exec vitest run --config vitest.db-integration.config.ts
+          tests/doctor-shift-gate.integration.test.ts
+          tests/seed-reviewer-demo.integration.test.ts
+
   # packages/rfid-controller ships its own vitest config + tsconfig and is a
   # contract-bearing surface (signed batches to POST /api/rfid/events). Neither
   # script was reachable from any workflow, so its tests and types were enforced

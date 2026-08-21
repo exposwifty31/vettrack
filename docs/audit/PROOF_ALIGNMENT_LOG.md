@@ -9748,3 +9748,49 @@ two registry entries into false `obsolete` failures that CI does not see. Same m
 a false PASS. `ignoredPathPrefixes` in `verify.config.json` covers neither case today.
 
 **Verdict:** VERIFIED for the reverse-check defect. The suffix-resolution finding above is OPEN.
+
+## 2026-08-21 — Route matrix committed before its source report is deleted (claude/unified-program-v2-review-44db19)
+
+**Claim:** The 311-route consumer matrix — including the 43 rows with no consumer — now lives at
+`docs/audit/route-consumer-matrix.md`, extracted from an untracked scratch report
+(`AUDIT-repo-b.md` → `docs/audit/route-consumer-matrix.md`) before the cleanup lane deletes it.
+The source was never tracked, so it is not resolvable from this tree by design.
+
+**Evidence:**
+- Command: `grep -cE '^\| (GET|POST|PUT|PATCH|DELETE) ' docs/audit/route-consumer-matrix.md` → `311`,
+  matching the source report's own headline count of 311 method+path pairs.
+- Command: `grep -c 'NO-CONSUMER' docs/audit/route-consumer-matrix.md` → `65` (43 pure NO-CONSUMER
+  plus the dev-only / suspected / stub / staged rows and the counts table).
+- Governance checked, not assumed: `verify.config.json` `governedDocs` holds 21 entries and the only
+  one under `docs/audit/` is `PROOF_ALIGNMENT_LOG.md`, so the new file is deliberately ungoverned.
+- Command: `pnpm verify:claims` after the extraction → `All claims accounted for`, 0 FAILED.
+
+**Verdict:** VERIFIED
+
+## 2026-08-21 — Cross-repo contract suites were enforced by no workflow (claude/unified-program-v2-review-44db19)
+
+**Claim:** `tests/doctor-shift-gate.integration.test.ts` and `tests/seed-reviewer-demo.integration.test.ts`
+now run in CI, in the existing `integration-ops` job, which already provisions Postgres and applies
+migrations.
+
+**Evidence:**
+- Command: `grep -rn 'doctor-shift-gate' .github/` and `grep -rn 'seed-reviewer' .github/` → no output
+  from either. Zero mentions across every workflow before this change.
+- `.github/workflows/ci.yml:222` — `integration-ops` job; its only suite step ran
+  `pnpm test:integration:ops`, whose config (`vitest.integration.ops.config.ts:21-24`) includes only
+  `equipment-operational-state` and `equipment-waitlist`.
+- `vitest.db-integration.config.ts` — includes all three DB suites, which is why the whole script was
+  NOT wired: measured on a freshly created and migrated database, that config run produced
+  `Test Files 1 failed | 2 passed (3)`, `Tests 10 failed | 54 passed (64)`, and the failing file was
+  `tests/equipment-operational-state.integration.test.ts` (worker sweeps + operational metrics) —
+  the one file CI already covers via the ops config, where it passes. Wiring the whole config would have
+  duplicated that file and imported a failure. The two target files are named explicitly instead.
+- Test: the two named files alone, on a clean migrated database →
+  `Test Files 2 passed (2)`, `Tests 15 passed (15)`, 30.25s.
+- Command: YAML re-parsed after the edit → 10 jobs, `integration-ops` step list ends with
+  `🩺 Cross-repo contract suites (doctor gate + reviewer seed)`.
+
+**Not fixed here:** the 10 `equipment-operational-state` failures under the db-integration config are
+recorded as a separate finding, not silently absorbed. They do not reproduce under the ops config.
+
+**Verdict:** VERIFIED for the wiring. The equipment-operational-state cross-config failure is OPEN.
