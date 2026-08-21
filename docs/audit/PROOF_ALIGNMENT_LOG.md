@@ -9972,8 +9972,10 @@ failure is worth recording rather than just fixing.
   depcruise, tenant-scope). `verify:claims` then reported
   `995 claims: 983 verified, 10 registered, 1 attested, 1875 excluded by rule, 1 FAILED`.
 - The one failure: `docs/audit/PROOF_ALIGNMENT_LOG.md:9910 [pull-request] no merge commit for #204`.
-  My heading read `## 2026-08-21 — PR #204 …`, and `PR #NNN` is claim-shaped: the gate resolves it to
-  a merge commit. The pull request is open, so there is none.
+  My heading carried the claim-shaped `PR #` + number form, which the gate resolves to a merge
+  commit. The pull request is open, so there is none. The offending form is deliberately NOT
+  reproduced in this entry — quoting it verbatim would re-trigger the same gate on this very
+  record of the failure.
 - **The suggested remedy did not apply, and taking it would have been worse than the bug.**
   `docs/pr-ledger.json`'s `$comment` reads: "Pull requests that landed WITHOUT a merge commit (rebase
   or squash merge) … that sha must be an ancestor of the default branch." #204 has not landed at all.
