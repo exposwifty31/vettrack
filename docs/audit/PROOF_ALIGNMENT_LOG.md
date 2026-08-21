@@ -9794,3 +9794,70 @@ migrations.
 recorded as a separate finding, not silently absorbed. They do not reproduce under the ops config.
 
 **Verdict:** VERIFIED for the wiring. The equipment-operational-state cross-config failure is OPEN.
+
+## 2026-08-21 — The tenant gate could not fail, and one flag would not have fixed it (claude/unified-program-v2-review-44db19)
+
+**Claim:** `clinicId` scope enforcement is now a gate that can actually fail, in
+`pnpm architecture:gates`, in CI, and as a declared evidence gate — failing on NEW findings
+only, against a committed baseline of the standing set.
+
+**Evidence:**
+- `scripts/architecture/run-architecture-gates.mjs` — before this change it ran tsc×2,
+  dependency-cruiser, `compare-cycles.mjs` and `verify-claims.mjs`, and did not mention the
+  tenant lint at all. Read in full, not sampled.
+- `.github/workflows/ci.yml` — the step DID exist, contradicting a "not run in CI" reading, but was
+  disarmed twice over: the command hardcoded `--warn-only`, which the script's own `--help`
+  documents as "exit 0 (default, G3)", and the step also carried `continue-on-error: true`.
+  **Removing `continue-on-error` alone would have changed nothing** — the command exits 0 on its
+  own. Both were changed.
+- Command: `node scripts/architecture/tenant-query-lint.mjs` (full repo) → **203** findings,
+  3 waived, `exit=0`. The plan's cited 204 had already moved; measured, not quoted.
+- Baseline written: `203 findings across 138 file::table keys`
+  (`.tenant-lint-known-violations.json`).
+- Test: `tests/tenant-lint-baseline.test.ts` → RED first, 6 failed + import error
+  (`diffAgainstBaseline` not exported); after implementation, `Tests 6 passed (6)`, and the
+  import cost fell 531ms → 21ms, which is the direct-run guard proving the scan no longer runs
+  on import.
+- **End-to-end refusal proved both ways**, not just the passing one: a throwaway probe file under
+  `server/routes/` (~~`__tenant_lint_probe.ts`~~ — created, run against, and deleted within the
+  session, so it is deliberately absent from the tree) containing an unscoped
+  `db.select().from(equipment)` → `1 NEW tenant-scope finding(s) not in the baseline`, `exit=1`,
+  naming the probe at line 3 column 21. Probe deleted → `no new findings vs baseline (203 known)`,
+  `exit=0`.
+- Command: `pnpm architecture:gates` → tenant lint runs inside it, then
+  `[architecture-gates] All G1 checks passed.`
+- Command: `actionlint .github/workflows/ci.yml` → exit 0.
+- Test: `pnpm test` on a clean machine → `Test Files 741 passed (741)`,
+  `Tests 6808 passed | 11 skipped`.
+
+**Verdict:** VERIFIED
+
+## 2026-08-21 — 18 failing test files were a stale local database, not the repo (claude/unified-program-v2-review-44db19)
+
+**Claim:** A `pnpm test` run showing `18 failed | 723 passed` had no defect behind it. Two
+environmental causes, both outside the working tree; recorded so the count is not later mistaken
+for a regression introduced by the same branch.
+
+**Evidence:**
+- Error read rather than summarised: `column "clinic_seq" of relation "vt_event_outbox" does not
+  exist` (Postgres 42703), thrown from `server/lib/realtime-outbox.ts:33` via
+  `insertRealtimeDomainEvent`.
+- `tests/vitest-setup.ts:10` — with no `.env` in this worktree, tests fall back to
+  `postgres://vettrack:vettrack@127.0.0.1:5432/vettrack_test`.
+- Command: `information_schema.columns` query against `vettrack_test` for
+  `vt_event_outbox.clinic_seq` → empty. The column added by
+  `migrations/186_vt_event_outbox_clinic_seq.sql` was absent from the DATABASE — a state no
+  repository diff can produce, which is what rules the branch out as the cause.
+- Command: `pnpm db:migrate` against that database → `Running migration:
+  186_vt_event_outbox_clinic_seq.sql` was the ONLY pending one. Re-run of
+  `tests/rfid-ingest.test.ts` → `Tests 8 passed (8)`, from 5 failed.
+- The 18th file, `tests/xlsx-write-only-guard.test.ts`, had a DIFFERENT cause and was checked
+  separately rather than assumed covered: `Test timed out in 5000ms`, no database access
+  (`grep` for `server/db` → 0 hits). Measured standalone, its actual work is
+  `walk: 33 ms | 1095 files` and `read all: 161 ms | 8.2 MB` — ~200ms against a 5000ms limit.
+  It failed only while a second full suite was running concurrently, which was my own doing.
+- Test: one clean full run, nothing else on the CPU → `Test Files 741 passed (741)`,
+  `Tests 6808 passed | 11 skipped (6819)`.
+
+**Verdict:** VERIFIED — no repository defect. The stale local database is an environment fix
+(`pnpm db:migrate` against `vettrack_test`), already applied.

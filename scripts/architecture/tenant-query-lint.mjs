@@ -9,7 +9,7 @@
  * @see docs/architecture/tenant-enforcement.md
  * @see docs/architecture/architecture-hardening-addendum.md §2.5, §9.5
  */
-import { readFileSync, existsSync, readdirSync, statSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync, readdirSync, statSync } from "node:fs";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
@@ -43,6 +43,8 @@ function parseArgs(argv) {
     base: "origin/main",
     paths: [],
     listTables: false,
+    baseline: null,
+    writeBaseline: false,
   };
 
   for (let i = 0; i < argv.length; i++) {
@@ -70,6 +72,15 @@ function parseArgs(argv) {
         break;
       case "--base":
         opts.base = argv[++i] ?? opts.base;
+        break;
+      // --baseline IMPLIES enforcement. It is not a reporting flag: a mode that
+      // loads a baseline and then exits 0 regardless is the disarmed gate this
+      // whole mechanism exists to replace.
+      case "--baseline":
+        opts.baseline = argv[++i] ?? null;
+        break;
+      case "--write-baseline":
+        opts.writeBaseline = true;
         break;
       case "--paths":
         while (argv[i + 1] && !argv[i + 1].startsWith("--")) {
@@ -105,6 +116,8 @@ Options:
   --paths <files>   Explicit file list (repeatable)
   --stdin           Read "path:line:..." lines from stdin (rg pipe)
   --base <ref>      Git base for --touched (default: origin/main)
+  --baseline <f>    Fail (exit 1) only on findings absent from baseline file f
+  --write-baseline  Regenerate that file from the current scan (with --baseline)
   --list-tables     Print schema-derived TENANT_TABLES and exit
   -h, --help        This message
 `);
@@ -354,6 +367,62 @@ function printReport(findings, tenantTableCount, scannedCount) {
   }
 }
 
+/**
+ * Compare live findings against the committed baseline.
+ *
+ * WHY A BASELINE AND NOT A CLEANUP FIRST. There are ~200 standing findings, and
+ * every one of them has been hand-checked at least once (the audit that produced
+ * them found 0 confirmed clinicId gaps). Blocking on all of them means the gate
+ * never turns on; leaving it warn-only means a REAL leak is indistinguishable
+ * from 200 lines nobody was ever stopped by. Freeze the known set, fail on new.
+ *
+ * KEYED BY `file::table` AND A COUNT, deliberately not `file:line`. A line number
+ * shifts on any unrelated edit above it, so a line-keyed baseline turns ordinary
+ * refactors into false regressions and teaches people to regenerate the baseline
+ * whenever it goes red — which is the same as not having one. The count is what
+ * still catches a SECOND violation of an already-known table in an already-known
+ * file, which a bare "is this file/table known?" check would wave straight through.
+ *
+ * A missing or malformed baseline is zero-tolerance, never a free pass: an
+ * unreadable baseline and an empty one must not behave alike.
+ *
+ * @param {Finding[]} findings live findings (waived ones are ignored here)
+ * @param {{ violations?: Record<string, number> }|null|undefined} baseline
+ * @returns {{ regressions: {key:string,file:string,table:string,allowed:number,found:number,findings:Finding[]}[], resolved: string[] }}
+ */
+export function diffAgainstBaseline(findings, baseline) {
+  /** @type {Map<string, Finding[]>} */
+  const live = new Map();
+  for (const f of findings ?? []) {
+    if (f.waived) continue;
+    const key = `${f.file}::${f.table}`;
+    if (!live.has(key)) live.set(key, []);
+    live.get(key).push(f);
+  }
+
+  const known =
+    baseline && typeof baseline === "object" && baseline.violations && typeof baseline.violations === "object"
+      ? baseline.violations
+      : {};
+
+  const regressions = [];
+  for (const [key, group] of live) {
+    const allowed = Number.isInteger(known[key]) ? known[key] : 0;
+    if (group.length > allowed) {
+      const [file, table] = key.split("::");
+      regressions.push({ key, file, table, allowed, found: group.length, findings: group });
+    }
+  }
+
+  // Reported, never failed on. A gate that punishes a PR for FIXING a violation
+  // is a gate people learn to route around.
+  const resolved = Object.keys(known).filter(
+    (k) => (live.get(k)?.length ?? 0) < known[k],
+  );
+
+  return { regressions, resolved };
+}
+
 async function main() {
   const opts = parseArgs(process.argv.slice(2));
 
@@ -395,13 +464,90 @@ async function main() {
   printReport(allFindings, tenantTables.size, files.length);
 
   const violationCount = allFindings.filter((f) => !f.waived).length;
+
+  if (opts.baseline) {
+    const baselinePath = path.resolve(repoRoot, opts.baseline);
+    const live = allFindings.filter((f) => !f.waived);
+
+    if (opts.writeBaseline) {
+      const violations = {};
+      for (const f of live) {
+        const key = `${f.file}::${f.table}`;
+        violations[key] = (violations[key] ?? 0) + 1;
+      }
+      const sorted = Object.fromEntries(Object.entries(violations).sort(([a], [b]) => a.localeCompare(b)));
+      writeFileSync(
+        baselinePath,
+        `${JSON.stringify(
+          {
+            $comment:
+              "Frozen set of known tenant-lint findings. The gate fails on anything NOT here. " +
+              "Keyed file::table with a count, not file:line, so an unrelated edit above a finding " +
+              "does not read as a regression. Regenerate ONLY to record a deliberate decision: " +
+              "node scripts/architecture/tenant-query-lint.mjs --all --baseline .tenant-lint-known-violations.json --write-baseline",
+            totalFindings: live.length,
+            violations: sorted,
+          },
+          null,
+          2,
+        )}\n`,
+      );
+      console.log(`[tenant-lint] wrote baseline: ${live.length} findings across ${Object.keys(sorted).length} file::table keys`);
+      process.exit(0);
+    }
+
+    // An unreadable baseline is a hard failure. Falling back to "no baseline"
+    // would silently turn a typo in a path into zero enforcement, which looks
+    // exactly like a clean run.
+    let baseline;
+    try {
+      baseline = JSON.parse(readFileSync(baselinePath, "utf8"));
+    } catch (err) {
+      console.error(`[tenant-lint] baseline unreadable at ${opts.baseline}: ${err.message}`);
+      console.error("[tenant-lint] refusing to run unenforced. Fix the path or regenerate with --write-baseline.");
+      process.exit(2);
+    }
+
+    const { regressions, resolved } = diffAgainstBaseline(live, baseline);
+
+    if (resolved.length > 0) {
+      console.log(`\n[tenant-lint] ${resolved.length} baseline entr(ies) no longer reproduce — tighten the baseline when convenient:`);
+      for (const key of resolved) console.log(`  - ${key}`);
+    }
+
+    if (regressions.length > 0) {
+      console.error(`\n[tenant-lint] ${regressions.length} NEW tenant-scope finding(s) not in the baseline:\n`);
+      for (const r of regressions) {
+        console.error(`  ${r.key}  (baseline allows ${r.allowed}, found ${r.found})`);
+        for (const f of r.findings) console.error(`    ${f.file}:${f.line}:${f.column}  .from(${f.table})`);
+      }
+      console.error(
+        "\n[tenant-lint] Every query must filter by clinicId. Scope the query, or — if this is a" +
+          "\n               genuine false positive — waive it on the line above with" +
+          "\n               // tenant-lint:scoped <reason>",
+      );
+      process.exit(1);
+    }
+
+    console.log(`\n[tenant-lint] no new findings vs baseline (${live.length} known).`);
+    process.exit(0);
+  }
+
   if (opts.strict && violationCount > 0) {
     process.exit(1);
   }
   process.exit(0);
 }
 
-main().catch((err) => {
-  console.error("[tenant-lint] Fatal:", err);
-  process.exit(2);
-});
+// Only scan when RUN, never when IMPORTED. tests/tenant-lint-baseline.test.ts
+// imports `diffAgainstBaseline` to prove the rule; without this guard that import
+// would run a full repo scan and call process.exit() out from under the runner.
+const invokedDirectly =
+  process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+
+if (invokedDirectly) {
+  main().catch((err) => {
+    console.error("[tenant-lint] Fatal:", err);
+    process.exit(2);
+  });
+}
