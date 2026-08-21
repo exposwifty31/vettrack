@@ -9373,7 +9373,7 @@ recomputed independently in both repositories and identical:
 
 **Evidence:** measured directly against the engine before any edit —
 
-```
+```text
 decide({ kind: "absent-path", target: "../../etc/passwd" })  ->  { disposition: "verified" }
 decide({ kind: "absent-dir",  target: "../../etc" })         ->  { disposition: "verified" }
 ```
