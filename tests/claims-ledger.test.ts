@@ -1485,7 +1485,7 @@ describe("the reverse checks and the append-only filter", () => {
    * A repository whose ONLY citation of an excused claim is a line in an
    * append-only document that is already on `main`.
    *
-   * This is the shape that took main red: `run.cjs` narrows an append-only
+   * This is the shape that took main red: `collectClaims` narrows an append-only
    * document's claims to the lines the BRANCH added — correct, and what keeps
    * 348 historical entries from being re-judged — and then hands that narrowed
    * set to the reverse checks, which ask a GLOBAL question ("does any live
