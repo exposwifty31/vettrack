@@ -8951,7 +8951,8 @@ itself.
   (a) `README.md` cites the App Store Connect app as `6778937527` on a line that also says "Play App Signing
   SHA-256"; the bare `sha` fired as commit vocabulary, the ten digits fit the hex shape, and the gate reported
   "no such commit" about a store record. The first fix refused every all-decimal token, which then silenced
-  `8455807` — a REAL commit cited in `G2-PLAN.md`, because roughly one short sha in twenty-five is all digits.
+  `8455807` — a real commit in the RN migration repo, cited in its `VetTrack---RN-Migration-/G2-PLAN.md`,
+  because roughly one short sha in twenty-five is all digits.
   The precise fix is to stop reading a hash-ALGORITHM name as a reference to a commit.
   (b) A package inside a code span was asserted live whatever the sentence said, while the same name in prose
   was read in context — so "and no `@clerk/clerk-expo` at any version" was reported as a missing dependency.
@@ -8966,11 +8967,26 @@ itself.
   the one place a downstream tool would consume it. `process.exitCode` and a natural exit; both figures were
   measured before and after.
 - Two real problems in #84 that the gate reported and that are NOT the gate's fault, left for that PR's author:
-  its `AGENTS.md` does not fix the frozen-stack line still claiming Gesture Handler 3.x against `~2.32.0` in
-  the manifest, and its `README.md` cites `push-fcm.ts` with no path — the file is real but lives in THIS
-  repo (`server/lib/push-fcm.ts`), so from the RN repo it resolves to nothing. #84 also carries a correction
+  it leaves the frozen-stack line in `VetTrack---RN-Migration-/AGENTS.md` still claiming Gesture Handler 3.x
+  against the `~2.32.0` its manifest carries, and its README cites `push-fcm.ts` with no path — the file is
+  real but lives in THIS repo (`server/lib/push-fcm.ts`), so from the RN repo it resolves to nothing. #84 also carries a correction
   the RN repo's own `#85` makes differently, and the two conflict in `AGENTS.md`; #204 and `#206` conflict in
   this file, both appending at the tail.
+- Process failure in this session, recorded because this file's rule is about exactly it: the commit above was
+  PUSHED while the gate reported three unaccounted claims. The commands were chained with `&&` after a step
+  whose output was not read, so a red gate scrolled past. All three were correct reports about the entry being
+  written — two cross-repo citations (a path and a commit belonging to the RN migration repo) and one more
+  over-broad rule, described next. Fixed in the following commit; the red state reached `origin` and is part
+  of the record.
+- The over-broad rule, found by the gate on this very entry: `NEGATED_AFTER` carried a bare "does not" among
+  the phrasings that mean absence, so "`AGENTS.md` does not fix the frozen-stack line" was read as a claim
+  that the file is GONE — and then failed, correctly, for existing. "Does not ship", "does not run", "does
+  not cover" are ordinary sentences about a file that is right there. Only "does not exist" is about absence.
+- The cross-repo commit is REGISTERED rather than reworded away: `docs/claims-registry.json` now carries
+  `8455807` with the reason that the cross-repo mechanism resolves paths by prefix and pull requests by
+  qualifier and has no equivalent for a commit, plus the command to re-verify it in the sibling checkout. That
+  is the documented second option when a claim is true but unverifiable here, and the reverse check deletes
+  the entry if the citation ever goes.
 - Declined, with reasons: the suggestion to keep the struck-range check in the prose scan — the check was
   unreachable because the text was already blanked, so it was replaced with a struck-range MASK, which both
   makes it reachable and reports the exclusion instead of dropping it silently. `struckRanges` itself is
@@ -8985,7 +9001,7 @@ collection.
 **Superseded by this round.** The fingerprint quoted above as ~~`2a8f510951c78d2b…`~~ was the value before
 the review; the engine changed, so the recorded value changed with it, which is the mechanism working rather
 than a problem. Current, and identical in both repositories:
-`c7d567f4d5b10a18a00626fea47ea379ea4f3c4299b261dfdce44f34d4f77a64`. The counts quoted above as
+`1787de826baad3fba32ffaf80c16a3380691b70aa9cf10beaeebd5ffe69785c0`. The counts quoted above as
 ~~`1000 claims … 40 excluded by rule`~~ and ~~`Tests 38 passed (38)`~~ are likewise superseded.
 
 **Commands run on this tree after the round:**

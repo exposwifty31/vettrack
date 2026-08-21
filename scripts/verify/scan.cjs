@@ -649,9 +649,15 @@ function collectLandingClaims(line, index, push, requireCitation, policy) {
  * says "`src/lib/nfc-platform.ts` does not exist" — reading that as a positive
  * path claim would report a defect for a sentence that is already correct, and
  * correct about the very thing the reader needs to know.
+ *
+ * EVERY ALTERNATIVE NAMES ABSENCE. A bare "does not" used to be one of them, and
+ * it read "`AGENTS.md` does not fix the frozen-stack line" as a claim that the
+ * file is GONE — then failed it, correctly, for existing. "Does not ship", "does
+ * not run", "does not cover" are all ordinary sentences about a file that is
+ * right there; only "does not exist" is about its absence.
  */
 const NEGATED_AFTER =
-  /^\s*(?:—\s*)?(?:does not exist|no longer exists?|never existed|was (?:removed|deleted)|were (?:removed|deleted)|has been (?:removed|deleted)|is gone|does not\b)/i;
+  /^\s*(?:—\s*)?(?:does not exist|no longer exists?|never existed|was (?:removed|deleted)|were (?:removed|deleted)|has been (?:removed|deleted)|is gone)/i;
 
 /**
  * The same assertion with the negation in front: "and no `yarn.lock` exists

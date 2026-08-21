@@ -45,6 +45,14 @@
       "kind": "glob",
       "match": "scripts/verify/*.js",
       "reason": "the SIBLING repo's copy of the shared engine — the RN migration repo carries it under that extension; this repo carries .cjs. Named here to explain the fingerprint contract, and verifiable only from that repo."
+    },
+    {
+      "kind": "commit",
+      "match": "8455807",
+      "docs": [
+        "docs/audit/PROOF_ALIGNMENT_LOG.md"
+      ],
+      "reason": "another repository's history: 8455807 is a commit in VetTrack---RN-Migration-, cited in this log because it is the counter-example that made the all-decimal sha heuristic wrong (roughly one short sha in twenty-five is all digits). The cross-repo mechanism resolves PATHS by prefix and PULL REQUESTS by qualifier; it has no equivalent for a commit, so this is registered rather than silently reworded. Re-verify with: git -C ../VetTrack---RN-Migration- cat-file -e 8455807^{commit}"
     }
   ]
 }
