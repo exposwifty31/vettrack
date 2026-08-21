@@ -72,6 +72,13 @@ describe("tenant-lint baseline", () => {
   });
 
   it("treats a missing or malformed baseline as zero-tolerance, never as a pass", () => {
+    // `bad as never` is deliberate. Three of these four values are OUTSIDE the
+    // declared input type, which is the point: the baseline arrives from
+    // JSON.parse of a hand-maintained file, so the type is a claim about what
+    // should be there, not a guarantee. The cast is how a type-checked test
+    // reaches the runtime boundary the type cannot describe. Widening the
+    // parameter to `unknown` instead would move the same check into the helper
+    // and weaken every honest caller's type — the wrong trade for one test.
     for (const bad of [null, undefined, {}, { violations: null }]) {
       const { regressions } = diffAgainstBaseline(
         [finding("server/routes/x.ts", "equipment", 1)],
@@ -84,5 +91,41 @@ describe("tenant-lint baseline", () => {
   it("ignores waived findings — a waiver is already a reviewed decision", () => {
     const waived = { ...finding("server/routes/y.ts", "equipment", 1), waived: true };
     expect(diffAgainstBaseline([waived], { violations: {} }).regressions).toEqual([]);
+  });
+});
+
+/**
+ * Argument parsing, proved through the real CLI.
+ *
+ * The pure-rule tests above cannot see this class of defect: `--baseline` with no
+ * value parsed to `null`, which fell through to the DEFAULT warn-only mode and exited
+ * 0 with findings present. That is the exact disarmed-gate shape this whole mechanism
+ * replaces, reintroduced one layer up — and CI invokes the CLI, not the function, so
+ * only a CLI-level test can refuse it.
+ */
+describe("tenant-lint CLI argument refusal", () => {
+  const run = (args: string[]) => {
+    const { spawnSync } = require("node:child_process") as typeof import("node:child_process");
+    const r = spawnSync("node", ["scripts/architecture/tenant-query-lint.mjs", ...args], {
+      encoding: "utf8",
+      timeout: 120_000,
+    });
+    return { status: r.status, stderr: String(r.stderr ?? "") };
+  };
+
+  it("REFUSES --baseline with no value instead of silently falling back to warn-only", () => {
+    const r = run(["--all", "--baseline"]);
+    expect(r.status).toBe(2);
+    expect(r.stderr).toContain("--baseline");
+  });
+
+  it("REFUSES --baseline followed by another flag, which is the same defect wearing a value", () => {
+    const r = run(["--baseline", "--all"]);
+    expect(r.status).toBe(2);
+  });
+
+  it("REFUSES --write-baseline without --baseline, which would otherwise write nothing and exit 0", () => {
+    const r = run(["--all", "--write-baseline"]);
+    expect(r.status).toBe(2);
   });
 });

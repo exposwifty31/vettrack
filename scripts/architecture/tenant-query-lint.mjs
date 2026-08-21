@@ -76,9 +76,22 @@ function parseArgs(argv) {
       // --baseline IMPLIES enforcement. It is not a reporting flag: a mode that
       // loads a baseline and then exits 0 regardless is the disarmed gate this
       // whole mechanism exists to replace.
-      case "--baseline":
-        opts.baseline = argv[++i] ?? null;
+      //
+      // Which is why a MISSING value is a hard parse error rather than `null`.
+      // `null` fell through to the DEFAULT warn-only mode, so `--baseline` with a
+      // typo'd or shell-dropped path exited 0 with findings present — the same
+      // disarmed gate, one layer up, wearing the flag that was supposed to arm it.
+      // A value that is itself a flag is the same defect wearing a value.
+      case "--baseline": {
+        const value = argv[i + 1];
+        if (!value || value.startsWith("--")) {
+          console.error("[tenant-lint] --baseline requires a path to a baseline file.");
+          process.exit(2);
+        }
+        opts.baseline = value;
+        i += 1;
         break;
+      }
       case "--write-baseline":
         opts.writeBaseline = true;
         break;
@@ -100,6 +113,12 @@ function parseArgs(argv) {
           process.exit(2);
         }
     }
+  }
+
+  // Silently doing nothing and exiting 0 is the failure mode this file is about.
+  if (opts.writeBaseline && !opts.baseline) {
+    console.error("[tenant-lint] --write-baseline requires --baseline <path> naming the file to write.");
+    process.exit(2);
   }
 
   return opts;

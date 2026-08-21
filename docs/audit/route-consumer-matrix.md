@@ -18,6 +18,45 @@ the condition under which it should instead be deleted), or genuinely reached by
 this scan could not see (record how). A route "kept for later" with no gate is how the next
 audit finds it again.
 
+## Corrections applied to the extract
+
+The body below is the source report's text. Two changes were made to it, listed here so
+"verbatim" stays an honest description rather than an approximate one:
+
+1. **A cited path that does not exist.** The note for `POST /api/integration-webhooks/:adapterId`
+   led with `server/routes/integrations/webhooks/inbound.router.ts`; no such file is in the tree.
+   The correct path — `server/integrations/webhooks/inbound.router.ts` — was already in that same
+   note's parenthetical, so the leading citation was corrected to match. A path that resolves to
+   nothing is not a snapshot of anything.
+
+2. **One internally inconsistent row, FLAGGED not rewritten.** `GET /api/health/ready` carries
+   `other = test (structural)` and a verdict of `NO-CONSUMER`, while this matrix's own legend
+   reserves `TEST-ONLY` for exactly that evidence. It is marked ⚠︎ rather than reclassified:
+   changing it would desync the row from the source's counts table, and this is another author's
+   dated snapshot, not a live document to rebalance. The Lane 4.2 triage gives every row a verdict
+   anyway, and this is one of the rows it must decide.
+
+**Counts, recomputed mechanically from the table rows in this file** rather than quoted from the
+header — 311 rows total:
+
+| verdict | rows |
+|---|---|
+| consumed (web+RN) | 122 |
+| consumed (web) | 115 |
+| **NO-CONSUMER** | **43** |
+| NO-CONSUMER (documented dev-only) | 7 |
+| SUSPECTED NO-CONSUMER | 6 |
+| TEST-ONLY | 6 |
+| consumed (RN) | 4 |
+| operator-surface | 3 |
+| contract-surface | 2 |
+| NO-CONSUMER (documented stub) | 1 |
+| NO-CONSUMER (staged) | 1 |
+| consumed (external device sender) | 1 |
+
+These agree with the source's own counts table row for row, which is the useful result: the
+extraction lost nothing.
+
 ---
 
 ## ROUTE-MATRIX
@@ -209,7 +248,7 @@ Consumer evidence: mechanical extraction of every `/api/*`-shaped string/templat
 | GET | `/api/health` | - | - | ops runbook + audit script (docs/release-runbook.md, docs/vettrack-safari-audit.json) | operator-surface |
 | GET | `/api/health/data-integrity` | - | - | none found | SUSPECTED NO-CONSUMER |
 | GET | `/api/health/live` | - | - | audit script (docs/vettrack-safari-audit.json) | operator-surface |
-| GET | `/api/health/ready` | - | - | test (structural) | NO-CONSUMER |
+| GET | `/api/health/ready` | - | - | test (structural) | NO-CONSUMER ⚠︎ |
 | GET | `/api/health/ready/data-integrity` | - | - | none found | NO-CONSUMER |
 | GET | `/api/health/ready/live` | - | - | none found | NO-CONSUMER |
 | GET | `/api/health/ready/startup` | - | - | none found | NO-CONSUMER |
@@ -394,7 +433,7 @@ Consumer evidence: mechanical extraction of every `/api/*`-shaped string/templat
 - **GET `/api/health/ready/live`** (`server/routes/health.ts:14`) — Alias path; only /api/health/live is called.
 - **GET `/api/health/ready/startup`** (`server/routes/health.ts:18`) — Alias path; only /api/health/startup is called.
 - **GET `/api/health/startup`** (`server/routes/health.ts:18`) — No web/RN product-client caller. Multiple runbooks curl this path post-deploy to verify databaseReachable:true.
-- **POST `/api/integration-webhooks/:adapterId`** (`server/routes/integrations/webhooks/inbound.router.ts:58`) — Raw-body HMAC-verified inbound webhook receiver for external PMS/vendor integrations (server/integrations/webhooks/inbound.router.ts). By design, the caller is an external vendor system, not traceable via repo grep.
+- **POST `/api/integration-webhooks/:adapterId`** (`server/integrations/webhooks/inbound.router.ts:58`) — Raw-body HMAC-verified inbound webhook receiver for external PMS/vendor integrations (server/integrations/webhooks/inbound.router.ts). By design, the caller is an external vendor system, not traceable via repo grep.
 - **GET `/api/integrations/analytics/product`** (`server/routes/integrations.ts:187`) — Route's own doc comment: "Product analytics stub (zeros until Phase D)" (integrations.ts top-of-file permissions matrix). Intentionally unimplemented placeholder, not a UI-wiring miss.
 - **GET `/api/integrations/billing/mismatch-report`** (`server/routes/integrations.ts:88`) — In-code comment tags it "Phase D Sprint 3". Admin-gated, zero web/RN callers — built ahead of its console UI.
 - **GET `/api/integrations/configs/:adapterId/logs`** (`server/routes/integrations.ts:684`) — Not called by web integrations object (dashboard/health/adapters/listConfigs/getConfig/runs/mappingsReview/upsert/patch/delete/storeCredentials/validate/runSync/updateMapping/retryRun/replayWebhook are all wired; .logs is not).

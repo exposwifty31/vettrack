@@ -9861,3 +9861,48 @@ for a regression introduced by the same branch.
 
 **Verdict:** VERIFIED — no repository defect. The stale local database is an environment fix
 (`pnpm db:migrate` against `vettrack_test`), already applied.
+
+## 2026-08-21 — Supersedes the route-matrix count: 65 was a text grep, the answer is 43 (claude/unified-program-v2-review-44db19)
+
+**Claim:** Corrects this session's earlier entry, which evidenced the extracted route matrix with
+`grep -c 'NO-CONSUMER'` → `65`. That counts the string anywhere in the file — the counts table and
+the notes included — not table rows, so it cannot support a claim about how many routes have no
+consumer. Per this log's own rule, the earlier entry stands and this one supersedes it.
+
+**Evidence:**
+- Command: an `awk` pass over the table rows only (lines matching `^| <METHOD> `), grouping by the
+  verdict column → 311 rows total, of which **43** are pure `NO-CONSUMER`, plus 7 documented
+  dev-only, 6 suspected, 6 test-only, 1 documented stub, 1 staged; 122 consumed (web+RN), 115
+  consumed (web), 4 consumed (RN), 3 operator-surface, 2 contract-surface, 1 external device sender.
+- Those figures agree row for row with the counts table the source report carries, which is the
+  result that matters: the extraction lost nothing. The recomputed table is now recorded in
+  `docs/audit/route-consumer-matrix.md` itself, so the number does not have to be re-derived.
+- `docs/audit/route-consumer-matrix.md` — the `POST /api/integration-webhooks/:adapterId` note led
+  with a path that does not exist in this tree. Verified by `ls` on both candidates: only
+  `server/integrations/webhooks/inbound.router.ts` is present. Corrected, and the correction is
+  listed in the file's own header so "verbatim" stays accurate.
+- `GET /api/health/ready` carries `other = test (structural)` with a verdict of `NO-CONSUMER`,
+  while the matrix legend reserves `TEST-ONLY` for that evidence. Marked ⚠︎ rather than
+  reclassified — rewriting it would desync the row from the source's counts table, and the Lane 4.2
+  triage has to decide that row regardless.
+
+**Verdict:** VERIFIED. Supersedes the `65` figure in this session's earlier route-matrix entry.
+
+## 2026-08-21 — The arming flag could disarm the gate it arms (claude/unified-program-v2-review-44db19)
+
+**Claim:** `--baseline` with no value parsed to `null`, fell through to the DEFAULT warn-only mode,
+and exited 0 with findings present — the same disarmed-gate shape the baseline mechanism was built
+to replace, reintroduced one layer up in the flag that was supposed to arm it. Found by CodeRabbit
+on the PR, not by me.
+
+**Evidence:**
+- Test: three CLI-level refusal cases added to `tests/tenant-lint-baseline.test.ts`, run BEFORE the
+  fix → `Tests 2 failed | 7 passed`. Exactly two, which is itself the finding: `--baseline --all`
+  already exited 2, but for the wrong reason — it took `"--all"` as the path and failed on the
+  unreadable-baseline branch by accident, not by refusing the argument.
+- The pure-rule tests could not have caught this. CI invokes the CLI, not `diffAgainstBaseline`, so
+  only a CLI-level assertion covers the layer that was broken.
+- After the fix: `Tests 9 passed (9)`; `pnpm tenant:lint:enforce` still `exit=0` on a clean tree,
+  so the armed path is unchanged.
+
+**Verdict:** VERIFIED
