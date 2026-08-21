@@ -1480,6 +1480,106 @@ describe("the engine refuses what it says it refuses", () => {
   });
 });
 
+describe("the reverse checks and the append-only filter", () => {
+  /**
+   * A repository whose ONLY citation of an excused claim is a line in an
+   * append-only document that is already on `main`.
+   *
+   * This is the shape that took main red: `run.cjs` narrows an append-only
+   * document's claims to the lines the BRANCH added — correct, and what keeps
+   * 348 historical entries from being re-judged — and then hands that narrowed
+   * set to the reverse checks, which ask a GLOBAL question ("does any live
+   * claim anywhere reach this entry?"). On a branch the citing line is added,
+   * so the entry matches and the gate is green. On `main` the diff is empty,
+   * the citation is invisible, and the entry is reported as an orphan. Same
+   * code, same entry, opposite verdicts — the asymmetry is deterministic, not
+   * flaky, and every registry / PR-ledger / attestation entry whose sole
+   * citation lives in the log inherits it the moment its branch merges.
+   */
+  function fixtureOnMain(): string {
+    const childProcess = require("node:child_process") as typeof import("node:child_process");
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "vt-appendonly-"));
+    const git = (...args: string[]) =>
+      childProcess.spawnSync("git", args, { cwd: dir, encoding: "utf8" as const });
+
+    fs.writeFileSync(path.join(dir, "package.json"), JSON.stringify({ scripts: {} }));
+    // The excused claim: a path deliberately not in the tree, cited once, in the log.
+    // WORDING MATTERS, and it cost a false RED: "removed the helper `X`" is
+    // classified `deletion-record` and never becomes a claim, so the first
+    // version of this fixture orphaned the entry for a reason unrelated to the
+    // defect. The scanner was right; the harness was wrong.
+    fs.writeFileSync(path.join(dir, "LOG.md"), "2026-01-01 - the audit cited `src/gone.ts` in its findings.\n");
+    fs.writeFileSync(
+      path.join(dir, "registry.json"),
+      JSON.stringify({
+        entries: [
+          { kind: "path", match: "src/gone.ts", reason: "deleted; this log line records the deletion" },
+        ],
+      }),
+    );
+    // A SECOND, ORDINARY governed document, because a repository whose only
+    // governed document is append-only is degenerate: on `main` the judged set
+    // would be empty and the `vacuous-scan` guard would fire for a reason that
+    // is not the defect. The real repository has twenty non-append-only docs.
+    fs.writeFileSync(path.join(dir, "NOTES.md"), "The manifest is `package.json`.\n");
+    fs.writeFileSync(
+      path.join(dir, "verify.config.json"),
+      JSON.stringify({
+        defaultBranch: "main",
+        governedDocs: ["LOG.md", "NOTES.md"],
+        appendOnlyDocs: ["LOG.md"],
+        registry: "registry.json",
+        attestations: "attestations.json",
+        prLedger: "pr-ledger.json",
+        evidenceReport: "evidence.json",
+        evidenceGates: [],
+      }),
+    );
+
+    git("init", "-b", "main");
+    git("config", "user.email", "gate@example.invalid");
+    git("config", "user.name", "gate");
+    git("add", "-A");
+    git("commit", "-m", "seed");
+    // A clean tree against `refs/heads/main` is the main condition: `addedLines`
+    // returns an EMPTY set rather than null, which is the branch this exercises.
+    // (null takes the `append-only-undiffable` path instead and proves nothing.)
+    return dir;
+  }
+
+  it("REFUSES to orphan a registry entry whose only citation is already on main", () => {
+    const dir = fixtureOnMain();
+    try {
+      const result = verify({ root: dir, now: "2026-01-02" });
+      const orphans = result.failures.filter((f) => f.kind === "registry-orphan");
+      expect(orphans).toEqual([]);
+      // And the append-only protection is INTACT: the historical line is still
+      // not re-judged, so the run carries no claim-level failure either. If the
+      // fix had simply stopped filtering, this assertion would catch it.
+      expect(result.failures).toEqual([]);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("still judges a claim on the line a branch adds, and still excuses it by the registry", () => {
+    // The other half of the asymmetry, asserted so the fix cannot be "ignore the
+    // append-only rule": an ADDED line must reach the claim-level rules.
+    const dir = fixtureOnMain();
+    try {
+      fs.writeFileSync(
+        path.join(dir, "LOG.md"),
+        "2026-01-01 - the audit cited `src/gone.ts` in its findings.\n2026-01-02 - and again `src/gone.ts`.\n",
+      );
+      const result = verify({ root: dir, now: "2026-01-02" });
+      expect(result.failures).toEqual([]);
+      expect(result.counts.registered).toBeGreaterThan(0);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
 describe("the engine's own source", () => {
   it("carries no control bytes", () => {
     // A previous globToRegExp substituted a sentinel for `**` and substituted it
