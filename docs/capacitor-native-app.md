@@ -18,7 +18,7 @@ The iOS/Android shell wraps the same React app and enables **native NFC** (Safar
 
 | Mode | Config | Use |
 |------|--------|-----|
-| **Bundled shell (ship)** | No `server.url` in `capacitor.config.json` | TestFlight / App Store — offline-capable web assets in `ios/App/App/public` |
+| **Bundled shell (ship)** | No `server.url` in `capacitor.config.ts` | TestFlight / App Store — offline-capable web assets in `ios/App/App/public` |
 | **Remote WebView (dev only)** | `CAPACITOR_SERVER_URL=https://vettrack.uk` | Staging smoke — **never archive** (Guideline 4.2 + OAuth breaks) |
 
 Bundled shell details:
