@@ -23,12 +23,10 @@
  * lives in scripts/verify/claims.cjs so it can be handed a bad command in a test.
  */
 
-import { Buffer } from "node:buffer";
 import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import { spawn, spawnSync } from "node:child_process";
-import { StringDecoder } from "node:string_decoder";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
 
@@ -39,7 +37,7 @@ const { resolveGitBinary } = require("./verify/git-facts.cjs");
 // The two refusal predicates live in the pure-decisions module so a test can
 // hand them a bad command and assert that they refuse. Inside this CLI they were
 // unreachable from any test, which is the same as untested.
-const { isReentrantGate, GATE_TOKEN, gateInvocation } = require("./verify/claims.cjs");
+const { isReentrantGate, GATE_TOKEN, gateInvocation, createOutputCollector } = require("./verify/claims.cjs");
 
 const say = (line) => process.stdout.write(`${line}\n`);
 
@@ -148,7 +146,7 @@ function runGate(gate) {
     // to convert into a recorded FAIL.
     const ownGroup = process.platform !== "win32";
     const child = spawn(command, spawnArgs, { cwd: ROOT, shell: false, detached: ownGroup });
-    let output = "";
+    const collected = createOutputCollector(MAX_OUTPUT_BYTES);
 
     // SETTLE EXACTLY ONCE, and on timeout settle IMMEDIATELY rather than waiting
     // for a `close` that a surviving descendant can withhold. The kill is
@@ -165,12 +163,12 @@ function runGate(gate) {
         // 0 is exactly how a gate reports green for a job that never ran.
         exitCode: code === null ? 1 : code,
         durationMs: Date.now() - started,
-        output,
+        output: collected.text,
       });
     };
 
     const timer = setTimeout(() => {
-      output += `\nrefused: gate exceeded ${GATE_TIMEOUT_MS}ms and was killed`;
+      collected.note(`\nrefused: gate exceeded ${GATE_TIMEOUT_MS}ms and was killed`);
       try {
         if (ownGroup && child.pid) process.kill(-child.pid, "SIGKILL");
         else if (child.pid) {
@@ -178,7 +176,13 @@ function runGate(gate) {
           // direct child — here the `cmd.exe` shim — leaving the npm process and
           // its descendants running against the checkout after this gate has
           // already been recorded as failed. `taskkill /T` walks the tree.
-          spawn("taskkill", ["/T", "/F", "/PID", String(child.pid)], {
+          //
+          // ABSOLUTE, not searched on PATH — the rule this file states at the
+          // top for git and which my first version of this line broke. A
+          // process-tree killer picked up from PATH is a worse thing to get
+          // wrong than the hang it exists to clean up.
+          const systemRoot = process.env.SystemRoot || "C:\\Windows";
+          spawn(path.join(systemRoot, "System32", "taskkill.exe"), ["/T", "/F", "/PID", String(child.pid)], {
             stdio: "ignore",
             shell: false,
           }).unref();
@@ -190,55 +194,20 @@ function runGate(gate) {
       settle(1);
     }, GATE_TIMEOUT_MS);
 
-    // BOUNDED. Gates run concurrently through `Promise.all`, so an unbounded
-    // buffer means every verbose gate on a large tree holds its whole log in
-    // memory at once. The cap is marked in the recorded output rather than
-    // applied silently: a truncated log that does not say so is a log that
-    // lies about being complete.
-    // Counted in BYTES, which is what the constant says. `output.length` counts
-    // UTF-16 code units, so a megabyte of multibyte output measured about a
-    // third of its real size and the cap never fired — a limit that is only a
-    // limit for ASCII is the kind of half-true guard this tool exists to refuse.
-    let bytes = 0;
-    let truncated = false;
-    // ONE DECODER PER STREAM, because a chunk boundary is not a character
-    // boundary. `Buffer.toString` decoded every `data` event independently, so a
-    // multibyte character split across two events became two U+FFFD and the gate
-    // log misreported what the gate printed. The byte CAP was corrected earlier
-    // and the byte DECODE was not — the same mistake at two scales.
-    const collectorFor = () => {
-      const decoder = new StringDecoder("utf8");
-      const write = (chunk) => {
-        if (truncated) return;
-        const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(String(chunk), "utf8");
-        const room = MAX_OUTPUT_BYTES - bytes;
-        if (buf.length <= room) {
-          bytes += buf.length;
-          output += decoder.write(buf);
-          return;
-        }
-        truncated = true;
-        // A byte-boundary slice can split a multibyte character. Writing then
-        // flushing keeps the tail valid UTF-8 rather than dropping held bytes.
-        output += decoder.write(buf.subarray(0, Math.max(room, 0)));
-        output += decoder.end();
-        output += `\n[output truncated at ${MAX_OUTPUT_BYTES} bytes]`;
-      };
-      // A stream can end mid-character. Flushing turns the held bytes into the
-      // replacement they actually are instead of dropping them silently.
-      write.flush = () => {
-        if (!truncated) output += decoder.end();
-      };
-      return write;
-    };
-    const fromStdout = collectorFor();
-    const fromStderr = collectorFor();
-    child.stdout.on("data", fromStdout);
-    child.stderr.on("data", fromStderr);
-    child.stdout.on("end", () => fromStdout.flush());
-    child.stderr.on("end", () => fromStderr.flush());
+    // BOUNDED, and the bound lives in `createOutputCollector` rather than here:
+    // gates run concurrently through `Promise.all`, so an unbounded buffer means
+    // every verbose gate on a large tree holds its whole log in memory at once.
+    // The collector reserves the truncation marker's own bytes, decodes each
+    // stream with its own stateful decoder, and routes the runner's diagnostics
+    // through the same budget — all of which a test can now drive directly.
+    const fromStdout = collected.stream();
+    const fromStderr = collected.stream();
+    child.stdout.on("data", (chunk) => fromStdout.write(chunk));
+    child.stderr.on("data", (chunk) => fromStderr.write(chunk));
+    child.stdout.on("end", () => fromStdout.end());
+    child.stderr.on("end", () => fromStderr.end());
     child.on("error", (err) => {
-      output += String(err?.message ?? err);
+      collected.note(String(err?.message ?? err));
       settle(1);
     });
     child.on("close", settle);

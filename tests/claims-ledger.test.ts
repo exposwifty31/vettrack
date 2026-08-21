@@ -69,6 +69,12 @@ type Rules = {
     platform: string,
     comspec?: string,
   ): { command: string; args: string[] };
+  createOutputCollector(maxBytes: number): {
+    stream(): { write(chunk: unknown): void; end(): void };
+    note(line: string): void;
+    readonly text: string;
+    readonly truncated: boolean;
+  };
   GATE_TOKEN: RegExp;
 };
 
@@ -892,7 +898,7 @@ describe("the engine refuses what it says it refuses", () => {
     };
     const verdict = rules.decide(
       { kind: "glob", pattern: "sibling-repo/docs/*.md", raw: "sibling-repo/docs/*.md" },
-      { globMatches: () => 0, suffixMatches: () => 0 },
+      factsWith({ globMatches: () => 0, suffixMatches: () => 0 }),
       context,
     );
     expect(verdict.disposition).toBe("registered");
@@ -906,8 +912,10 @@ describe("the engine refuses what it says it refuses", () => {
     process.env.VT_GIT_BINARY = "/nope/not/here";
     try {
       const resolved = gitFacts.resolveGitBinary();
-      expect(typeof resolved).not.toBe("string");
-      expect((resolved as { problem: string }).problem).toContain("VT_GIT_BINARY");
+      // `null` also satisfies "not a string", and `null` is exactly what the
+      // OLD code returned here — so that assertion alone did not separate the
+      // fix from the regression it guards.
+      expect(resolved).toMatchObject({ problem: expect.stringContaining("VT_GIT_BINARY") });
     } finally {
       if (previous === undefined) delete process.env.VT_GIT_BINARY;
       else process.env.VT_GIT_BINARY = previous;
@@ -923,8 +931,7 @@ describe("the engine refuses what it says it refuses", () => {
     process.env.VT_GIT_BINARY = REPO_ROOT;
     try {
       const resolved = gitFacts.resolveGitBinary();
-      expect(typeof resolved).not.toBe("string");
-      expect((resolved as { problem: string }).problem).toContain("VT_GIT_BINARY");
+      expect(resolved).toMatchObject({ problem: expect.stringContaining("VT_GIT_BINARY") });
     } finally {
       if (previous === undefined) delete process.env.VT_GIT_BINARY;
       else process.env.VT_GIT_BINARY = previous;
@@ -954,6 +961,44 @@ describe("the engine refuses what it says it refuses", () => {
         (claim) => claim.kind === "script" && (claim as { script?: string }).script === "lint",
       ),
     ).toBe(true);
+  });
+
+  it("keeps a multibyte character whole across chunk boundaries", () => {
+    // The collector decoded each `data` event on its own, so a character split
+    // across two events became two replacement characters and the gate log
+    // misreported what the gate printed. It lived in an inline closure inside
+    // the runner where no test could reach it — a later change could restore
+    // per-chunk decoding and this suite would stay green. That is why it is a
+    // function now, and why this test exists rather than a comment.
+    const bufferModule = require("node:buffer") as typeof import("node:buffer");
+    const collector = rules.createOutputCollector(1000);
+    const stream = collector.stream();
+    stream.write(bufferModule.Buffer.from([0x41, 0xf0, 0x9f])); // "A" + first 2 bytes
+    stream.write(bufferModule.Buffer.from([0x98, 0x80, 0x42])); // last 2 bytes + "B"
+    stream.end();
+    expect(collector.text).toBe("A\u{1F600}B");
+    expect(collector.text).not.toContain("\uFFFD");
+    expect(collector.truncated).toBe(false);
+  });
+
+  it("keeps the truncation marker inside the byte budget it names", () => {
+    // The marker used to be appended AFTER the cap, so the recorded output
+    // exceeded the very limit the marker announced. A cap exceeded by the note
+    // announcing the cap is not a cap. The runner's own diagnostics — timeout,
+    // spawn error — go through the same budget for the same reason.
+    const bufferModule = require("node:buffer") as typeof import("node:buffer");
+    const limit = 64;
+    const collector = rules.createOutputCollector(limit);
+    const stream = collector.stream();
+    stream.write(bufferModule.Buffer.from("x".repeat(500), "utf8"));
+    stream.end();
+    expect(collector.truncated).toBe(true);
+    expect(bufferModule.Buffer.byteLength(collector.text, "utf8")).toBeLessThanOrEqual(limit);
+    expect(collector.text).toContain("truncated");
+
+    // A note after truncation cannot push it back over the line either.
+    collector.note("\nrefused: gate exceeded 1ms and was killed");
+    expect(bufferModule.Buffer.byteLength(collector.text, "utf8")).toBeLessThanOrEqual(limit);
   });
 
   it("routes a Windows command shim through the command processor", () => {

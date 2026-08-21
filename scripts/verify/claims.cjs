@@ -20,6 +20,9 @@
  * There is no sixth disposition, and in particular there is no "skipped".
  */
 
+const { Buffer } = require("node:buffer");
+const { StringDecoder } = require("node:string_decoder");
+
 const TARGETS = new Set(["physical-device", "sim", "eas-store", "app-store", "external-service"]);
 const ATTESTATION_FIELDS = [
   "id",
@@ -225,6 +228,84 @@ function isReentrantGate(command) {
 }
 
 const GATE_TOKEN = /^[\w./:@=-]+$/;
+
+/**
+ * Collect a child process's output under a hard byte budget.
+ *
+ * A DECISION MOVED OUT OF THE RUNNER so the suite can drive it. Two defects
+ * lived in this logic and neither was reachable from a test while it was an
+ * inline closure: the cap counted UTF-16 code units rather than bytes, and each
+ * `data` event was decoded on its own, so a multibyte character split across two
+ * events became two replacement characters. Both are fixed — and a test that
+ * cannot see the collector cannot stop them coming back, which is the whole
+ * reason this moved.
+ *
+ * The marker's own bytes are RESERVED, so the recorded output, marker included,
+ * stays inside the budget the caller named. A cap exceeded by the note
+ * announcing the cap is not a cap.
+ */
+function createOutputCollector(maxBytes) {
+  const marker = `\n[output truncated at ${maxBytes} bytes]`;
+  const budget = Math.max(0, maxBytes - Buffer.byteLength(marker, "utf8"));
+  let text = "";
+  let bytes = 0;
+  let truncated = false;
+
+  const cut = () => {
+    truncated = true;
+    text += marker;
+  };
+
+  return {
+    /** One decoder PER STREAM: a chunk boundary is not a character boundary. */
+    stream() {
+      const decoder = new StringDecoder("utf8");
+      return {
+        write(chunk) {
+          if (truncated) return;
+          const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(String(chunk), "utf8");
+          const room = budget - bytes;
+          if (buf.length <= room) {
+            bytes += buf.length;
+            text += decoder.write(buf);
+            return;
+          }
+          text += decoder.write(buf.subarray(0, Math.max(room, 0)));
+          text += decoder.end();
+          cut();
+        },
+        // A stream can end mid-character. Flushing turns the held bytes into
+        // the replacement they are rather than dropping them silently.
+        end() {
+          if (!truncated) text += decoder.end();
+        },
+      };
+    },
+
+    /** A diagnostic the runner adds itself, bounded by the same budget. */
+    note(line) {
+      if (truncated) return;
+      const buf = Buffer.from(String(line), "utf8");
+      const room = budget - bytes;
+      if (buf.length > room) {
+        text += buf.subarray(0, Math.max(room, 0)).toString("utf8").replace(/\uFFFD$/, "");
+        cut();
+        return;
+      }
+      bytes += buf.length;
+      text += String(line);
+    },
+
+    get text() {
+      return text;
+    },
+
+    get truncated() {
+      return truncated;
+    },
+  };
+}
+
 
 /**
  * How a validated gate command reaches `spawn`.
@@ -637,6 +718,7 @@ module.exports = {
   RULES,
   isReentrantGate,
   gateInvocation,
+  createOutputCollector,
   TARGETS,
   attestationVerdict,
   daysBetween,

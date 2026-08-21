@@ -9412,3 +9412,47 @@ recomputed independently in both repositories and identical:
 `477 claims … 0 FAILED`, ledger `78 passed`, typecheck and lint clean.
 
 **Verdict:** VERIFIED.
+
+### The collector moved so a test could reach it, and I broke my own PATH rule, 2026-08-21
+
+**Claim:** the output collector is now testable, and the process-tree killer no longer resolves from `PATH`.
+
+**Evidence:**
+
+**The collector.** Two defects had already been fixed in it — the cap counting UTF-16 code units instead of
+bytes, and each `data` event decoded on its own so a multibyte character split across two events became two
+replacement characters. Both fixes were real and neither was reachable from a test, because the collector was
+an inline closure inside `runGate`. A later change could restore per-chunk decoding and the suite would stay
+green. It is `createOutputCollector` now, beside the other decisions this engine keeps pure so the suite can
+drive them, and two cases are pinned: a four-byte character split across two writes comes back whole with no
+replacement character, and a 500-byte write against a 64-byte budget leaves the recorded text — truncation
+marker included — at or under 64 bytes. The marker's own bytes are reserved, because a cap exceeded by the
+note announcing the cap is not a cap; the runner's timeout and spawn-error diagnostics go through the same
+budget for the same reason.
+
+**And a rule I broke myself.** `scripts/verify-evidence.mjs` states at the top that binaries are resolved from
+a fixed list of absolute paths, **not searched on `PATH`**. The Windows process-tree fix added the previous
+round then called `spawn("taskkill", …)` — searched on `PATH`, in the file that says it does not do that.
+SonarCloud's quality gate went from passing to a **B security rating on new code** at that commit, and this is
+the change that would explain it; the analysis itself could not be read from here, because this environment
+blocks `sonarcloud.io`. Resolved from `%SystemRoot%\System32` now. A process-tree killer taken from `PATH` is
+a worse thing to get wrong than the hang it exists to clean up.
+
+**Three test-quality points, all real.** The probes this suite creates in the repository root are now ignored:
+`verify:evidence` reads `git status --porcelain`, so a probe left behind by a run killed mid-test marks the
+tree DIRTY and invalidates the evidence report that follows. The cross-repository glob stub bypassed the
+`factsWith` helper, so it would break rather than fail if the rule started reading another fact. And
+`expect(typeof resolved).not.toBe("string")` is satisfied by `null` — which is exactly what the old code
+returned there, so the assertion did not separate the fix from the regression it guards.
+
+**Superseded fingerprint:** ~~`28ed7439f5660e82cf530fa017a8bca8f35ef8fc2c174ef9a2ec1a0a0661d7d6`~~. Current,
+recomputed independently in both repositories and identical:
+`8fbfc71960f3a8d5952f183268d490bb51e9dbceab5de51ef7e0738fb1580ed9`.
+
+**Commands run on the tree before this entry was appended:** `node scripts/verify-claims.mjs` →
+`1068 claims … 0 FAILED`; `pnpm exec vitest run tests/claims-ledger.test.ts` → `Tests 81 passed (81)`;
+`npx tsc --noEmit` → 0 errors; `pnpm architecture:gates` → `All G1 checks passed.` In the RN migration repo:
+`477 claims … 0 FAILED`, ledger `80 passed`, typecheck and lint clean, and `node scripts/verify-evidence.mjs`
+→ `all declared gates passed`, which exercises the new collector end to end.
+
+**Verdict:** VERIFIED.

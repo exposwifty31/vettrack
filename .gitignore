@@ -160,3 +160,11 @@ android/keystore.properties
 # committed: the report is bound to a tree hash, so a committed one would be
 # stale the moment the next commit lands. CI regenerates it before the gate runs.
 docs/audit/evidence-run.json
+
+# Fixtures the claims-ledger suite creates in the repository root to prove that
+# a symlink cannot escape the checkout. They are removed in `finally`, but a run
+# killed mid-test would leave one behind — and `verify:evidence` reads
+# `git status --porcelain`, so an untracked leftover marks the tree DIRTY and
+# invalidates the evidence report that follows.
+/.vt-symlink-probe-*
+/vt-glob-probe-*
