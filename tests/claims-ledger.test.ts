@@ -1550,7 +1550,14 @@ describe("the reverse checks and the append-only filter", () => {
   it("REFUSES to orphan a registry entry whose only citation is already on main", () => {
     const dir = fixtureOnMain();
     try {
-      const result = verify({ root: dir, now: "2026-01-02" });
+      // `enforceEvidence: false` EXPLICITLY, not inherited. Layer 3 otherwise
+      // reads VT_ENFORCE_EVIDENCE from the ambient environment, and the RN CI
+      // test job sets it to "1" on purpose (its workflow produces the evidence
+      // report in the step before). This fixture has no report, so the run
+      // gained an `evidence` failure and both assertions broke — green locally,
+      // red in CI. A test about the reverse checks must not be coupled to an
+      // env var about layer 3.
+      const result = verify({ root: dir, now: "2026-01-02", enforceEvidence: false });
       const orphans = result.failures.filter((f) => f.kind === "registry-orphan");
       expect(orphans).toEqual([]);
       // And the append-only protection is INTACT: the historical line is still
@@ -1571,7 +1578,14 @@ describe("the reverse checks and the append-only filter", () => {
         path.join(dir, "LOG.md"),
         "2026-01-01 - the audit cited `src/gone.ts` in its findings.\n2026-01-02 - and again `src/gone.ts`.\n",
       );
-      const result = verify({ root: dir, now: "2026-01-02" });
+      // `enforceEvidence: false` EXPLICITLY, not inherited. Layer 3 otherwise
+      // reads VT_ENFORCE_EVIDENCE from the ambient environment, and the RN CI
+      // test job sets it to "1" on purpose (its workflow produces the evidence
+      // report in the step before). This fixture has no report, so the run
+      // gained an `evidence` failure and both assertions broke — green locally,
+      // red in CI. A test about the reverse checks must not be coupled to an
+      // env var about layer 3.
+      const result = verify({ root: dir, now: "2026-01-02", enforceEvidence: false });
       expect(result.failures).toEqual([]);
       expect(result.counts.registered).toBeGreaterThan(0);
     } finally {
