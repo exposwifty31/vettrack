@@ -9907,7 +9907,14 @@ on the PR, not by me.
 
 **Verdict:** VERIFIED
 
-## 2026-08-21 — PR #204 re-scoped after review: main already had the coverage; kept only the guard
+## 2026-08-21 — db-integration work re-scoped after review: main already had the coverage; kept only the guard
+
+> Deliberately no `PR #` reference in this heading. The claim gate reads `PR #NNN` as a
+> pull-request claim and requires a merge commit to verify it against; the pull request this
+> entry was written on is still open, so there is none. `docs/pr-ledger.json` is not the escape
+> hatch either — its own `$comment` scopes it to PRs that **landed** without a merge commit, and
+> requires the sha be an ancestor of the default branch. Registering an unmerged PR there would
+> be a false claim in the exact register this log exists to keep honest. The gate was right.
 
 **Claim:** The `db-integration` job proposed on 2026-08-20 is withdrawn. `main` solved the coverage
 better in the meantime, and the review found a real hole in my own preflight. What survives is the
@@ -9954,3 +9961,31 @@ than letting the closed row imply the class is handled.
 
 **Verdict:** VERIFIED for every claim above except the new test file passing, which is PARTIAL
 pending CI.
+
+## 2026-08-21 — The claim gate caught a false claim in this very log
+
+**Claim:** The `📎 Claim verification (evidence)` check failed on my own change, correctly, and the
+failure is worth recording rather than just fixing.
+
+**Evidence:**
+- Job `96790063327` → `verify:evidence` **passed** all four declared gates (typecheck, i18n-parity,
+  depcruise, tenant-scope). `verify:claims` then reported
+  `995 claims: 983 verified, 10 registered, 1 attested, 1875 excluded by rule, 1 FAILED`.
+- The one failure: `docs/audit/PROOF_ALIGNMENT_LOG.md:9910 [pull-request] no merge commit for #204`.
+  My heading read `## 2026-08-21 — PR #204 …`, and `PR #NNN` is claim-shaped: the gate resolves it to
+  a merge commit. The pull request is open, so there is none.
+- **The suggested remedy did not apply, and taking it would have been worse than the bug.**
+  `docs/pr-ledger.json`'s `$comment` reads: "Pull requests that landed WITHOUT a merge commit (rebase
+  or squash merge) … that sha must be an ancestor of the default branch." #204 has not landed at all.
+  Registering it would assert a landing that did not happen, inside the log whose whole purpose is to
+  stop exactly that.
+- Fix: heading no longer carries `PR #`. The entry describes the work; a note records why the
+  reference is absent so it does not get re-added.
+
+**Why this is worth an entry rather than a silent fix:** the gate caught an unmerged PR being cited
+as a landed fact in an append-only evidence log — written by an author who had just spent the session
+arguing that documents should not claim things that are not yet true. The mechanism does not care who
+wrote the claim, which is the point of having it.
+
+**Verdict:** VERIFIED — failure reproduced from the job log, remedy checked against the ledger's own
+scope comment rather than assumed from the error message.
