@@ -73,7 +73,7 @@ const GIT_PROBLEM = typeof RESOLVED_GIT === "string" ? null : (RESOLVED_GIT?.pro
  */
 const SHA = /^[0-9a-f]{7,40}$/i;
 const REF = /^\w[\w./-]*$/;
-const REPO_PATH = /^[^\0\-][^\0]*$/;
+const REPO_PATH = /^[^\0-][^\0]*$/;
 
 /** No git call may outlive this, and none may be truncated by the default buffer. */
 const GIT_TIMEOUT_MS = 30_000;

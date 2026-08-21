@@ -56,10 +56,10 @@ const SEPARATOR = "\u0020";
  * Longest name first so a shorter one cannot claim a prefix of it.
  */
 const MODULE_REQUIRE = new RegExp(
-  `require\\("\\./(${[...ENGINE_MODULES]
+  String.raw`require\("\./(${[...ENGINE_MODULES]
     .sort((a, b) => b.length - a.length)
     .map((name) => name.replace(/[.*+?^${}()|[\]\\-]/g, String.raw`\$&`))
-    .join("|")})\\.c?js"\\)`,
+    .join("|")})\.c?js"\)`,
   "g",
 );
 

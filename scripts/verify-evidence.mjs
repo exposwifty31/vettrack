@@ -181,7 +181,7 @@ function runGate(gate) {
           // top for git and which my first version of this line broke. A
           // process-tree killer picked up from PATH is a worse thing to get
           // wrong than the hang it exists to clean up.
-          const systemRoot = process.env.SystemRoot || "C:\\Windows";
+          const systemRoot = process.env.SystemRoot || String.raw`C:\Windows`;
           spawn(path.join(systemRoot, "System32", "taskkill.exe"), ["/T", "/F", "/PID", String(child.pid)], {
             stdio: "ignore",
             shell: false,

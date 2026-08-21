@@ -154,8 +154,8 @@ function scriptNameIn(recipe, packageManager = "npm") {
     // entry named "exec".
     // Shape-checked above, which is not the same as escaped: the class admits
     // `.`, and `.` is a wildcard. Same fix as the scanner's, for the same field.
-    const literal = packageManager.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const bare = new RegExp(`^${literal}\\s+([a-z][\\w:.-]*)`).exec(recipe);
+    const literal = packageManager.replace(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
+    const bare = new RegExp(String.raw`^${literal}\s+([a-z][\w:.-]*)`).exec(recipe);
     if (bare && !PACKAGE_MANAGER_VERBS.has(bare[1])) return bare[1];
   }
   return null;

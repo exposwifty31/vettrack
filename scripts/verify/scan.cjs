@@ -172,7 +172,7 @@ function isCommitish(token) {
  * A path-shaped code span. Anchored: a span is a file reference only if the
  * WHOLE span is one, so prose that merely contains a filename is not claimed.
  */
-const PATH_SPAN = new RegExp(`^([\\w@][\\w./@+-]*\\.(?:${FILE_EXT}))(?::(\\d+)(?:-(\\d+))?)?$`);
+const PATH_SPAN = new RegExp(String.raw`^([\w@][\w./@+-]*\.(?:${FILE_EXT}))(?::(\d+)(?:-(\d+))?)?$`);
 const DIR_SPAN = /^([\w@][\w./@+-]*\/)$/;
 
 /** `name@range` / `@scope/name@range` — the last `@` that is not the scope sigil. */
@@ -224,11 +224,11 @@ function plainProse(line) {
 function buildAliasPattern(aliases) {
   const names = Object.keys(aliases).sort((a, b) => b.length - a.length);
   if (names.length === 0) return null;
-  const escaped = names.map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+  const escaped = names.map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`));
   // A bare major counts: this project's docs write "React 18" and "Capacitor 8"
   // as often as "React Native 0.86.2", and both are version claims about the
   // manifest. `satisfiesVersion` compares only the segments the claim pins.
-  return new RegExp(`\\b(${escaped.join("|")})\\s+([\\^~]?\\d+(?:\\.(?:\\d+|x)){0,2})\\b`, "g");
+  return new RegExp(String.raw`\b(${escaped.join("|")})\s+([\^~]?\d+(?:\.(?:\d+|x)){0,2})\b`, "g");
 }
 
 /**
@@ -599,8 +599,8 @@ function collectScriptClaims(line, index, policy, push) {
   // and `.` is a wildcard, so a manager named `tool.v1` matched `toolXv1` and
   // claimed a script the manifest never defined. The comment above described
   // this exact defect while the code left it in place.
-  const literal = manager.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const runPattern = new RegExp(`\\b${literal}\\s+run\\s+([\\w:-]+)`, "g");
+  const literal = manager.replace(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
+  const runPattern = new RegExp(String.raw`\b${literal}\s+run\s+([\w:-]+)`, "g");
   for (const m of line.matchAll(runPattern)) {
     push(index, { kind: "script", raw: m[0], script: m[1] });
   }
@@ -804,7 +804,7 @@ function classifySpan(span, index, policy, push, decline, after = "", before = "
   // and `not-a-signature` as packages, which is how a checker earns its
   // reputation for crying wolf.
   const scoped = /^(@[a-z0-9][\w.-]*\/[a-z0-9][\w.-]*)(?:\/.*)?$/i.exec(span);
-  if (scoped && !new RegExp(`\\.(?:${FILE_EXT})$`).test(span)) {
+  if (scoped && !new RegExp(String.raw`\.(?:${FILE_EXT})$`).test(span)) {
     classifyPackageSpan(scoped, span, { index, policy, push, decline, after, before });
     return;
   }

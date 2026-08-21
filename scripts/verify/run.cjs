@@ -225,7 +225,7 @@ function verify({ root = REPO_ROOT, now = new Date().toISOString().slice(0, 10),
     }
   }
 
-  const combinedFacts = { ...facts, ...(git.facts ?? {}) };
+  const combinedFacts = { ...facts, ...git.facts };
   const context = {
     registry,
     attestations,
@@ -239,9 +239,10 @@ function verify({ root = REPO_ROOT, now = new Date().toISOString().slice(0, 10),
   };
 
   const { decided, byDisposition, claimFailures } = decideAll(claims, combinedFacts, context, git.ready);
-  failures.push(...claimFailures);
-
-  failures.push(...reverseCheckFailures(config, context, claims, combinedFacts));
+  failures.push(
+    ...claimFailures,
+    ...reverseCheckFailures(config, context, claims, combinedFacts),
+  );
 
   // Layer 3: the declared gates must have run, and passed, on this tree.
   const evidenceResult = rules.evidenceVerdict({

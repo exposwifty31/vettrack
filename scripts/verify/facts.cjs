@@ -134,7 +134,7 @@ function createFacts(root, policy) {
   const filteredListings = new Set();
 
   const manifest = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8"));
-  const dependencies = { ...(manifest.devDependencies ?? {}), ...(manifest.dependencies ?? {}) };
+  const dependencies = { ...manifest.devDependencies, ...manifest.dependencies };
 
   const REPO_ROOT = path.resolve(root);
   // Compared against the RESOLVED root, because a checkout can itself sit under
@@ -326,7 +326,7 @@ function createFacts(root, policy) {
     },
 
     scriptExists(name) {
-      return Object.prototype.hasOwnProperty.call(manifest.scripts ?? {}, name);
+      return Object.hasOwn(manifest.scripts ?? {}, name);
     },
 
     /**

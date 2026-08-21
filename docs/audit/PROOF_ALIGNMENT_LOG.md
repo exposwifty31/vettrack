@@ -9498,3 +9498,45 @@ recomputed independently in both repositories and identical:
 → `all declared gates passed`.
 
 **Verdict:** VERIFIED.
+
+### Sixteen SonarCloud findings, read rather than reasoned, 2026-08-21
+
+**Claim:** the sixteen new issues SonarCloud raised on the sibling repository are resolved, and the one Medium
+among them was a real ambiguity in a security-relevant pattern.
+
+**Evidence.** Two entries above record that this environment blocks `sonarcloud.io`, so the previous
+`PATH` fix was reasoned from the diff rather than read off the report. The owner supplied the report
+directly. That is worth recording as a change in the *kind* of evidence available, not just its content: the
+earlier entry said "this is the change that would explain it", and the list confirms there was no other
+security finding to explain it.
+
+| finding | severity | resolution |
+|---|---|---|
+| `Unnecessary escape character: \-` in `git-facts` | **Medium** | `REPO_PATH` was `[^\0\-]`. A `-` needs no escape when it sits last in a character class, and the escape made a pattern that guards an argv boundary harder to read than it needs to be. |
+| `String.raw` should be used to avoid escaping `\` ×9 | Low | Every dynamically built pattern in `scan`, `claims`, `fingerprint`, plus the Windows path in the runner. `fingerprint` already used the idiom in one line, so these were consistency gaps rather than a new convention. |
+| The empty object is useless ×2 | Low | `{ ...(x ?? {}) }` in `facts` and `run`. Spreading `undefined` is already a no-op, so the fallback did nothing. |
+| `Object.hasOwn()` over `Object.prototype.hasOwnProperty.call()` | Low | `facts`. The `?? {}` there is load-bearing and stays — `Object.hasOwn(undefined, …)` throws. |
+| Do not call `Array#push()` multiple times | Low | Two consecutive pushes onto `failures` in `run`, merged into one call. |
+
+**The Medium one was checked as behaviour, not as text.** `REPO_PATH` is what stops a path being read as a
+git flag, so the sources of every reachable pattern were captured before the edit and compared after: eleven
+are byte-identical, and the twelfth is `REPO_PATH` itself, whose *text* changed by exactly one character.
+Its behaviour is pinned by probe instead — `-rf` rejected, `--upload-pack=x` rejected, an ordinary
+`docs/<name>.md` accepted, `<dir>-<dir>/<name>.md` accepted so an interior dash is still ordinary, a NUL byte
+rejected.
+
+*The gate caught this passage while it was being written*: the probe values were first spelled as real-looking
+paths, and it read them as claims about files that do not exist. Fourth time it has done that to an entry of
+mine, and the fourth time it was right — fixed with the documented placeholder form rather than by quietly
+rewording.
+
+**Superseded fingerprint:** ~~`54550c0097ae2d5fd863d41fa81c6204e72782f60202fcbd32e5de315df455f7`~~. Current,
+recomputed independently in both repositories and identical:
+`99a096b7ec77c2cae76e3fef297df5c18ce6a171208600a9d925f7238f0f5a68`.
+
+**Commands run on the tree before this entry was appended:** `node scripts/verify-claims.mjs` →
+`1071 claims … 0 FAILED`; `pnpm exec vitest run tests/claims-ledger.test.ts` → `Tests 83 passed (83)`;
+`npx tsc --noEmit` → 0 errors; `pnpm architecture:gates` → `All G1 checks passed.` In the RN migration repo:
+`477 claims … 0 FAILED`, ledger `82 passed`, typecheck and lint clean.
+
+**Verdict:** VERIFIED.
