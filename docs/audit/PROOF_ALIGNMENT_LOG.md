@@ -9677,3 +9677,74 @@ clean tree `56f9caeda9bb` → all three declared gates PASS. In the RN migration
 `npm run verify:evidence` → all three declared gates PASS.
 
 **Verdict:** VERIFIED.
+
+---
+
+## 2026-08-21 — the reverse checks were asked a global question and given a branch-shaped answer
+
+**What failed.** `main` went red on the merge of the verify-engine PR itself, with the gate that PR
+added. Two CI jobs, one cause: `tests/claims-ledger.test.ts` reported `1 failed | 1617 passed`, and the
+`Claim gate` step reported `[registry-orphan] entry "8455807" (commit) matches no claim in any governed
+document — delete it`.
+
+**Why the suggested fix was wrong.** The entry is not stale. Checked against every governed document named
+in `verify.config.json`, `8455807` is cited exactly twice and both citations are in
+`docs/audit/PROOF_ALIGNMENT_LOG.md`. The gate could not see them.
+
+**Root cause — a scope mismatch between two rules that are each correct alone.** `collectClaims` in
+`scripts/verify/run.cjs` narrows an append-only document to the lines the BRANCH added. That is deliberate,
+and it is what keeps this file's historical entries from being re-judged. `reverseCheckFailures` then asks a
+GLOBAL question of that narrowed set — "does any live claim ANYWHERE reach this exemption?" On a branch the
+citing line is added, the entry matches, green. On the default branch the diff is empty, the citation is
+invisible, the entry is an orphan, red.
+
+Measured on the same commit `af5482687`, not inferred:
+
+```text
+run 32450671948 (branch)   claim verification: success   tests shard 2/4: success
+run 32456255632 (main)     claim verification: failure   tests shard 2/4: failure
+```
+
+and main's own tally is the proof that it is a reverse check rather than a claim:
+`987 claims: 976 verified, 10 registered, 1 attested, 1828 excluded by rule, 0 FAILED` — zero failed claims,
+and still `1 unaccounted`.
+
+**The class is wider than the one entry.** Every registry, PR-ledger and attestation entry whose sole
+citation lives in this append-only file inherits the same fate the moment its branch merges. It is
+deterministic, not flaky.
+
+**Fix.** `collectClaims` also returns `allClaims`, unfiltered. `claims` still drives what is JUDGED, so the
+append-only protection is untouched; `allClaims` drives the three reverse checks, which is the set their
+question was always about.
+
+**The first RED was mine, not the engine's.** The initial fixture said "removed the helper" — wording the
+scanner classifies `deletion-record`, so no claim was ever extracted and the entry orphaned for a reason
+unrelated to the defect. Instrumenting the fixture instead of stacking a second fix is what caught it. A
+second, non-append-only document was then added to the fixture because a repository whose only governed
+document is append-only trips `vacuous-scan` on the default branch — again not the defect. Both are recorded
+in `tests/claims-ledger.test.ts` so the next reader does not pay for them twice.
+
+**Commands run on a clean-room clone at the branch head, with `refs/remotes/origin/main` present:**
+`node scripts/verify-claims.mjs` → `987 claims … 0 FAILED`, `All claims accounted for`;
+`VT_ENFORCE_EVIDENCE=1 pnpm verify:claims` (what the failing CI job runs) → same, green;
+`pnpm exec vitest run tests/claims-ledger.test.ts` → `Tests 88 passed (88)`;
+`pnpm architecture:gates` → `[architecture-gates] All G1 checks passed.`;
+`pnpm verify:evidence` on a tree with zero dirty files → `typecheck` PASS, `i18n-parity` PASS,
+`depcruise` PASS, `all declared gates passed`.
+
+**Blast radius, measured rather than argued:** the only files that require the engine are
+`tests/claims-ledger.test.ts` and `scripts/verify-claims.mjs`.
+
+**Shared engine.** `scripts/verify/` is fingerprinted, so this cost the deliberate line it is designed to
+cost. The identical change is ported to the RN migration repo; the two copies are byte-identical after the
+sanctioned extension normalisation, and both repositories independently recompute the same value.
+Superseded: ~~`f0f3e4c7`~~. Current: `dc8e1fcf` — full value in `verify.config.json`. On the RN tree, clean:
+`477 claims … 0 FAILED`, `All claims accounted for`; jest 146 suites / 1597 passed; typecheck 0 errors;
+lint clean.
+
+**Not fixed here, and recorded so it is not mistaken for done:** on a working copy that contains an
+unrelated checkout inside the repository root, path-suffix resolution reaches into it. Locally that turned
+two registry entries into false `obsolete` failures that CI does not see. Same mechanism, opposite sign, is
+a false PASS. `ignoredPathPrefixes` in `verify.config.json` covers neither case today.
+
+**Verdict:** VERIFIED for the reverse-check defect. The suffix-resolution finding above is OPEN.

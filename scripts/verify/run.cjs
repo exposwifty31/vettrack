@@ -32,6 +32,10 @@ function collectClaims(config, git, ROOT) {
   const claims = [];
   const excluded = [];
   const failures = [];
+  // EVERY claim, including the append-only lines the branch did not add. The
+  // reverse checks below ask a GLOBAL question and must not be answered with a
+  // branch-shaped subset — see the comment on `allClaims` in `verify`.
+  const allClaims = [];
 
   for (const file of config.governedDocs) {
     const absolute = path.join(ROOT, file);
@@ -40,6 +44,7 @@ function collectClaims(config, git, ROOT) {
       continue;
     }
     const found = scan.extractFromMarkdown(fs.readFileSync(absolute, "utf8"), { file }, config);
+    allClaims.push(...found.claims);
 
     // An append-only document is scanned in FULL (the fence/retraction state
     // machine needs the whole text to be correct) and then filtered to the lines
@@ -65,13 +70,19 @@ function collectClaims(config, git, ROOT) {
     excluded.push(...found.excluded);
   }
 
-  return { claims, excluded, failures };
+  return { claims, allClaims, excluded, failures };
 }
 
 /**
  * Reverse checks: a registry entry, a PR-ledger entry or an attestation that no
  * live claim reaches is an exemption still excusing something that no longer
  * exists.
+ *
+ * `claims` MUST be the unfiltered set. Every rule here asks "does any live claim
+ * ANYWHERE reach this entry?", and an append-only document contributes only the
+ * lines the branch added. Fed that subset, an entry whose sole citation is
+ * already on the default branch matches nothing and is reported as an orphan —
+ * green on the branch that added the line, red on `main` the moment it merges.
  */
 function reverseCheckFailures(config, context, claims, combinedFacts) {
   const failures = [];
@@ -200,7 +211,12 @@ function verify({ root = REPO_ROOT, now = new Date().toISOString().slice(0, 10),
   const facts = createFacts(ROOT, config);
   const git = createGitFacts(ROOT, config.defaultBranch);
 
-  const { claims, excluded, failures } = collectClaims(config, git, ROOT);
+  // TWO SETS, DELIBERATELY. `claims` is what gets JUDGED: an append-only
+  // document contributes only the lines this branch added, so the 348 historical
+  // entries in the proof log are never re-judged. `allClaims` is what the
+  // reverse checks are asked about, because "is this exemption still needed?" is
+  // a question about the whole document set, not about one branch's diff.
+  const { claims, allClaims, excluded, failures } = collectClaims(config, git, ROOT);
   const notes = [];
 
   // GUARD THE GUARD. A scan that found nothing passes every assertion below for
@@ -241,7 +257,7 @@ function verify({ root = REPO_ROOT, now = new Date().toISOString().slice(0, 10),
   const { decided, byDisposition, claimFailures } = decideAll(claims, combinedFacts, context, git.ready);
   failures.push(
     ...claimFailures,
-    ...reverseCheckFailures(config, context, claims, combinedFacts),
+    ...reverseCheckFailures(config, context, allClaims, combinedFacts),
   );
 
   // Layer 3: the declared gates must have run, and passed, on this tree.
