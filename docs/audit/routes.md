@@ -2,7 +2,7 @@
 
 Routes derived from `server/app/routes.ts`, `server/index.ts`, and `server/routes/*.ts`.
 
-Generated 2026-08-19. **284** unique method+path pairs.
+Generated 2026-08-21. **285** unique method+path pairs.
 
 ---
 
@@ -50,7 +50,7 @@ Generated 2026-08-19. **284** unique method+path pairs.
 
 | File | Sample routes |
 |------|---------------|
-| `code-blue.ts` | `GET /api/code-blue/events`, `POST /api/code-blue/events`, `PATCH /api/code-blue/events/:id`, `GET /api/code-blue/history`, `POST /api/code-blue/one-tap`, `GET /api/code-blue/reconciliation` (+8 more) |
+| `code-blue.ts` | `GET /api/code-blue/eligible-managers`, `GET /api/code-blue/events`, `POST /api/code-blue/events`, `PATCH /api/code-blue/events/:id`, `GET /api/code-blue/history`, `POST /api/code-blue/one-tap` (+9 more) |
 | `crash-cart.ts` | `POST /api/crash-cart/checks`, `GET /api/crash-cart/checks/latest`, `GET /api/crash-cart/items`, `POST /api/crash-cart/items`, `DELETE /api/crash-cart/items/:id`, `PATCH /api/crash-cart/items/:id` |
 
 ## Scheduling & shifts

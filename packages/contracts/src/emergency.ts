@@ -53,6 +53,10 @@ export const EMERGENCY_SERVER_ROUTE_ALLOWLIST: readonly string[] = [
   "POST /api/code-blue/sessions",
   "POST /api/code-blue/one-tap",
   "GET /api/code-blue/sessions/active",
+  // Discovery read: who would the manager check accept right now. Not an
+  // offline-block mutation (it is a GET) and not a cache-bypass path — the SW
+  // never caches API GETs at all, so there is nothing to deny-list.
+  "GET /api/code-blue/eligible-managers",
   "POST /api/code-blue/sessions/:id/logs",
   "PATCH /api/code-blue/sessions/:id/presence",
   "PATCH /api/code-blue/sessions/:id/end",

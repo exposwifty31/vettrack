@@ -131,8 +131,11 @@ export interface EvaluateCodeBlueManagerOptions {
    * `shadow_would_have_denied` rows per list fetch — and that counter is the signal the
    * `off | shadow | enforce` rollout decision is made on. Reads must not vote in it.
    *
-   * NEVER pass this from a mutation path. `tests/authority-code-blue-manager-observe.test.ts`
-   * asserts the verdict is unchanged; a guard test asserts no mutation call site sets it.
+   * NEVER pass this from a mutation path. Both halves are pinned in
+   * `tests/authority-code-blue-manager-observe.test.ts`: the first describe asserts the
+   * verdict is unchanged and that omitting the flag still emits; the second ("no mutation
+   * call site may silence it") scans every non-test caller of this function and fails if
+   * any but the discovery read passes `observe`.
    */
   observe?: boolean;
 }
