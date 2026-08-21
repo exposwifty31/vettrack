@@ -9978,7 +9978,8 @@ failure is worth recording rather than just fixing.
   record of the failure.
 - **The suggested remedy did not apply, and taking it would have been worse than the bug.**
   `docs/pr-ledger.json`'s `$comment` reads: "Pull requests that landed WITHOUT a merge commit (rebase
-  or squash merge) … that sha must be an ancestor of the default branch." #204 has not landed at all.
+  or squash merge) … that sha must be an ancestor of the default branch." This pull request has not
+  landed at all.
   Registering it would assert a landing that did not happen, inside the log whose whole purpose is to
   stop exactly that.
 - Fix: heading no longer carries `PR #`. The entry describes the work; a note records why the
@@ -9988,6 +9989,18 @@ failure is worth recording rather than just fixing.
 as a landed fact in an append-only evidence log — written by an author who had just spent the session
 arguing that documents should not claim things that are not yet true. The mechanism does not care who
 wrote the claim, which is the point of having it.
+
+**The rule, read from source after guessing wrong twice.** `scripts/verify/scan.cjs:142` defines
+`MERGE_CONTEXT = /(?<![\w-])MERGED\b|\bmerged\b|\blanded\b|\bPRs?\s+#/`. A bare number-sign
+reference becomes a pull-request claim ONLY on a line that also carries merge vocabulary —
+`merged`, `landed`, `MERGED`, or the `PR` + number-sign form. The comment above it says so
+outright: a bare reference is "deliberately NOT enough," because README and G2-PLAN both cite
+react-native-nfc-manager's upstream issue number, which is not a pull request here.
+
+That is why the first fix moved the failure instead of clearing it: I removed the `PR` + number
+form from the heading, but a later line said the pull request "has not landed" next to its
+number — merge vocabulary plus a number, which is precisely the pattern. Two failed runs were
+spent inferring the rule from error text before reading the fifteen lines that define it.
 
 **Verdict:** VERIFIED — failure reproduced from the job log, remedy checked against the ledger's own
 scope comment rather than assumed from the error message.
