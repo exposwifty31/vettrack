@@ -283,6 +283,16 @@ jobs:
       # config's ordering (10 of 49 — worker sweeps and operational metrics) while
       # passing in the ops one. Importing a known instability to buy coverage that
       # already exists is a bad trade. These two pass clean: 15 tests, ~30s.
+      # Both suites above are `describe.skipIf(!dbReachable)`. That is correct on a
+      # laptop with no database and inverts here: an unset or unreachable DATABASE_URL
+      # makes both skip, vitest exits 0, and the step below reports success having
+      # asserted nothing — the same "gate that passes when it did not run" shape the
+      # rfid-controller comment rejects. The preflight asserts the suites' own probe
+      # condition (plus the migration 181-184 table doctor-gate documents needing) and
+      # fails loud. Its pure branches are tested in tests/ci-db-integration-preflight.test.ts.
+      - name: 🚦 Refuse a silent skip
+        run: node scripts/ci/db-integration-preflight.mjs
+
       - name: 🩺 Cross-repo contract suites (doctor gate + reviewer seed)
         run: >-
           pnpm exec vitest run --config vitest.db-integration.config.ts

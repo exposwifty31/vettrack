@@ -9906,3 +9906,137 @@ on the PR, not by me.
   so the armed path is unchanged.
 
 **Verdict:** VERIFIED
+
+## 2026-08-21 — db-integration work re-scoped after review: main already had the coverage; kept only the guard
+
+> Deliberately no `PR #` reference in this heading. The claim gate reads `PR #NNN` as a
+> pull-request claim and requires a merge commit to verify it against; the pull request this
+> entry was written on is still open, so there is none. `docs/pr-ledger.json` is not the escape
+> hatch either — its own `$comment` scopes it to PRs that **landed** without a merge commit, and
+> requires the sha be an ancestor of the default branch. Registering an unmerged PR there would
+> be a false claim in the exact register this log exists to keep honest. The gate was right.
+
+**Claim:** The `db-integration` job proposed on 2026-08-20 is withdrawn. `main` solved the coverage
+better in the meantime, and the review found a real hole in my own preflight. What survives is the
+silent-skip guard, retargeted at main's step and corrected.
+
+**Evidence — the review's three load-bearing claims, each checked against primary sources:**
+- **`main` shipped the coverage first. TRUE.** `git log --oneline -1 7a3ad3a` → "ci: the cross-repo
+  contract suites were enforced by no workflow at all". `git show origin/main:.github/workflows/ci.yml`
+  lines 286-290 run the two suites **by name** inside `integration-ops`. Branch was
+  `git rev-list --count HEAD..origin/main` = **49** behind.
+- **Named files were deliberate, and my whole-config approach would have imported a red suite. TRUE.**
+  main's ci.yml:279-285 records the measurement: `test:db-integration`'s config also pulls in
+  `equipment-operational-state`, which `test:integration:ops` already runs, and which fails 10 of 49
+  under that config's ordering. My job would have run one file twice per PR and imported that.
+- **My preflight did not assert the condition the third suite gates on. TRUE — and it is the exact
+  failure the guard existed to prevent.** `tests/equipment-operational-state.integration.test.ts:33-38`
+  does not stop at `SELECT 1`; it queries `information_schema.columns` for
+  `vt_equipment.custody_state` and sets `dbReachable = rows.length === 1`. A reachable but
+  schema-behind database passed my preflight and skipped 49 tests.
+
+**What the re-scoped change does, and its verification:**
+- No new job. `🚦 Refuse a silent skip` is now a step inside `integration-ops`, immediately before
+  main's `🩺 Cross-repo contract suites` step. Command:
+  `yaml.safe_load(ci.yml)` → `integration-ops` steps end `[…, '🔌 Integration ops suite',
+  '🚦 Refuse a silent skip', '🩺 Cross-repo contract suites (doctor gate + reviewer seed)']`;
+  `'db-integration' in jobs` → **False**.
+- Scope re-verified rather than assumed: both suites main actually runs probe **only** `SELECT 1`
+  (`doctor-shift-gate:46-62`, `seed-reviewer-demo:20-32`), so assertion 1 is exactly their condition.
+  The `custody_state` probe belongs to a file this step does not run; the script now says so in its
+  header instead of claiming a generality it does not have.
+- Added assertion 2 (`vt_clinical_check_ins` present) because doctor-shift-gate documents migrations
+  181-184 as its precondition at `:15` but does **not** probe for them — so a schema-behind database
+  would fail deep inside the suite rather than here.
+- Command: `node --check scripts/ci/db-integration-preflight.mjs` → exit 0.
+  `env -u DATABASE_URL node scripts/ci/db-integration-preflight.mjs` → refusal message, `exit=1`.
+- **Missing-tests finding addressed:** `tests/ci-db-integration-preflight.test.ts` feeds the two pure
+  predicates deliberately broken input (unset / empty / whitespace-only URL; 0 and 2 schema rows).
+  Not run locally — this container has no `node_modules`. CI on this PR is the proof.
+
+**The review's third finding is correct and is NOT closed by this PR.** Verified 2026-08-21:
+`vite.config.ts` excludes 10 entries from `pnpm test`, and a `grep -rl` over `.github/workflows/`
+returns **0** workflows for every one of them. TASKS.md now carries that as its own open row rather
+than letting the closed row imply the class is handled.
+
+**Verdict:** VERIFIED for every claim above except the new test file passing, which is PARTIAL
+pending CI.
+
+## 2026-08-21 — The claim gate caught a false claim in this very log
+
+**Claim:** The `📎 Claim verification (evidence)` check failed on my own change, correctly, and the
+failure is worth recording rather than just fixing.
+
+**Evidence:**
+- Job `96790063327` → `verify:evidence` **passed** all four declared gates (typecheck, i18n-parity,
+  depcruise, tenant-scope). `verify:claims` then reported
+  `995 claims: 983 verified, 10 registered, 1 attested, 1875 excluded by rule, 1 FAILED`.
+- The one failure: `docs/audit/PROOF_ALIGNMENT_LOG.md:9910 [pull-request] no merge commit for #204`.
+  My heading carried the claim-shaped `PR #` + number form, which the gate resolves to a merge
+  commit. The pull request is open, so there is none. The offending form is deliberately NOT
+  reproduced in this entry — quoting it verbatim would re-trigger the same gate on this very
+  record of the failure.
+- **The suggested remedy did not apply, and taking it would have been worse than the bug.**
+  `docs/pr-ledger.json`'s `$comment` reads: "Pull requests that landed WITHOUT a merge commit (rebase
+  or squash merge) … that sha must be an ancestor of the default branch." This pull request has not
+  landed at all.
+  Registering it would assert a landing that did not happen, inside the log whose whole purpose is to
+  stop exactly that.
+- Fix: heading no longer carries `PR #`. The entry describes the work; a note records why the
+  reference is absent so it does not get re-added.
+
+**Why this is worth an entry rather than a silent fix:** the gate caught an unmerged PR being cited
+as a landed fact in an append-only evidence log — written by an author who had just spent the session
+arguing that documents should not claim things that are not yet true. The mechanism does not care who
+wrote the claim, which is the point of having it.
+
+**The real lesson is not the rule — it is that the checker runs locally.**
+`node scripts/verify-claims.mjs` executes with no `node_modules` present. It was runnable in this
+container the whole time. Four CI cycles were spent inferring its behaviour from error text, then
+transcribing one of its patterns by hand and auditing against the transcription, when the tool
+itself was one command away. Run the gate; do not model it.
+
+The pattern that matters lives at `scripts/verify/scan.cjs:142` and the comment above it explains
+the intent. Read it there rather than copied to here: quoting it verbatim is what broke the
+previous attempt, because the pattern is built from the very vocabulary it searches for, so any
+faithful quotation of it trips it. Two of this file's own lines failed that way.
+
+Note when running locally: `[git-unavailable]` against `.github/workflows/ci.yml` is an artifact of
+a shallow clone and does not occur in CI, which sets `fetch-depth: 0`. Ignore that one line locally;
+everything else the local run reports is real.
+
+**Verdict:** VERIFIED — failure reproduced from the job log, remedy checked against the ledger's own
+scope comment rather than assumed from the error message.
+
+## 2026-08-21 — The preflight's own run-guard could silently disable it (claude/founder-review-34bl1o)
+
+**Claim:** `scripts/ci/db-integration-preflight.mjs` decides whether to run by comparing
+`import.meta.url` against `` `file://${process.argv[1]}` ``. `import.meta.url` is realpath-resolved
+and `process.argv[1]` is not, so any symlink on the invocation path made the two disagree, the
+guard evaluate false, and the script parse, print nothing and exit 0 — a pass, emitted by the gate
+whose whole purpose is refusing passes that did not run.
+
+**Evidence:**
+- Command: `node -e "realpathSync('/tmp')"` → `/private/tmp`. On macOS `/tmp` is a symlink, which
+  is what surfaced this: a copy of the script run from `/tmp` printed nothing and exited 0, while
+  the same bytes copied to `/private/tmp` refused correctly with `exit=1`. Same file, two paths,
+  opposite behaviour.
+- Test: `tests/ci-db-integration-preflight.test.ts` — symlink case run against the ORIGINAL guard
+  → `Tests 1 failed | 10 passed`. Against the realpath'd guard → `Tests 11 passed (11)`.
+- All three paths verified by MESSAGE, not exit code: real path → `❌ … Refusing.`; via symlink →
+  `❌ … Refusing.`; healthy database → `✅ DATABASE_URL reachable and migrated — the contract
+  suites will execute, not skip.`
+
+**Asserting the message is the point, not pedantry.** A `SyntaxError` also exits 1. An earlier
+attempt at this fix used `await` inside a non-async arrow; both the real-path and symlink runs
+returned `exit=1` and read as success. A crash and a refusal are indistinguishable by exit code.
+
+**Correction to how this was found.** The finding was first reported as "`main()` is never called —
+the gate is dead code". That was wrong. There is no `main()`; the logic is inline under
+`if (invokedDirectly)`, in lines 56-80 — a range left unread between a `sed -n '1,55p'` and a
+`tail -30` of a 110-line file. The grep that "confirmed" it searched for a name the file does not
+use, and the run that "confirmed" it executed a copy from `/tmp`. Three shortcuts agreeing with
+each other is not corroboration.
+
+**Verdict:** VERIFIED for the guard defect. The "dead gate" report it started from was FALSE and
+is retracted here.
