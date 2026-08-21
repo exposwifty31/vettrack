@@ -10007,3 +10007,36 @@ everything else the local run reports is real.
 
 **Verdict:** VERIFIED — failure reproduced from the job log, remedy checked against the ledger's own
 scope comment rather than assumed from the error message.
+
+## 2026-08-21 — The preflight's own run-guard could silently disable it (claude/founder-review-34bl1o)
+
+**Claim:** `scripts/ci/db-integration-preflight.mjs` decides whether to run by comparing
+`import.meta.url` against `` `file://${process.argv[1]}` ``. `import.meta.url` is realpath-resolved
+and `process.argv[1]` is not, so any symlink on the invocation path made the two disagree, the
+guard evaluate false, and the script parse, print nothing and exit 0 — a pass, emitted by the gate
+whose whole purpose is refusing passes that did not run.
+
+**Evidence:**
+- Command: `node -e "realpathSync('/tmp')"` → `/private/tmp`. On macOS `/tmp` is a symlink, which
+  is what surfaced this: a copy of the script run from `/tmp` printed nothing and exited 0, while
+  the same bytes copied to `/private/tmp` refused correctly with `exit=1`. Same file, two paths,
+  opposite behaviour.
+- Test: `tests/ci-db-integration-preflight.test.ts` — symlink case run against the ORIGINAL guard
+  → `Tests 1 failed | 10 passed`. Against the realpath'd guard → `Tests 11 passed (11)`.
+- All three paths verified by MESSAGE, not exit code: real path → `❌ … Refusing.`; via symlink →
+  `❌ … Refusing.`; healthy database → `✅ DATABASE_URL reachable and migrated — the contract
+  suites will execute, not skip.`
+
+**Asserting the message is the point, not pedantry.** A `SyntaxError` also exits 1. An earlier
+attempt at this fix used `await` inside a non-async arrow; both the real-path and symlink runs
+returned `exit=1` and read as success. A crash and a refusal are indistinguishable by exit code.
+
+**Correction to how this was found.** The finding was first reported as "`main()` is never called —
+the gate is dead code". That was wrong. There is no `main()`; the logic is inline under
+`if (invokedDirectly)`, in lines 56-80 — a range left unread between a `sed -n '1,55p'` and a
+`tail -30` of a 110-line file. The grep that "confirmed" it searched for a name the file does not
+use, and the run that "confirmed" it executed a copy from `/tmp`. Three shortcuts agreeing with
+each other is not corroboration.
+
+**Verdict:** VERIFIED for the guard defect. The "dead gate" report it started from was FALSE and
+is retracted here.

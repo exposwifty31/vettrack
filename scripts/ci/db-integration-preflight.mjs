@@ -32,6 +32,9 @@
  * follow-up, not this script.
  */
 
+import { realpathSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+
 /** Pure: the DATABASE_URL branch. Kept separate so it is testable without a database. */
 export function evaluateDatabaseUrl(databaseUrl) {
   if (!databaseUrl || !databaseUrl.trim()) {
@@ -61,8 +64,26 @@ export function evaluateSchema(rowCount) {
 
 // Self-execute only when run as a script, so the tests can import the predicates.
 // import.meta.main is not available on this Node line; compare argv[1] instead.
-const invokedDirectly =
-  process.argv[1] && import.meta.url === new URL(`file://${process.argv[1]}`).href;
+//
+// BOTH SIDES ARE REALPATH'D, and that is not defensive noise. `import.meta.url` is
+// already fully resolved; `process.argv[1]` is not. Any symlink on the invocation path
+// makes the two disagree and the guard silently false — the gate then parses, prints
+// nothing, and exits 0, which is indistinguishable from a pass. That is exactly the
+// failure this whole script exists to refuse, hiding in the line that starts it.
+// It is not hypothetical: on macOS `/tmp` is a symlink to `/private/tmp`, so a copy run
+// from `/tmp` no-ops while the same bytes at their real path refuse correctly. A
+// symlinked checkout or a container bind-mount is the same shape in CI.
+const invokedDirectly = (() => {
+  if (!process.argv[1]) return false;
+  try {
+    return (
+      realpathSync(fileURLToPath(import.meta.url)) === realpathSync(process.argv[1])
+    );
+  } catch {
+    // A path that cannot be resolved is not a reason to skip the gate.
+    return import.meta.url === new URL(`file://${process.argv[1]}`).href;
+  }
+})();
 
 if (invokedDirectly) {
   const urlVerdict = evaluateDatabaseUrl(process.env.DATABASE_URL);
