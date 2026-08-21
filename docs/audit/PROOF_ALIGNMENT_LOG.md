@@ -9624,3 +9624,56 @@ in both repositories and identical:
 `477 claims … 0 FAILED`, ledger `83 passed`, typecheck and lint clean.
 
 **Verdict:** VERIFIED.
+
+### An unwatched killer would have taken the whole evidence run down, 2026-08-21
+
+**Claim.** The Windows branch of the gate timeout in `scripts/verify-evidence.mjs` spawned `taskkill.exe`
+with no `error` listener; the POSIX branch swallowed every kill failure in a bare `catch`; neither read what
+the killer reported. All three are fixed, and the run that says so was itself recorded on a clean tree.
+
+**Evidence.** The `error` case is not a style point. `spawn` reports a failure to start as an **asynchronous**
+event, and an `error` event with no listener is thrown rather than ignored — so the surrounding `try`/`catch`
+could never have caught it. A `taskkill.exe` that would not start therefore killed the evidence runner
+itself, losing the report for every other gate at the exact moment the timeout existed to produce one. Both
+shapes, run in a real child process:
+
+```text
+no error listener:  exit 1, "Unhandled 'error' event", never reached the report write
+error listener:     exit 0, reached the report write, recorded "... ENOENT"
+```
+
+That measurement is pinned by `tests/claims-ledger.test.ts`, which spawns both shapes rather than asserting
+about them. Two quieter twins sat in the same block: taskkill's exit status was never read, so a killer that
+ran and reported failure left the tree alive silently; and the POSIX `catch {}` read `ESRCH` (the tree had
+already exited — what the kill was for, and a false alarm if reported) and `EPERM` (it is still running
+against the checkout) as the same event. `terminationProblem` in the shared engine is the decision that
+separates them, so the Windows half can be asked from a machine that is not Windows.
+
+**On the verdicts above this one.** CodeRabbit's review of `e4ee4214b` said the `VERIFIED` lines in this file
+were being written without running `pnpm verify:evidence`. That was correct. The reports those entries could
+have cited were taken over a **dirty** working copy — which layer 3 rejects by design, because a report over
+a dirty tree records some other code passing — and no entry named one. This entry names one:
+
+```text
+$ pnpm verify:evidence          # clean tree 56f9caeda9bb, no "(DIRTY working copy)"
+  PASS  typecheck    (29s)  pnpm typecheck
+  PASS  i18n-parity   (1s)  pnpm i18n:check
+  PASS  depcruise     (4s)  pnpm depcruise:check
+$ VT_ENFORCE_EVIDENCE=1 pnpm verify:claims   # what CI runs
+  1075 claims: 1061 verified, 13 registered, 1 attested, 2334 excluded by rule, 0 FAILED
+```
+
+Under enforcement the "evidence not current" note is gone, which is the only thing that distinguishes a
+report that supports a claim of green from one that does not.
+
+**Superseded fingerprint:** ~~`6cdd47e8`~~ (full value in the entry above). Current, recomputed independently
+in both repositories and identical: `f0f3e4c7` — full value recorded in `verify.config.json`.
+
+**Commands run on the tree before this entry was appended:** `node scripts/verify-claims.mjs` →
+`1075 claims … 0 FAILED`; `pnpm exec vitest run tests/claims-ledger.test.ts` → `Tests 86 passed (86)`;
+`npx tsc --noEmit` → 0 errors; `pnpm architecture:gates` → `All G1 checks passed.`; `pnpm verify:evidence` on
+clean tree `56f9caeda9bb` → all three declared gates PASS. In the RN migration repo, on clean tree
+`02fa3ad6f832`: `477 claims … 0 FAILED`, ledger `85 passed`, typecheck 0 errors, lint clean, and
+`npm run verify:evidence` → all three declared gates PASS.
+
+**Verdict:** VERIFIED.
