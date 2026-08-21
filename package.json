@@ -39,6 +39,8 @@
     "test:rfid-controller": "vitest run --config packages/rfid-controller/vitest.config.ts",
     "rfid-controller:typecheck": "tsc --noEmit -p packages/rfid-controller/tsconfig.json",
     "typecheck": "tsc --noEmit && tsc -p tsconfig.server.json --noEmit",
+    "verify:claims": "node scripts/verify-claims.mjs",
+    "verify:evidence": "node scripts/verify-evidence.mjs",
     "typecheck:server": "tsc -p tsconfig.server.json --noEmit",
     "contracts:typecheck": "tsc --noEmit -p node_modules/@vettrack/contracts/tsconfig.json",
     "tenant:lint:all": "node scripts/architecture/tenant-query-lint.mjs --warn-only --all",

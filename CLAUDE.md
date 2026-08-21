@@ -35,6 +35,10 @@ pnpm depcruise:check         # dependency-cruiser boundary check against known-v
 pnpm architecture:cycles     # import-cycle regression check
 pnpm knip                   # unused files/exports/deps (also not part of architecture:gates)
 
+# Claim verification (the docs are checked, not trusted)
+pnpm verify:claims           # every statement in a governed doc must be accounted for
+pnpm verify:evidence         # run the declared gates and record the result (layer 3)
+
 # i18n
 pnpm i18n:check              # locales/en.json ⟷ locales/he.json parity
 
@@ -87,7 +91,7 @@ Omit `CLERK_SECRET_KEY` / `VITE_CLERK_PUBLISHABLE_KEY` to use dev-bypass auth (h
 
 VetTrack is a veterinary hospital operations platform: equipment tracking & custody, Code Blue emergency workflows, inventory/dispense, tasks & shifts, and external PMS integrations for multi-clinic deployments. (Legacy `/patients`, `/er`, `/billing`, `/meds` routes survive only as redirects — see scope note below.)
 
-**Stack:** React 18 + Vite frontend (port 5000) · Express + TypeScript backend (port 3001) · PostgreSQL + Drizzle ORM · BullMQ + Redis · Clerk auth · SSE realtime (+ additive Socket.io collab channel) · PWA / offline-first · Capacitor 8 native shell (iOS/Android, live on the App Store) · Sentry · Railway deploy
+**Stack:** React 18 + Vite frontend (port 5000) · Express + TypeScript backend (port 3001) · PostgreSQL + Drizzle ORM · BullMQ + Redis · Clerk auth · SSE realtime (+ additive Socket.io collab channel) · PWA / offline-first · Capacitor 8 native shell (iOS/Android, live on the App Store) <!-- vt-claim: attested ios-app-store-live --> · Sentry · Railway deploy
 
 **Active program:** `docs/design/program-plan.md` is the forward-looking program — per-role UX, the web app as a management console, and the Command Center board as a fourth `"board"` platform target — with `docs/design/{plan-validation-register,platform-strategy-research}.md` as its cited research base. Parts have since landed (the `"board"` target, `src/features/command-board`, the web console pages); treat the doc as direction and verify against the code for current state. The mobile-native successor is an Expo SDK 57 migration (CNG / prebuild, New Architecture mandatory) in a separate public repo (`VetTrack---RN-Migration-`; owner decision 2026-07-22; the old Expo companion `literate-dollop` is retired and no longer exists — verified against the owner's repo list 2026-07-28). `packages/contracts` (`@vettrack/contracts`) remains the framework-free shared layer; contract bumps may need a companion PR in that successor repo.
 
@@ -165,7 +169,7 @@ These exist as load-bearing contracts. Extend or wire additively — do **not** 
 
 - **Realtime transport:** SSE via `/api/realtime/stream`, outbox-backed ordering on `vt_event_outbox`, monotonic `id:` cursor, HTTP replay via `/api/realtime/replay`. Not WebSockets, not polling. (The R-RTC-1 Socket.io channel on `/collab-ws` is a sanctioned **additive** exception for ephemeral collaboration state only — see below.)
 - **Collab channel is ephemeral-only:** `/collab-ws` (`server/lib/realtime-collab/`) carries presence/cursors/typing/nudges. It **never** carries domain or emergency state, and its init is non-fatal — any failure logs and leaves it disabled while SSE and Code Blue start normally (R-RTC-1.7).
-- **RFID is advisory-only (ADR-006, binding):** RFID is supporting evidence — it **never** overrides a human-confirmed room. Canonical location precedence: active checkout/scan > human `roomId` > RFID last-seen > free-text > unknown. Low-confidence/conflicting reads raise `rfid_location_conflict` / `ambiguous_rfid_location` for a human to resolve; the system never guesses. Ingest is HMAC-signed vendor-controller POSTs to `/api/rfid/events` (raw body parsed before `express.json`, no Clerk session; per-clinic secrets with rotation via `server/lib/rfid/provisioning.ts`).
+- **RFID is advisory-only (ADR-006, binding):** RFID is supporting evidence — it **never** overrides a human-confirmed room. Canonical location precedence: active checkout/scan > human `roomId` > RFID last-seen > free-text > unknown. Low-confidence/conflicting reads raise `rfid_location_conflict` / `ambiguous_rfid_location` for a human to resolve; the system never guesses. Ingest is HMAC-signed vendor-controller POSTs to `/api/rfid/events` (raw body parsed before `express.json()`, no Clerk session; per-clinic secrets with rotation via `server/lib/rfid/provisioning.ts`).
 - **BroadcastChannel envelope:** cross-tab gossip carries `cursor`, `buildTag`, `ts`, `senderNonce` and `kind ∈ { "cursor", "build_tag", "code_blue_seen" }`. Ordering is rooted in the monotonic outbox cursor; `ts` is advisory.
 - **PWA build-tag:** `__VT_BUILD_TAG__` is the single source of truth for the SW cache name (`vettrack-<buildTag>`) and the split-version detector. Injected at build time into both `public/sw.js` and the client bundle.
 - **Emergency endpoint cache denylist:** `/api/display/snapshot`, `/api/code-blue/sessions/active`, `/api/realtime/{stream,replay,outbox-head,telemetry}` — never read from or written to Cache Storage. The bypass is unconditional and pre-existing entries are purged on SW activate.
@@ -264,6 +268,58 @@ All workers and recurring schedulers are registered in `server/app/start-schedul
 | `scanUnresolvedEmergencyDispenses` (interval) | Unresolved emergency dispense escalation (30/60/120-min thresholds) |
 
 Redis is optional in dev (app runs; queues log `QUEUE_DISABLED_NO_REDIS`). Production requires Redis.
+
+### Claim verification (the docs are checked, not trusted)
+
+`pnpm verify:claims` resolves every statement in a governed document against reality, and the same engine
+runs inside `pnpm test` (`tests/claims-ledger.test.ts`) and `pnpm architecture:gates` — so a document that
+starts lying fails CI. It exists because `CLAUDE.md` is the map everyone works from, and
+`docs/audit/PROOF_ALIGNMENT_LOG.md` is 8,700 lines of "verify before reporting done" kept entirely by
+whoever remembers it. The port's first run found `docs/migrations.md` describing ~~`drizzle.config.ts`~~ in the
+present tense, five days after commit `b043585de` deleted it.
+
+**Four layers.** *Exists* — paths, line ranges, globs, dependency versions, package scripts, the directory
+layout, declared absence. *Executed* — a "MERGED"/"landed" line must cite a PR or commit, and that citation
+must exist and be an ancestor of `main`. *Works* — the gates in `verify.config.json` must have run green on
+this tree (`docs/audit/evidence-run.json`, written by `pnpm verify:evidence`, never committed). *Attested* —
+what the repo cannot prove (the App Store, a device) is a dated entry in `docs/attestations.json` with an
+expiry and a re-verify recipe.
+
+Every claim ends as `verified` · `registered` · `attested` · `excluded by rule` · **FAIL**. There is no
+"skipped": a silent skip and a passing check look identical from outside, and only one of them is honest.
+One sixth label exists and is not an exception: on a tree where layer 2 cannot run at all (a shallow clone,
+no `main`), commit and pull-request claims are counted `unresolvable` so the dispositions still sum to the
+total. It appears only on a run that is **already failing** on `git-unavailable`, never on a passing one.
+
+**When it fails, pick one — never a fourth option:** fix the document (the common case); or add an entry to
+`docs/claims-registry.json` with an auditable reason if the claim is true but unverifiable here; or add an
+entry to `docs/attestations.json` if it needs a human on real hardware. Exemptions cannot rot — an entry
+that matches no live claim fails, and so does one whose claim would now verify on its own.
+
+**Writing claims:** cite files in backticks; a shorthand that resolves as a path suffix is fine. Superseded
+values go in `~~strikethrough~~`, and `X` → `Y` / "renamed from `X`" mark `X` as a former name — so the
+repo's correction style stays safe to write. Close every strikethrough you open: an unterminated run blanks
+the rest of the document and its claims would vanish, so the gate reports the run instead (a `` `~~` `` inside
+a code span is literal text and opens nothing). Two things prose cannot express unambiguously use an HTML
+comment: `<!-- vt-claim: absent drizzle-kit scope=deps -->` and `<!-- vt-claim: attested <id> -->`. A marker
+inside backticks is an EXAMPLE, not a claim — which is what makes this sentence safe to write, and what stops
+a documented `attested <id>` from satisfying the "referenced by a governed document" rule on its own.
+
+**`docs/audit/PROOF_ALIGNMENT_LOG.md` is append-only, and the gate respects that:** it checks only the lines
+a branch ADDS. A new entry must be verifiable now; the 348 historical entries stay the record they are,
+which is what that file's own first rule requires.
+
+Scope lives in `verify.config.json`. A document that is not listed is deliberately ungoverned, not
+accidentally missed.
+
+**The engine is shared with the RN migration repo and cannot drift quietly.** `scripts/verify/*.cjs` here is
+the same code that repo carries as `scripts/verify/*.js` (this package is `"type": "module"`, so the copies
+differ only in the extension inside their internal `require` calls). Nothing offline can compare two
+repositories, so `scripts/verify/fingerprint.cjs` hashes the engine with that one difference normalised away,
+both repos record the result in `verify.config.json` as `engineFingerprint`, and the gate fails when the local
+files stop matching it. Editing the engine therefore costs a deliberate, reviewable line that says the shared
+code changed — which is the moment to port it. The hash covers the fingerprint module itself, so the rule that
+decides what counts as drift cannot drift for free.
 
 ### i18n (Phase 6)
 

@@ -8744,3 +8744,936 @@ it.
 
 **Verdict:** VERIFIED — every number above is from a command run this session, including both sides
 of the baseline comparison.
+
+## 2026-08-20 — Claim verification gate: the repo's own prose is now machine-checked (branches `claude/verify-docs-drift-99i5lj` → `claude/verify-engine-99i5lj` → `claude/verify-ci-99i5lj`)
+
+**Claim:** A four-layer claim-verification gate landed in both repos. Every statement in a governed document
+resolves to `verified` / `registered` / `attested` / `excluded by rule` / FAIL — there is no silent skip.
+It runs as `pnpm verify:claims`, inside `pnpm test` (`tests/claims-ledger.test.ts`), and as the last step of
+`pnpm architecture:gates`. Both repos are green, and the gate found real drift in each on its first run.
+
+**Evidence:**
+- `scripts/verify/claims.cjs`, `scripts/verify/scan.cjs`, `scripts/verify/facts.cjs`,
+  `scripts/verify/git-facts.cjs`, `scripts/verify/run.cjs` — the engine, shared with the RN migration repo
+  (which carries it as plain `.js`; this package is `"type": "module"`, hence `.cjs`). Decisions are pure
+  functions over plain data, so a deliberately FALSE claim can be handed to them directly.
+- Command: `node scripts/verify-claims.mjs` → `395 claims: 387 verified, 7 registered, 1 attested,
+  18 excluded by rule, 0 FAILED` / `All claims accounted for.`
+- Command: `pnpm verify:evidence` → `PASS typecheck (38s)`, `PASS i18n-parity (1s)`, `PASS depcruise (7s)`,
+  `all declared gates passed`. Report written to `docs/audit/evidence-run.json` (gitignored; bound to a tree
+  hash, so a committed copy would be stale at the next commit).
+- Command: `pnpm architecture:gates` → the new `[architecture-gates] claim verification` step ran last and
+  the run ended `All G1 checks passed.`
+- Test: `pnpm exec vitest run tests/claims-ledger.test.ts` → `Test Files 1 passed (1)`, `Tests 38 passed (38)`.
+  Every block leads with a fabricated FALSE claim and asserts refusal, then asserts the healthy case.
+- RED probes run against this working tree, each restored afterwards, all four bit:
+  ~~`server/does-not-exist.ts`~~ appended to `CLAUDE.md` → `[path] path does not exist`;
+  `drizzle-kit` re-added to `devDependencies` → `[absence] claims "drizzle-kit" is absent from deps, found 1
+  occurrence(s)`; a fabricated 40-hex sha cited as landed → `[commit] no such commit in this repository`;
+  an unused registry entry → `[registry-orphan] ... matches no claim in any governed document`.
+- Real drift this gate found here, now fixed: `docs/migrations.md` described ~~`drizzle.config.ts`~~ in the
+  present tense, five days after commit `b043585de` ("chore: retire drizzle-kit, ...") deleted it —
+  confirmed with `git log --diff-filter=D -- drizzle.config.ts`. The paragraph is retained with a dated
+  correction rather than rewritten, and the now-moot "repoint `out`" advice is marked as such.
+- Also corrected here: `CLAUDE.md` cited the Express middleware as ~~`express.json`~~ (a file-shaped
+  reference to a function call) — now `express.json()`.
+- `docs/audit/PROOF_ALIGNMENT_LOG.md` is governed as APPEND-ONLY: the gate checks only the lines a branch
+  adds (`addedLines` in `scripts/verify/git-facts.cjs`, via `git diff --unified=0 origin/main`). The 348
+  historical entries are left as the record they are, which this file's own first rule requires. This entry
+  was itself checked by that path.
+- Layer 3's ACCEPTING path was observed end-to-end, not just unit-asserted. The working copy here is dirty
+  by construction while the work is uncommitted, so it was reproduced in a throwaway clone of the RN repo
+  outside both working trees: changes committed there, `git status --porcelain` empty, `origin/main` pointed
+  at the real `c866dbc`. `verify-evidence.mjs` wrote `dirty: false` with all three gates at exit 0, and
+  `VT_ENFORCE_EVIDENCE=1 node scripts/verify-claims.mjs` then reported `470 claims ... 0 FAILED` with no
+  `[evidence]` failure and no unenforced-note — the shape CI produces. The clone was deleted afterwards.
+- Found while doing that, and now fixed: a STALE default-branch ref changes the verdict silently. Run against
+  an `origin/main` 19 merges behind, the same tree produced 11 failures, every one a true sentence about work
+  that had landed. The gate now prints `layer 2 measured against <ref> -> <head>` on every run, and both CI
+  workflows fetch the ref explicitly before the gate runs.
+
+- Governance widened from 7 documents to 21 (`README.md`, `ARCHITECTURE.md`, `CONTEXT.md`, `FLOW_MATRIX.md`,
+  `SECURITY.md`, `PLAN.md`, `TASKS.md`, `RESUBMISSION_RUNBOOK.md`, `docs/README.md`,
+  `docs/capacitor-native-app.md`, `docs/release-runbook.md`, `docs/dev-signin-runbook.md`,
+  `docs/integrations-guide.md`, `docs/engineering-rules-rollout.md` added). Command:
+  `node scripts/verify-claims.mjs` → `1000 claims: 990 verified, 9 registered, 1 attested,
+  40 excluded by rule, 0 FAILED`.
+- Four more pieces of real drift the widened scope found, all fixed here:
+  (a) `README.md` and `ARCHITECTURE.md` both routed the reader to a rollout directory that commit
+  `6504be25a` ("chore: remove verified-dead server + client modules") deleted — confirmed with
+  `git log --diff-filter=D`; rollout gating actually lives in `server/integrations/feature-flags.ts` and
+  `server/integrations/vendor-x-rollout.ts`, and `server/integrations/resilience/` (three files) is intact.
+  (b) `ARCHITECTURE.md` still named the tasks page by its pre-2026-07-04 filename, six weeks after the
+  sanctioned rename to `src/pages/Tasks.tsx` that `CLAUDE.md` records.
+  (c) `docs/capacitor-native-app.md` said ~~`capacitor.config.json`~~; the file is `capacitor.config.ts`.
+  (d) `docs/README.md` indexed a row as ~~"Capacitor 1.0.1"~~, where `1.0.1` is the stale APP version
+  `docs/MAINTENANCE_MODE.md` is about, not a Capacitor version — reworded so neither a reader nor the
+  version check can misread it.
+- Config defect found and fixed: `ios/` and `android/` had been copied into `ignoredPathPrefixes` from the
+  RN repo's config, where prebuild generates and gitignores them. Here they are TRACKED, and the copied
+  exclusion hid every reference into the native projects. `git ls-files ios/` is what settled it.
+- Defect in the gate's own source, found while investigating why a fix had not taken: `globToRegExp`
+  substituted a sentinel for `**` and substituted it back, and the sentinel it shipped with was a literal
+  NUL. Nothing failed — the transformation worked — but the file read as binary to `grep`, and a later edit
+  that matched on the intended character silently did nothing, leaving twenty glob claims failing against a
+  fix that looked applied. Rewritten to tokenise with no placeholder at all, and
+  `tests/claims-ledger.test.ts` now fails if any engine file carries a control byte.
+- The engine exists as two copies in two repositories and nothing offline can compare them, so a fingerprint
+  contract was added: `scripts/verify/fingerprint.cjs` hashes the six engine modules with the one sanctioned
+  difference (the module extension inside internal `require` calls) normalised away, and each repo records
+  the result as `engineFingerprint` in `verify.config.json`. Both repos independently computed
+  `2a8f510951c78d2b…` — identical, which is the evidence that the copies agree today. It cannot prove they
+  agree tomorrow; what it does is make editing one of them impossible to do quietly, since the gate fails
+  until the recorded value is deliberately updated, and the message names the sibling. The hash covers the
+  fingerprint module itself, so the rule that decides what counts as drift cannot drift for free.
+- That guard immediately earned itself: the control-byte check written earlier in this session failed on the
+  brand-new `fingerprint` module for the SAME defect it was written for — a separator typed into a template
+  literal arrived as a literal NUL, for the second time in one session. Caught before it could reach the
+  sibling repo; the separator is now an explicit `\u0020`.
+- Process error made and repaired in this session, recorded because this file's own rule is about exactly
+  it: the addendum above was first inserted into a HISTORICAL entry (a scripted replace matched the first
+  `**Verdict:** VERIFIED.` in the file, not this entry's). `git diff HEAD --unified=0` showed the stray
+  27-line hunk at line 629; it was moved here and the historical entry restored, leaving one hunk in the
+  diff. No historical entry is modified by this session's work.
+
+### Review round — CodeRabbit on `#206` (here) and `#86` (RN), 2026-08-20
+
+Two reviews, 35 comments between them, on the same shared engine. Every one was checked against the code
+before anything changed. The ones that were real fell into one family: **places where the engine could pass
+in silence rather than fail out loud** — the failure mode this whole gate exists to remove, found in the gate
+itself.
+
+- `scripts/verify-claims.mjs` guarded its entire body behind an `invokedDirectly` check comparing
+  `process.argv[1]` to its own URL. The day that assumption stopped holding — a symlinked bin, a wrapper, a
+  different working directory — the command would have exited **0 having verified nothing**, and every caller
+  would have read that as a pass. Removed; the CLI now always runs, and a configuration error exits 2 with its
+  own message instead of a stack trace.
+- `verify:evidence`'s re-entrancy guard anchored on `test` followed by a boundary, so `npm run test:ci`,
+  `npm run test:unit`, `jest`, `npx jest` and `pnpm test` all passed the filter and would have been EXECUTED,
+  re-entering the suite that reads the report. It now refuses all of them, and the predicate moved into
+  `scripts/verify/claims.cjs` beside `GATE_TOKEN` so both can be handed a bad command in a test — inside the
+  CLI they were unreachable from any test, which is the same as untested.
+- An unterminated `~~` run blanked every line after it. The claims on those lines vanished with no failure and
+  no exclusion, and the vacuous-scan guard only fires at zero claims, so a partial skip passed the gate. Now
+  reported as `strikethrough-unterminated` at the line the run opened.
+- A `vt-claim` marker inside an inline code span was read as live. An `attested <id>` EXAMPLE in a document
+  therefore satisfied the "referenced by a governed document" rule on its own — which is precisely what stops
+  a stale attestation from ever being reported. Markers in code spans are now excluded as
+  `marker-is-an-example`; `CLAUDE.md`'s own syntax demonstration was one of them.
+- `classifySpan` had five bare `return`s — an oversized span, a span with whitespace, an i18n key namespace
+  written with a `*`, an empty span, and every span that simply is not path-shaped. The module header promises
+  that a declined span is reported with the rule that declined it, and five silent exits made that promise
+  false. All five are reported now, which is why the excluded count moved from 40 to ~1,880: the same spans,
+  previously invisible.
+- `addedLines` skipped every line starting with `+++`, but an added source line whose own text starts with
+  `++` renders that way. The cursor fell one behind for the rest of the hunk — every later claim read at the
+  wrong line, or dropped from the added set — in the append-only path that governs THIS file. Now lifted out
+  as the pure `addedLinesFromDiff` and given a fabricated diff in a test.
+- `readJson` treated a JSON syntax error the same as a missing file, continuing on `{ entries: [] }`: a
+  registry with a stray comma would have made every registered claim report the wrong cause. Malformed input
+  is now a named configuration error.
+- Smaller, same shape: `git()` ran with Node's default `maxBuffer`, so a large diff of this 8,700-line file
+  came back KILLED and was reported as "cannot diff" — the wrong cause; `pathExistsAtCommit` skipped the
+  argument validation its own module header promises; `globToRegExp` left `?` unescaped, so it became a quantifier on the
+  character before it and a glob claim matched a file whose name is one character shorter; a gate that hangs had no timeout; the attestation recipe reader understood only `npm run`, so any
+  `pnpm <script>` recipe here would have been reported as a missing file; and the CI fetch of `origin/main`
+  ended in `|| true`, which hid the reason (the verifier still failed loud, but said nothing about why).
+- The unterminated-run check earned itself before it landed: it failed on the paragraph of THIS entry that
+  describes it, because the scanner split on `~~` even inside an inline code span, where markdown renders it
+  as literal tildes. Any document that documents the syntax would have tripped it — a false alarm produced by
+  a rule written to prevent silent skips. Delimiters are now read outside code spans only. A struck code span
+  is reported as `former-name` in the same pass, rather than being blanked into invisibility.
+- One more defect the unterminated-run check surfaced, in the code-span reader itself: these documents cite
+  files as `` `src/lib/api.ts` `` — a longer backtick fence around a backticked reference — and the
+  single-backtick regex read that as two spans each holding one space, with everything between them falling
+  into prose. Never claimed, never declined, invisible. It also left the tildes in a documented `~~` outside
+  any span, which is how it was found. The reader is now a linear scan that matches an opening fence to a
+  closing fence of the same width, with no backtracking, for the same reason `inDeletionClause` is written
+  that way: it runs on every line of every governed document.
+- Third defect in the same family, found by CodeRabbit's re-review of the fix commits: marker extraction ran
+  BEFORE the retraction pass and masked only code spans, so `~~<!-- vt-claim: attested x -->~~` — a marker the
+  author struck out — still produced a live claim, and so did one inside a multi-line struck run. Same worst
+  case as the code-span hole: a retracted `attested <id>` satisfied the "referenced by a governed document"
+  rule by itself, which is what keeps a stale attestation from ever being reported. Markers now take both
+  masks, reported as `marker-retracted`; inside a fence the struck mask is empty, because `~~` in a shell
+  block is two tildes. Reproduced before the fix and refused after, for the same-line and the across-lines
+  case.
+- Second re-review round, five more findings, three of them the same family again. A line-range claim on a
+  file that STATS but cannot be READ reported `verified` — the identical silent pass this session had just
+  fixed in `grepCount` (NaN -> fail) and left standing in the sibling rule; the two now agree. The
+  re-entrancy predicate anchored each alternative at the start of a token, so `node --test` produced `--test`
+  and passed: running it starts the Node test runner, which runs the suite that reads this report. And the
+  gate timeout killed only the direct child, while a gate is an `npm`/`pnpm` script whose descendants hold the
+  output pipes open — `close` never fires and `Promise.all` waits forever, which is the hang the timeout was
+  added to convert into a recorded FAIL. Gates now run in their own process group, the timeout signals the
+  group, and the promise settles exactly once and immediately rather than waiting for a `close` a survivor can
+  withhold. Proven with a child that leaves a background `sleep 60` behind: settles at 1507 ms with exit 1,
+  not at 60 s.
+- Two of the engine's own guards were themselves not guarding. The control-byte scan filtered one extension,
+  so a `.cjs` module carrying a NUL — the exact defect it was written for — went unread. And "hashes every
+  module, so a new one cannot slip in unhashed" compared `files.length` to `ENGINE_MODULES.length`, both
+  derived from the same list: a module added to the directory and left out of the list kept the lengths equal
+  and the test passed while the module sat outside the fingerprint. It now compares the hashed set against
+  the directory listing. `git()` also discarded `result.error`, so a timeout or a maxBuffer kill arrived with
+  an empty stderr and was reported as "cannot diff" — the wrong cause the bounds exist to prevent.
+- Third re-review round, eight more real findings, and the pattern held: two were guards that did not guard,
+  and one was a rule I had fixed on one branch and left standing on its sibling AGAIN. `grepCount`'s DIRECTORY
+  branch returned `false` for a file it could not read, so the file counted as one that does not contain the
+  pattern and the absence claim passed BECAUSE a file could not be opened — the file branch had been fixed
+  two rounds earlier. `fingerprintEngine` resolved `.js` before `.cjs` with `.find`, so if both copies of a
+  module existed it hashed one and ignored the other: green, about bytes that no longer run, reached through
+  the drift detector's own file resolution. It now refuses the ambiguity.
+- Two more silent passes, both reachable: `isReentrantGate` did not know `npm t`, npm's own alias for the
+  test script; and `packageManager`, read from `verify.config.json`, was interpolated into a pattern
+  unescaped — a metacharacter would silently change what it means and `pnpm(` made `new RegExp` throw from
+  inside a pure decision function. It is now checked at the boundary like every other file-sourced string.
+- `handleFence` closed on any backtick run, so a three-backtick line inside a four-backtick block flipped the
+  state early and the rest of the block was read as prose. Fences nest by width; only a run at least as wide
+  as the opener closes one now.
+- The gate timeout could never fire where it matters: `GATE_TIMEOUT_MS` was 15 minutes against
+  `timeout-minutes: 15` on the job, with checkout and install ahead of it, so CI always died first and the
+  recorded FAIL was unreachable. Ten minutes now.
+- Reporting: commit and pull-request claims on a tree where layer 2 cannot run were dropped from both the
+  tally and the decided list while `counts.claims` still reported the pre-skip total, so the dispositions did
+  not sum to it. They are counted `unresolvable` — a label that appears only on a run already failing on
+  `git-unavailable`, documented as such in `CLAUDE.md`. And the attestation's `evidence` was pointed at
+  `CLAUDE.md` in the previous round, which made it cite as its proof the same prose its own marker governs;
+  it is back on `RESUBMISSION_RUNBOOK.md`.
+- Declined, with the reproduction as the reason: the report that a struck code span yields two exclusions
+  (`empty-span` and `former-name`). `blankRetracted` blanks the backticks along with the text, so `codeSpans`
+  finds nothing on the blanked line and `classifySpan` is never reached. Three shapes were run — one struck
+  span, two struck spans on a line, and a span inside a multi-line run — and each produced exactly one
+  exclusion, with the right reason.
+- Fourth round, and this one came from pointing the gate at somebody else's pull request rather than at a
+  review. `VetTrack---RN-Migration-#84` and this repo's `#204` are a founder-review pair opened by a different
+  session, touching the same files. Running the gate against #84's documents reported six failures — and the
+  useful half of them were the gate's own false alarms, on sentences that are true:
+  (a) `README.md` cites the App Store Connect app as `6778937527` on a line that also says "Play App Signing
+  SHA-256"; the bare `sha` fired as commit vocabulary, the ten digits fit the hex shape, and the gate reported
+  "no such commit" about a store record. The first fix refused every all-decimal token, which then silenced
+  `8455807` — a real commit in the RN migration repo, cited in its `VetTrack---RN-Migration-/G2-PLAN.md`,
+  because roughly one short sha in twenty-five is all digits.
+  The precise fix is to stop reading a hash-ALGORITHM name as a reference to a commit.
+  (b) A package inside a code span was asserted live whatever the sentence said, while the same name in prose
+  was read in context — so "and no `@clerk/clerk-expo` at any version" was reported as a missing dependency.
+  Code spans now get the two readings prose gets. Deliberately not the path rule's third: a deletion verb a
+  clause away is fine for a file and wrong for a package, and using it reported "the positional-array form was
+  removed, and this repo is on `@tanstack/react-query`" as a defect. Also added: "swapped `X` for the renamed
+  `Y`" names `X` as former and `Y` as live — reading the second as gone would have left the auth SDK
+  unchecked, the one thing these documents were wrong about for months.
+- Found while doing that, in the CLI rather than the engine: `verify-claims.mjs --json` was cut at exactly
+  65,536 bytes through a PIPE, because `process.exit()` abandons a pending stdout write. The report is 318,049
+  bytes. Valid-looking output, silently short — the same failure class as everything else in this entry, in
+  the one place a downstream tool would consume it. `process.exitCode` and a natural exit; both figures were
+  measured before and after.
+- Two real problems in #84 that the gate reported and that are NOT the gate's fault, left for that PR's author:
+  it leaves the frozen-stack line in `VetTrack---RN-Migration-/AGENTS.md` still claiming Gesture Handler 3.x
+  against the `~2.32.0` its manifest carries, and its README cites `push-fcm.ts` with no path — the file is
+  real but lives in THIS repo (`server/lib/push-fcm.ts`), so from the RN repo it resolves to nothing. #84 also carries a correction
+  the RN repo's own `#85` makes differently, and the two conflict in `AGENTS.md`; #204 and `#206` conflict in
+  this file, both appending at the tail.
+- Process failure in this session, recorded because this file's rule is about exactly it: the commit above was
+  PUSHED while the gate reported three unaccounted claims. The commands were chained with `&&` after a step
+  whose output was not read, so a red gate scrolled past. All three were correct reports about the entry being
+  written — two cross-repo citations (a path and a commit belonging to the RN migration repo) and one more
+  over-broad rule, described next. Fixed in the following commit; the red state reached `origin` and is part
+  of the record.
+- The over-broad rule, found by the gate on this very entry: `NEGATED_AFTER` carried a bare "does not" among
+  the phrasings that mean absence, so "`AGENTS.md` does not fix the frozen-stack line" was read as a claim
+  that the file is GONE — and then failed, correctly, for existing. "Does not ship", "does not run", "does
+  not cover" are ordinary sentences about a file that is right there. Only "does not exist" is about absence.
+- The cross-repo commit is REGISTERED rather than reworded away: `docs/claims-registry.json` now carries
+  `8455807` with the reason that the cross-repo mechanism resolves paths by prefix and pull requests by
+  qualifier and has no equivalent for a commit, plus the command to re-verify it in the sibling checkout. That
+  is the documented second option when a claim is true but unverifiable here, and the reverse check deletes
+  the entry if the citation ever goes.
+- Declined, with reasons: the suggestion to keep the struck-range check in the prose scan — the check was
+  unreachable because the text was already blanked, so it was replaced with a struck-range MASK, which both
+  makes it reachable and reports the exclusion instead of dropping it silently. `struckRanges` itself is
+  deleted rather than kept as a tested-but-unused export.
+
+Layer 4's pinned clock was also removed: the repository-wide run in `tests/claims-ledger.test.ts` used
+`verify({ now: "2026-08-20" })`, which froze staleness, so an attestation past its budget still resolved as
+`attested` here and only the CLI's real clock would ever have said otherwise. It now uses the real date, from
+`beforeAll` rather than the describe body so a configuration error fails a named test instead of aborting
+collection.
+
+**Superseded by this round.** The fingerprint quoted above as ~~`2a8f510951c78d2b…`~~ was the value before
+the review; the engine changed, so the recorded value changed with it, which is the mechanism working rather
+than a problem. Current, and identical in both repositories:
+`1787de826baad3fba32ffaf80c16a3380691b70aa9cf10beaeebd5ffe69785c0`. The counts quoted above as
+~~`1000 claims … 40 excluded by rule`~~ and ~~`Tests 38 passed (38)`~~ are likewise superseded.
+
+**Commands run on this tree after the round:**
+- `node scripts/verify-claims.mjs` → `1035 claims: 1024 verified, 10 registered, 1 attested,
+  1882 excluded by rule, 0 FAILED` / `All claims accounted for.`
+- `pnpm exec vitest run tests/claims-ledger.test.ts` → `Test Files 1 passed (1)`, `Tests 50 passed (50)`.
+- In the RN repo, the same engine: `477 claims: 416 verified, 58 registered, 3 attested, 1494 excluded by
+  rule, 0 FAILED`, and `Tests: 49 passed, 49 total`.
+- Both repositories independently computed the fingerprint above, which is the evidence the copies still
+  agree after being changed on both sides in the same session.
+
+One claim fewer in each repository than before the round, in both cases exactly the in-code-span marker
+example that should never have been a claim. Every other claim and every disposition is unchanged — checked
+by diffing the `--json` claim sets of the old and new engines against the same working tree, not by comparing
+totals.
+
+**Verdict:** VERIFIED.
+
+### Correction — the block titled "commands run on this tree" was measured on an earlier tree, 2026-08-21
+
+**Claim under audit:** the four figures in the *Commands run on this tree after the round* block above —
+this repository's claim total and its disposition counts, its `tests/claims-ledger.test.ts` count, and the
+same two for the RN migration repo.
+
+**Evidence:** re-ran both commands in both checkouts. The figures below were measured on the tree as it
+stood **before this entry was appended**. Appending it moved this repository's total to 1,054, because
+the entry cites a file and that citation is itself a claim — said here rather than quietly reconciled,
+since a count of the corpus, stated inside the corpus, is only meaningful with the tree named.
+
+- `node scripts/verify-claims.mjs` here → `1053 claims: 1039 verified, 13 registered, 1 attested,
+  2015 excluded by rule, 0 FAILED` / `All claims accounted for.`
+- `pnpm exec vitest run tests/claims-ledger.test.ts` → `Test Files 1 passed (1)`, `Tests 62 passed (62)`.
+- The same engine in the RN migration repo → `477 claims: 416 verified, 58 registered, 3 attested,
+  1510 excluded by rule, 0 FAILED`, and `Tests: 61 passed, 61 total`.
+- `engineFingerprint` is unchanged by this entry: no engine file is touched.
+
+**Verdict:** the block was WRONG about the tree it names. Superseded: ~~`1035 claims: 1024 verified, 10
+registered, 1 attested, 1882 excluded by rule`~~ · ~~`Tests 50 passed (50)`~~ · ~~`1494 excluded by rule`~~
+(RN) · ~~`Tests: 49 passed, 49 total`~~ (RN). The figures above are the measured ones.
+
+**How it happened, precisely.** The block was written by the commit that closed the first re-review round and
+was correct for that tree. Two further commits then changed the engine, which changed both counts and both
+test totals. The round's final commit edited the fingerprint line *inside that same block* and left the four
+counts beside it untouched — the value that had a mechanism watching it was updated, and the values that had
+only a human reading them were not.
+
+**This is not covered by the append-only rule.** An entry that records what was true when it was written
+stays the record it is; that is this file's first rule and the gate honours it by checking only the lines a
+branch adds. This block does not say "when written" — it names *this tree*, and the tree it names is the head
+of the branch it ships on. A statement about the current tree is either true now or it is wrong now.
+
+**Why the gate did not catch it, stated as a limit rather than excused.** The gate resolves paths, line
+ranges, globs, dependency versions, package scripts, the directory layout, declared absence, commits, pull
+requests and attestations. A bare integer in prose is none of those, so `1035` was never a claim and never
+had a disposition. Making counts self-checking would mean the document quoting a command's output and the
+gate re-running that command to compare — layer 3 machinery pointed at prose — and layer 3 already records
+its runs in `docs/audit/evidence-run.json`. It would also be circular in the way the line above
+demonstrates: the act of recording the count changes it. Recorded here as a known edge the gate does not
+reach, so the next person reading a count in this file knows nothing checked it.
+
+**Found by:** the second CodeRabbit review on `#206`, which asked for exactly this re-run. Nine of its ten
+inline findings and all four of its outside-diff findings were already fixed by the three commits that
+followed it; this was the one still open, and it was open because it is the one that could not be closed by
+reasoning about the code — only by running the commands again.
+
+**Verdict:** VERIFIED.
+
+### Third review round — four ways the gate could still pass in silence, 2026-08-21
+
+**Claim under audit:** four findings CodeRabbit raised against the head after the correction above, each
+re-checked against the code before being treated as real.
+
+**Evidence and verdict — all four were real, and three are the same defect class this gate exists to remove.**
+
+- **A `**` between separators demanded a directory.** `globToRegExp` in `scripts/verify/facts.cjs` translated
+  the whole `/**/` to `/.*/`, so a pattern written `docs/**/<file>.md` did NOT match `docs/<file>.md` — only
+  nested paths. This is the false-alarm direction, not the miss: a correct glob claim would be reported as a
+  defect. `/**/` is now an optional directory sequence, and a pattern that STARTS with the same double-star
+  segment is handled explicitly. Seven cases pinned, including the two that must NOT change: one `*` still
+  stops at a separator, and `?` is still a literal.
+  (The illustrative paths above carry the `<…>` placeholder form on purpose — written as concrete paths they
+  were read as claims about files that do not exist, and this gate reported all three. That is the rule
+  working, and the fix is the documented first option: correct the document.)
+- **A walk that could not read a directory returned quietly.** This is the THIRD face of one rule in this
+  session. An unreadable file was refused in the file branch of `grepCount`, then in its directory branch —
+  and `list` itself still swallowed a `readdirSync` failure and returned a short listing, so an absence claim
+  counted zero hits over a tree that was never fully walked and verified. Only absence needs the guard: a
+  glob EXISTENCE claim against a short listing already fails loudly, while absence fails open.
+- **An uppercase object id produced no claim at all.** `isCommitish` in `scripts/verify/scan.cjs` tested
+  `/^[0-9a-f]{7,40}$/`, but git resolves `ABCDEF1` and `abcdef1` to the same object. The citation was not
+  reported as wrong — it was never extracted, and "no claim" is the one outcome this engine has no label for.
+  The argv validator in `scripts/verify/git-facts.cjs` already carried the `i` flag, so nothing downstream
+  had to change.
+- **The gate output buffer was unbounded.** The timeout half of an earlier finding had been fixed and the
+  buffer half had not, so a verbose gate held its whole log in memory while every other gate ran beside it.
+  Capped, and the truncation is written into the recorded output: a truncated log that does not say so is a
+  log that lies about being complete.
+
+**The fingerprint did its job on this round.** The engine changed, the recorded value stopped matching, and
+the suite failed on that alone — 64 passed, 1 failed, and the one failure was the drift guard refusing to let
+one copy move without the other. Superseded: ~~`1787de826baad3fba32ffaf80c16a3380691b70aa9cf10beaeebd5ffe69785c0`~~.
+Both repositories independently recomputed the new value and agree:
+`73a81cd34a45934b14ca0cc656eb617eaf5afb5cd3edc77b547a0d19bbcd89d2`.
+
+**The gate ran in CI for the first time, and green.** Until this round nothing had exercised it on a runner:
+this repository's workflow triggers on `pull_request` with a `main` branch filter, so a PR stacked on another
+branch gets no run at all — and retargeting it does not start one either, because a base change is an `edited`
+action and the default trigger types are `opened`, `synchronize` and `reopened`. A PR could therefore reach
+`main` having been checked by nothing. Recorded as a finding about `.github/workflows/ci.yml` rather than
+worked around: the evidence was obtained through the workflow's own `workflow_dispatch` path, which cannot
+deploy from a feature branch because that job is gated on `github.ref`. The job `📎 Claim verification
+(evidence)` passed both its steps.
+
+**Commands run after the fixes, on the tree as it stood before this entry was appended:**
+- `node scripts/verify-claims.mjs` → `1054 claims: 1040 verified, 13 registered, 1 attested,
+  2028 excluded by rule, 0 FAILED`; `pnpm exec vitest run tests/claims-ledger.test.ts` → `Tests 65 passed (65)`;
+  `npx tsc --noEmit` → 0 errors; `pnpm architecture:gates` → `All G1 checks passed.`
+- In the RN migration repo, the same engine: `477 claims … 0 FAILED`, `Tests: 64 passed, 64 total` for the
+  ledger suite, `146 passed, 146 total` / `1574 passed` for the full run, `npm run lint` clean, typecheck clean.
+- The local `eslint-plugin-sonarjs` proxy over the changed engine reported nothing, which is what stands in
+  for SonarCloud here — that host is not reachable from this container.
+- Appending this entry took the total to 1,058, for the same reason the entry above records: the entry cites
+  files, and those citations are claims. Stated, not reconciled away.
+
+**Verdict:** VERIFIED.
+
+### Correction to the round above, and two more findings, 2026-08-21
+
+**The round-three heading classified its own findings wrongly, and the entry contradicted itself.** The
+heading called them ~~"four ways the gate could still pass in silence"~~ and the body said ~~"three are the
+same defect class"~~. Neither survives reading the four:
+
+| finding | what it actually was |
+|---|---|
+| `**` between separators | a **false alarm** — a correct glob claim reported as a defect. The entry's own body says exactly that two paragraphs below the heading, which is the contradiction. |
+| a walk that could not read a directory | a **silent pass** — absence verified over a tree never fully walked |
+| an uppercase object id | a **silent omission** — no claim extracted at all |
+| an unbounded output buffer | a **resource bound**, not a verdict defect at all |
+
+So: two of the four are the silent family, and the other two are a false alarm and a resource limit.
+Reported by the review, and correct. Written down rather than reworded away, because a summary that
+misclassifies its own evidence is the same failure as a document that misstates a file — and this file's
+whole purpose is to be the record that does not do that.
+
+**Two further findings from the same round, both real.**
+
+- **A scope could resolve outside the checkout.** Every target reaching `scripts/verify/facts.cjs` comes
+  from a document — a path span, or a marker carrying its own `scope=` — and `path.join` resolves `../../etc`
+  without complaint. A claim about this repository could therefore be answered by a file this repository does
+  not contain: verified, and about the wrong tree. Containment is now checked once, at the boundary, which is
+  the rule `scripts/verify/git-facts.cjs` already applies to everything it hands to an argv. Absence is the
+  dangerous direction, because a 0 from outside the tree reads as "confirmed absent"; it now returns `NaN`.
+  Proved by refusal: an escaping scope, an escaping path and an escaping line-range all refuse, while
+  `package.json` and a harmless interior `..` still resolve.
+- **The output cap was not counting bytes.** `MAX_OUTPUT_BYTES` was compared against `output.length`, which
+  counts UTF-16 code units, so multibyte output measured about a third of its real size and the cap never
+  fired. A limit that is only a limit for ASCII is the same half-true guard this tool exists to refuse.
+  Now counted in bytes, with the truncation written into the log — measured with the collector itself:
+  1500 bytes fed against a 1000-byte cap retained 999, marked the truncation, and left the tail valid UTF-8,
+  where the previous rule would have kept the whole thing.
+
+**Superseded fingerprint:** ~~`73a81cd34a45934b14ca0cc656eb617eaf5afb5cd3edc77b547a0d19bbcd89d2`~~. Current,
+recomputed independently in both repositories and identical:
+`8065f0383300d7d576af8751488e2483ac9097b4ee8b40c05bc6f91d4dec66e2`.
+
+**Verdict:** VERIFIED.
+
+### Lexical containment was not containment, 2026-08-21
+
+**Claim under audit:** that the root-containment guard added in the round above actually kept every read inside
+the checkout.
+
+**Verdict: it did not, and the guard said it did.** `insideRoot` compared `path.resolve` output and stopped
+there. `statSync` and `readFileSync` FOLLOW symbolic links, so a tracked `docs/<file>.md` pointing at an
+absolute path outside the tree passed the string check and then read the outside file anyway. A path claim, a line-range
+claim, or an `absent` marker scoped at such a link came back verified from data this repository does not
+contain — which is worse than the hole it replaced, because the first version at least did not announce a
+protection it lacked.
+
+**Evidence, reproduced before the fix and refused after.** With a link inside the tree pointing at a file in
+the system temporary directory: the lexical check returned true and the read returned the outside content.
+After the fix, all four surfaces refuse — `fileExists` false, `lineCount` null, `grepCount` NaN for the linked
+file and NaN for a linked directory — while `package.json` still resolves normally.
+
+- The resolved target is now compared against the resolved root, because a checkout can itself sit under a
+  link and comparing a resolved target to an unresolved root would refuse every path in it.
+- An ABSENT path is not an escape. `realpathSync` throws for a path that is not there, and treating that as a
+  containment failure would turn every claim about a missing file into the wrong kind of error; the caller
+  still refuses it in the ordinary way.
+- Containment is checked PER ENTRY inside a directory scope, not once for the scope. The walk lists a link as
+  an ordinary file, so one link inside a directory is a door out of the tree, and it makes the scope
+  uncheckable for the same reason an unreadable file does.
+
+**Found by:** the fourth CodeRabbit review round on the RN migration repo, from static inspection. Graded High
+there, and correctly — this is the class the whole engine exists to remove, in the guard written to remove it.
+
+**Superseded fingerprint:** ~~`8065f0383300d7d576af8751488e2483ac9097b4ee8b40c05bc6f91d4dec66e2`~~. Current,
+recomputed independently in both repositories and identical:
+`f45235d72618706705b340a815817bd95c2ed96f0159440df03f030d006cd103`.
+
+**Commands run on the tree before this entry was appended:** `node scripts/verify-claims.mjs` →
+`1061 claims: 1047 verified, 13 registered, 1 attested, 2080 excluded by rule, 0 FAILED`; `pnpm exec vitest run
+tests/claims-ledger.test.ts` → `Tests 67 passed (67)`; `npx tsc --noEmit` → 0 errors; `pnpm architecture:gates`
+→ `All G1 checks passed.`; the local sonarjs proxy over the changed engine → clean. In the RN migration repo:
+`477 claims … 0 FAILED`, ledger `66 passed`, lint and typecheck clean.
+
+**Verdict:** VERIFIED.
+
+### Fifth review round — eight findings, and one of them was a rule I had declined twice, 2026-08-21
+
+**The one I had wrong.** Twice this session I recorded that the `|| echo "::warning::"` on the `origin/main`
+fetch was a non-defect, reasoning that the gate fails loudly on `git-unavailable` when the ref is missing.
+I never measured it. Measured now, by deleting the remote-tracking ref and running the gate: it does not
+report the ref as unavailable. It falls back to the local `refs/heads/main`, which on this checkout was
+twenty merges stale, and produced **100 FAILED claims** — every one a true sentence about work that had
+landed. That is the exact "a stale ref changes the verdict" failure this gate's own history records catching,
+reintroduced through a fallback, and I had reasoned past it instead of running it. The CI fallback is gone
+from both jobs here and from the sibling: a fetch that cannot get the ground truth now fails the job.
+
+**Seven more, all real.**
+
+- **A FILTERED listing was treated as a complete one.** The walk skips `node_modules`, unnamed dot entries and
+  ignored prefixes — correct for a glob, and not evidence of absence. A token in a skipped file made
+  `grepCount` return 0, and a 0 there reads as "confirmed absent" over a tree that was never fully walked.
+  The same silent pass as an unreadable file, arriving through the filters rather than through an error, and
+  the fourth face of that one rule. No live absence claim uses a directory scope in either repository — the
+  markers use `scope=deps` and `scope=app.json` — so closing it costs nothing today and shuts the door before
+  someone writes one.
+- **The scanner interpolated a file-sourced package-manager name into a `RegExp` unchecked**, while
+  `scripts/verify/claims.cjs` had checked the same field since the second round. Two modules reading one
+  configuration value disagreed about whether to validate it.
+- **A cross-repo GLOB could never resolve.** The fail branch keyed on `target ?? name`; a glob claim carries
+  neither, it carries `pattern`. The key was the empty string for every glob, so no cross-repo prefix could
+  match one — a glob into the sibling repository failed while the identical path resolved.
+- **`mergeCommitForPr` fell back to `HEAD`** when there was no default-branch ref. On a pull-request checkout
+  `HEAD` is the feature branch, so a merge commit found there is not proof of landing. `addedLines` and
+  `refHead` already refused in that state; this now agrees with them.
+- **`readJson` read every failure as absence.** Only `ENOENT` means absent; `EACCES` on a present ledger read
+  as an empty one, which fails every registered claim and reports every attestation missing, with the real
+  cause nowhere — the same misdiagnosis the parse branch was written to prevent, through a different code.
+- **A bad `VT_GIT_BINARY` reported as a missing git**, sending the reader to look for an install rather than
+  at the value they had set. The cause is now carried out of the resolver.
+- **The gate runner could not spawn a Windows shim**, and the orphaned section banner in the test file sent a
+  reader navigating by banners into the wrong block.
+
+**Proved by refusal, each one run before it was written down:** a filtered scope returns `NaN` while an
+unfiltered one still answers `0`; a malformed manager name throws a named configuration error; a cross-repo
+glob now resolves to `registered`; a bad `VT_GIT_BINARY` returns its own cause.
+
+**Superseded fingerprint:** ~~`f45235d72618706705b340a815817bd95c2ed96f0159440df03f030d006cd103`~~. Current,
+recomputed independently in both repositories and identical:
+`a5498cb22a3a1170977794caa6c8fba27fbbca377e436d0435cbc298182eabdd`.
+
+**Commands run on the tree before this entry was appended:** `node scripts/verify-claims.mjs` →
+`1063 claims … 0 FAILED`; `pnpm exec vitest run tests/claims-ledger.test.ts` → `Tests 71 passed (71)`;
+`npx tsc --noEmit` → 0 errors; `pnpm architecture:gates` → `All G1 checks passed.`; sonarjs proxy clean. In
+the RN migration repo: `477 claims … 0 FAILED`, ledger `70 passed`, lint and typecheck clean.
+
+**Verdict:** VERIFIED.
+
+### Sixth review round — the glob matcher could hang the gate, 2026-08-21
+
+**Claim under audit:** that `globToRegExp` was safe to run on a pattern taken from a governed document.
+
+**Verdict: it was not, and the failure mode was the worst one available.** The translation built a pattern
+whose adjacent single-segment wildcard groups backtrack against each other, and the cost is exponential.
+(Written out rather than quoted: the regex fragment is glob-shaped, and this gate reads it as a glob claim
+about a file — which it did, on the first draft of this entry.) Measured on this
+engine, matching a non-matching subject:
+
+| wildcards in the pattern | time |
+|---|---|
+| 4 | 1.1 ms |
+| 6 | 51 ms |
+| 8 | 996 ms |
+| 10 | did not finish in 5 s |
+
+Every one of those patterns is well under the scanner's 200-character span cap, and a glob is written in a
+governed document — so an ordinary documentation edit could wedge the gate with no verdict at all. Not a
+wrong answer: **no answer**, which is the one outcome this engine has no label for, in the component whose
+whole job is to produce a disposition for every claim.
+
+**Fixed by removing the regex, not by bounding it.** A cap would have been an arbitrary threshold that also
+refused legitimate patterns. Glob matching is a two-pointer walk with a single re-entry anchor — no recursion
+and no backtracking tree, so the cost is polynomial rather than exponential — and the same rule that matches
+one segment matches the segment list, so a `**` costs an anchor rather than a tree. `globToRegExp` now returns
+a matcher rather than a `RegExp`, which every caller already treated it as: nothing asked for anything but
+`test`.
+
+*Corrected 2026-08-21 (this passage previously read ~~"a two-pointer walk with a single re-entry anchor —
+linear, no recursion, no backtracking tree"~~):* the walk is bounded but **not linear**. A retry after a star
+rechecks the literal that follows it, so the cost is O(pattern x subject) per segment: a star followed by a
+192-character literal, matched against a 768-character subject, costs 111,361 comparisons. CodeRabbit caught
+the overclaim in review, and its comparison counts reproduced here exactly — 12,545 at a 64-character suffix,
+49,665 at 128, 111,361 at 192.
+
+The algorithm did not change and did not need to. The bound is acceptable because both factors are capped, not
+because the walk is cheap per character: a pattern comes from a span the scanner truncates at 200 characters,
+and a subject is ONE path segment. Measured, the worst 200-character pattern run against every tracked path
+segment costs 5.9 ms in total here (11,302 segments) and 2.6 ms in the sibling repository (1,846). The
+exponential regex it replaced did not finish at all. Replacing a bounded algorithm to settle a documentation
+defect would have been the fourth option this repo does not allow itself.
+
+**The finding worth keeping is where the false sentence lived.** It was in this log — a governed document —
+and the four layers that govern this log resolve paths, versions, commits and declared absence. None of them
+resolves a claim about how code *behaves*. The gate would never have caught this, a human reviewer did, and
+that boundary is worth stating plainly rather than discovering later.
+
+**Semantics pinned before and after**, eleven cases: a `**` segment matching zero directories and many; a
+single `*` still stopping at a separator; `?` still literal; the `suffix` form still resolving a shorthand
+citation. After the change, 64 wildcards match in 0.01 ms — where 10 had not finished in five seconds.
+
+**A second finding, about a test of mine, and it was destructive.** The symlink fixture used a fixed name in
+the repository root and removed it recursively in `finally`. A pre-existing untracked directory of that name,
+or a parallel run of the suite, would have been deleted. It now uses a unique directory and enters the
+cleanup block before creating anything, so a throw during setup still cleans up. A test that guards against
+reading outside the tree should not be the thing that destroys something inside it.
+
+Two more caught by the repo's own gates while fixing the above: a `**` written inside a block comment closed
+that comment, and the `path` type in both suites declared only `join`.
+
+**Superseded fingerprint:** ~~`a5498cb22a3a1170977794caa6c8fba27fbbca377e436d0435cbc298182eabdd`~~. Current,
+recomputed independently in both repositories and identical:
+`1adb3fb67c1bc52f8de2135caa28e67beeeb279fd3d6ceaed801df4f9c71c0f6`.
+
+**Commands run on the tree before this entry was appended:** `node scripts/verify-claims.mjs` →
+`1065 claims … 0 FAILED`; `pnpm exec vitest run tests/claims-ledger.test.ts` → `Tests 72 passed (72)`;
+`npx tsc --noEmit` → 0 errors; `pnpm architecture:gates` → `All G1 checks passed.`; sonarjs proxy clean. In
+the RN migration repo: `477 claims … 0 FAILED`, ledger `71 passed`, lint and typecheck clean.
+
+**Verdict:** VERIFIED.
+
+### Eighth review round — six findings, and half of them were twins, 2026-08-21
+
+**Claim:** the six findings CodeRabbit raised on the sibling repository at `fc1dd46` are real, and the fixes
+are proved rather than asserted.
+
+**Evidence:** each was checked against the code before anything was edited, and the two that could produce a
+silently wrong verdict were also proved RED first — reverted, watched to fail, restored.
+
+| finding | why it mattered |
+|---|---|
+| `globMatches` and `suffixMatches` filtered a listing by NAME | `list` yields names and does not follow them, so a symlink pointing outside the checkout is an ordinary-looking entry. `fileExists` rejected it through `insideRoot`; its twins did not. A glob claim could therefore be **verified from content this repository does not contain** — the highest-severity shape this engine has. RED proved: with the filter removed the probe counts 1 where it must count 0. |
+| `packageManager` was validated, not escaped | The boundary check admits `.`, and `.` is a wildcard, so a manager named `tool.v1` matched `toolXv1` and named a script the manifest never defines. **The comment beside the code described this exact defect while the code left it in place.** Both readers of that field — scanner and claims — carried it. RED proved: the reverted build returns `lint` where the fixed one returns null. |
+| `VT_GIT_BINARY` accepted a directory | `existsSync` is true for one. It reaches `spawnSync`, fails `EACCES`, and comes back out as "not a git repository" — the wrong cause that branch exists to prevent, arriving through the one shape the check never tested. |
+| the Windows branch could not run at all | A `.cmd` is a script, not an executable image, so `spawn` with `shell: false` cannot start `npm.cmd`. Renaming the token **announced a portability the code did not have** — the same shape as calling the matcher linear. It now reaches the command processor explicitly, and the decision moved into a pure function so the suite can ask what Windows would do from a machine that is not Windows. |
+| the timeout killed only the direct child on Windows | The POSIX process-group path was right; its Windows half was never written. `taskkill /T` walks the tree. |
+| output was decoded per chunk | A multibyte character split across two `data` events became two replacement characters. The byte CAP was corrected in an earlier round and the byte DECODE was not — the same mistake at two scales. |
+
+**Three of the six are twins of defects already fixed elsewhere in this engine**, which is now the most
+frequent shape in this work: a rule corrected in one function and left standing in the one beside it. It is
+worth naming as a review heuristic rather than as a run of bad luck — after fixing any guard here, the next
+question is which other function answers the same question a different way.
+
+**Superseded fingerprint:** ~~`489c9b8c960d8dbe1ee9f21da777239288a667fc2c5ccb31f80c8ca9f16c93dd`~~. Current,
+recomputed independently in both repositories and identical:
+`fe21f794338249b9a1365754fe374c0651b755d885d3590ad352e9709460e013`.
+
+**Commands run on the tree before this entry was appended:** `node scripts/verify-claims.mjs` →
+`1066 claims … 0 FAILED`; `pnpm exec vitest run tests/claims-ledger.test.ts` → `Tests 77 passed (77)`;
+`npx tsc --noEmit` → 0 errors; `pnpm architecture:gates` → `All G1 checks passed.` In the RN migration repo:
+`477 claims … 0 FAILED`, ledger `76 passed`, typecheck and lint clean.
+
+**Verdict:** VERIFIED.
+
+### The absence rule verified what it could not see, 2026-08-21
+
+**Claim:** an absence claim about a target outside the checkout resolved as `verified`, and now refuses.
+
+**Evidence:** measured directly against the engine before any edit —
+
+```text
+decide({ kind: "absent-path", target: "../../etc/passwd" })  ->  { disposition: "verified" }
+decide({ kind: "absent-dir",  target: "../../etc" })         ->  { disposition: "verified" }
+```
+
+`insideRoot` refuses the escaping path, `stat` turns that refusal into null, `fileExists` reports a plain
+`false`, and the rule read that `false` as confirmation. **A governed document could assert the absence of
+anything outside this repository and the gate would agree, having never been able to look.**
+
+For an EXISTENCE claim the same collapse is harmless — a claim about a file this repository does not contain
+should fail. For an ABSENCE claim it inverts, because absence is the one rule that turns "no evidence" into a
+pass. That makes it the one rule that must distinguish an unexaminable target from a missing one, and it was
+the one rule that did not. It is also the rule this engine was built around: declared absence is what would
+have caught the dependency the frozen-stack bullet named for months and this repository never had.
+
+`withinRoot` is now part of the facts contract and both absence rules refuse when it answers false. Four
+cases pinned: outside-root file and directory both fail; a genuinely missing path INSIDE the tree still
+verifies, so the guard is containment rather than a blanket refusal that would make absence unusable; and a
+target that is present still fails as it always did. A second test pins that the real contract exposes
+`withinRoot` at all — the rules call it optionally so the suite's synthetic stubs keep working, and without
+that test deleting the method would silently restore the old pass.
+
+**Two more from the same review, both wrong-cause defects already fixed once elsewhere in this engine:**
+`verify-evidence` discarded the cause object `resolveGitBinary` returns, so a bad `VT_GIT_BINARY` surfaced as
+the generic "git is unavailable" — the reader sent to look for a missing install rather than at the variable
+they had set wrongly. Demonstrated by running the CLI rather than by a unit test, because the runner is a CLI
+and not a pure module: with the variable pointed at a directory it now prints
+`cannot bind a report to a tree: VT_GIT_BINARY is not an absolute path to an existing file: …`.
+
+**Superseded fingerprint:** ~~`fe21f794338249b9a1365754fe374c0651b755d885d3590ad352e9709460e013`~~. Current,
+recomputed independently in both repositories and identical:
+`28ed7439f5660e82cf530fa017a8bca8f35ef8fc2c174ef9a2ec1a0a0661d7d6`.
+
+**Commands run on the tree before this entry was appended:** `node scripts/verify-claims.mjs` →
+`1067 claims … 0 FAILED`; `pnpm exec vitest run tests/claims-ledger.test.ts` → `Tests 79 passed (79)`;
+`npx tsc --noEmit` → 0 errors; `pnpm architecture:gates` → `All G1 checks passed.` In the RN migration repo:
+`477 claims … 0 FAILED`, ledger `78 passed`, typecheck and lint clean.
+
+**Verdict:** VERIFIED.
+
+### The collector moved so a test could reach it, and I broke my own PATH rule, 2026-08-21
+
+**Claim:** the output collector is now testable, and the process-tree killer no longer resolves from `PATH`.
+
+**Evidence:**
+
+**The collector.** Two defects had already been fixed in it — the cap counting UTF-16 code units instead of
+bytes, and each `data` event decoded on its own so a multibyte character split across two events became two
+replacement characters. Both fixes were real and neither was reachable from a test, because the collector was
+an inline closure inside `runGate`. A later change could restore per-chunk decoding and the suite would stay
+green. It is `createOutputCollector` now, beside the other decisions this engine keeps pure so the suite can
+drive them, and two cases are pinned: a four-byte character split across two writes comes back whole with no
+replacement character, and a 500-byte write against a 64-byte budget leaves the recorded text — truncation
+marker included — at or under 64 bytes. The marker's own bytes are reserved, because a cap exceeded by the
+note announcing the cap is not a cap; the runner's timeout and spawn-error diagnostics go through the same
+budget for the same reason.
+
+**And a rule I broke myself.** `scripts/verify-evidence.mjs` states at the top that binaries are resolved from
+a fixed list of absolute paths, **not searched on `PATH`**. The Windows process-tree fix added the previous
+round then called `spawn("taskkill", …)` — searched on `PATH`, in the file that says it does not do that.
+SonarCloud's quality gate went from passing to a **B security rating on new code** at that commit, and this is
+the change that would explain it; the analysis itself could not be read from here, because this environment
+blocks `sonarcloud.io`. Resolved from `%SystemRoot%\System32` now. A process-tree killer taken from `PATH` is
+a worse thing to get wrong than the hang it exists to clean up.
+
+**Three test-quality points, all real.** The probes this suite creates in the repository root are now ignored:
+`verify:evidence` reads `git status --porcelain`, so a probe left behind by a run killed mid-test marks the
+tree DIRTY and invalidates the evidence report that follows. The cross-repository glob stub bypassed the
+`factsWith` helper, so it would break rather than fail if the rule started reading another fact. And
+`expect(typeof resolved).not.toBe("string")` is satisfied by `null` — which is exactly what the old code
+returned there, so the assertion did not separate the fix from the regression it guards.
+
+**Superseded fingerprint:** ~~`28ed7439f5660e82cf530fa017a8bca8f35ef8fc2c174ef9a2ec1a0a0661d7d6`~~. Current,
+recomputed independently in both repositories and identical:
+`8fbfc71960f3a8d5952f183268d490bb51e9dbceab5de51ef7e0738fb1580ed9`.
+
+**Commands run on the tree before this entry was appended:** `node scripts/verify-claims.mjs` →
+`1068 claims … 0 FAILED`; `pnpm exec vitest run tests/claims-ledger.test.ts` → `Tests 81 passed (81)`;
+`npx tsc --noEmit` → 0 errors; `pnpm architecture:gates` → `All G1 checks passed.` In the RN migration repo:
+`477 claims … 0 FAILED`, ledger `80 passed`, typecheck and lint clean, and `node scripts/verify-evidence.mjs`
+→ `all declared gates passed`, which exercises the new collector end to end.
+
+**Verdict:** VERIFIED.
+
+### The byte cap was wrong a third time, and the PATH fix is now confirmed rather than reasoned, 2026-08-21
+
+**Claim:** `createOutputCollector` bounds the text it records, not the bytes it was handed; and the SonarCloud
+regression named in the entry above was in fact the `PATH` lookup.
+
+**Evidence — the cap.** Measured against the collector as it stood, before any edit:
+
+```text
+maxBytes=64, fed 40 malformed input bytes  ->  130 bytes recorded
+maxBytes=10, fed 200 bytes                 ->   31 bytes recorded (the marker alone)
+```
+
+Both are real, and the first is the interesting one. A malformed input byte decodes to `U+FFFD`, which is
+**three bytes out for one byte in**, so a gate emitting invalid bytes inside the budget still blew through the
+ceiling. The second case is simpler: a ceiling below the marker's own length emitted the whole marker anyway.
+
+**This cap has now been wrong three times, each by measuring the wrong thing** — `output.length` (UTF-16 code
+units), then the INPUT byte length, now the decoded byte length. The lesson is not "measure bytes"; it is that
+a limit must be measured on **the artefact it constrains**, which here is the recorded text and nothing else.
+It counts what lands in the text now, and the marker is trimmed rather than exempt: a note that overflows the
+limit it announces is precisely the defect this helper exists to prevent. After the change, the same two
+inputs record 61 and 10 bytes, and a four-byte character split across two writes still returns whole.
+
+**Evidence — the `PATH` fix.** The entry above said SonarCloud's move from passing to a B security rating was
+*explained by* the `spawn("taskkill", …)` lookup, and said plainly that the analysis could not be read from
+here because this environment blocks `sonarcloud.io`. That was a hypothesis, and it is now confirmed: with the
+call resolved from `%SystemRoot%\System32`, the quality gate on the sibling repository returned to **passing**
+with 0 security hotspots. Recording the confirmation next to the hypothesis, because a guess that turns out
+right is still a guess until something checks it.
+
+**Superseded fingerprint:** ~~`8fbfc71960f3a8d5952f183268d490bb51e9dbceab5de51ef7e0738fb1580ed9`~~. Current,
+recomputed independently in both repositories and identical:
+`54550c0097ae2d5fd863d41fa81c6204e72782f60202fcbd32e5de315df455f7`.
+
+**Commands run on the tree before this entry was appended:** `node scripts/verify-claims.mjs` →
+`1070 claims … 0 FAILED`; `pnpm exec vitest run tests/claims-ledger.test.ts` → `Tests 83 passed (83)`;
+`npx tsc --noEmit` → 0 errors; `pnpm architecture:gates` → `All G1 checks passed.` In the RN migration repo:
+`477 claims … 0 FAILED`, ledger `82 passed`, typecheck and lint clean, and `node scripts/verify-evidence.mjs`
+→ `all declared gates passed`.
+
+**Verdict:** VERIFIED.
+
+### Sixteen SonarCloud findings, read rather than reasoned, 2026-08-21
+
+**Claim:** the sixteen new issues SonarCloud raised on the sibling repository are resolved, and the one Medium
+among them was a real ambiguity in a security-relevant pattern.
+
+**Evidence.** Two entries above record that this environment blocks `sonarcloud.io`, so the previous
+`PATH` fix was reasoned from the diff rather than read off the report. The owner supplied the report
+directly. That is worth recording as a change in the *kind* of evidence available, not just its content: the
+earlier entry said "this is the change that would explain it", and the list confirms there was no other
+security finding to explain it.
+
+| finding | severity | resolution |
+|---|---|---|
+| `Unnecessary escape character: \-` in `git-facts` | **Medium** | `REPO_PATH` was `[^\0\-]`. A `-` needs no escape when it sits last in a character class, and the escape made a pattern that guards an argv boundary harder to read than it needs to be. |
+| `String.raw` should be used to avoid escaping `\` ×9 | Low | Every dynamically built pattern in `scan`, `claims`, `fingerprint`, plus the Windows path in the runner. `fingerprint` already used the idiom in one line, so these were consistency gaps rather than a new convention. |
+| The empty object is useless ×2 | Low | `{ ...(x ?? {}) }` in `facts` and `run`. Spreading `undefined` is already a no-op, so the fallback did nothing. |
+| `Object.hasOwn()` over `Object.prototype.hasOwnProperty.call()` | Low | `facts`. The `?? {}` there is load-bearing and stays — `Object.hasOwn(undefined, …)` throws. |
+| Do not call `Array#push()` multiple times | Low | Two consecutive pushes onto `failures` in `run`, merged into one call. |
+
+**The Medium one was checked as behaviour, not as text.** `REPO_PATH` is what stops a path being read as a
+git flag, so the sources of every reachable pattern were captured before the edit and compared after: eleven
+are byte-identical, and the twelfth is `REPO_PATH` itself, whose *text* changed by exactly one character.
+Its behaviour is pinned by probe instead — `-rf` rejected, `--upload-pack=x` rejected, an ordinary
+`docs/<name>.md` accepted, `<dir>-<dir>/<name>.md` accepted so an interior dash is still ordinary, a NUL byte
+rejected.
+
+*The gate caught this passage while it was being written*: the probe values were first spelled as real-looking
+paths, and it read them as claims about files that do not exist. Fourth time it has done that to an entry of
+mine, and the fourth time it was right — fixed with the documented placeholder form rather than by quietly
+rewording.
+
+**Superseded fingerprint:** ~~`54550c0097ae2d5fd863d41fa81c6204e72782f60202fcbd32e5de315df455f7`~~. Current,
+recomputed independently in both repositories and identical:
+`99a096b7ec77c2cae76e3fef297df5c18ce6a171208600a9d925f7238f0f5a68`.
+
+**Commands run on the tree before this entry was appended:** `node scripts/verify-claims.mjs` →
+`1071 claims … 0 FAILED`; `pnpm exec vitest run tests/claims-ledger.test.ts` → `Tests 83 passed (83)`;
+`npx tsc --noEmit` → 0 errors; `pnpm architecture:gates` → `All G1 checks passed.` In the RN migration repo:
+`477 claims … 0 FAILED`, ledger `82 passed`, typecheck and lint clean.
+
+**Verdict:** VERIFIED.
+
+### A failure without its cause, and a detector I taught to look away, 2026-08-21
+
+**Claim:** a timeout diagnostic now survives truncation, and the probe fixtures are no longer hidden from the
+dirty-tree check.
+
+**Evidence — the lost cause.** Routing the runner's own diagnostics through the gate's output budget meant
+they were dropped once the budget filled. Measured before the fix, 500 bytes of output against a 64-byte
+ceiling followed by a timeout note:
+
+```text
+truncated: true
+timeout reason present: false
+recorded: "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\n[output truncated at 64 bytes]"
+```
+
+The gate was still recorded as failed — the exit code is set independently — but **"gate exceeded 600000ms and
+was killed" was gone.** Precisely when a hang is most likely, which is when output is large, the word that
+says *why* disappeared. That is the same wrong-cause family already fixed three times in this engine, and it
+arrived through the fix for the round before it. A reserve is carved out of the ceiling now, so the note
+always has room and the recorded text still never exceeds the limit: the same two inputs record 64 and 10
+bytes, with the reason present.
+
+**Evidence — the detector.** The round above added `.gitignore` entries for the probe fixtures this suite
+creates in the repository root. The reasoning was that a probe left behind by a run killed mid-test would mark
+the tree DIRTY and invalidate the evidence report. That reasoning was backwards, and the review said so:
+`git status --porcelain` does not report ignored paths, so the entries made a checkout **with stray files in
+it report as clean**.
+
+Reverted. A leftover probe *should* read as a dirty tree — invalidating evidence recorded over a tree that
+holds files nobody accounted for is the conservative, correct direction, and it is the direction this whole
+engine argues for everywhere else. **Adding a path to `.gitignore` so a cleanliness check stops mentioning it
+is teaching a detector to look away**, which is the defect class this tool exists to remove, applied by me to
+the tool itself. The test already enters its cleanup block before creating anything, so a leftover needs a
+hard kill; if that happens, the loud signal is the one worth having.
+
+**Superseded fingerprint:** ~~`99a096b7ec77c2cae76e3fef297df5c18ce6a171208600a9d925f7238f0f5a68`~~. Current,
+recomputed independently in both repositories and identical:
+`16ad314a`, in full below.
+
+`16ad314a6f9e3c5f1cdaddc6e650a0bbd96f1b1ab53d09ba45b54ef48e86e7dc`
+
+**Commands run on the tree before this entry was appended:** `node scripts/verify-claims.mjs` →
+`1072 claims … 0 FAILED`; `pnpm exec vitest run tests/claims-ledger.test.ts` → `Tests 83 passed (83)`;
+`npx tsc --noEmit` → 0 errors; `pnpm architecture:gates` → `All G1 checks passed.` In the RN migration repo:
+`477 claims … 0 FAILED`, ledger `82 passed`, typecheck and lint clean.
+
+**Verdict:** VERIFIED.
+
+### The reserve was not reserved, 2026-08-21
+
+**Claim:** the diagnostic note now survives truncation at any ceiling, not only at large ones.
+
+**Evidence.** The entry above carved a reserve out of the ceiling so a timeout note would outlive a truncated
+gate. It did not finish the job: `cut()` appended the truncation marker with `maxBytes - textBytes` as its
+room, so the marker could consume the reserve it was supposed to leave alone. At a small ceiling the record
+came back as the marker and nothing else, and the note was dropped after all — **the same defect one layer
+below where it had just been fixed**, which is now the third time a fix in this collector has produced the
+next one.
+
+The marker stops at the reserve now. Between the two, the note wins: "output truncated" is a property of the
+log, while "gate exceeded 600000ms and was killed" is the reason the gate failed, and a failure recorded
+without its cause is the shape this engine keeps catching in itself. Measured across three ceilings —
+
+```text
+maxBytes=     10  ->      10 bytes recorded, note reached the record
+maxBytes=     64  ->      64 bytes recorded, full phrase present
+maxBytes=1000000  ->  999847 bytes recorded, full phrase present
+```
+
+Ten bytes cannot hold the words, and the pinned case says only that the diagnostic is not silently discarded.
+The production ceiling is 1,000,000 bytes, so the 200-byte reserve costs 0.02% of the log there; the tiny
+ceilings exist only in the tests, and they are where the invariant was breaking.
+
+**Superseded fingerprint:** ~~`16ad314a`~~ (full value in the entry above). Current, recomputed independently
+in both repositories and identical:
+`6cdd47e8` — full value recorded in `verify.config.json`.
+
+**Commands run on the tree before this entry was appended:** `node scripts/verify-claims.mjs` →
+`1073 claims … 0 FAILED`; `pnpm exec vitest run tests/claims-ledger.test.ts` → `Tests 84 passed (84)`;
+`npx tsc --noEmit` → 0 errors; `pnpm architecture:gates` → `All G1 checks passed.` In the RN migration repo:
+`477 claims … 0 FAILED`, ledger `83 passed`, typecheck and lint clean.
+
+**Verdict:** VERIFIED.
+
+### An unwatched killer would have taken the whole evidence run down, 2026-08-21
+
+**Claim.** The Windows branch of the gate timeout in `scripts/verify-evidence.mjs` spawned `taskkill.exe`
+with no `error` listener; the POSIX branch swallowed every kill failure in a bare `catch`; neither read what
+the killer reported. All three are fixed, and the run that says so was itself recorded on a clean tree.
+
+**Evidence.** The `error` case is not a style point. `spawn` reports a failure to start as an **asynchronous**
+event, and an `error` event with no listener is thrown rather than ignored — so the surrounding `try`/`catch`
+could never have caught it. A `taskkill.exe` that would not start therefore killed the evidence runner
+itself, losing the report for every other gate at the exact moment the timeout existed to produce one. Both
+shapes, run in a real child process:
+
+```text
+no error listener:  exit 1, "Unhandled 'error' event", never reached the report write
+error listener:     exit 0, reached the report write, recorded "... ENOENT"
+```
+
+That measurement is pinned by `tests/claims-ledger.test.ts`, which spawns both shapes rather than asserting
+about them. Two quieter twins sat in the same block: taskkill's exit status was never read, so a killer that
+ran and reported failure left the tree alive silently; and the POSIX `catch {}` read `ESRCH` (the tree had
+already exited — what the kill was for, and a false alarm if reported) and `EPERM` (it is still running
+against the checkout) as the same event. `terminationProblem` in the shared engine is the decision that
+separates them, so the Windows half can be asked from a machine that is not Windows.
+
+**On the verdicts above this one.** CodeRabbit's review of `e4ee4214b` said the `VERIFIED` lines in this file
+were being written without running `pnpm verify:evidence`. That was correct. The reports those entries could
+have cited were taken over a **dirty** working copy — which layer 3 rejects by design, because a report over
+a dirty tree records some other code passing — and no entry named one. This entry names one:
+
+```text
+$ pnpm verify:evidence          # clean tree 56f9caeda9bb, no "(DIRTY working copy)"
+  PASS  typecheck    (29s)  pnpm typecheck
+  PASS  i18n-parity   (1s)  pnpm i18n:check
+  PASS  depcruise     (4s)  pnpm depcruise:check
+$ VT_ENFORCE_EVIDENCE=1 pnpm verify:claims   # what CI runs
+  1075 claims: 1061 verified, 13 registered, 1 attested, 2334 excluded by rule, 0 FAILED
+```
+
+Under enforcement the "evidence not current" note is gone, which is the only thing that distinguishes a
+report that supports a claim of green from one that does not.
+
+**Superseded fingerprint:** ~~`6cdd47e8`~~ (full value in the entry above). Current, recomputed independently
+in both repositories and identical: `f0f3e4c7` — full value recorded in `verify.config.json`.
+
+**Commands run on the tree before this entry was appended:** `node scripts/verify-claims.mjs` →
+`1075 claims … 0 FAILED`; `pnpm exec vitest run tests/claims-ledger.test.ts` → `Tests 86 passed (86)`;
+`npx tsc --noEmit` → 0 errors; `pnpm architecture:gates` → `All G1 checks passed.`; `pnpm verify:evidence` on
+clean tree `56f9caeda9bb` → all three declared gates PASS. In the RN migration repo, on clean tree
+`02fa3ad6f832`: `477 claims … 0 FAILED`, ledger `85 passed`, typecheck 0 errors, lint clean, and
+`npm run verify:evidence` → all three declared gates PASS.
+
+**Verdict:** VERIFIED.

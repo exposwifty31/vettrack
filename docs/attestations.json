@@ -1,0 +1,15 @@
+{
+  "$comment": "Layer 4 - claims this repository cannot prove on its own: a physical device, the App Store, an external service. Each entry is a dated statement of what a human observed, with an expiry and a re-verify recipe, referenced from a governed document with <!-- vt-claim: attested <id> -->. An entry past its budget FAILS the gate, and so does one no document references. Device and store claims are NOT auto-detected from prose - the marker is how such a claim enters the ledger.",
+  "entries": [
+    {
+      "id": "ios-app-store-live",
+      "claim": "The Capacitor iOS shell is live on the App Store. Re-verify by opening the store listing and confirming the published build is at least the number in ios/.last-shipped-build",
+      "target": "app-store",
+      "evidence": "ios/.last-shipped-build",
+      "attestedBy": "repo owner (recorded in CLAUDE.md, Architecture / Native shell)",
+      "attestedAt": "2026-08-20",
+      "staleAfterDays": 120,
+      "reverifyWith": "RESUBMISSION_RUNBOOK.md#b-current-state-what-is-already-done"
+    }
+  ]
+}

@@ -1,0 +1,134 @@
+{
+  "$comment": "Scope + policy for the claim-verification gate. Ported from the VetTrack RN migration repo (scripts/verify/ is the same engine). Everything the gate looks at is named HERE - a document that is not listed is deliberately ungoverned, not accidentally missed.",
+  "packageManager": "pnpm",
+  "packageManagerBuiltins": [
+    "install",
+    "i",
+    "add",
+    "remove",
+    "exec",
+    "dlx",
+    "run",
+    "why",
+    "list",
+    "ls",
+    "store",
+    "publish",
+    "link",
+    "update",
+    "outdated",
+    "audit",
+    "rebuild",
+    "prune",
+    "patch",
+    "deploy",
+    "env",
+    "setup",
+    "config",
+    "create",
+    "init"
+  ],
+  "defaultBranch": "main",
+  "governedDocs": [
+    "CLAUDE.md",
+    "AGENTS.md",
+    "CONTRIBUTING.md",
+    "DEFINITION_OF_DONE.md",
+    "docs/migrations.md",
+    "docs/CONVENTIONS.md",
+    "docs/audit/PROOF_ALIGNMENT_LOG.md",
+    "README.md",
+    "ARCHITECTURE.md",
+    "CONTEXT.md",
+    "FLOW_MATRIX.md",
+    "SECURITY.md",
+    "PLAN.md",
+    "TASKS.md",
+    "RESUBMISSION_RUNBOOK.md",
+    "docs/README.md",
+    "docs/capacitor-native-app.md",
+    "docs/release-runbook.md",
+    "docs/dev-signin-runbook.md",
+    "docs/integrations-guide.md",
+    "docs/engineering-rules-rollout.md"
+  ],
+  "appendOnlyDocs": [
+    "docs/audit/PROOF_ALIGNMENT_LOG.md"
+  ],
+  "statusDocs": [
+    "docs/audit/PROOF_ALIGNMENT_LOG.md",
+    "PLAN.md",
+    "TASKS.md"
+  ],
+  "ungoverned": {
+    "$comment": "Not scanned, and each exclusion is a reason rather than an oversight.",
+    "docs/plans/**": "forward-looking plans; they cite artifacts that do not exist yet by design",
+    "docs/Research/**": "imported research; a record of what was read, not a claim this repo makes",
+    "docs/audit/** (except the PROOF log)": "point-in-time audit reports, superseded by the gate itself",
+    "BUG_REGISTER.md": "issue tracker in markdown; entries describe defects, not the tree"
+  },
+  "ignoredPathPrefixes": [
+    "node_modules/",
+    "dist/",
+    ".cache/",
+    "coverage/",
+    "playwright-report/",
+    "test-results/",
+    "public/assets/",
+    "docs/audit/evidence-run.json"
+  ],
+  "includeDotDirs": [
+    ".github",
+    ".cursor"
+  ],
+  "dependencyAliases": {
+    "React": "react",
+    "Vite": "vite",
+    "Drizzle ORM": "drizzle-orm",
+    "BullMQ": "bullmq",
+    "Express": "express",
+    "Socket.io": "socket.io",
+    "Dexie": "dexie",
+    "Capacitor": "@capacitor/core"
+  },
+  "crossRepoNames": [
+    "VetTrack---RN-Migration-",
+    "rn"
+  ],
+  "crossRepoPrefixes": [
+    {
+      "prefix": "VetTrack---RN-Migration-/",
+      "reason": "cross-repo: the Expo/RN migration repo, which this repo deliberately never touches"
+    },
+    {
+      "prefix": "src/infrastructure/auth/",
+      "reason": "cross-repo: RN-side auth adapters (this repo's auth lives in server/middleware and src/hooks)"
+    }
+  ],
+  "treeBlocks": [
+    {
+      "file": "CLAUDE.md",
+      "afterHeading": "### Directory layout"
+    }
+  ],
+  "evidenceGates": [
+    {
+      "id": "typecheck",
+      "command": "pnpm typecheck"
+    },
+    {
+      "id": "i18n-parity",
+      "command": "pnpm i18n:check"
+    },
+    {
+      "id": "depcruise",
+      "command": "pnpm depcruise:check"
+    }
+  ],
+  "registry": "docs/claims-registry.json",
+  "attestations": "docs/attestations.json",
+  "prLedger": "docs/pr-ledger.json",
+  "evidenceReport": "docs/audit/evidence-run.json",
+  "siblingRepo": "exposwifty31/VetTrack---RN-Migration- (the Expo/RN repo; same engine as scripts/verify/*.js)",
+  "engineFingerprint": "f0f3e4c7383fac894cc5ce4e4730fd0da32d6b5cdd2f9b7820e02dcee36ecf5a"
+}
