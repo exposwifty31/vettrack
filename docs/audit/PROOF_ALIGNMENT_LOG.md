@@ -9168,3 +9168,44 @@ recomputed independently in both repositories and identical:
 `8065f0383300d7d576af8751488e2483ac9097b4ee8b40c05bc6f91d4dec66e2`.
 
 **Verdict:** VERIFIED.
+
+### Lexical containment was not containment, 2026-08-21
+
+**Claim under audit:** that the root-containment guard added in the round above actually kept every read inside
+the checkout.
+
+**Verdict: it did not, and the guard said it did.** `insideRoot` compared `path.resolve` output and stopped
+there. `statSync` and `readFileSync` FOLLOW symbolic links, so a tracked `docs/<file>.md` pointing at an
+absolute path outside the tree passed the string check and then read the outside file anyway. A path claim, a line-range
+claim, or an `absent` marker scoped at such a link came back verified from data this repository does not
+contain — which is worse than the hole it replaced, because the first version at least did not announce a
+protection it lacked.
+
+**Evidence, reproduced before the fix and refused after.** With a link inside the tree pointing at a file in
+the system temporary directory: the lexical check returned true and the read returned the outside content.
+After the fix, all four surfaces refuse — `fileExists` false, `lineCount` null, `grepCount` NaN for the linked
+file and NaN for a linked directory — while `package.json` still resolves normally.
+
+- The resolved target is now compared against the resolved root, because a checkout can itself sit under a
+  link and comparing a resolved target to an unresolved root would refuse every path in it.
+- An ABSENT path is not an escape. `realpathSync` throws for a path that is not there, and treating that as a
+  containment failure would turn every claim about a missing file into the wrong kind of error; the caller
+  still refuses it in the ordinary way.
+- Containment is checked PER ENTRY inside a directory scope, not once for the scope. The walk lists a link as
+  an ordinary file, so one link inside a directory is a door out of the tree, and it makes the scope
+  uncheckable for the same reason an unreadable file does.
+
+**Found by:** the fourth CodeRabbit review round on the RN migration repo, from static inspection. Graded High
+there, and correctly — this is the class the whole engine exists to remove, in the guard written to remove it.
+
+**Superseded fingerprint:** ~~`8065f0383300d7d576af8751488e2483ac9097b4ee8b40c05bc6f91d4dec66e2`~~. Current,
+recomputed independently in both repositories and identical:
+`f45235d72618706705b340a815817bd95c2ed96f0159440df03f030d006cd103`.
+
+**Commands run on the tree before this entry was appended:** `node scripts/verify-claims.mjs` →
+`1061 claims: 1047 verified, 13 registered, 1 attested, 2080 excluded by rule, 0 FAILED`; `pnpm exec vitest run
+tests/claims-ledger.test.ts` → `Tests 67 passed (67)`; `npx tsc --noEmit` → 0 errors; `pnpm architecture:gates`
+→ `All G1 checks passed.`; the local sonarjs proxy over the changed engine → clean. In the RN migration repo:
+`477 claims … 0 FAILED`, ledger `66 passed`, lint and typecheck clean.
+
+**Verdict:** VERIFIED.

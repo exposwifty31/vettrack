@@ -49,6 +49,18 @@ function createFacts(root, policy) {
   const dependencies = { ...(manifest.devDependencies ?? {}), ...(manifest.dependencies ?? {}) };
 
   const REPO_ROOT = path.resolve(root);
+  // Compared against the RESOLVED root, because a checkout can itself sit under
+  // a link (a `/tmp` that is really `/private/tmp`); measuring a resolved target
+  // against an unresolved root would refuse every path in such a checkout.
+  const REAL_ROOT = (() => {
+    try {
+      return fs.realpathSync(REPO_ROOT);
+    } catch {
+      return REPO_ROOT;
+    }
+  })();
+
+  const contains = (base, full) => full === base || full.startsWith(base + path.sep);
 
   /**
    * Resolve `relative` beneath the checkout, or null when it escapes.
@@ -59,10 +71,27 @@ function createFacts(root, policy) {
    * a file this repository does not contain: verified, and about the wrong
    * tree. Checked once here rather than trusted at each call site, which is the
    * rule `git-facts` already applies to everything it hands to an argv.
+   *
+   * LEXICAL CONTAINMENT IS NOT CONTAINMENT. The first version of this guard
+   * compared `path.resolve` output and stopped there, but `statSync` and
+   * `readFileSync` FOLLOW symbolic links: a tracked `docs/proof.md` pointing at
+   * `/external/proof.md` passed the string check and then read the outside file
+   * anyway. The claim came back verified from data this repository does not
+   * contain — a guard that announced containment without delivering it, which is
+   * the half-true guard this engine exists to refuse.
    */
   const insideRoot = (relative) => {
     const full = path.resolve(REPO_ROOT, relative);
-    return full === REPO_ROOT || full.startsWith(REPO_ROOT + path.sep) ? full : null;
+    if (!contains(REPO_ROOT, full)) return null;
+    try {
+      return contains(REAL_ROOT, fs.realpathSync(full)) ? full : null;
+    } catch {
+      // Nothing there to resolve. An ABSENT path is not an escape: the caller
+      // refuses it in the ordinary way (false / null / NaN), and treating it as
+      // a containment failure would turn every claim about a missing file into
+      // the wrong kind of error.
+      return full;
+    }
   };
 
   const stat = (relative) => {
@@ -201,7 +230,7 @@ function createFacts(root, policy) {
         // is not evidence of absence — it is a scope this run could not check,
         // and NaN is how that reaches the caller as a failure rather than a 0.
         try {
-          return fs.readFileSync(path.join(REPO_ROOT, scope), "utf8").split(pattern).length - 1;
+          return fs.readFileSync(path.resolve(REPO_ROOT, scope), "utf8").split(pattern).length - 1;
         } catch {
           return Number.NaN;
         }
@@ -216,8 +245,17 @@ function createFacts(root, policy) {
         let unreadable = 0;
         const hits = entries.filter((relative) => {
           if (relative.endsWith("/")) return false;
+          // Checked PER ENTRY, not once for the scope: the walk lists a symbolic
+          // link as an ordinary file, so a single link inside the directory is a
+          // door out of the tree. One that escapes makes the scope uncheckable
+          // for the same reason an unreadable file does.
+          const full = insideRoot(relative);
+          if (full === null) {
+            unreadable += 1;
+            return false;
+          }
           try {
-            return fs.readFileSync(path.join(root, relative), "utf8").includes(pattern);
+            return fs.readFileSync(full, "utf8").includes(pattern);
           } catch {
             unreadable += 1;
             return false;

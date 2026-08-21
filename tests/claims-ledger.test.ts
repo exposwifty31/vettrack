@@ -711,6 +711,36 @@ describe("the engine refuses what it says it refuses", () => {
     expect(facts.fileExists("docs/../package.json")).toBe(true);
   });
 
+  it("refuses a path that reaches outside through a symbolic link", () => {
+    // LEXICAL CONTAINMENT IS NOT CONTAINMENT. The first version of the guard
+    // compared `path.resolve` output and stopped, but `statSync` and
+    // `readFileSync` FOLLOW links: a tracked `docs/proof.md` pointing at
+    // `/external/proof.md` passed the string check and read the outside file
+    // anyway, so a claim came back verified from data this repository does not
+    // contain. Reproduced before the fix — the lexical check passed and the
+    // read escaped — and refused after.
+    const osModule = require("node:os") as typeof import("node:os");
+    const fsModule = require("node:fs") as typeof import("node:fs");
+    const probe = path.join(REPO_ROOT, ".vt-symlink-probe");
+    const outside = fsModule.mkdtempSync(path.join(osModule.tmpdir(), "vt-outside-"));
+    fsModule.writeFileSync(path.join(outside, "secret.md"), "outside-token\n");
+    fsModule.mkdirSync(probe, { recursive: true });
+    fsModule.symlinkSync(path.join(outside, "secret.md"), path.join(probe, "link.md"));
+    fsModule.symlinkSync(outside, path.join(probe, "dir"));
+    try {
+      const facts = createFacts(REPO_ROOT, POLICY);
+      expect(facts.fileExists(".vt-symlink-probe/link.md")).toBe(false);
+      expect(facts.lineCount(".vt-symlink-probe/link.md")).toBeNull();
+      expect(Number.isNaN(facts.grepCount("outside-token", ".vt-symlink-probe/link.md"))).toBe(true);
+      expect(Number.isNaN(facts.grepCount("outside-token", ".vt-symlink-probe/dir"))).toBe(true);
+      // A file genuinely inside the checkout still resolves.
+      expect(facts.fileExists("package.json")).toBe(true);
+    } finally {
+      fsModule.rmSync(probe, { recursive: true, force: true });
+      fsModule.rmSync(outside, { recursive: true, force: true });
+    }
+  });
+
   it("reads an uppercase object id as a commit citation", () => {
     // git resolves `ABCDEF1` and `abcdef1` to the same object. A lowercase-only
     // test did not report an uppercase citation as WRONG — it produced no claim
