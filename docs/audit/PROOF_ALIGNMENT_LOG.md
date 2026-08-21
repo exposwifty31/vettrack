@@ -9990,17 +9990,20 @@ as a landed fact in an append-only evidence log — written by an author who had
 arguing that documents should not claim things that are not yet true. The mechanism does not care who
 wrote the claim, which is the point of having it.
 
-**The rule, read from source after guessing wrong twice.** `scripts/verify/scan.cjs:142` defines
-`MERGE_CONTEXT = /(?<![\w-])MERGED\b|\bmerged\b|\blanded\b|\bPRs?\s+#/`. A bare number-sign
-reference becomes a pull-request claim ONLY on a line that also carries merge vocabulary —
-`merged`, `landed`, `MERGED`, or the `PR` + number-sign form. The comment above it says so
-outright: a bare reference is "deliberately NOT enough," because README and G2-PLAN both cite
-react-native-nfc-manager's upstream issue number, which is not a pull request here.
+**The real lesson is not the rule — it is that the checker runs locally.**
+`node scripts/verify-claims.mjs` executes with no `node_modules` present. It was runnable in this
+container the whole time. Four CI cycles were spent inferring its behaviour from error text, then
+transcribing one of its patterns by hand and auditing against the transcription, when the tool
+itself was one command away. Run the gate; do not model it.
 
-That is why the first fix moved the failure instead of clearing it: I removed the `PR` + number
-form from the heading, but a later line said the pull request "has not landed" next to its
-number — merge vocabulary plus a number, which is precisely the pattern. Two failed runs were
-spent inferring the rule from error text before reading the fifteen lines that define it.
+The pattern that matters lives at `scripts/verify/scan.cjs:142` and the comment above it explains
+the intent. Read it there rather than copied to here: quoting it verbatim is what broke the
+previous attempt, because the pattern is built from the very vocabulary it searches for, so any
+faithful quotation of it trips it. Two of this file's own lines failed that way.
+
+Note when running locally: `[git-unavailable]` against `.github/workflows/ci.yml` is an artifact of
+a shallow clone and does not occur in CI, which sets `fetch-depth: 0`. Ignore that one line locally;
+everything else the local run reports is real.
 
 **Verdict:** VERIFIED — failure reproduced from the job log, remedy checked against the ledger's own
 scope comment rather than assumed from the error message.
