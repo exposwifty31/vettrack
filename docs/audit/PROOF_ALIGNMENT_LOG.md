@@ -9019,3 +9019,52 @@ by diffing the `--json` claim sets of the old and new engines against the same w
 totals.
 
 **Verdict:** VERIFIED.
+
+### Correction — the block titled "commands run on this tree" was measured on an earlier tree, 2026-08-21
+
+**Claim under audit:** the four figures in the *Commands run on this tree after the round* block above —
+this repository's claim total and its disposition counts, its `tests/claims-ledger.test.ts` count, and the
+same two for the RN migration repo.
+
+**Evidence:** re-ran both commands in both checkouts. The figures below were measured on the tree as it
+stood **before this entry was appended**. Appending it moved this repository's total to 1,054, because
+the entry cites a file and that citation is itself a claim — said here rather than quietly reconciled,
+since a count of the corpus, stated inside the corpus, is only meaningful with the tree named.
+
+- `node scripts/verify-claims.mjs` here → `1053 claims: 1039 verified, 13 registered, 1 attested,
+  2015 excluded by rule, 0 FAILED` / `All claims accounted for.`
+- `pnpm exec vitest run tests/claims-ledger.test.ts` → `Test Files 1 passed (1)`, `Tests 62 passed (62)`.
+- The same engine in the RN migration repo → `477 claims: 416 verified, 58 registered, 3 attested,
+  1510 excluded by rule, 0 FAILED`, and `Tests: 61 passed, 61 total`.
+- `engineFingerprint` is unchanged by this entry: no engine file is touched.
+
+**Verdict:** the block was WRONG about the tree it names. Superseded: ~~`1035 claims: 1024 verified, 10
+registered, 1 attested, 1882 excluded by rule`~~ · ~~`Tests 50 passed (50)`~~ · ~~`1494 excluded by rule`~~
+(RN) · ~~`Tests: 49 passed, 49 total`~~ (RN). The figures above are the measured ones.
+
+**How it happened, precisely.** The block was written by the commit that closed the first re-review round and
+was correct for that tree. Two further commits then changed the engine, which changed both counts and both
+test totals. The round's final commit edited the fingerprint line *inside that same block* and left the four
+counts beside it untouched — the value that had a mechanism watching it was updated, and the values that had
+only a human reading them were not.
+
+**This is not covered by the append-only rule.** An entry that records what was true when it was written
+stays the record it is; that is this file's first rule and the gate honours it by checking only the lines a
+branch adds. This block does not say "when written" — it names *this tree*, and the tree it names is the head
+of the branch it ships on. A statement about the current tree is either true now or it is wrong now.
+
+**Why the gate did not catch it, stated as a limit rather than excused.** The gate resolves paths, line
+ranges, globs, dependency versions, package scripts, the directory layout, declared absence, commits, pull
+requests and attestations. A bare integer in prose is none of those, so `1035` was never a claim and never
+had a disposition. Making counts self-checking would mean the document quoting a command's output and the
+gate re-running that command to compare — layer 3 machinery pointed at prose — and layer 3 already records
+its runs in `docs/audit/evidence-run.json`. It would also be circular in the way the line above
+demonstrates: the act of recording the count changes it. Recorded here as a known edge the gate does not
+reach, so the next person reading a count in this file knows nothing checked it.
+
+**Found by:** the second CodeRabbit review on `#206`, which asked for exactly this re-run. Nine of its ten
+inline findings and all four of its outside-diff findings were already fixed by the three commits that
+followed it; this was the one still open, and it was open because it is the one that could not be closed by
+reasoning about the code — only by running the commands again.
+
+**Verdict:** VERIFIED.
