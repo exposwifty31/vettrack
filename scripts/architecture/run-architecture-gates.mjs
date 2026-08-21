@@ -40,6 +40,19 @@ run("dependency-cruiser", "pnpm", [
 ]);
 run("madge cycle baseline", "node", ["scripts/architecture/compare-cycles.mjs"]);
 
+// Tenant scope: every query filters clinicId. This gate was absent from this
+// runner entirely, and its CI step was disarmed twice over (`--warn-only`, whose
+// own --help says "exit 0", inside a `continue-on-error: true` step). A real
+// clinicId leak was therefore indistinguishable from ~200 standing findings that
+// had never blocked anyone. The baseline freezes the known set so only NEW
+// findings fail — see .tenant-lint-known-violations.json for how to regenerate.
+run("tenant query lint (new findings only)", "node", [
+  "scripts/architecture/tenant-query-lint.mjs",
+  "--all",
+  "--baseline",
+  ".tenant-lint-known-violations.json",
+]);
+
 // Claim verification: every path, version, script, absence, landing citation and
 // attestation in a governed document must be accounted for. Same engine as
 // `pnpm verify:claims` and as the vitest gate in tests/claims-ledger.test.ts.

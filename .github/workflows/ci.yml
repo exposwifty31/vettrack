@@ -270,6 +270,25 @@ jobs:
       - name: 🔌 Integration ops suite
         run: pnpm test:integration:ops
 
+      # doctor-shift-gate and seed-reviewer-demo are excluded from `pnpm test` by
+      # vite.config.ts (both need a real database) and were named by NO workflow, so
+      # the cross-repo contract they pin — migrations 181-184 and the
+      # `source: "doctor_gate"` shape the RN app and the TV ward board both consume —
+      # was enforced by nothing, on either side of the seam.
+      #
+      # NAMED FILES, deliberately, rather than `pnpm test:db-integration`. That
+      # script's config also includes equipment-operational-state, which the step
+      # above already covers via test:integration:ops. Adding the whole config would
+      # run that file twice per PR, and measured on a clean database it FAILS in this
+      # config's ordering (10 of 49 — worker sweeps and operational metrics) while
+      # passing in the ops one. Importing a known instability to buy coverage that
+      # already exists is a bad trade. These two pass clean: 15 tests, ~30s.
+      - name: 🩺 Cross-repo contract suites (doctor gate + reviewer seed)
+        run: >-
+          pnpm exec vitest run --config vitest.db-integration.config.ts
+          tests/doctor-shift-gate.integration.test.ts
+          tests/seed-reviewer-demo.integration.test.ts
+
   # packages/rfid-controller ships its own vitest config + tsconfig and is a
   # contract-bearing surface (signed batches to POST /api/rfid/events). Neither
   # script was reachable from any workflow, so its tests and types were enforced
@@ -351,12 +370,18 @@ jobs:
       - name: 🔄 madge cycle baseline
         run: node scripts/architecture/compare-cycles.mjs
 
-      - name: 🏥 tenant query lint (warn only, G3)
-        env:
-          TENANT_LINT_BASE: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || 'origin/main' }}
-        run: |
-          node scripts/architecture/tenant-query-lint.mjs --warn-only --touched --base "${TENANT_LINT_BASE}"
-        continue-on-error: true
+      # ENFORCING. Removing `continue-on-error` alone would have changed nothing:
+      # the command hardcoded `--warn-only`, which this script's own --help documents
+      # as "exit 0 (default, G3)". Two independent disarms on one gate, and neither
+      # was visible from the other. Both are gone.
+      #
+      # `--all`, not `--touched`: the baseline makes a full scan safe, and a full scan
+      # also catches a violation moved into an untouched file by a rename — which is
+      # exactly the shape `--touched` cannot see.
+      - name: 🏥 tenant query lint (new findings only)
+        run: >-
+          node scripts/architecture/tenant-query-lint.mjs
+          --all --baseline .tenant-lint-known-violations.json
 
       - name: 🔑 query key registry drift (warn only, G4)
         run: node scripts/architecture/collect-query-keys.mjs --warn-only

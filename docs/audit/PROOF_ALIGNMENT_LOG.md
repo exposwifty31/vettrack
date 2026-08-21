@@ -9748,3 +9748,161 @@ two registry entries into false `obsolete` failures that CI does not see. Same m
 a false PASS. `ignoredPathPrefixes` in `verify.config.json` covers neither case today.
 
 **Verdict:** VERIFIED for the reverse-check defect. The suffix-resolution finding above is OPEN.
+
+## 2026-08-21 — Route matrix committed before its source report is deleted (claude/unified-program-v2-review-44db19)
+
+**Claim:** The 311-route consumer matrix — including the 43 rows with no consumer — now lives at
+`docs/audit/route-consumer-matrix.md`, extracted from an untracked scratch report
+(`AUDIT-repo-b.md` → `docs/audit/route-consumer-matrix.md`) before the cleanup lane deletes it.
+The source was never tracked, so it is not resolvable from this tree by design.
+
+**Evidence:**
+- Command: `grep -cE '^\| (GET|POST|PUT|PATCH|DELETE) ' docs/audit/route-consumer-matrix.md` → `311`,
+  matching the source report's own headline count of 311 method+path pairs.
+- Command: `grep -c 'NO-CONSUMER' docs/audit/route-consumer-matrix.md` → `65` (43 pure NO-CONSUMER
+  plus the dev-only / suspected / stub / staged rows and the counts table).
+- Governance checked, not assumed: `verify.config.json` `governedDocs` holds 21 entries and the only
+  one under `docs/audit/` is `PROOF_ALIGNMENT_LOG.md`, so the new file is deliberately ungoverned.
+- Command: `pnpm verify:claims` after the extraction → `All claims accounted for`, 0 FAILED.
+
+**Verdict:** VERIFIED
+
+## 2026-08-21 — Cross-repo contract suites were enforced by no workflow (claude/unified-program-v2-review-44db19)
+
+**Claim:** `tests/doctor-shift-gate.integration.test.ts` and `tests/seed-reviewer-demo.integration.test.ts`
+now run in CI, in the existing `integration-ops` job, which already provisions Postgres and applies
+migrations.
+
+**Evidence:**
+- Command: `grep -rn 'doctor-shift-gate' .github/` and `grep -rn 'seed-reviewer' .github/` → no output
+  from either. Zero mentions across every workflow before this change.
+- `.github/workflows/ci.yml:222` — `integration-ops` job; its only suite step ran
+  `pnpm test:integration:ops`, whose config (`vitest.integration.ops.config.ts:21-24`) includes only
+  `equipment-operational-state` and `equipment-waitlist`.
+- `vitest.db-integration.config.ts` — includes all three DB suites, which is why the whole script was
+  NOT wired: measured on a freshly created and migrated database, that config run produced
+  `Test Files 1 failed | 2 passed (3)`, `Tests 10 failed | 54 passed (64)`, and the failing file was
+  `tests/equipment-operational-state.integration.test.ts` (worker sweeps + operational metrics) —
+  the one file CI already covers via the ops config, where it passes. Wiring the whole config would have
+  duplicated that file and imported a failure. The two target files are named explicitly instead.
+- Test: the two named files alone, on a clean migrated database →
+  `Test Files 2 passed (2)`, `Tests 15 passed (15)`, 30.25s.
+- Command: YAML re-parsed after the edit → 10 jobs, `integration-ops` step list ends with
+  `🩺 Cross-repo contract suites (doctor gate + reviewer seed)`.
+
+**Not fixed here:** the 10 `equipment-operational-state` failures under the db-integration config are
+recorded as a separate finding, not silently absorbed. They do not reproduce under the ops config.
+
+**Verdict:** VERIFIED for the wiring. The equipment-operational-state cross-config failure is OPEN.
+
+## 2026-08-21 — The tenant gate could not fail, and one flag would not have fixed it (claude/unified-program-v2-review-44db19)
+
+**Claim:** `clinicId` scope enforcement is now a gate that can actually fail, in
+`pnpm architecture:gates`, in CI, and as a declared evidence gate — failing on NEW findings
+only, against a committed baseline of the standing set.
+
+**Evidence:**
+- `scripts/architecture/run-architecture-gates.mjs` — before this change it ran tsc×2,
+  dependency-cruiser, `compare-cycles.mjs` and `verify-claims.mjs`, and did not mention the
+  tenant lint at all. Read in full, not sampled.
+- `.github/workflows/ci.yml` — the step DID exist, contradicting a "not run in CI" reading, but was
+  disarmed twice over: the command hardcoded `--warn-only`, which the script's own `--help`
+  documents as "exit 0 (default, G3)", and the step also carried `continue-on-error: true`.
+  **Removing `continue-on-error` alone would have changed nothing** — the command exits 0 on its
+  own. Both were changed.
+- Command: `node scripts/architecture/tenant-query-lint.mjs` (full repo) → **203** findings,
+  3 waived, `exit=0`. The plan's cited 204 had already moved; measured, not quoted.
+- Baseline written: `203 findings across 138 file::table keys`
+  (`.tenant-lint-known-violations.json`).
+- Test: `tests/tenant-lint-baseline.test.ts` → RED first, 6 failed + import error
+  (`diffAgainstBaseline` not exported); after implementation, `Tests 6 passed (6)`, and the
+  import cost fell 531ms → 21ms, which is the direct-run guard proving the scan no longer runs
+  on import.
+- **End-to-end refusal proved both ways**, not just the passing one: a throwaway probe file under
+  `server/routes/` (~~`__tenant_lint_probe.ts`~~ — created, run against, and deleted within the
+  session, so it is deliberately absent from the tree) containing an unscoped
+  `db.select().from(equipment)` → `1 NEW tenant-scope finding(s) not in the baseline`, `exit=1`,
+  naming the probe at line 3 column 21. Probe deleted → `no new findings vs baseline (203 known)`,
+  `exit=0`.
+- Command: `pnpm architecture:gates` → tenant lint runs inside it, then
+  `[architecture-gates] All G1 checks passed.`
+- Command: `actionlint .github/workflows/ci.yml` → exit 0.
+- Test: `pnpm test` on a clean machine → `Test Files 741 passed (741)`,
+  `Tests 6808 passed | 11 skipped`.
+
+**Verdict:** VERIFIED
+
+## 2026-08-21 — 18 failing test files were a stale local database, not the repo (claude/unified-program-v2-review-44db19)
+
+**Claim:** A `pnpm test` run showing `18 failed | 723 passed` had no defect behind it. Two
+environmental causes, both outside the working tree; recorded so the count is not later mistaken
+for a regression introduced by the same branch.
+
+**Evidence:**
+- Error read rather than summarised: `column "clinic_seq" of relation "vt_event_outbox" does not
+  exist` (Postgres 42703), thrown from `server/lib/realtime-outbox.ts:33` via
+  `insertRealtimeDomainEvent`.
+- `tests/vitest-setup.ts:10` — with no `.env` in this worktree, tests fall back to
+  `postgres://vettrack:vettrack@127.0.0.1:5432/vettrack_test`.
+- Command: `information_schema.columns` query against `vettrack_test` for
+  `vt_event_outbox.clinic_seq` → empty. The column added by
+  `migrations/186_vt_event_outbox_clinic_seq.sql` was absent from the DATABASE — a state no
+  repository diff can produce, which is what rules the branch out as the cause.
+- Command: `pnpm db:migrate` against that database → `Running migration:
+  186_vt_event_outbox_clinic_seq.sql` was the ONLY pending one. Re-run of
+  `tests/rfid-ingest.test.ts` → `Tests 8 passed (8)`, from 5 failed.
+- The 18th file, `tests/xlsx-write-only-guard.test.ts`, had a DIFFERENT cause and was checked
+  separately rather than assumed covered: `Test timed out in 5000ms`, no database access
+  (`grep` for `server/db` → 0 hits). Measured standalone, its actual work is
+  `walk: 33 ms | 1095 files` and `read all: 161 ms | 8.2 MB` — ~200ms against a 5000ms limit.
+  It failed only while a second full suite was running concurrently, which was my own doing.
+- Test: one clean full run, nothing else on the CPU → `Test Files 741 passed (741)`,
+  `Tests 6808 passed | 11 skipped (6819)`.
+
+**Verdict:** VERIFIED — no repository defect. The stale local database is an environment fix
+(`pnpm db:migrate` against `vettrack_test`), already applied.
+
+## 2026-08-21 — Supersedes the route-matrix count: 65 was a text grep, the answer is 43 (claude/unified-program-v2-review-44db19)
+
+**Claim:** Corrects this session's earlier entry, which evidenced the extracted route matrix with
+`grep -c 'NO-CONSUMER'` → `65`. That counts the string anywhere in the file — the counts table and
+the notes included — not table rows, so it cannot support a claim about how many routes have no
+consumer. Per this log's own rule, the earlier entry stands and this one supersedes it.
+
+**Evidence:**
+- Command: an `awk` pass over the table rows only (lines matching `^| <METHOD> `), grouping by the
+  verdict column → 311 rows total, of which **43** are pure `NO-CONSUMER`, plus 7 documented
+  dev-only, 6 suspected, 6 test-only, 1 documented stub, 1 staged; 122 consumed (web+RN), 115
+  consumed (web), 4 consumed (RN), 3 operator-surface, 2 contract-surface, 1 external device sender.
+- Those figures agree row for row with the counts table the source report carries, which is the
+  result that matters: the extraction lost nothing. The recomputed table is now recorded in
+  `docs/audit/route-consumer-matrix.md` itself, so the number does not have to be re-derived.
+- `docs/audit/route-consumer-matrix.md` — the `POST /api/integration-webhooks/:adapterId` note led
+  with a path that does not exist in this tree. Verified by `ls` on both candidates: only
+  `server/integrations/webhooks/inbound.router.ts` is present. Corrected, and the correction is
+  listed in the file's own header so "verbatim" stays accurate.
+- `GET /api/health/ready` carries `other = test (structural)` with a verdict of `NO-CONSUMER`,
+  while the matrix legend reserves `TEST-ONLY` for that evidence. Marked ⚠︎ rather than
+  reclassified — rewriting it would desync the row from the source's counts table, and the Lane 4.2
+  triage has to decide that row regardless.
+
+**Verdict:** VERIFIED. Supersedes the `65` figure in this session's earlier route-matrix entry.
+
+## 2026-08-21 — The arming flag could disarm the gate it arms (claude/unified-program-v2-review-44db19)
+
+**Claim:** `--baseline` with no value parsed to `null`, fell through to the DEFAULT warn-only mode,
+and exited 0 with findings present — the same disarmed-gate shape the baseline mechanism was built
+to replace, reintroduced one layer up in the flag that was supposed to arm it. Found by CodeRabbit
+on the PR, not by me.
+
+**Evidence:**
+- Test: three CLI-level refusal cases added to `tests/tenant-lint-baseline.test.ts`, run BEFORE the
+  fix → `Tests 2 failed | 7 passed`. Exactly two, which is itself the finding: `--baseline --all`
+  already exited 2, but for the wrong reason — it took `"--all"` as the path and failed on the
+  unreadable-baseline branch by accident, not by refusing the argument.
+- The pure-rule tests could not have caught this. CI invokes the CLI, not `diffAgainstBaseline`, so
+  only a CLI-level assertion covers the layer that was broken.
+- After the fix: `Tests 9 passed (9)`; `pnpm tenant:lint:enforce` still `exit=0` on a clean tree,
+  so the armed path is unchanged.
+
+**Verdict:** VERIFIED
