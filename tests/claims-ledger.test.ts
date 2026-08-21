@@ -26,7 +26,7 @@
  * never disagree.
  */
 
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect, beforeAll, vi } from "vitest";
 import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
@@ -87,8 +87,9 @@ const scan = require("../scripts/verify/scan.cjs") as Scan;
 const { verify } = require("../scripts/verify/run.cjs") as {
   verify(options?: { root?: string; now?: string; enforceEvidence?: boolean }): VerifyResult;
 };
-const { globToRegExp } = require("../scripts/verify/facts.cjs") as {
+const { globToRegExp, createFacts } = require("../scripts/verify/facts.cjs") as {
   globToRegExp(pattern: string, options?: { suffix?: boolean }): RegExp;
+  createFacts(root: string, policy: unknown): { grepCount(pattern: string, scope: string): number };
 };
 const gitFacts = require("../scripts/verify/git-facts.cjs") as {
   addedLinesFromDiff(stdout: string): Set<number>;
@@ -646,6 +647,55 @@ describe("the engine refuses what it says it refuses", () => {
     expect(globToRegExp("foo?.ts").test("fo.ts")).toBe(false);
     expect(globToRegExp("foo?.ts").test("foo?.ts")).toBe(true);
     expect(globToRegExp("server/routes/*.ts", { suffix: true }).test("server/routes/a.ts")).toBe(true);
+  });
+
+  it("matches a `**` between separators against zero directories", () => {
+    // `docs/**/plan.md` NAMES `docs/plan.md`. Translating the whole `/**/` to
+    // `/.*/` demanded a directory in between, so the glob failed against the
+    // file it was written for and the claim was reported as a defect — the
+    // false alarm, not the miss.
+    expect(globToRegExp("docs/**/plan.md").test("docs/plan.md")).toBe(true);
+    expect(globToRegExp("docs/**/plan.md").test("docs/g2/plan.md")).toBe(true);
+    expect(globToRegExp("docs/**/plan.md").test("docs/a/b/plan.md")).toBe(true);
+    expect(globToRegExp("docs/**/plan.md").test("other/plan.md")).toBe(false);
+    expect(globToRegExp("**/x.ts").test("x.ts")).toBe(true);
+    expect(globToRegExp("**/x.ts").test("a/b/x.ts")).toBe(true);
+    // The single-star rule is unchanged: one `*` still stops at a separator.
+    expect(globToRegExp("docs/*.md").test("docs/a/b.md")).toBe(false);
+  });
+
+  it("refuses an absence claim when the walk could not read a directory", () => {
+    // The THIRD face of one rule. An unreadable file was refused in the file
+    // branch of `grepCount`, then in its directory branch — and the traversal
+    // itself still returned quietly, so a scope that was never fully walked
+    // counted zero hits and the absence verified. Stubbed rather than chmod-ed
+    // because this suite may run as root, where chmod 000 is not a refusal and
+    // the test would pass without ever reaching the branch.
+    const fsModule = require("node:fs") as typeof import("node:fs");
+    const real = fsModule.readdirSync;
+    const spy = vi.spyOn(fsModule, "readdirSync").mockImplementation(((
+      target: Parameters<typeof real>[0],
+      options: Parameters<typeof real>[1],
+    ) => {
+      if (String(target).endsWith("/scripts/verify")) throw new Error("EACCES");
+      return (real as (...a: unknown[]) => unknown)(target, options);
+    }) as typeof real);
+    try {
+      const facts = createFacts(REPO_ROOT, POLICY);
+      expect(Number.isNaN(facts.grepCount("no-such-token-anywhere", "scripts"))).toBe(true);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it("reads an uppercase object id as a commit citation", () => {
+    // git resolves `ABCDEF1` and `abcdef1` to the same object. A lowercase-only
+    // test did not report an uppercase citation as WRONG — it produced no claim
+    // at all, and "no claim" is the one outcome this engine has no label for.
+    const claims = extract("Superseded by commit `ABCDEF1234567`, now on main.");
+    expect(claims.filter((claim) => claim.kind === "commit").map((claim) => claim.sha)).toEqual([
+      "ABCDEF1234567",
+    ]);
   });
 
   it("counts an added line whose own text starts with `++`", () => {

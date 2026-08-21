@@ -21,18 +21,29 @@ function globToRegExp(pattern, { suffix = false } = {}) {
   // /foo?\.ts/ and match `fo.ts` — a glob claim verifying against a file it does
   // not name. No governed document uses `?` as a wildcard; several name files
   // that contain one.
+  // `**` BETWEEN SEPARATORS MATCHES ZERO DIRECTORIES. `docs/**/plan.md` names
+  // `docs/plan.md` as well as `docs/g2/plan.md`. Translating the whole `/**/`
+  // to `/.*/` demanded a directory in between, so the pattern failed against
+  // the very file it was written for — a glob claim reported as a defect
+  // because of the translation, which is the false alarm this module exists
+  // not to produce.
   const escape = (part) => part.replace(/[.+?^${}()|[\]\\]/g, String.raw`\$&`);
-  const body = pattern
-    .split("**")
-    .map((chunk) => chunk.split("*").map(escape).join("[^/]*"))
-    .join(".*");
-  return new RegExp(`^${suffix ? "(?:.*/)?" : ""}${body}$`);
+  const segment = (chunk) => chunk.split("*").map(escape).join("[^/]*");
+  const ANY_DIRS = "(?:.*/)?";
+  const leading = pattern.startsWith("**/");
+  const body = (leading ? pattern.slice(3) : pattern)
+    .split("/**/")
+    .map((part) => part.split("**").map(segment).join(".*"))
+    .join(`/${ANY_DIRS}`);
+  return new RegExp(`^${suffix ? ANY_DIRS : ""}${leading ? ANY_DIRS : ""}${body}$`);
 }
 
 function createFacts(root, policy) {
   const statCache = new Map();
   const lineCache = new Map();
   const listingCache = new Map();
+  /** Listings whose walk hit a directory it could not read. See `grepCount`. */
+  const partialListings = new Set();
 
   const manifest = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8"));
   const dependencies = { ...(manifest.devDependencies ?? {}), ...(manifest.dependencies ?? {}) };
@@ -57,6 +68,14 @@ function createFacts(root, policy) {
       try {
         entries = fs.readdirSync(path.join(root, current), { withFileTypes: true });
       } catch {
+        // A directory that cannot be read makes this listing PARTIAL, and
+        // returning quietly is the THIRD face of one rule: an unreadable file
+        // was refused in the file branch of `grepCount`, then in its directory
+        // branch, and the traversal itself still came back short. Only absence
+        // needs the guard — a glob EXISTENCE claim against a short listing
+        // fails loudly on its own, while absence would pass because the tree
+        // was never fully walked.
+        partialListings.add(dir);
         return;
       }
       for (const entry of entries) {
@@ -168,8 +187,10 @@ function createFacts(root, policy) {
         // read counts it as a file that does not contain the pattern, so the
         // absence claim passes BECAUSE a file could not be opened. One unreadable
         // file makes the whole scope uncheckable.
+        const entries = list(scope);
+        if (partialListings.has(scope)) return Number.NaN;
         let unreadable = 0;
-        const hits = list(scope).filter((relative) => {
+        const hits = entries.filter((relative) => {
           if (relative.endsWith("/")) return false;
           try {
             return fs.readFileSync(path.join(root, relative), "utf8").includes(pattern);

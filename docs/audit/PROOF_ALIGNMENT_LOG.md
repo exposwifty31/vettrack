@@ -9068,3 +9068,62 @@ followed it; this was the one still open, and it was open because it is the one 
 reasoning about the code — only by running the commands again.
 
 **Verdict:** VERIFIED.
+
+### Third review round — four ways the gate could still pass in silence, 2026-08-21
+
+**Claim under audit:** four findings CodeRabbit raised against the head after the correction above, each
+re-checked against the code before being treated as real.
+
+**Evidence and verdict — all four were real, and three are the same defect class this gate exists to remove.**
+
+- **A `**` between separators demanded a directory.** `globToRegExp` in `scripts/verify/facts.cjs` translated
+  the whole `/**/` to `/.*/`, so a pattern written `docs/**/<file>.md` did NOT match `docs/<file>.md` — only
+  nested paths. This is the false-alarm direction, not the miss: a correct glob claim would be reported as a
+  defect. `/**/` is now an optional directory sequence, and a pattern that STARTS with the same double-star
+  segment is handled explicitly. Seven cases pinned, including the two that must NOT change: one `*` still
+  stops at a separator, and `?` is still a literal.
+  (The illustrative paths above carry the `<…>` placeholder form on purpose — written as concrete paths they
+  were read as claims about files that do not exist, and this gate reported all three. That is the rule
+  working, and the fix is the documented first option: correct the document.)
+- **A walk that could not read a directory returned quietly.** This is the THIRD face of one rule in this
+  session. An unreadable file was refused in the file branch of `grepCount`, then in its directory branch —
+  and `list` itself still swallowed a `readdirSync` failure and returned a short listing, so an absence claim
+  counted zero hits over a tree that was never fully walked and verified. Only absence needs the guard: a
+  glob EXISTENCE claim against a short listing already fails loudly, while absence fails open.
+- **An uppercase object id produced no claim at all.** `isCommitish` in `scripts/verify/scan.cjs` tested
+  `/^[0-9a-f]{7,40}$/`, but git resolves `ABCDEF1` and `abcdef1` to the same object. The citation was not
+  reported as wrong — it was never extracted, and "no claim" is the one outcome this engine has no label for.
+  The argv validator in `scripts/verify/git-facts.cjs` already carried the `i` flag, so nothing downstream
+  had to change.
+- **The gate output buffer was unbounded.** The timeout half of an earlier finding had been fixed and the
+  buffer half had not, so a verbose gate held its whole log in memory while every other gate ran beside it.
+  Capped, and the truncation is written into the recorded output: a truncated log that does not say so is a
+  log that lies about being complete.
+
+**The fingerprint did its job on this round.** The engine changed, the recorded value stopped matching, and
+the suite failed on that alone — 64 passed, 1 failed, and the one failure was the drift guard refusing to let
+one copy move without the other. Superseded: ~~`1787de826baad3fba32ffaf80c16a3380691b70aa9cf10beaeebd5ffe69785c0`~~.
+Both repositories independently recomputed the new value and agree:
+`73a81cd34a45934b14ca0cc656eb617eaf5afb5cd3edc77b547a0d19bbcd89d2`.
+
+**The gate ran in CI for the first time, and green.** Until this round nothing had exercised it on a runner:
+this repository's workflow triggers on `pull_request` with a `main` branch filter, so a PR stacked on another
+branch gets no run at all — and retargeting it does not start one either, because a base change is an `edited`
+action and the default trigger types are `opened`, `synchronize` and `reopened`. A PR could therefore reach
+`main` having been checked by nothing. Recorded as a finding about `.github/workflows/ci.yml` rather than
+worked around: the evidence was obtained through the workflow's own `workflow_dispatch` path, which cannot
+deploy from a feature branch because that job is gated on `github.ref`. The job `📎 Claim verification
+(evidence)` passed both its steps.
+
+**Commands run after the fixes, on the tree as it stood before this entry was appended:**
+- `node scripts/verify-claims.mjs` → `1054 claims: 1040 verified, 13 registered, 1 attested,
+  2028 excluded by rule, 0 FAILED`; `pnpm exec vitest run tests/claims-ledger.test.ts` → `Tests 65 passed (65)`;
+  `npx tsc --noEmit` → 0 errors; `pnpm architecture:gates` → `All G1 checks passed.`
+- In the RN migration repo, the same engine: `477 claims … 0 FAILED`, `Tests: 64 passed, 64 total` for the
+  ledger suite, `146 passed, 146 total` / `1574 passed` for the full run, `npm run lint` clean, typecheck clean.
+- The local `eslint-plugin-sonarjs` proxy over the changed engine reported nothing, which is what stands in
+  for SonarCloud here — that host is not reachable from this container.
+- Appending this entry took the total to 1,058, for the same reason the entry above records: the entry cites
+  files, and those citations are claims. Stated, not reconciled away.
+
+**Verdict:** VERIFIED.

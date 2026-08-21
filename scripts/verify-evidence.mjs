@@ -94,6 +94,9 @@ say(`\n-- evidence run --\n  tree ${String(treeHash).slice(0, 12)}${dirty ? " (D
  */
 const GATE_TIMEOUT_MS = 10 * 60 * 1000;
 
+/** Per-gate ceiling on buffered stdout+stderr. See `runGate`. */
+const MAX_OUTPUT_BYTES = 1_000_000;
+
 function runGate(gate) {
   return new Promise((resolve) => {
     const tokens = gate.command.split(/\s+/).filter(Boolean);
@@ -150,12 +153,24 @@ function runGate(gate) {
       settle(1);
     }, GATE_TIMEOUT_MS);
 
-    child.stdout.on("data", (chunk) => {
+    // BOUNDED. Gates run concurrently through `Promise.all`, so an unbounded
+    // buffer means every verbose gate on a large tree holds its whole log in
+    // memory at once. The cap is marked in the recorded output rather than
+    // applied silently: a truncated log that does not say so is a log that
+    // lies about being complete.
+    let truncated = false;
+    const collect = (chunk) => {
+      if (output.length >= MAX_OUTPUT_BYTES) {
+        if (!truncated) {
+          truncated = true;
+          output += `\n[output truncated at ${MAX_OUTPUT_BYTES} bytes]`;
+        }
+        return;
+      }
       output += chunk;
-    });
-    child.stderr.on("data", (chunk) => {
-      output += chunk;
-    });
+    };
+    child.stdout.on("data", collect);
+    child.stderr.on("data", collect);
     child.on("error", (err) => {
       output += String(err?.message ?? err);
       settle(1);

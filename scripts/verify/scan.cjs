@@ -155,9 +155,17 @@ const MERGE_CONTEXT = /(?<![\w-])MERGED\b|\bmerged\b|\blanded\b|\bPRs?\s+#/;
  */
 const COMMIT_CONTEXT = /\b(?:commit|sha(?![\w-]*\d)|SHA(?![\w-]*\d)|revision|pin(?:ned)?)\b/;
 
-/** A hex run of commit shape. Context above decides whether to read it as one. */
+/**
+ * A hex run of commit shape. Context above decides whether to read it as one.
+ *
+ * CASE-INSENSITIVE, because git is: `git cat-file -e ABCDEF1` resolves the same
+ * object as the lowercase spelling. A lowercase-only test did not report an
+ * uppercase citation as wrong — it produced NO CLAIM AT ALL, which is the one
+ * outcome this engine has no label for. `SHA` in `git-facts` already carries
+ * the `i` flag, so an uppercase token survives the argv validator too.
+ */
 function isCommitish(token) {
-  return /^[0-9a-f]{7,40}$/.test(token);
+  return /^[0-9a-f]{7,40}$/i.test(token);
 }
 
 /**
