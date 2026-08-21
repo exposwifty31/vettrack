@@ -164,14 +164,21 @@ function createFacts(root, policy) {
         }
       }
       if (target?.isDirectory()) {
-        return list(scope).filter((relative) => {
+        // SAME RULE AS THE FILE BRANCH. Returning false for a file that cannot be
+        // read counts it as a file that does not contain the pattern, so the
+        // absence claim passes BECAUSE a file could not be opened. One unreadable
+        // file makes the whole scope uncheckable.
+        let unreadable = 0;
+        const hits = list(scope).filter((relative) => {
           if (relative.endsWith("/")) return false;
           try {
             return fs.readFileSync(path.join(root, relative), "utf8").includes(pattern);
           } catch {
+            unreadable += 1;
             return false;
           }
         }).length;
+        return unreadable > 0 ? Number.NaN : hits;
       }
       // A scope that does not exist cannot support an absence claim: returning 0
       // would make "absent from a file that is not there" quietly true.

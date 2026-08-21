@@ -107,14 +107,28 @@ function reverseCheckFailures(config, context, claims, combinedFacts) {
  * list it describes rather than as a loop with a tally inside it.
  */
 function decideAll(claims, combinedFacts, context, gitReady) {
-  const byDisposition = { verified: 0, registered: 0, attested: 0, fail: 0 };
+  const byDisposition = { verified: 0, registered: 0, attested: 0, fail: 0, unresolvable: 0 };
   const decided = [];
   const claimFailures = [];
   for (const claim of claims) {
     // A commit or PR claim on a tree where layer 2 cannot run is already reported
     // as a configuration failure; judging it here as well would say the claim is
     // false when what is missing is the history to check it against.
-    if ((claim.kind === "commit" || claim.kind === "pull-request") && !gitReady) continue;
+    //
+    // RECORDED, NOT DROPPED. Skipping it left the claim in neither the tally nor
+    // the decided list while `counts.claims` still reported the pre-skip total,
+    // so the dispositions did not sum to it and a reader could not reconcile the
+    // report. `unresolvable` only ever appears on a run that is ALREADY failing
+    // on `git-unavailable`; it is not a way for a claim to pass.
+    if ((claim.kind === "commit" || claim.kind === "pull-request") && !gitReady) {
+      byDisposition.unresolvable += 1;
+      decided.push({
+        ...claim,
+        disposition: "unresolvable",
+        detail: "layer 2 cannot run on this tree — see the git-unavailable failure",
+      });
+      continue;
+    }
     const verdict = rules.decide(claim, combinedFacts, context);
     byDisposition[verdict.disposition] = (byDisposition[verdict.disposition] ?? 0) + 1;
     decided.push({ ...claim, ...verdict });

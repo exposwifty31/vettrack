@@ -31,22 +31,6 @@ const SHELL_LANGS = new Set(["bash", "sh", "shell", "console", "zsh"]);
 /** Extensions that make a code span a file reference rather than prose. */
 const FILE_EXT = "ts|tsx|js|jsx|mjs|cjs|json|jsonc|md|css|svg|png|jpg|ya?ml|sql|sh|html|txt|lock|xml|plist";
 
-/**
- * Inline code spans, as a linear scan rather than a regex.
- *
- * MULTI-BACKTICK DELIMITERS ARE WHY. Markdown writes a span that itself contains
- * a backtick with a longer fence: these documents cite files as `` `src/lib/api.ts` ``
- * in exactly that form. A single-backtick regex read that line as two spans each
- * containing one space, and the path between them fell into prose — never
- * claimed, never declined, invisible. It also left the `~~` in `` `~~` ``
- * outside any span, so the strikethrough scanner treated a literal as a
- * delimiter and opened a run that never closed.
- *
- * Linear, with no backtracking, for the same reason `inDeletionClause` is: this
- * runs on every line of every governed document.
- *
- * @returns {{ index: number, length: number, text: string }[]} in source order
- */
 /** Index of the next run of EXACTLY `width` backticks at or after `from`, or -1. */
 function closingFence(line, from, width) {
   let j = from;
@@ -63,6 +47,22 @@ function closingFence(line, from, width) {
   return -1;
 }
 
+/**
+ * Inline code spans, as a linear scan rather than a regex.
+ *
+ * MULTI-BACKTICK DELIMITERS ARE WHY. Markdown writes a span that itself contains
+ * a backtick with a longer fence: these documents cite files as `` `src/lib/api.ts` ``
+ * in exactly that form. A single-backtick regex read that line as two spans each
+ * containing one space, and the path between them fell into prose — never
+ * claimed, never declined, invisible. It also left the `~~` in `` `~~` ``
+ * outside any span, so the strikethrough scanner treated a literal as a
+ * delimiter and opened a run that never closed.
+ *
+ * Linear, with no backtracking, for the same reason `inDeletionClause` is: this
+ * runs on every line of every governed document.
+ *
+ * @returns {{ index: number, length: number, text: string }[]} in source order
+ */
 function codeSpans(line) {
   const spans = [];
   let i = 0;
@@ -242,16 +242,24 @@ function within(ranges, index) {
  * should move on.
  */
 function handleFence(state, line, ctx) {
-  const fence = /^\s*```+\s*(\S*)/.exec(line);
+  const fence = /^\s*(`{3,})\s*(\S*)/.exec(line);
   if (!fence) return false;
+  const width = fence[1].length;
   if (state.fenceLang === null) {
-    state.fenceLang = fence[1].toLowerCase();
+    state.fenceLang = fence[2].toLowerCase();
+    state.fenceWidth = width;
     state.treeArmed = ctx.treeBlocks.some((b) => b.afterHeading === state.lastHeading);
     state.treeStack = [];
-  } else {
-    state.fenceLang = null;
-    state.treeArmed = false;
+    return true;
   }
+  // FENCES NEST BY WIDTH. A three-backtick line inside a four-backtick block is
+  // CONTENT, not the closing fence — which is how a document that shows a fenced
+  // example gets its remaining lines misclassified. Only a run at least as wide
+  // as the opener closes it.
+  if (width < state.fenceWidth) return true;
+  state.fenceLang = null;
+  state.fenceWidth = null;
+  state.treeArmed = false;
   return true;
 }
 
@@ -514,6 +522,8 @@ function extractFromMarkdown(text, where, policy) {
 
   const state = {
     fenceLang: null,
+    /** Backtick width of the OPEN fence — only a run this wide or wider closes it. */
+    fenceWidth: null,
     lastHeading: "",
     treeArmed: false,
     /** Indentation stack for the structure tree — see `collectTreeClaim`. */

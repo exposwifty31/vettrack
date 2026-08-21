@@ -74,8 +74,15 @@ function fingerprintEngine(dir) {
   const files = [];
   for (const name of ENGINE_MODULES) {
     const candidates = [`${name}.js`, `${name}.cjs`].map((file) => path.join(dir, file));
-    const found = candidates.find((candidate) => fs.existsSync(candidate));
-    if (!found) throw new Error(`engine module missing: ${name}.{js,cjs} in ${dir}`);
+    const present = candidates.filter((candidate) => fs.existsSync(candidate));
+    if (present.length === 0) throw new Error(`engine module missing: ${name}.{js,cjs} in ${dir}`);
+    // TWO COPIES OF ONE MODULE IS THE DRIFT THIS FILE EXISTS TO CATCH, and taking
+    // the first match would hash the stale one and leave the live one uncovered —
+    // green, about bytes that no longer run. Refuse the ambiguity.
+    if (present.length > 1) {
+      throw new Error(`engine module ${name} exists as BOTH .js and .cjs in ${dir} — delete the stale copy`);
+    }
+    const found = present[0];
     files.push(path.basename(found));
     const source = fs
       .readFileSync(found, "utf8")

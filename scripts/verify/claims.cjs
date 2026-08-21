@@ -138,6 +138,14 @@ function scriptNameIn(recipe, packageManager = "npm") {
   const npmish = /^(?:npm|pnpm|yarn|bun)\s+run\s+([\w:.-]+)/.exec(recipe);
   if (npmish) return npmish[1];
   if (packageManager !== "npm") {
+    // The manager name comes out of `verify.config.json` — a file — and is
+    // interpolated into a pattern. A metacharacter in it would silently change
+    // what that pattern means, and `pnpm(` would make `new RegExp` throw from
+    // inside a pure decision function. Same rule this module applies to every
+    // other file-sourced string: check the shape at the boundary.
+    if (!/^[\w.-]+$/.test(packageManager)) {
+      throw new Error(`packageManager in verify.config.json is not a plain name: ${packageManager}`);
+    }
     // `pnpm typecheck` is a script; `pnpm exec tsx x.ts` and `pnpm install` are
     // CLI verbs, and reading those as scripts would demand a `package.json`
     // entry named "exec".
@@ -196,7 +204,7 @@ const PACKAGE_MANAGER_VERBS = new Set([
  * a process spawn. `shell: false` already means nothing parses it as shell; this
  * is about refusing to spawn an unexamined file-sourced string at all.
  */
-const REENTRANT_TOKEN = /^(?:test(?:[:-][\w:-]+)?|verify:[\w:-]+|jest|vitest)$/;
+const REENTRANT_TOKEN = /^(?:t|test(?:[:-][\w:-]+)?|verify:[\w:-]+|jest|vitest)$/;
 
 /**
  * Would running this declared gate re-enter the verifier?
@@ -204,7 +212,8 @@ const REENTRANT_TOKEN = /^(?:test(?:[:-][\w:-]+)?|verify:[\w:-]+|jest|vitest)$/;
  * A leading dash run and a trailing `=value` are STRIPPED before the test rather
  * than encoded in the pattern: `node --test` is the Node test runner and its
  * token is `--test`, and folding that into the regex pushed it past the
- * complexity limit for no gain in what it recognises.
+ * complexity limit for no gain in what it recognises. Bare `t` is in the
+ * alternation because it is npm's own alias for `test`.
  */
 function isReentrantGate(command) {
   return String(command)

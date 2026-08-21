@@ -78,11 +78,17 @@ function reportFailures(result) {
 
 function report(result) {
   say("\n-- claim verification --");
+  // `unresolvable` is printed only when it is non-zero: it appears solely on a run
+  // that has already failed because layer 2 could not run, and a permanent `0` in
+  // the summary would read as a disposition claims routinely take.
+  const unresolvable = result.counts.unresolvable
+    ? `, ${result.counts.unresolvable} unresolvable (layer 2 unavailable)`
+    : "";
   say(
     `  ${result.counts.claims} claims: ` +
       `${result.counts.verified} verified, ${result.counts.registered} registered, ` +
       `${result.counts.attested} attested, ${result.counts.excluded} excluded by rule, ` +
-      `${result.counts.fail} FAILED`,
+      `${result.counts.fail} FAILED${unresolvable}`,
   );
 
   const excluded = excludedByRule(result);

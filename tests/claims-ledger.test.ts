@@ -666,6 +666,8 @@ describe("the engine refuses what it says it refuses", () => {
 
   it("refuses a flag-shaped sha before it reaches a git argv", () => {
     const { facts } = gitFacts.createGitFacts(REPO_ROOT, "main");
+    // `expect(...).not.toBeNull()` is a runtime check the compiler cannot use to
+    // narrow a `const`, so the three assertions below repeat it to the type.
     expect(facts).not.toBeNull();
     expect(facts!.pathExistsAtCommit("--upload-pack=touch /tmp/x", "README.md")).toBe(false);
     expect(facts!.pathExistsAtCommit("-fffffff", "README.md")).toBe(false);
@@ -687,6 +689,56 @@ describe("the engine refuses what it says it refuses", () => {
 
     const real = extract("The shell is live. <!-- vt-claim: attested some-id -->");
     expect(real).toContainEqual(expect.objectContaining({ kind: "attested", id: "some-id" }));
+  });
+
+  it("refuses `npm t`, npm's own alias for the test script", () => {
+    expect(rules.isReentrantGate("npm t")).toBe(true);
+    expect(rules.isReentrantGate("pnpm t")).toBe(true);
+    // …without claiming an ordinary token that merely starts with t.
+    expect(rules.isReentrantGate("node t.js")).toBe(false);
+    expect(rules.isReentrantGate("pnpm typecheck")).toBe(false);
+  });
+
+  it("refuses a package manager name that is not a plain name", () => {
+    // It comes from verify.config.json and is interpolated into a pattern:
+    // `pnpm(` made `new RegExp` throw from inside a pure decision function.
+    expect(() => rules.scriptNameIn("pnpm( x", "pnpm(")).toThrow(/not a plain name/);
+    expect(rules.scriptNameIn("pnpm typecheck", "pnpm")).toBe("typecheck");
+  });
+
+  it("refuses an absence claim when a file under the directory scope cannot be read", () => {
+    // The file branch already returned NaN for this; the directory branch counted
+    // an unreadable file as one that does not contain the pattern, so the absence
+    // claim passed BECAUSE a file could not be opened.
+    const cannotRead = factsWith({ grepCount: () => Number.NaN });
+    const verdict = rules.evaluateRule(
+      { kind: "absence", pattern: "sqlite", scope: "src" },
+      cannotRead,
+    );
+    expect(verdict.disposition).toBe("fail");
+    expect(verdict.detail).toContain("cannot read scope");
+  });
+
+  it("reads a fence as closed only by a run at least as wide as its opener", () => {
+    // A three-backtick line inside a four-backtick block is CONTENT. Closing on
+    // it flipped the state early and read the rest of the block as prose.
+    const nested = [
+      "````markdown",
+      "outer",
+      "```",
+      "`src/does-not-exist.ts` is inside the outer fence",
+      "````",
+      "`src/lib/api.ts` is after it",
+    ].join("\n");
+    const claims = extract(nested);
+    expect(claims.map((c) => c.line)).toEqual([6]);
+    // An ordinary fence still opens and closes: the span inside it is not read
+    // as prose, and the one after it is. Asserted without a package-manager
+    // command, because the two repositories declare different managers.
+    const ordinary = extract(
+      ["```text", "`src/does-not-exist.ts`", "```", "`src/lib/api.ts`"].join("\n"),
+    );
+    expect(ordinary.map((c) => c.line)).toEqual([4]);
   });
 
   it("refuses a gate that names a test runner with a flag", () => {

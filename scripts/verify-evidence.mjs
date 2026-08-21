@@ -85,9 +85,14 @@ say(`\n-- evidence run --\n  tree ${String(treeHash).slice(0, 12)}${dirty ? " (D
 
 /**
  * A gate that hangs must become a recorded FAIL, not a job that dies on the CI
- * timeout with no report at all. Generous, because these are real builds.
+ * timeout with no report at all — which means the budget has to sit INSIDE the
+ * job budget. At 15 minutes against `timeout-minutes: 15` in
+ * `.github/workflows/ci.yml`, and with checkout and install ahead of it, the job
+ * always died first and the recorded FAIL was unreachable in the one place it
+ * matters. Ten leaves room for the steps before it and is still generous for a
+ * real build.
  */
-const GATE_TIMEOUT_MS = 15 * 60 * 1000;
+const GATE_TIMEOUT_MS = 10 * 60 * 1000;
 
 function runGate(gate) {
   return new Promise((resolve) => {

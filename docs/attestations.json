@@ -3,9 +3,9 @@
   "entries": [
     {
       "id": "ios-app-store-live",
-      "claim": "The Capacitor iOS shell is live on the App Store",
+      "claim": "The Capacitor iOS shell is live on the App Store; re-verify by opening the store listing for the build the runbook records",
       "target": "app-store",
-      "evidence": "CLAUDE.md",
+      "evidence": "RESUBMISSION_RUNBOOK.md",
       "attestedBy": "repo owner (recorded in CLAUDE.md, Architecture / Native shell)",
       "attestedAt": "2026-08-20",
       "staleAfterDays": 120,

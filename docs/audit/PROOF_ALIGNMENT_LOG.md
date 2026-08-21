@@ -8916,6 +8916,34 @@ itself.
   and the test passed while the module sat outside the fingerprint. It now compares the hashed set against
   the directory listing. `git()` also discarded `result.error`, so a timeout or a maxBuffer kill arrived with
   an empty stderr and was reported as "cannot diff" — the wrong cause the bounds exist to prevent.
+- Third re-review round, eight more real findings, and the pattern held: two were guards that did not guard,
+  and one was a rule I had fixed on one branch and left standing on its sibling AGAIN. `grepCount`'s DIRECTORY
+  branch returned `false` for a file it could not read, so the file counted as one that does not contain the
+  pattern and the absence claim passed BECAUSE a file could not be opened — the file branch had been fixed
+  two rounds earlier. `fingerprintEngine` resolved `.js` before `.cjs` with `.find`, so if both copies of a
+  module existed it hashed one and ignored the other: green, about bytes that no longer run, reached through
+  the drift detector's own file resolution. It now refuses the ambiguity.
+- Two more silent passes, both reachable: `isReentrantGate` did not know `npm t`, npm's own alias for the
+  test script; and `packageManager`, read from `verify.config.json`, was interpolated into a pattern
+  unescaped — a metacharacter would silently change what it means and `pnpm(` made `new RegExp` throw from
+  inside a pure decision function. It is now checked at the boundary like every other file-sourced string.
+- `handleFence` closed on any backtick run, so a three-backtick line inside a four-backtick block flipped the
+  state early and the rest of the block was read as prose. Fences nest by width; only a run at least as wide
+  as the opener closes one now.
+- The gate timeout could never fire where it matters: `GATE_TIMEOUT_MS` was 15 minutes against
+  `timeout-minutes: 15` on the job, with checkout and install ahead of it, so CI always died first and the
+  recorded FAIL was unreachable. Ten minutes now.
+- Reporting: commit and pull-request claims on a tree where layer 2 cannot run were dropped from both the
+  tally and the decided list while `counts.claims` still reported the pre-skip total, so the dispositions did
+  not sum to it. They are counted `unresolvable` — a label that appears only on a run already failing on
+  `git-unavailable`, documented as such in `CLAUDE.md`. And the attestation's `evidence` was pointed at
+  `CLAUDE.md` in the previous round, which made it cite as its proof the same prose its own marker governs;
+  it is back on `RESUBMISSION_RUNBOOK.md`.
+- Declined, with the reproduction as the reason: the report that a struck code span yields two exclusions
+  (`empty-span` and `former-name`). `blankRetracted` blanks the backticks along with the text, so `codeSpans`
+  finds nothing on the blanked line and `classifySpan` is never reached. Three shapes were run — one struck
+  span, two struck spans on a line, and a span inside a multi-line run — and each produced exactly one
+  exclusion, with the right reason.
 - Declined, with reasons: the suggestion to keep the struck-range check in the prose scan — the check was
   unreachable because the text was already blanked, so it was replaced with a struck-range MASK, which both
   makes it reachable and reports the exclusion instead of dropping it silently. `struckRanges` itself is
@@ -8930,7 +8958,7 @@ collection.
 **Superseded by this round.** The fingerprint quoted above as ~~`2a8f510951c78d2b…`~~ was the value before
 the review; the engine changed, so the recorded value changed with it, which is the mechanism working rather
 than a problem. Current, and identical in both repositories:
-`b8a4873ea5a00344d1d900d4a47e6351454e16fbfb6ae87821803c42de30fec3`. The counts quoted above as
+`0f664f56de934f104da7b03a9024b0d6992bf4a7596b36f7eaa2347b7c93fa07`. The counts quoted above as
 ~~`1000 claims … 40 excluded by rule`~~ and ~~`Tests 38 passed (38)`~~ are likewise superseded.
 
 **Commands run on this tree after the round:**
