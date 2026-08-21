@@ -37,7 +37,7 @@ const { resolveGitBinary } = require("./verify/git-facts.cjs");
 // The two refusal predicates live in the pure-decisions module so a test can
 // hand them a bad command and assert that they refuse. Inside this CLI they were
 // unreachable from any test, which is the same as untested.
-const { isReentrantGate, GATE_TOKEN, gateInvocation, createOutputCollector } = require("./verify/claims.cjs");
+const { isReentrantGate, GATE_TOKEN, gateInvocation, createOutputCollector, terminationProblem } = require("./verify/claims.cjs");
 
 const say = (line) => process.stdout.write(`${line}\n`);
 
@@ -110,6 +110,23 @@ const GATE_TIMEOUT_MS = 10 * 60 * 1000;
 /** Per-gate ceiling on buffered stdout+stderr. See `runGate`. */
 const MAX_OUTPUT_BYTES = 1_000_000;
 
+/**
+ * Kills that failed AFTER their gate had already settled, so they could not
+ * reach that gate's own record. Run-level, and surfaced the way `GIT_PROBLEM`
+ * is — printed, never written into the evidence report. BEST EFFORT BY
+ * CONSTRUCTION: `taskkill` answers asynchronously and this process exits when
+ * the last gate settles, so a late answer can be lost. An empty list is
+ * therefore not proof that nothing was left running, which is exactly why it
+ * must not appear in the report as if it were.
+ */
+const TERMINATION_PROBLEMS = [];
+
+/** Record a termination outcome at run level, if the decision says it matters. */
+function noteTermination(outcome) {
+  const problem = terminationProblem(outcome);
+  if (problem) TERMINATION_PROBLEMS.push(problem);
+}
+
 function runGate(gate) {
   return new Promise((resolve) => {
     const tokens = gate.command.split(/\s+/).filter(Boolean);
@@ -169,28 +186,49 @@ function runGate(gate) {
 
     const timer = setTimeout(() => {
       collected.note(`\nrefused: gate exceeded ${GATE_TIMEOUT_MS}ms and was killed`);
-      try {
-        if (ownGroup && child.pid) process.kill(-child.pid, "SIGKILL");
-        else if (child.pid) {
-          // Windows has no process group to signal, and `kill` reaches only the
-          // direct child — here the `cmd.exe` shim — leaving the npm process and
-          // its descendants running against the checkout after this gate has
-          // already been recorded as failed. `taskkill /T` walks the tree.
-          //
-          // ABSOLUTE, not searched on PATH — the rule this file states at the
-          // top for git and which my first version of this line broke. A
-          // process-tree killer picked up from PATH is a worse thing to get
-          // wrong than the hang it exists to clean up.
-          const systemRoot = process.env.SystemRoot || String.raw`C:\Windows`;
-          spawn(path.join(systemRoot, "System32", "taskkill.exe"), ["/T", "/F", "/PID", String(child.pid)], {
-            stdio: "ignore",
-            shell: false,
-          }).unref();
-        } else child.kill("SIGKILL");
-      } catch {
-        // Already gone, or the group cannot be signalled. The FAIL is recorded
-        // either way — a gate this tool could not stop is still a failed gate.
+      if (ownGroup && child.pid) {
+        try {
+          process.kill(-child.pid, "SIGKILL");
+        } catch (err) {
+          // A BARE `catch {}` HERE READ TWO OPPOSITE EVENTS AS ONE: "the tree
+          // already exited" (ESRCH — what the kill was for) and "the tree is
+          // still running and I may not signal it" (EPERM). Only the first is
+          // benign, and the second is the one whoever reads this log needs. The
+          // gate has not settled yet, so this one lands in its own record.
+          const problem = terminationProblem({ how: "signal", code: err?.code, message: err?.message });
+          if (problem) collected.note(`\n${problem}`);
+        }
+      } else if (child.pid) {
+        // Windows has no process group to signal, and `kill` reaches only the
+        // direct child — here the `cmd.exe` shim — leaving the npm process and
+        // its descendants running against the checkout after this gate has
+        // already been recorded as failed. `taskkill /T` walks the tree.
+        //
+        // ABSOLUTE, not searched on PATH — the rule this file states at the
+        // top for git and which my first version of this line broke. A
+        // process-tree killer picked up from PATH is a worse thing to get
+        // wrong than the hang it exists to clean up.
+        const systemRoot = process.env.SystemRoot || String.raw`C:\Windows`;
+        const killer = spawn(
+          path.join(systemRoot, "System32", "taskkill.exe"),
+          ["/T", "/F", "/PID", String(child.pid)],
+          { stdio: "ignore", shell: false },
+        );
+        // AN `error` EVENT WITH NO LISTENER IS THROWN, NOT IGNORED. A
+        // `taskkill.exe` that would not start therefore crashed this runner
+        // instead of letting it write the FAIL it had just decided on — the
+        // precise outcome the timeout exists to prevent. The `try`/`catch` this
+        // replaced could never have caught it: the event is asynchronous.
+        killer.on("error", (err) => noteTermination({ how: "taskkill", code: err?.code, message: err?.message }));
+        // And a taskkill that RAN and reported failure left the tree alive while
+        // the runner said nothing, because nobody read its status.
+        killer.on("exit", (code) => noteTermination({ how: "taskkill", code }));
+        killer.unref();
       }
+      // There is deliberately no third branch. No `child.pid` means `spawn`
+      // never produced a process, the `error` listener below has already
+      // settled this gate, and the `child.kill()` that used to sit here was a
+      // no-op standing in for one.
       settle(1);
     }, GATE_TIMEOUT_MS);
 
@@ -256,4 +294,7 @@ fs.writeFileSync(
 const failed = results.filter((r) => r.exitCode !== 0);
 say(`\n  report: ${config.evidenceReport}`);
 say(failed.length === 0 ? "  all declared gates passed\n" : `  ${failed.length} gate(s) failed\n`);
+// A gate this tool could not stop is still a recorded FAIL — but the processes
+// it left behind are the next run's problem, so they get said out loud.
+for (const problem of TERMINATION_PROBLEMS) say(`  warning: ${problem}`);
 process.exit(failed.length === 0 ? 0 : 1);

@@ -75,6 +75,11 @@ type Rules = {
     readonly text: string;
     readonly truncated: boolean;
   };
+  terminationProblem(outcome: {
+    how?: string;
+    code?: string | number | null;
+    message?: string | null;
+  }): string | null;
   GATE_TOKEN: RegExp;
 };
 
@@ -973,8 +978,11 @@ describe("the engine refuses what it says it refuses", () => {
     const bufferModule = require("node:buffer") as typeof import("node:buffer");
     const collector = rules.createOutputCollector(1000);
     const stream = collector.stream();
-    stream.write(bufferModule.Buffer.from([0x41, 0xf0, 0x9f])); // "A" + first 2 bytes
-    stream.write(bufferModule.Buffer.from([0x98, 0x80, 0x42])); // last 2 bytes + "B"
+    // THE SPLIT IS THE TEST. U+1F600 is four bytes and they are handed over in
+    // two separate writes on purpose, because that is what a pipe does under
+    // load; a single write would pass with or without the fix.
+    stream.write(bufferModule.Buffer.from([0x41, 0xf0, 0x9f])); // "A" + first 2 bytes of U+1F600
+    stream.write(bufferModule.Buffer.from([0x98, 0x80, 0x42])); // its last 2 bytes + "B"
     stream.end();
     expect(collector.text).toBe("A\u{1F600}B");
     expect(collector.text).not.toContain("\uFFFD");
@@ -1058,6 +1066,69 @@ describe("the engine refuses what it says it refuses", () => {
     collector.note("\nrefused: gate exceeded 600000ms and was killed");
     expect(collector.text).not.toBe(beforeNote);
     expect(bufferModule.Buffer.byteLength(collector.text, "utf8")).toBeLessThanOrEqual(10);
+  });
+
+  it("tells a kill that worked from a kill that left the tree running", () => {
+    // The runner used to read these two as one event. POSIX `ESRCH` and
+    // `taskkill` exit 128 both mean "already gone" — which is what the kill was
+    // FOR, so saying anything would be a false alarm. `EPERM` and a non-zero
+    // taskkill mean processes are still running against the checkout after the
+    // gate was recorded as failed, and the old bare `catch {}` said nothing
+    // about either. Asked here as a pure decision because half of it belongs to
+    // a platform this suite does not run on.
+    expect(rules.terminationProblem({ how: "signal", code: "ESRCH", message: "kill ESRCH" })).toBeNull();
+    expect(rules.terminationProblem({ how: "taskkill", code: 0 })).toBeNull();
+    expect(rules.terminationProblem({ how: "taskkill", code: 128 })).toBeNull();
+
+    expect(rules.terminationProblem({ how: "signal", code: "EPERM", message: "kill EPERM" })).toContain("EPERM");
+    expect(rules.terminationProblem({ how: "taskkill", code: 1 })).toContain("exit 1");
+    // A killer that never started reports a spawn error, not an exit status.
+    expect(
+      rules.terminationProblem({ how: "taskkill", code: "ENOENT", message: "spawn taskkill.exe ENOENT" }),
+    ).toContain("ENOENT");
+    // No cause at all is still a problem — silence is the thing being fixed.
+    expect(rules.terminationProblem({ how: "signal" })).not.toBeNull();
+  });
+
+  it("proves an unwatched killer would have taken the whole runner down", () => {
+    // NOT A STYLE POINT. `spawn` reports a failure to start as an asynchronous
+    // `error` event, and an `error` event with no listener is THROWN. The
+    // runner's `try`/`catch` could never catch it, so a `taskkill.exe` that
+    // would not start killed the evidence run itself — losing the report for
+    // every other gate, at the exact moment the timeout existed to produce one.
+    // Demonstrated by running both shapes in a real child node process.
+    const childProcess = require("node:child_process") as typeof import("node:child_process");
+    const spawnOptions = { encoding: "utf8" as const, timeout: 20_000 };
+    const missing = "/nonexistent/System32/taskkill.exe";
+
+    const unwatched = childProcess.spawnSync(
+      process.execPath,
+      [
+        "-e",
+        `const {spawn}=require("node:child_process");` +
+          `try{spawn(${JSON.stringify(missing)},["/T"],{stdio:"ignore",shell:false}).unref()}catch{};` +
+          `setTimeout(()=>console.log("REPORT WRITTEN"),200)`,
+      ],
+      spawnOptions,
+    );
+    expect(unwatched.status).not.toBe(0);
+    expect(unwatched.stdout ?? "").not.toContain("REPORT WRITTEN");
+    expect(unwatched.stderr ?? "").toContain("Unhandled 'error' event");
+
+    const watched = childProcess.spawnSync(
+      process.execPath,
+      [
+        "-e",
+        `const {spawn}=require("node:child_process");` +
+          `const k=spawn(${JSON.stringify(missing)},["/T"],{stdio:"ignore",shell:false});` +
+          `k.on("error",e=>console.log("warning:",e.code));k.on("exit",()=>{});k.unref();` +
+          `setTimeout(()=>console.log("REPORT WRITTEN"),200)`,
+      ],
+      spawnOptions,
+    );
+    expect(watched.status).toBe(0);
+    expect(watched.stdout ?? "").toContain("REPORT WRITTEN");
+    expect(watched.stdout ?? "").toContain("ENOENT");
   });
 
   it("routes a Windows command shim through the command processor", () => {

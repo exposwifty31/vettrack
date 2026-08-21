@@ -383,6 +383,40 @@ function gateInvocation(rawCommand, args, platform, comspec) {
 
 
 /**
+ * `taskkill` reports "process not found" with this exit status. It is the one
+ * non-zero status that means the kill got what it wanted.
+ */
+const TASKKILL_PROCESS_NOT_FOUND = 128;
+
+/**
+ * Did a failed kill leave the gate's process tree running?
+ *
+ * A kill that fails is usually not a problem: the ordinary reason a signal does
+ * not land is that the tree had already exited, which is the outcome the kill
+ * was for. POSIX reports that as `ESRCH`; `taskkill` reports it as exit 128.
+ * Everything else — `EPERM`, access denied, a `taskkill.exe` that will not
+ * start — means processes may still be running against the checkout after the
+ * gate was recorded as failed, and the runner used to say nothing at all: the
+ * POSIX side swallowed the cause in a bare `catch`, and the Windows side never
+ * looked at the killer's exit status.
+ *
+ * Returns the sentence to record, or null when the outcome means "already gone".
+ * A DECISION, not an inline branch, because the Windows half of it cannot be
+ * reached from the platform this suite runs on.
+ */
+function terminationProblem(outcome) {
+  const { how = "signal", code = null, message = null } = outcome ?? {};
+  if (how === "taskkill") {
+    if (code === 0 || code === TASKKILL_PROCESS_NOT_FOUND) return null;
+    if (message) return `taskkill could not stop the gate's process tree: ${message}`;
+    return `taskkill could not stop the gate's process tree (exit ${code === null ? "unknown" : code})`;
+  }
+  if (code === "ESRCH") return null;
+  return `could not signal the gate's process group${code ? ` (${code})` : ""}: ${message ?? "unknown cause"}`;
+}
+
+
+/**
  * Is one attestation still standing? `now` is a parameter, never `Date.now()`,
  * so the staleness rule is testable without waiting ninety days.
  */
@@ -776,6 +810,8 @@ module.exports = {
   isReentrantGate,
   gateInvocation,
   createOutputCollector,
+  terminationProblem,
+  TASKKILL_PROCESS_NOT_FOUND,
   TARGETS,
   attestationVerdict,
   daysBetween,
