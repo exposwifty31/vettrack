@@ -9588,3 +9588,39 @@ recomputed independently in both repositories and identical:
 `477 claims … 0 FAILED`, ledger `82 passed`, typecheck and lint clean.
 
 **Verdict:** VERIFIED.
+
+### The reserve was not reserved, 2026-08-21
+
+**Claim:** the diagnostic note now survives truncation at any ceiling, not only at large ones.
+
+**Evidence.** The entry above carved a reserve out of the ceiling so a timeout note would outlive a truncated
+gate. It did not finish the job: `cut()` appended the truncation marker with `maxBytes - textBytes` as its
+room, so the marker could consume the reserve it was supposed to leave alone. At a small ceiling the record
+came back as the marker and nothing else, and the note was dropped after all — **the same defect one layer
+below where it had just been fixed**, which is now the third time a fix in this collector has produced the
+next one.
+
+The marker stops at the reserve now. Between the two, the note wins: "output truncated" is a property of the
+log, while "gate exceeded 600000ms and was killed" is the reason the gate failed, and a failure recorded
+without its cause is the shape this engine keeps catching in itself. Measured across three ceilings —
+
+```text
+maxBytes=     10  ->      10 bytes recorded, note reached the record
+maxBytes=     64  ->      64 bytes recorded, full phrase present
+maxBytes=1000000  ->  999847 bytes recorded, full phrase present
+```
+
+Ten bytes cannot hold the words, and the pinned case says only that the diagnostic is not silently discarded.
+The production ceiling is 1,000,000 bytes, so the 200-byte reserve costs 0.02% of the log there; the tiny
+ceilings exist only in the tests, and they are where the invariant was breaking.
+
+**Superseded fingerprint:** ~~`16ad314a`~~ (full value in the entry above). Current, recomputed independently
+in both repositories and identical:
+`6cdd47e8` — full value recorded in `verify.config.json`.
+
+**Commands run on the tree before this entry was appended:** `node scripts/verify-claims.mjs` →
+`1073 claims … 0 FAILED`; `pnpm exec vitest run tests/claims-ledger.test.ts` → `Tests 84 passed (84)`;
+`npx tsc --noEmit` → 0 errors; `pnpm architecture:gates` → `All G1 checks passed.` In the RN migration repo:
+`477 claims … 0 FAILED`, ledger `83 passed`, typecheck and lint clean.
+
+**Verdict:** VERIFIED.

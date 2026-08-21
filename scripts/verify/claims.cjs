@@ -290,7 +290,13 @@ function createOutputCollector(maxBytes) {
 
   const cut = () => {
     truncated = true;
-    textBytes += appendUpTo(marker, maxBytes - textBytes);
+    // The marker STOPS AT THE RESERVE. Letting it run to `maxBytes` let it eat
+    // the room held for the diagnostic, so at a small ceiling the record came
+    // back as the marker alone and the note was dropped after all — the same
+    // defect one layer down from where it was just fixed. Between the two, the
+    // note wins: "output truncated" is a property of the log, "gate exceeded
+    // 600000ms" is the reason the gate failed.
+    textBytes += appendUpTo(marker, maxBytes - noteReserve - textBytes);
   };
 
   /**

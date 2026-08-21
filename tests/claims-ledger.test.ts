@@ -1036,6 +1036,30 @@ describe("the engine refuses what it says it refuses", () => {
     expect(collector.truncated).toBe(true);
   });
 
+  it("keeps room for the diagnostic even at a ceiling the marker alone would fill", () => {
+    // Reserving room for the note was not enough while the MARKER could still
+    // run to `maxBytes`: at a small ceiling it consumed the reserve and the
+    // record came back as the marker alone, so the note was dropped after all —
+    // the same defect one layer below where it had just been fixed.
+    //
+    // Between the two, the note wins. "output truncated" is a property of the
+    // log; "gate exceeded 600000ms and was killed" is the reason the gate
+    // failed, and a failure recorded without its cause is what this engine
+    // keeps catching in itself. Ten bytes cannot hold the words — the point is
+    // that the diagnostic is not silently discarded.
+    const bufferModule = require("node:buffer") as typeof import("node:buffer");
+    const collector = rules.createOutputCollector(10);
+    const stream = collector.stream();
+    stream.write(bufferModule.Buffer.from("x".repeat(200), "utf8"));
+    stream.end();
+    expect(collector.truncated).toBe(true);
+
+    const beforeNote = collector.text;
+    collector.note("\nrefused: gate exceeded 600000ms and was killed");
+    expect(collector.text).not.toBe(beforeNote);
+    expect(bufferModule.Buffer.byteLength(collector.text, "utf8")).toBeLessThanOrEqual(10);
+  });
+
   it("routes a Windows command shim through the command processor", () => {
     // `npm.cmd` with `shell: false` CANNOT START: a `.cmd` is a script, not an
     // executable image. The branch that renamed the token announced Windows
