@@ -28,6 +28,10 @@
 
 import { describe, it, expect, beforeAll, vi } from "vitest";
 import { createRequire } from "node:module";
+// A REAL IMPORT, not `require("node:buffer") as typeof import("node:buffer")`.
+// That cast asserted a type rather than checking one, in a file whose whole
+// subject is the difference between the two.
+import { Buffer } from "node:buffer";
 
 const require = createRequire(import.meta.url);
 
@@ -975,14 +979,13 @@ describe("the engine refuses what it says it refuses", () => {
     // the runner where no test could reach it — a later change could restore
     // per-chunk decoding and this suite would stay green. That is why it is a
     // function now, and why this test exists rather than a comment.
-    const bufferModule = require("node:buffer") as typeof import("node:buffer");
     const collector = rules.createOutputCollector(1000);
     const stream = collector.stream();
     // THE SPLIT IS THE TEST. U+1F600 is four bytes and they are handed over in
     // two separate writes on purpose, because that is what a pipe does under
     // load; a single write would pass with or without the fix.
-    stream.write(bufferModule.Buffer.from([0x41, 0xf0, 0x9f])); // "A" + first 2 bytes of U+1F600
-    stream.write(bufferModule.Buffer.from([0x98, 0x80, 0x42])); // its last 2 bytes + "B"
+    stream.write(Buffer.from([0x41, 0xf0, 0x9f])); // "A" + first 2 bytes of U+1F600
+    stream.write(Buffer.from([0x98, 0x80, 0x42])); // its last 2 bytes + "B"
     stream.end();
     expect(collector.text).toBe("A\u{1F600}B");
     expect(collector.text).not.toContain("\uFFFD");
@@ -994,14 +997,13 @@ describe("the engine refuses what it says it refuses", () => {
     // exceeded the very limit the marker announced. A cap exceeded by the note
     // announcing the cap is not a cap. The runner's own diagnostics — timeout,
     // spawn error — go through the same budget for the same reason.
-    const bufferModule = require("node:buffer") as typeof import("node:buffer");
     const limit = 64;
     const collector = rules.createOutputCollector(limit);
     const stream = collector.stream();
-    stream.write(bufferModule.Buffer.from("x".repeat(500), "utf8"));
+    stream.write(Buffer.from("x".repeat(500), "utf8"));
     stream.end();
     expect(collector.truncated).toBe(true);
-    expect(bufferModule.Buffer.byteLength(collector.text, "utf8")).toBeLessThanOrEqual(limit);
+    expect(Buffer.byteLength(collector.text, "utf8")).toBeLessThanOrEqual(limit);
     expect(collector.text).toContain("truncated");
 
     // A note after truncation cannot push it back over the line — AND must
@@ -1018,7 +1020,7 @@ describe("the engine refuses what it says it refuses", () => {
     // the text changed would pass on a stray newline; asserting that what was
     // appended is a leading run of the message is the property the caller needs.
     expect(refusal.startsWith(collector.text.slice(beforeRefusal.length))).toBe(true);
-    expect(bufferModule.Buffer.byteLength(collector.text, "utf8")).toBeLessThanOrEqual(limit);
+    expect(Buffer.byteLength(collector.text, "utf8")).toBeLessThanOrEqual(limit);
   });
 
   it("bounds the recorded text by its own bytes, not the bytes it was fed", () => {
@@ -1027,12 +1029,11 @@ describe("the engine refuses what it says it refuses", () => {
     // malformed input byte decodes to U+FFFD — three bytes out for one byte in
     // — so a gate emitting invalid bytes inside the budget still blew through
     // the ceiling. Measured before this fix: a 64-byte cap recorded 130 bytes.
-    const bufferModule = require("node:buffer") as typeof import("node:buffer");
     const collector = rules.createOutputCollector(64);
     const stream = collector.stream();
-    stream.write(bufferModule.Buffer.from(new Array(40).fill(0xff)));
+    stream.write(Buffer.from(new Array(40).fill(0xff)));
     stream.end();
-    expect(bufferModule.Buffer.byteLength(collector.text, "utf8")).toBeLessThanOrEqual(64);
+    expect(Buffer.byteLength(collector.text, "utf8")).toBeLessThanOrEqual(64);
     expect(collector.truncated).toBe(true);
   });
 
@@ -1041,12 +1042,11 @@ describe("the engine refuses what it says it refuses", () => {
     // nothing else — 31 bytes recorded against a 10-byte cap. In that case the
     // marker is the thing that gets cut: a note overflowing the limit it
     // announces is precisely the defect this helper exists to prevent.
-    const bufferModule = require("node:buffer") as typeof import("node:buffer");
     const collector = rules.createOutputCollector(10);
     const stream = collector.stream();
-    stream.write(bufferModule.Buffer.from("x".repeat(200), "utf8"));
+    stream.write(Buffer.from("x".repeat(200), "utf8"));
     stream.end();
-    expect(bufferModule.Buffer.byteLength(collector.text, "utf8")).toBeLessThanOrEqual(10);
+    expect(Buffer.byteLength(collector.text, "utf8")).toBeLessThanOrEqual(10);
     expect(collector.truncated).toBe(true);
   });
 
@@ -1061,10 +1061,9 @@ describe("the engine refuses what it says it refuses", () => {
     // failed, and a failure recorded without its cause is what this engine
     // keeps catching in itself. Ten bytes cannot hold the words — the point is
     // that the diagnostic is not silently discarded.
-    const bufferModule = require("node:buffer") as typeof import("node:buffer");
     const collector = rules.createOutputCollector(10);
     const stream = collector.stream();
-    stream.write(bufferModule.Buffer.from("x".repeat(200), "utf8"));
+    stream.write(Buffer.from("x".repeat(200), "utf8"));
     stream.end();
     expect(collector.truncated).toBe(true);
 
@@ -1084,7 +1083,7 @@ describe("the engine refuses what it says it refuses", () => {
     const appended = collector.text.slice(beforeNote.length);
     expect(refusal.startsWith(appended)).toBe(true);
     expect(appended.trim().length).toBeGreaterThan(0);
-    expect(bufferModule.Buffer.byteLength(collector.text, "utf8")).toBeLessThanOrEqual(10);
+    expect(Buffer.byteLength(collector.text, "utf8")).toBeLessThanOrEqual(10);
   });
 
   it("tells a kill that worked from a kill that left the tree running", () => {
