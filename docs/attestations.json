@@ -3,13 +3,13 @@
   "entries": [
     {
       "id": "ios-app-store-live",
-      "claim": "The Capacitor iOS shell is live on the App Store; re-verify by opening the store listing for the build the runbook records",
+      "claim": "The Capacitor iOS shell is live on the App Store. Re-verify by opening the store listing and confirming the published build is at least the number in ios/.last-shipped-build",
       "target": "app-store",
-      "evidence": "RESUBMISSION_RUNBOOK.md",
+      "evidence": "ios/.last-shipped-build",
       "attestedBy": "repo owner (recorded in CLAUDE.md, Architecture / Native shell)",
       "attestedAt": "2026-08-20",
       "staleAfterDays": 120,
-      "reverifyWith": "RESUBMISSION_RUNBOOK.md"
+      "reverifyWith": "RESUBMISSION_RUNBOOK.md#b-current-state-what-is-already-done"
     }
   ]
 }
