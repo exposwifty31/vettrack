@@ -586,6 +586,15 @@ function extractFromMarkdown(text, where, policy) {
 /** `npm run x` / `pnpm x` — a script name the manifest must actually define. */
 function collectScriptClaims(line, index, policy, push) {
   const manager = policy.packageManager ?? "npm";
+  // THE SAME BOUNDARY CHECK `scriptNameIn` APPLIES, and for the same reason: the
+  // value comes out of `verify.config.json`, a file, and is interpolated into a
+  // pattern. A metacharacter would quietly change what that pattern means, and
+  // an unbalanced one would make `new RegExp` throw from inside the scanner — an
+  // unhandled error where a configuration error belongs. Two modules reading one
+  // field disagreed about whether to check it; they no longer do.
+  if (!/^[\w.-]+$/.test(manager)) {
+    throw new Error(`packageManager in verify.config.json is not a plain name: ${manager}`);
+  }
   const runPattern = new RegExp(`\\b${manager}\\s+run\\s+([\\w:-]+)`, "g");
   for (const m of line.matchAll(runPattern)) {
     push(index, { kind: "script", raw: m[0], script: m[1] });

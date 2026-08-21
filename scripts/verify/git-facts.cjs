@@ -27,7 +27,14 @@ const path = require("node:path");
  */
 function resolveGitBinary() {
   const override = process.env.VT_GIT_BINARY;
-  if (override) return path.isAbsolute(override) && fs.existsSync(override) ? override : null;
+  // A BAD OVERRIDE IS NOT A MISSING GIT. Both used to return null and produce
+  // one message listing the fixed paths and advising the reader to set
+  // VT_GIT_BINARY — the variable they had already set, wrongly. The cause is
+  // carried out so the message can name the one the run actually hit.
+  if (override) {
+    if (path.isAbsolute(override) && fs.existsSync(override)) return override;
+    return { problem: `VT_GIT_BINARY is not an absolute path to an existing file: ${override}` };
+  }
   return (
     ["/usr/bin/git", "/usr/local/bin/git", "/opt/homebrew/bin/git", "/bin/git"].find((candidate) =>
       fs.existsSync(candidate),
@@ -35,7 +42,11 @@ function resolveGitBinary() {
   );
 }
 
-const GIT_BINARY = resolveGitBinary();
+const RESOLVED_GIT = resolveGitBinary();
+/** The path, or null. The two shapes are read apart once, here. */
+const GIT_BINARY = typeof RESOLVED_GIT === "string" ? RESOLVED_GIT : null;
+/** Why there is no path, when the reason is more specific than "not installed". */
+const GIT_PROBLEM = typeof RESOLVED_GIT === "string" ? null : (RESOLVED_GIT?.problem ?? null);
 
 /**
  * Shapes allowed to reach a git argv, checked HERE rather than trusted from the
@@ -133,8 +144,9 @@ function createGitFacts(root, defaultBranch) {
 
   if (!GIT_BINARY) {
     problems.push(
-      "git was not found at any known absolute path (/usr/bin/git, /usr/local/bin/git, " +
-        "/opt/homebrew/bin/git, /bin/git). Set VT_GIT_BINARY to an absolute path.",
+      GIT_PROBLEM ??
+        "git was not found at any known absolute path (/usr/bin/git, /usr/local/bin/git, " +
+          "/opt/homebrew/bin/git, /bin/git). Set VT_GIT_BINARY to an absolute path.",
     );
     return { ready: false, problems, facts: null, ref: null };
   }
@@ -197,11 +209,18 @@ function createGitFacts(root, defaultBranch) {
      * would report every low-numbered PR as landed.
      */
     mergeCommitForPr(number) {
+      // NO DEFAULT-BRANCH REF, NO ANSWER. Falling back to `HEAD` searched the
+      // feature branch on a CI checkout, where a merge commit proves nothing
+      // about landing on the default branch — and `obsoletePrLedgerEntries`
+      // calls this without consulting `ready`, so a false positive there would
+      // report a needed ledger entry as redundant. `addedLines` and `refHead`
+      // already return null in this state; this now agrees with them.
+      if (!ref) return null;
       if (!Number.isInteger(number) || number <= 0 || number > 999999) return null;
       if (!prCache.has(number)) {
         const search = git(root, [
           "log",
-          ref ?? "HEAD",
+          ref,
           "--merges",
           "--fixed-strings",
           `--grep=Merge pull request #${number} from`,

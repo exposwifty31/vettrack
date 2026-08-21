@@ -566,7 +566,12 @@ function decide(claim, facts, context = {}) {
   }
 
   if (verdict.disposition === "fail") {
-    const target = claim.target ?? claim.name ?? "";
+    // `pattern` is where a glob claim keeps its key — `registryEntryFor` already
+    // reads it that way. Omitting it here made the key an empty string for every
+    // glob, so no `crossRepoPrefixes` entry could ever match one and a glob into
+    // a sibling repository failed instead of resolving to `registered`. Two
+    // lookups over the same claims must use the same key.
+    const target = claim.target ?? claim.pattern ?? claim.name ?? "";
     const crossRepo = (context.crossRepoPrefixes ?? []).find(
       (p) => target.startsWith(p.prefix) || `${target}/`.startsWith(p.prefix),
     );

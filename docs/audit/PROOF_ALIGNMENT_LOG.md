@@ -9209,3 +9209,55 @@ tests/claims-ledger.test.ts` → `Tests 67 passed (67)`; `npx tsc --noEmit` → 
 `477 claims … 0 FAILED`, ledger `66 passed`, lint and typecheck clean.
 
 **Verdict:** VERIFIED.
+
+### Fifth review round — eight findings, and one of them was a rule I had declined twice, 2026-08-21
+
+**The one I had wrong.** Twice this session I recorded that the `|| echo "::warning::"` on the `origin/main`
+fetch was a non-defect, reasoning that the gate fails loudly on `git-unavailable` when the ref is missing.
+I never measured it. Measured now, by deleting the remote-tracking ref and running the gate: it does not
+report the ref as unavailable. It falls back to the local `refs/heads/main`, which on this checkout was
+twenty merges stale, and produced **100 FAILED claims** — every one a true sentence about work that had
+landed. That is the exact "a stale ref changes the verdict" failure this gate's own history records catching,
+reintroduced through a fallback, and I had reasoned past it instead of running it. The CI fallback is gone
+from both jobs here and from the sibling: a fetch that cannot get the ground truth now fails the job.
+
+**Seven more, all real.**
+
+- **A FILTERED listing was treated as a complete one.** The walk skips `node_modules`, unnamed dot entries and
+  ignored prefixes — correct for a glob, and not evidence of absence. A token in a skipped file made
+  `grepCount` return 0, and a 0 there reads as "confirmed absent" over a tree that was never fully walked.
+  The same silent pass as an unreadable file, arriving through the filters rather than through an error, and
+  the fourth face of that one rule. No live absence claim uses a directory scope in either repository — the
+  markers use `scope=deps` and `scope=app.json` — so closing it costs nothing today and shuts the door before
+  someone writes one.
+- **The scanner interpolated a file-sourced package-manager name into a `RegExp` unchecked**, while
+  `scripts/verify/claims.cjs` had checked the same field since the second round. Two modules reading one
+  configuration value disagreed about whether to validate it.
+- **A cross-repo GLOB could never resolve.** The fail branch keyed on `target ?? name`; a glob claim carries
+  neither, it carries `pattern`. The key was the empty string for every glob, so no cross-repo prefix could
+  match one — a glob into the sibling repository failed while the identical path resolved.
+- **`mergeCommitForPr` fell back to `HEAD`** when there was no default-branch ref. On a pull-request checkout
+  `HEAD` is the feature branch, so a merge commit found there is not proof of landing. `addedLines` and
+  `refHead` already refused in that state; this now agrees with them.
+- **`readJson` read every failure as absence.** Only `ENOENT` means absent; `EACCES` on a present ledger read
+  as an empty one, which fails every registered claim and reports every attestation missing, with the real
+  cause nowhere — the same misdiagnosis the parse branch was written to prevent, through a different code.
+- **A bad `VT_GIT_BINARY` reported as a missing git**, sending the reader to look for an install rather than
+  at the value they had set. The cause is now carried out of the resolver.
+- **The gate runner could not spawn a Windows shim**, and the orphaned section banner in the test file sent a
+  reader navigating by banners into the wrong block.
+
+**Proved by refusal, each one run before it was written down:** a filtered scope returns `NaN` while an
+unfiltered one still answers `0`; a malformed manager name throws a named configuration error; a cross-repo
+glob now resolves to `registered`; a bad `VT_GIT_BINARY` returns its own cause.
+
+**Superseded fingerprint:** ~~`f45235d72618706705b340a815817bd95c2ed96f0159440df03f030d006cd103`~~. Current,
+recomputed independently in both repositories and identical:
+`a5498cb22a3a1170977794caa6c8fba27fbbca377e436d0435cbc298182eabdd`.
+
+**Commands run on the tree before this entry was appended:** `node scripts/verify-claims.mjs` →
+`1063 claims … 0 FAILED`; `pnpm exec vitest run tests/claims-ledger.test.ts` → `Tests 71 passed (71)`;
+`npx tsc --noEmit` → 0 errors; `pnpm architecture:gates` → `All G1 checks passed.`; sonarjs proxy clean. In
+the RN migration repo: `477 claims … 0 FAILED`, ledger `70 passed`, lint and typecheck clean.
+
+**Verdict:** VERIFIED.

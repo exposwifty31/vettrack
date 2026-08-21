@@ -47,7 +47,11 @@ const say = (line) => process.stdout.write(`${line}\n`);
 // cannot disagree about which git they ran. The gate commands below are a
 // different case: npm and pnpm legitimately live wherever nvm or corepack put
 // them, and pinning those to absolute paths would break more than it protects.
-const GIT_BINARY = resolveGitBinary();
+// `resolveGitBinary` reports a bad `VT_GIT_BINARY` as a cause object rather than
+// as a missing install; this runner only needs the path, and a null here already
+// makes `git()` return null, which the tree-hash guard below turns into a refusal.
+const RESOLVED_GIT = resolveGitBinary();
+const GIT_BINARY = typeof RESOLVED_GIT === "string" ? RESOLVED_GIT : null;
 
 function git(args) {
   if (!GIT_BINARY) return null;
@@ -112,7 +116,15 @@ function runGate(gate) {
       });
       return;
     }
-    const [command, ...args] = tokens;
+    const [rawCommand, ...args] = tokens;
+    // On Windows `npm` and `pnpm` are `.cmd` shims, which `spawn` cannot execute
+    // with `shell: false` — and turning the shell on to fix that would hand the
+    // whole command line to `cmd.exe`. The token has already passed `GATE_TOKEN`,
+    // so appending the extension is the narrow fix; the shell stays off.
+    const command =
+      process.platform === "win32" && /^(?:npm|pnpm|yarn|npx)$/.test(rawCommand)
+        ? `${rawCommand}.cmd`
+        : rawCommand;
     const started = Date.now();
     // POSIX: its own process GROUP, so the timeout below can signal the whole
     // tree. A gate is an `npm`/`pnpm` script, which spawns descendants; killing

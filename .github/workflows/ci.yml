@@ -157,8 +157,13 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: 🌿 Fetch default branch (claim verification, layer 2)
+        # NO FALLBACK. The warning form exited 0, so a failed fetch let the job
+        # run on whatever `main` ref happened to be present. That is not "layer 2
+        # unavailable" — measured with the remote ref gone, this repository's own
+        # documents resolved against a stale local `refs/heads/main` and produced
+        # 100 failures, every one a true sentence about work that had landed. A
+        # fetch that cannot get the ground truth fails the job.
         run: git fetch --no-tags origin main:refs/remotes/origin/main
-          || echo "::warning::could not fetch origin/main — claim verification will report layer 2 as unavailable"
 
       # Apply all `migrations/*.sql` via `server/migrate.ts` (tracks `vt_migrations`).
       - name: 🗄️ Database migrations
@@ -198,8 +203,13 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: 🌿 Fetch default branch
+        # NO FALLBACK. The warning form exited 0, so a failed fetch let the job
+        # run on whatever `main` ref happened to be present. That is not "layer 2
+        # unavailable" — measured with the remote ref gone, this repository's own
+        # documents resolved against a stale local `refs/heads/main` and produced
+        # 100 failures, every one a true sentence about work that had landed. A
+        # fetch that cannot get the ground truth fails the job.
         run: git fetch --no-tags origin main:refs/remotes/origin/main
-          || echo "::warning::could not fetch origin/main — claim verification will report layer 2 as unavailable"
 
       - name: 🧾 Evidence gates (typecheck + i18n parity + depcruise)
         run: pnpm verify:evidence

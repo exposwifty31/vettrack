@@ -100,6 +100,7 @@ const { globToRegExp, createFacts } = require("../scripts/verify/facts.cjs") as 
 };
 const gitFacts = require("../scripts/verify/git-facts.cjs") as {
   addedLinesFromDiff(stdout: string): Set<number>;
+  resolveGitBinary(): string | { problem: string } | null;
   createGitFacts(
     root: string,
     defaultBranch: string,
@@ -602,10 +603,6 @@ describe("extraction refuses to invent defects", () => {
 });
 
 // ---------------------------------------------------------------------------
-// The gate itself, over the real repository
-// ---------------------------------------------------------------------------
-
-// ---------------------------------------------------------------------------
 // The refusals that were unreachable — every one of these was a path the engine
 // could take in silence, and silence is the one disposition it does not have
 // ---------------------------------------------------------------------------
@@ -738,6 +735,60 @@ describe("the engine refuses what it says it refuses", () => {
     } finally {
       fsModule.rmSync(probe, { recursive: true, force: true });
       fsModule.rmSync(outside, { recursive: true, force: true });
+    }
+  });
+
+  it("refuses an absence scope whose listing the walk shortened", () => {
+    // `list` skips `node_modules`, unnamed dot entries and ignored prefixes.
+    // Correct for a glob; not evidence of absence. A token sitting in a skipped
+    // file made `grepCount` return 0, and a 0 there reads as "confirmed absent"
+    // over a tree that was never fully walked — the same silent pass as an
+    // unreadable file, arriving through the filters instead of through an error.
+    const facts = createFacts(REPO_ROOT, POLICY);
+    expect(Number.isNaN(facts.grepCount("zzz-no-such-token", "."))).toBe(true);
+    // A scope with nothing filtered out of it still answers.
+    expect(facts.grepCount("zzz-no-such-token", "scripts/verify")).toBe(0);
+  });
+
+  it("refuses a package manager that would change what the script pattern means", () => {
+    // The value is file-sourced and interpolated into a RegExp. `scriptNameIn`
+    // has checked its shape since the second round; the scanner read the same
+    // field and did not — so an unbalanced value threw from inside the scan as
+    // an unhandled error where a configuration error belongs.
+    expect(() =>
+      scan.extractFromMarkdown("`pnpm run x`", { file: "PLAN.md" }, { ...POLICY, packageManager: "pn(m" }),
+    ).toThrow(/not a plain name/);
+  });
+
+  it("resolves a cross-repo GLOB through the prefix registry, not only a path", () => {
+    // A glob claim keeps its key in `pattern`. The fail branch read only
+    // `target ?? name`, so the key was "" for every glob and no cross-repo
+    // prefix could match one — a glob into the sibling repository failed
+    // instead of resolving to `registered`, while the identical path did not.
+    const context = {
+      crossRepoPrefixes: [{ prefix: "sibling-repo/", reason: "lives in the sibling checkout" }],
+    };
+    const verdict = rules.decide(
+      { kind: "glob", pattern: "sibling-repo/docs/*.md", raw: "sibling-repo/docs/*.md" },
+      { globMatches: () => 0, suffixMatches: () => 0 },
+      context,
+    );
+    expect(verdict.disposition).toBe("registered");
+  });
+
+  it("reports a bad VT_GIT_BINARY as itself, not as a missing git", () => {
+    // Both used to return null and produce one message listing the fixed paths
+    // and advising the reader to set VT_GIT_BINARY — the variable they had
+    // already set, wrongly, which sent them looking for a missing install.
+    const previous = process.env.VT_GIT_BINARY;
+    process.env.VT_GIT_BINARY = "/nope/not/here";
+    try {
+      const resolved = gitFacts.resolveGitBinary();
+      expect(typeof resolved).not.toBe("string");
+      expect((resolved as { problem: string }).problem).toContain("VT_GIT_BINARY");
+    } finally {
+      if (previous === undefined) delete process.env.VT_GIT_BINARY;
+      else process.env.VT_GIT_BINARY = previous;
     }
   });
 

@@ -171,7 +171,15 @@ function verify({ root = REPO_ROOT, now = new Date().toISOString().slice(0, 10),
     let text;
     try {
       text = fs.readFileSync(path.join(ROOT, relative), "utf8");
-    } catch {
+    } catch (error) {
+      // ONLY ENOENT MEANS ABSENT. `EACCES` on a present ledger, or `EISDIR`,
+      // read as `{ entries: [] }`: every registered claim then fails and every
+      // attested one reports "no attestation with id …", with the real cause
+      // nowhere. That is the same misdiagnosis the parse branch below was
+      // written to prevent, reached through a different error code.
+      if (error?.code !== "ENOENT") {
+        throw new Error(`${relative} could not be read: ${error?.message ?? error}`);
+      }
       return fallback;
     }
     try {

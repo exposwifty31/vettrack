@@ -44,6 +44,15 @@ function createFacts(root, policy) {
   const listingCache = new Map();
   /** Listings whose walk hit a directory it could not read. See `grepCount`. */
   const partialListings = new Set();
+  /**
+   * Listings the walk deliberately SHORTENED — `node_modules`, an unnamed dot
+   * entry, an ignored prefix. Correct for a glob, and not evidence of absence:
+   * a token sitting in a skipped file makes `grepCount` return 0, and a 0 there
+   * reads as "confirmed absent" over a tree that was never fully walked. The
+   * same silent pass as an unreadable file, arriving through the filters
+   * instead of through an error.
+   */
+  const filteredListings = new Set();
 
   const manifest = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8"));
   const dependencies = { ...(manifest.devDependencies ?? {}), ...(manifest.dependencies ?? {}) };
@@ -126,14 +135,21 @@ function createFacts(root, policy) {
         return;
       }
       for (const entry of entries) {
-        if (entry.name === "node_modules") continue;
+        if (entry.name === "node_modules") {
+          filteredListings.add(dir);
+          continue;
+        }
         // `.github/workflows/ci.yml` is cited by name in the plan docs, so the
         // dot-directories the config names are walked; the rest are not.
         if (entry.name.startsWith(".") && !(policy.includeDotDirs ?? []).includes(entry.name)) {
+          filteredListings.add(dir);
           continue;
         }
         const relative = current === "" ? entry.name : `${current}/${entry.name}`;
-        if ((policy.ignoredPathPrefixes ?? []).some((p) => `${relative}/`.startsWith(p))) continue;
+        if ((policy.ignoredPathPrefixes ?? []).some((p) => `${relative}/`.startsWith(p))) {
+          filteredListings.add(dir);
+          continue;
+        }
         out.push(entry.isDirectory() ? `${relative}/` : relative);
         if (entry.isDirectory()) walk(relative);
       }
@@ -241,7 +257,10 @@ function createFacts(root, policy) {
         // absence claim passes BECAUSE a file could not be opened. One unreadable
         // file makes the whole scope uncheckable.
         const entries = list(scope);
-        if (partialListings.has(scope)) return Number.NaN;
+        // Incomplete for EITHER reason. A directory that could not be read and a
+        // directory whose contents were filtered out are the same thing to an
+        // absence claim: files under the scope that this run never opened.
+        if (partialListings.has(scope) || filteredListings.has(scope)) return Number.NaN;
         let unreadable = 0;
         const hits = entries.filter((relative) => {
           if (relative.endsWith("/")) return false;
