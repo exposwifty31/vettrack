@@ -9906,3 +9906,51 @@ on the PR, not by me.
   so the armed path is unchanged.
 
 **Verdict:** VERIFIED
+
+## 2026-08-21 — PR #204 re-scoped after review: main already had the coverage; kept only the guard
+
+**Claim:** The `db-integration` job proposed on 2026-08-20 is withdrawn. `main` solved the coverage
+better in the meantime, and the review found a real hole in my own preflight. What survives is the
+silent-skip guard, retargeted at main's step and corrected.
+
+**Evidence — the review's three load-bearing claims, each checked against primary sources:**
+- **`main` shipped the coverage first. TRUE.** `git log --oneline -1 7a3ad3a` → "ci: the cross-repo
+  contract suites were enforced by no workflow at all". `git show origin/main:.github/workflows/ci.yml`
+  lines 286-290 run the two suites **by name** inside `integration-ops`. Branch was
+  `git rev-list --count HEAD..origin/main` = **49** behind.
+- **Named files were deliberate, and my whole-config approach would have imported a red suite. TRUE.**
+  main's ci.yml:279-285 records the measurement: `test:db-integration`'s config also pulls in
+  `equipment-operational-state`, which `test:integration:ops` already runs, and which fails 10 of 49
+  under that config's ordering. My job would have run one file twice per PR and imported that.
+- **My preflight did not assert the condition the third suite gates on. TRUE — and it is the exact
+  failure the guard existed to prevent.** `tests/equipment-operational-state.integration.test.ts:33-38`
+  does not stop at `SELECT 1`; it queries `information_schema.columns` for
+  `vt_equipment.custody_state` and sets `dbReachable = rows.length === 1`. A reachable but
+  schema-behind database passed my preflight and skipped 49 tests.
+
+**What the re-scoped change does, and its verification:**
+- No new job. `🚦 Refuse a silent skip` is now a step inside `integration-ops`, immediately before
+  main's `🩺 Cross-repo contract suites` step. Command:
+  `yaml.safe_load(ci.yml)` → `integration-ops` steps end `[…, '🔌 Integration ops suite',
+  '🚦 Refuse a silent skip', '🩺 Cross-repo contract suites (doctor gate + reviewer seed)']`;
+  `'db-integration' in jobs` → **False**.
+- Scope re-verified rather than assumed: both suites main actually runs probe **only** `SELECT 1`
+  (`doctor-shift-gate:46-62`, `seed-reviewer-demo:20-32`), so assertion 1 is exactly their condition.
+  The `custody_state` probe belongs to a file this step does not run; the script now says so in its
+  header instead of claiming a generality it does not have.
+- Added assertion 2 (`vt_clinical_check_ins` present) because doctor-shift-gate documents migrations
+  181-184 as its precondition at `:15` but does **not** probe for them — so a schema-behind database
+  would fail deep inside the suite rather than here.
+- Command: `node --check scripts/ci/db-integration-preflight.mjs` → exit 0.
+  `env -u DATABASE_URL node scripts/ci/db-integration-preflight.mjs` → refusal message, `exit=1`.
+- **Missing-tests finding addressed:** `tests/ci-db-integration-preflight.test.ts` feeds the two pure
+  predicates deliberately broken input (unset / empty / whitespace-only URL; 0 and 2 schema rows).
+  Not run locally — this container has no `node_modules`. CI on this PR is the proof.
+
+**The review's third finding is correct and is NOT closed by this PR.** Verified 2026-08-21:
+`vite.config.ts` excludes 10 entries from `pnpm test`, and a `grep -rl` over `.github/workflows/`
+returns **0** workflows for every one of them. TASKS.md now carries that as its own open row rather
+than letting the closed row imply the class is handled.
+
+**Verdict:** VERIFIED for every claim above except the new test file passing, which is PARTIAL
+pending CI.
