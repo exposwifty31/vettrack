@@ -1010,8 +1010,14 @@ describe("the engine refuses what it says it refuses", () => {
     // reason missing: exactly when a hang is most likely, the word "timeout"
     // disappeared. A failure without its cause is the defect this engine keeps
     // finding in itself, so the note now has reserved room.
-    collector.note("\nrefused: gate exceeded 1ms and was killed");
+    const refusal = "\nrefused: gate exceeded 1ms and was killed";
+    const beforeRefusal = collector.text;
+    collector.note(refusal);
     expect(collector.text).toContain("refused: gate exceeded");
+    // AND WHAT ARRIVED IS THE DIAGNOSTIC, not merely something. Asserting that
+    // the text changed would pass on a stray newline; asserting that what was
+    // appended is a leading run of the message is the property the caller needs.
+    expect(refusal.startsWith(collector.text.slice(beforeRefusal.length))).toBe(true);
     expect(bufferModule.Buffer.byteLength(collector.text, "utf8")).toBeLessThanOrEqual(limit);
   });
 
@@ -1063,8 +1069,21 @@ describe("the engine refuses what it says it refuses", () => {
     expect(collector.truncated).toBe(true);
 
     const beforeNote = collector.text;
-    collector.note("\nrefused: gate exceeded 600000ms and was killed");
-    expect(collector.text).not.toBe(beforeNote);
+    const refusal = "\nrefused: gate exceeded 600000ms and was killed";
+    collector.note(refusal);
+    // NOT `not.toBe(beforeNote)`. That passes on any change at all — a lone
+    // newline, a stray marker fragment — while claiming the diagnostic
+    // survived. Ten bytes cannot hold the words, so the assertion is that what
+    // landed is a LEADING RUN of the message: the note was cut, not replaced.
+    //
+    // AND NOT `startsWith` ALONE, which was this assertion's first draft: the
+    // message begins with "\n", so a `note()` that appended only a newline
+    // satisfied it and the probe that should have failed passed. The run has to
+    // reach the words. Probed by making `note()` append "\n" and nothing else —
+    // green before this line, red after it.
+    const appended = collector.text.slice(beforeNote.length);
+    expect(refusal.startsWith(appended)).toBe(true);
+    expect(appended.trim().length).toBeGreaterThan(0);
     expect(bufferModule.Buffer.byteLength(collector.text, "utf8")).toBeLessThanOrEqual(10);
   });
 
