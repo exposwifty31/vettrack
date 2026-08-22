@@ -96,9 +96,11 @@ that it is.**
 
 R2 measures *administered-but-not-ordered*. It cannot see *administered-but-not-witnessed* — care
 delivered without a scan, dispense event, or RFID read. If staff bypass the scan step for speed —
-which is the dominant finding in time-and-motion studies of barcode systems in human hospitals —
-then the witnessed stream is a **sample, not a record**, and the inverse-delta is partly a
-function of scan compliance rather than of care delivery.
+which this program *assumes* is common, from general knowledge of barcode systems in human
+hospitals and **without a source in hand** (§13) — then the witnessed stream is a **sample, not a
+record**, and the inverse-delta is partly a function of scan compliance rather than of care
+delivery. The assumption is what R1 exists to measure; it is not evidence and may not be cited as
+any.
 
 **Binding condition.** R1 must report a measured capture-compliance rate alongside every finding,
 and R2 must report the delta **and** the compliance rate together. If compliance is below the
@@ -321,6 +323,7 @@ makes the moat investment look larger than it is. **The moat-building share is 4
 ### R-moat (40%)
 
 #### R1 · Floor ethnography — *what actually happens between order and act*
+
 Structured observation plus time-and-motion measurement in Israeli clinics. Trace the path from
 "the vet ordered X" to "X happened": where intent fragments, what carries it (paper, whiteboard,
 verbal, WhatsApp), where it is lost, what it costs.
@@ -360,7 +363,7 @@ If 80 unordered acts actually occurred and only 40 were captured, true complianc
 
 **The calibrated formula. G1a's 70% bar is computed on this, never on the raw ratio:**
 
-```
+```text
 r        = R1's observed ratio of unordered to ordered care acts   (in-room, days)
 captures = all physical-stream care rows in the period             (allowlist per §7 R2 / M1)
 orders   = inbound PMS orders in the period                        (B1 feed or §5 extract)
@@ -372,14 +375,28 @@ Against the worked example: r = 80/100 = 0.8 → 110 ÷ (100 × 1.8) = **61%**. 
 the true rate; the raw proxy does not.
 
 **Selection-bias rule (required).** R1 must report capture compliance **separately** for ordered
-and unordered acts — call them `c_ord` and `c_unord`. If `c_unord > c_ord` (staff skip ordered
-routine work and scan the unordered extras), **M1 is inflated**, because its numerator is
-over-represented relative to its denominator. Then either:
+and unordered acts — call them `c_ord` and `c_unord`. If they differ, M1 computed from captured rows
+is biased, because each group is captured at a different rate.
 
-- correct M1 by the factor `c_ord ÷ c_unord` and report both the raw and corrected values, **or**
-- **G1a cannot pass.**
+**Reconstruct both populations before taking the share.** Scaling the observed ratio by
+`c_ord ÷ c_unord` does *not* correct it — that rescales the numerator without renormalising the
+denominator, and it is wrong for almost every combination of the two rates:
 
-If R1 cannot measure `c_ord` and `c_unord` separately, G1a cannot pass. A single blended compliance
+```text
+N_ord   = captured care events that matched an order
+N_unord = captured care events that matched no order
+
+M1 = (N_unord / c_unord) ÷ ( (N_unord / c_unord) + (N_ord / c_ord) )
+```
+
+*Worked check.* 100 ordered acts at `c_ord` 0.70 → 70 captured; 80 unordered acts at `c_unord` 0.50
+→ 40 captured. True M1 = 80/180 = **0.444**. Raw from captures = 40/110 = 0.364. The rejected ratio
+rule gives 0.364 × 1.4 = **0.509** — further from the truth than the uncorrected figure. The
+estimator above gives (40/0.5) ÷ (40/0.5 + 70/0.7) = 80/180 = **0.444**.
+
+**Undefined inputs fail the gate; they never default.** If `c_ord` or `c_unord` is zero, missing, or
+was not measured separately, or if either reconstructed population is zero, **M1 is undefined and
+G1a cannot pass.** A blended compliance
 number is not sufficient evidence for a claim about the unordered population.
 
 **Dependency, corrected (revision 4).** Revision 3 wrote "G1 cannot run before B1 exists," which
@@ -428,6 +445,41 @@ custodian for an allowlisted care event. They are never counted as care events t
 the numerator or the denominator. Any change to this allowlist is a change to the gate and requires
 re-registering the threshold under the anti-HARKing rule (§9).
 
+##### ⚠️ Canonical event identity and cross-system matching — registered before R2, not during it
+
+The allowlist says which rows are eligible. It does **not** say when two eligible rows are the same
+act, nor what "corresponds to a PMS order" means. Without both, M1 and M2 move with row duplication
+and with whoever did the matching — and a threshold that moves is not a threshold.
+
+**(a) One act, one row — deduplication inside VetTrack.** A single administration can produce a
+`vt_dispense_events` row *and* a consumable scan in `vt_scan_logs`. They are one care event.
+
+- **Precedence:** `vt_dispense_events` is canonical. A scan describing the same act is collapsed
+  into it and survives as evidence (timing, actor, location), never as a second denominator row.
+- **Identity key shape:** `clinicId` + case/patient reference + item identity + actor + an
+  event-time proximity window. The window's exact value is registered with the settling window
+  (§9 precondition 4).
+
+**(b) M1 — when does a care event *correspond to* a PMS order?** A care event counts as *ordered*
+only on a deterministic match: same `clinicId`, same case/patient reference, same item identity, and
+the order exists within the settling window of the event. Anything else is *unordered*. **Fuzzy,
+manual, or judgement-based matching is not admissible** — it is the mechanism by which a
+disappointing M1 becomes an encouraging one.
+
+**(c) M2 — when does a dispense *correspond to* an invoice line?** Same `clinicId`, same case
+reference, same item identity, and quantity reconciled within the billing period. A dispense that
+matches no such line after the settling window is uninvoiced.
+
+**(d) Unmatchable rows are reported, never dropped.** Rows that cannot be resolved under (a)–(c)
+are counted and reported as a separate `unmatched` figure alongside M1 and M2. Silently discarding
+them would move both metrics in an unknown direction.
+
+**Registration.** The concrete keys, the proximity window, and the item-identity rule are fixed and
+written into `docs/audit/PROOF_ALIGNMENT_LOG.md` **before B2a's first run**, alongside the
+thresholds. Changing any of them afterwards changes the gate and re-triggers the anti-HARKing rule
+(§9) — the numbers before and after such a change are not comparable and may not be reported as a
+trend.
+
 **Settling window (required).** An event counts as *never ordered* only after the PMS has had a
 defined interval to catch up — start at **24 hours**, tuned by R1's observed order-entry latency.
 Without it, M1 measures *PMS data-entry lag*, not blindness. Report the window with every number.
@@ -461,9 +513,11 @@ corpus.
 **Musk test:** ✅ for accounts held (§3's reclassification — a compounding switching cost, not a
 market-wide barrier), and only under §3's load-bearing-workflow condition.
 **Unblocks:** M1 → the category claim and the pitch · M2 → 0.6 pricing and 2.4's ROI Ledger.
-**Depends on B1** (compliance denominator, §7 R1) and on both streams being live (§5, §9).
+**Depends on B2a and a comparison side** — B1's feed **or** a labelled manual extract (§5, §7 R1) —
+and on both streams being live (§5, §9). B1 specifically is required for the Provet path and G2.
 
 #### R5 · The Musk audit — *a standing exercise*
+
 At every phase boundary: for **every** asset claimed, ask "could an unlimited-resource team have
 this within six months?" If yes, it is a feature, demoted or cut.
 **Output:** the dated, versioned asset register of §3, with a pass/fail and a **named Power type**
@@ -471,6 +525,7 @@ per asset. Mislabelling a Switching Cost as a Cornered Resource — revision 1's
 what this audit exists to catch.
 
 #### R6 · Admissibility and retention research
+
 What makes a chain-of-custody record acceptable to an insurer, a regulator, or in a malpractice
 proceeding: requirements, precedent, evidentiary standards, signature and retention rules.
 
@@ -508,6 +563,7 @@ retention design that survives erasure, **plus** a named switching-cost layer.
 ### R-entry (15%) — necessary, and **not** a moat
 
 #### R3 · Provet Cloud verification — *clearing Aethel's blocking backlog*
+
 Aethel's `competitive-landscape.md §6` marks the webhook catalogue **"blocks adapter design"** and
 "the single most load-bearing unverified assumption in the entire plan."
 
@@ -526,6 +582,7 @@ profile · **partner-programme terms, API-stability guarantees, and competing-fe
 not a moat.
 
 #### R4 · Incumbent capability boundary
+
 First pass complete (zero operational endpoints across ezyVet and Provet — §1). Extend to: what
 SmartFlow and Vet Radar actually do; the real ceiling of Provet's native Digital Whiteboard; ezyVet
 partner-programme stages and pilot-site requirements.
@@ -540,6 +597,7 @@ collapses in the room.
 ## 8. Track B — Build (35%) and M0 — Aethel port (5%)
 
 ### B0 · RLS floor — **promoted to G0-parallel** (was buried in Track B in revision 1)
+
 Aethel INV-005 / ADR-0003: Row-Level Security as the tenancy enforcement floor, with
 application-layer filtering as defense-in-depth rather than the control. ADR-0010 adds what
 VetTrack has not considered: **connection pooling mode is itself a tenancy control** — tenant
@@ -554,6 +612,7 @@ multi-clinic corpus depends on it, and retrofitting a tenancy floor under a live
 expensive than laying it first. **Runs in parallel with the G0 window, not after it.**
 
 ### B1 · `ProvetCloudAdapter` — inbound clinical intent
+
 **The missing organ.** Webhook ingestion + REST reads behind the existing `IntegrationAdapter`
 interface (`server/integrations/adapters/base.ts`), which already maps almost 1:1 onto Provet's
 real API — `fetchPatients` → `/patient/`, `getPatientWorklist` → `/consultation/`, `fetchInventory`
@@ -576,6 +635,7 @@ what G1a unlocks*. That is circular: the gate could not open until the instrumen
 instrument sat behind the gate. Two slices, on opposite sides of G1a:
 
 #### B2a · The meter — **runs before G1, part of R2's instrumentation**
+
 A read-only computation of M1 and M2 over the physical stream and the comparison side (B1 feed or
 §5 extract). No product surface, no storage commitment, no write path. Its only consumer is R2's
 report and the proof log.
@@ -584,6 +644,7 @@ call-sites) for M2's valuation. Honours the §7 R2 care-event allowlist and the 
 **Not blocked on R6** — it computes, it does not retain.
 
 #### B2b · The product — **opens after G1a passes**
+
 The delta as a live workflow input per §3's load-bearing condition: reconciliation, variance,
 the ROI Ledger surface, and the outbound path via `exportBillingEntry` (`generic-pms.ts:177`,
 zero callers). Task 1.4's recon established ~80% of this pipeline already exists and is
@@ -593,10 +654,12 @@ design — this is the slice where history becomes something the clinic depends 
 where §3 says the lock is either built or forfeited.
 
 ### B3 · Capture-compliance work — *conditional on R1*
+
 If R1 finds compliance below §9's threshold, closing that gap outranks everything except B1.
 Scope is unknowable before R1 and is deliberately not pre-specified.
 
 ### B5 · Install playbook and time-to-first-value — *the land-grab work item* (new in revision 3)
+
 §3 concludes that 3.0 is a land-grab race and that speed-to-install outranks feature depth.
 Revision 2 stated that conclusion and then left Track B as RLS, adapter, engine, and compliance —
 no install work at all. A strategic conclusion with no corresponding work item is decoration.
@@ -616,9 +679,11 @@ the land-grab thesis rather than with product depth.
 *Either this item exists, or §3's land-grab sentence is retracted. Revision 3 keeps both.*
 
 ### B4 · Whatever R1 surfaces
+
 Reserved capacity. **Do not pre-fill.**
 
 ### M0 · The Aethel port (5%) — *a named track, not a silent tax*
+
 Revision 1 assigned this work no home. It is real effort with a real schedule impact on G0.
 
 | Port | Destination | Why |
@@ -814,8 +879,9 @@ no third:
 2. **B1 proven end-to-end — and it is a measuring instrument, not only a feature.** Live Provet
    sandbox webhook fires → VetTrack receives the object ID → fetches the body → an operational task
    appears on the floor surface. ≤2.0s p95. Failing test written before the adapter (RED→GREEN,
-   repo law). **Both G1 gates are blocked until this ships**, because the inbound order feed is
-   M1's comparison side and the compliance proxy's denominator.
+   repo law). B1 is **required for the Provet path and for G2**. It is *not* the only way to reach
+   G1: the gates need B2a plus a comparison side, which on the lab path is a labelled manual extract
+   (§5, §9 precondition 2).
 3. **B5's time-to-first-value trends down.** Days from signed to first fact-stream row, per install.
    If it is not measured, §3's land-grab conclusion is not being executed.
 4. **R5's asset register is dated, versioned, and names a Power type per asset.** Any asset failing
