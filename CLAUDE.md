@@ -30,7 +30,7 @@ pnpm test:signup            # signup E2E flow
 
 # Architecture gates (server/schema, module boundaries, dead code)
 pnpm architecture:gates      # tsc (frontend + tsconfig.server-check.json) + depcruise + madge cycles + tenant scope + claim verification
-pnpm tenant:lint:enforce     # every query filters clinicId. Fails on findings NOT in .tenant-lint-known-violations.json
+pnpm tenant:lint:enforce     # every query filters clinicId. Fails when live findings for a file::table key exceed its recorded count
 pnpm tenant:lint:touched     # warn-only variant (touched files); reports, never fails
 pnpm depcruise:check         # dependency-cruiser boundary check against known-violations baseline
 pnpm architecture:cycles     # import-cycle regression check
@@ -164,11 +164,18 @@ ios/ android/     Capacitor native shells (capacitor.config.ts at root) — buil
 
 Every DB table has a `clinicId` column. **Every query must filter by `clinicId`.** No exceptions. Dev-bypass hardcodes `clinicId = "dev-clinic-default"`.
 
-**This is now machine-enforced, and the enforcement is baseline-relative.** `pnpm tenant:lint:enforce`
-runs inside `pnpm architecture:gates` and in CI, and fails on any finding **not** in
-`.tenant-lint-known-violations.json` — a frozen set of ~200 hand-reviewed findings, keyed
-`file::table` with a count rather than `file:line` so an unrelated edit above a finding does not
-read as a regression. A new unscoped `.from(<tenantTable>)` fails the build and names the
+**This is now machine-enforced, and the enforcement is baseline-relative — by COUNT, not by
+identity.** `pnpm tenant:lint:enforce` runs inside `pnpm architecture:gates` and in CI. It groups
+live findings by `file::table` and fails a key when the live count **exceeds** the count recorded in
+`.tenant-lint-known-violations.json` — a frozen set of ~200 hand-reviewed findings
+(`diffAgainstBaseline` in `scripts/architecture/tenant-query-lint.mjs`). Counting rather than
+pinning `file:line` is deliberate: an unrelated edit above a finding must not read as a regression.
+
+Know what that does **not** catch, because the difference is the gate's real edge: the baseline does
+not identify individual findings, so a *different* unscoped query replacing a known one at the same
+`file::table` key keeps the count equal and passes. The gate catches a new violation site and any
+net increase; it does not certify that the ~200 recorded findings are still the same ~200. A new
+unscoped `.from(<tenantTable>)` at an unrecorded key fails the build and names the
 `file:line:column`. If a finding is a genuine false positive, waive it in place with
 `// tenant-lint:scoped <reason>`; regenerate the baseline only to record a deliberate decision.
 

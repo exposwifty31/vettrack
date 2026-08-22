@@ -53,6 +53,38 @@ If any of these are missing or incomplete, say so before proceeding.
 
 ---
 
+## Gates that will fail your branch
+
+Four gates are enforced in CI and are the ones agents most often trip. `CLAUDE.md` carries the
+full detail; this is the operational minimum.
+
+```bash
+pnpm architecture:gates   # tsc (frontend + tsconfig.server-check.json) + depcruise + madge cycles
+                          #   + tenant scope + claim verification — all four, in one command
+pnpm tenant:lint:enforce  # runs inside the above; see below
+pnpm verify:claims        # every statement in a governed doc must resolve against reality
+pnpm test:integration:ops # equipment operational-state + waitlist; CI runs the suites BY NAME
+```
+
+**Tenant lint is baseline-relative by COUNT, not by identity.** It groups findings by
+`file::table` and fails a key only when the live count **exceeds** the count recorded in
+`.tenant-lint-known-violations.json` (~200 frozen, hand-reviewed findings). A red build means you
+added an unscoped `.from(<tenantTable>)` — it names the `file:line:column`. **Do not regenerate the
+baseline to make it green**; that is identical to having no gate. Waive a genuine false positive in
+place with `// tenant-lint:scoped <reason>`. Note the edge: because the baseline counts rather than
+identifies, a *different* unscoped query replacing a known one at the same key keeps the count equal
+and passes — the gate catches new sites and net increases, not substitutions.
+
+**Claim verification means documentation is checked, not trusted.** A path, line range, or "MERGED"
+claim in a governed document must resolve, or CI fails. When it does, fix the document, or register
+the claim in `docs/claims-registry.json` / `docs/attestations.json` with a reason. There is no
+fourth option and no silent skip.
+
+**DB-integration tests are excluded from `pnpm test` by default** and CI runs selected suites by
+name — a green `pnpm test` locally does not mean the DB suites ran.
+
+---
+
 ## Output Format
 
 After every task:
