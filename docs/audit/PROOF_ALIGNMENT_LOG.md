@@ -10085,3 +10085,110 @@ log grows — writing this entry took it to 998 — so the stable assertion is `
 `engine-strict=true` in `.npmrc`, npm rather than pnpm); measured there as exit 1 `EBADENGINE` on Node 26 and
 exit 0 on Node 22. That repo has no `.nvmrc` and hardcodes `node-version: '22'` in three workflow sites —
 recorded as OPEN, not fixed here.
+---
+
+## 2026-08-22 — GET /api/code-blue/eligible-managers, discovery-only (feat/code-blue-eligible-managers)
+
+**Claim:** A read-only endpoint lists the active vets/admins the Code Blue manager check would accept,
+by calling the SAME evaluator the POST calls rather than reimplementing its predicate. Nobody's
+permissions change. In `off` mode the list is every active vet/admin — one-for-one with what the POST
+accepts in that mode — and that case is explicit in code, not incidental.
+
+**Evidence — what the code does:**
+- `server/lib/authority/code-blue-eligible-managers.ts:91-92` — the `off` branch returns every
+  candidate without consulting the evaluator. Explicit, so the one-for-one property is a line of code
+  rather than a side effect of the evaluator happening to allow.
+- `server/lib/authority/code-blue-eligible-managers.ts:63` — `eq(users.clinicId, clinicId)` on the
+  `users` table itself, not via a join.
+- `server/lib/authority/code-blue-eligible-managers.ts:119` — `observe: false`, so a repeated GET
+  during an emergency does not write `shadow_would_have_denied` counters. Reads must not vote in the
+  signal the `off | shadow | enforce` rollout is decided on.
+- `server/routes/code-blue.ts:727` — mounted behind `requireAuth` + `requireClinicalUser`. The reader
+  gate at `server/routes/code-blue.ts:294` was not touched and not narrowed; the manager-validation
+  query the POST uses was not touched either.
+- `packages/contracts/src/code-blue.ts:17-33` — the shared type, re-exported from
+  `packages/contracts/src/index.ts`.
+- `packages/contracts/src/emergency.ts:59` — declared in `EMERGENCY_SERVER_ROUTE_ALLOWLIST`, which
+  `tests/offline-phase-7-emergency-surface-parity.test.ts` requires for any emergency route. Read
+  `public/sw.js` to check whether the cache-bypass list also needed it: API GETs are never written to
+  Cache Storage at all, so there was nothing to deny-list. No cache path was added.
+
+**Evidence — the cross-tenant test was proved by mutation, and the result was not what I expected:**
+Deleted the `clinicId` predicate from the candidate query and re-ran
+`tests/code-blue-eligible-managers.service.test.ts`. Three tests cover tenancy; only two failed.
+- `tests/code-blue-eligible-managers.service.test.ts:424` — the result-shaped test, in `enforce` mode
+  (`:415`), **still passed with the tenant filter deleted**. Cause, confirmed by reading
+  `server/lib/authority/code-blue-manager.wiring.ts:86-88`: the per-candidate lookup returns
+  `cross_clinic` for a foreign user, so the evaluator denied clinic B's rows on the way out and the
+  assertion never saw the leak. An application-level check masked a missing SQL predicate.
+- `tests/code-blue-eligible-managers.service.test.ts:433` — the predicate assertion caught it, because
+  it asserts on the WHERE binding rather than on the returned rows.
+- `tests/code-blue-eligible-managers.service.test.ts:442` — the `off`-mode case caught it, because no
+  evaluator runs there to mask anything.
+Both were restored to green after reinstating the predicate. Recorded because the obvious test is the
+one that would have shipped the bug: in `enforce` mode a result-only tenancy assertion here is not a
+tenancy test.
+
+**Evidence — the inaccurate comment inherited on this branch:**
+`server/lib/authority/enforcement/code-blue-manager.evaluator.ts` claimed in prose that "a guard test
+asserts no mutation call site sets it". Grepped for it; no such test existed in
+`tests/authority-code-blue-manager-observe.test.ts` or anywhere else. Wrote the guard rather than
+softening the sentence — `tests/authority-code-blue-manager-observe.test.ts:166` scans every non-test
+caller of the evaluator and fails if any but the discovery read passes `observe`. Proved it fires:
+added `observe: false` to the mutation wiring at
+`server/lib/authority/code-blue-manager.wiring.ts:134` and the run reported
+`Tests 2 failed | 7 passed (9)`, naming the offending file in the failure message; reverted, back to
+`Tests 9 passed (9)`. The comment at
+`server/lib/authority/enforcement/code-blue-manager.evaluator.ts:134-138` now names both halves.
+
+**Commands actually run on this tree:**
+- `pnpm exec vitest run tests/code-blue-eligible-managers.service.test.ts tests/code-blue-eligible-managers.route.test.ts tests/authority-code-blue-manager-observe.test.ts`
+  → `Test Files 3 passed (3)`, `Tests 33 passed (33)`.
+- `pnpm test` full suite, compared against a baseline run of the same suite on the unmodified tree:
+  baseline `Test Files 12 failed | 729 passed (741)` / `Tests 53 failed | 6754 passed | 11 skipped (6818)`;
+  with these changes `Test Files 12 failed | 731 passed (743)` / `Tests 53 failed | 6783 passed | 11 skipped (6847)`.
+  The failing FILE SET is identical between the two runs (`diff` of the two sorted lists → no output).
+  So: +29 passing, and no test that passed before fails now.
+- The 53 pre-existing failures are not twelve separate problems. Eleven of the twelve files fail in
+  `beforeEach` with `TypeError: Cannot read properties of undefined` on `localStorage`/`sessionStorage`
+  (`.clear()` in ten files, `.setItem()` in `tests/dev-role-override.test.ts`) — web storage is absent
+  from the test environment, so the bodies never run. The twelfth,
+  `tests/shift-activity-date-format.test.tsx`, is an unrelated locale-dependent date assertion. Neither
+  is touched by this branch and neither was investigated further.
+- `pnpm typecheck` → 0 errors.
+- `pnpm verify:claims` → green, `0 FAILED`.
+- `pnpm docs:audit` → regenerated `docs/audit/routes.md`. This was a real regression I caused and
+  caught: `tests/docs-audit-freshness.test.ts` failed once the route existed, because the generated
+  route inventory no longer matched the code. Only the routes inventory is in the diff; `docs/audit/db.md`
+  and `docs/audit/frontend-routes.md` regenerated with date-stamp-only changes and were reverted to keep
+  the diff to what actually changed.
+
+**Standing vetoes — both PASS, both by manual doctrine check, not by tool.** The `healthcare-reviewer`
+and `security-reviewer` subagents named in the veto reference files are not installed in this
+environment. Rather than skip, I read the doctrine and checked against it directly; this is a weaker
+instrument than the tool and is recorded as such.
+- Clinical Safety Officer — PASS. Checked against the doctrine that emergency mutations must fail loud
+  offline and never queue: this endpoint is a GET and adds no mutation, so the classifier in
+  `src/lib/offline-emergency-block.ts` is untouched. Checked against "session end is server-confirmed"
+  and "no polling-based recovery": no realtime or session-lifecycle code is in the diff. Checked against
+  the fail-open carve-out: a resolver fault keeps a candidate in the list
+  (`tests/code-blue-eligible-managers.service.test.ts:339`), so a transient failure cannot silently
+  shrink the picker during an arrest.
+- Security Master — PASS. Checked against the multi-tenancy rule that every query filters the TARGET
+  table by `clinicId`: satisfied at `server/lib/authority/code-blue-eligible-managers.ts:63` and
+  asserted on the predicate, not just the result. No new raw `db.execute`. No secrets. Role continues to
+  come from the database via the existing middleware; the endpoint reads authority and grants none.
+
+**Two observations carried out of the diff rather than fixed in it:**
+- The candidate query does not filter `deletedAt`, matching the POST's manager-validation query so the
+  two cannot disagree. Filtering only here would make the list narrower than what the POST accepts,
+  which is the exact drift this endpoint exists to prevent. Worth fixing on both sides together, not one.
+- `src/pages/code-blue.tsx` still populates its manager picker from `/api/users/managers`, which is not
+  eligibility-aware. Rewiring it is a permissions-visible UX change and was deliberately left out of a
+  discovery-only branch.
+
+**Pending, not done here:** `packages/contracts` changed, so the React Native migration repo needs
+`npm run vendor:vettrack` re-run. Correctly sequenced AFTER this merges — vendoring from an unmerged
+branch would pull unreviewed contract code into that repo.
+
+**Verdict:** VERIFIED, with the two observations above OPEN and the veto checks qualified as manual.

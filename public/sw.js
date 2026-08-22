@@ -208,7 +208,12 @@ self.addEventListener("fetch", (event) => {
   // On failure  → serve the cached shell so the SPA router + Dexie take over.
   // Fallback order: /index.html → / → inline "you are offline" message.
 
-  if (event.request.mode === "navigate") {
+  // `!isApiRequest(url)`: a navigate-mode request to an API path would otherwise
+  // be cached under "/" and "/index.html" by the branch below — this runs BEFORE
+  // the API handler, so network-only there never saw it. That reached emergency
+  // endpoints too, whose cache bypass is meant to be unconditional. Guarded on
+  // the class rather than per-path: naming one endpoint leaves the next one open.
+  if (event.request.mode === "navigate" && !isApiRequest(url)) {
     event.respondWith(
       fetch(event.request)
         .then((response) => {

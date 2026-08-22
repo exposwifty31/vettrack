@@ -17,6 +17,28 @@ describe("P1-9: SW API cache isolation", () => {
     expect(apiSection).not.toContain("cache.match");
   });
 
+  /**
+   * The API handler being network-only is not sufficient on its own: the
+   * navigation branch runs FIRST and writes any successful response under `/`
+   * and `/index.html`. A `navigate`-mode request to an API path therefore
+   * reached the shell cache without ever passing the API handler — and that
+   * includes every emergency path in the denylist, whose bypass CLAUDE.md calls
+   * unconditional. The guard belongs on the navigation branch, not on a
+   * per-endpoint list, because adding one path leaves the class open.
+   */
+  it("sw.js navigation handler refuses API URLs, so no API response is cached as the shell", async () => {
+    const fs = await import("fs");
+    const source = fs.readFileSync("public/sw.js", "utf8");
+
+    const navSection = source.slice(
+      source.indexOf("1. Navigation requests"),
+      source.indexOf("2a. Content-hashed build assets"),
+    );
+    expect(navSection).toContain('cache.put("/index.html"');
+    // The branch must exclude API URLs before it can cache anything.
+    expect(navSection).toMatch(/mode === "navigate"[\s\S]{0,80}!isApiRequest\(url\)/);
+  });
+
   it("sw.js emergency bypass denylist is preserved", async () => {
     const fs = await import("fs");
     const source = fs.readFileSync("public/sw.js", "utf8");
