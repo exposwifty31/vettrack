@@ -10040,3 +10040,44 @@ each other is not corroboration.
 
 **Verdict:** VERIFIED for the guard defect. The "dead gate" report it started from was FALSE and
 is retracted here.
+
+---
+
+## 2026-08-22 — Node engines ceiling: the range was the easy half, `engine-strict` was the load-bearing one
+
+**Task:** cap `engines.node` below 25 in both repositories, after Node 26 satisfied the open-ended
+`">=22.12.0"` and produced 12 failing test files via its built-in experimental `localStorage` — a failure
+shape that reads as broken tests, not as a wrong runtime.
+
+**What was actually measured, not assumed.** The version range alone would have been decorative. `.npmrc`
+carried `engine-strict=false`, which downgrades the check to a `WARN` and exits 0. Both halves are required,
+and each combination was run rather than reasoned about:
+
+| pnpm | `engine-strict` | Node | exit |
+|---|---|---|---|
+| 9.15.9 | `false` (prior state) | 26.7.0 | 0 — warn only |
+| 9.15.9 | `true` | 26.7.0 | 1 `ERR_PNPM_UNSUPPORTED_ENGINE` |
+| 9.15.9 | `true` | 22.14.0 | 0 |
+| 9.15.9 | `true` | 24.17.0 | 0 |
+| 11.22.0 | `true` | 26.7.0 | **0 — ignores the setting entirely** |
+
+The inverse direction was run deliberately: a ceiling that blocks Node 22 or 24 would break every CI job and
+the whole team, so "does not fire when it should not" is as much the claim as "fires when it should".
+
+**Caveat recorded because it is a live dependency, not a footnote.** pnpm 11 ignores `engine-strict`. This
+gate holds only because the `packageManager` field pins version 9.15.9 and corepack honours it. Raising that pin
+silently disarms the gate; re-measure the table above before doing so.
+
+**Blast radius, measured:** every CI job resolves Node from `.nvmrc` (`22.14.0`); `Dockerfile` is
+`node:22-alpine`, so the Railway production runtime is inside the range. Neither changes behaviour.
+
+**Docs.** `CLAUDE.md:8`, `README.md:32`, `README.md:115`, `docs/CHATGPT_PROJECT_INSTRUCTIONS.md:51` and
+`docs/cloud-agent-starter-skill.md:8` each stated a lower bound with no ceiling. Reading that line is what
+made Node 26 look supported, so leaving them would have preserved the original trap while claiming it was
+closed. `node scripts/verify-claims.mjs` re-run after the doc edits: `992 claims … 0 FAILED`,
+`All claims accounted for`.
+
+**Verdict:** VERIFIED. Ported to the RN migration repo as the same two-part change (`engines` +
+`engine-strict=true` in `.npmrc`, npm rather than pnpm); measured there as exit 1 `EBADENGINE` on Node 26 and
+exit 0 on Node 22. That repo has no `.nvmrc` and hardcodes `node-version: '22'` in three workflow sites —
+recorded as OPEN, not fixed here.
