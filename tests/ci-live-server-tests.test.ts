@@ -52,6 +52,23 @@ describe("parseResultsLine", () => {
     });
   });
 
+  it("refuses an impossible slash summary rather than deriving a negative failure count", () => {
+    // "31/29 passed" yields failed: -2, which is under every floor and reads as a
+    // pass. A suite that cannot count its own assertions is a suite that did not
+    // report, so the parser declines it rather than interpreting it.
+    expect(parseResultsLine("Results: 31/29 passed")).toBeNull();
+    expect(parseResultsLine("Results: 5/4 passed, 1 FAILED")).toBeNull();
+  });
+
+  it("still accepts an all-passed summary at the boundary", () => {
+    // The guard above must not reject the ordinary equal case.
+    expect(parseResultsLine("Results: 4/4 passed ✓")).toEqual({
+      passed: 4,
+      total: 4,
+      failed: 0,
+    });
+  });
+
   it("returns null when the suite printed no summary at all", () => {
     expect(parseResultsLine("")).toBeNull();
     expect(parseResultsLine("Test process failed: ECONNREFUSED")).toBeNull();
@@ -82,6 +99,19 @@ describe("evaluateSuite", () => {
     });
     expect(v.ok).toBe(false);
     expect(v.message).toContain("1 of 9");
+  });
+
+  it("refuses reported failures even when the suite exited 0", () => {
+    // The hole this runner exists to close, in its own failure branch: a suite whose
+    // exit path is broken says it failed and exits 0. The floor is met, so only
+    // reading the reported failure count catches it.
+    const v = evaluateSuite({
+      ...base,
+      exitCode: 0,
+      parsed: { passed: 7, total: 9, failed: 2 },
+    });
+    expect(v.ok).toBe(false);
+    expect(v.message).toContain("exited 0");
   });
 
   it("refuses a suite that shrank below its floor while exiting 0", () => {

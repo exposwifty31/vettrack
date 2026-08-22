@@ -67,6 +67,13 @@ export function parseResultsLine(stdout) {
   if (slash) {
     const passed = Number(slash[1]);
     const total = Number(slash[2]);
+    // "31/29 passed" is not a number this runner should try to interpret: it yields
+    // failed: -2, which is below every floor and reads as a pass. An impossible
+    // summary is a suite that cannot be trusted to count, so refuse to parse it and
+    // let the null branch call it what it is — a suite that did not report.
+    if (!Number.isSafeInteger(passed) || !Number.isSafeInteger(total) || passed > total) {
+      return null;
+    }
     return { passed, total, failed: total - passed };
   }
 
@@ -99,6 +106,20 @@ export function evaluateSuite({ name, exitCode, parsed, floor }) {
     return {
       ok: false,
       message: `${name}: ${parsed.failed} of ${parsed.total} assertions failed (exit ${exitCode}).`,
+    };
+  }
+  // Reported failures are a refusal even on exit 0. Today every suite ends with
+  // `if (failed > 0) process.exit(1)`, so this cannot fire — which is exactly why it
+  // is here. This runner exists because a suite's exit code is not a trustworthy
+  // summary of what it did; taking that seriously means reading the count it
+  // reported for FAILURES too, not only for shortfalls. A suite that says it failed
+  // and exits 0 has a broken exit path, and that is worse than an ordinary red.
+  if (parsed.failed > 0) {
+    return {
+      ok: false,
+      message:
+        `${name}: reported ${parsed.failed} of ${parsed.total} assertions failed but ` +
+        `exited 0. Trust the report, not the exit code — and fix the suite's exit path.`,
     };
   }
   if (typeof floor !== "number") {
