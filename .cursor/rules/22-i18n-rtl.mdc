@@ -36,7 +36,8 @@ These are physical and stay fixed when the layout mirrors — each needs an expl
 
 The highest-frequency user-visible bug. A Hebrew sentence containing an English word, a phone number, or a price can render its parts in the wrong visual order.
 
-- **Every `<input>` and `<textarea>` gets `dir="auto"`.** Without it, an English email typed into a Hebrew form jumps to the wrong side mid-typing. This is the single most visible RTL defect end users hit.
+- **Every free-text `<input>` and `<textarea>` gets `dir="auto"`.** Without it, an English word typed into a Hebrew form jumps to the wrong side mid-typing — the single most visible RTL defect end users hit.
+- **But `dir="auto"` is wrong for fixed-format fields.** It resolves direction from the first *strong* character, and a phone number, IBAN, or account number has none — so it falls back to the base direction and renders RTL. Set `dir="ltr"` explicitly on phone, email, ID, code, and IBAN inputs, and isolate their values on display too.
 - `<bdi>` for user-generated content of unknown direction (names, comments, search queries) — it isolates and auto-detects.
 - `<bdo dir="ltr">` only to *force* direction, overriding the algorithm. Use for phone numbers, IDs, code, and IBANs.
 - `<span dir="ltr">` or `unicode-bidi: isolate` around any value whose visual order must not shift.
