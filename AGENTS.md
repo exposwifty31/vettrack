@@ -59,10 +59,13 @@ Four gates are enforced in CI and are the ones agents most often trip. `CLAUDE.m
 full detail; this is the operational minimum.
 
 ```bash
-pnpm architecture:gates   # tsc (frontend + tsconfig.server-check.json) + depcruise + madge cycles
-                          #   + tenant scope + claim verification — all four, in one command
-pnpm tenant:lint:enforce  # runs inside the above; see below
-pnpm verify:claims        # every statement in a governed doc must resolve against reality
+# One command, six steps — run this first; it subsumes the two below it.
+pnpm architecture:gates   # tsc (frontend) + tsc (tsconfig.server-check.json) + depcruise
+                          #   + madge cycles + tenant lint + claim verification
+pnpm tenant:lint:enforce  # already run by architecture:gates; standalone for a faster loop
+pnpm verify:claims        # already run by architecture:gates; standalone for a faster loop
+
+# NOT part of architecture:gates — a separate CI job, and separately runnable.
 pnpm test:integration:ops # equipment operational-state + waitlist; CI runs the suites BY NAME
 ```
 
