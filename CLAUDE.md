@@ -5,7 +5,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Commands
 
 ```bash
-# Development (Node ≥ 22.12, pnpm 9.15.9 — pnpm workspace: root app + packages/*)
+# Development (Node ≥ 22.12 and < 25, pnpm 9.15.9 — pnpm workspace: root app + packages/*)
 pnpm install
 pnpm dev                    # API on :3001 + Vite on :5000 (kills ports first via predev)
 pnpm dev:bypass             # dev with Clerk forced off (VITE_FORCE_DEV_BYPASS=true CLERK_ENABLED=false)
