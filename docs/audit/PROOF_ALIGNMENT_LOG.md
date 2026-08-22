@@ -10075,7 +10075,7 @@ silently disarms the gate; re-measure the table above before doing so.
 `docs/cloud-agent-starter-skill.md:8` each stated a lower bound with no ceiling. Reading that line is what
 made Node 26 look supported, so leaving them would have preserved the original trap while claiming it was
 closed. Re-run after the doc edits with the governed command `pnpm verify:claims`, on Node 22.14.0 (the
-`.nvmrc` runtime, and the one this change makes mandatory): exit 0, `997 claims: 986 verified, 10 registered,
+`.nvmrc` runtime used for this verification; the contract admits the whole `>=22.12.0 <25` range): exit 0, `997 claims: 986 verified, 10 registered,
 1 attested, 0 FAILED`, `All claims accounted for`. That script entry is defined as `node scripts/verify-claims.mjs`,
 so the two are the same process — the governed name is recorded here because an audit entry that cites a
 private invocation cannot be re-run by a reader following the documented workflow. The total moves as this
