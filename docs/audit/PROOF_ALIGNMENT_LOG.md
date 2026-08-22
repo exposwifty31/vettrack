@@ -10346,8 +10346,10 @@ on that dirty tree.
   only on the query-key and route-contract warn steps at `:500-506`). Baseline file
   `.tenant-lint-known-violations.json` → `totalFindings: 203`, `violations` dict length 138.
   `TASKS.md:29` and `.github/pull_request_template.md:16-21` rewritten to match.
-- RN-repo facts, read this session in /Users/dan/VetTrack-RN-Migration (not this tree —
-  do not cite those paths as if they lived here): ios.buildNumber is the string 29 and
+- RN-repo facts, read this session in the RN migration checkout (repo
+  exposwifty31/VetTrack---RN-Migration- — a separate repository, deliberately named
+  by slug rather than by a local filesystem path, and its files must never be cited
+  as if they lived in this tree): ios.buildNumber is the string 29 and
   android.versionCode is 10301; g3-results still says "to be filled by the owner" for
   Pixel 7 and iPhone 16 Plus; G3-PLAN §7 P5 is UNKNOWN because the replacement Play
   account is not registered; W3B stages 0–2 ran 2026-08-21 and the
