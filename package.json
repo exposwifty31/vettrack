@@ -77,7 +77,8 @@
     "deck:seed": "tsx scripts/seed-investor-deck-demo.ts",
     "seed:reviewer-demo": "tsx scripts/seed-reviewer-demo.ts",
     "deck:capture": "tsx scripts/capture-investor-deck-screenshots.ts",
-    "deck:verify-assets": "tsx scripts/verify-investor-deck-assets.ts"
+    "deck:verify-assets": "tsx scripts/verify-investor-deck-assets.ts",
+    "test:live-server": "node scripts/ci/live-server-tests.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1037.0",
