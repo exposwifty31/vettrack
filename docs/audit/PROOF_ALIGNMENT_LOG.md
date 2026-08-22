@@ -10323,3 +10323,47 @@ cannot silently shrink. The DB-only orphans (`tests/migrations/**`, `restock.ser
 `shift-chat-window`) are **still unwired** — they are a different setup and are not covered here.
 
 **Verdict:** VERIFIED
+
+## 2026-08-22 — founder-review reset of both working trees through the verify engine
+
+**Claim:** Both checkouts sit on honest `main`; living-doc lies found in this review were
+corrected on the tree (uncommitted); both claim engines and both evidence suites ran green
+on that dirty tree.
+
+**Evidence:**
+- Capacitor HEAD `06f62efde` (`Merge pull request #217`) on `main...origin/main`. RN HEAD
+  `a137498` (`Merge pull request #107`) on `main...origin/main`. Command: `git status -sb` +
+  `git log -1 --oneline` in each repo.
+- `gh repo list exposwifty31` → exactly four public unarchived repos: `vettrack`,
+  `VetTrack---RN-Migration-`, `VetCrew`, `aethel-orchestrator`. `literate-dollop` is absent.
+  `PLAN.md:100` now states that listing and date.
+- `https://vettrack.uk/api/health` → HTTP 200
+  `{"status":"ok","type":"readiness","checks":{"db":"ok","clerk":"ok","vapid":"ok","worker":"ok"}}`.
+  Homepage title still `VetTrack — Veterinary Equipment QR Tracking System`.
+- Tenant silent-gate is closed, not warn-only: `verify.config.json:128-129` `tenant-scope` →
+  `pnpm tenant:lint:enforce`; `.github/workflows/ci.yml:495-498` step name
+  "tenant query lint (new findings only)" with **no** `continue-on-error` (that flag remains
+  only on the query-key and route-contract warn steps at `:500-506`). Baseline file
+  `.tenant-lint-known-violations.json` → `totalFindings: 203`, `violations` dict length 138.
+  `TASKS.md:29` and `.github/pull_request_template.md:16-21` rewritten to match.
+- RN-repo facts, read this session in /Users/dan/VetTrack-RN-Migration (not this tree —
+  do not cite those paths as if they lived here): ios.buildNumber is the string 29 and
+  android.versionCode is 10301; g3-results still says "to be filled by the owner" for
+  Pixel 7 and iPhone 16 Plus; G3-PLAN §7 P5 is UNKNOWN because the replacement Play
+  account is not registered; W3B stages 0–2 ran 2026-08-21 and the
+  nfc-write-readback-verified attestation exists there. Issue 95 is CLOSED
+  (closedAt 2026-08-22T02:32:56Z). Issue 94 is still OPEN; the mechanism fix commit
+  on the RN tree isolates the UID instead of flipping the sentence.
+- Command: `node scripts/verify-claims.mjs` (capacitor, Node v24.17.0) — first pass
+  before this entry: `1005 claims: 994 verified, 10 registered, 1 attested, 0 FAILED`.
+  A later pass that cited RN paths as if they were here failed 7 path-lines; those
+  citations were removed. Re-run after the rewrite:
+  `1010 claims: 999 verified, 10 registered, 1 attested, 0 FAILED`.
+- Command: `npm run verify:claims` (RN, after README + W3B-table rewrite) →
+  `540 claims: 474 verified, 61 registered, 5 attested, 0 FAILED`.
+- Command: `pnpm verify:evidence` (capacitor, `nvm use 24`) → PASS typecheck 32s,
+  i18n-parity 2s, depcruise 8s, tenant-scope 3s.
+- Command: `npm run verify:evidence` (RN) → PASS typecheck 12s, lint 27s,
+  release-preflight-offline 2s.
+
+**Verdict:** VERIFIED

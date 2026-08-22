@@ -13,12 +13,12 @@
 Triggers include: new domain boundaries, cross-domain DB access, new/changed BullMQ queues or job payloads, realtime/outbox SSE types, offline sync semantics, tenancy model, repository convention breaks, new integration vendors, pilot route surface, breaking `shared/` contracts.  
 Full list: [docs/architecture/adr/TRIGGERS.md](docs/architecture/adr/TRIGGERS.md)
 
-## Architecture governance (G3–G5, warn-only)
+## Architecture governance (G3–G5)
 
-CI reports **warnings only** for tenant lint, query keys, and route contract — not merge-blocking.  
-If you see new warnings, note them in the PR (or update baselines per [governance-known-limitations.md](docs/architecture/governance-known-limitations.md)).
+Tenant lint is **merge-blocking** on new findings (`pnpm tenant:lint:enforce` / CI "tenant query lint (new findings only)" against `.tenant-lint-known-violations.json`). Query keys and route contract stay warn-only.  
+If the tenant step fails, fix the query or record a deliberate baseline update per [governance-known-limitations.md](docs/architecture/governance-known-limitations.md).
 
-- [ ] `pnpm tenant:lint:touched` (if `server/` changed) — warnings OK during pause
+- [ ] `pnpm tenant:lint:enforce` (if `server/` changed) — new findings are a red gate, not a warning
 - [ ] `pnpm query-keys:audit` (if new/changed `queryKey` in `src/`) — run `--write-registry` if updating baseline
 - [ ] `pnpm routes:contract` (if routes/mounts changed) — run `--write-contract` if updating baseline
 
