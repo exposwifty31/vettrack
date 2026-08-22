@@ -1,0 +1,13 @@
+{
+  "$comment": "Recorded assertion counts for the live-server suites, in the same spirit as the RN repo's ios-shipped-build-floor: a number a human maintains, which nothing offline can derive. Each suite reports `Results: …` on exit, but exits 0 whenever `failed === 0` — INCLUDING when it asserted nothing. A floor turns 'ran and passed' into 'ran, passed, and ran as much as last time'. Raise a floor when a suite legitimately gains cases; never lower one to make a run go green.",
+  "$recorded": "2026-08-22, against migrations 001-186 + `pnpm seed:dev:e2e`, server on :3001 in dev-bypass",
+  "$why-these-numbers": "equipment-scan-e2e is the reason this file exists. Without the seed fixture it reports `28/29 passed, 1 FAILED`; with it, `31/31 passed`. Same script, same exit-code logic, two different totals — so a run that quietly stops creating fixtures would shrink the total while still exiting 0. Only a count catches that.",
+  "suites": {
+    "charge-alert-worker": 10,
+    "code-blue-mode-equipment": 10,
+    "equipment-scan-e2e": 31,
+    "expiry-api": 6,
+    "expiry-check-worker": 8,
+    "returns-api": 9
+  }
+}

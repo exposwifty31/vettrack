@@ -10273,3 +10273,53 @@ forward is that in both cases the failure label named the wrong layer — "build
 platform network step two stages past the build, and "flake" for a deterministic,
 correctly-refusing gate. Reading the step-level timeline rather than the summary line is what
 separated them.
+
+---
+
+## 2026-08-22 — Wire the six orphaned live-server suites into CI, gated on assertion count
+
+**Claim:** The six live-server suites excluded by `vite.config.ts` — including the two covering
+Code Blue and equipment scan — ran in no workflow. They now run in a `live-server` CI job the merge
+gate depends on, and the runner refuses a suite that passed everything it ran while running less
+than it used to.
+
+**Evidence:**
+
+- `vite.config.ts:163-168` — the six `.test.js` entries in the exclude list, read directly.
+- Command: for each of `charge-alert-worker`, `code-blue-mode-equipment`, `equipment-scan-e2e`,
+  `expiry-api`, `expiry-check-worker`, `returns-api` → `grep -rl <name> .github/workflows/` returned
+  **0 workflows**. Confirms the TASKS.md line rather than restating it.
+- `tests/code-blue-mode-equipment.test.js` (tail) — `if (failed > 0) { process.exit(1); }`. Every
+  suite has this shape, so `passed === 0 && failed === 0` exits **0**. That is the hole an exit-code
+  gate cannot see, and it is why the runner gates on a count.
+
+**The silent-skip case is real here, not hypothetical — measured both ways:**
+- Local Postgres 16 cluster + `pnpm migrate` (186 migrations applied) + API booted on :3001 in
+  dev-bypass (`/api/health` → `{"status":"ok",...,"db":"ok"}`).
+- Before `pnpm seed:dev:e2e`: `equipment-scan-e2e` → `Results: 28/29 passed, 1 FAILED`, with
+  `GET /api/equipment/eq1 returned 404`.
+- After seeding: `Results: 31/31 passed ✓`. **Same script, 29 → 31 total.** The missing fixture does
+  not merely fail one case, it stops two others from running. Had that case skipped rather than
+  failed, the suite would have gone green two assertions short with nothing to say so.
+
+**Guard proved by refusal, in both directions:**
+- Floor raised to 99 for `returns-api` → `FAIL … ran 9 assertions, floor is 99`, runner `exit=1`.
+- Floors restored, `eq1` deleted from `vt_equipment` → `FAIL equipment-scan-e2e: 1 of 29 assertions
+  failed (exit 1)`, runner `exit=1`. Fixture re-seeded → runner `exit=0`.
+
+**Gates run on this tree:**
+- `node scripts/ci/live-server-tests.mjs` → `74 assertions across 6 suites` / `PASS`.
+- `pnpm exec vitest run tests/ci-live-server-tests.test.ts` → 12 passed (every branch of the pure
+  halves, each proved by a refusal).
+- `pnpm typecheck` → clean, both tsconfigs.
+- `pnpm test` → **746 files / 6873 passed, 11 skipped**.
+- `pnpm verify:claims` → `1000 claims: 989 verified, 10 registered, 1 attested, 0 FAILED`. Needed a
+  full clone first: on the shallow checkout it refused with `[git-unavailable]`, the same correct
+  refusal recorded in the entry above this one.
+
+**Scope, stated so the next reader does not over-trust it:** the runner reads each suite's own
+summary line, so a suite that miscounts itself would fool it too. What it buys is that the count
+cannot silently shrink. The DB-only orphans (`tests/migrations/**`, `restock.service`,
+`shift-chat-window`) are **still unwired** — they are a different setup and are not covered here.
+
+**Verdict:** VERIFIED
