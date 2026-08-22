@@ -10192,3 +10192,53 @@ instrument than the tool and is recorded as such.
 branch would pull unreviewed contract code into that repo.
 
 **Verdict:** VERIFIED, with the two observations above OPEN and the veto checks qualified as manual.
+
+## 2026-08-22 — `docs/vettrack-3.0-program.md` lands governed, and the gate caught two of its own claims
+
+**Claim:** The VetTrack 3.0 program plan is added as a *governed* document, not an ungoverned one —
+`pnpm verify:claims` resolves every statement in it. Two factual claims it made about this codebase
+were wrong and were corrected against the tree before commit. The G1a/G1b thresholds are registered
+here **before** R2's first run, which is that gate's own anti-HARKing requirement (§9).
+
+**Evidence — the two corrections, checked against the tree this session:**
+- "59 API route **mounts**" was wrong. `ls server/routes/*.ts | wc -l` → **59** (that is route
+  *files*); `grep -cE "app\.use\(" server/app/routes.ts` → **58** mounts. `CLAUDE.md` states 60
+  mounts / 57 distinct routers. The doc now claims only what was measured: 59 route files under
+  `server/routes/`.
+- "~200 hand-reviewed known violations" was imprecise. `.tenant-lint-known-violations.json` carries
+  `totalFindings: 203` across a `violations` object of **138** `file::table` keys. The doc now states
+  both numbers.
+
+**Evidence — claims verified, not asserted:** `ls migrations/*.sql | wc -l` → 189 ·
+`server/integrations/adapters/generic-pms.ts:110` is `requiredCredentials: ["base_url", "api_key"]` ·
+`generic-pms.ts:177` is `async exportBillingEntry(...)` · `migrations/185_rls_role_precondition_guard.sql`
+exists · a repo-wide grep for `clinical.?order|treatment.?sheet|order.?intent|physician.?order` over
+`server/` and `src/` returns **0 files**, which is the doc's central gap claim.
+
+**Evidence — the gate run (`node scripts/verify-claims.mjs`, Node v22.14.0):**
+- First run, doc in `governedDocs`, no cross-repo prefix: **15 FAILED**, all one class — paths owned
+  by `exposwifty31/aethel-orchestrator` or the RN repo, plus a bare ~~`api-evangelist/*`~~ (now a URL).
+- After rewriting those references with repo prefixes, registering `aethel-orchestrator/` in
+  `crossRepoPrefixes`, and turning the third-party catalogue into a URL:
+  **1058 claims — 1033 verified, 24 registered, 1 attested, 1939 excluded by rule, 0 FAILED.**
+- The gate also surfaced a real error, not just a formatting one: the doc claimed the RN repo vendors
+  ~~`@vettrack/shared`~~. This repo publishes only `@vettrack/contracts` (`ls packages/` → `contracts`,
+  `rfid-controller`). The sentence was rewritten to say what is true here.
+
+**Registered before measurement (§9 anti-HARKing) — neither may be revised downward after seeing data:**
+- **G1a (thesis, M1):** ≥10% of allowlisted physical-stream care events in a clinic-month have no
+  corresponding PMS order after the settling window · two consecutive clinic-months at ≥2 clinics ·
+  calibrated compliance ≥70% (`captures ÷ (orders × (1 + r))`, never the raw `captures ÷ orders`) ·
+  unordered events cluster systematically rather than scattering.
+- **G1b (commercial, M2):** ≥15% of dispense events with no invoice line, same window and cadence, at
+  item-level-billing clinics only.
+- Settling window starts at 24h, tuned by R1's observed order-entry latency.
+
+**NOT RUN, and why:** `tests/claims-ledger.test.ts` (the vitest wrapper around the same engine) was not
+executed — this worktree has no `node_modules` (`ls node_modules | wc -l` → 0) and a docs-only change
+did not justify a full install. The engine itself is zero-dependency and was run directly, green. CI
+runs the wrapper. `pnpm` could not be used at all here: Node is v26.7.0 against the repo's
+`>=22.12.0 <25` ceiling, so the run used nvm's v22.14.0 directly.
+
+**Verdict:** VERIFIED for the claim-gate result and the two corrections. The vitest wrapper is
+**NOT RUN** and is left to CI. The G1 thresholds are registered, not yet measured — no data exists.
