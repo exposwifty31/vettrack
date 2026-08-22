@@ -40,7 +40,7 @@ Every query filters by tenant id — enforced structurally via Row Level Securit
 - Never in source, never in a client bundle, never in a log line, and **never anywhere in a URL** — path segment included. `/reset/<token>` leaks exactly like `?token=` does: into access logs, proxy logs, browser history, and `Referer` headers on every outbound link from that page. Put the secret in a header or a POST body.
 - The one common exception is a single-use, short-TTL link mailed to a user (password reset, magic sign-in). If the product needs it: one use, minutes not days, invalidated on redemption, and a `Referrer-Policy: no-referrer` on the landing page.
 - Validate all required env vars at startup and crash if one is missing. A silent `undefined` API key becomes an outage at the worst time.
-- Anything prefixed `NEXT_PUBLIC_` / `VITE_` / `PUBLIC_` is shipped to the browser. Treat those as published.
+- Anything prefixed `NEXT_PUBLIC_` / `VITE_` / `PUBLIC_` / `EXPO_PUBLIC_` is inlined into the client bundle or the shipped app binary. Treat those values as published: a mobile binary is as extractable as a JS bundle, and stripping a key from source later does not recall the builds already installed.
 - Rotate on exposure. A secret in git history is compromised even after the commit is amended.
 
 ## Sessions and Tokens

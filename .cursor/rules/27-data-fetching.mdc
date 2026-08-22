@@ -45,14 +45,16 @@ useMutation({
     return { prev }                                                   // rollback context
   },
   onError: (_e, next, ctx) => qc.setQueryData(userKeys.detail(next.id), ctx?.prev),
-  onSettled: (_d, _e, next) => {
-    qc.invalidateQueries({ queryKey: userKeys.detail(next.id) })
-    qc.invalidateQueries({ queryKey: [...userKeys.all, 'list'] })   // the row is stale too
-  },
+  onSettled: (_d, _e, next) => Promise.all([                        // returned, so the
+    qc.invalidateQueries({ queryKey: userKeys.detail(next.id) }),   // mutation stays
+    qc.invalidateQueries({ queryKey: [...userKeys.all, 'list'] }),  // pending until both
+  ]),                                                               // refetches land
 })
 ```
 
 The `cancelQueries` line is the one people omit — without it an in-flight refetch lands after your optimistic write and reverts it. Optimistic updates without a rollback path are worse than none; the UI lies about a failure.
+
+**Return the invalidation promise.** v5 awaits whatever a mutation callback returns, so returning `Promise.all([...])` keeps the mutation pending until the refetches land. Without it `isPending` flips to false while the screen still shows stale data, and a spinner disappears a beat too early.
 
 Invalidate narrowly — but invalidate **every** key the changed fields appear in. Updating a user's name and invalidating only `detail` leaves the list rendering the old name until something else happens to refetch it; that is the most common "the UI didn't update" report. Narrow means scoped to the entity, not scoped to one query.
 

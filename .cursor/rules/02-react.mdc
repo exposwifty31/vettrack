@@ -61,7 +61,7 @@ Every effect that subscribes returns a cleanup. No exceptions.
 
 ## Lists
 
-- Long lists get virtualized, on every platform. Rendering 500 rows at once is a jank guarantee.
+- Long lists get virtualized once measurement says they need it. Do not carry a row-count threshold around in your head: profile the actual list, on the slowest device it has to run on, and decide from p95 frame time and dropped-frame counts. The cost is per-row render work, not row count.
 
 ## Errors and Loading
 
