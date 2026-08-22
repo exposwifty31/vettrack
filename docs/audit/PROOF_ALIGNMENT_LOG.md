@@ -10074,8 +10074,12 @@ silently disarms the gate; re-measure the table above before doing so.
 **Docs.** `CLAUDE.md:8`, `README.md:32`, `README.md:115`, `docs/CHATGPT_PROJECT_INSTRUCTIONS.md:51` and
 `docs/cloud-agent-starter-skill.md:8` each stated a lower bound with no ceiling. Reading that line is what
 made Node 26 look supported, so leaving them would have preserved the original trap while claiming it was
-closed. `node scripts/verify-claims.mjs` re-run after the doc edits: `992 claims … 0 FAILED`,
-`All claims accounted for`.
+closed. Re-run after the doc edits with the governed command `pnpm verify:claims`, on Node 22.14.0 (the
+`.nvmrc` runtime, and the one this change makes mandatory): exit 0, `997 claims: 986 verified, 10 registered,
+1 attested, 0 FAILED`, `All claims accounted for`. That script entry is defined as `node scripts/verify-claims.mjs`,
+so the two are the same process — the governed name is recorded here because an audit entry that cites a
+private invocation cannot be re-run by a reader following the documented workflow. The total moves as this
+log grows — writing this entry took it to 998 — so the stable assertion is `0 FAILED`, not the count.
 
 **Verdict:** VERIFIED. Ported to the RN migration repo as the same two-part change (`engines` +
 `engine-strict=true` in `.npmrc`, npm rather than pnpm); measured there as exit 1 `EBADENGINE` on Node 26 and
