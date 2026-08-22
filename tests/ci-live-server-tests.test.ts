@@ -45,6 +45,19 @@ describe("parseResultsLine", () => {
     });
   });
 
+  it("refuses a slash summary whose reported failure count contradicts its totals", () => {
+    // Not producible from the suite as written: equipment-scan-e2e computes
+    // `const total = passed + failed` (tests/equipment-scan-e2e.test.js:249), making
+    // `total - passed === failed` an identity. Guarded because that identity is one
+    // edit away from dissolving, and because while the reported count was discarded,
+    // evaluateSuite's "reported failures are a refusal even on exit 0" branch could
+    // never fire for this format. The agreeing case is covered above (28/29, 1 FAILED)
+    // and must keep parsing — the cross-check accepts agreement, it does not reject
+    // the count's presence.
+    expect(parseResultsLine("Results: 9/9 passed, 1 FAILED")).toBeNull();
+    expect(parseResultsLine("Results: 28/29 passed, 3 FAILED")).toBeNull();
+  });
+
   it("takes the LAST summary line, not the first", () => {
     // A suite may echo an earlier section's tally before its own final line.
     expect(parseResultsLine("Results: 1 passed, 0 failed\nResults: 9 passed, 0 failed")).toEqual({

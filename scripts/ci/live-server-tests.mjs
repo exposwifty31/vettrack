@@ -63,7 +63,7 @@ export function parseResultsLine(stdout) {
   const line = lines.filter((l) => /^\s*Results:/.test(l)).pop();
   if (!line) return null;
 
-  const slash = line.match(/Results:\s*(\d+)\s*\/\s*(\d+)\s+passed/);
+  const slash = line.match(/Results:\s*(\d+)\s*\/\s*(\d+)\s+passed(?:,\s*(\d+)\s+FAILED)?/i);
   if (slash) {
     const passed = Number(slash[1]);
     const total = Number(slash[2]);
@@ -74,7 +74,26 @@ export function parseResultsLine(stdout) {
     if (!Number.isSafeInteger(passed) || !Number.isSafeInteger(total) || passed > total) {
       return null;
     }
-    return { passed, total, failed: total - passed };
+    const failed = total - passed;
+    // This format prints its failure count SEPARATELY from its totals, and this parser
+    // used to read the totals and throw that number away. Cross-check it instead.
+    //
+    // Not reachable from the suite as written — equipment-scan-e2e computes
+    // `const total = passed + failed` (tests/equipment-scan-e2e.test.js:249), so
+    // `total - passed === failed` is an arithmetic identity there. Guarded for two
+    // reasons that do not depend on reachability. The identity is one edit away from
+    // dissolving: a `total` changed to an expected-count constant is a natural thing
+    // to write and would break it silently. And while the reported number was
+    // discarded, evaluateSuite's "reported failures are a refusal even on exit 0"
+    // branch was DEAD for this format — a guard whose entire purpose is trusting the
+    // report over the exit code, bypassed for the one format that reports failures
+    // explicitly. An unsafe reportedFailed is caught by the same inequality, since
+    // `failed` is bounded by two safe integers and can never equal it.
+    const reportedFailed = slash[3] === undefined ? undefined : Number(slash[3]);
+    if (reportedFailed !== undefined && reportedFailed !== failed) {
+      return null;
+    }
+    return { passed, total, failed };
   }
 
   const plain = line.match(/Results:\s*(\d+)\s+passed,\s*(\d+)\s+failed/);
