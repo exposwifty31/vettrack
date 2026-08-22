@@ -1,0 +1,66 @@
+---
+description: End-to-end testing with Playwright — selector strategy, auto-waiting, test isolation, and eliminating flake.
+globs: **/e2e/**,**/*.e2e.ts,**/*.spec.ts,playwright.config.*
+alwaysApply: false
+---
+
+# Playwright / E2E
+
+E2E tests are expensive and, when flaky, actively harmful — a suite people re-run until it passes is a suite that no longer blocks anything. Keep it small, deterministic, and focused on journeys that would cost real money if broken.
+
+## Selectors, Best to Worst
+
+1. `getByRole('button', { name: 'Submit' })` — matches what the user and the screen reader perceive.
+2. `getByLabel` / `getByPlaceholder` — for form fields.
+3. `getByText` — for content.
+4. `getByTestId` — when no accessible identity exists.
+5. CSS/XPath — effectively never.
+
+A role-based selector that breaks usually means accessibility broke too. That is a feature: the test caught a real regression.
+
+## Waiting
+
+Playwright auto-waits for actionability before every interaction. Adding your own waits usually makes things worse.
+
+```ts
+await expect(page.getByRole('alert')).toHaveText('Saved')   // retries until timeout
+```
+
+- **Never** `waitForTimeout`. It is either too short (flake) or too long (slow suite) — usually both on different machines.
+- Web-first assertions (`expect(locator).toBeVisible()`) retry automatically. `expect(await locator.isVisible()).toBe(true)` does not — the `await` snapshots one moment.
+- Wait for a state, not a duration: a response, a URL, an element, a network idle.
+
+## Isolation
+
+Each test creates its own data and does not depend on another test's leftovers. Parallel workers make shared state a race by construction.
+
+- Unique data per test (`user-${testInfo.testId}@example.com`).
+- Authentication via a saved storage state in `globalSetup`, not by logging in through the UI in every test. Logging in is one test's job; the rest reuse the session.
+- Clean up in a fixture teardown, not at the end of the test body — a failing test never reaches the end.
+
+## Scope
+
+Test journeys, not pages: sign up → verify → first action. Search → filter → open result → act.
+
+Do not E2E-test validation messages, formatting, or edge cases that a unit test covers in 3ms instead of 30s.
+
+## Debugging Artifacts
+
+Configure `trace: 'on-first-retry'`, `screenshot: 'only-on-failure'`, `video: 'retain-on-failure'`. A CI failure with no artifact costs an hour of local reproduction attempts.
+
+Run with `--repeat-each=5` before merging a new test. If it fails once in five, it is flaky now and will be quarantined later.
+
+## Config
+
+- Retries in CI (1–2), zero locally — local retries hide flake from the person who introduced it.
+- Explicit `baseURL`; no hardcoded hosts.
+- `fullyParallel: true`, and `workers: 1` only as a temporary diagnostic.
+- Deterministic environment: seeded database, mocked third parties, frozen time where it matters.
+
+## NEVER
+
+- Testing against production.
+- Hardcoded credentials in a spec file.
+- One giant test asserting twenty things — the first failure hides the rest.
+- Conditional logic branching on what the page happens to show.
+- Asserting on an exact timestamp or an auto-generated id.

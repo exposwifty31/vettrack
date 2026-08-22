@@ -1,0 +1,70 @@
+---
+description: Commits, branches, and pull requests — atomic changes, useful messages, and reviewable diffs.
+globs: **/*
+alwaysApply: false
+---
+
+# Git & Pull Requests
+
+## Commits
+
+One logical change per commit. A commit that renames a variable, fixes a bug, and reformats a file cannot be reverted, cherry-picked, or bisected usefully.
+
+```
+fix(auth): reject expired refresh tokens
+
+Tokens past their expiry were accepted because the comparison
+used the issued-at claim instead of exp. Sessions could outlive
+their intended lifetime indefinitely.
+
+Fixes #482
+```
+
+- Imperative mood, under 72 characters in the subject: "add", not "added" or "adds".
+- The body explains **why**, not what — the diff already shows what.
+- Conventional prefixes (`feat` `fix` `refactor` `docs` `test` `chore` `perf`) when the repo uses them. Consistency matters more than the specific scheme.
+- Never commit unrelated formatting alongside a logic change. Reviewers cannot see the real change through 400 whitespace lines — do it in a separate commit.
+
+## Branches
+
+- Short-lived and rebased onto the trunk frequently. A branch that lives two weeks is a merge conflict accruing interest.
+- `type/short-description` — `fix/expired-token-check`.
+- Never commit directly to the default branch.
+- Force-push only to your own unshared branch, and only with `--force-with-lease`.
+
+## Pull Requests
+
+Small. A 200-line PR gets a real review; a 2000-line PR gets "LGTM". If a change must be large, sequence it as stacked PRs.
+
+The description answers: what changed, why, how it was verified, and what a reviewer should focus on. Screenshots for UI changes; before/after numbers for performance claims.
+
+Self-review the diff before requesting review. You will find the stray `console.log`, the commented-out block, and the file you did not mean to touch — and it takes two minutes rather than a round trip.
+
+## Review — Receiving
+
+**Every comment gets investigated.** Not negotiated over. A comment means a reviewer found something confusing or wrong; even when the code is correct, the confusion is real data.
+
+- Disagree with reasoning and evidence, not assertion. Then defer to the reviewer if unresolved.
+- "Fixed" is not a reply. Say what changed.
+- Never resolve a thread you did not address.
+
+## Review — Giving
+
+- Distinguish blocking from optional. Prefix non-blockers with `nit:` so the author can triage.
+- Ask about intent before asserting a bug. "What happens when `items` is empty?" beats "this is broken".
+- Review the design before the details. Ten style comments on code that should not exist is wasted effort on both sides.
+
+## Hygiene
+
+- `.gitignore` covers env files, build output, dependencies, editor state, and OS cruft — before the first commit.
+- Never commit a secret. If one lands, rotate it — history rewriting does not un-leak it.
+- Never commit generated files unless the build genuinely requires them checked in.
+- Merge conflicts resolved by understanding both sides. Do not blanket-accept one side; that silently deletes someone's work.
+
+## NEVER
+
+- `git push --force` to a shared branch.
+- `git commit -am` without reading `git diff` first.
+- "wip", "fix", "asdf" as commit messages on a branch destined for the trunk.
+- Amending or rebasing a commit that others have pulled.
+- Committing on the user's behalf unless explicitly asked.

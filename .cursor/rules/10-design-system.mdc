@@ -1,0 +1,73 @@
+---
+description: Component library and design-system discipline — shadcn/ui patterns, variants, composition over configuration, and visual quality bars.
+globs: **/components/ui/**,**/components/**/*.tsx,components.json
+alwaysApply: false
+---
+
+# Design System & UI Components
+
+## Composition Over Configuration
+
+A component with 14 boolean props is a component that should have been three components.
+
+```tsx
+// Bad: every new case adds a prop
+<Card title="X" subtitle="Y" showFooter footerAlign="right" hasIcon icon={<I/>} />
+
+// Good: the consumer composes what they need
+<Card>
+  <Card.Header><Card.Title>X</Card.Title></Card.Header>
+  <Card.Footer className="justify-end"><Button /></Card.Footer>
+</Card>
+```
+
+Ask before adding a prop: *is this a variant of the same thing, or a different thing?* Variants get `cva`. Different things get their own component.
+
+## Variants
+
+```ts
+const button = cva('inline-flex items-center rounded-md transition-colors focus-visible:ring-2', {
+  variants: {
+    intent: { primary: 'bg-brand-600 text-white', ghost: 'hover:bg-muted' },
+    size:   { sm: 'h-8 px-3 text-sm', md: 'h-10 px-4' },
+  },
+  defaultVariants: { intent: 'primary', size: 'md' },
+})
+```
+
+- Every component forwards `className` and merges it with `cn()`. A consumer must be able to adjust spacing without forking.
+- Forward `ref` and spread `...props` so native attributes, `aria-*`, and `data-*` pass through.
+- Use `asChild` (Radix `Slot`) instead of a `renderAs` prop.
+
+## Owned, Not Installed
+
+shadcn/ui components are copied into your repo. You own them.
+
+- Edit them freely, but edit the **primitive**, not fifty call sites.
+- Re-running the CLI overwrites local changes. Note customizations before updating.
+- Keep primitives (`components/ui`) free of business logic and data fetching. If it imports your API client, it is a feature component.
+
+## Accessibility Is Structural
+
+Build on Radix/Ark/React Aria primitives rather than hand-rolling. Focus trapping, `aria-activedescendant`, typeahead, and scroll locking are genuinely hard and already solved.
+
+Non-negotiables: keyboard reachable, visible focus ring, ESC closes overlays, focus restored on close, correct roles, ≥44px touch targets, and no color-only status signaling.
+
+## Visual Quality Bar
+
+Generic AI-looking UI comes from a small set of tells. Avoid them deliberately:
+
+- **Contrast** — one clear focal point per view; not everything is bold.
+- **Spacing rhythm** — a consistent scale, with generous space around the primary action.
+- **Type hierarchy** — at most 3 sizes and 2 weights per view; line-height ~1.5 for body.
+- **Motion with intent** — 150–250ms, ease-out, and respect `prefers-reduced-motion`.
+- **Real empty/loading/error states** — designed, not an afterthought spinner.
+- **Restraint** — one accent color; gradients and shadows earn their place or go.
+
+## NEVER
+
+- A wrapper component that only passes props through.
+- Hardcoded hex values or pixel spacing inside a primitive — use tokens.
+- Fixed heights on text containers — translations are longer, and Hebrew/Arabic wrap differently.
+- `div` with `onClick` where a `button` belongs.
+- Shipping a component without hover, focus, active, disabled, and loading states.

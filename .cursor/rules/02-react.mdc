@@ -1,0 +1,78 @@
+---
+description: React 19 component architecture, hook correctness, render performance, and state placement. Framework-agnostic React rules.
+globs: **/*.tsx,**/*.jsx
+alwaysApply: false
+---
+
+# React
+
+## Component Shape
+
+```tsx
+interface UserCardProps {
+  user: User
+  onSelect?: (id: string) => void
+}
+
+export function UserCard({ user, onSelect }: UserCardProps) {
+  if (!user.isActive) return <InactiveBadge />   // early return, no nesting
+  return <article onClick={() => onSelect?.(user.id)}>{user.name}</article>
+}
+```
+
+- Function declarations, not `const X = () => {}`. They hoist, and stack traces name them.
+- Props interface directly above the component. Destructure in the signature.
+- Named exports. One component per file, named after the file.
+- Under 150 lines. Past that, the component is doing two jobs — extract one.
+
+## State Placement
+
+The order to reach for, cheapest first:
+
+1. **Derived** — compute during render. `const total = items.reduce(...)`. No state, no effect, cannot desync.
+2. **Local** — `useState` in the component that owns it.
+3. **URL** — filters, sort, pagination, active tab. Survives refresh and is shareable.
+4. **Lifted** — the nearest common ancestor, only once two siblings genuinely need it.
+5. **Server cache** — TanStack Query / SWR / RSC. Server data is not client state.
+6. **Global store** — last resort, for genuinely cross-cutting concerns only.
+
+Most `useState` + `useEffect` pairs are a derived value wearing a costume.
+
+## useEffect Is Not a Lifecycle Hook
+
+An effect synchronizes with something **outside React**: a subscription, a timer, a DOM node, an imperative API.
+
+Do not use it for:
+- Deriving state from props → compute during render.
+- Fetching on mount → use the framework's loader, RSC, or a query library.
+- Reacting to a user event → put the logic in the event handler.
+- Resetting state when a prop changes → change the `key` instead.
+
+Every effect that subscribes returns a cleanup. No exceptions.
+
+## Render Performance
+
+- Do not reach for `memo`/`useMemo`/`useCallback` preemptively. Measure with the Profiler, then apply where it demonstrably helps.
+- The React Compiler handles most memoization. If it is enabled, manual memo is usually noise.
+- Never define a component inside another component — it remounts the whole subtree every render.
+- `key` is a stable identity, never an array index — with reordering, index keys corrupt state.
+
+## Lists and Forms
+
+- Long lists get virtualized. 500 DOM rows is a jank guarantee.
+- Uncontrolled inputs (`defaultValue` + `FormData`) by default; controlled only when you need to react per keystroke.
+- Every input has an associated `<label>`. Not a placeholder pretending to be one.
+
+## Errors and Loading
+
+- `<ErrorBoundary>` around each independently-failing region — not one at the app root.
+- `<Suspense>` boundaries scoped tightly so one slow query does not blank the page.
+- Skeletons matching final layout dimensions, to avoid layout shift.
+
+## NEVER
+
+- Conditional hooks, or hooks in loops.
+- Mutating state directly — `state.x = 1` then `setState(state)` will not re-render.
+- `dangerouslySetInnerHTML` without sanitizing.
+- Index as key on a reorderable list.
+- Business logic inside JSX — extract to a named function.

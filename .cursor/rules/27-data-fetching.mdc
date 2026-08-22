@@ -1,0 +1,73 @@
+---
+description: Client data fetching and server state — TanStack Query / SWR patterns, cache keys, mutations, and error/retry behavior.
+globs: **/hooks/**,**/queries/**,**/api/**,**/*.query.ts,**/*.api.ts
+alwaysApply: false
+---
+
+# Data Fetching & Server State
+
+Server data is a **cache of someone else's state**, not application state. Copying it into `useState` guarantees it goes stale and you never find out.
+
+## Query Keys Are the Cache
+
+```ts
+export const userKeys = {
+  all:    ['users'] as const,
+  list:   (filters: Filters) => [...userKeys.all, 'list', filters] as const,
+  detail: (id: string)       => [...userKeys.all, 'detail', id] as const,
+}
+```
+
+A key factory in one place. Ad-hoc inline keys mean an invalidation somewhere else silently misses, and the bug presents as "sometimes the list doesn't refresh".
+
+**Every value the fetcher depends on belongs in the key** — filters, pagination, locale, tenant. A parameter not in the key returns a stale result from a different request.
+
+## Staleness
+
+- `staleTime` is how long data is trusted without a refetch. The default of 0 refetches on every mount and focus.
+- Set it per data type: a currency rate is 30 seconds, a user profile is 5 minutes, a country list is effectively forever.
+- `gcTime` is how long an unused cache entry survives. It is not `staleTime`, and confusing them produces baffling behavior.
+- Prefetch on hover or on route intent — it is the cheapest perceived-performance win available.
+
+## Mutations
+
+```ts
+useMutation({
+  mutationFn: updateUser,
+  onMutate: async (next) => {
+    await qc.cancelQueries({ queryKey: userKeys.detail(next.id) })   // stop in-flight overwrite
+    const prev = qc.getQueryData(userKeys.detail(next.id))
+    qc.setQueryData(userKeys.detail(next.id), next)
+    return { prev }                                                   // rollback context
+  },
+  onError: (_e, next, ctx) => qc.setQueryData(userKeys.detail(next.id), ctx?.prev),
+  onSettled: (_d, _e, next) => qc.invalidateQueries({ queryKey: userKeys.detail(next.id) }),
+})
+```
+
+The `cancelQueries` line is the one people omit — without it an in-flight refetch lands after your optimistic write and reverts it. Optimistic updates without a rollback path are worse than none; the UI lies about a failure.
+
+Invalidate narrowly. `invalidateQueries()` with no key refetches everything on screen.
+
+## Errors and Retries
+
+- Do **not** retry 4xx. A 400 will be 400 forever; retrying wastes time and can duplicate side effects.
+- Retry transient failures (network, 5xx, 429) with exponential backoff and jitter.
+- Every mutation is idempotent or carries an idempotency key. A retried payment is a real incident.
+- Distinguish three UI states: no data yet, empty result, and failed. Rendering an empty list for a failed request hides the failure.
+- Global `onError` for logging and toasts; local handling for anything requiring specific recovery.
+
+## Request Hygiene
+
+- One API client with the base URL, auth header, timeout, and error normalization in one place. Scattered `fetch` calls diverge immediately.
+- Every request has a timeout and an `AbortSignal`. A hung request holds a connection and a spinner indefinitely.
+- Validate responses at the boundary — a backend contract change should fail loudly at parse time, not as `undefined` three components deep.
+- Deduplicate in-flight identical requests. The library does this if you let it own the fetch.
+
+## NEVER
+
+- `useEffect` + `fetch` + `setState` for data loading.
+- Copying query data into local state.
+- A cache key missing one of its dependencies.
+- Retrying a non-idempotent mutation without an idempotency key.
+- An infinite list without a cursor — offset pagination drifts when rows are inserted.

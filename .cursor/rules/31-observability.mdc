@@ -1,0 +1,76 @@
+---
+description: Logging, metrics, tracing, and error reporting — making production debuggable before it breaks.
+globs: **/logger*,**/telemetry/**,**/monitoring/**,**/*.ts,**/*.py,**/*.go
+alwaysApply: false
+---
+
+# Observability
+
+The question observability answers is not "is it up?" — it is "why is this specific user's request slow, right now?" Design for that question.
+
+## Structured Logs
+
+```ts
+logger.info({ userId, orderId, durationMs, event: 'order.created' }, 'order created')
+```
+
+- JSON, machine-parseable. A string log is grep-only; a structured log is queryable.
+- Consistent field names across the whole codebase — `userId` everywhere, never `user_id` in one service and `uid` in another. Inconsistency defeats aggregation.
+- A **correlation id** generated at the edge and propagated through every layer, every service, and every queue message. Without it you cannot reconstruct a single request, which is most of what you need logs for.
+- Log the event, not a sentence. `event: 'payment.declined'` is aggregatable; "Payment was declined for user" is not.
+
+## Levels That Mean Something
+
+| Level | Meaning |
+|---|---|
+| `error` | Something failed and needs human attention. Wakes someone up. |
+| `warn` | Degraded but handled — a retry succeeded, a fallback engaged. |
+| `info` | Business events: created, deleted, logged in. |
+| `debug` | Development detail. Off in production. |
+
+If everything is `error`, alerting is worthless and gets muted. That is the actual failure mode — not too few logs, but too many alarming ones.
+
+## What Never Goes in a Log
+
+Passwords, tokens, API keys, session ids, full card numbers, health records, and full request bodies containing any of the above. Redact at the logger level with a denylist, not at each call site — one missed call site is a breach.
+
+Logs are widely readable inside most organizations and are retained far longer than people assume.
+
+## Metrics
+
+The four that matter for any request-serving system: **rate, errors, duration, saturation**.
+
+- Histograms for latency, never averages. p50/p95/p99 tell you about real users; an average tells you about nobody.
+- Low-cardinality labels. A `userId` label creates a time series per user and will take down your metrics backend.
+- Business metrics alongside technical ones — orders per minute catches problems that CPU never will.
+
+## Tracing
+
+Distributed tracing is the only practical way to answer "where did the 3 seconds go" across services.
+
+- OpenTelemetry; do not build your own propagation format.
+- Spans for every external call: database, HTTP, cache, queue.
+- Trace context propagated across async boundaries and queue messages — this is the step usually skipped, and it breaks the trace exactly where debugging is hardest.
+- Sample intelligently: keep all errors and slow requests, sample the fast successes.
+
+## Errors and Alerts
+
+- Report to a real error tracker with stack trace, release version, user context (id, never PII), and breadcrumbs.
+- Group by cause, not by message — a message with an interpolated id creates a new group per occurrence and hides the pattern.
+- **Alert on symptoms users feel** — error rate, latency, failed checkouts — not on causes like CPU. High CPU with happy users is not an incident.
+- Every alert has a runbook link and a named owner. An alert nobody knows how to action gets muted within a week, and then it is worse than nothing.
+
+## Health Checks
+
+`/healthz` — is the process alive? Cheap, no dependencies. Answers "restart me?"
+`/readyz` — are dependencies reachable? Answers "send me traffic?"
+
+Conflating them causes restart loops when a database blips: the process is fine, the dependency is not.
+
+## NEVER
+
+- `console.log` as production logging.
+- Logging inside a hot loop.
+- Logging a secret or PII.
+- An alert with no owner or no runbook.
+- Deploying a feature with no way to observe whether it works.

@@ -1,0 +1,90 @@
+---
+description: Zero-compromise TypeScript. No any, proper narrowing, exhaustive types, discriminated unions, and runtime validation at the boundary.
+globs: **/*.ts,**/*.tsx,**/*.mts,**/*.cts,tsconfig*.json
+alwaysApply: false
+---
+
+# Strict TypeScript
+
+Every value is typed. Every edge case is handled. The compiler is the first test suite.
+
+## Required tsconfig
+
+```json
+{
+  "compilerOptions": {
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "verbatimModuleSyntax": true,
+    "isolatedModules": true
+  }
+}
+```
+
+`noUncheckedIndexedAccess` is the one people disable. Do not. `arr[0]` genuinely can be `undefined`.
+
+## The "No Any" Rule
+
+`any` disables the type checker for everything it touches, silently and transitively. There is always a better type.
+
+```ts
+// Use unknown, then narrow
+function parseConfig(raw: unknown): Config {
+  const result = configSchema.safeParse(raw)
+  if (!result.success) throw new ConfigError(result.error.message)
+  return result.data
+}
+```
+
+- `Record<string, unknown>` instead of `object` or `any` for open-shaped data.
+- `JSON.parse(text) as unknown`, then validate with Zod/Valibot. Never `as SomeType` on parsed JSON.
+- Third-party lib untyped? Write a `.d.ts` with the subset you actually use.
+
+## Modeling State
+
+Make illegal states unrepresentable. Prefer a discriminated union over a bag of optional fields.
+
+```ts
+// Bad: 8 possible combinations, 3 of which are nonsense
+type State = { loading?: boolean; data?: User; error?: Error }
+
+// Good: exactly 3 states
+type State =
+  | { status: 'loading' }
+  | { status: 'success'; data: User }
+  | { status: 'error'; error: Error }
+```
+
+## Exhaustiveness
+
+Every switch over a union ends with a compile-time guard:
+
+```ts
+function assertNever(x: never): never {
+  throw new Error(`Unhandled variant: ${JSON.stringify(x)}`)
+}
+```
+
+Adding a union member then becomes a compile error at every site that must handle it. This is the single highest-leverage TS pattern.
+
+## Boundaries
+
+Types are erased at runtime. Anything crossing a boundary — network, `localStorage`, env vars, form input, message events — is validated with a schema, not asserted with a cast.
+
+## Naming and Structure
+
+- `type` for unions, mapped, and conditional types. `interface` for object shapes that may be extended or declaration-merged.
+- Named exports only. Default exports break rename-refactoring and auto-import.
+- Booleans read as predicates: `isActive`, `hasPermission`, `shouldRetry`, `canEdit`.
+- Prefer `as const` objects over `enum` — enums generate runtime code and behave oddly with `isolatedModules`.
+
+## NEVER
+
+- `as any` — narrow properly, or `as unknown as T` with a comment explaining the invariant.
+- `@ts-ignore` — use `@ts-expect-error` with a reason, so it fails loudly once the error is gone.
+- Non-null `!` without a comment naming the invariant that makes it safe.
+- `Function`, `object`, or `{}` as types — all three are near-useless.
+- Barrel files (`index.ts` re-exporting everything) — they wreck tree-shaking and create import cycles.

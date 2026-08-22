@@ -1,0 +1,84 @@
+---
+description: Internationalization and RTL/bidirectional correctness, with emphasis on Hebrew. Logical properties, bidi isolation, icon mirroring, and translation-safe layout.
+globs: **/*.tsx,**/*.vue,**/*.svelte,**/*.css,**/locales/**,**/messages/**,**/i18n/**
+alwaysApply: false
+---
+
+# i18n & RTL (Hebrew)
+
+RTL is not "the layout, mirrored". It is a set of specific traps, most of which look fine until a real Hebrew string with an English word and a phone number lands in them.
+
+## Foundation
+
+Set direction on the HTML element, not in CSS: `<html lang="he" dir="rtl">`. Browsers, screen readers, and the bidi algorithm all key off the attribute.
+
+## Logical Properties, Always
+
+| Physical | Logical |
+|---|---|
+| `margin-left` / `margin-right` | `margin-inline-start` / `margin-inline-end` |
+| `padding-left` / `padding-right` | `padding-inline-start` / `padding-inline-end` |
+| `border-left` | `border-inline-start` |
+| `text-align: left` / `right` | `text-align: start` / `end` |
+| `left: 0` / `right: 0` | `inset-inline-start: 0` / `inset-inline-end: 0` |
+
+Tailwind: `ms-*` `me-*` `ps-*` `pe-*` `rounded-s-*` `rounded-e-*` `border-s-*` `text-start`. For insets, `inset-s-*` / `inset-e-*` (v4.3 renamed the deprecated `start-*`/`end-*`).
+
+Need a genuine direction-specific rule? Prefer `:dir(rtl)` over `[dir="rtl"]` — it resolves the *computed* direction, so it also matches elements inheriting from `dir="auto"`.
+
+## What Logical Properties Do Not Fix
+
+These are physical and stay fixed when the layout mirrors — each needs an explicit `:dir(rtl)` override when its direction carries meaning:
+
+`box-shadow` · `text-shadow` · `linear-gradient` angles · `transform-origin` · `background-position` · `translateX` keyframes (slide-in drawers, carousels, shimmer) · SVG and chart axes (use the charting library's `reversed` option, not CSS).
+
+## Bidirectional Text
+
+The highest-frequency user-visible bug. A Hebrew sentence containing an English word, a phone number, or a price can render its parts in the wrong visual order.
+
+- **Every `<input>` and `<textarea>` gets `dir="auto"`.** Without it, an English email typed into a Hebrew form jumps to the wrong side mid-typing. This is the single most visible RTL defect end users hit.
+- `<bdi>` for user-generated content of unknown direction (names, comments, search queries) — it isolates and auto-detects.
+- `<bdo dir="ltr">` only to *force* direction, overriding the algorithm. Use for phone numbers, IDs, code, and IBANs.
+- `<span dir="ltr">` or `unicode-bidi: isolate` around any value whose visual order must not shift.
+
+**Format first, then isolate.** These are two different fixes and people conflate them constantly. Use `Intl.NumberFormat('he-IL', { style: 'currency', currency: 'ILS' })` and `Intl.DateTimeFormat('he-IL')` to produce the correct string; isolation only stops an already-correct string from flipping.
+
+## Icon Mirroring
+
+Mirror icons whose meaning depends on reading direction. Leave the rest alone.
+
+**Mirror:** back/forward arrows, breadcrumb chevrons, send arrows, carousel and pagination arrows, indent and reply arrows, forward-motion progress.
+**Do not mirror:** logos, checkmarks, close/X, media play buttons (they point at a timeline, not at reading order), clocks, and depictions of physical objects.
+
+Flip with `transform: scaleX(-1)`, not `rotate-180` — rotation also flips vertically.
+
+## Portalled UI
+
+Modals, dropdowns, tooltips, and toasts mount at `document.body` and often assume LTR regardless of the page. Set `dir` on `<html>` **and** the library's own direction setting — Radix `<DirectionProvider dir="rtl">`, MUI theme `direction: 'rtl'`. Otherwise popovers open on the wrong side while the rest of the page looks correct.
+
+## Layout Traps
+
+- Flexbox `row` **already** reverses under RTL. Adding `row-reverse` double-flips it back to LTR order — a very common accidental bug.
+- Progress bars fill from the right; sliders and swipe gestures reverse.
+- Numeric, code, and date table cells stay LTR (`<td dir="ltr">`) even inside an RTL table.
+- Fixed/sticky chrome with a hardcoded `left: 0` will not move. Scrollbars sit on the left — `scrollbar-gutter: stable` prevents reflow.
+
+## Translation-Safe Layout
+
+- German runs ~30% longer than English, Hebrew often shorter but with different wrapping. **Never a fixed height or width on a text container.**
+- No string concatenation to build a sentence — grammar and word order differ. Use interpolation with named placeholders.
+- Plurals via ICU MessageFormat. Hebrew has singular, dual, and plural forms; an `if (n === 1)` is wrong in several languages.
+- Never hardcode date, number, or currency formatting. `Intl` knows the locale rules; you do not.
+- Hebrew typography: `line-height: 1.7`, slightly larger base size, and **never `letter-spacing`** — it breaks Hebrew letterforms visually.
+
+## Verify Before Shipping
+
+Flip the whole app to `dir="rtl"` and look for anything that did not move — that element is still using a physical property. Test this canonical string in every text surface: `שלום John 050-1234567 ₪1,234`. It exercises Hebrew, Latin, a phone number, and a currency amount at once. Then open every modal, dropdown, tooltip, and toast.
+
+## NEVER
+
+- A hardcoded user-facing string in a component.
+- `text-align: left` in a bidi-capable app.
+- `row-reverse` used as a way to "make it RTL".
+- Assuming a translated string fits the original's box.
+- Locale detection from a timezone or an IP — ask, or read `Accept-Language`.

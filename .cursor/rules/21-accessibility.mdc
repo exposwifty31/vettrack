@@ -1,0 +1,67 @@
+---
+description: WCAG 2.2 AA in practice — semantics, keyboard, focus, ARIA, contrast, motion, and forms. Applies to any UI code.
+globs: **/*.tsx,**/*.jsx,**/*.vue,**/*.svelte,**/*.astro,**/*.html
+alwaysApply: false
+---
+
+# Accessibility
+
+Not a checklist bolted on before launch. Most of it is free if the markup is right, and expensive to retrofit if it is not.
+
+## Semantics First
+
+The correct element brings keyboard support, focus behavior, and screen-reader semantics with it, for free.
+
+- `<button>` for actions, `<a href>` for navigation. A `div` with `onClick` is unreachable by keyboard, invisible to assistive tech, and does not fire on Enter/Space.
+- Real landmarks: `<header> <nav> <main> <aside> <footer>`. One `<main>` per page.
+- One `<h1>`, then a heading order with no skipped levels. Screen-reader users navigate by heading — a broken outline is a broken table of contents.
+- `<ul>`/`<ol>` for lists, `<table>` with `<th scope>` for tabular data.
+
+**The first rule of ARIA is not to use ARIA.** `role="button"` on a div is strictly worse than a button. ARIA adds semantics; it never adds behavior.
+
+## Keyboard
+
+Every interactive element is reachable and operable with a keyboard alone. Test by unplugging the mouse and completing the primary flow.
+
+- Visible focus indicator, ≥3:1 contrast against its background. Never `outline: none` without a stronger replacement.
+- `:focus-visible` so keyboard users get a ring and mouse users do not.
+- DOM order matches visual order. Positive `tabindex` values reorder the whole page and are effectively always a bug.
+- Modals: focus moves in on open, is trapped inside, ESC closes, focus returns to the trigger on close.
+- A "skip to content" link as the first focusable element.
+
+## Forms
+
+- Every input has a `<label for>` or an `aria-label`. A placeholder is not a label — it vanishes on typing and usually fails contrast.
+- Errors are associated with `aria-describedby` and announced via a live region. A red border alone communicates nothing to a screen-reader or a colorblind user.
+- Group related controls in `<fieldset>` with a `<legend>`.
+- Correct `type` and `autocomplete` attributes — this is a large usability win on mobile, not just an a11y one.
+- Never validate on every keystroke before first blur; it announces errors while the user is mid-word.
+
+## Visual
+
+- Contrast: 4.5:1 body text, 3:1 for large text and UI component boundaries.
+- Never color alone to convey meaning — pair it with an icon, text, or pattern.
+- Layout survives 200% zoom and a 320px viewport without horizontal scroll.
+- Touch targets ≥44×44px with adequate spacing.
+- Respect `prefers-reduced-motion` — vestibular disorders make parallax and large transforms genuinely nauseating.
+
+## Dynamic Content
+
+- Live regions (`aria-live="polite"`) for async status: saved, error, results count.
+- Focus management on route change in an SPA — otherwise focus stays on the old page and the user hears nothing.
+- Loading states announced, not just visually spinning.
+- `alt` text describes purpose: `alt="Delete invoice 4821"`, `alt=""` for decorative images.
+
+## Verify
+
+Automated tooling (axe, Lighthouse) catches roughly a third of issues. It cannot judge whether your alt text is meaningful or your focus order makes sense.
+
+Manual pass: keyboard-only, screen reader on one flow (VoiceOver/NVDA), 200% zoom, and a contrast check.
+
+## NEVER
+
+- `outline: none` with no replacement.
+- `aria-hidden` on a focusable element — it creates a control screen-reader users can reach but cannot identify.
+- Autoplaying audio or video with sound.
+- A time limit with no way to extend it.
+- `role` or `tabindex` used to make a `div` behave like a native element.

@@ -1,0 +1,69 @@
+---
+description: Application security — authn/authz, injection, secrets, multi-tenancy isolation, and the OWASP failures that actually happen.
+globs: **/auth/**,**/middleware/**,**/api/**,**/*.env*,**/security/**,**/*.ts,**/*.py,**/*.go
+alwaysApply: false
+---
+
+# Security
+
+Written around the failures that occur in real codebases, not the ones that appear in slide decks.
+
+## Authorization Is the #1 Real Vulnerability
+
+Broken access control outranks everything else in practice, and it looks like ordinary code.
+
+- **Never trust a client-supplied identifier.** `GET /invoices/:id` must verify that the *authenticated* user owns that invoice — the fact that the UI only ever links to their own is not a control.
+- Authorize on the **server**, per request, per object. A hidden button is not a permission.
+- Deny by default. New endpoints are protected unless explicitly opened, not the reverse.
+- Check authorization **before** validation and before any side effect, so a 403 never leaks whether a record exists.
+
+## Multi-Tenancy
+
+If one bug can expose another tenant's data, discipline is not enough of a control.
+
+Every query filters by tenant id — enforced structurally via Row Level Security or a repository layer that cannot construct an unfiltered query. Add a test that fails when a new query bypasses the filter. The tenant id comes from the **session**, never from a request parameter or header.
+
+## Injection
+
+- Parameterized queries, always. String-interpolated SQL is the vulnerability regardless of how internal the input feels.
+- Never pass user input to a shell. If you must invoke a process, use an argument array — never a concatenated command string.
+- Path traversal: resolve and confirm the result is inside the intended directory. `../` in a filename is a classic.
+- SSRF: user-supplied URLs are fetched only against an allowlist, with redirects disabled and internal ranges (169.254.169.254, 10.x, 127.x) blocked. Cloud metadata endpoints are the standard target.
+- XSS: framework escaping by default. `dangerouslySetInnerHTML` / `v-html` / `set:html` require sanitization with a real library, not a regex.
+
+## Secrets
+
+- Never in source, never in a client bundle, never in a log line, never in a URL query string (they land in access logs and referrers).
+- Validate all required env vars at startup and crash if one is missing. A silent `undefined` API key becomes an outage at the worst time.
+- Anything prefixed `NEXT_PUBLIC_` / `VITE_` / `PUBLIC_` is shipped to the browser. Treat those as published.
+- Rotate on exposure. A secret in git history is compromised even after the commit is amended.
+
+## Sessions and Tokens
+
+- Passwords hashed with argon2id or bcrypt (cost ≥12). Never a general-purpose hash, never a homemade scheme.
+- Session cookies: `httpOnly`, `secure`, `sameSite=lax` (or `strict`), with a real expiry. A JWT in `localStorage` is readable by any XSS.
+- Short-lived access tokens with refresh rotation; revocation must actually work.
+- Constant-time comparison for tokens and signatures. A `===` on a secret leaks it through timing.
+- Rate-limit login, password reset, and MFA — per account **and** per IP.
+
+## Input and Output
+
+- Validate at the boundary with a schema: type, range, length, and format. A missing max length is a memory-exhaustion vector.
+- Allowlist over denylist. You cannot enumerate every bad input.
+- Upload handling: verify content by magic bytes not extension, cap size, strip metadata, store outside the web root, and serve from a separate origin.
+- Errors return a generic message plus a correlation id. Stack traces, SQL text, and library versions are reconnaissance.
+
+## Dependencies and Headers
+
+- Lockfile committed; automated vulnerability scanning in CI.
+- Pin actions and base images by digest — a mutable tag is a supply-chain hole.
+- `Content-Security-Policy`, `Strict-Transport-Security`, `X-Content-Type-Options: nosniff`, `Referrer-Policy`.
+- CORS with an explicit origin allowlist. `Access-Control-Allow-Origin: *` with credentials is not a valid combination.
+
+## NEVER
+
+- Rolling your own crypto, session handling, or password reset flow.
+- `eval`, `exec`, or dynamic `require` on anything derived from input.
+- Logging a password, token, full card number, or health record.
+- Disabling TLS verification "temporarily".
+- An authorization check performed only in the UI.

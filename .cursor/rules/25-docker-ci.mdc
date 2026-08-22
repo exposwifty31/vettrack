@@ -1,0 +1,66 @@
+---
+description: Containers and CI/CD — reproducible images, fast reliable pipelines, and safe deployment.
+globs: Dockerfile*,docker-compose*,.github/workflows/**,.gitlab-ci.yml,**/*.tf,k8s/**
+alwaysApply: false
+---
+
+# Docker & CI/CD
+
+## Images
+
+```dockerfile
+FROM node:22-slim AS deps
+WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev            # cached until the lockfile changes
+
+FROM node:22-slim AS runtime
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+USER node                        # never root
+EXPOSE 3000
+CMD ["node", "server.js"]
+```
+
+- **Layer order follows change frequency.** Dependencies before source, or every source edit reinstalls everything.
+- Multi-stage builds: build tools and dev dependencies never reach the final image. Smaller image, smaller attack surface.
+- Pin base images by digest, not a mutable tag. `node:22` today is not `node:22` next month.
+- Run as a non-root user. A container escape from root is a host compromise.
+- A real `.dockerignore` — otherwise `node_modules`, `.git`, and `.env` get copied into the build context and possibly into the image.
+- One process per container. Need a sidecar? That is a second container.
+- Configuration by environment variable; secrets by mount or a secret manager, never `ENV` (they persist in image layers).
+
+## Pipelines
+
+Order stages so the cheapest failure comes first: lint → typecheck → unit tests → build → integration → e2e → deploy. Failing lint after a 12-minute e2e run wastes everyone's time.
+
+- The full gate runs on every PR, not only on the trunk.
+- Cache dependencies keyed on the lockfile hash.
+- Run independent jobs in parallel; declare dependencies explicitly.
+- Fail on warnings. A warning nobody must fix is a warning nobody reads.
+- A flaky test is quarantined with a tracking issue, not retried into apparent success. Blanket retries hide real race conditions.
+
+## Secrets and Permissions
+
+- Repository/organization secrets, never a literal in a workflow file.
+- Minimum token permissions (`permissions: contents: read` and widen deliberately).
+- Pin third-party actions to a commit SHA. A tag can be moved to point at malicious code.
+- Never `echo` a secret; CI logs are often broadly readable.
+- Untrusted PRs from forks do not get secrets. `pull_request_target` with a checkout of PR code is a known code-execution path.
+
+## Deployment
+
+- Same artifact promoted through environments. Rebuilding per environment means you tested something else.
+- Migrations run before the new code that needs them, and are backward compatible — during a rolling deploy both versions run against one schema.
+- Health and readiness probes are distinct: liveness answers "restart me?", readiness answers "send me traffic?".
+- A rollback path that has actually been exercised. An untested rollback is a hope.
+- Deploys are gradual (canary or percentage rollout) with automatic halt on error-rate regression.
+
+## NEVER
+
+- `latest` as a base image tag.
+- A secret baked into an image layer.
+- `docker run --privileged` outside a deliberate, documented case.
+- Deploying without a rollback plan.
+- `curl | bash` in a build step.

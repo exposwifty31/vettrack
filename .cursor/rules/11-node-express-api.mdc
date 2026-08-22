@@ -1,0 +1,74 @@
+---
+description: Node.js REST APIs with Express/Fastify and TypeScript — layered architecture, validation, error handling, and production hardening.
+globs: src/routes/**,src/controllers/**,src/services/**,src/repositories/**,src/middleware/**,server.ts,app.ts
+alwaysApply: false
+---
+
+# Node.js API (Express / Fastify)
+
+## Layers, and What Each May Import
+
+```
+routes/        wiring only: path -> middleware -> controller
+controllers/   parse request, call service, format response
+services/      business logic. NO Request/Response types here.
+repositories/  all database access. No SQL anywhere else.
+middleware/    auth, validation, rate limiting, error handling
+```
+
+The dependency rule: **downward only.** A service that imports `Request` cannot be unit-tested or reused from a queue worker or a CLI. A controller that writes SQL has made the database unswappable.
+
+## Validation at the Edge
+
+```ts
+const createUser = z.object({
+  email: z.string().email(),
+  age: z.number().int().min(13).max(120),
+})
+
+router.post('/users', validate(createUser), asyncHandler(async (req, res) => {
+  const user = await userService.create(req.validated)
+  res.status(201).json({ data: user })
+}))
+```
+
+Validate params, query, body, and headers. **Never trust a client-supplied `id` for authorization** — always re-check ownership server-side. This is the most common real vulnerability in a codebase that otherwise looks careful.
+
+## Errors
+
+```ts
+export class AppError extends Error {
+  constructor(message: string, public statusCode: number, public isOperational = true) {
+    super(message)
+    Error.captureStackTrace(this, this.constructor)
+  }
+}
+```
+
+- Services throw domain errors. Controllers never build HTTP status codes from string matching.
+- One global error middleware, registered **last**, maps domain errors to status codes.
+- Distinguish operational errors (bad input, not found — expected) from programmer errors (bugs — should alert).
+- Never leak a stack trace or a raw DB error to a client. Log the detail; return a correlation id.
+
+## Async Correctness
+
+- Every async route handler is wrapped so rejections reach the error middleware. An unhandled rejection in Express 4 silently hangs the request.
+- Independent awaits run under `Promise.all`. Sequential awaits that do not depend on each other are latency you chose.
+- Every outbound call gets a timeout and an `AbortSignal`. A hung upstream should not hold your connection pool.
+- Long work goes to a queue and returns `202` with a status URL. Do not hold an HTTP connection for 30 seconds.
+
+## Production Hardening
+
+- `helmet`, CORS with an explicit origin allowlist (never `*` with credentials), and rate limiting on auth and write routes.
+- Graceful shutdown: stop accepting connections, drain in-flight requests, close the DB pool, then exit.
+- Structured JSON logs (`pino`) with a request id propagated through every layer. `console.log` is not logging.
+- Health endpoints: `/healthz` (process alive) and `/readyz` (dependencies reachable) — they are not the same check.
+- Every response uses a consistent envelope: `{ data }` or `{ error: { code, message } }`.
+
+## NEVER
+
+- Business logic in a controller.
+- SQL in a service.
+- Secrets read from anywhere but validated env at startup — fail fast if one is missing.
+- `res.send(err)` — that ships internals to an attacker.
+- Blocking the event loop: sync `fs`, sync crypto, or a JSON.parse of a 50MB payload.
