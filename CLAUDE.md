@@ -22,6 +22,7 @@ pnpm test -- --reporter=verbose  # with detail
 pnpm test -- tests/some.test.ts  # single file
 pnpm test:db-integration    # equipment-operational-state DB test (needs DATABASE_URL + migrations)
 pnpm test:integration:ops   # equipment operational-state + waitlist integration tests
+pnpm test:live-server       # the six live-server suites, gated on assertion COUNT (needs API on :3001)
 pnpm test:rfid-controller   # packages/rfid-controller unit tests (own vitest config)
 pnpm test:playwright:ci     # Playwright CI suite (Chromium). Suite selection is PW_SUITE env → allowlist in playwright.config.ts
 pnpm test:playwright:phase9 # Phase 9 realtime/PWA drills (needs running app)
@@ -30,7 +31,7 @@ pnpm test:signup            # signup E2E flow
 
 # Architecture gates (server/schema, module boundaries, dead code)
 pnpm architecture:gates      # tsc (frontend + tsconfig.server-check.json) + depcruise + madge cycles + tenant scope + claim verification
-pnpm tenant:lint:enforce     # every query filters clinicId. Fails on findings NOT in .tenant-lint-known-violations.json
+pnpm tenant:lint:enforce     # every query filters clinicId. Fails when live findings for a file::table key exceed its recorded count
 pnpm tenant:lint:touched     # warn-only variant (touched files); reports, never fails
 pnpm depcruise:check         # dependency-cruiser boundary check against known-violations baseline
 pnpm architecture:cycles     # import-cycle regression check
@@ -164,11 +165,18 @@ ios/ android/     Capacitor native shells (capacitor.config.ts at root) — buil
 
 Every DB table has a `clinicId` column. **Every query must filter by `clinicId`.** No exceptions. Dev-bypass hardcodes `clinicId = "dev-clinic-default"`.
 
-**This is now machine-enforced, and the enforcement is baseline-relative.** `pnpm tenant:lint:enforce`
-runs inside `pnpm architecture:gates` and in CI, and fails on any finding **not** in
-`.tenant-lint-known-violations.json` — a frozen set of ~200 hand-reviewed findings, keyed
-`file::table` with a count rather than `file:line` so an unrelated edit above a finding does not
-read as a regression. A new unscoped `.from(<tenantTable>)` fails the build and names the
+**This is now machine-enforced, and the enforcement is baseline-relative — by COUNT, not by
+identity.** `pnpm tenant:lint:enforce` runs inside `pnpm architecture:gates` and in CI. It groups
+live findings by `file::table` and fails a key when the live count **exceeds** the count recorded in
+`.tenant-lint-known-violations.json` — a frozen set of ~200 hand-reviewed findings
+(`diffAgainstBaseline` in `scripts/architecture/tenant-query-lint.mjs`). Counting rather than
+pinning `file:line` is deliberate: an unrelated edit above a finding must not read as a regression.
+
+Know what that does **not** catch, because the difference is the gate's real edge: the baseline does
+not identify individual findings, so a *different* unscoped query replacing a known one at the same
+`file::table` key keeps the count equal and passes. The gate catches a new violation site and any
+net increase; it does not certify that the ~200 recorded findings are still the same ~200. A new
+unscoped `.from(<tenantTable>)` at an unrecorded key fails the build and names the
 `file:line:column`. If a finding is a genuine false positive, waive it in place with
 `// tenant-lint:scoped <reason>`; regenerate the baseline only to record a deliberate decision.
 
@@ -374,7 +382,7 @@ Use `logAudit()` from `server/lib/audit.ts` for all critical actions. It is fire
 
 `pnpm test` runs vitest. Several test groups are excluded by default in `vite.config.ts`:
 - DB integration tests (require `DATABASE_URL` + applied migrations): `tests/restock.service.test.ts`, `tests/migrations/**`, `tests/equipment-operational-state.integration.test.ts`, `tests/shift-chat-window.integration.test.ts`, `tests/seed-reviewer-demo.integration.test.ts`, `tests/doctor-shift-gate.integration.test.ts`, `tests/tenant-pooling-isolation.integration.test.ts`. Dedicated runners cover only a subset: `pnpm test:db-integration` (`vitest.db-integration.config.ts` — equipment-operational-state, seed-reviewer-demo, doctor-shift-gate; **CI runs the latter two by name** inside the `integration-ops` job rather than this whole config, because equipment-operational-state fails under this config's ordering while passing under the ops one), `pnpm test:integration:ops` (operational-state + waitlist), `pnpm test:rls-pooling` (`vitest.rls-pooling.config.ts` — tenant-pooling-isolation; runs real DDL, needs `RLS_POOLING_PROBE=1` + `RLS_PROBE_DATABASE_URL` pointed at a throwaway database); the shift-chat test runs directly via `pnpm exec tsx tests/shift-chat-window.integration.test.ts`. `tests/restock.service.test.ts` and `tests/migrations/**` have no runner — invoke them directly via `pnpm exec tsx <file>`.
-- Live-server tests (require dev server on :3001): `tests/charge-alert-worker.test.js`, `tests/code-blue-mode-equipment.test.js`, `tests/equipment-scan-e2e.test.js`, `tests/expiry-api.test.js`, `tests/expiry-check-worker.test.js`, `tests/returns-api.test.js`
+- Live-server tests (require dev server on :3001): `tests/charge-alert-worker.test.js`, `tests/code-blue-mode-equipment.test.js`, `tests/equipment-scan-e2e.test.js`, `tests/expiry-api.test.js`, `tests/expiry-check-worker.test.js`, `tests/returns-api.test.js`. ~~No workflow named any of them.~~ *Corrected 2026-08-22:* they now run in CI's `live-server` job via `pnpm test:live-server` (`scripts/ci/live-server-tests.mjs`), and the merge gate depends on it. **The runner gates on the reported assertion count, not just the exit code** — each suite ends with `if (failed > 0) process.exit(1)`, so a suite that asserted nothing exits 0; `scripts/ci/live-server-assertion-floors.json` records what each one ran (74 total) and a shortfall is a failure. The job seeds `eq1` via `pnpm seed:dev:e2e` first, because without that fixture `equipment-scan-e2e` reports 29 assertions instead of 31 rather than merely failing one
 - Phase 9 deterministic drills: `tests/phase-9-deterministic-drills.test.ts` covers bounded-counter contracts in unit form; `tests/phase-9-drills.spec.ts` is the Playwright browser harness for the eight realtime/PWA drills.
 
 E2E tests use Playwright: `pnpm test:signup` (requires Chromium). The Phase 9 drills also use Playwright and require a running app — invoke through the dedicated `playwright.ui.config.ts` / `playwright.config.ts` runners. Playwright discovery is allowlist-only via the `PW_SUITE` env var (default `ci`). Server-side smoke tests run via `pnpm test:server:smoke` (tsx-executed, not vitest). The `packages/rfid-controller` tests run separately via `pnpm test:rfid-controller`.

@@ -820,9 +820,14 @@ no third:
    If it is not measured, §3's land-grab conclusion is not being executed.
 4. **R5's asset register is dated, versioned, and names a Power type per asset.** Any asset failing
    the six-month test is demoted in the same commit that records the failure.
-5. **B0 shrinks the tenancy baseline.** `.tenant-lint-known-violations.json` must get **smaller**,
-   never larger. `pnpm architecture:gates`, `pnpm tenant:lint:enforce`, `pnpm verify:claims`,
-   `pnpm typecheck` all green.
+5. **B0 lowers the recorded tenancy counts.** `.tenant-lint-known-violations.json` records a count
+   per `file::table` key, and `tenant:lint:enforce` fails a key when the live count **exceeds** it.
+   B0's work must drive those recorded counts **down**, never up. Note what that gate does not do —
+   `CLAUDE.md` is explicit that the baseline is relative **by count, not by identity**, so a
+   different unscoped query replacing a known one at the same key keeps the count equal and passes.
+   Reaching RLS on a key is therefore proven by removing the key, not by watching it hold steady.
+   `pnpm architecture:gates`, `pnpm tenant:lint:enforce`, `pnpm verify:claims`, `pnpm typecheck`
+   all green.
 6. **Every claim in this document is governed.** Add it to `verify.config.json` so
    `pnpm verify:claims` checks it. A strategy document that starts lying should fail CI like any
    other.

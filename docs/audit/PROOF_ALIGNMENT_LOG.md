@@ -10193,6 +10193,136 @@ branch would pull unreviewed contract code into that repo.
 
 **Verdict:** VERIFIED, with the two observations above OPEN and the veto checks qualified as manual.
 
+## 2026-08-22 — the deploy that failed after its healthcheck passed, and the CI failure that was not a flake
+
+**Two red signals, reported together, sharing nothing but a timestamp.** Neither was what its
+label said, and in both cases the label pointed away from the cause.
+
+### 1. "Build failed" on Railway — the build did not fail
+
+`CI — VetTrack` failed on the tip of `main`. Every quality job passed — typecheck, frontend
+build, all four test shards, integration ops, RFID controller, architecture gates, claim
+verification. Only `🚢 Deploy to Railway` failed, and `✅ Merge gate` failed because of it.
+
+The deploy job's log showed the image built and pushed, then `[1/1] Healthcheck succeeded!` at
+04:09:34, then **seven minutes with zero output**, then `Deploy failed` at 04:16:34. The
+container's own log ends at 04:09:25 and totals 246 lines — it did not crash, it had nothing
+more to say.
+
+**What was ruled out by measurement, not by reasoning:**
+- The two startup errors in the failed container's log (`UNHANDLED PROMISE: Stream isn't
+  writeable`, from the non-fatal `/collab-ws` Redis adapter path, and a caught
+  `stale-returned-sweep` duplicate-key) appear **identically in the deployment that succeeded
+  90 minutes earlier**. Noise, not cause.
+- Not resource exhaustion: peak memory 660 MB against a 24576 MB limit, peak CPU 0.15 of 24 vCPU.
+- Not a regression in the delta: the only commits between the two deployments are #213's.
+
+**Root cause, from Railway's own `deploymentEvents` step timeline** (the CLI surfaces none of
+this; `railway logs` shows the container, not the platform):
+
+| step | 00:13 ok | 02:37 ok | **04:08 FAILED** |
+|---|---|---|---|
+| SNAPSHOT_CODE | 7.0s | 7.5s | 6.9s |
+| BUILD_IMAGE | 36s | 84s | 44s |
+| CREATE_CONTAINER | 20s | 18s | 20s |
+| HEALTHCHECK | 4.5s | 3.5s | 3.5s |
+| **CONFIGURE_NETWORK** | **1.2s** | **1.3s** | **7m 08s → `Error configuring network`** |
+| DRAIN_INSTANCES | ✅ | ✅ | never reached |
+
+`CONFIGURE_NETWORK` is a Railway platform step that runs **after** the container is up and has
+answered its healthcheck. The application was healthy throughout; the platform could not attach
+it to the network. `deploymentStopped: true`, single instance `REMOVED`. Four prior deployments
+completed the same step in 1.2–2.0s with no error, so this is a one-off platform fault, not a
+pattern. Production stayed on the previous revision and served it cleanly throughout —
+`healthz` 200, 0× 5xx, p99 5 ms over the window.
+
+**Resolution: re-ran the deploy job on the same commit — no code change, because there was no
+code defect.** Deployment `1e7896e4`: `CONFIGURE_NETWORK` 04:41:14→04:41:15, **one second**, no
+error; `DRAIN_INSTANCES` ran. Verified from outside rather than from the status field:
+`GET https://vettrack.uk/api/version` reports
+`gitCommit: 448555447adf5dd8e5570c02361b46b7906cfe45`, which is the SHA `origin/main` pointed at
+when this was written — so the running revision is the one that was meant to ship. That is a
+revision-identity check and nothing more: no image or artifact digest was compared, so it does
+not establish that the deployed bytes match a locally built artifact. `/api/healthz` returns 200. The Worker service then built as `deploy.sh` intends — on the failed
+run `set -e` had aborted before it, which is why both services had been stranded on the 02:37/02:39
+revision.
+
+### 2. `Flake Detection` — deterministic, in the workflow built to find non-determinism
+
+All **three** runs failed on `tests/claims-ledger.test.ts` → `expected [ Array(1) ] to deeply
+equal []`. A flaky test does not fail 3/3.
+
+`.github/workflows/flake-detection.yml` checked out at the default depth 1. `pnpm test` includes
+the claim gate, whose layer 2 resolves commit and pull-request claims against `main`; a depth-1
+clone has no `main`, so the gate reports `git-unavailable` and refuses to certify claims it
+cannot see. That is the gate working, not failing. `ci.yml` already passes `fetch-depth: 0`
+at three sites for this exact reason; this workflow was the copy that missed it.
+
+**Reproduced in both directions before writing the fix:**
+- `git clone --depth 1` of `main` → `1 unaccounted claim(s)`, with the diagnostic
+  `[git-unavailable] shallow clone: commit and pull-request claims cannot be checked. Set
+  fetch-depth: 0 on actions/checkout` — matching the CI failure exactly, including the count.
+- The same tree at full depth → `995 claims: 984 verified, 10 registered, 1 attested, 0 FAILED`,
+  `All claims accounted for`. Also confirmed at the failing commit itself, so the shallow
+  checkout is the whole difference.
+
+Fix opened as a pull request against `main`; it adds `fetch-depth: 0` and a comment recording why.
+
+**Verdict:** VERIFIED. Production is live on the current `main` tip. The one thing worth carrying
+forward is that in both cases the failure label named the wrong layer — "build failed" for a
+platform network step two stages past the build, and "flake" for a deterministic,
+correctly-refusing gate. Reading the step-level timeline rather than the summary line is what
+separated them.
+
+---
+
+## 2026-08-22 — Wire the six orphaned live-server suites into CI, gated on assertion count
+
+**Claim:** The six live-server suites excluded by `vite.config.ts` — including the two covering
+Code Blue and equipment scan — ran in no workflow. They now run in a `live-server` CI job the merge
+gate depends on, and the runner refuses a suite that passed everything it ran while running less
+than it used to.
+
+**Evidence:**
+
+- `vite.config.ts:163-168` — the six `.test.js` entries in the exclude list, read directly.
+- Command: for each of `charge-alert-worker`, `code-blue-mode-equipment`, `equipment-scan-e2e`,
+  `expiry-api`, `expiry-check-worker`, `returns-api` → `grep -rl <name> .github/workflows/` returned
+  **0 workflows**. Confirms the TASKS.md line rather than restating it.
+- `tests/code-blue-mode-equipment.test.js` (tail) — `if (failed > 0) { process.exit(1); }`. Every
+  suite has this shape, so `passed === 0 && failed === 0` exits **0**. That is the hole an exit-code
+  gate cannot see, and it is why the runner gates on a count.
+
+**The silent-skip case is real here, not hypothetical — measured both ways:**
+- Local Postgres 16 cluster + `pnpm migrate` (186 migrations applied) + API booted on :3001 in
+  dev-bypass (`/api/health` → `{"status":"ok",...,"db":"ok"}`).
+- Before `pnpm seed:dev:e2e`: `equipment-scan-e2e` → `Results: 28/29 passed, 1 FAILED`, with
+  `GET /api/equipment/eq1 returned 404`.
+- After seeding: `Results: 31/31 passed ✓`. **Same script, 29 → 31 total.** The missing fixture does
+  not merely fail one case, it stops two others from running. Had that case skipped rather than
+  failed, the suite would have gone green two assertions short with nothing to say so.
+
+**Guard proved by refusal, in both directions:**
+- Floor raised to 99 for `returns-api` → `FAIL … ran 9 assertions, floor is 99`, runner `exit=1`.
+- Floors restored, `eq1` deleted from `vt_equipment` → `FAIL equipment-scan-e2e: 1 of 29 assertions
+  failed (exit 1)`, runner `exit=1`. Fixture re-seeded → runner `exit=0`.
+
+**Gates run on this tree:**
+- `node scripts/ci/live-server-tests.mjs` → `74 assertions across 6 suites` / `PASS`.
+- `pnpm exec vitest run tests/ci-live-server-tests.test.ts` → 12 passed (every branch of the pure
+  halves, each proved by a refusal).
+- `pnpm typecheck` → clean, both tsconfigs.
+- `pnpm test` → **746 files / 6873 passed, 11 skipped**.
+- `pnpm verify:claims` → `1000 claims: 989 verified, 10 registered, 1 attested, 0 FAILED`. Needed a
+  full clone first: on the shallow checkout it refused with `[git-unavailable]`, the same correct
+  refusal recorded in the entry above this one.
+
+**Scope, stated so the next reader does not over-trust it:** the runner reads each suite's own
+summary line, so a suite that miscounts itself would fool it too. What it buys is that the count
+cannot silently shrink. The DB-only orphans (`tests/migrations/**`, `restock.service`,
+`shift-chat-window`) are **still unwired** — they are a different setup and are not covered here.
+
+**Verdict:** VERIFIED
 ## 2026-08-22 — `docs/vettrack-3.0-program.md` lands governed, and the gate caught two of its own claims
 
 **Claim:** The VetTrack 3.0 program plan is added as a *governed* document, not an ungoverned one —
