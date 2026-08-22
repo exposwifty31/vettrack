@@ -33,7 +33,7 @@ Every interactive element is reachable and operable with a keyboard alone. Test 
 
 ## Forms
 
-- Every input has a `<label for>` or an `aria-label`. A placeholder is not a label — it vanishes on typing and usually fails contrast.
+- Every input has a visible `<label>` associated by `for` — `htmlFor` in JSX. It is not only a name: clicking the label focuses the control, which `aria-label` does not give you. Reach for `aria-labelledby` when the visible text lives elsewhere, and `aria-label` only when there is no visible label at all. A placeholder is not a label — it vanishes on typing and usually fails contrast.
 - Errors are associated with `aria-describedby` and announced via a live region. A red border alone communicates nothing to a screen-reader or a colorblind user.
 - Group related controls in `<fieldset>` with a `<legend>`.
 - Correct `type` and `autocomplete` attributes — this is a large usability win on mobile, not just an a11y one.

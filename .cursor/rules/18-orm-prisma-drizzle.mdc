@@ -35,7 +35,10 @@ The characteristic ORM failure: a loop that awaits a query per item.
 for (const post of posts) post.author = await getUser(post.authorId)
 
 // Good — one query
-const authors = await db.select().from(users).where(inArray(users.id, authorIds))
+const authors = await db
+  .select({ id: users.id, name: users.name, avatarUrl: users.avatarUrl })   // projection, not select *
+  .from(users)
+  .where(inArray(users.id, authorIds))
 const byId = new Map(authors.map(a => [a.id, a]))
 ```
 

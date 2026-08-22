@@ -16,7 +16,7 @@ The example below is **illustrative, not a template to copy**. Match the project
 FROM node:22-slim@sha256:<pin-a-reviewed-digest> AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./
-RUN npm ci --omit=dev            # cached until the lockfile changes
+RUN npm ci --omit=dev            # cached until either copied file changes
 
 FROM node:22-slim@sha256:<same-digest-as-above> AS runtime
 WORKDIR /app

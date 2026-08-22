@@ -40,7 +40,8 @@ useMutation({
   onMutate: async (next) => {
     await qc.cancelQueries({ queryKey: userKeys.detail(next.id) })   // stop in-flight overwrite
     const prev = qc.getQueryData(userKeys.detail(next.id))
-    qc.setQueryData(userKeys.detail(next.id), next)
+    qc.setQueryData(userKeys.detail(next.id), (old: User | undefined) =>
+      old ? { ...old, ...next } : old)                                // merge — `next` may be a patch
     return { prev }                                                   // rollback context
   },
   onError: (_e, next, ctx) => qc.setQueryData(userKeys.detail(next.id), ctx?.prev),

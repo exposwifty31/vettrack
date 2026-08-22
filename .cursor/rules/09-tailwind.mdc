@@ -6,23 +6,24 @@ alwaysApply: false
 
 # Tailwind CSS
 
-> **This project is on Tailwind v3.4.** Configuration lives in `tailwind.config.js`, not in CSS via `@theme`. Extend `theme.extend` there and the tokens still surface as utilities. Logical utilities (`ms-*` `me-*` `ps-*` `pe-*` `rounded-s-*`) exist since v3.3 and are correct here; the v4.3 inset names `inset-s-*`/`inset-e-*` do **not** exist — use `start-*`/`end-*`. Everything below applies unchanged unless it references `@theme`.
-
-v4 configures in CSS via `@theme`, not a JS config file. One `@import "tailwindcss"` replaces the three `@tailwind` directives.
+**This project runs Tailwind v3.4** with `tailwind.config.ts` and the three `@tailwind` directives. The v4 CSS-first setup (`@import "tailwindcss"`, `@theme`) does not apply here — do not introduce it piecemeal.
 
 ## Tokens, Not Arbitrary Values
 
-```css
-@import "tailwindcss";
-
-@theme {
-  --color-brand-500: oklch(0.62 0.19 259);
-  --spacing-gutter: 1.5rem;
-  --radius-card: 0.75rem;
-}
+```ts
+// tailwind.config.ts
+export default {
+  theme: {
+    extend: {
+      colors:       { brand: { 500: 'oklch(0.62 0.19 259)' } },
+      spacing:      { gutter: '1.5rem' },
+      borderRadius: { card: '0.75rem' },
+    },
+  },
+} satisfies Config
 ```
 
-Every `@theme` variable becomes a utility (`bg-brand-500`, `p-gutter`, `rounded-card`) **and** a plain CSS variable usable anywhere.
+Every extended key becomes a utility — `bg-brand-500`, `p-gutter`, `rounded-card`. Define a token once there rather than repeating a raw value across components.
 
 - Arbitrary values (`w-[347px]`, `text-[#f0a]`) are a smell. One-off? Fine. Third time you write it? It is a token.
 - Use the spacing scale. `p-5` and `p-6` next to each other is visible; `p-[22px]` between them is noise.

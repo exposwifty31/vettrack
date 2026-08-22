@@ -85,7 +85,7 @@ Types are erased at runtime. Anything crossing a boundary — network, `localSto
 
 ## NEVER
 
-- `as any` — narrow properly, or `as unknown as T` with a comment explaining the invariant.
+- `as any` — narrow properly. `as unknown as T` is permitted only for a **local, provable** invariant, with a comment naming it. It is never acceptable for external data: anything from the network, storage, env, or user input needs a schema or a type guard, per *Boundaries* above.
 - `@ts-ignore` — use `@ts-expect-error` with a reason, so it fails loudly once the error is gone.
 - Non-null `!` without a comment naming the invariant that makes it safe.
 - `Function`, `object`, or `{}` as types — all three are near-useless.

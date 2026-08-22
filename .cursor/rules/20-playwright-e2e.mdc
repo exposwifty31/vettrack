@@ -28,7 +28,7 @@ await expect(page.getByRole('alert')).toHaveText('Saved')   // retries until tim
 
 - **Never** `waitForTimeout`. It is either too short (flake) or too long (slow suite) — usually both on different machines.
 - Web-first assertions (`expect(locator).toBeVisible()`) retry automatically. `expect(await locator.isVisible()).toBe(true)` does not — the `await` snapshots one moment.
-- Wait for a state, not a duration: a response, a URL, an element, a network idle.
+- Wait for a state, not a duration: a web-first assertion, a specific response, a URL, or an element. **Not `networkidle`** — Playwright discourages it, and it never settles on a page holding an SSE stream or a poll.
 
 ## Isolation
 

@@ -1,6 +1,6 @@
 ---
 description: Node.js REST APIs with Express/Fastify and TypeScript — layered architecture, validation, error handling, and production hardening.
-globs: src/routes/**,src/controllers/**,src/services/**,src/repositories/**,src/middleware/**,server.ts,app.ts
+globs: server/routes/**,server/services/**,server/middleware/**,server/repositories/**,server/**/*.ts,server.ts,app.ts
 alwaysApply: false
 ---
 
@@ -20,17 +20,23 @@ The dependency rule: **downward only.** A service that imports `Request` cannot 
 
 ## Validation at the Edge
 
+This repo already ships the middleware — `server/middleware/validate.ts`. Use it; do not invent a parallel one.
+
 ```ts
 const createUser = z.object({
   email: z.string().email(),
   age: z.number().int().min(13).max(120),
 })
 
-router.post('/users', validate(createUser), asyncHandler(async (req, res) => {
-  const user = await userService.create(req.validated)
+// validateBody replaces req.body with the parsed value and, on failure,
+// responds { error: "Validation failed", details } before the handler runs.
+router.post('/users', validateBody(createUser), asyncHandler(async (req, res) => {
+  const user = await userService.create(req.body)
   res.status(201).json({ data: user })
 }))
 ```
+
+`validateUuid(paramName)` is the companion for route params. A new endpoint that hand-rolls its own parsing produces a second, inconsistent error shape for clients.
 
 Validate params, query, body, and headers. **Never trust a client-supplied `id` for authorization** — always re-check ownership server-side. This is the most common real vulnerability in a codebase that otherwise looks careful.
 

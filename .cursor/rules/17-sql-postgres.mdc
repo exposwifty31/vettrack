@@ -23,7 +23,8 @@ An index makes reads faster and writes slower. Both halves matter.
 - Index every foreign key you filter or join on — Postgres does **not** create these automatically.
 - Composite index column order follows the query: equality columns first, then range, then sort.
 - Partial indexes for skewed predicates: `WHERE deleted_at IS NULL` — smaller, faster, cheaper to maintain.
-- `CREATE INDEX CONCURRENTLY` in production. The plain form takes an `ACCESS EXCLUSIVE` lock and stops all writes to the table.
+- `CREATE INDEX CONCURRENTLY` in production. Plain `CREATE INDEX` takes a `SHARE` lock: reads continue, but every `INSERT`, `UPDATE`, and `DELETE` on that table blocks until it finishes. On a large table that is an outage.
+- `CONCURRENTLY` **cannot run inside a transaction block**, and most migration runners wrap each migration in one. Put it in a migration the runner executes without a transaction, or run it out of band — do not discover this on the production deploy.
 - Verify with `EXPLAIN (ANALYZE, BUFFERS)` on realistic data volume. A sequential scan on 100 rows is correct behavior; the plan changes at scale.
 
 ## Queries

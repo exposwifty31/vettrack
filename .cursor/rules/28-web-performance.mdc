@@ -18,7 +18,7 @@ Never optimize from intuition. Profile, change one thing, measure again.
 ## Core Web Vitals
 
 **LCP (< 2.5s)** — largest element painted. Almost always a hero image or headline.
-- Preload the LCP image, `fetchpriority="high"`, never lazy-load it.
+- Preload the LCP image and mark it high priority — `fetchPriority="high"` in React JSX, `fetchpriority="high"` in HTML and in Vue/Svelte/Astro templates. Never lazy-load it.
 - Kill render-blocking resources; inline critical CSS.
 - Cut server response time — a slow TTFB caps everything downstream.
 
