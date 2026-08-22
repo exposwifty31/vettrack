@@ -10367,5 +10367,14 @@ on that dirty tree.
   i18n-parity 2s, depcruise 8s, tenant-scope 3s.
 - Command: `npm run verify:evidence` (RN) → PASS typecheck 12s, lint 27s,
   release-preflight-offline 2s.
+- **Added 2026-08-22, after the first review pass on this branch:** the entry above recorded
+  `verify:evidence` but not the repo's own gate, and `verify:evidence` is a
+  strict subset of it — so `VERIFIED` was standing on less than the house
+  requires. Run on the exact branch tree (`53a36973f`, worktree, `nvm use 24`):
+  `pnpm architecture:gates` → `[architecture-gates] All G1 checks passed.`
+  Tenant lint inside it: `no new findings vs baseline (203 known)`, 3 waived in
+  scanned files. Claim verification inside it, measured against
+  `refs/remotes/origin/main -> cc0a72e32`:
+  `1020 claims: 1009 verified, 10 registered, 1 attested, 0 FAILED`.
 
 **Verdict:** VERIFIED
