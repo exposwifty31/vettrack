@@ -29,7 +29,7 @@
   | **Observability** | Sentry (`@sentry/node`, `@sentry/react`) |
   | **Deploy** | Railway (`railway.json`, `Dockerfile`, `nixpacks.toml`) |
 
-  Runtime: Node ≥ 22.12, pnpm 9.15.9.
+  Runtime: Node ≥ 22.12 and < 25 (Node 25+ is refused by `engine-strict`), pnpm 9.15.9.
 
   ---
 
@@ -112,7 +112,7 @@
   ## Installation
 
   ```bash
-  # Prerequisites: Node >= 22.12 (nvm use), pnpm 9.15.9, PostgreSQL, Redis (optional in dev)
+  # Prerequisites: Node >= 22.12 and < 25 (nvm use), pnpm 9.15.9, PostgreSQL, Redis (optional in dev)
   pnpm install
   cp .env.example .env          # fill DATABASE_URL etc.
   pnpm db:migrate               # apply all migrations (also runs at server startup)

@@ -48,7 +48,7 @@ Use this as **Custom Instructions**, **Project knowledge**, or paste the summary
 
 ## Environment & running locally
 
-- **Node:** `>=22.12.0` (see `package.json` / `.nvmrc`).
+- **Node:** `>=22.12.0 <25` (see `package.json` / `.nvmrc`). Node 25+ is refused at install time.
 - **Package manager:** **pnpm 9.15.9** (`packageManager` field).
 - **Backend** listens on **`PORT`** (set **`3001` in dev** so Vite’s proxy in `vite.config.ts` matches). If `PORT` is missing, the server may default to **3000** and break the dev proxy.
 - **Frontend (Vite):** dev server on **port 5000** (`pnpm dev` runs both via `concurrently`).
