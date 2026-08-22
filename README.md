@@ -29,7 +29,7 @@
   | **Observability** | Sentry (`@sentry/node`, `@sentry/react`) |
   | **Deploy** | Railway (`railway.json`, `Dockerfile`, `nixpacks.toml`) |
 
-  Runtime: Node ≥ 22.12, pnpm 9.15.9.
+  Runtime: Node ≥ 22.12 and < 25 (Node 25+ is refused by `engine-strict`), pnpm 9.15.9.
 
   ---
 
@@ -112,7 +112,7 @@
   ## Installation
 
   ```bash
-  # Prerequisites: Node >= 22.12 (nvm use), pnpm 9.15.9, PostgreSQL, Redis (optional in dev)
+  # Prerequisites: Node >= 22.12 and < 25 (nvm use), pnpm 9.15.9, PostgreSQL, Redis (optional in dev)
   pnpm install
   cp .env.example .env          # fill DATABASE_URL etc.
   pnpm db:migrate               # apply all migrations (also runs at server startup)
@@ -152,6 +152,7 @@
   ## Development workflow
 
   1. **Schema change** → edit `server/schema/*.ts` → hand-write `migrations/NNN_description.sql` (idempotent statements; check `migrations/` for the current tail) → commit it → `pnpm db:migrate`. `drizzle-kit` is **not** the authoring path and is not installed — see [`docs/migrations.md`](docs/migrations.md).
+     <!-- vt-claim: absent drizzle-kit scope=deps -->
   2. **New API route** → add `server/routes/<x>.ts` → register in `server/app/routes.ts`.
   3. **New worker/scheduler** → register in `server/app/start-schedulers.ts`.
   4. **API surface** → typed function in `src/lib/api.ts` + type in `src/types/`.

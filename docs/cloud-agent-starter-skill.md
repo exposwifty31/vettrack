@@ -5,7 +5,7 @@ This is the minimal, practical runbook Cloud agents should use first when workin
 ## 1) Fast bootstrap (first 5 minutes)
 
 ### Prereqs
-- Node `>=22.12.0` (repo targets `22.14.0`)
+- Node `>=22.12.0 <25` (repo targets `22.14.0`)
 - `pnpm` `9.15.9`
 - PostgreSQL 16
 

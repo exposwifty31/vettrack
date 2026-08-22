@@ -132,6 +132,7 @@ Every DB table has a `clinicId` column. **Every query must filter by `clinicId`.
 
 - All tables prefixed `vt_`, defined in `server/schema/*.ts`, re-exported from `server/db.ts`
 - After schema edits: hand-write the next `migrations/NNN_description.sql` → commit it → `pnpm db:migrate`. `drizzle-kit` is not installed and never worked against this schema barrel — see `docs/migrations.md`
+  <!-- vt-claim: absent drizzle-kit scope=deps -->
 - Application queries go through the Drizzle query builder. What needs justifying is a whole
   raw statement — ``db.execute(sql`…`)`` — each a construct Drizzle has no
   builder for (`FOR UPDATE SKIP LOCKED`, `DISTINCT ON`, `pg_advisory_xact_lock`). Re-derive

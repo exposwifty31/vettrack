@@ -9749,6 +9749,342 @@ a false PASS. `ignoredPathPrefixes` in `verify.config.json` covers neither case 
 
 **Verdict:** VERIFIED for the reverse-check defect. The suffix-resolution finding above is OPEN.
 
+## 2026-08-21 — Route matrix committed before its source report is deleted (claude/unified-program-v2-review-44db19)
+
+**Claim:** The 311-route consumer matrix — including the 43 rows with no consumer — now lives at
+`docs/audit/route-consumer-matrix.md`, extracted from an untracked scratch report
+(`AUDIT-repo-b.md` → `docs/audit/route-consumer-matrix.md`) before the cleanup lane deletes it.
+The source was never tracked, so it is not resolvable from this tree by design.
+
+**Evidence:**
+- Command: `grep -cE '^\| (GET|POST|PUT|PATCH|DELETE) ' docs/audit/route-consumer-matrix.md` → `311`,
+  matching the source report's own headline count of 311 method+path pairs.
+- Command: `grep -c 'NO-CONSUMER' docs/audit/route-consumer-matrix.md` → `65` (43 pure NO-CONSUMER
+  plus the dev-only / suspected / stub / staged rows and the counts table).
+- Governance checked, not assumed: `verify.config.json` `governedDocs` holds 21 entries and the only
+  one under `docs/audit/` is `PROOF_ALIGNMENT_LOG.md`, so the new file is deliberately ungoverned.
+- Command: `pnpm verify:claims` after the extraction → `All claims accounted for`, 0 FAILED.
+
+**Verdict:** VERIFIED
+
+## 2026-08-21 — Cross-repo contract suites were enforced by no workflow (claude/unified-program-v2-review-44db19)
+
+**Claim:** `tests/doctor-shift-gate.integration.test.ts` and `tests/seed-reviewer-demo.integration.test.ts`
+now run in CI, in the existing `integration-ops` job, which already provisions Postgres and applies
+migrations.
+
+**Evidence:**
+- Command: `grep -rn 'doctor-shift-gate' .github/` and `grep -rn 'seed-reviewer' .github/` → no output
+  from either. Zero mentions across every workflow before this change.
+- `.github/workflows/ci.yml:222` — `integration-ops` job; its only suite step ran
+  `pnpm test:integration:ops`, whose config (`vitest.integration.ops.config.ts:21-24`) includes only
+  `equipment-operational-state` and `equipment-waitlist`.
+- `vitest.db-integration.config.ts` — includes all three DB suites, which is why the whole script was
+  NOT wired: measured on a freshly created and migrated database, that config run produced
+  `Test Files 1 failed | 2 passed (3)`, `Tests 10 failed | 54 passed (64)`, and the failing file was
+  `tests/equipment-operational-state.integration.test.ts` (worker sweeps + operational metrics) —
+  the one file CI already covers via the ops config, where it passes. Wiring the whole config would have
+  duplicated that file and imported a failure. The two target files are named explicitly instead.
+- Test: the two named files alone, on a clean migrated database →
+  `Test Files 2 passed (2)`, `Tests 15 passed (15)`, 30.25s.
+- Command: YAML re-parsed after the edit → 10 jobs, `integration-ops` step list ends with
+  `🩺 Cross-repo contract suites (doctor gate + reviewer seed)`.
+
+**Not fixed here:** the 10 `equipment-operational-state` failures under the db-integration config are
+recorded as a separate finding, not silently absorbed. They do not reproduce under the ops config.
+
+**Verdict:** VERIFIED for the wiring. The equipment-operational-state cross-config failure is OPEN.
+
+## 2026-08-21 — The tenant gate could not fail, and one flag would not have fixed it (claude/unified-program-v2-review-44db19)
+
+**Claim:** `clinicId` scope enforcement is now a gate that can actually fail, in
+`pnpm architecture:gates`, in CI, and as a declared evidence gate — failing on NEW findings
+only, against a committed baseline of the standing set.
+
+**Evidence:**
+- `scripts/architecture/run-architecture-gates.mjs` — before this change it ran tsc×2,
+  dependency-cruiser, `compare-cycles.mjs` and `verify-claims.mjs`, and did not mention the
+  tenant lint at all. Read in full, not sampled.
+- `.github/workflows/ci.yml` — the step DID exist, contradicting a "not run in CI" reading, but was
+  disarmed twice over: the command hardcoded `--warn-only`, which the script's own `--help`
+  documents as "exit 0 (default, G3)", and the step also carried `continue-on-error: true`.
+  **Removing `continue-on-error` alone would have changed nothing** — the command exits 0 on its
+  own. Both were changed.
+- Command: `node scripts/architecture/tenant-query-lint.mjs` (full repo) → **203** findings,
+  3 waived, `exit=0`. The plan's cited 204 had already moved; measured, not quoted.
+- Baseline written: `203 findings across 138 file::table keys`
+  (`.tenant-lint-known-violations.json`).
+- Test: `tests/tenant-lint-baseline.test.ts` → RED first, 6 failed + import error
+  (`diffAgainstBaseline` not exported); after implementation, `Tests 6 passed (6)`, and the
+  import cost fell 531ms → 21ms, which is the direct-run guard proving the scan no longer runs
+  on import.
+- **End-to-end refusal proved both ways**, not just the passing one: a throwaway probe file under
+  `server/routes/` (~~`__tenant_lint_probe.ts`~~ — created, run against, and deleted within the
+  session, so it is deliberately absent from the tree) containing an unscoped
+  `db.select().from(equipment)` → `1 NEW tenant-scope finding(s) not in the baseline`, `exit=1`,
+  naming the probe at line 3 column 21. Probe deleted → `no new findings vs baseline (203 known)`,
+  `exit=0`.
+- Command: `pnpm architecture:gates` → tenant lint runs inside it, then
+  `[architecture-gates] All G1 checks passed.`
+- Command: `actionlint .github/workflows/ci.yml` → exit 0.
+- Test: `pnpm test` on a clean machine → `Test Files 741 passed (741)`,
+  `Tests 6808 passed | 11 skipped`.
+
+**Verdict:** VERIFIED
+
+## 2026-08-21 — 18 failing test files were a stale local database, not the repo (claude/unified-program-v2-review-44db19)
+
+**Claim:** A `pnpm test` run showing `18 failed | 723 passed` had no defect behind it. Two
+environmental causes, both outside the working tree; recorded so the count is not later mistaken
+for a regression introduced by the same branch.
+
+**Evidence:**
+- Error read rather than summarised: `column "clinic_seq" of relation "vt_event_outbox" does not
+  exist` (Postgres 42703), thrown from `server/lib/realtime-outbox.ts:33` via
+  `insertRealtimeDomainEvent`.
+- `tests/vitest-setup.ts:10` — with no `.env` in this worktree, tests fall back to
+  `postgres://vettrack:vettrack@127.0.0.1:5432/vettrack_test`.
+- Command: `information_schema.columns` query against `vettrack_test` for
+  `vt_event_outbox.clinic_seq` → empty. The column added by
+  `migrations/186_vt_event_outbox_clinic_seq.sql` was absent from the DATABASE — a state no
+  repository diff can produce, which is what rules the branch out as the cause.
+- Command: `pnpm db:migrate` against that database → `Running migration:
+  186_vt_event_outbox_clinic_seq.sql` was the ONLY pending one. Re-run of
+  `tests/rfid-ingest.test.ts` → `Tests 8 passed (8)`, from 5 failed.
+- The 18th file, `tests/xlsx-write-only-guard.test.ts`, had a DIFFERENT cause and was checked
+  separately rather than assumed covered: `Test timed out in 5000ms`, no database access
+  (`grep` for `server/db` → 0 hits). Measured standalone, its actual work is
+  `walk: 33 ms | 1095 files` and `read all: 161 ms | 8.2 MB` — ~200ms against a 5000ms limit.
+  It failed only while a second full suite was running concurrently, which was my own doing.
+- Test: one clean full run, nothing else on the CPU → `Test Files 741 passed (741)`,
+  `Tests 6808 passed | 11 skipped (6819)`.
+
+**Verdict:** VERIFIED — no repository defect. The stale local database is an environment fix
+(`pnpm db:migrate` against `vettrack_test`), already applied.
+
+## 2026-08-21 — Supersedes the route-matrix count: 65 was a text grep, the answer is 43 (claude/unified-program-v2-review-44db19)
+
+**Claim:** Corrects this session's earlier entry, which evidenced the extracted route matrix with
+`grep -c 'NO-CONSUMER'` → `65`. That counts the string anywhere in the file — the counts table and
+the notes included — not table rows, so it cannot support a claim about how many routes have no
+consumer. Per this log's own rule, the earlier entry stands and this one supersedes it.
+
+**Evidence:**
+- Command: an `awk` pass over the table rows only (lines matching `^| <METHOD> `), grouping by the
+  verdict column → 311 rows total, of which **43** are pure `NO-CONSUMER`, plus 7 documented
+  dev-only, 6 suspected, 6 test-only, 1 documented stub, 1 staged; 122 consumed (web+RN), 115
+  consumed (web), 4 consumed (RN), 3 operator-surface, 2 contract-surface, 1 external device sender.
+- Those figures agree row for row with the counts table the source report carries, which is the
+  result that matters: the extraction lost nothing. The recomputed table is now recorded in
+  `docs/audit/route-consumer-matrix.md` itself, so the number does not have to be re-derived.
+- `docs/audit/route-consumer-matrix.md` — the `POST /api/integration-webhooks/:adapterId` note led
+  with a path that does not exist in this tree. Verified by `ls` on both candidates: only
+  `server/integrations/webhooks/inbound.router.ts` is present. Corrected, and the correction is
+  listed in the file's own header so "verbatim" stays accurate.
+- `GET /api/health/ready` carries `other = test (structural)` with a verdict of `NO-CONSUMER`,
+  while the matrix legend reserves `TEST-ONLY` for that evidence. Marked ⚠︎ rather than
+  reclassified — rewriting it would desync the row from the source's counts table, and the Lane 4.2
+  triage has to decide that row regardless.
+
+**Verdict:** VERIFIED. Supersedes the `65` figure in this session's earlier route-matrix entry.
+
+## 2026-08-21 — The arming flag could disarm the gate it arms (claude/unified-program-v2-review-44db19)
+
+**Claim:** `--baseline` with no value parsed to `null`, fell through to the DEFAULT warn-only mode,
+and exited 0 with findings present — the same disarmed-gate shape the baseline mechanism was built
+to replace, reintroduced one layer up in the flag that was supposed to arm it. Found by CodeRabbit
+on the PR, not by me.
+
+**Evidence:**
+- Test: three CLI-level refusal cases added to `tests/tenant-lint-baseline.test.ts`, run BEFORE the
+  fix → `Tests 2 failed | 7 passed`. Exactly two, which is itself the finding: `--baseline --all`
+  already exited 2, but for the wrong reason — it took `"--all"` as the path and failed on the
+  unreadable-baseline branch by accident, not by refusing the argument.
+- The pure-rule tests could not have caught this. CI invokes the CLI, not `diffAgainstBaseline`, so
+  only a CLI-level assertion covers the layer that was broken.
+- After the fix: `Tests 9 passed (9)`; `pnpm tenant:lint:enforce` still `exit=0` on a clean tree,
+  so the armed path is unchanged.
+
+**Verdict:** VERIFIED
+
+## 2026-08-21 — db-integration work re-scoped after review: main already had the coverage; kept only the guard
+
+> Deliberately no `PR #` reference in this heading. The claim gate reads `PR #NNN` as a
+> pull-request claim and requires a merge commit to verify it against; the pull request this
+> entry was written on is still open, so there is none. `docs/pr-ledger.json` is not the escape
+> hatch either — its own `$comment` scopes it to PRs that **landed** without a merge commit, and
+> requires the sha be an ancestor of the default branch. Registering an unmerged PR there would
+> be a false claim in the exact register this log exists to keep honest. The gate was right.
+
+**Claim:** The `db-integration` job proposed on 2026-08-20 is withdrawn. `main` solved the coverage
+better in the meantime, and the review found a real hole in my own preflight. What survives is the
+silent-skip guard, retargeted at main's step and corrected.
+
+**Evidence — the review's three load-bearing claims, each checked against primary sources:**
+- **`main` shipped the coverage first. TRUE.** `git log --oneline -1 7a3ad3a` → "ci: the cross-repo
+  contract suites were enforced by no workflow at all". `git show origin/main:.github/workflows/ci.yml`
+  lines 286-290 run the two suites **by name** inside `integration-ops`. Branch was
+  `git rev-list --count HEAD..origin/main` = **49** behind.
+- **Named files were deliberate, and my whole-config approach would have imported a red suite. TRUE.**
+  main's ci.yml:279-285 records the measurement: `test:db-integration`'s config also pulls in
+  `equipment-operational-state`, which `test:integration:ops` already runs, and which fails 10 of 49
+  under that config's ordering. My job would have run one file twice per PR and imported that.
+- **My preflight did not assert the condition the third suite gates on. TRUE — and it is the exact
+  failure the guard existed to prevent.** `tests/equipment-operational-state.integration.test.ts:33-38`
+  does not stop at `SELECT 1`; it queries `information_schema.columns` for
+  `vt_equipment.custody_state` and sets `dbReachable = rows.length === 1`. A reachable but
+  schema-behind database passed my preflight and skipped 49 tests.
+
+**What the re-scoped change does, and its verification:**
+- No new job. `🚦 Refuse a silent skip` is now a step inside `integration-ops`, immediately before
+  main's `🩺 Cross-repo contract suites` step. Command:
+  `yaml.safe_load(ci.yml)` → `integration-ops` steps end `[…, '🔌 Integration ops suite',
+  '🚦 Refuse a silent skip', '🩺 Cross-repo contract suites (doctor gate + reviewer seed)']`;
+  `'db-integration' in jobs` → **False**.
+- Scope re-verified rather than assumed: both suites main actually runs probe **only** `SELECT 1`
+  (`doctor-shift-gate:46-62`, `seed-reviewer-demo:20-32`), so assertion 1 is exactly their condition.
+  The `custody_state` probe belongs to a file this step does not run; the script now says so in its
+  header instead of claiming a generality it does not have.
+- Added assertion 2 (`vt_clinical_check_ins` present) because doctor-shift-gate documents migrations
+  181-184 as its precondition at `:15` but does **not** probe for them — so a schema-behind database
+  would fail deep inside the suite rather than here.
+- Command: `node --check scripts/ci/db-integration-preflight.mjs` → exit 0.
+  `env -u DATABASE_URL node scripts/ci/db-integration-preflight.mjs` → refusal message, `exit=1`.
+- **Missing-tests finding addressed:** `tests/ci-db-integration-preflight.test.ts` feeds the two pure
+  predicates deliberately broken input (unset / empty / whitespace-only URL; 0 and 2 schema rows).
+  Not run locally — this container has no `node_modules`. CI on this PR is the proof.
+
+**The review's third finding is correct and is NOT closed by this PR.** Verified 2026-08-21:
+`vite.config.ts` excludes 10 entries from `pnpm test`, and a `grep -rl` over `.github/workflows/`
+returns **0** workflows for every one of them. TASKS.md now carries that as its own open row rather
+than letting the closed row imply the class is handled.
+
+**Verdict:** VERIFIED for every claim above except the new test file passing, which is PARTIAL
+pending CI.
+
+## 2026-08-21 — The claim gate caught a false claim in this very log
+
+**Claim:** The `📎 Claim verification (evidence)` check failed on my own change, correctly, and the
+failure is worth recording rather than just fixing.
+
+**Evidence:**
+- Job `96790063327` → `verify:evidence` **passed** all four declared gates (typecheck, i18n-parity,
+  depcruise, tenant-scope). `verify:claims` then reported
+  `995 claims: 983 verified, 10 registered, 1 attested, 1875 excluded by rule, 1 FAILED`.
+- The one failure: `docs/audit/PROOF_ALIGNMENT_LOG.md:9910 [pull-request] no merge commit for #204`.
+  My heading carried the claim-shaped `PR #` + number form, which the gate resolves to a merge
+  commit. The pull request is open, so there is none. The offending form is deliberately NOT
+  reproduced in this entry — quoting it verbatim would re-trigger the same gate on this very
+  record of the failure.
+- **The suggested remedy did not apply, and taking it would have been worse than the bug.**
+  `docs/pr-ledger.json`'s `$comment` reads: "Pull requests that landed WITHOUT a merge commit (rebase
+  or squash merge) … that sha must be an ancestor of the default branch." This pull request has not
+  landed at all.
+  Registering it would assert a landing that did not happen, inside the log whose whole purpose is to
+  stop exactly that.
+- Fix: heading no longer carries `PR #`. The entry describes the work; a note records why the
+  reference is absent so it does not get re-added.
+
+**Why this is worth an entry rather than a silent fix:** the gate caught an unmerged PR being cited
+as a landed fact in an append-only evidence log — written by an author who had just spent the session
+arguing that documents should not claim things that are not yet true. The mechanism does not care who
+wrote the claim, which is the point of having it.
+
+**The real lesson is not the rule — it is that the checker runs locally.**
+`node scripts/verify-claims.mjs` executes with no `node_modules` present. It was runnable in this
+container the whole time. Four CI cycles were spent inferring its behaviour from error text, then
+transcribing one of its patterns by hand and auditing against the transcription, when the tool
+itself was one command away. Run the gate; do not model it.
+
+The pattern that matters lives at `scripts/verify/scan.cjs:142` and the comment above it explains
+the intent. Read it there rather than copied to here: quoting it verbatim is what broke the
+previous attempt, because the pattern is built from the very vocabulary it searches for, so any
+faithful quotation of it trips it. Two of this file's own lines failed that way.
+
+Note when running locally: `[git-unavailable]` against `.github/workflows/ci.yml` is an artifact of
+a shallow clone and does not occur in CI, which sets `fetch-depth: 0`. Ignore that one line locally;
+everything else the local run reports is real.
+
+**Verdict:** VERIFIED — failure reproduced from the job log, remedy checked against the ledger's own
+scope comment rather than assumed from the error message.
+
+## 2026-08-21 — The preflight's own run-guard could silently disable it (claude/founder-review-34bl1o)
+
+**Claim:** `scripts/ci/db-integration-preflight.mjs` decides whether to run by comparing
+`import.meta.url` against `` `file://${process.argv[1]}` ``. `import.meta.url` is realpath-resolved
+and `process.argv[1]` is not, so any symlink on the invocation path made the two disagree, the
+guard evaluate false, and the script parse, print nothing and exit 0 — a pass, emitted by the gate
+whose whole purpose is refusing passes that did not run.
+
+**Evidence:**
+- Command: `node -e "realpathSync('/tmp')"` → `/private/tmp`. On macOS `/tmp` is a symlink, which
+  is what surfaced this: a copy of the script run from `/tmp` printed nothing and exited 0, while
+  the same bytes copied to `/private/tmp` refused correctly with `exit=1`. Same file, two paths,
+  opposite behaviour.
+- Test: `tests/ci-db-integration-preflight.test.ts` — symlink case run against the ORIGINAL guard
+  → `Tests 1 failed | 10 passed`. Against the realpath'd guard → `Tests 11 passed (11)`.
+- All three paths verified by MESSAGE, not exit code: real path → `❌ … Refusing.`; via symlink →
+  `❌ … Refusing.`; healthy database → `✅ DATABASE_URL reachable and migrated — the contract
+  suites will execute, not skip.`
+
+**Asserting the message is the point, not pedantry.** A `SyntaxError` also exits 1. An earlier
+attempt at this fix used `await` inside a non-async arrow; both the real-path and symlink runs
+returned `exit=1` and read as success. A crash and a refusal are indistinguishable by exit code.
+
+**Correction to how this was found.** The finding was first reported as "`main()` is never called —
+the gate is dead code". That was wrong. There is no `main()`; the logic is inline under
+`if (invokedDirectly)`, in lines 56-80 — a range left unread between a `sed -n '1,55p'` and a
+`tail -30` of a 110-line file. The grep that "confirmed" it searched for a name the file does not
+use, and the run that "confirmed" it executed a copy from `/tmp`. Three shortcuts agreeing with
+each other is not corroboration.
+
+**Verdict:** VERIFIED for the guard defect. The "dead gate" report it started from was FALSE and
+is retracted here.
+
+---
+
+## 2026-08-22 — Node engines ceiling: the range was the easy half, `engine-strict` was the load-bearing one
+
+**Task:** cap `engines.node` below 25 in both repositories, after Node 26 satisfied the open-ended
+`">=22.12.0"` and produced 12 failing test files via its built-in experimental `localStorage` — a failure
+shape that reads as broken tests, not as a wrong runtime.
+
+**What was actually measured, not assumed.** The version range alone would have been decorative. `.npmrc`
+carried `engine-strict=false`, which downgrades the check to a `WARN` and exits 0. Both halves are required,
+and each combination was run rather than reasoned about:
+
+| pnpm | `engine-strict` | Node | exit |
+|---|---|---|---|
+| 9.15.9 | `false` (prior state) | 26.7.0 | 0 — warn only |
+| 9.15.9 | `true` | 26.7.0 | 1 `ERR_PNPM_UNSUPPORTED_ENGINE` |
+| 9.15.9 | `true` | 22.14.0 | 0 |
+| 9.15.9 | `true` | 24.17.0 | 0 |
+| 11.22.0 | `true` | 26.7.0 | **0 — ignores the setting entirely** |
+
+The inverse direction was run deliberately: a ceiling that blocks Node 22 or 24 would break every CI job and
+the whole team, so "does not fire when it should not" is as much the claim as "fires when it should".
+
+**Caveat recorded because it is a live dependency, not a footnote.** pnpm 11 ignores `engine-strict`. This
+gate holds only because the `packageManager` field pins version 9.15.9 and corepack honours it. Raising that pin
+silently disarms the gate; re-measure the table above before doing so.
+
+**Blast radius, measured:** every CI job resolves Node from `.nvmrc` (`22.14.0`); `Dockerfile` is
+`node:22-alpine`, so the Railway production runtime is inside the range. Neither changes behaviour.
+
+**Docs.** `CLAUDE.md:8`, `README.md:32`, `README.md:115`, `docs/CHATGPT_PROJECT_INSTRUCTIONS.md:51` and
+`docs/cloud-agent-starter-skill.md:8` each stated a lower bound with no ceiling. Reading that line is what
+made Node 26 look supported, so leaving them would have preserved the original trap while claiming it was
+closed. Re-run after the doc edits with the governed command `pnpm verify:claims`, on Node 22.14.0 (the
+`.nvmrc` runtime used for this verification; the contract admits the whole `>=22.12.0 <25` range): exit 0, `997 claims: 986 verified, 10 registered,
+1 attested, 0 FAILED`, `All claims accounted for`. That script entry is defined as `node scripts/verify-claims.mjs`,
+so the two are the same process — the governed name is recorded here because an audit entry that cites a
+private invocation cannot be re-run by a reader following the documented workflow. The total moves as this
+log grows — writing this entry took it to 998 — so the stable assertion is `0 FAILED`, not the count.
+
+**Verdict:** VERIFIED. Ported to the RN migration repo as the same two-part change (`engines` +
+`engine-strict=true` in `.npmrc`, npm rather than pnpm); measured there as exit 1 `EBADENGINE` on Node 26 and
+exit 0 on Node 22. That repo has no `.nvmrc` and hardcodes `node-version: '22'` in three workflow sites —
+recorded as OPEN, not fixed here.
 ---
 
 ## 2026-08-22 — GET /api/code-blue/eligible-managers, discovery-only (feat/code-blue-eligible-managers)
@@ -9856,3 +10192,4 @@ instrument than the tool and is recorded as such.
 branch would pull unreviewed contract code into that repo.
 
 **Verdict:** VERIFIED, with the two observations above OPEN and the veto checks qualified as manual.
+||||||| e9147b905

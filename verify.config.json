@@ -123,6 +123,10 @@
     {
       "id": "depcruise",
       "command": "pnpm depcruise:check"
+    },
+    {
+      "id": "tenant-scope",
+      "command": "pnpm tenant:lint:enforce"
     }
   ],
   "registry": "docs/claims-registry.json",
