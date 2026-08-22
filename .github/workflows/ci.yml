@@ -372,6 +372,17 @@ jobs:
 
       - name: 🚀 Boot the API and wait for readiness
         run: |
+          # All six suites hard-code their base URL at :3001 and none of them reads
+          # PORT (`grep -c process.env tests/<suite>.test.js` → 0, for all six). So this
+          # job's real contract is the PORT NUMBER, not the env var, and the probe below
+          # is deliberately not parameterised on $PORT: at PORT=4000 a parameterised
+          # probe would go green against 4000 while all six suites hammered a dead 3001,
+          # which is a worse failure than this one. Assert the coupling instead of
+          # hiding it, and fail in one second rather than after a 60s misleading wait.
+          if [ "${PORT}" != "3001" ]; then
+            echo "::error::PORT is '${PORT}', but the six live-server suites hard-code :3001. Either set PORT back to 3001, or change every suite's BASE constant and this guard together."
+            exit 1
+          fi
           pnpm exec tsx server/index.ts > /tmp/vt-server.log 2>&1 &
           echo $! > /tmp/vt-server.pid
           for i in $(seq 1 60); do

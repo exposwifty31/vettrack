@@ -133,6 +133,12 @@ export function summarize(results) {
   return { ok: failures.length === 0, failures, totalAssertions };
 }
 
+/**
+ * Run every floored suite in order and exit non-zero if any is refused. The floors
+ * file is the list of suites: adding one there without a `tests/<name>.test.js`
+ * fails at spawn, and adding the file without a floor is refused by `evaluateSuite`,
+ * so neither half can be added alone and silently do nothing.
+ */
 function main() {
   const floors = JSON.parse(readFileSync(FLOORS_FILE, "utf8")).suites;
   const names = Object.keys(floors);
