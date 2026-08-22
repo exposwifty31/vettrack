@@ -68,6 +68,44 @@ async function loadManagerCandidates(clinicId: string): Promise<ManagerCandidate
     .orderBy(users.name);
 }
 
+/**
+ * Ceiling on simultaneous per-candidate authority resolves.
+ *
+ * Each resolve costs a pooled connection on a cache miss. The default pool is 20,
+ * and the mutations this discovery read exists to serve — `POST /code-blue/sessions`
+ * and `/one-tap` — draw from the same pool. Six leaves the emergency path the
+ * clear majority of it while still overlapping the round-trips, which is the
+ * whole reason this is not a serial loop.
+ */
+export const ELIGIBLE_MANAGER_LOOKUP_CONCURRENCY = 6;
+
+/**
+ * `Promise.all`-shaped result, `limit`-shaped cost: results land at their input
+ * index, so callers may keep using positional access. Workers pull from a shared
+ * cursor rather than pre-slicing into chunks — a chunked split runs at the speed
+ * of its slowest member per round, and one cold cache miss would stall five idle
+ * workers behind it.
+ */
+async function mapWithBoundedConcurrency<TIn, TOut>(
+  items: readonly TIn[],
+  limit: number,
+  fn: (item: TIn, index: number) => Promise<TOut>,
+): Promise<TOut[]> {
+  const results = new Array<TOut>(items.length);
+  let cursor = 0;
+  const worker = async (): Promise<void> => {
+    for (;;) {
+      const index = cursor++;
+      if (index >= items.length) return;
+      results[index] = await fn(items[index], index);
+    }
+  };
+  await Promise.all(
+    Array.from({ length: Math.min(limit, items.length) }, () => worker()),
+  );
+  return results;
+}
+
 export async function listCodeBlueEligibleManagers(
   input: ListCodeBlueEligibleManagersInput,
 ): Promise<CodeBlueEligibleManager[]> {
@@ -96,9 +134,16 @@ export async function listCodeBlueEligibleManagers(
 
   // Concurrent, not sequential: this is a read on an emergency path, and serial
   // round-trips would multiply its latency by the size of the clinic's roster.
-  // The fan-out is bounded by the active vets/admins of ONE clinic.
-  const verdicts = await Promise.all(
-    candidates.map(async (candidate) => {
+  // BOUNDED, though — `Promise.all` over the whole roster started every resolve
+  // at once, and "the active vets/admins of ONE clinic" is an assumption rather
+  // than a limit. A roster wider than the connection pool let this read starve
+  // the Code Blue mutations it feeds. Truncating the candidate query instead
+  // would break this module's whole invariant: a short list disagrees with the
+  // POST, and omitting an eligible manager mid-arrest is worse than being slow.
+  const verdicts = await mapWithBoundedConcurrency(
+    candidates,
+    ELIGIBLE_MANAGER_LOOKUP_CONCURRENCY,
+    async (candidate) => {
       const lookup = await loadCodeBlueManagerLookup({
         clinicId: input.clinicId,
         managerUserId: candidate.id,
@@ -119,7 +164,7 @@ export async function listCodeBlueEligibleManagers(
           observe: false,
         },
       );
-    }),
+    },
   );
 
   return candidates

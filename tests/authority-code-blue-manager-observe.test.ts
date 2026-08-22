@@ -164,7 +164,7 @@ function passesObserve(source: string): boolean {
 }
 
 describe("code-blue manager evaluator: no mutation call site may silence it", () => {
-  it("the discovery path is the ONLY caller that passes `observe`", async () => {
+  it("the discovery path is the ONLY caller that passes `observe`", () => {
     const silencing = evaluatorCallers()
       .filter(({ source }) => passesObserve(source))
       .map(({ file }) => file);

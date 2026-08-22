@@ -734,7 +734,7 @@ router.get("/eligible-managers", requireAuth, requireClinicalUser, async (req, r
     const body: CodeBlueEligibleManagersResponse = { managers };
     return res.json(body);
   } catch (err) {
-    console.error("code-blue:eligible-managers", err);
+    console.error("[code-blue] eligible-managers failed", err);
     return res.status(500).json(
       apiError({
         code: "INTERNAL_ERROR",

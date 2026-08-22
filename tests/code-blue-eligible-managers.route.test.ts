@@ -39,6 +39,9 @@ vi.mock("../server/middleware/auth.js", async () => {
         });
         return;
       }
+      // The fixture carries only the fields this route reads (id, role,
+      // clinicId); `authUser` is the full DB user row. Widening the fixture to
+      // the real type would pin this suite to every unrelated column change.
       req.authUser = currentAuthUser as unknown as Request["authUser"];
       req.clinicId = currentAuthUser.clinicId;
       next();
@@ -92,6 +95,9 @@ function makeRes(): { res: Response; captured: Captured } {
     getHeader(name: string) {
       return headers.get(name.toLowerCase());
     },
+    // Express's Response has ~60 members; this double implements the four the
+    // handler touches (status, json, setHeader, getHeader). A structural cast
+    // would demand stubs for the rest, none of which this test exercises.
   } as unknown as Response;
   return { res, captured };
 }
@@ -105,6 +111,8 @@ function makeReq(overrides: Partial<Request> = {}): Request {
     params: {},
     query: {},
     ...overrides,
+    // Same reason as the Response double above: Express's Request is far wider
+    // than the handful of fields the route reads, and the extras are inert here.
   } as unknown as Request;
 }
 

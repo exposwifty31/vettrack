@@ -151,14 +151,32 @@ vi.mock("../server/db.js", () => ({
 let snapshots: Record<string, AuthoritySnapshot | "throw"> = {};
 const resolveAuthorityCalls: string[] = [];
 
+/**
+ * In-flight tracking for the concurrency bound. `resolveAuthority` is the
+ * resolver that costs a connection, so peak overlap HERE is the number the
+ * 20-connection pool actually sees.
+ */
+let authorityInFlight = 0;
+let authorityPeakInFlight = 0;
+
 vi.mock("../server/lib/authority.js", () => ({
   resolveAuthority: async ({ authUser }: { authUser: { id: string } }) => {
     resolveAuthorityCalls.push(authUser.id);
-    const entry = snapshots[authUser.id];
-    if (entry === "throw" || entry === undefined) {
-      throw new Error(`no snapshot registered for ${authUser.id}`);
+    authorityInFlight += 1;
+    authorityPeakInFlight = Math.max(authorityPeakInFlight, authorityInFlight);
+    try {
+      // Yield so genuinely-parallel callers overlap here rather than each
+      // resolving before the next begins — without it every scheduling shape
+      // measures a peak of 1 and the assertion below could never fail.
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      const entry = snapshots[authUser.id];
+      if (entry === "throw" || entry === undefined) {
+        throw new Error(`no snapshot registered for ${authUser.id}`);
+      }
+      return entry;
+    } finally {
+      authorityInFlight -= 1;
     }
-    return entry;
   },
 }));
 
@@ -172,7 +190,10 @@ vi.mock("../server/lib/audit.js", async () => {
   return { ...actual, logAudit: (...args: unknown[]) => { auditCalls.push(args); } };
 });
 
-import { listCodeBlueEligibleManagers } from "../server/lib/authority/code-blue-eligible-managers.js";
+import {
+  ELIGIBLE_MANAGER_LOOKUP_CONCURRENCY,
+  listCodeBlueEligibleManagers,
+} from "../server/lib/authority/code-blue-eligible-managers.js";
 import { evaluateCodeBlueManagerForRoute } from "../server/lib/authority/code-blue-manager.wiring.js";
 import { getMetricsSnapshot, resetMetrics } from "../server/lib/metrics.js";
 
@@ -309,6 +330,97 @@ describe("listCodeBlueEligibleManagers — mode shadow", () => {
     expect(manager.shadowWouldHaveDenied.noOpenCheckIn).toBe(0);
     expect(manager.allow).toBe(0);
     expect(auditCalls).toEqual([]);
+  });
+});
+
+// ── connection-pool safety ──────────────────────────────────────────────────
+
+/**
+ * `Promise.all` over the candidate list started EVERY authority resolve at once.
+ * The comment in the module bounded the fan-out by "the active vets/admins of ONE
+ * clinic" — an assumption, not a bound: a large clinic's roster is exactly the
+ * case where this fires. Each resolve costs a connection on a cache miss, so a
+ * roster wider than the 20-connection pool lets a DISCOVERY read starve the Code
+ * Blue mutations it exists to serve.
+ *
+ * Truncating the candidate query with a LIMIT was the other option, and it is the
+ * wrong one here. This module's stated invariant is that the list cannot disagree
+ * with the POST; a truncated list silently omits eligible managers during a
+ * cardiac arrest, which is worse than a slower one. The fan-out is bounded
+ * instead, so the answer stays complete.
+ */
+/**
+ * The pool default is 20 and the Code Blue mutations share it. Ten is half —
+ * a ceiling the discovery read must stay under no matter what the module's own
+ * constant is set to.
+ */
+const POOL_SAFE_PEAK = 10;
+
+describe("listCodeBlueEligibleManagers — bounded fan-out", () => {
+  beforeEach(() => {
+    currentMode = "enforce";
+    authorityInFlight = 0;
+    authorityPeakInFlight = 0;
+  });
+
+  it("never runs more authority resolves at once than the pool can absorb", async () => {
+    const roster = Array.from({ length: 40 }, (_unused, i) =>
+      user({ id: `u-${String(i).padStart(2, "0")}`, name: `Vet ${String(i).padStart(2, "0")}` }),
+    );
+    allUsers = roster;
+    snapshots = Object.fromEntries(roster.map((candidate) => [candidate.id, ELIGIBLE]));
+
+    await listCodeBlueEligibleManagers({ clinicId: "clinic-a", now: NOW });
+
+    // Asserted against a LITERAL, deliberately, not against
+    // ELIGIBLE_MANAGER_LOOKUP_CONCURRENCY. Comparing the observed peak to the
+    // constant that produces it is self-referential: raising the constant to 1000
+    // would widen the assertion with it and the test could never fail. This
+    // number states the REQUIREMENT — stay well clear of the 20-connection pool
+    // so Code Blue mutations keep theirs — independently of the value the module
+    // happens to pick.
+    expect(authorityPeakInFlight).toBeLessThanOrEqual(POOL_SAFE_PEAK);
+    // Guards the reverse failure: a bound of 1 would pass the line above while
+    // turning a concurrent read into 40 serial round-trips on an emergency path.
+    expect(authorityPeakInFlight).toBeGreaterThan(1);
+  });
+
+  it("keeps the configured bound inside the pool-safe ceiling", async () => {
+    // Pins the constant itself, so raising it past what the pool tolerates fails
+    // here rather than silently at runtime under load.
+    expect(ELIGIBLE_MANAGER_LOOKUP_CONCURRENCY).toBeLessThanOrEqual(POOL_SAFE_PEAK);
+    expect(ELIGIBLE_MANAGER_LOOKUP_CONCURRENCY).toBeGreaterThan(1);
+  });
+
+  it("still evaluates EVERY candidate — bounding concurrency must not truncate the answer", async () => {
+    const roster = Array.from({ length: 40 }, (_unused, i) =>
+      user({ id: `u-${String(i).padStart(2, "0")}`, name: `Vet ${String(i).padStart(2, "0")}` }),
+    );
+    allUsers = roster;
+    snapshots = Object.fromEntries(roster.map((candidate) => [candidate.id, ELIGIBLE]));
+
+    const result = await listCodeBlueEligibleManagers({ clinicId: "clinic-a", now: NOW });
+
+    expect(result).toHaveLength(40);
+    expect(resolveAuthorityCalls).toHaveLength(40);
+  });
+
+  it("preserves candidate ORDER — the list is rendered as a picker", async () => {
+    const roster = Array.from({ length: 12 }, (_unused, i) =>
+      user({ id: `u-${String(i).padStart(2, "0")}`, name: `Vet ${String(i).padStart(2, "0")}` }),
+    );
+    allUsers = roster;
+    // Every other candidate is ineligible, so a reordering bug cannot hide behind
+    // a uniformly-eligible roster.
+    snapshots = Object.fromEntries(
+      roster.map((candidate, i) => [candidate.id, i % 2 === 0 ? ELIGIBLE : NO_OPROLE]),
+    );
+
+    const result = await listCodeBlueEligibleManagers({ clinicId: "clinic-a", now: NOW });
+
+    expect(result.map((m) => m.userId)).toEqual(
+      roster.filter((_unused, i) => i % 2 === 0).map((c) => c.id),
+    );
   });
 });
 
