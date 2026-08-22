@@ -10239,9 +10239,11 @@ pattern. Production stayed on the previous revision and served it cleanly throug
 **Resolution: re-ran the deploy job on the same commit — no code change, because there was no
 code defect.** Deployment `1e7896e4`: `CONFIGURE_NETWORK` 04:41:14→04:41:15, **one second**, no
 error; `DRAIN_INSTANCES` ran. Verified from outside rather than from the status field:
-`GET https://vettrack.uk/api/version` returns
-`gitCommit: 448555447adf5dd8e5570c02361b46b7906cfe45`, byte-identical to `origin/main`, and
-`/api/healthz` returns 200. The Worker service then built as `deploy.sh` intends — on the failed
+`GET https://vettrack.uk/api/version` reports
+`gitCommit: 448555447adf5dd8e5570c02361b46b7906cfe45`, which is the SHA `origin/main` pointed at
+when this was written — so the running revision is the one that was meant to ship. That is a
+revision-identity check and nothing more: no image or artifact digest was compared, so it does
+not establish that the deployed bytes match a locally built artifact. `/api/healthz` returns 200. The Worker service then built as `deploy.sh` intends — on the failed
 run `set -e` had aborted before it, which is why both services had been stranded on the 02:37/02:39
 revision.
 
