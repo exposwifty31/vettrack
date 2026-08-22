@@ -62,7 +62,12 @@ Every query filters by tenant id — enforced structurally via Row Level Securit
 
 - Lockfile committed; automated vulnerability scanning in CI.
 - Pin actions and base images by digest — a mutable tag is a supply-chain hole.
-- `Content-Security-Policy`, `Strict-Transport-Security`, `X-Content-Type-Options: nosniff`, `Referrer-Policy`.
+- Security headers with **protective values**, not just present ones. A header name on its own proves nothing: `Content-Security-Policy: default-src *` satisfies "we have a CSP" and blocks nothing.
+  - `Content-Security-Policy: default-src 'self'; frame-ancestors 'none'; object-src 'none'` — no `unsafe-inline` or `unsafe-eval` in `script-src`; use a nonce or hash instead. `frame-ancestors 'none'` is also the modern clickjacking control.
+  - `Strict-Transport-Security: max-age=31536000; includeSubDomains` — a real max-age. `max-age=0` is the header disabling itself.
+  - `X-Content-Type-Options: nosniff`
+  - `Referrer-Policy: strict-origin-when-cross-origin` at minimum; `no-referrer` on any page whose URL carries a token.
+  - `X-Frame-Options: DENY` alongside `frame-ancestors` while you still support browsers that ignore CSP framing.
 - CORS with an explicit origin allowlist. `Access-Control-Allow-Origin: *` with credentials is not a valid combination.
 
 ## NEVER
