@@ -84,4 +84,4 @@ Skip this section entirely in a React Native codebase.
 - Uncontrolled inputs (`defaultValue` + `FormData`) by default; controlled only when you need to react per keystroke.
 - Every input has an associated `<label>`. Not a placeholder pretending to be one.
 - `dangerouslySetInnerHTML` without sanitizing is prohibited.
-- Semantic elements (`<button>`, `<a href>`, `<article>`) over `<div onClick>` — the accessibility rule in this collection covers why.
+- A click handler belongs on a **native interactive element**: `<button>` for an action, `<a href>` for navigation. Never `<div onClick>` — and never `<article onClick>` either. Sectioning elements (`<article>`, `<section>`, `<li>`) are containers: they carry no keyboard activation and no button or link semantics. For a clickable card, keep the container semantic and put a real `<button>` or `<a>` inside it. The accessibility rule in this collection covers why.

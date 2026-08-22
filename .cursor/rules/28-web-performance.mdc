@@ -18,7 +18,8 @@ Never optimize from intuition. Profile, change one thing, measure again.
 ## Core Web Vitals
 
 **LCP (< 2.5s)** — largest element painted. Almost always a hero image or headline.
-- Preload the LCP image and mark it high priority — `fetchPriority="high"` in React JSX, `fetchpriority="high"` in HTML and in Vue/Svelte/Astro templates. Never lazy-load it.
+- Never lazy-load the LCP image, and mark it high priority — `fetchPriority="high"` in React JSX, `fetchpriority="high"` in HTML and in Vue/Svelte/Astro templates.
+- **Preload it only when discovery is late** — the image comes from CSS, from JS, or from markup the parser reaches slowly. If it is already an `<img>` in the initial HTML, the preload scanner finds it and `fetchPriority` is enough; an extra `<link rel=preload>` buys nothing. For a responsive image the preload must repeat `imagesrcset` and `imagesizes` exactly, or it fetches the wrong candidate and you pay for two downloads.
 - Kill render-blocking resources; inline critical CSS.
 - Cut server response time — a slow TTFB caps everything downstream.
 

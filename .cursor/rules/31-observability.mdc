@@ -11,7 +11,10 @@ The question observability answers is not "is it up?" — it is "why is this spe
 ## Structured Logs
 
 ```ts
-logger.info({ userId, orderId, durationMs, event: 'order.created' }, 'order created')
+logger.info(safeFields({ userId, orderId, durationMs, event: 'order.created' }), 'order created')
+// safeFields = the allowlist serializer from "What Never Goes in a Log" below.
+// Calling logger.info with a raw object bypasses it — wire the serializer into
+// the logger itself so a call site cannot opt out by forgetting.
 ```
 
 - JSON, machine-parseable. A string log is grep-only; a structured log is queryable.
