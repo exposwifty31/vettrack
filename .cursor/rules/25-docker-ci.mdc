@@ -8,13 +8,17 @@ alwaysApply: false
 
 ## Images
 
+The example below is **illustrative, not a template to copy**. Match the project's actual package manager, build step, port, and start command — a repo on pnpm with `pnpm start` on 8080 should not inherit npm and `node server.js` from here. What transfers is the *structure*: layer order, multi-stage, non-root, digest-pinned base.
+
 ```dockerfile
-FROM node:22-slim AS deps
+# Digest pinned deliberately — see the rule below. Resolve a current one with:
+#   docker buildx imagetools inspect node:22-slim
+FROM node:22-slim@sha256:<pin-a-reviewed-digest> AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev            # cached until the lockfile changes
 
-FROM node:22-slim AS runtime
+FROM node:22-slim@sha256:<same-digest-as-above> AS runtime
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .

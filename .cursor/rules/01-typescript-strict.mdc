@@ -10,6 +10,8 @@ Every value is typed. Every edge case is handled. The compiler is the first test
 
 ## Required tsconfig
 
+**Merge these options into the existing `tsconfig.json` — do not replace it.** Keep whatever `extends` base the project uses (`expo/tsconfig.base`, a framework preset), and keep its `types`, `baseUrl`, `paths`, and `include`.
+
 ```json
 {
   "compilerOptions": {

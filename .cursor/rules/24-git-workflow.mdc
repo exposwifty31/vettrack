@@ -1,6 +1,5 @@
 ---
 description: Commits, branches, and pull requests — atomic changes, useful messages, and reviewable diffs.
-globs: **/*
 alwaysApply: false
 ---
 

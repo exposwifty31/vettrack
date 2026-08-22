@@ -15,7 +15,7 @@ Broken access control outranks everything else in practice, and it looks like or
 - **Never trust a client-supplied identifier.** `GET /invoices/:id` must verify that the *authenticated* user owns that invoice — the fact that the UI only ever links to their own is not a control.
 - Authorize on the **server**, per request, per object. A hidden button is not a permission.
 - Deny by default. New endpoints are protected unless explicitly opened, not the reverse.
-- Check authorization **before** validation and before any side effect, so a 403 never leaks whether a record exists.
+- Order matters: **validate the request's shape first, then authorize, then act.** Schema validation rejects a malformed id before it reaches authorization logic; authorization then runs before any side effect and before any response that would reveal whether the record exists. Returning 404-vs-403 based on existence, ahead of the ownership check, is an enumeration oracle.
 
 ## Multi-Tenancy
 
@@ -28,12 +28,17 @@ Every query filters by tenant id — enforced structurally via Row Level Securit
 - Parameterized queries, always. String-interpolated SQL is the vulnerability regardless of how internal the input feels.
 - Never pass user input to a shell. If you must invoke a process, use an argument array — never a concatenated command string.
 - Path traversal: resolve and confirm the result is inside the intended directory. `../` in a filename is a classic.
-- SSRF: user-supplied URLs are fetched only against an allowlist, with redirects disabled and internal ranges (169.254.169.254, 10.x, 127.x) blocked. Cloud metadata endpoints are the standard target.
+- SSRF: a hostname allowlist is not sufficient on its own, because a permitted name can resolve to an internal address (DNS rebinding). Require all four:
+  1. Scheme allowlist — `http`/`https` only. Reject `file:`, `gopher:`, `ftp:`, `data:`.
+  2. Resolve **every** `A`/`AAAA` record and validate each resolved address before connecting — then connect to the validated address, not by re-resolving the name.
+  3. Disable redirects, or re-run the full validation on every hop.
+  4. Block the private and special ranges, not a sample of them: `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, `127.0.0.0/8`, `169.254.0.0/16` (cloud metadata — the standard target), `0.0.0.0/8`, plus IPv6 `::1`, `fe80::/10`, `fc00::/7`, `::ffff:0:0/96` (IPv4-mapped), and multicast.
 - XSS: framework escaping by default. `dangerouslySetInnerHTML` / `v-html` / `set:html` require sanitization with a real library, not a regex.
 
 ## Secrets
 
-- Never in source, never in a client bundle, never in a log line, never in a URL query string (they land in access logs and referrers).
+- Never in source, never in a client bundle, never in a log line, and **never anywhere in a URL** — path segment included. `/reset/<token>` leaks exactly like `?token=` does: into access logs, proxy logs, browser history, and `Referer` headers on every outbound link from that page. Put the secret in a header or a POST body.
+- The one common exception is a single-use, short-TTL link mailed to a user (password reset, magic sign-in). If the product needs it: one use, minutes not days, invalidated on redemption, and a `Referrer-Policy: no-referrer` on the landing page.
 - Validate all required env vars at startup and crash if one is missing. A silent `undefined` API key becomes an outage at the worst time.
 - Anything prefixed `NEXT_PUBLIC_` / `VITE_` / `PUBLIC_` is shipped to the browser. Treat those as published.
 - Rotate on exposure. A secret in git history is compromised even after the commit is amended.

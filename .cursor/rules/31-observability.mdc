@@ -32,7 +32,11 @@ If everything is `error`, alerting is worthless and gets muted. That is the actu
 
 ## What Never Goes in a Log
 
-Passwords, tokens, API keys, session ids, full card numbers, health records, and full request bodies containing any of the above. Redact at the logger level with a denylist, not at each call site — one missed call site is a breach.
+Passwords, tokens, API keys, session ids, full card numbers, health records, and full request bodies containing any of the above.
+
+**Fail closed: allowlist the fields that may be logged, do not denylist the ones that may not.** A denylist covers the sensitive fields you thought of; the next one someone adds is logged in plaintext by default, and nobody notices until an audit. Serialize log payloads through a safe-field serializer that drops anything unrecognized.
+
+`userId` in the example above means an **opaque internal identifier** — a UUID or a database id. An email address, phone number, national id, or patient name is not a valid `userId` value, regardless of what the calling code happens to have in hand.
 
 Logs are widely readable inside most organizations and are retained far longer than people assume.
 

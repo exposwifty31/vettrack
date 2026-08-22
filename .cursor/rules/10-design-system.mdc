@@ -6,6 +6,8 @@ alwaysApply: false
 
 # Design System & UI Components
 
+> **Scope.** The reasoning here — composition over configuration, variants, forwarding overrides, the visual quality bar — applies on any platform. The *mechanics* are DOM-specific: Radix, `Slot`/`asChild`, `aria-*`, `cn()` over Tailwind class strings. In React Native, apply the same reasoning through RN primitives, `StyleSheet`/the project's styling layer, and the `accessibility*` props.
+
 ## Composition Over Configuration
 
 A component with 14 boolean props is a component that should have been three components.

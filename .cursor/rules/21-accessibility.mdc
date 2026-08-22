@@ -1,10 +1,12 @@
 ---
 description: WCAG 2.2 AA in practice — semantics, keyboard, focus, ARIA, contrast, motion, and forms. Applies to any UI code.
-globs: **/*.tsx,**/*.jsx,**/*.vue,**/*.svelte,**/*.astro,**/*.html
+globs: **/*.vue,**/*.svelte,**/*.astro,**/*.html,src/**/*.tsx,app/**/*.tsx,components/**/*.tsx
 alwaysApply: false
 ---
 
-# Accessibility
+# Accessibility (Web / DOM)
+
+> **Web only.** Everything here assumes a DOM. In a React Native codebase none of it applies — there is no `<button>`, no `tabindex`, no `:focus-visible`, no `aria-*`, no `<label>`. Use `accessibilityRole`, `accessibilityLabel`, `accessibilityState`, `accessibilityHint`, and `accessibilityLiveRegion` instead, and do not let this file's rules replace them.
 
 Not a checklist bolted on before launch. Most of it is free if the markup is right, and expensive to retrofit if it is not.
 
