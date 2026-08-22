@@ -153,7 +153,16 @@ function main() {
       encoding: "utf8",
       timeout: 5 * 60_000,
     });
-    const stdout = `${run.stdout ?? ""}${run.stderr ?? ""}`;
+    // spawnSync reports spawn-level failure in run.error, NOT in stdout. Measured,
+    // because the obvious guess is wrong: a renamed or deleted suite file gives
+    // status=1, error=NONE, and "Cannot find module" on stderr — already captured
+    // below. The case that is genuinely silent is the `timeout` above firing on a
+    // hung suite: status=null, stdout="", and the ETIMEDOUT lives only in run.error.
+    // Without this line that suite would refuse with the generic "no Results:"
+    // message over an empty diagnostic block, which reads like a crash of unknown
+    // origin rather than a hang.
+    const spawnError = run.error ? `spawn failed for ${file}: ${run.error.message}\n` : "";
+    const stdout = `${spawnError}${run.stdout ?? ""}${run.stderr ?? ""}`;
     const parsed = parseResultsLine(stdout);
     const verdict = evaluateSuite({
       name,

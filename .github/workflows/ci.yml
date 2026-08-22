@@ -384,7 +384,6 @@ jobs:
             exit 1
           fi
           pnpm exec tsx server/index.ts > /tmp/vt-server.log 2>&1 &
-          echo $! > /tmp/vt-server.pid
           for i in $(seq 1 60); do
             if curl -fsS -m 2 -o /dev/null http://127.0.0.1:3001/api/health; then
               echo "API ready after ${i}s"; exit 0
