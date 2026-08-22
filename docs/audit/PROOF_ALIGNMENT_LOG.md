@@ -10192,3 +10192,82 @@ instrument than the tool and is recorded as such.
 branch would pull unreviewed contract code into that repo.
 
 **Verdict:** VERIFIED, with the two observations above OPEN and the veto checks qualified as manual.
+
+## 2026-08-22 — the deploy that failed after its healthcheck passed, and the CI failure that was not a flake
+
+**Two red signals, reported together, sharing nothing but a timestamp.** Neither was what its
+label said, and in both cases the label pointed away from the cause.
+
+### 1. "Build failed" on Railway — the build did not fail
+
+`CI — VetTrack` failed on the tip of `main`. Every quality job passed — typecheck, frontend
+build, all four test shards, integration ops, RFID controller, architecture gates, claim
+verification. Only `🚢 Deploy to Railway` failed, and `✅ Merge gate` failed because of it.
+
+The deploy job's log showed the image built and pushed, then `[1/1] Healthcheck succeeded!` at
+04:09:34, then **seven minutes with zero output**, then `Deploy failed` at 04:16:34. The
+container's own log ends at 04:09:25 and totals 246 lines — it did not crash, it had nothing
+more to say.
+
+**What was ruled out by measurement, not by reasoning:**
+- The two startup errors in the failed container's log (`UNHANDLED PROMISE: Stream isn't
+  writeable`, from the non-fatal `/collab-ws` Redis adapter path, and a caught
+  `stale-returned-sweep` duplicate-key) appear **identically in the deployment that succeeded
+  90 minutes earlier**. Noise, not cause.
+- Not resource exhaustion: peak memory 660 MB against a 24576 MB limit, peak CPU 0.15 of 24 vCPU.
+- Not a regression in the delta: the only commits between the two deployments are #213's.
+
+**Root cause, from Railway's own `deploymentEvents` step timeline** (the CLI surfaces none of
+this; `railway logs` shows the container, not the platform):
+
+| step | 00:13 ok | 02:37 ok | **04:08 FAILED** |
+|---|---|---|---|
+| SNAPSHOT_CODE | 7.0s | 7.5s | 6.9s |
+| BUILD_IMAGE | 36s | 84s | 44s |
+| CREATE_CONTAINER | 20s | 18s | 20s |
+| HEALTHCHECK | 4.5s | 3.5s | 3.5s |
+| **CONFIGURE_NETWORK** | **1.2s** | **1.3s** | **7m 08s → `Error configuring network`** |
+| DRAIN_INSTANCES | ✅ | ✅ | never reached |
+
+`CONFIGURE_NETWORK` is a Railway platform step that runs **after** the container is up and has
+answered its healthcheck. The application was healthy throughout; the platform could not attach
+it to the network. `deploymentStopped: true`, single instance `REMOVED`. Four prior deployments
+completed the same step in 1.2–2.0s with no error, so this is a one-off platform fault, not a
+pattern. Production stayed on the previous revision and served it cleanly throughout —
+`healthz` 200, 0× 5xx, p99 5 ms over the window.
+
+**Resolution: re-ran the deploy job on the same commit — no code change, because there was no
+code defect.** Deployment `1e7896e4`: `CONFIGURE_NETWORK` 04:41:14→04:41:15, **one second**, no
+error; `DRAIN_INSTANCES` ran. Verified from outside rather than from the status field:
+`GET https://vettrack.uk/api/version` returns
+`gitCommit: 448555447adf5dd8e5570c02361b46b7906cfe45`, byte-identical to `origin/main`, and
+`/api/healthz` returns 200. The Worker service then built as `deploy.sh` intends — on the failed
+run `set -e` had aborted before it, which is why both services had been stranded on the 02:37/02:39
+revision.
+
+### 2. `Flake Detection` — deterministic, in the workflow built to find non-determinism
+
+All **three** runs failed on `tests/claims-ledger.test.ts` → `expected [ Array(1) ] to deeply
+equal []`. A flaky test does not fail 3/3.
+
+`.github/workflows/flake-detection.yml` checked out at the default depth 1. `pnpm test` includes
+the claim gate, whose layer 2 resolves commit and pull-request claims against `main`; a depth-1
+clone has no `main`, so the gate reports `git-unavailable` and refuses to certify claims it
+cannot see. That is the gate working, not failing. `ci.yml` already passes `fetch-depth: 0`
+at three sites for this exact reason; this workflow was the copy that missed it.
+
+**Reproduced in both directions before writing the fix:**
+- `git clone --depth 1` of `main` → `1 unaccounted claim(s)`, with the diagnostic
+  `[git-unavailable] shallow clone: commit and pull-request claims cannot be checked. Set
+  fetch-depth: 0 on actions/checkout` — matching the CI failure exactly, including the count.
+- The same tree at full depth → `995 claims: 984 verified, 10 registered, 1 attested, 0 FAILED`,
+  `All claims accounted for`. Also confirmed at the failing commit itself, so the shallow
+  checkout is the whole difference.
+
+Fix opened as a pull request against `main`; it adds `fetch-depth: 0` and a comment recording why.
+
+**Verdict:** VERIFIED. Production is live on the current `main` tip. The one thing worth carrying
+forward is that in both cases the failure label named the wrong layer — "build failed" for a
+platform network step two stages past the build, and "flake" for a deterministic,
+correctly-refusing gate. Reading the step-level timeline rather than the summary line is what
+separated them.
