@@ -10192,4 +10192,3 @@ instrument than the tool and is recorded as such.
 branch would pull unreviewed contract code into that repo.
 
 **Verdict:** VERIFIED, with the two observations above OPEN and the veto checks qualified as manual.
-||||||| e9147b905
