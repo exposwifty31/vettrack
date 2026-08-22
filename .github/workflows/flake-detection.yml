@@ -74,6 +74,12 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          # `pnpm test` includes tests/claims-ledger.test.ts, whose layer 2 resolves
+          # commit and pull-request claims against main. A depth-1 checkout has no
+          # main to resolve against, so the gate reports `git-unavailable` and every
+          # run of this workflow failed on a claim that is true — a repo-shaped
+          # failure wearing a flaky-test label. Full history, same as ci.yml.
+          fetch-depth: 0
 
       - name: 📦 pnpm
         uses: pnpm/action-setup@v6.0.10
