@@ -6,6 +6,8 @@
  * this particular guard exists to catch a green that means nothing, which is the
  * failure mode you cannot see by looking at a passing run.
  */
+import { spawnSync } from "node:child_process";
+
 import { describe, expect, it } from "vitest";
 
 import {
@@ -65,6 +67,27 @@ describe("parseResultsLine", () => {
     expect(parseResultsLine("Results: 4/4 passed ✓")).toEqual({
       passed: 4,
       total: 4,
+      failed: 0,
+    });
+  });
+
+  it("refuses a plain summary whose counts are not the numbers that were printed", () => {
+    // The slash branch validated its counts and this one did not, which is the whole
+    // defect: past 2^53 the parse stops matching stdout ("9007199254740993" comes back
+    // as ...992), and the resulting total clears every floor. The gate would then pass
+    // on a count no suite ever reported.
+    expect(parseResultsLine("Results: 9007199254740992 passed, 0 failed")).toBeNull();
+    expect(parseResultsLine("Results: 0 passed, 9007199254740993 failed")).toBeNull();
+    // Two safe operands whose SUM is unsafe — the boundary a per-operand check misses.
+    expect(parseResultsLine("Results: 9007199254740991 passed, 1 failed")).toBeNull();
+  });
+
+  it("still accepts the largest plain summary that is a real count", () => {
+    // The guard above must not be off-by-one strict: MAX_SAFE_INTEGER is a real number
+    // the parser should keep, absurd as it would be as an assertion count.
+    expect(parseResultsLine("Results: 9007199254740991 passed, 0 failed")).toEqual({
+      passed: 9007199254740991,
+      total: 9007199254740991,
       failed: 0,
     });
   });
@@ -155,5 +178,27 @@ describe("summarize", () => {
     expect(s.ok).toBe(false);
     expect(s.failures).toHaveLength(2);
     expect(s.totalAssertions).toBe(7);
+  });
+});
+
+describe("module self-execution guard", () => {
+  it("skips main() instead of crashing when imported with no argv[1]", () => {
+    // Regression. The guard called realpathSync(process.argv[1]) unconditionally, so an
+    // import from a context without argv[1] threw on the way in:
+    //   Error: ENOENT: no such file or directory, lstat '<cwd>/undefined'
+    // vitest sets argv[1], so the suite above never touched this path — the module that
+    // refuses a suite for not reporting was one import context away from not loading.
+    const runner = new URL("../scripts/ci/live-server-tests.mjs", import.meta.url).href;
+    const r = spawnSync(
+      process.execPath,
+      ["--input-type=module", "-e", `await import(${JSON.stringify(runner)}); console.log("LOADED");`],
+      { encoding: "utf8", timeout: 30_000 },
+    );
+
+    expect(r.stderr).not.toContain("ENOENT");
+    expect(r.stdout).toContain("LOADED");
+    expect(r.status).toBe(0);
+    // Loaded without side effects: main() would have printed its header.
+    expect(r.stdout).not.toContain("live-server suites");
   });
 });

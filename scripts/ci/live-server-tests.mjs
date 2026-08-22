@@ -81,7 +81,26 @@ export function parseResultsLine(stdout) {
   if (plain) {
     const passed = Number(plain[1]);
     const failed = Number(plain[2]);
-    return { passed, total: passed + failed, failed };
+    const total = passed + failed;
+    // The same refusal as the slash branch, for a sharper reason than "it clears the
+    // floor": past 2^53 the parse is no longer the number the suite printed.
+    // "9007199254740993" comes back as ...992, and "...995" rounds UP to ...996. The
+    // value compared to the floor was never on stdout, so the comparison is meaningless
+    // whichever way it lands. All three are checked because two safe operands still
+    // overflow into an unsafe sum at the boundary (MAX_SAFE passed + 1 failed).
+    //
+    // This does NOT close the whole class and must not be read as if it does: a
+    // timestamp-shaped "1755855019000 passed" is a perfectly safe integer and clears a
+    // floor of 9. Nothing non-arbitrary fixes that — any ceiling picked here would also
+    // refuse the growth the floor design deliberately allows.
+    if (
+      !Number.isSafeInteger(passed) ||
+      !Number.isSafeInteger(failed) ||
+      !Number.isSafeInteger(total)
+    ) {
+      return null;
+    }
+    return { passed, total, failed };
   }
 
   return null;
@@ -209,6 +228,23 @@ function main() {
   console.log("PASS");
 }
 
-if (realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url))) {
+// Mirrors db-integration-preflight.mjs's guard, including the two parts that look like
+// belt-and-braces and are not. `process.argv[1]` is absent under `node -e` and merely
+// unresolved under a symlink; realpathSync throws on the first and silently disagrees on
+// the second. The bare comparison this replaced therefore CRASHED on import — measured:
+// `ENOENT: no such file or directory, lstat '<cwd>/undefined'` — and would have no-op'd
+// from a symlinked checkout, which is the shape of a CI bind-mount and of /tmp on macOS.
+// A path that cannot be resolved is not a reason to skip the gate, so the catch falls
+// back to comparing hrefs rather than returning false.
+const invokedDirectly = (() => {
+  if (!process.argv[1]) return false;
+  try {
+    return realpathSync(fileURLToPath(import.meta.url)) === realpathSync(process.argv[1]);
+  } catch {
+    return import.meta.url === new URL(`file://${process.argv[1]}`).href;
+  }
+})();
+
+if (invokedDirectly) {
   main();
 }
