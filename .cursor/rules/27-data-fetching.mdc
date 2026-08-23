@@ -37,16 +37,35 @@ A key factory in one place. Ad-hoc inline keys mean an invalidation somewhere el
 ```ts
 // tenantId comes from the authenticated session, not from `next` — never let a
 // mutation payload pick which tenant's cache entry it writes to.
+//
+// latestAttempt guards the SAME race onError closes below: it is keyed by the
+// exact cache key so a stale rollback can never fire once a newer attempt for
+// that entity has started. `scope: { id }` was considered instead — it does
+// not fit here, because scope is fixed when useMutation is CREATED, and this
+// hook is generic: the entity id is only known per-call, inside onMutate.
+const latestAttempt = useRef<Record<string, symbol>>({})
+
 useMutation({
   mutationFn: updateUser,
   onMutate: async (next) => {
+    const key = userKeys.detail(tenantId, next.id).join(':')
+    const attempt = Symbol()
+    latestAttempt.current[key] = attempt                                      // this call is now the newest for this entity
     await qc.cancelQueries({ queryKey: userKeys.detail(tenantId, next.id) })  // stop in-flight overwrite
     const prev = qc.getQueryData(userKeys.detail(tenantId, next.id))
     qc.setQueryData(userKeys.detail(tenantId, next.id), (old: User | undefined) =>
       old ? { ...old, ...next } : old)                                        // merge — `next` may be a patch
-    return { prev }                                                           // rollback context
+    return { prev, attempt, key }                                             // rollback context
   },
-  onError: (_e, next, ctx) => qc.setQueryData(userKeys.detail(tenantId, next.id), ctx?.prev),
+  onError: (_e, next, ctx) => {
+    // Only roll back if THIS attempt is still the latest for the entity — a
+    // slower-failing mutation whose successor already succeeded must not
+    // stomp that successor's newer, already-committed data with its own
+    // stale snapshot.
+    if (ctx && latestAttempt.current[ctx.key] === ctx.attempt) {
+      qc.setQueryData(userKeys.detail(tenantId, next.id), ctx.prev)
+    }
+  },
   onSettled: (_d, _e, next) => Promise.all([                                // returned, so the
     qc.invalidateQueries({ queryKey: userKeys.detail(tenantId, next.id) }), // mutation stays
     qc.invalidateQueries({ queryKey: [...userKeys.all(tenantId), 'list'] }),// pending until both — partial match, every filter variant
@@ -56,7 +75,7 @@ useMutation({
 
 The `cancelQueries` line is the one people omit — without it an in-flight refetch lands after your optimistic write and reverts it. Optimistic updates without a rollback path are worse than none; the UI lies about a failure.
 
-**This `onError` has a second bug once two mutations for the same entity overlap.** If mutation A's `onMutate` snapshots `prev`, mutation B (same `tenantId`/`id`) starts and succeeds, and only *then* A fails — A's `onError` restores its own stale `prev`, silently reverting B's newer, already-committed data. The snapshot is only valid if it's still the *latest* mutation for that entity by the time it's restored. Give same-entity mutations a shared `scope: { id: userKeys.detail(tenantId, id).join(':') }` so TanStack Query serializes them (one runs at a time per scope, never overlapping) — cheaper than tracking mutation freshness by hand, and it removes the race instead of detecting it after the fact.
+**`onError` has a second bug once two mutations for the same entity overlap.** If mutation A's `onMutate` snapshots `prev`, mutation B (same `tenantId`/`id`) starts and succeeds, and only *then* A fails — an unconditional rollback restores A's stale `prev`, silently reverting B's newer, already-committed data. The snapshot is only valid if it's still the *latest* attempt for that entity by the time it's restored — `latestAttempt` above tracks exactly that, keyed by the same string the cache itself is keyed by.
 
 **Return the invalidation promise.** v5 awaits whatever a mutation callback returns, so returning `Promise.all([...])` keeps the mutation pending until the refetches land — for queries currently observed by a mounted component. `invalidateQueries` defaults to `refetchType: 'active'`: a matching query with no mounted observer is marked stale but does **not** refetch on the spot, so its promise resolves without a network round-trip. That's usually right — nothing is watching it, so nothing needs to update yet — but if a specific invalidation must force a background refetch regardless of who's watching, pass `refetchType: 'all'` explicitly.
 
