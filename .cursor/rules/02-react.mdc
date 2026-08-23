@@ -1,5 +1,5 @@
 ---
-description: React 19 component architecture, hook correctness, render performance, and state placement. Platform-neutral React core, with DOM-specific items marked.
+description: React 18+ component architecture, hook correctness, render performance, and state placement. Platform-neutral React core, with DOM-specific items marked. This repo pins 18.3.
 globs: **/*.tsx,**/*.jsx
 alwaysApply: false
 ---
@@ -65,7 +65,7 @@ Every effect that subscribes returns a cleanup. No exceptions.
 
 ## Errors and Loading
 
-- A boundary around each independently-failing region — not one at the app root. This repo doesn't have a generic `<ErrorBoundary>`; use its own: `AppErrorBoundary` (app-root fallback), `PageErrorBoundary` (per-route), `BoardErrorBoundary` (the `/board` kiosk shell — remounts children for a clean SSE teardown/rebuild rather than showing a static fallback). All three take one required prop, `children`.
+- A boundary around each independently-failing region, not *only* one at the app root — a single app-root boundary still blanks the whole screen for a failure anywhere in it. This repo's own boundaries: `AppErrorBoundary` (the required app-root fallback — keep it, it's the last line of defense), `PageErrorBoundary` (per-route, catches most failures before they reach the root), `BoardErrorBoundary` (the `/board` kiosk shell — remounts children for a clean SSE teardown/rebuild rather than showing a static fallback). All three take one required prop, `children`.
 - `<Suspense>` boundaries scoped tightly so one slow query does not blank the screen.
 - Skeletons matching final layout dimensions, to avoid layout shift.
 

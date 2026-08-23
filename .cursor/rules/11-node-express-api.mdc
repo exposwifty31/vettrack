@@ -73,7 +73,7 @@ export class AppError extends Error {
 - Graceful shutdown: stop accepting connections, drain in-flight requests, close the DB pool, then exit.
 - Structured JSON logs (`pino`) with a request id propagated through every layer. `console.log` is not logging.
 - Health endpoints: `/healthz` (process alive) and `/readyz` (dependencies reachable) — they are not the same check.
-- Every response uses a consistent envelope: `{ data }` on success; on failure, **`error` is always a string**, never nested — matching the validation shape above, not a `{ error: { code, message } }` object. (This repo's general-purpose version is `server/lib/apiError.ts`: `{ error: <localized text>, code: <key>, params? }` — `code` sits beside `error`, not inside it.)
+- Every response uses a consistent envelope: `{ data }` on success; on failure, **`error` is always a string**, never nested — matching the validation shape above, not a `{ error: { code, message } }` object. (This repo's general-purpose failure shape is `server/lib/apiError.ts`: `{ error: <localized text>, code: <key>, params? }` — `code` sits beside `error`, not inside it.) **The success side is not universal in this repo** — `server/routes/admin-task-ownership.ts` returns its resource fields directly (`{ clinicId, rows, requestId }`, no `data` wrapper), verified against the route, not assumed. Migrate it and its clients to the wrapped shape, or document the direct-resource shape as a supported exception — don't let this bullet and the real route silently disagree.
 
 ## NEVER
 

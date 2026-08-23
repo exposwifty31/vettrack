@@ -47,7 +47,7 @@ Never optimize from intuition. Profile, change one thing, measure again.
 Images are usually the largest payload; fonts are usually the worst layout-shift offender.
 
 - Modern formats (AVIF/WebP) with a fallback, responsive `srcset`, and correct `sizes`.
-- Lazy-load everything below the fold; eager-load what is above it.
+- Lazy-load everything below the fold; eager-load what is above it. **Eager and high-priority are different knobs** — eager-loading an above-the-fold image just stops it deferring; `fetchpriority="high"` is reserved for the LCP image specifically (see Core Web Vitals above). Marking every above-the-fold image high-priority makes them compete with each other for bandwidth instead of helping the one that matters.
 - Self-host fonts. A third-party font request adds a DNS lookup, a connection, and a privacy question.
 - Subset fonts to the characters actually used, and preload the one used for the LCP text.
 - Two weights, not six. Each is a separate download.
@@ -56,7 +56,7 @@ Images are usually the largest payload; fonts are usually the worst layout-shift
 
 - Virtualize a list once measurement says it needs it — no fixed row-count threshold, matching "Measure First" above and `02-react.mdc`'s Lists section. The cost is per-row render work, not row count.
 - Animate only `transform` and `opacity` — they run on the compositor. Animating `width`, `top`, or `box-shadow` forces layout on every frame.
-- `content-visibility: auto` to skip rendering off-screen sections.
+- `content-visibility: auto` to skip rendering off-screen sections — but set `contain-intrinsic-size` on them too. Without a reserved size a skipped section is 0×0 until it scrolls into view, then jumps to its real size the instant rendering resumes: a layout shift this rule's own CLS budget forbids, and a wrong scrollbar estimate while it's still off-screen.
 - Batch DOM reads and writes; interleaving them causes layout thrashing.
 - Memoize where the profiler shows a real cost, not preemptively — memoization has its own cost.
 
@@ -66,7 +66,7 @@ Images are usually the largest payload; fonts are usually the worst layout-shift
 - Preconnect to critical third-party origins; `dns-prefetch` for likely ones.
 - Compress with Brotli.
 - Stream server-rendered HTML so the browser can start early.
-- Third-party scripts are the most common cause of a bad INP and the least examined. **Audit before choosing a loading strategy — don't default to `async`/`defer`.** `async`/`defer` only help scripts with no ordering dependency; a script that a later inline `<script>` depends on (e.g. loading a UMD build, then calling a global it defines) breaks under either, because neither guarantees it runs before the dependent code. Use `async` for scripts nothing depends on, `defer` when order matters but nothing needs the result immediately, and leave a script synchronous — or restructure the dependency — when something in the initial render needs it before paint. A worker is an option only for work that doesn't touch the DOM.
+- Third-party scripts are the most common cause of a bad INP and the least examined. **Audit before choosing a loading strategy — don't default to `async`/`defer`.** `async` is for a script nothing depends on and that depends on nothing — it runs the instant it downloads, in no guaranteed order relative to anything else. `defer` preserves execution order **among deferred external scripts**, so a UMD loader marked `defer`, followed by a `defer`red script that calls the global it defines, is safe. What `defer` does **not** do is satisfy a dependency **from inline code**: an inline `<script>` isn't itself deferrable, runs at its own parse-time position, and cannot be made to wait for a deferred script to finish — a UMD build loaded `defer` and consumed by a later inline `<script>` breaks, same as it would under `async`. Leave a script synchronous — or restructure the dependency (move the consumer external and `defer` too, or inline the loader) — when something in the initial render needs it before paint. A worker is an option only for work that doesn't touch the DOM.
 
 ## NEVER
 

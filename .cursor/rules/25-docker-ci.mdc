@@ -47,11 +47,19 @@ Order stages so the cheapest failure comes first: lint → typecheck → unit te
 
 ## Secrets and Permissions
 
-- Repository/organization secrets, never a literal in a workflow file.
-- Minimum token permissions (`permissions: contents: read` and widen deliberately).
-- Pin third-party actions to a commit SHA. A tag can be moved to point at malicious code.
+Provider-neutral:
+- Repository/organization secrets, never a literal in a workflow/pipeline file.
 - Never `echo` a secret; CI logs are often broadly readable.
+
+**GitHub Actions:**
+- Minimum token permissions (`permissions: contents: read` and widen deliberately) — GitHub-Actions-specific; GitLab has no equivalent YAML key.
+- Pin third-party actions to a commit SHA. A tag can be moved to point at malicious code.
 - Untrusted PRs from forks do not get secrets. `pull_request_target` with a checkout of PR code is a known code-execution path.
+
+**GitLab CI/CD:**
+- Mark sensitive CI/CD variables **Protected** (only exposed to protected branches/tags) and **Masked** (scrubbed from job logs) — the closest equivalent to "minimum token permissions," since GitLab authorizes at the variable/runner level, not via a pipeline-file permissions key.
+- Protected runners for jobs that need real credentials; shared runners for everything else.
+- A **fork's merge request pipeline runs in the fork's context by default and cannot see protected variables** — but a maintainer **manually triggering** a pipeline for a fork branch in the *target* project's context can expose the target project's protected variables to fork-authored code. Know which context a pipeline runs in before triggering one for external contributions.
 
 ## Deployment
 
