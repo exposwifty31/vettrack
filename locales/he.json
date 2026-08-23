@@ -2092,6 +2092,7 @@
     "itemDeleteFailed": "מחיקת פריט נכשלה",
     "itemInUse": "פריט בשימוש ולא ניתן למחוק",
     "codeExists": "פריט עם קוד זה כבר קיים",
+    "nfcTagExists": "תג ה-NFC הזה כבר משויך לפריט אחר",
     "loadError": "טעינת פריטי מלאי נכשלה",
     "noItems": "אין פריטי מלאי",
     "searchPlaceholder": "חיפוש לפי קוד או תווית...",
