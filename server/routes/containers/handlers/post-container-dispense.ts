@@ -1,0 +1,679 @@
+import type { RequestHandler } from "express";
+import { randomUUID } from "crypto";
+import { and, eq } from "drizzle-orm";
+import {
+  containerItems,
+  containers,
+  db,
+  idempotencyKeys,
+  inventoryItems,
+  inventoryLogs,
+  operationalTasks,
+} from "../../../db.js";
+import { logAudit, resolveAuditActorRole } from "../../../lib/audit.js";
+import {
+  evaluateDispenseAgainstOrders,
+  loadInventoryItemLabelCode,
+  type DispenseLineForValidation,
+  type OrphanLineDetail,
+  type OrphanReasonCode,
+} from "../../../lib/dispense-order-validation.js";
+import { resolveClinicalInvariantEnforcementMode } from "../../../lib/authority/enforcement/clinical-invariant.config.js";
+import { evaluateClinicalInvariant } from "../../../lib/authority/enforcement/clinical-invariant.evaluator.js";
+import {
+  emitClinicalInvariantShadowWouldHaveBlockedAudit,
+  emitClinicalInvariantOrphanDispenseDeniedAuditInTx,
+  emitClinicalInvariantEmergencyBypassAudit,
+  emitClinicalInvariantFailOpenAudit,
+} from "../../../lib/authority/enforcement/clinical-invariant.audit.js";
+import { clinicalInvariantMetrics } from "../../../lib/authority/enforcement/clinical-invariant.metrics.js";
+import type { ClinicalInvariantEnforcementMode } from "../../../lib/authority/enforcement/clinical-invariant.types.js";
+import { incrementMetric } from "../../../lib/metrics.js";
+import {
+  buildClinicalInvariantError,
+  ClinicalInvariantDenyError,
+  isClinicalInvariantFailOpenActive,
+} from "../../../lib/clinical-invariant-error.js";
+import { DISPENSE_IDEMPOTENCY_ENDPOINT } from "../../../middleware/container-dispense-idempotency.js";
+import { hashDispenseRequestBody } from "../../../lib/dispense-idempotency-hash.js";
+import {
+  handleCheckViolation,
+  isCheckViolation,
+  isInventoryConstraintError,
+  toInventoryConstraintError,
+} from "../../../lib/db-constraint-errors.js";
+import { apiError, resolveRequestId } from "../../../lib/route-utils.js";
+
+type DispenseBody = {
+  items: Array<{ itemId: string; quantity: number }>;
+  isEmergency: boolean;
+  bypassReason?: "EMERGENCY_CPR" | "PROTOCOL_OVERRIDE" | "TECH_ERROR";
+};
+
+// POST /api/containers/:id/dispense
+// Consumables dispense is NON-clinical (drug formulary removed, migrations
+// 142-143): any authenticated staff member — including a supervised student —
+// may dispense. `requireEffectiveRole("student")` is the role floor. This is NOT
+// a clinical-authority gate; STUDENT_NEVER_ELEVATED and the clinical-authority
+// middleware stay in force for Code Blue + genuinely-clinical routes.
+export const postContainerDispenseHandler: RequestHandler = async (req, res) => {
+  const requestId = resolveRequestId(res, req.headers["x-request-id"]);
+  try {
+    const clinicId = req.clinicId!;
+    const actorUserId = req.authUser!.id;
+    const actorDisplayName = req.authUser!.name || req.authUser!.email;
+    const containerId = req.params.id;
+    const body = req.body as DispenseBody;
+    const { isEmergency } = body;
+          const requestIdempotencyKey = res.locals.dispenseIdempotencyKey;
+    const takenAt = new Date();
+    const allowTestBillingFail =
+      process.env.VETTRACK_TEST_FORCE_BILLING_FAIL === "1" &&
+      typeof req.headers["x-test-force-billing-fail"] === "string" &&
+      req.headers["x-test-force-billing-fail"].trim() === "1";
+
+    const dispenseRequestHash = hashDispenseRequestBody(req.body);
+
+    if (isEmergency && body.items.length === 0) {
+      // Standalone emergency tap: log event only, no stock changes (complete later)
+      const emergencyEventId = randomUUID();
+      const bypassReason = body.bypassReason;
+      await db.transaction(async (tx) => {
+        const [container] = await tx
+          .select()
+          .from(containers)
+          .where(and(eq(containers.clinicId, clinicId), eq(containers.id, containerId)))
+          .limit(1);
+        if (!container) throw Object.assign(new Error("CONTAINER_NOT_FOUND"), { statusCode: 404 });
+
+        await tx.insert(inventoryLogs).values({
+          id: emergencyEventId,
+          clinicId,
+          containerId,
+          taskId: null,
+          logType: "adjustment",
+          quantityBefore: 0,
+          quantityAdded: 0,
+          quantityAfter: 0,
+          roomId: container.roomId,
+          note: "emergency",
+          metadata: {
+            isEmergency: true,
+            containerId,
+            pendingCompletion: true,
+            ...(bypassReason ? { bypassReason } : {}),
+          },
+          createdByUserId: actorUserId,
+        });
+      });
+
+      return res.json({
+        success: true,
+        emergencyEventId,
+        takenBy: { userId: actorUserId, displayName: actorDisplayName },
+        takenAt: takenAt.toISOString(),
+      });
+    }
+
+    // Normal dispense — stock, logs, billing, idempotency replay row (single transaction).
+    const dispensedItems: Array<{ itemId: string; label: string; quantity: number; newStock: number }> = [];
+    const billingIds: string[] = [];
+    let autoBilledCents = 0;
+
+    type PendingShadowAudit = {
+              containerId: string;
+      requestId: string;
+      orphanLines: ReadonlyArray<OrphanLineDetail>;
+    };
+    // PR 5.7 — post-commit emission slots (mirror dispense.service.ts).
+    type PendingEmergencyBypassAudit = {
+      userId: string;
+      containerId: string;
+      requestId: string;
+      bypassReason: string;
+    };
+    type PendingFailOpenAudit = {
+      route: string;
+      requestId: string;
+      errorType?: string;
+    };
+
+    // Returning the audit payload via the callback's return value
+    // (rather than closure-mutating an outer `let`) keeps
+    // TypeScript's flow narrowing intact across the async tx
+    // boundary — otherwise the variable narrows to `never` at the
+    // post-commit emission site under the server-check tsconfig.
+    const {
+      responsePayload,
+      pendingShadowAudit,
+      pendingEmergencyBypassAudit,
+      pendingFailOpenAudit,
+      copDegraded,
+    } = await db.transaction(async (tx) => {
+      let pendingShadowAudit: PendingShadowAudit | null = null;
+      let pendingEmergencyBypassAudit: PendingEmergencyBypassAudit | null = null;
+      let pendingFailOpenAudit: PendingFailOpenAudit | null = null;
+      let copDegraded = false;
+      const [container] = await tx
+        .select()
+        .from(containers)
+        .where(and(eq(containers.clinicId, clinicId), eq(containers.id, containerId)))
+        .limit(1);
+      if (!container) throw Object.assign(new Error("CONTAINER_NOT_FOUND"), { statusCode: 404 });
+
+      // ── Phase 5 PR 5.4 — clinical-invariant evaluator wiring ───────────
+      // Wiring layer per Phase 5 plan §15 PR 5.4 + CI-21 + CI-22 + CI-23
+      // + CI-27 + CI-28. Mirror of the PR 5.3 wiring at the dispense-
+      // confirm boundary. Mode is resolved EXACTLY ONCE per request and
+      // held request-local. This is the SOLE clinical-invariant
+      // evaluator invocation point on the container-dispense path
+      // (CI-21).
+      //
+      // Off-mode does NOT invoke the evaluator (CI-22 + CI-27): it
+      // ticks the resolved counter and proceeds. Shadow / enforce
+      // invoke the evaluator exactly once with the wiring-layer's
+      // resolved mode pinned via `options.modeResolver`.
+      //
+      // PR 5.4 does NOT act on the deny verdict — the 422 path lands
+      // in PR 5.7. The pre-existing legacy `evaluateDispenseAgainstOrders`
+      // call below (lines ~395+) continues to provide the production
+      // hard-block at HTTP 400 with reason `ORPHAN_DISPENSE_BLOCKED`;
+      // PR 5.7 will consolidate the two paths.
+      //
+      // Mutation-order invariant (CI-23): this block runs BEFORE the
+      // legacy validation, BEFORE the billing loop, BEFORE the
+      // dispenseEvents UPDATE / inventory mutation.
+      //
+      // Transaction-boundary invariant (CI-28): runs inside the
+      // existing `db.transaction` callback owned by the route handler.
+      // No nested tx, no savepoint, no orchestration change.
+      //
+      // Wiring-layer Strategy A safety net (CI-16, CI-20): any throw
+      // inside the mode resolver, the evaluator, or its DB reads is
+      // caught here EXACTLY ONCE. No retry. Mutation proceeds. PR 5.7
+      // will dispatch fail-open / fail-closed semantics here.
+      let clinicalInvariantMode: ClinicalInvariantEnforcementMode;
+      try {
+        clinicalInvariantMode = await resolveClinicalInvariantEnforcementMode(clinicId);
+      } catch {
+        clinicalInvariantMode = "off";
+      }
+
+      if (clinicalInvariantMode === "off") {
+        incrementMetric("clinical_invariant_resolved_off");
+      } else {
+        incrementMetric(
+          clinicalInvariantMode === "shadow"
+            ? "clinical_invariant_resolved_shadow"
+            : "clinical_invariant_resolved_enforce",
+        );
+        try {
+          // Emergency carve-out (CI-7): the wired evaluator skips the
+          // per-item label/code lookup when `isEmergency && bypassReason`
+          // — its own carve-out short-circuits before reading `lines`.
+          // For DRAFT-equivalent (non-emergency) dispenses we hydrate
+          // validation lines via the same `loadInventoryItemLabelCode`
+          // helper the legacy block uses below.
+          const carveOut =
+            body.isEmergency &&
+            typeof body.bypassReason === "string" &&
+            body.bypassReason.length > 0;
+          const validationLines: DispenseLineForValidation[] = [];
+          if (!carveOut) {
+            for (const lineItem of body.items) {
+              const inv = await loadInventoryItemLabelCode(tx, clinicId, lineItem.itemId);
+              validationLines.push({
+                itemId: lineItem.itemId,
+                quantity: lineItem.quantity,
+                label: inv?.label ?? "",
+                code: inv?.code ?? "",
+              });
+            }
+          }
+          // CI-22 — pin the wiring-layer's resolved mode so the
+          // evaluator never re-resolves. Single-source request-local
+          // mode; the `clinical_invariant_resolved_*` counters and
+          // the evaluator's mode dispatch cannot desync.
+          const ciVerdict = await evaluateClinicalInvariant(
+            {
+              tx,
+              clinicId,
+              animalId: null,
+              containerId,
+              lines: validationLines,
+              isEmergency: body.isEmergency,
+              bypassReason: body.bypassReason ?? null,
+              requestId,
+            },
+            { modeResolver: async () => clinicalInvariantMode },
+          );
+          // PR 5.7 — handle the enforce-mode deny verdict. The
+          // denial audit is attempted inside the tx via
+          // `AuditDbExecutor` so the audit-ordering contract
+          // (audit attempted BEFORE the 422 response is sent —
+          // §9.4 + the PR 5.7.1 regression test) is honored. Per
+          // CI-26 the row is best-effort and NOT durable: the
+          // throw rolls the tx back and the audit row goes with
+          // it. Durable observability for the denial is the
+          // metric counters + 422 response + server logs.
+          if (ciVerdict.action === "deny") {
+            clinicalInvariantMetrics.blockedTotal();
+            const seenReasons = new Set<OrphanReasonCode>();
+            for (const line of ciVerdict.orphanLines) {
+              for (const reason of line.reasons) {
+                seenReasons.add(reason);
+              }
+            }
+            for (const reason of seenReasons) {
+              clinicalInvariantMetrics.blockedReason(reason);
+            }
+            // PR 5.7 post-merge review fix (Codex P1 + Cursor):
+            // emitter awaits its `logAudit({tx,…})` Promise so
+            // async rejections can't escape, and we await here so
+            // the INSERT attempt completes before the deny throw
+            // (§9.4 ordering contract).
+            await emitClinicalInvariantOrphanDispenseDeniedAuditInTx(tx, {
+              clinicId,
+              animalId: null,
+              containerId,
+              requestId,
+              orphanLines: ciVerdict.orphanLines,
+            });
+            const denyBody = buildClinicalInvariantError({
+              requestId,
+              orphanLines: ciVerdict.orphanLines,
+            });
+            throw new ClinicalInvariantDenyError(denyBody);
+          }
+
+          // PR 5.7 — emergency carve-out (CI-7). Tick the counter
+          // and capture the audit payload for post-commit emission.
+          if (
+            ciVerdict.action === "allow" &&
+            ciVerdict.disposition === "EMERGENCY_BYPASS"
+          ) {
+            clinicalInvariantMetrics.emergencyBypassTotal();
+            pendingEmergencyBypassAudit = {
+              userId: actorUserId,
+              containerId,
+              requestId,
+              bypassReason: body.bypassReason ?? "",
+            };
+          }
+
+          // PR 5.5 — shadow detection capture (unchanged). Sampled
+          // shadow audit fires AFTER the tx commits (post-commit;
+          // never inside the tx — Codex P2 review on PR 5.5).
+          if (
+            ciVerdict.action === "allow" &&
+            ciVerdict.disposition === "WOULD_HAVE_BLOCKED_SHADOW" &&
+            ciVerdict.orphanLines
+          ) {
+            pendingShadowAudit = {
+              containerId,
+              requestId,
+              orphanLines: ciVerdict.orphanLines,
+            };
+          }
+        } catch (err) {
+          // Wiring-layer Strategy A safety net (CI-16, CI-20).
+          // Caught EXACTLY ONCE. No retry. No recursion.
+          //
+          // Enforce-mode deny surfaces here as
+          // `ClinicalInvariantDenyError` — re-throw so the route's
+          // catch renders the §6.3 422 envelope. The tx rolls back
+          // with the throw.
+          if (err instanceof ClinicalInvariantDenyError) {
+            throw err;
+          }
+          // Everything else is an evaluator-side throw. PR 5.7
+          // dispatches per plan §8.2:
+          //   - shadow: always allow + `evaluator_failure_total++`.
+          //     `SMART_COP_VALIDATION_FAIL_OPEN` is irrelevant in
+          //     shadow mode.
+          //   - enforce + fail-open env true: allow + degraded
+          //     header + fail-open audit.
+          //   - enforce + fail-open env false (default): throw
+          //     503 so the tx rolls back. No retry.
+          clinicalInvariantMetrics.evaluatorFailureTotal();
+          if (clinicalInvariantMode === "enforce") {
+            if (isClinicalInvariantFailOpenActive()) {
+              clinicalInvariantMetrics.failOpenTotal();
+              copDegraded = true;
+              const errorType =
+                err instanceof Error && typeof err.name === "string" && err.name.length > 0
+                  ? err.name
+                  : undefined;
+              pendingFailOpenAudit = {
+                route: "containers.dispense",
+                requestId,
+                errorType,
+              };
+            } else {
+              clinicalInvariantMetrics.failClosedTotal();
+              throw Object.assign(new Error("COP_VALIDATION_UNAVAILABLE"), {
+                statusCode: 503,
+                reason: "COP_VALIDATION_UNAVAILABLE",
+                requestId,
+              });
+            }
+          }
+          // Shadow mode: tick the failure counter (above) and
+          // proceed. No header, no audit, no retry.
+        }
+      }
+      // ─────────────────────────────────────────────────────────────────────
+
+      if (!body.isEmergency) {
+        const validationLines: DispenseLineForValidation[] = [];
+        for (const lineItem of body.items) {
+          const inv = await loadInventoryItemLabelCode(tx, clinicId, lineItem.itemId);
+          if (!inv) {
+            throw Object.assign(new Error("INVENTORY_ITEM_NOT_FOUND"), { statusCode: 404, itemId: lineItem.itemId });
+          }
+          validationLines.push({
+            itemId: lineItem.itemId,
+            quantity: lineItem.quantity,
+            label: inv.label,
+            code: inv.code,
+          });
+        }
+
+        const { orphanLines } = await evaluateDispenseAgainstOrders(tx, {
+          clinicId,
+          containerId,
+          lines: validationLines,
+        });
+
+        if (orphanLines.length > 0 && !body.bypassReason) {
+          throw Object.assign(new Error("ORPHAN_DISPENSE_BLOCKED"), {
+            statusCode: 400,
+            reason: "ORPHAN_DISPENSE_BLOCKED",
+            orphanLines,
+          });
+        }
+      }
+
+      for (const lineItem of body.items) {
+        let ci: (typeof containerItems.$inferSelect) | undefined;
+        let item: { label: string } | undefined;
+        let newQty = 0;
+        try {
+        // Verify container item exists and has sufficient quantity
+        const [ciRow] = await tx
+          .select()
+          .from(containerItems)
+          .where(
+            and(
+              eq(containerItems.clinicId, clinicId),
+              eq(containerItems.containerId, containerId),
+              eq(containerItems.itemId, lineItem.itemId),
+            ),
+          )
+          .limit(1);
+        ci = ciRow;
+
+        if (!ci) {
+          throw Object.assign(new Error("ITEM_NOT_IN_CONTAINER"), {
+            statusCode: 409,
+            code: "INSUFFICIENT_STOCK",
+            itemId: lineItem.itemId,
+            available: 0,
+            requested: lineItem.quantity,
+          });
+        }
+
+        if (ci.quantity < lineItem.quantity) {
+          throw Object.assign(new Error("INSUFFICIENT_STOCK"), {
+            statusCode: 409,
+            code: "INSUFFICIENT_STOCK",
+            itemId: lineItem.itemId,
+            available: ci.quantity,
+            requested: lineItem.quantity,
+          });
+        }
+
+        // Get item label
+        const [itemRow] = await tx
+          .select({ label: inventoryItems.label })
+          .from(inventoryItems)
+          .where(and(eq(inventoryItems.clinicId, clinicId), eq(inventoryItems.id, lineItem.itemId)))
+          .limit(1);
+        item = itemRow;
+
+        newQty = ci.quantity - lineItem.quantity;
+
+        // Decrement container item quantity
+        await tx
+          .update(containerItems)
+          .set({ quantity: newQty, updatedAt: new Date() })
+          .where(
+            and(
+              eq(containerItems.clinicId, clinicId),
+              eq(containerItems.containerId, containerId),
+              eq(containerItems.itemId, lineItem.itemId),
+            ),
+          );
+        } catch (lineErr) {
+          if (isCheckViolation(lineErr)) {
+            throw toInventoryConstraintError(lineErr);
+          }
+          throw lineErr;
+        }
+
+        // Insert inventory log
+        const inventoryLogId = randomUUID();
+        await tx.insert(inventoryLogs).values({
+          id: inventoryLogId,
+          clinicId,
+          containerId,
+          taskId: null,
+          logType: "adjustment",
+          quantityBefore: ci.quantity,
+          quantityAdded: -lineItem.quantity,
+          quantityAfter: newQty,
+          roomId: container.roomId,
+          note: null,
+          metadata: {
+            isEmergency: Boolean(body.bypassReason) || Boolean(body.isEmergency),
+            itemId: lineItem.itemId,
+            ...(body.bypassReason ? { bypassReason: body.bypassReason } : {}),
+          },
+          createdByUserId: actorUserId,
+        });
+
+        dispensedItems.push({
+          itemId: lineItem.itemId,
+          label: item?.label ?? lineItem.itemId,
+          quantity: lineItem.quantity,
+          newStock: newQty,
+        });
+
+      }
+
+      if (body.isEmergency && body.bypassReason) {
+        await tx.insert(operationalTasks).values({
+          id: randomUUID(),
+          clinicId,
+          type: "SYSTEM",
+          tag: "BILLING_RECONCILIATION_REQUIRED",
+          title: "Emergency dispense — billing reconciliation required",
+        });
+      }
+
+      const payload: Record<string, unknown> = {
+        success: true,
+        dispensed: dispensedItems,
+        takenBy: { userId: actorUserId, displayName: actorDisplayName },
+        takenAt: takenAt.toISOString(),
+        billingIds,
+        autoBilledCents,
+      };
+      // Phase 5 PR 5.7 post-merge fix (Codex P2): persist the
+      // degraded flag inside the idempotency-cached body so the
+      // `X-COP-Validation-Status: degraded` header can be re-emitted
+      // on idempotent replay (§6.2). The body field is additive
+      // and backend-operational only (CI-13 — no client consumer).
+      // The companion change lives in
+      // `server/middleware/container-dispense-idempotency.ts`
+      // (replay path re-emits the header when this flag is true).
+      if (copDegraded) payload.copValidationDegraded = true;
+
+      await tx
+        .insert(idempotencyKeys)
+        .values({
+          clinicId,
+          key: requestIdempotencyKey!,
+          endpoint: DISPENSE_IDEMPOTENCY_ENDPOINT,
+          requestHash: dispenseRequestHash,
+          statusCode: 200,
+          responseBody: payload,
+        })
+        .onConflictDoUpdate({
+          target: [idempotencyKeys.clinicId, idempotencyKeys.key],
+          set: {
+            endpoint: DISPENSE_IDEMPOTENCY_ENDPOINT,
+            requestHash: dispenseRequestHash,
+            statusCode: 200,
+            responseBody: payload,
+          },
+        });
+
+      return {
+        responsePayload: payload,
+        pendingShadowAudit,
+        pendingEmergencyBypassAudit,
+        pendingFailOpenAudit,
+        copDegraded,
+      };
+    });
+
+    // Phase 5 PR 5.5 — POST-COMMIT shadow audit emission. Fires
+    // only when (a) the tx above committed (a throw would have
+    // bypassed this), and (b) the evaluator returned
+    // `WOULD_HAVE_BLOCKED_SHADOW`. Best-effort per CI-25.
+    if (pendingShadowAudit) {
+      emitClinicalInvariantShadowWouldHaveBlockedAudit({
+        clinicId,
+        animalId: null,
+        containerId: pendingShadowAudit.containerId,
+        requestId: pendingShadowAudit.requestId,
+        orphanLines: pendingShadowAudit.orphanLines,
+      });
+    }
+    // Phase 5 PR 5.7 — emergency-bypass audit (post-commit; the
+    // emergency mutation has committed at this point).
+    if (pendingEmergencyBypassAudit) {
+      emitClinicalInvariantEmergencyBypassAudit({
+        clinicId,
+        userId: pendingEmergencyBypassAudit.userId,
+        containerId: pendingEmergencyBypassAudit.containerId,
+        requestId: pendingEmergencyBypassAudit.requestId,
+        bypassReason: pendingEmergencyBypassAudit.bypassReason,
+      });
+    }
+    // Phase 5 PR 5.7 — fail-open audit (post-commit; the degraded
+    // allow path committed the mutation).
+    if (pendingFailOpenAudit) {
+      emitClinicalInvariantFailOpenAudit({
+        clinicId,
+        route: pendingFailOpenAudit.route,
+        requestId: pendingFailOpenAudit.requestId,
+        errorType: pendingFailOpenAudit.errorType,
+      });
+    }
+    // Phase 5 PR 5.7 — emit `X-COP-Validation-Status: degraded`
+    // ONLY on the enforce + fail-open allow path (§6.2 binding
+    // table). All other paths (off / shadow / enforce-pass /
+    // enforce-deny / fail-closed) MUST NOT set this header.
+    if (copDegraded) res.setHeader("X-COP-Validation-Status", "degraded");
+
+    res.locals.dispenseIdempotencyPersistedInTransaction = true;
+
+    logAudit({
+      clinicId,
+      actionType: "inventory_dispensed",
+      performedBy: req.authUser!.id,
+      performedByEmail: req.authUser!.email ?? "",
+      targetId: containerId,
+      targetType: "container",
+      actorRole: resolveAuditActorRole(req),
+      metadata: {
+        dispensedItemCount: dispensedItems.length,
+        autoBilledCents,
+        isEmergency: Boolean(body.bypassReason) || Boolean(body.isEmergency),
+        ...(body.bypassReason ? { bypassReason: body.bypassReason } : {}),
+      },
+    });
+
+    return res.json(responsePayload);
+  } catch (err: unknown) {
+    // Phase 5 PR 5.7 — render the clinical-invariant §6.3 422
+    // envelope as-is. The body was built inside the tx; here we
+    // just serialize it. The throw rolled the tx back so no
+    // inventory / billing artefact persists.
+    if (err instanceof ClinicalInvariantDenyError) {
+      return res.status(err.status).json(err.body);
+    }
+    if (isInventoryConstraintError(err)) {
+      return res.status(err.status).json({
+        code: err.code,
+        message: err.message,
+        constraint: err.constraint,
+      });
+    }
+    if (isCheckViolation(err) && handleCheckViolation(err, res)) {
+      return;
+    }
+    const e = err as Record<string, unknown> & { statusCode?: number; reason?: string; orphanLines?: unknown; itemId?: string };
+    // Phase 5 PR 5.7 — fail-closed evaluator failure → 503
+    // (`COP_VALIDATION_UNAVAILABLE`). No mutation persisted.
+    if (e.reason === "COP_VALIDATION_UNAVAILABLE" || (err as Error).message === "COP_VALIDATION_UNAVAILABLE") {
+      return res.status(503).json(
+        apiError({
+          code: "COP_VALIDATION_UNAVAILABLE",
+          reason: "COP_VALIDATION_UNAVAILABLE",
+          message: "Clinical-invariant validation is unavailable; please retry.",
+          requestId,
+        }),
+      );
+    }
+    if (e.code === "INSUFFICIENT_STOCK") {
+      return res.status(409).json({
+        code: "INSUFFICIENT_STOCK",
+        error: "INSUFFICIENT_STOCK",
+        reason: "Insufficient stock",
+        message: "Insufficient stock for requested item",
+        itemId: e.itemId,
+        available: e.available,
+        requested: e.requested,
+        requestId,
+      });
+    }
+    if (e.reason === "ORPHAN_DISPENSE_BLOCKED" || (err as Error).message === "ORPHAN_DISPENSE_BLOCKED") {
+      return res.status(400).json({
+        code: "ORPHAN_DISPENSE_BLOCKED",
+        error: "ORPHAN_DISPENSE_BLOCKED",
+        reason: "ORPHAN_DISPENSE_BLOCKED",
+        message: "Dispense blocked: lines do not align with active orders or patient context.",
+        orphanLines: e.orphanLines ?? [],
+        requestId,
+      });
+    }
+    if ((err as Error).message === "INVENTORY_ITEM_NOT_FOUND") {
+      return res.status(404).json(
+        apiError({
+          code: "NOT_FOUND",
+          reason: "INVENTORY_ITEM_NOT_FOUND",
+          message: "Inventory item not found for dispense line",
+          requestId,
+        }),
+      );
+    }
+    if (e.statusCode === 404 || (err as Error).message === "CONTAINER_NOT_FOUND") {
+      return res.status(404).json(apiError({ code: "NOT_FOUND", reason: "CONTAINER_NOT_FOUND", message: "Container not found", requestId }));
+    }
+    console.error(err);
+    return res.status(500).json(apiError({ code: "INTERNAL_ERROR", reason: "DISPENSE_FAILED", message: "Failed to process dispense", requestId }));
+  }
+};
