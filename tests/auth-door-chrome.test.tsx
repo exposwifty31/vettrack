@@ -19,6 +19,7 @@ import {
 } from "../src/lib/clerk-appearance";
 import { RoleChips, type SignupRequestedRole } from "@/features/auth/components/RoleChips";
 import { useState } from "react";
+import { t } from "@/lib/i18n";
 
 const read = (p: string) => readFileSync(resolve(process.cwd(), p), "utf-8");
 
@@ -56,8 +57,11 @@ vi.mock("@/lib/capacitor-runtime", () => ({
 
 describe("Clerk appearance — Ivory inset form (not a second card)", () => {
   it("hides Clerk header title/subtitle and flattens the card chrome", () => {
+    expect(clerkAppearance.elements.header).toMatch(/hidden/);
     expect(clerkAppearance.elements.headerTitle).toMatch(/hidden/);
     expect(clerkAppearance.elements.headerSubtitle).toMatch(/hidden/);
+    expect(clerkAppearance.elements.formHeaderTitle).toMatch(/hidden/);
+    expect(clerkAppearance.elements.formHeaderSubtitle).toMatch(/hidden/);
     expect(clerkAppearance.elements.card).toMatch(/shadow-none/);
     expect(clerkAppearance.elements.card).toMatch(/border-0|border-none/);
     expect(clerkAppearance.elements.card).toMatch(/bg-transparent/);
@@ -98,6 +102,17 @@ describe("Auth pages — Ivory door chrome (source contract)", () => {
       expect(source).not.toMatch(/text-2xl font-bold/);
     });
   }
+
+  it("Welcome back is sign-in only; sign-up uses createAccount", () => {
+    const signin = read("src/pages/signin.tsx");
+    const signup = read("src/pages/signup.tsx");
+    expect(signin).toMatch(/title=\{t\.authPage\.welcomeBack\}/);
+    expect(signin).toMatch(/subtitle=\{t\.authPage\.signInSubtitle\}/);
+    expect(signin).not.toMatch(/t\.authPage\.createAccount/);
+    expect(signup).toMatch(/title=\{t\.authPage\.createAccount\}/);
+    expect(signup).toMatch(/subtitle=\{t\.authPage\.signUpSubtitle\}/);
+    expect(signup).not.toMatch(/t\.authPage\.welcomeBack/);
+  });
 
   it("phone sign-in is not a second generic bg-card shadow-sm card", () => {
     const source = read("src/components/phone-sign-in.tsx");
@@ -144,7 +159,7 @@ describe("Sign-in / Sign-up pages render the Ivory sheet", () => {
     vi.resetModules();
   });
 
-  it("sign-in mounts one Ivory sheet with the page title and no role chips", async () => {
+  it("sign-in mounts one Ivory sheet with Welcome back only (no role chips, no create-account title)", async () => {
     const { default: SignInPage } = await import("@/pages/signin");
     const { hook } = memoryLocation({ path: "/signin", record: true });
     const { container } = render(
@@ -156,14 +171,17 @@ describe("Sign-in / Sign-up pages render the Ivory sheet", () => {
     expect(sheet).toBeTruthy();
     expect(sheet!.className).toMatch(/bg-ivory-surface/);
     expect(sheet!.className).toMatch(/border-ivory-border/);
-    expect(container.querySelector(".vt-page-title")).toBeTruthy();
     expect(container.querySelector(".from-primary\\/5")).toBeNull();
     expect(screen.queryByRole("radiogroup")).toBeNull();
     expect(screen.queryByTestId("role-chip-vet")).toBeNull();
     expect(screen.queryByTestId("role-chip-technician")).toBeNull();
+
+    const title = screen.getByTestId("auth-door-title");
+    expect(title.textContent).toBe(t.authPage.welcomeBack);
+    expect(screen.queryByText(t.authPage.createAccount)).toBeNull();
   });
 
-  it("sign-up mounts one Ivory sheet with interactive role chips", async () => {
+  it("sign-up mounts Create account title (never Welcome back) with interactive role chips", async () => {
     const { default: SignUpPage } = await import("@/pages/signup");
     const { hook } = memoryLocation({ path: "/signup", record: true });
     const { container } = render(
@@ -174,7 +192,11 @@ describe("Sign-in / Sign-up pages render the Ivory sheet", () => {
     const sheet = container.querySelector("[data-testid='auth-door-sheet']");
     expect(sheet).toBeTruthy();
     expect(sheet!.className).toMatch(/bg-ivory-surface/);
-    expect(container.querySelector(".vt-page-title")).toBeTruthy();
+
+    const title = screen.getByTestId("auth-door-title");
+    expect(title.textContent).toBe(t.authPage.createAccount);
+    expect(screen.queryByText(t.authPage.welcomeBack)).toBeNull();
+
     const chips = screen.getAllByRole("radio");
     expect(chips).toHaveLength(2);
     for (const chip of chips) {

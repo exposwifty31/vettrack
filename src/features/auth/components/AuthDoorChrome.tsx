@@ -42,7 +42,9 @@ export function AuthDoorChrome({
             <VetTrackMark size={36} />
             <span className="vt-title text-ivory-text">VetTrack</span>
           </Link>
-          <h1 className="vt-page-title text-ivory-text text-balance">{title}</h1>
+          <h1 className="vt-page-title text-ivory-text text-balance" data-testid="auth-door-title">
+            {title}
+          </h1>
           <p className="vt-text-sm mt-2 text-ivory-text2 text-pretty">{subtitle}</p>
         </div>
         {children}

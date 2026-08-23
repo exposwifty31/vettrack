@@ -38,8 +38,14 @@ export const clerkAppearance = {
     logoImage: "hidden",
     // Page chrome owns the sheet; Clerk is an inset form, not a second card.
     card: "shadow-none border-0 bg-transparent p-0 w-full",
+    // Kill every Clerk leftover title so page h1 is the only heading
+    // (Sign-In's "Welcome back" must never appear on /signup).
+    header: "hidden",
     headerTitle: "hidden",
     headerSubtitle: "hidden",
+    formHeader: "hidden",
+    formHeaderTitle: "hidden",
+    formHeaderSubtitle: "hidden",
     socialButtonsBlockButton:
       "min-h-[44px] rounded-md border-ivory-border bg-ivory-surface text-ivory-text hover:bg-muted",
     formFieldLabel: "vt-text-sm text-ivory-text",

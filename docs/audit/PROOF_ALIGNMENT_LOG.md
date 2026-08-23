@@ -10825,3 +10825,14 @@ on that dirty tree.
 - Test: `pnpm test -- tests/auth-door-chrome.test.tsx tests/role-chips-signup.test.tsx tests/native-auth-surface.test.ts tests/stage-10-access-token-consistency.test.js tests/i18n-parity.test.ts` → 5 files, 38 passed
 
 **Verdict:** VERIFIED
+
+## 2026-08-23 — Auth titles page-specific (Welcome back = sign-in only)
+
+**Claim:** `/signin` title is `t.authPage.welcomeBack`; `/signup` title is `t.authPage.createAccount` and never Welcome back. Clerk leftover headers (`header*`, `formHeader*`) stay hidden.
+
+**Evidence:**
+- `src/pages/signin.tsx` — `title={t.authPage.welcomeBack}`; `src/pages/signup.tsx` — `title={t.authPage.createAccount}` (no `welcomeBack`)
+- `src/lib/clerk-appearance.ts` — `header`, `headerTitle`, `headerSubtitle`, `formHeader`, `formHeaderTitle`, `formHeaderSubtitle` all `hidden`
+- Test: `pnpm test -- tests/auth-door-chrome.test.tsx tests/role-chips-signup.test.tsx tests/native-auth-surface.test.ts` → 29 passed (RTL asserts page-specific titles + source contract)
+
+**Verdict:** VERIFIED
