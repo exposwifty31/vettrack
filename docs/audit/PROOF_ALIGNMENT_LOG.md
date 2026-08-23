@@ -10432,3 +10432,66 @@ not make. Reasoning posted on the review thread rather than silently skipped.
 
 **Verdict:** VERIFIED for both defect fixes, the three round-two findings, and the gate results.
 The declined marker is a reasoned decline recorded on the review thread, not a verification.
+
+## 2026-08-23 — a rate ceiling cannot stop a near-threshold flip; the interval can (claude/competitive-moats-strategy-c03ca6)
+
+**Supersedes the test-scope claim in the entry immediately above.** That entry recorded
+`pnpm test -- tests/claims-ledger.test.ts` → 88/88 as its test evidence. That is a *filtered*
+invocation and does not satisfy this repository's requirement to run `pnpm test`. The review round
+caught it. The full suite has now been run and its real result is recorded below, unrounded.
+
+**Claim:** CodeRabbit's third round raised five findings, all five valid on inspection. Four are
+document defects — two of them in text this branch had just added, including one that shows the
+previous round's 5% unresolved-rate bound was only a partial fix. The fifth is the test-scope error
+above.
+
+**Evidence — the 5% bound did not close the hole it was written for (checked arithmetically):**
+- Ten unordered rows in 100 matchable is exactly 10% and passes G1a. Four unresolved rows are a
+  3.8% unresolved rate — inside the 5% bound, therefore allowed — and if all four were ordered the
+  true figure is 10 ÷ 104 = **9.6%**, a fail. In the other direction, 9 ÷ 100 fails at 9% while
+  13 ÷ 104 = **12.5%** passes. A rate ceiling bounds how much mass is discarded; it does not stop
+  that mass from deciding a near-threshold verdict.
+- `docs/vettrack-3.0-program.md:511` — (d) now recomputes each metric at both extremes of the
+  unresolved set (`M1_low`/`M1_high`, `M2_low`/`M2_high`). PASS requires the low bound to clear the
+  threshold, FAIL requires the high bound to miss it, and a straddling interval is **INDETERMINATE**
+  — re-run, never rounded into either column. The 5% rate survives as a separate data-quality floor.
+
+**Evidence — the other three document fixes:**
+- `docs/vettrack-3.0-program.md:474` — (b-bis) steps 2 and 3 previously ordered candidates by `|Δt|`
+  while a separate step 4 demanded *n*-th-to-*n*-th timestamp pairing for repeated acts; the two
+  rules disagree when deltas or timestamps tie. Event-timestamp order is now applied first and the
+  repeated-act rule is a consequence of it, not a competing clause.
+- `docs/vettrack-3.0-program.md:491` — (c-bis) previously marked a dispense of 10 covered by an
+  invoice line for 1 as *matched*, so nine units left the commercial claim silently. Quantity is now
+  allocated in a second pass that cannot create an event-level match, the remainder is **M2q**, and
+  M2q is **reported, not gated**, because no threshold for it was registered before measurement —
+  inventing one now is the HARKing §9 forbids.
+- `docs/vettrack-3.0-program.md:862` and `docs/vettrack-3.0-program.md:886` — §9's G1a and G1b now
+  carry the interval rule and the INDETERMINATE state, and the four-outcomes table says explicitly
+  that the fifth state is not one of its rows. Propagating into §9 is the point: the defect fixed in
+  the previous commit was precisely a §7 rule that never reached the clause that binds the gate.
+
+**Evidence — the full test suite, exact command and exact result:**
+- `pnpm test` (Node v24.17.0) → **exit 1**. `Test Files 18 failed | 709 passed | 19 skipped (746)`;
+  `Tests 20 failed | 6601 passed | 270 skipped (6891)`.
+- **Every failure is one cause, and it is environmental:** 60 `ECONNREFUSED` against
+  `127.0.0.1:5432`, **zero** assertion failures, and 10 `TypeError: Cannot read properties of
+  undefined (reading 'close')` which are teardown cascades from a connection that never opened. All
+  18 files are DB-backed (`tests/*.integration.test.ts` plus the four `shift-handover-*` suites).
+- Cause confirmed rather than assumed: this worktree has no `.env`, `pg_isready -h 127.0.0.1 -p 5432`
+  gets no response, and `brew services list` reports its Homebrew PostgreSQL service (major
+  version 18) in `error` state — a machine-level service, not an npm dependency of this repo.
+- **Not repaired here.** Fixing a machine-level service and provisioning a migrated database to
+  re-derive a result CI already produces was judged out of scope for a documentation change. CI ran
+  all four `Tests (shard n/4)` jobs against this branch head with a database service and all four
+  passed, which is the stronger evidence for these 18 files.
+- `pnpm architecture:gates` → exit 0; tenant-lint "no new findings vs baseline (203 known)"; claim
+  verification 1108 claims, **0 FAILED**, including the tree that carries this entry.
+
+**Verdict:** VERIFIED for the four document fixes and for `pnpm architecture:gates`.
+**PARTIAL for `pnpm test`:** the command was run in full and exited 1; 6601 tests pass and the 20
+failures are all the absent local Postgres. The 18 DB-backed files are **NOT VERIFIED LOCALLY** and
+rest on CI. **Follow-up:** `tests/shift-handover-*` and the `*.integration.test.ts` group are not in
+the exclusion list `CLAUDE.md` documents for `pnpm test`, so a developer without a local database
+sees 18 red files on a clean checkout. Either the exclusion list or those suites' setup is wrong;
+that is a pre-existing repository issue, not a product of this branch.

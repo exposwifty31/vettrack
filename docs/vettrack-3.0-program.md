@@ -476,31 +476,63 @@ window plus a field list is not a unique key — several orders, several invoice
 repetitions of the same act can fall inside one window. Assignment is therefore a deterministic
 greedy pass, not a lookup:
 
-1. Enumerate every candidate pair permitted by (b) or (c).
-2. Sort by `|Δt|` ascending; break ties by the lower row identifier on the VetTrack side, then the
-   lower identifier on the PMS side. The order is total, so the result does not depend on scan order.
-3. Assign greedily. **Each care event takes at most one order; each order is taken at most once.**
-   The same holds for dispense ↔ invoice line.
-4. **Repeated acts** (same case, same item, several administrations in one window) pair in
-   timestamp order — the *n*-th act to the *n*-th counterpart — never many-to-one.
+1. Enumerate every candidate pair permitted by (b) or (c), grouped by `clinicId` + case reference +
+   item identity.
+2. **Within a group, process the VetTrack-side rows in event-timestamp order.** This ordering is
+   applied first, and it is what makes repeated acts pair *n*-th to *n*-th; `|Δt|` never overrides
+   it. Equal timestamps fall through to the identifier tie-break in step 3.
+3. For each row in that order, take the still-unclaimed counterpart with the smallest `|Δt|`. Break
+   ties by the counterpart's earlier timestamp, then the lower identifier on the VetTrack side, then
+   the lower identifier on the PMS side. The order is total, so the result never depends on scan
+   order.
+4. **Each care event takes at most one order; each order is taken at most once.** The same holds for
+   dispense ↔ invoice line — never many-to-one.
 
-**(c-bis) Split quantities.** Where a dispense and its invoice line disagree on quantity, the event
-counts as **matched** and the difference is carried as a residual in the unresolved report (below).
-M2 stays an event-level ratio, because its 15% threshold was registered on events; reporting the
-quantity residual separately keeps that threshold meaningful without silently redefining it.
+**(c-bis) Split quantities, and the shortfall an event-level ratio cannot see.** (b-bis) pairs each
+dispense with **at most one** invoice line, and that pairing alone is what M2 reads. Quantity is
+accounted in a **second pass that never touches M2**: once the event-level pass has run, any invoice
+line in the same group that is still unclaimed may be allocated to the dispense — in the same
+(b-bis) order, each line to at most one dispense — until the dispensed quantity is met. Any
+unallocated remainder is **uninvoiced quantity**. The second pass creates no additional event-level
+match, so (b-bis)'s one-to-one rule is intact.
 
-**(d) Unresolved rows leave both the numerator and the denominator, and are gated.** A row that
-cannot be resolved under (a)–(c) — no determinable case reference, no item identity, an ambiguity
-the tie-breakers cannot close — is **not** an unordered event and must not be counted as one. It is
-excluded from M1 and M2 entirely, and:
+M2 stays an event-level ratio — its 15% threshold was registered on events, and redefining the unit
+after measurement is the HARKing §9 forbids. But an event-level ratio counts a dispense of 10
+covered by an invoice line for 1 as *invoiced*, and the nine remaining units then vanish from the
+commercial claim. The quantity is therefore carried as its own figure:
 
-- the **matchable denominator** is published alongside every metric, so the reader can see what
-  share of the period the number actually describes;
-- the **unresolved rate** is published with it; and
-- **if the unresolved rate exceeds 5%, G1a and G1b cannot pass.** The bound sits deliberately below
-  G1a's own 10% bar: an excluded row is of unknown class, so the discarded mass can move M1 by up to
-  the unresolved rate in either direction. A tolerance equal to the threshold would let "difficult
-  to match" decide the verdict on its own.
+- **M2q = uninvoiced quantity ÷ dispensed quantity**, per clinic-month, published beside M2.
+- M2q is **reported, not gated** in this revision — no threshold for it was registered before
+  measurement, and inventing one now is precisely what §9 prohibits. It may gate G1b only once its
+  threshold is registered before B2a's first run, under the same rule as M1 and M2.
+- A dispense whose allocated quantity is **zero** is not a partial match at all. It is uninvoiced
+  and counts in M2 proper.
+
+**(d) Unresolved rows leave both metrics — and the gate reads an interval, not a point estimate.**
+A row that cannot be resolved under (a)–(c) — no determinable case reference, no item identity, an
+ambiguity the tie-breakers cannot close — is **not** an unordered event and must not be counted as
+one. It is excluded from the numerator *and* the denominator of both metrics. Excluding it does not
+make it harmless: its true class is unknown, so it can still decide the verdict.
+
+- The **matchable denominator** and the **unresolved rate** are published with every metric. The
+  rate is `unresolved ÷ (matchable + unresolved)`, computed **per metric and per clinic-month** —
+  the unit the thresholds are registered in — unless another aggregation is registered before B2a's
+  first run.
+- **Recompute each metric at both extremes of the unresolved set**, using the same estimator (for
+  M1, the de-biased reconstruction of §7 R1):
+  - `M1_low` — every unresolved row is *ordered*; `M1_high` — every unresolved row is *unordered*.
+  - `M2_low` — every unresolved dispense is *invoiced*; `M2_high` — every one is *uninvoiced*.
+- **PASS requires the low bound to clear the threshold; FAIL requires the high bound to miss it.**
+  If the interval straddles the threshold the clinic-month is **INDETERMINATE** — neither passed nor
+  failed — and is re-run with the matching defect fixed. An indeterminate month may not be reported
+  as a pass, quoted as a floor, or averaged with determinate months.
+- **Separately, an unresolved rate above 5% makes the clinic-month inadmissible** — a data-quality
+  floor, independent of the bounds test. Both conditions must hold.
+
+*Why a bound and not just a rate.* Ten unordered rows in 100 matchable is exactly 10% and reads as a
+pass. Four unresolved rows — 3.8%, comfortably inside the 5% floor — put the true figure at
+10 ÷ 104 = **9.6%** if all four were ordered, and at 14 ÷ 104 = **13.5%** if none were. A rate
+ceiling alone cannot stop a near-threshold flip in either direction; the interval can.
 
 **Registration.** The concrete keys, the proximity window, and the item-identity rule are fixed and
 written into `docs/audit/PROOF_ALIGNMENT_LOG.md` **before B2a's first run**, alongside the
@@ -827,9 +859,20 @@ Checked **before** the measurement period begins, not discovered during it:
   reported with the figure. If `c_ord` and `c_unord` were not measured separately, or either
   reconstructed population is zero, G1a cannot pass.
 
-**FAIL:** M1 below 10%, or randomly scattered ⇒ **the witnessed-execution thesis is wrong and the
-program stops for redesign.** Calibrated compliance below 70%, or missing calibration constants
-⇒ G1a is suspended and B3 runs before re-attempt.
+- **The verdict is read off the interval, not the point estimate (§7 R2 (d)).** PASS requires
+  `M1_low` — every unresolved row counted as *ordered* — to clear 10%. The unresolved rate must
+  also sit at or below 5%. Both conditions are per clinic-month.
+
+**FAIL:** `M1_high` below 10% — i.e. the metric misses the bar even when every unresolved row is
+counted as unordered — or unordered events that scatter randomly instead of clustering ⇒ **the
+witnessed-execution thesis is wrong and the program stops for redesign.** Calibrated compliance
+below 70%, or missing calibration constants ⇒ G1a is suspended and B3 runs before re-attempt.
+
+**INDETERMINATE:** the interval `[M1_low, M1_high]` straddles 10%, or the unresolved rate exceeds
+5%. The clinic-month is **neither passed nor failed**; it is re-run with the matching defect fixed.
+It may not be reported as a pass, quoted as a floor, or averaged with determinate months — an
+indeterminate result that gets rounded into either column is how the anti-HARKing rule is evaded
+without anyone editing a threshold.
 
 ### G1b — the commercial threshold (M2)
 
@@ -840,10 +883,22 @@ program stops for redesign.** Calibrated compliance below 70%, or missing calibr
 - **15%** — the smallest gap that could plausibly justify value-based pricing at any credible price
   point. Also a commitment device.
 - Compliance is the same calibrated figure used by G1a.
+- **The interval rule of §7 R2 (d) applies identically.** PASS requires `M2_low` — every unresolved
+  dispense counted as *invoiced* — to clear 15%; FAIL requires `M2_high` to miss it; anything
+  between is **INDETERMINATE**, on the same terms as G1a.
+- **M2q — uninvoiced quantity ÷ dispensed quantity (§7 R2 (c-bis)) — is reported alongside M2 and
+  does not gate G1b in this revision.** M2 counts events with no invoice line at all; a dispense of
+  10 billed as 1 is *matched* at event level, so the quantity shortfall is invisible to the
+  threshold and is carried separately. M2q may gate only once its own threshold is registered before
+  B2a's first run.
 
 ### The four outcomes — all named in advance
 
 Naming only the happy path is how a program rationalises a partial result after the fact.
+
+**A fifth state exists and is deliberately not in this table.** An INDETERMINATE clinic-month (§7 R2
+(d)) is not a row here — it is the absence of a result, and it resolves by re-running the month, not
+by picking the nearer cell.
 
 | | **G1b passes** | **G1b fails** |
 |---|---|---|
