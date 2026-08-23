@@ -66,6 +66,11 @@ vi.mock("../server/db.js", () => ({
   users: new Proxy({}, { get: (_t, prop) => ({ _column: String(prop) }) }),
 }));
 
+// The router only ever calls status/json/setHeader/getHeader on `res` and
+// reads method/url/originalUrl/headers/params/body/locale off `req` — a full
+// Express Request/Response would need dozens of unused members stubbed out
+// for no benefit, so these fixtures implement only what's exercised and cast
+// through `unknown` (same convention as tests/equipment-locate-route.test.ts).
 function makeRes(): { res: Response; captured: { statusCode: number; body: Record<string, unknown> } } {
   const captured = { statusCode: 200, body: {} as Record<string, unknown> };
   const headers = new Map<string, string>();
@@ -88,7 +93,7 @@ function makeRes(): { res: Response; captured: { statusCode: number; body: Recor
   return { res, captured };
 }
 
-function makeReq(body: Record<string, unknown>): Request {
+function makeReq(body: Record<string, unknown>, locale: "en" | "he" = "en"): Request {
   return {
     method: "POST",
     url: "/",
@@ -96,6 +101,7 @@ function makeReq(body: Record<string, unknown>): Request {
     headers: {},
     params: {},
     body,
+    locale,
   } as unknown as Request;
 }
 
@@ -146,9 +152,18 @@ describe("POST /api/inventory-items", () => {
   it("returns a distinct 409 NFC_TAG_EXISTS on a duplicate nfc_tag_id, not CODE_EXISTS", async () => {
     insertShouldThrow = { code: "23505", constraint: ITEM_NFC_TAG_UNIQUE_CONSTRAINT };
     const { res, captured } = makeRes();
-    await dispatch(makeReq({ ...validBody, nfcTagId: "tag-1" }), res);
+    await dispatch(makeReq({ ...validBody, nfcTagId: "tag-1" }, "en"), res);
     expect(captured.statusCode).toBe(409);
     expect(captured.body.reason).toBe("NFC_TAG_EXISTS");
+    expect(captured.body.message).toBe("This NFC tag is already assigned to another item");
+  });
+
+  it("localizes the NFC conflict message to the request locale instead of hardcoding English", async () => {
+    insertShouldThrow = { code: "23505", constraint: ITEM_NFC_TAG_UNIQUE_CONSTRAINT };
+    const { res, captured } = makeRes();
+    await dispatch(makeReq({ ...validBody, nfcTagId: "tag-1" }, "he"), res);
+    expect(captured.statusCode).toBe(409);
+    expect(captured.body.message).toBe("תג ה-NFC הזה כבר משויך לפריט אחר");
   });
 
   it("falls through to 500 for an unrelated constraint violation instead of misreporting CODE_EXISTS", async () => {

@@ -2092,6 +2092,7 @@
     "itemDeleteFailed": "Failed to delete item",
     "itemInUse": "Item is in use and cannot be deleted",
     "codeExists": "An item with this code already exists",
+    "nfcTagExists": "This NFC tag is already assigned to another item",
     "loadError": "Failed to load inventory items",
     "noItems": "No inventory items",
     "searchPlaceholder": "Search by code or label...",

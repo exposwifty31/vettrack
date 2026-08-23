@@ -16,6 +16,8 @@ import { logAudit, resolveAuditActorRole } from "../lib/audit.js";
 import { resolveRequestId, apiError } from "../lib/route-utils.js";
 import { listLowStockItems } from "../services/inventory-console.service.js";
 import { isUniqueViolation, ITEM_CODE_UNIQUE_CONSTRAINT, ITEM_NFC_TAG_UNIQUE_CONSTRAINT } from "../lib/pg-errors.js";
+import { getLocaleDictionaries } from "../../lib/i18n/loader.js";
+import { translate } from "../../lib/i18n/index.js";
 
 const router = Router();
 
@@ -225,8 +227,10 @@ router.post("/", requireAuth, requireAdmin, validateBody(createItemSchema), asyn
       );
     }
     if (isUniqueViolation(err, ITEM_NFC_TAG_UNIQUE_CONSTRAINT)) {
+      const { primary, fallback, locale: lc } = getLocaleDictionaries(req.locale);
+      const message = translate(primary, "inventoryItemsPage.nfcTagExists", undefined, { fallbackDict: fallback, locale: lc });
       return res.status(409).json(
-        apiError({ code: "CONFLICT", reason: "NFC_TAG_EXISTS", message: "This NFC tag is already assigned to another item", requestId }),
+        apiError({ code: "CONFLICT", reason: "NFC_TAG_EXISTS", message, requestId }),
       );
     }
     console.error(err);
