@@ -25,6 +25,7 @@ import {
   evaluateCheckoutV1Preconditions,
   finalizeCheckoutSideEffects,
   finalizeReturnSideEffects,
+  invalidateAnchorAfterCheckout,
   performEquipmentCheckout,
   performEquipmentReturn,
   quickScanEquipmentCustody,
@@ -573,6 +574,8 @@ router.post(
 
     updated = txResult.updated;
     undoToken = txResult.undoToken;
+
+    invalidateAnchorAfterCheckout(clinicId, req.params.id);
 
     await finalizeCheckoutSideEffects({
       clinicId,
