@@ -1,6 +1,9 @@
 import { and, eq, sql } from "drizzle-orm";
 import { db, equipment, stagingQueue } from "../db.js";
 import { enqueueNotificationJob as _enqueueNotificationJob, type PushPriority } from "./queue.js";
+import { getLocaleDictionaries } from "../../lib/i18n/loader.js";
+import { interpolate, translate } from "../../lib/i18n/index.js";
+import { resolveUserLocale as _resolveUserLocale } from "./resolve-user-locale.js";
 
 async function _findNextClaim(equipmentId: string, clinicId: string) {
   return db
@@ -40,6 +43,7 @@ async function _getEquipmentName(equipmentId: string, clinicId: string) {
 export const stagingPromotionDeps = {
   findNextClaim: _findNextClaim,
   getEquipmentName: _getEquipmentName,
+  resolveLocale: _resolveUserLocale,
   enqueueNotificationJob: _enqueueNotificationJob,
 };
 
@@ -53,18 +57,23 @@ export async function promoteStagingQueueNext(
 
     const equipmentName = await stagingPromotionDeps.getEquipmentName(equipmentId, clinicId);
 
-    // TODO: i18n — push notification locale hardcoded as Hebrew (no req.locale in fire-and-forget context)
     const priority: PushPriority =
       nextClaim.clinicalPriority === "emergency" ? "CRITICAL"
       : nextClaim.clinicalPriority === "urgent" ? "HIGH"
       : "NORMAL";
 
+    const locale = await stagingPromotionDeps.resolveLocale(clinicId, nextClaim.requestedById);
+    const { primary, fallback, locale: lc } = getLocaleDictionaries(locale);
+    const title = translate(primary, "stagingQueue.promotedTitle", undefined, { fallbackDict: fallback, locale: lc });
+    const bodyTemplate = translate(primary, "stagingQueue.promotedBody", undefined, { fallbackDict: fallback, locale: lc });
+    const body = interpolate(bodyTemplate, { name: equipmentName });
+
     await stagingPromotionDeps.enqueueNotificationJob({
       type: "push_to_user",
       clinicId,
       userId: nextClaim.requestedById,
-      title: "אתה ראשון בתור",
-      body: `ניתן לבצע checkout של ${equipmentName}`,
+      title,
+      body,
       tag: `staging-promoted:${equipmentId}`,
       url: `/equipment/${equipmentId}`,
       priority,
