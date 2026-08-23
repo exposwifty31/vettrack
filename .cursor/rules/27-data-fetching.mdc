@@ -14,9 +14,9 @@ The APIs named below (`staleTime`, `gcTime`, `useMutation`, `invalidateQueries`)
 
 ```ts
 export const userKeys = {
-  all:    ['users'] as const,
-  list:   (filters: Filters) => [...userKeys.all, 'list', filters] as const,
-  detail: (id: string)       => [...userKeys.all, 'detail', id] as const,
+  all:    (tenantId: string) => ['users', tenantId] as const,
+  list:   (tenantId: string, filters: Filters) => [...userKeys.all(tenantId), 'list', filters] as const,
+  detail: (tenantId: string, id: string)       => [...userKeys.all(tenantId), 'detail', id] as const,
 }
 ```
 
@@ -35,20 +35,22 @@ A key factory in one place. Ad-hoc inline keys mean an invalidation somewhere el
 ## Mutations
 
 ```ts
+// tenantId comes from the authenticated session, not from `next` — never let a
+// mutation payload pick which tenant's cache entry it writes to.
 useMutation({
   mutationFn: updateUser,
   onMutate: async (next) => {
-    await qc.cancelQueries({ queryKey: userKeys.detail(next.id) })   // stop in-flight overwrite
-    const prev = qc.getQueryData(userKeys.detail(next.id))
-    qc.setQueryData(userKeys.detail(next.id), (old: User | undefined) =>
-      old ? { ...old, ...next } : old)                                // merge — `next` may be a patch
-    return { prev }                                                   // rollback context
+    await qc.cancelQueries({ queryKey: userKeys.detail(tenantId, next.id) })  // stop in-flight overwrite
+    const prev = qc.getQueryData(userKeys.detail(tenantId, next.id))
+    qc.setQueryData(userKeys.detail(tenantId, next.id), (old: User | undefined) =>
+      old ? { ...old, ...next } : old)                                        // merge — `next` may be a patch
+    return { prev }                                                           // rollback context
   },
-  onError: (_e, next, ctx) => qc.setQueryData(userKeys.detail(next.id), ctx?.prev),
-  onSettled: (_d, _e, next) => Promise.all([                        // returned, so the
-    qc.invalidateQueries({ queryKey: userKeys.detail(next.id) }),   // mutation stays
-    qc.invalidateQueries({ queryKey: [...userKeys.all, 'list'] }),  // pending until both
-  ]),                                                               // refetches land
+  onError: (_e, next, ctx) => qc.setQueryData(userKeys.detail(tenantId, next.id), ctx?.prev),
+  onSettled: (_d, _e, next) => Promise.all([                                // returned, so the
+    qc.invalidateQueries({ queryKey: userKeys.detail(tenantId, next.id) }), // mutation stays
+    qc.invalidateQueries({ queryKey: [...userKeys.all(tenantId), 'list'] }),// pending until both — partial match, every filter variant
+  ]),                                                                       // refetches land
 })
 ```
 

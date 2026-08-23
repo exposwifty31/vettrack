@@ -33,7 +33,7 @@ CMD ["node", "server.js"]
 - Run as a non-root user. A container escape from root is a host compromise.
 - A real `.dockerignore` — otherwise `node_modules`, `.git`, and `.env` get copied into the build context and possibly into the image.
 - One process per container. Need a sidecar? That is a second container.
-- Configuration by environment variable; secrets by mount or a secret manager, never `ENV` (they persist in image layers).
+- Configuration by environment variable, injected at container **runtime** — that's the normal path (a platform like Railway setting `DATABASE_URL` on the running container is fine, and is how production secrets typically ship). What's banned is **baking** a secret into the image: a Dockerfile `ENV` or `ARG` instruction persists its value in every layer, readable from `docker history` long after the secret is rotated. Prefer a mount or a secret manager for anything that must never touch a layer; runtime env injection is the accepted middle ground for everything else.
 
 ## Pipelines
 

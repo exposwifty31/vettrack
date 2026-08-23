@@ -1,6 +1,6 @@
 ---
 description: Application security — authn/authz, injection, secrets, multi-tenancy isolation, and the OWASP failures that actually happen.
-globs: **/auth/**,**/middleware/**,**/api/**,**/*.env*,**/security/**,**/*.ts,**/*.py,**/*.go
+globs: **/auth/**,**/middleware/**,**/api/**,**/*.env*,**/security/**,**/*.ts,**/*.tsx,**/*.py,**/*.go
 alwaysApply: false
 ---
 
@@ -21,7 +21,7 @@ Broken access control outranks everything else in practice, and it looks like or
 
 If one bug can expose another tenant's data, discipline is not enough of a control.
 
-Every query filters by tenant id — enforced structurally via Row Level Security or a repository layer that cannot construct an unfiltered query. Add a test that fails when a new query bypasses the filter. In production the tenant id comes from the **authenticated session or organization context** — never from a request parameter, body field, or header, all of which the client controls. A development override header is acceptable only if it is explicitly gated off in production and the gate is the first thing a reviewer can see.
+Every query filters by tenant id — enforced structurally via Row Level Security or a repository layer that cannot construct an unfiltered query. Add a test that fails when a new query bypasses the filter. In production the tenant id comes from the **authenticated session or organization context** — never from a request parameter, body field, or header the client controls unverified. The one sanctioned exception is a signed webhook: tenant id may come from the payload when the signature is verified first, against the raw body, before the payload is trusted for anything — an HMAC-signed vendor callback is the common case. A development override header is acceptable only if it is explicitly gated off in production and the gate is the first thing a reviewer can see.
 
 ## Injection
 
