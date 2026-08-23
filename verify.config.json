@@ -50,7 +50,8 @@
     "docs/release-runbook.md",
     "docs/dev-signin-runbook.md",
     "docs/integrations-guide.md",
-    "docs/engineering-rules-rollout.md"
+    "docs/engineering-rules-rollout.md",
+    "docs/vettrack-3.0-program.md"
   ],
   "appendOnlyDocs": [
     "docs/audit/PROOF_ALIGNMENT_LOG.md"
@@ -103,6 +104,10 @@
     {
       "prefix": "src/infrastructure/auth/",
       "reason": "cross-repo: RN-side auth adapters (this repo's auth lives in server/middleware and src/hooks)"
+    },
+    {
+      "prefix": "aethel-orchestrator/",
+      "reason": "cross-repo: exposwifty31/aethel-orchestrator, the spec-phase strategy repo whose doctrine docs/vettrack-3.0-program.md ports and then archives (M0)"
     }
   ],
   "treeBlocks": [
