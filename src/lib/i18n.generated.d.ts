@@ -2712,6 +2712,10 @@ export interface TStructure {
       title: string;
       body: string;
     };
+    codeBlue: {
+      title: string;
+      body: string;
+    };
   };
   shiftChat: {
     broadcast: {

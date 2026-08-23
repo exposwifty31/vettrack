@@ -15,6 +15,7 @@ import {
 } from "../../../lib/code-blue-nearest-cart.js";
 import { logAudit, resolveAuditActorRole } from "../../../lib/audit.js";
 import { enqueueNotificationJob } from "../../../lib/queue.js";
+import { resolveCodeBlueBroadcastPushCopy } from "../../../lib/code-blue-broadcast-push.js";
 import { postSystemMessage } from "../../../lib/shift-chat-presence.js";
 import { invalidateActiveCodeBlueCache } from "../../../lib/code-blue-keepalive.js";
 import { evaluateCodeBlueManagerForRoute } from "../../../lib/authority/code-blue-manager.wiring.js";
@@ -133,11 +134,12 @@ export const postOneTapHandler: RequestHandler = async (req, res) => {
         metadata: { via: "one_tap", managerUserId: managerUser.id },
       });
 
+      const pushCopy = resolveCodeBlueBroadcastPushCopy(req.authUser!.name ?? "");
       void enqueueNotificationJob({
         type: "code_blue_broadcast",
         clinicId,
-        title: "⚠ CODE BLUE",
-        body: `CODE BLUE הופעל ע״י ${req.authUser!.name}`,
+        title: pushCopy.title,
+        body: pushCopy.body,
         tag: `code-blue-${outcome.sessionId}`,
         ...(outcome.pagingOutboxId !== null
           ? { notificationRequestOutboxId: outcome.pagingOutboxId }

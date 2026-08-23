@@ -2708,6 +2708,10 @@
     "handover": {
       "title": "Shift handover ready",
       "body": "The outgoing shift left a handover for you. Tap to review."
+    },
+    "codeBlue": {
+      "title": "⚠ CODE BLUE",
+      "body": "CODE BLUE activated by {name}"
     }
   },
   "shiftChat": {

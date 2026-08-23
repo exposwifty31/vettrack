@@ -6,6 +6,7 @@ import { eq, and, inArray, isNull, sql } from "drizzle-orm";
 import { logAudit, resolveAuditActorRole } from "../../../lib/audit.js";
 import { insertRealtimeDomainEvent } from "../../../lib/realtime-outbox.js";
 import { enqueueNotificationJob } from "../../../lib/queue.js";
+import { resolveCodeBlueBroadcastPushCopy } from "../../../lib/code-blue-broadcast-push.js";
 import { postSystemMessage } from "../../../lib/shift-chat-presence.js";
 import { invalidateActiveCodeBlueCache } from "../../../lib/code-blue-keepalive.js";
 import { evaluateCodeBlueManagerForRoute } from "../../../lib/authority/code-blue-manager.wiring.js";
@@ -212,11 +213,12 @@ export const postSessionsHandler: RequestHandler = async (req, res) => {
       metadata: { startedAt: startedAt.toISOString(), managerUserId: body.managerUserId },
     });
 
+    const pushCopy = resolveCodeBlueBroadcastPushCopy(req.authUser!.name ?? "");
     void enqueueNotificationJob({
       type: "code_blue_broadcast",
       clinicId,
-      title: "⚠ CODE BLUE",
-      body: `CODE BLUE הופעל ע״י ${req.authUser!.name}`,
+      title: pushCopy.title,
+      body: pushCopy.body,
       tag: `code-blue-${id}`,
       ...(codeBlueNotificationRequestOutboxId !== undefined
         ? { notificationRequestOutboxId: codeBlueNotificationRequestOutboxId }

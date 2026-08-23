@@ -33,8 +33,6 @@ const KNOWN_DEBT_ALLOWLIST = new Set<string>([
   "server/lib/role-notification-scheduler.ts",
   "server/routes/activity.ts",
   "server/routes/alert-acks.ts",
-  "server/routes/code-blue/handlers/post-one-tap.ts",
-  "server/routes/code-blue/handlers/post-sessions.ts",
   "server/routes/crash-cart.ts",
   "server/routes/folders.ts",
   "server/routes/shift-chat.ts",

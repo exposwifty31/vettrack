@@ -10800,3 +10800,19 @@ on that dirty tree.
   `1020 claims: 1009 verified, 10 registered, 1 attested, 0 FAILED`.
 
 **Verdict:** VERIFIED
+
+## 2026-08-23 — Code Blue activation push i18n extraction (PR #242 follow-on)
+
+**Claim:** `post-sessions` / `post-one-tap` no longer hardcode Hebrew in `code_blue_broadcast` title/body; copy is `push.codeBlue.*` via `resolveCodeBlueBroadcastPushCopy` (INITIAL_LOCALE `he`); allowlist dropped those two handlers; enqueue path/tag/fail-open unchanged.
+
+**Evidence:**
+- `locales/he.json` — `push.codeBlue.title` = `⚠ CODE BLUE`, `body` = `CODE BLUE הופעל ע״י {name}`
+- `locales/en.json` — `push.codeBlue.body` = `CODE BLUE activated by {name}`
+- `server/lib/code-blue-broadcast-push.ts` — `getLocaleDictionaries(INITIAL_LOCALE)` + `translate(...push.codeBlue.*)` with try/catch ASCII fail-open
+- `server/routes/code-blue/handlers/post-sessions.ts` / `post-one-tap.ts` — `rg '[֐-׿]'` → no matches; still `enqueueNotificationJob` + `code-blue-${…}` tags + `.catch(() => {})`
+- `tests/i18n-no-hebrew-in-source.test.ts` — allowlist no longer lists the two handlers
+- Test: `pnpm exec vitest run tests/code-blue-broadcast-push-i18n.test.ts tests/i18n-no-hebrew-in-source.test.ts tests/i18n-namespace-reachability.test.ts tests/i18n-parity.test.ts` → 4 files, 25 passed
+- Test: `pnpm exec vitest run tests/code-blue-pr-4-2-route-wiring.test.ts tests/code-blue-pr-4-5-enforce.test.ts tests/code-blue-push-unmutable.test.ts …` → 6 files, 64 passed
+- Command: `pnpm i18n:check` → deep key parity OK
+
+**Verdict:** VERIFIED

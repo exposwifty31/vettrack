@@ -2708,6 +2708,10 @@
     "handover": {
       "title": "מסירת המשמרת מוכנה",
       "body": "המשמרת היוצאת השאירה לך מסירה. הקש לצפייה."
+    },
+    "codeBlue": {
+      "title": "⚠ CODE BLUE",
+      "body": "CODE BLUE הופעל ע״י {name}"
     }
   },
   "shiftChat": {
