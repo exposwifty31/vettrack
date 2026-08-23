@@ -320,4 +320,21 @@ describe("promoteStagingQueueNext", () => {
       }),
     );
   });
+
+  it("still sends the notification (defaulting to Hebrew) when locale lookup rejects", async () => {
+    vi.mocked(stagingPromotionDeps.findNextClaim).mockResolvedValue({
+      id: "claim-locale-fail",
+      requestedById: "user-x",
+      clinicalPriority: "routine",
+    });
+    vi.mocked(stagingPromotionDeps.getEquipmentName).mockResolvedValue("Ventilator B");
+    vi.mocked(stagingPromotionDeps.resolveLocale).mockRejectedValue(new Error("connection reset"));
+    await promoteStagingQueueNext("eq-1", "clinic-1");
+    expect(stagingPromotionDeps.enqueueNotificationJob).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: "אתה ראשון בתור",
+        body: "ניתן לבצע checkout של Ventilator B",
+      }),
+    );
+  });
 });

@@ -62,7 +62,13 @@ export async function promoteStagingQueueNext(
       : nextClaim.clinicalPriority === "urgent" ? "HIGH"
       : "NORMAL";
 
-    const locale = await stagingPromotionDeps.resolveLocale(clinicId, nextClaim.requestedById);
+    let locale: Awaited<ReturnType<typeof stagingPromotionDeps.resolveLocale>>;
+    try {
+      locale = await stagingPromotionDeps.resolveLocale(clinicId, nextClaim.requestedById);
+    } catch (localeErr) {
+      console.error("[staging-promotion] locale lookup failed, defaulting to he:", localeErr);
+      locale = "he";
+    }
     const { primary, fallback, locale: lc } = getLocaleDictionaries(locale);
     const title = translate(primary, "stagingQueue.promotedTitle", undefined, { fallbackDict: fallback, locale: lc });
     const bodyTemplate = translate(primary, "stagingQueue.promotedBody", undefined, { fallbackDict: fallback, locale: lc });
