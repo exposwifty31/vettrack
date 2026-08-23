@@ -73,7 +73,7 @@ export class AppError extends Error {
 - Graceful shutdown: stop accepting connections, drain in-flight requests, close the DB pool, then exit.
 - Structured JSON logs (`pino`) with a request id propagated through every layer. `console.log` is not logging.
 - Health endpoints: `/healthz` (process alive) and `/readyz` (dependencies reachable) — they are not the same check.
-- Every response uses a consistent envelope: `{ data }` or `{ error: { code, message } }`.
+- Every response uses a consistent envelope: `{ data }` on success; on failure, **`error` is always a string**, never nested — matching the validation shape above, not a `{ error: { code, message } }` object. (This repo's general-purpose version is `server/lib/apiError.ts`: `{ error: <localized text>, code: <key>, params? }` — `code` sits beside `error`, not inside it.)
 
 ## NEVER
 
