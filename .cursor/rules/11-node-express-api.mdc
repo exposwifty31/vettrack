@@ -36,7 +36,11 @@ router.post('/users', validateBody(createUser), asyncHandler(async (req, res) =>
 }))
 ```
 
-`validateUuid(paramName)` is the companion for route params. A new endpoint that hand-rolls its own parsing produces a second, inconsistent error shape for clients.
+**One error shape for every validation failure: `{ error: string, details: Array<{ field, message }> }`.** `details` is `[]` when there is nothing to enumerate — never an omitted key. A client that branches on whether `details` exists, instead of checking whether it's empty, has two code paths for one failure mode.
+
+`validateUuid(paramName)` is the companion for route params — it must return the same shape. **This repo's current `validateUuid` does not**: it responds with `{ error }` alone, no `details` key, which is exactly the second shape this rule warns against. Treat that as the known gap to close, not a second acceptable format to document — a new endpoint that copies `validateUuid`'s response instead of `validateBody`'s reproduces the inconsistency instead of fixing it.
+
+A new endpoint that hand-rolls its own parsing produces a third, inconsistent error shape for clients — don't.
 
 Validate params, query, body, and headers. **Never trust a client-supplied `id` for authorization** — always re-check ownership server-side. This is the most common real vulnerability in a codebase that otherwise looks careful.
 

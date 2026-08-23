@@ -6,7 +6,7 @@ alwaysApply: false
 
 # React
 
-> **Scope.** Everything above the *Web (DOM) only* heading applies on any React renderer — web, React Native, or otherwise. The DOM section does not: in React Native there is no `<label>`, no `FormData`, no `dangerouslySetInnerHTML`, and lists virtualize through FlashList rather than a DOM windowing library. The React Native rule in this collection covers the native equivalents.
+> **Scope.** Everything above the *Web (DOM) only* heading applies on any React renderer — web, React Native, or otherwise. The DOM section does not: in React Native there is no `<label>`, no DOM form serialization (`FormData` itself is still available — RN's `fetch` polyfill uses it for request payloads), no `dangerouslySetInnerHTML`, and lists virtualize through FlashList rather than a DOM windowing library. The React Native rule in this collection covers the native equivalents.
 
 ## Component Shape
 
@@ -65,7 +65,7 @@ Every effect that subscribes returns a cleanup. No exceptions.
 
 ## Errors and Loading
 
-- `<ErrorBoundary>` around each independently-failing region — not one at the app root.
+- A boundary around each independently-failing region — not one at the app root. This repo doesn't have a generic `<ErrorBoundary>`; use its own: `AppErrorBoundary` (app-root fallback), `PageErrorBoundary` (per-route), `BoardErrorBoundary` (the `/board` kiosk shell — remounts children for a clean SSE teardown/rebuild rather than showing a static fallback). All three take one required prop, `children`.
 - `<Suspense>` boundaries scoped tightly so one slow query does not blank the screen.
 - Skeletons matching final layout dimensions, to avoid layout shift.
 

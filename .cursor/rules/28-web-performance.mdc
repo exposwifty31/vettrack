@@ -25,7 +25,7 @@ Never optimize from intuition. Profile, change one thing, measure again.
 
 **INP (< 200ms)** — responsiveness to interaction. Replaced FID because FID measured only the first one.
 - Break long tasks (>50ms) with `scheduler.yield()` or `setTimeout`.
-- `startTransition` for non-urgent state updates so typing stays responsive.
+- In React, `startTransition` for non-urgent state updates so typing stays responsive — this rule's globs also match Vue/Svelte/Astro files; the API is React-only, use each framework's own equivalent there.
 - Debounce expensive handlers; move heavy computation to a Web Worker.
 
 **CLS (< 0.1)** — visual stability. The one that makes people tap the wrong button.
@@ -54,7 +54,7 @@ Images are usually the largest payload; fonts are usually the worst layout-shift
 
 ## Rendering
 
-- Virtualize any list past a few hundred rows.
+- Virtualize a list once measurement says it needs it — no fixed row-count threshold, matching "Measure First" above and `02-react.mdc`'s Lists section. The cost is per-row render work, not row count.
 - Animate only `transform` and `opacity` — they run on the compositor. Animating `width`, `top`, or `box-shadow` forces layout on every frame.
 - `content-visibility: auto` to skip rendering off-screen sections.
 - Batch DOM reads and writes; interleaving them causes layout thrashing.
@@ -66,7 +66,7 @@ Images are usually the largest payload; fonts are usually the worst layout-shift
 - Preconnect to critical third-party origins; `dns-prefetch` for likely ones.
 - Compress with Brotli.
 - Stream server-rendered HTML so the browser can start early.
-- Third-party scripts are the most common cause of a bad INP and the least examined. Audit each one and load it `async`/`defer` or via a worker.
+- Third-party scripts are the most common cause of a bad INP and the least examined. **Audit before choosing a loading strategy — don't default to `async`/`defer`.** `async`/`defer` only help scripts with no ordering dependency; a script that a later inline `<script>` depends on (e.g. loading a UMD build, then calling a global it defines) breaks under either, because neither guarantees it runs before the dependent code. Use `async` for scripts nothing depends on, `defer` when order matters but nothing needs the result immediately, and leave a script synchronous — or restructure the dependency — when something in the initial render needs it before paint. A worker is an option only for work that doesn't touch the DOM.
 
 ## NEVER
 

@@ -11,7 +11,8 @@ The question observability answers is not "is it up?" — it is "why is this spe
 ## Structured Logs
 
 ```ts
-logger.info(safeFields({ userId, orderId, durationMs, event: 'order.created' }), 'order created')
+logger.info('order.created', safeFields({ userId, orderId, durationMs }))
+// event first, fields second — matches this repo's Logger interface.
 // safeFields = the allowlist serializer from "What Never Goes in a Log" below.
 // Calling logger.info with a raw object bypasses it — wire the serializer into
 // the logger itself so a call site cannot opt out by forgetting.
@@ -62,15 +63,15 @@ Distributed tracing is the only practical way to answer "where did the 3 seconds
 
 ## Errors and Alerts
 
-- Report to a real error tracker with stack trace, release version, user context (id, never PII), and breadcrumbs.
+- Report to a real error tracker with stack trace, release version, user context (id, never PII), and breadcrumbs. Set `sendDefaultPii: false` — the SDK default sends far more than an opaque id, and the exception needs an explicit, documented, and verified reason before it ships, not a config default nobody chose.
 - Group by cause, not by message — a message with an interpolated id creates a new group per occurrence and hides the pattern.
 - **Alert on symptoms users feel** — error rate, latency, failed checkouts — not on causes like CPU. High CPU with happy users is not an incident.
 - Every alert has a runbook link and a named owner. An alert nobody knows how to action gets muted within a week, and then it is worse than nothing.
 
 ## Health Checks
 
-`/healthz` — is the process alive? Cheap, no dependencies. Answers "restart me?"
-`/readyz` — are dependencies reachable? Answers "send me traffic?"
+`/healthz` (this repo: `/api/healthz`) — is the process alive? Cheap, no dependencies. Answers "restart me?"
+`/readyz` (this repo: `/api/health/ready`) — are dependencies reachable? Answers "send me traffic?"
 
 Conflating them causes restart loops when a database blips: the process is fine, the dependency is not.
 

@@ -35,7 +35,7 @@ await expect(page.getByRole('alert')).toHaveText('Saved')   // retries until tim
 Each test creates its own data and does not depend on another test's leftovers. Parallel workers make shared state a race by construction.
 
 - Unique data per test (`user-${testInfo.testId}@example.com`).
-- Authentication via a saved storage state in `globalSetup`, not by logging in through the UI in every test. Logging in is one test's job; the rest reuse the session.
+- Authentication via a saved storage state in `globalSetup`, not by logging in through the UI in every test. Logging in is one test's job; the rest reuse the session. **That storage-state file (e.g. `playwright-ui-session.json`) is a secret** — it holds live authenticated cookies or tokens. Gitignore it, generate it fresh per environment rather than committing or sharing one, and never publish it as a CI artifact; an artifact download hands out a live session.
 - Clean up in a fixture teardown, not at the end of the test body — a failing test never reaches the end.
 
 ## Scope
