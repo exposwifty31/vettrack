@@ -190,7 +190,7 @@ Full cards in the plan library. Summary only:
 
 ## Completed
 
-- 2026-08-23 — **Auth Ivory door chrome** (visual-only): `/signin` + `/signup` use shared `AuthDoorChrome`. **Platform layouts:** web = centered Ivory sheet (`max-w-sm`); Capacitor phone = full-bleed top-aligned (no floating card); tablet = same language + `max-w-lg` / landscape two-column. Flattened Clerk appearance; 44px role chips on **sign-up only**; Welcome back = sign-in only. Auth logic untouched. Tests: `auth-door-chrome` + `role-chips-signup` + `native-auth-surface` green; `tsc --noEmit` clean.
+- 2026-08-23 — **Auth Ivory door chrome** (visual-only): `/signin` + `/signup` use shared `AuthDoorChrome`. **Platform layouts:** web = centered Ivory sheet (`max-w-sm`); Capacitor phone = full-bleed top-aligned (no floating card); tablet = same language + `max-w-lg` / landscape two-column. Flattened Clerk appearance — including the OUTER `cardBox` and the grey `footer` band, which Clerk 5 draws outside `card`, so the page chrome is the only card on every variant. 44px role chips on **sign-up only**; Welcome back = sign-in only. Auth logic untouched. Tests: `auth-door-chrome` + `role-chips-signup` + `native-auth-surface` green; `tsc --noEmit` clean. Verified in the bundled Capacitor shell on iPhone SE (375pt), iPhone 17 and iPad Pro 11-inch (portrait + landscape).
 - 2026-08-13 — **The nine-blocker push + TV board** (PRs #167–#181 to `main`): native push +
   RFID readers, reviewer-demo seed (#175), Code Blue vet-QA persona + click-path runbook (#179),
   doctor shift gate + migrations 181–184 (#180, RN companion #59), TV Command Center board
