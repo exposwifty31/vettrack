@@ -1,0 +1,108 @@
+---
+description: Client data fetching and server state — TanStack Query patterns, cache keys, mutations, and error/retry behavior.
+globs: **/hooks/**,**/queries/**,**/api/**,**/*.query.ts,**/*.api.ts
+alwaysApply: false
+---
+
+# Data Fetching & Server State
+
+Server data is a **cache of someone else's state**, not application state. Copying it into `useState` guarantees it goes stale and you never find out.
+
+The APIs named below (`staleTime`, `gcTime`, `useMutation`, `invalidateQueries`) are TanStack Query's. The reasoning — key completeness, cancel-before-optimistic-write, narrow invalidation, retry policy — carries to any server-cache library, but SWR spells its options differently; do not transliterate the names.
+
+## Query Keys Are the Cache
+
+```ts
+export const userKeys = {
+  all:    (tenantId: string) => ['users', tenantId] as const,
+  list:   (tenantId: string, filters: Filters) => [...userKeys.all(tenantId), 'list', filters] as const,
+  detail: (tenantId: string, id: string)       => [...userKeys.all(tenantId), 'detail', id] as const,
+}
+```
+
+A key factory in one place. Ad-hoc inline keys mean an invalidation somewhere else silently misses, and the bug presents as "sometimes the list doesn't refresh".
+
+**Every value the fetcher depends on belongs in the key** — filters, pagination, locale, tenant. A parameter not in the key returns a stale result from a different request.
+
+## Staleness
+
+- `staleTime` is how long data is trusted without a refetch. The default of 0 refetches on every mount and focus.
+- **Refetch-on-focus is browser behavior.** React Native has no window-focus event; you get it only by wiring `focusManager` to `AppState` yourself. Do not assume data refreshes when the user returns to the app — verify it, or refetch explicitly on screen focus.
+- Set it per data type: a currency rate is 30 seconds, a user profile is 5 minutes, a country list is effectively forever.
+- `gcTime` is how long an unused cache entry survives. It is not `staleTime`, and confusing them produces baffling behavior.
+- Prefetch on route intent — the cheapest perceived-performance win available. On the web that includes hover; on touch platforms there is no hover, so prefetch on navigation intent, list-item visibility, or press-in instead.
+
+## Mutations
+
+```ts
+// tenantId comes from the authenticated session, not from `next` — never let a
+// mutation payload pick which tenant's cache entry it writes to.
+//
+// latestAttempt guards the SAME race onError closes below: it is keyed by the
+// exact cache key so a stale rollback can never fire once a newer attempt for
+// that entity has started. `scope: { id }` was considered instead — it does
+// not fit here, because scope is fixed when useMutation is CREATED, and this
+// hook is generic: the entity id is only known per-call, inside onMutate.
+const latestAttempt = useRef<Record<string, symbol>>({})
+
+useMutation({
+  mutationFn: updateUser,
+  onMutate: async (next) => {
+    const key = userKeys.detail(tenantId, next.id).join(':')
+    const attempt = Symbol()
+    latestAttempt.current[key] = attempt                                      // this call is now the newest for this entity
+    await qc.cancelQueries({ queryKey: userKeys.detail(tenantId, next.id) })  // stop in-flight overwrite
+    const prev = qc.getQueryData(userKeys.detail(tenantId, next.id))
+    qc.setQueryData(userKeys.detail(tenantId, next.id), (old: User | undefined) =>
+      old ? { ...old, ...next } : old)                                        // merge — `next` may be a patch
+    return { prev, attempt, key }                                             // rollback context
+  },
+  onError: (_e, next, ctx) => {
+    // Only roll back if THIS attempt is still the latest for the entity — a
+    // slower-failing mutation whose successor already succeeded must not
+    // stomp that successor's newer, already-committed data with its own
+    // stale snapshot.
+    if (ctx && latestAttempt.current[ctx.key] === ctx.attempt) {
+      qc.setQueryData(userKeys.detail(tenantId, next.id), ctx.prev)
+    }
+  },
+  onSettled: (_d, _e, next) => Promise.all([                                // returned, so the
+    qc.invalidateQueries({ queryKey: userKeys.detail(tenantId, next.id) }), // mutation stays
+    qc.invalidateQueries({ queryKey: [...userKeys.all(tenantId), 'list'] }),// pending until both — partial match, every filter variant
+  ]),                                                                       // refetches land
+})
+```
+
+The `cancelQueries` line is the one people omit — without it an in-flight refetch lands after your optimistic write and reverts it. Optimistic updates without a rollback path are worse than none; the UI lies about a failure.
+
+**`onError` has a second bug once two mutations for the same entity overlap.** If mutation A's `onMutate` snapshots `prev`, mutation B (same `tenantId`/`id`) starts and succeeds, and only *then* A fails — an unconditional rollback restores A's stale `prev`, silently reverting B's newer, already-committed data. The snapshot is only valid if it's still the *latest* attempt for that entity by the time it's restored — `latestAttempt` above tracks exactly that, keyed by the same string the cache itself is keyed by.
+
+**Return the invalidation promise.** v5 awaits whatever a mutation callback returns, so returning `Promise.all([...])` keeps the mutation pending until the refetches land — for queries currently observed by a mounted component. `invalidateQueries` defaults to `refetchType: 'active'`: a matching query with no mounted observer is marked stale but does **not** refetch on the spot, so its promise resolves without a network round-trip. That's usually right — nothing is watching it, so nothing needs to update yet — but if a specific invalidation must force a background refetch regardless of who's watching, pass `refetchType: 'all'` explicitly.
+
+Invalidate narrowly — but invalidate **every** key the changed fields appear in. Updating a user's name and invalidating only `detail` leaves the list rendering the old name until something else happens to refetch it; that is the most common "the UI didn't update" report. Narrow means scoped to the entity, not scoped to one query.
+
+`invalidateQueries()` with no key at all refetches everything on screen — that is the other extreme, and it is not the fix.
+
+## Errors and Retries
+
+- Do **not** retry *permanent* 4xx — 400, 401, 403, 404, 422. A 400 will be 400 forever; retrying wastes time and can duplicate side effects.
+- **429 is the exception.** It is a 4xx but explicitly transient: retry it with bounded backoff, and honor `Retry-After` when the server sends it rather than guessing a delay.
+- Retry transient failures (network errors, timeouts, 5xx, 429) with exponential backoff and jitter, under a maximum attempt count.
+- Every mutation is idempotent or carries an idempotency key. A retried payment is a real incident.
+- Distinguish three UI states: no data yet, empty result, and failed. Rendering an empty list for a failed request hides the failure.
+- Global `onError` for logging and toasts; local handling for anything requiring specific recovery.
+
+## Request Hygiene
+
+- One API client with the base URL, auth header, timeout, and error normalization in one place. Scattered `fetch` calls diverge immediately.
+- Every request has a timeout and an `AbortSignal`. A hung request holds a connection and a spinner indefinitely.
+- Validate responses at the boundary — a backend contract change should fail loudly at parse time, not as `undefined` three components deep.
+- Deduplicate in-flight identical requests. The library does this if you let it own the fetch.
+
+## NEVER
+
+- `useEffect` + `fetch` + `setState` for data loading.
+- Copying query data into local state.
+- A cache key missing one of its dependencies.
+- Retrying a non-idempotent mutation without an idempotency key.
+- An infinite list without a cursor — offset pagination drifts when rows are inserted.

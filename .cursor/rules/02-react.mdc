@@ -1,0 +1,87 @@
+---
+description: React 18+ component architecture, hook correctness, render performance, and state placement. Platform-neutral React core, with DOM-specific items marked. This repo pins 18.3.
+globs: **/*.tsx,**/*.jsx
+alwaysApply: false
+---
+
+# React
+
+> **Scope.** Everything above the *Web (DOM) only* heading applies on any React renderer — web, React Native, or otherwise. The DOM section does not: in React Native there is no `<label>`, no DOM form serialization (`FormData` itself is still available — RN's `fetch` polyfill uses it for request payloads), no `dangerouslySetInnerHTML`, and lists virtualize through FlashList rather than a DOM windowing library. The React Native rule in this collection covers the native equivalents.
+
+## Component Shape
+
+```tsx
+interface UserCardProps {
+  user: User
+  onSelect?: (id: string) => void
+}
+
+export function UserCard({ user, onSelect }: UserCardProps) {
+  if (!user.isActive) return <InactiveBadge />   // early return, no nesting
+  return <CardShell onSelect={() => onSelect?.(user.id)}>{user.name}</CardShell>
+}
+```
+
+- Function declarations, not `const X = () => {}`. They hoist, and stack traces name them.
+- Props interface directly above the component. Destructure in the signature.
+- Named exports. One component per file, named after the file.
+- Under 150 lines. Past that, the component is doing two jobs — extract one.
+
+## State Placement
+
+The order to reach for, cheapest first:
+
+1. **Derived** — compute during render. `const total = items.reduce(...)`. No state, no effect, cannot desync.
+2. **Local** — `useState` in the component that owns it.
+3. **URL** — filters, sort, pagination, active tab. Survives refresh and is shareable.
+4. **Lifted** — the nearest common ancestor, only once two siblings genuinely need it.
+5. **Server cache** — a query library, or React Server Components where the platform has them (web/SSR only; there is no RSC in React Native). Server data is not client state.
+6. **Global store** — last resort, for genuinely cross-cutting concerns only.
+
+Most `useState` + `useEffect` pairs are a derived value wearing a costume.
+
+## useEffect Is Not a Lifecycle Hook
+
+An effect synchronizes with something **outside React**: a subscription, a timer, a DOM node, an imperative API.
+
+Do not use it for:
+- Deriving state from props → compute during render.
+- Fetching on mount → use a query library, or the framework's loader / RSC on web. In React Native the query library *is* the loader — there is no route-level server loader.
+- Reacting to a user event → put the logic in the event handler.
+- Resetting state when a prop changes → change the `key` instead. Note what this costs: a new `key` unmounts the component and **destroys the entire subtree's state**, including focus, scroll position, and uncontrolled input values, then remounts from scratch. That is the intended tool for "reset this form when the selected record changes", but it is deliberate and expensive — not a targeted field reset.
+
+Every effect that subscribes returns a cleanup. No exceptions.
+
+## Render Performance
+
+- Do not reach for `memo`/`useMemo`/`useCallback` preemptively. Measure with the Profiler, then apply where it demonstrably helps.
+- The React Compiler handles most memoization. If it is enabled, manual memo is usually noise.
+- Never define a component inside another component — it remounts the whole subtree every render.
+- `key` is a stable identity, never an array index — with reordering, index keys corrupt state.
+
+## Lists
+
+- Long lists get virtualized once measurement says they need it. Do not carry a row-count threshold around in your head: profile the actual list, on the slowest device it has to run on, and decide from p95 frame time and dropped-frame counts. The cost is per-row render work, not row count.
+
+## Errors and Loading
+
+- A boundary around each independently-failing region, not *only* one at the app root — a single app-root boundary still blanks the whole screen for a failure anywhere in it. This repo's own boundaries: `AppErrorBoundary` (the required app-root fallback — keep it, it's the last line of defense), `PageErrorBoundary` (per-route, catches most failures before they reach the root), `BoardErrorBoundary` (the `/board` kiosk shell — remounts children for a clean SSE teardown/rebuild rather than showing a static fallback). All three take one required prop, `children`.
+- `<Suspense>` boundaries scoped tightly so one slow query does not blank the screen.
+- Skeletons matching final layout dimensions, to avoid layout shift.
+
+## NEVER
+
+- Conditional hooks, or hooks in loops.
+- Mutating state directly — `state.x = 1` then `setState(state)` will not re-render.
+- Index as key on a reorderable list.
+- Business logic inside JSX — extract to a named function.
+- Defining a component inside another component.
+
+## Web (DOM) only
+
+Skip this section entirely in a React Native codebase.
+
+- Uncontrolled inputs (`defaultValue` + `FormData`) by default; controlled only when you need to react per keystroke.
+- Every input has an associated `<label>`. Not a placeholder pretending to be one.
+- `dangerouslySetInnerHTML` without sanitizing is prohibited.
+- A click handler belongs on a **native interactive element**: `<button>` for an action, `<a href>` for navigation. Never `<div onClick>` — and never `<article onClick>` either. Sectioning elements (`<article>`, `<section>`, `<li>`) are containers: they carry no keyboard activation and no button or link semantics. For a clickable card, keep the container semantic and put a real `<button>` or `<a>` inside it. The accessibility rule in this collection covers why.

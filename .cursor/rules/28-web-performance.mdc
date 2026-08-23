@@ -1,0 +1,77 @@
+---
+description: Web performance — Core Web Vitals, bundle discipline, images, fonts, rendering cost, and measuring before optimizing.
+globs: **/*.tsx,**/*.jsx,**/*.vue,**/*.svelte,**/*.astro,vite.config.*,next.config.*,webpack.config.*
+alwaysApply: false
+---
+
+# Web Performance
+
+## Measure First
+
+Never optimize from intuition. Profile, change one thing, measure again.
+
+- Field data (real users) over lab data. A Lighthouse 98 on a Mac says nothing about a mid-range Android on 4G.
+- Report p75/p95, not averages. The average hides exactly the users who are suffering.
+- Throttle CPU 4× and network to Slow 4G when profiling locally. Your machine is not the target.
+- A performance claim with no measurement attached is not a claim.
+
+## Core Web Vitals
+
+**LCP (< 2.5s)** — largest element painted. Almost always a hero image or headline.
+- Never lazy-load the LCP image, and mark it high priority — `fetchPriority="high"` in React JSX, `fetchpriority="high"` in HTML and in Vue/Svelte/Astro templates.
+- **Preload it only when discovery is late** — the image comes from CSS, from JS, or from markup the parser reaches slowly. If it is already an `<img>` in the initial HTML, the preload scanner finds it and `fetchPriority` is enough; an extra `<link rel=preload>` buys nothing. For a responsive image the preload must repeat `imagesrcset` and `imagesizes` exactly, or it fetches the wrong candidate and you pay for two downloads.
+- Kill render-blocking resources; inline critical CSS.
+- Cut server response time — a slow TTFB caps everything downstream.
+
+**INP (< 200ms)** — responsiveness to interaction. Replaced FID because FID measured only the first one.
+- Break long tasks (>50ms) with `scheduler.yield()` or `setTimeout`.
+- In React, `startTransition` for non-urgent state updates so typing stays responsive — this rule's globs also match Vue/Svelte/Astro files; the API is React-only, use each framework's own equivalent there.
+- Debounce expensive handlers; move heavy computation to a Web Worker.
+
+**CLS (< 0.1)** — visual stability. The one that makes people tap the wrong button.
+- Explicit `width`/`height` or `aspect-ratio` on every image and embed.
+- Reserve space for ads, banners, and async content before it arrives.
+- `font-display: optional` or `swap` with a metric-matched fallback.
+- Never insert content above existing content after paint.
+
+## Bundle
+
+- Every dependency is weight. Check the cost before adding one; `date-fns` beats `moment`, and often a 20-line function beats both.
+- Named imports only — `import { debounce } from 'lodash-es'`, never the whole library.
+- Route-level code splitting by default. Component-level for heavy, conditionally-rendered things (editors, charts, maps).
+- Run a bundle analyzer periodically. The surprises are duplicated dependencies at different versions and an accidentally-imported icon set.
+- Set a size budget in CI. A budget nobody enforces is a wish.
+
+## Images and Fonts
+
+Images are usually the largest payload; fonts are usually the worst layout-shift offender.
+
+- Modern formats (AVIF/WebP) with a fallback, responsive `srcset`, and correct `sizes`.
+- Lazy-load everything below the fold; eager-load what is above it. **Eager and high-priority are different knobs** — eager-loading an above-the-fold image just stops it deferring; `fetchpriority="high"` is reserved for the LCP image specifically (see Core Web Vitals above). Marking every above-the-fold image high-priority makes them compete with each other for bandwidth instead of helping the one that matters.
+- Self-host fonts. A third-party font request adds a DNS lookup, a connection, and a privacy question.
+- Subset fonts to the characters actually used, and preload the one used for the LCP text.
+- Two weights, not six. Each is a separate download.
+
+## Rendering
+
+- Virtualize a list once measurement says it needs it — no fixed row-count threshold, matching "Measure First" above and `02-react.mdc`'s Lists section. The cost is per-row render work, not row count.
+- Animate only `transform` and `opacity` — they run on the compositor. Animating `width`, `top`, or `box-shadow` forces layout on every frame.
+- `content-visibility: auto` to skip rendering off-screen sections — but set `contain-intrinsic-size` on them too. Without a reserved size a skipped section is 0×0 until it scrolls into view, then jumps to its real size the instant rendering resumes: a layout shift this rule's own CLS budget forbids, and a wrong scrollbar estimate while it's still off-screen.
+- Batch DOM reads and writes; interleaving them causes layout thrashing.
+- Memoize where the profiler shows a real cost, not preemptively — memoization has its own cost.
+
+## Network
+
+- HTTP caching with immutable hashed asset filenames and long max-age.
+- Preconnect to critical third-party origins; `dns-prefetch` for likely ones.
+- Compress with Brotli.
+- Stream server-rendered HTML so the browser can start early.
+- Third-party scripts are the most common cause of a bad INP and the least examined. **Audit before choosing a loading strategy — don't default to `async`/`defer`.** `async` is for a script nothing depends on and that depends on nothing — it runs the instant it downloads, in no guaranteed order relative to anything else. `defer` preserves execution order **among deferred external scripts**, so a UMD loader marked `defer`, followed by a `defer`red script that calls the global it defines, is safe. What `defer` does **not** do is satisfy a dependency **from inline code**: an inline `<script>` isn't itself deferrable, runs at its own parse-time position, and cannot be made to wait for a deferred script to finish — a UMD build loaded `defer` and consumed by a later inline `<script>` breaks, same as it would under `async`. Leave a script synchronous — or restructure the dependency (move the consumer external and `defer` too, or inline the loader) — when something in the initial render needs it before paint. A worker is an option only for work that doesn't touch the DOM.
+
+## NEVER
+
+- Shipping an unoptimized image straight from a camera or a design tool.
+- A synchronous XHR or a blocking script in `<head>`.
+- Loading an entire dataset to display ten rows.
+- An unthrottled `scroll` or `resize` handler.
+- Optimizing without a before-and-after number.

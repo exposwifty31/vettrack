@@ -1,0 +1,84 @@
+---
+description: Node.js REST APIs with Express/Fastify and TypeScript — layered architecture, validation, error handling, and production hardening.
+globs: server/routes/**,server/services/**,server/middleware/**,server/repositories/**,server/**/*.ts,server.ts,app.ts
+alwaysApply: false
+---
+
+# Node.js API (Express / Fastify)
+
+## Layers, and What Each May Import
+
+```
+routes/        wiring only: path -> middleware -> controller
+controllers/   parse request, call service, format response
+services/      business logic. NO Request/Response types here.
+repositories/  all database access. No SQL anywhere else.
+middleware/    auth, validation, rate limiting, error handling
+```
+
+The dependency rule: **downward only.** A service that imports `Request` cannot be unit-tested or reused from a queue worker or a CLI. A controller that writes SQL has made the database unswappable.
+
+## Validation at the Edge
+
+This repo already ships the middleware — `server/middleware/validate.ts`. Use it; do not invent a parallel one.
+
+```ts
+const createUser = z.object({
+  email: z.string().email(),
+  age: z.number().int().min(13).max(120),
+})
+
+// validateBody replaces req.body with the parsed value and, on failure,
+// responds { error: "Validation failed", details } before the handler runs.
+router.post('/users', validateBody(createUser), asyncHandler(async (req, res) => {
+  const user = await userService.create(req.body)
+  res.status(201).json({ data: user })
+}))
+```
+
+**One error shape for every validation failure: `{ error: string, details: Array<{ field, message }> }`.** `details` is `[]` when there is nothing to enumerate — never an omitted key. A client that branches on whether `details` exists, instead of checking whether it's empty, has two code paths for one failure mode.
+
+`validateUuid(paramName)` is the companion for route params — it must return the same shape. **This repo's current `validateUuid` does not**: it responds with `{ error }` alone, no `details` key, which is exactly the second shape this rule warns against. Treat that as the known gap to close, not a second acceptable format to document — a new endpoint that copies `validateUuid`'s response instead of `validateBody`'s reproduces the inconsistency instead of fixing it.
+
+A new endpoint that hand-rolls its own parsing produces a third, inconsistent error shape for clients — don't.
+
+Validate params, query, body, and headers. **Never trust a client-supplied `id` for authorization** — always re-check ownership server-side. This is the most common real vulnerability in a codebase that otherwise looks careful.
+
+## Errors
+
+```ts
+export class AppError extends Error {
+  constructor(message: string, public statusCode: number, public isOperational = true) {
+    super(message)
+    Error.captureStackTrace(this, this.constructor)
+  }
+}
+```
+
+- Services throw domain errors. Controllers never build HTTP status codes from string matching.
+- One global error middleware, registered **last**, maps domain errors to status codes.
+- Distinguish operational errors (bad input, not found — expected) from programmer errors (bugs — should alert).
+- Never leak a stack trace or a raw DB error to a client. Log the detail; return a correlation id.
+
+## Async Correctness
+
+- Every async route handler is wrapped so rejections reach the error middleware. An unhandled rejection in Express 4 silently hangs the request.
+- Independent awaits run under `Promise.all`. Sequential awaits that do not depend on each other are latency you chose.
+- Every outbound call gets a timeout and an `AbortSignal`. A hung upstream should not hold your connection pool.
+- Long work goes to a queue and returns `202` with a status URL. Do not hold an HTTP connection for 30 seconds.
+
+## Production Hardening
+
+- `helmet`, CORS with an explicit origin allowlist (never `*` with credentials), and rate limiting on auth and write routes.
+- Graceful shutdown: stop accepting connections, drain in-flight requests, close the DB pool, then exit.
+- Structured JSON logs (`pino`) with a request id propagated through every layer. `console.log` is not logging.
+- Health endpoints: `/healthz` (process alive) and `/readyz` (dependencies reachable) — they are not the same check.
+- Every response uses a consistent envelope: `{ data }` on success; on failure, **`error` is always a string**, never nested — matching the validation shape above, not a `{ error: { code, message } }` object. (This repo's general-purpose failure shape is `server/lib/apiError.ts`: `{ error: <localized text>, code: <key>, params? }` — `code` sits beside `error`, not inside it.) **The success side is not universal in this repo** — `server/routes/admin-task-ownership.ts` returns its resource fields directly (`{ clinicId, rows, requestId }`, no `data` wrapper), verified against the route, not assumed. Migrate it and its clients to the wrapped shape, or document the direct-resource shape as a supported exception — don't let this bullet and the real route silently disagree.
+
+## NEVER
+
+- Business logic in a controller.
+- SQL in a service.
+- Secrets read from anywhere but validated env at startup — fail fast if one is missing.
+- `res.send(err)` — that ships internals to an attacker.
+- Blocking the event loop: sync `fs`, sync crypto, or a JSON.parse of a 50MB payload.
