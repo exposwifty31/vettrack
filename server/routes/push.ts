@@ -2,7 +2,7 @@ import { Router, type Request, type Response } from "express";
 import { randomUUID } from "crypto";
 import { z } from "zod";
 import { db, pushSubscriptions } from "../db.js";
-import { eq, and } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 import { requireAuth } from "../middleware/auth.js";
 import { validateBody } from "../middleware/validate.js";
 import { authSensitiveLimiter, pushTestLimiter } from "../middleware/rate-limiters.js";
@@ -133,19 +133,30 @@ router.post(
       // token needs no web-push signing pair, and the native transport's
       // credentials may arrive from the owner later.
       //
-      // Replace-then-insert atomically. The delete is scoped to (clinicId, token)
-      // — matching the (clinic_id, token) partial unique index — so a same-clinic
-      // device re-register replaces the prior row without ever reaching another
-      // clinic's subscription. (userId is deliberately NOT in the predicate: the
-      // uniqueness key is (clinicId, token), so a shared device re-registered by a
-      // different user in the same clinic must replace the row, not 500 on the
-      // unique index. Ownership scoping stays on PATCH/DELETE.)
+      // Atomic upsert on (clinicId, token) — matching the partial unique index
+      // ux_vt_push_subscriptions_clinic_token (migration 180). (userId is
+      // deliberately not part of the conflict target: the uniqueness key is
+      // (clinicId, token), so a shared device re-registered by a different user
+      // in the same clinic must replace the row, not 500 on the unique index.
+      // Ownership scoping stays on PATCH/DELETE.)
+      //
+      // RN-Migration #98: delete-then-insert (two statements, even inside one
+      // db.transaction) is not atomic against a SECOND transaction racing the
+      // same key — under READ COMMITTED, T2's INSERT can block on T1's
+      // still-uncommitted unique-index entry and then fail with 23505 once T1
+      // commits. A single INSERT ... ON CONFLICT DO UPDATE has no such window:
+      // Postgres itself serializes conflicting upserts against the same key.
+      //
+      // The unique index is PARTIAL (`WHERE token IS NOT NULL`) — target alone
+      // is not enough for Postgres to infer it; targetWhere must repeat the
+      // exact predicate or the ON CONFLICT clause won't match the index and
+      // this reverts to the same 23505 under concurrency.
       try {
-        // Detect an ownership transfer INSIDE the tx (SELECT the current owner of
-        // this (clinicId, token) before the delete). The audit itself fires AFTER
-        // the tx commits — fire-and-forget, never on the tx client — so it honors
-        // the "don't await logAudit in a transaction path" convention and never
-        // audits a rolled-back write.
+        // Detect an ownership transfer INSIDE the tx (SELECT the current owner
+        // of this (clinicId, token) before the upsert). The audit itself fires
+        // AFTER the tx commits — fire-and-forget, never on the tx client — so
+        // it honors the "don't await logAudit in a transaction path"
+        // convention and never audits a rolled-back write.
         let priorUserId: string | null = null;
         const [sub] = await db.transaction(async (tx) => {
           const existing = await tx
@@ -155,12 +166,19 @@ router.post(
           if (existing[0] && existing[0].userId !== userId) {
             priorUserId = existing[0].userId;
           }
-          await tx
-            .delete(pushSubscriptions)
-            .where(and(eq(pushSubscriptions.clinicId, clinicId), eq(pushSubscriptions.token, body.token)));
           return tx
             .insert(pushSubscriptions)
             .values({ id: randomUUID(), clinicId, userId, platform: body.platform, token: body.token, ...settings })
+            .onConflictDoUpdate({
+              target: [pushSubscriptions.clinicId, pushSubscriptions.token],
+              targetWhere: sql`${pushSubscriptions.token} IS NOT NULL`,
+              // createdAt is refreshed on update too, matching the old
+              // delete-then-insert's semantics (admin-notifications.service.ts
+              // orders by createdAt DESC as an activity-recency signal — an
+              // UPDATE that left it untouched would silently change that
+              // ordering, which is a separate concern from the race fix).
+              set: { userId, platform: body.platform, createdAt: sql`now()`, ...settings },
+            })
             .returning();
         });
         if (!sub) {

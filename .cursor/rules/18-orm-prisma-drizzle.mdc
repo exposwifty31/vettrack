@@ -1,0 +1,77 @@
+---
+description: TypeScript ORM usage — Drizzle and Prisma. Type-safe queries, N+1 avoidance, transactions, and the repository boundary.
+globs: **/db/**/*.ts,**/schema.ts,**/schema.prisma,drizzle.config.ts
+alwaysApply: false
+---
+
+# TypeScript ORMs (Drizzle / Prisma)
+
+## Where Queries Live
+
+Database access is confined to a repository/data-access layer. Not in a component, a route handler, or a service that also does business logic.
+
+The test: *could you swap Postgres for something else by editing one folder?* If not, the ORM has leaked. And more practically — a query in a React component cannot be reused by the cron job that needs the same data.
+
+## Select Explicitly
+
+Both ORMs return every column by default. That ships `password_hash` and `internal_notes` to whatever consumes the result.
+
+```ts
+// Drizzle
+const users = await db.select({ id: t.users.id, email: t.users.email }).from(t.users)
+
+// Prisma
+const users = await prisma.user.findMany({ select: { id: true, email: true } })
+```
+
+Define a shared "public shape" per entity and reuse it, so a new sensitive column does not silently join every response.
+
+## N+1
+
+The characteristic ORM failure: a loop that awaits a query per item.
+
+```ts
+// Bad — 1 + N round trips
+for (const post of posts) post.author = await getUser(post.authorId)
+
+// Good — one query
+const authors = await db
+  .select({ id: users.id, name: users.name, avatarUrl: users.avatarUrl })   // projection, not select *
+  .from(users)
+  .where(inArray(users.id, authorIds))
+const byId = new Map(authors.map(a => [a.id, a]))
+```
+
+Use `with` (Drizzle relations) or `include` (Prisma) for eager loading. Log query counts in development — the bug is invisible with seed data and fatal with production data.
+
+## Transactions
+
+```ts
+await db.transaction(async (tx) => {
+  await tx.insert(orders).values(order)
+  await tx.update(inventory).set({ count: sql`${inventory.count} - 1` })
+})
+```
+
+- **Every query inside the block must use `tx`, not `db`.** Using the outer handle silently runs outside the transaction — no error, no rollback, and it only manifests under failure.
+- Do not call an external API inside a transaction.
+- `sql\`\`` for atomic increments — read-modify-write in application code loses updates under concurrency.
+
+## Migrations
+
+- Generated from the schema, then **read before committing**. Generators miss renames (they emit drop + add, which deletes data), type widenings, and index changes.
+- Committed to version control and applied by CI, never by hand against production.
+- The schema file is the source of truth. Manual `ALTER TABLE` against a live database guarantees drift.
+
+## Typing
+
+- Derive types from the schema (`InferSelectModel`, Prisma's generated types). Never hand-write an interface that duplicates a table — it will diverge.
+- Do not pass ORM entities to the client directly; map to an explicit DTO. This is the same leak as `select *`, one layer up.
+
+## NEVER
+
+- A raw query with interpolated user input — use the parameterized tagged template.
+- An unbounded `findMany()`. Always take a limit.
+- ORM calls inside a React component or a `render` path.
+- Business logic in a database hook/middleware — it hides control flow.
+- Connection pool created per request in serverless — use the driver's serverless/pooled mode.

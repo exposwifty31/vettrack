@@ -1,0 +1,62 @@
+---
+description: PostgreSQL schema design, indexing, query performance, migrations, and multi-tenant safety.
+globs: **/*.sql,**/migrations/**,**/schema.prisma,**/schema.ts
+alwaysApply: false
+---
+
+# PostgreSQL
+
+## Schema Design
+
+- Every table gets a primary key. UUID v7 or an identity column — v7 sorts by time, so it indexes far better than v4.
+- `timestamptz`, never `timestamp`. A naive timestamp is a production incident scheduled for the next DST change.
+- `numeric` for money. Never `float` — `0.1 + 0.2` is not `0.3`, and that becomes a reconciliation ticket.
+- `text` over `varchar(n)` unless the limit is a real business rule; there is no performance difference in Postgres.
+- `NOT NULL` by default. Nullable is a deliberate decision meaning "genuinely unknown", not a convenience.
+- Constraints live in the database: foreign keys, `UNIQUE`, `CHECK`. Application-level validation is a UX nicety; the database is the last line of defense and the only one that holds under concurrency.
+- Explicit `ON DELETE` behavior on every FK. The default `NO ACTION` surprises people at the worst time.
+
+## Indexing
+
+An index makes reads faster and writes slower. Both halves matter.
+
+- Index every foreign key you filter or join on — Postgres does **not** create these automatically.
+- Composite index column order follows the query: equality columns first, then range, then sort.
+- Partial indexes for skewed predicates: `WHERE deleted_at IS NULL` — smaller, faster, cheaper to maintain.
+- `CREATE INDEX CONCURRENTLY` in production. Plain `CREATE INDEX` takes a `SHARE` lock: reads continue, but every `INSERT`, `UPDATE`, and `DELETE` on that table blocks until it finishes. On a large table that is an outage.
+- `CONCURRENTLY` **cannot run inside a transaction block**, and most migration runners wrap each migration in one. Put it in a migration the runner executes without a transaction, or run it out of band — do not discover this on the production deploy.
+- Verify with `EXPLAIN (ANALYZE, BUFFERS)` on realistic data volume. A sequential scan on 100 rows is correct behavior; the plan changes at scale.
+
+## Queries
+
+- Explicit column lists. `SELECT *` breaks the moment someone adds a column, and it moves bytes you discard.
+- Always parameterized. String-interpolated SQL is the injection vulnerability, regardless of how "internal" the input feels.
+- Keyset pagination (`WHERE id > $1 ORDER BY id LIMIT 50`) for deep lists. `OFFSET 100000` scans and discards 100,000 rows.
+- CTEs for readability, but know they can act as optimization fences; check the plan on hot paths.
+- `INSERT ... ON CONFLICT DO UPDATE` for upserts — a read-then-write race is not a hypothetical.
+
+## Transactions
+
+- Short. A transaction held open across a network call to a third-party API holds locks for that entire round trip.
+- Consistent lock ordering across the codebase to avoid deadlocks.
+- `SELECT ... FOR UPDATE` when you read a value you are about to write based on.
+- Explicit isolation level when the default `READ COMMITTED` is not sufficient — and know that it usually is not for financial invariants.
+
+## Migrations
+
+- **Forward-only, with a tested rollback procedure, and reviewed.** "Reversible" implies a paired down-migration ships by default — most hand-authored migrations don't have one, and an untested rollback is a hope, not a procedure. Write and test the actual recovery (a compensating forward migration, a restore point, whatever fits) before the migration ships, not after it fails.
+- **Expand/contract** for anything breaking: add the new column nullable → backfill in batches → start writing both → switch reads → drop the old. One deploy per step.
+- Never rename or drop a column in the same release that stops using it — old application instances are still running during a rolling deploy.
+- Backfills run in batches with a sleep, **and each batch commits before the sleep — never one outer transaction wrapping the whole loop.** A single `UPDATE` over ten million rows doesn't lock the table outright — it acquires a ROW EXCLUSIVE table lock (which still blocks conflicting DDL) plus row-level locks on every row it touches, holds them for the transaction's duration, and can block concurrent writes to those same rows; it also generates WAL and bloat proportional to the row count. Batching only bounds any of that if each batch's transaction actually ends: a committed batch releases its locks, lets the WAL checkpoint, and advances the vacuum cleanup horizon before the next batch starts. One outer transaction around every batch reproduces the exact problem batching exists to avoid — the total lock/WAL/bloat footprint of the whole backfill, just spread across more statements.
+
+## Multi-Tenancy
+
+If the schema is shared, **every query filters by tenant id**. Enforce it structurally — Row Level Security, or a repository layer that cannot construct an unfiltered query — and add a test that fails if a new query bypasses it. Relying on developer discipline here fails exactly once, expensively.
+
+## NEVER
+
+- Storing secrets or tokens in plaintext.
+- `SELECT *` in application code.
+- A query built by string concatenation.
+- An unbounded query on a user-facing path.
+- DDL on a large table during peak traffic without knowing which lock it takes.

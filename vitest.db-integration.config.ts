@@ -23,6 +23,7 @@ export default defineConfig({
       "tests/seed-reviewer-demo.integration.test.ts",
       "tests/doctor-shift-gate.integration.test.ts",
       "tests/push-endpoint-cross-clinic.integration.test.ts",
+      "tests/push-subscription-race.integration.test.ts",
     ],
     exclude: ["**/node_modules/**"],
     hookTimeout: 60_000,

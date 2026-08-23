@@ -1,0 +1,69 @@
+---
+description: Tailwind CSS v4 — design tokens, class ordering, variants, logical properties for RTL, and when to stop using utilities.
+globs: **/*.css,tailwind.config.*,**/*.tsx,**/*.vue,**/*.svelte,**/*.astro
+alwaysApply: false
+---
+
+# Tailwind CSS
+
+**This project runs Tailwind v3.4** with `tailwind.config.ts` and the three `@tailwind` directives. The v4 CSS-first setup (`@import "tailwindcss"`, `@theme`) does not apply here — do not introduce it piecemeal.
+
+## Tokens, Not Arbitrary Values
+
+```ts
+// tailwind.config.ts
+export default {
+  theme: {
+    extend: {
+      colors:       { brand: { 500: 'oklch(0.62 0.19 259)' } },
+      spacing:      { gutter: '1.5rem' },
+      borderRadius: { card: '0.75rem' },
+    },
+  },
+} satisfies Config
+```
+
+Every extended key becomes a utility — `bg-brand-500`, `p-gutter`, `rounded-card`. Define a token once there rather than repeating a raw value across components.
+
+- Arbitrary values (`w-[347px]`, `text-[#f0a]`) are a smell. One-off? Fine. Third time you write it? It is a token.
+- Use the spacing scale. `p-5` and `p-6` next to each other is visible; `p-[22px]` between them is noise.
+- Colors in `oklch` — perceptually uniform, so a lightness change looks like a lightness change.
+
+## Class Discipline
+
+- Install `prettier-plugin-tailwindcss`. Class order stops being a code-review topic permanently.
+- Conditional classes go through `cn()` (clsx + tailwind-merge). Merge matters: `cn('p-2', 'p-4')` must yield `p-4`, not both.
+- **Never build class names by string concatenation** — `text-${color}-500` is invisible to the scanner and gets stripped from the build.
+- Repeated 8-class combinations become a component, not an `@apply` block. `@apply` recreates the CSS-bloat problem Tailwind exists to solve.
+
+## RTL and Internationalization
+
+Use **logical properties** so a single codebase serves both directions:
+
+- `ms-4` / `me-4` instead of `ml-4` / `mr-4`
+- `ps-4` / `pe-4` instead of `pl-4` / `pr-4`
+- `start-0` / `end-0` instead of `left-0` / `right-0` (on v4.3+ these are renamed `inset-s-0`/`inset-e-0`; this project is on v3.4, so the `start-*`/`end-*` names are the correct ones)
+- `text-start` / `text-end` instead of `text-left` / `text-right`
+
+`left`/`right` remain correct only for genuinely direction-independent things — a spinner's rotation origin, a decorative corner flourish.
+
+Logical properties do **not** cover everything. `box-shadow`, `text-shadow`, `linear-gradient` angles, `transform-origin`, `background-position`, and `translateX` keyframes are physical and stay put when direction flips. Override those explicitly with an `rtl:` variant.
+
+## Variants and State
+
+- `hover:` `focus-visible:` `disabled:` `aria-expanded:` `data-[state=open]:` — style from state, not from a class you toggle in JS.
+- `focus-visible:` rather than `focus:` — keyboard users get a ring, mouse users do not.
+- `group`/`peer` for parent- and sibling-driven styling, so no JS is needed to coordinate.
+- `dark:` variants defined together with their light counterpart, never in a separate stylesheet.
+
+## When to Leave Tailwind
+
+Utilities are wrong for: keyframe animations, complex `grid-template-areas`, print stylesheets, and deeply nested third-party overrides. Write real CSS in those cases. Mixing is normal, not a failure.
+
+## NEVER
+
+- Dynamic class name construction.
+- `!important` (`!p-4`) to win a specificity fight — fix the source.
+- Inline `style` for anything Tailwind covers.
+- `@apply` for more than a two-utility legacy shim.
+- Deleting `focus` styles without a `focus-visible` replacement.
