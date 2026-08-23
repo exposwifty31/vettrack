@@ -2659,9 +2659,6 @@
     "dispense": {
       "internalError": "Internal error processing dispense."
     },
-    "stability": {
-      "notAvailableInProduction": "Not available in production."
-    },
     "er": {
       "notAuthenticated": "Authentication required.",
       "internalError": "Internal error in ER admin operation."

@@ -22,10 +22,9 @@ import { memoryLocation } from "wouter/memory-location";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useMobileShellContext } from "@/shell/mobile/MobileShellContext";
 import { MobileShell } from "@/shell/mobile/MobileShell";
-import { MobileTabBar } from "@/shell/mobile/MobileTabBar";
 import { NativeTabSidebar } from "@/native/NativeTabSidebar";
 import { AppShell } from "@/components/layout/AppShell";
-import { isTabActive as tabBarIsActive } from "@/native/NativeTabBar";
+import { NativeTabBar, isTabActive as tabBarIsActive } from "@/native/NativeTabBar";
 import { isNavItemActive } from "@/lib/routes/native-nav-model";
 
 vi.mock("@/lib/i18n", () => ({
@@ -194,8 +193,8 @@ describe.each([
 });
 
 describe("tab-bar rendering", () => {
-  it("MobileTabBar renders the tab navigation landmark", () => {
-    renderAt("/home", <MobileTabBar onMorePress={() => {}} />);
+  it("NativeTabBar renders the tab navigation landmark", () => {
+    renderAt("/home", <NativeTabBar onMorePress={() => {}} />);
     expect(screen.getByRole("navigation", { name: "Tab navigation" })).toBeTruthy();
   });
 
