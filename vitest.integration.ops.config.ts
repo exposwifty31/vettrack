@@ -21,6 +21,7 @@ export default defineConfig({
     include: [
       "tests/equipment-operational-state.integration.test.ts",
       "tests/equipment-waitlist.integration.test.ts",
+      "tests/push-endpoint-cross-clinic.integration.test.ts",
     ],
     exclude: ["**/node_modules/**"],
     hookTimeout: 30_000,

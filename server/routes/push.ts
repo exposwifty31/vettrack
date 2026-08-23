@@ -240,10 +240,13 @@ router.post(
     }
 
     // Replace-then-insert atomically. The delete is scoped to (clinicId, endpoint)
-    // — endpoint is globally unique, so this replaces this browser's prior row
-    // within the tenant. (userId is deliberately NOT in the predicate: the unique
-    // key is the endpoint, so a same-device re-subscribe by a different user must
-    // still replace the row rather than 500 on the unique index.)
+    // — matching the (clinic_id, endpoint) partial unique index (migration 187,
+    // issue #226) — so a same-clinic re-subscribe replaces the prior row without
+    // ever reaching another clinic's subscription; the same physical endpoint can
+    // hold an independent row per clinic. (userId is deliberately NOT in the
+    // predicate: the uniqueness key is (clinicId, endpoint), so a shared device
+    // re-subscribed by a different user in the same clinic must still replace the
+    // row, not 500 on the unique index.)
     try {
       const [sub] = await db.transaction(async (tx) => {
         await tx

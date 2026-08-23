@@ -153,6 +153,7 @@ export default defineConfig(({ mode }) => {
         "tests/shift-chat-window.integration.test.ts",
         "tests/seed-reviewer-demo.integration.test.ts",
         "tests/doctor-shift-gate.integration.test.ts",
+        "tests/push-endpoint-cross-clinic.integration.test.ts",
         // Runs real DDL — CREATE TABLE + ENABLE/FORCE ROW LEVEL SECURITY +
         // CREATE POLICY — against whatever DATABASE_URL is exported. It scopes
         // itself to a zz_-prefixed probe table and self-skips on the placeholder

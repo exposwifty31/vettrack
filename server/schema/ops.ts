@@ -209,7 +209,10 @@ export const pushSubscriptions = vtTable("vt_push_subscriptions", {
   // ADR-009: web | ios | android | expo. Web-push rows keep endpoint/p256dh/auth;
   // native rows carry `token` instead. The web columns are nullable so native rows validate.
   platform: text("platform").notNull().default("web").$type<PushPlatform>(),
-  endpoint: text("endpoint").unique(),
+  // Scoped unique via ux_vt_push_subscriptions_clinic_endpoint (clinic_id, endpoint),
+  // not a column-level constraint — same physical endpoint, independent per clinic
+  // (issue #226; mirrors token's ux_vt_push_subscriptions_clinic_token from ADR-009).
+  endpoint: text("endpoint"),
   p256dh: text("p256dh"),
   auth: text("auth"),
   token: text("token"),
