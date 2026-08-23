@@ -10544,3 +10544,79 @@ review findings; the review bodies have to be read as well.
 
 **Verdict:** VERIFIED for the (a) one-to-one fix and for the gate results. The wording correction is
 a **recorded clarification** of an earlier entry, not a re-verification of it.
+
+## 2026-08-23 — greedy matching was not cardinality-preserving, and it inflated the thesis metric (claude/competitive-moats-strategy-c03ca6)
+
+**Claim:** Six review findings, five acted on and one declined with the mechanism shown. The
+important one is algorithmic: the deterministic pairing rule this branch introduced was
+nearest-first greedy, which is not cardinality-preserving, and its failure mode moved M1 in the
+flattering direction.
+
+**Evidence — greedy strands a row that a valid assignment would have matched:**
+- Care events at 10:00 and 10:10, orders at 10:02 and 09:55, ten-minute window. Candidate pairs are
+  10:00–10:02 (Δ 2), 10:00–09:55 (Δ 5), 10:10–10:02 (Δ 8); 10:10–09:55 is Δ 15 and outside the
+  window. Greedy takes 10:00 → 10:02 and strands 10:10 — **one match**. The assignment
+  10:00 → 09:55 and 10:10 → 10:02 makes **two**. Computed, not reasoned about.
+- The stranded event is then counted **unordered**, so greedy inflates M1 — the metric G1a exists to
+  test — purely as a function of assignment order.
+- `docs/vettrack-3.0-program.md:499` requires a maximum-cardinality assignment and states the
+  counterexample inline at `docs/vettrack-3.0-program.md:504`; `docs/vettrack-3.0-program.md:509`
+  restricts tie-breaking to maximum-cardinality assignments (lexicographically smallest sorted
+  `|Δt|` vector, then identifiers), keeping the result order-independent.
+- The repeated-act clause is now derived rather than asserted: both keys are timestamps on one axis,
+  so the minimising assignment never crosses. One less rule that could contradict another.
+- `docs/vettrack-3.0-program.md:469` — (a) cites the same rule instead of paraphrasing the
+  superseded greedy one. Here a stranded pair is worse than an unmatched row: it splits one act into
+  two counted events.
+
+**Evidence — quantity allocation is now defined over units, and is order-independent:**
+- `docs/vettrack-3.0-program.md:526` — each allocation is
+  `min(remaining dispense quantity, remaining line quantity)`, the event-level matched line
+  contributes first, and lines carry residuals.
+- Checked by computing both orders: a dispense of 10 against lines of 1 and 9 yields **0** uninvoiced
+  whichever line matched at event level. A dispense of 4 against a line of 10 takes 4 and leaves 6,
+  so a line is never over-allocated. A dispense of 10 against a line of 1 alone leaves **9**
+  uninvoiced — the case that was previously recorded as fully invoiced.
+- `docs/vettrack-3.0-program.md:544` — a clinic-month with zero dispensed quantity reports M2q as
+  `NOT APPLICABLE`, never `0` and never `NaN`, matching the rule §7 R1 already applies to M1's
+  calibration constants.
+
+**Evidence — the output contract no longer omits what the gate is decided on:**
+- `docs/vettrack-3.0-program.md:613` — R2's output previously listed M1, M2, compliance and the
+  settling window only, while the verdict is now read off `M1_low`/`M1_high` and `M2_low`/`M2_high`.
+  A reader given the four headline numbers could not check the gate. The bounds, the matchable
+  denominator, the unresolved rate, and M2q are now part of the contract. This is the same
+  propagation failure as the §7/§9 estimator earlier in this branch: a rule added in one section
+  and not carried to the section that consumes it.
+
+**Evidence — CI on the branch head this entry describes:**
+- Workflow run `32609698672` — `CI — VetTrack`, status completed, conclusion **success**.
+- Test shards, all four green: `97120579234` (1/4), `97120579254` (2/4), `97120579210` (3/4),
+  `97120579177` (4/4). These are the jobs that cover the 18 DB-backed files an earlier entry
+  recorded as NOT VERIFIED LOCALLY.
+- **The head hash is deliberately not pinned here**, and the reason is a property of the gate rather
+  than an oversight. A hash in a code span next to commit vocabulary is read as a commit claim and
+  must be an ancestor of the default branch; a branch head is not one, so pinning it would fail the
+  gate today. `docs/claims-registry.json` is not the escape hatch either — after this branch is
+  integrated the hash *would* resolve on its own, and an exemption that has become resolvable is
+  itself a gate failure. The run and job identifiers above are stable and independently checkable,
+  and they are what the claim actually rests on.
+
+**Declined, with the mechanism shown:** the review asked that "all claims accounted for" be narrowed
+to "all **registered** claims accounted for". That replacement is inaccurate. `registered` is one
+specific disposition — an entry in `docs/claims-registry.json`, 25 of them in this run — so the
+proposed wording would describe a much smaller set than the sentence reports. "All claims accounted
+for" is the verifier's own summary line and means every extracted claim received *some* disposition:
+verified, registered, attested, or excluded by rule, with none left silent. The source-absence
+sentence the finding points at is not an unaccounted claim; the engine classifies it as
+not-claim-shaped, which is one of those dispositions. **Recorded precisely instead:** the run on the
+tree carrying this entry is 1139 claims — 1113 verified, 25 registered, 1 attested, 2082 excluded by
+rule, **0 FAILED**. "Accounted for" is not a synonym for "verified", and the breakdown is the honest
+form of it.
+
+**Evidence — the gates:** `pnpm architecture:gates` → exit 0; tenant-lint "no new findings vs
+baseline (203 known)"; claim verification **0 FAILED**. Markdown integrity re-checked directly;
+all seven cited anchors re-read after the edits rather than trusted.
+
+**Verdict:** VERIFIED for the five fixes and the gate results. The sixth finding is a **reasoned
+decline**, not a verification.

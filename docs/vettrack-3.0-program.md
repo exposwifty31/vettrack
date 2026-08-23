@@ -466,10 +466,12 @@ and with whoever did the matching — and a threshold that moves is not a thresh
   the M1 and M2 denominators altogether. This is the same one-to-one failure as (b-bis), one layer
   earlier and in the more damaging direction: (b-bis) risks over-*matching*, this risks
   over-*collapsing*.
-- **Dispense rows and scans are therefore paired one-to-one, by (b-bis)'s rule.** Within a key
-  group, process dispense rows in event-timestamp order and give each the still-unclaimed scan with
-  the smallest `|Δt|`; ties break by the scan's earlier timestamp, then its lower identifier. Each
-  scan is consumed by at most one dispense.
+- **Dispense rows and scans are therefore paired one-to-one, by (b-bis)'s rule — the same rule, not
+  a paraphrase of it.** Take the maximum-cardinality assignment within the key group, tie-broken by
+  the lexicographically smallest sorted `|Δt|` vector and then by identifiers. Each scan is consumed
+  by at most one dispense. Greedy nearest-first is excluded here for the same reason as in (b-bis),
+  and the consequence here is worse: a stranded pair does not merely go unmatched, it splits one act
+  into two counted events.
 - **Unpaired rows on either side stay whole — *n* real administrations yield *n* events.** A
   dispense with no scan is a canonical care event on its own; the scan is corroboration, never a
   precondition. A leftover consumable or case-tag scan is **not** discarded either: the allowlist
@@ -494,23 +496,44 @@ greedy pass, not a lookup:
 
 1. Enumerate every candidate pair permitted by (b) or (c), grouped by `clinicId` + case reference +
    item identity.
-2. **Within a group, process the VetTrack-side rows in event-timestamp order.** This ordering is
-   applied first, and it is what makes repeated acts pair *n*-th to *n*-th; `|Δt|` never overrides
-   it. Equal timestamps fall through to the identifier tie-break in step 3.
-3. For each row in that order, take the still-unclaimed counterpart with the smallest `|Δt|`. Break
-   ties by the counterpart's earlier timestamp, then the lower identifier on the VetTrack side, then
-   the lower identifier on the PMS side. The order is total, so the result never depends on scan
+2. **Maximise the number of pairs first.** Take a one-to-one assignment of **maximum cardinality**
+   over the candidates. Nearest-first greedy is *not* equivalent and must not be used: it can spend
+   the only counterpart a later row had and strand that row, turning a matched event into an
+   unmatched one.
+
+   *Worked counterexample.* Care events at 10:00 and 10:10, orders at 10:02 and 09:55, ten-minute
+   window. Greedy gives 10:00 → 10:02 (Δ 2 min), and 10:10 is then stranded — 09:55 is 15 minutes
+   away, outside the window. The assignment 10:00 → 09:55 (Δ 5) and 10:10 → 10:02 (Δ 8) matches
+   both. Greedy would have counted a genuinely ordered act as **unordered**, inflating M1 — the
+   thesis metric — on nothing but assignment order.
+3. **Break ties only among maximum-cardinality assignments.** Of those, take the one whose multiset
+   of `|Δt|` values, sorted ascending, is lexicographically smallest. If several survive, compare
+   their pairs ordered by the VetTrack-side identifier and take the lexicographically smallest by
+   (VetTrack identifier, PMS identifier). The order is total, so the result never depends on scan
    order.
 4. **Each care event takes at most one order; each order is taken at most once.** The same holds for
    dispense ↔ invoice line — never many-to-one.
+5. **Repeated acts need no separate rule.** Both keys are timestamps on one axis, so the assignment
+   minimising the sorted `|Δt|` vector never crosses: the *n*-th act pairs with the *n*-th
+   counterpart. That property is a consequence of the objective, not an extra clause that could
+   contradict it.
 
 **(c-bis) Split quantities, and the shortfall an event-level ratio cannot see.** (b-bis) pairs each
 dispense with **at most one** invoice line, and that pairing alone is what M2 reads. Quantity is
-accounted in a **second pass that never touches M2**: once the event-level pass has run, any invoice
-line in the same group that is still unclaimed may be allocated to the dispense — in the same
-(b-bis) order, each line to at most one dispense — until the dispensed quantity is met. Any
-unallocated remainder is **uninvoiced quantity**. The second pass creates no additional event-level
-match, so (b-bis)'s one-to-one rule is intact.
+accounted in a **second pass that never touches M2**, over units rather than rows:
+
+1. **The event-level matched line contributes first**, and it contributes only what it has: the
+   allocation is `min(remaining dispense quantity, remaining line quantity)`.
+2. **Then any other candidate line in the same group**, in (b-bis)'s order, under the same `min(...)`
+   rule, until the dispensed quantity is met or no candidate line has quantity left.
+3. **Lines carry a residual and may serve more than one dispense** until exhausted; a line is never
+   allocated beyond its own quantity, so a line of 10 against a dispense of 4 gives up 4 and keeps 6.
+   A dispense is never credited beyond what it dispensed.
+4. Whatever the dispense still lacks is **uninvoiced quantity**.
+
+Allocating over units rather than whole lines is what makes the result order-independent: a dispense
+of 10 meeting lines of 1 and 9 yields the same M2q whichever line it matched at event level. The
+second pass creates no additional event-level match, so (b-bis)'s one-to-one rule is intact.
 
 M2 stays an event-level ratio — its 15% threshold was registered on events, and redefining the unit
 after measurement is the HARKing §9 forbids. But an event-level ratio counts a dispense of 10
@@ -518,6 +541,9 @@ covered by an invoice line for 1 as *invoiced*, and the nine remaining units the
 commercial claim. The quantity is therefore carried as its own figure:
 
 - **M2q = uninvoiced quantity ÷ dispensed quantity**, per clinic-month, published beside M2.
+- **A clinic-month with zero dispensed quantity reports M2q as `NOT APPLICABLE`** — never `0`, never
+  `NaN`, and never a value a clinic-month could pass on. This is the same rule §7 R1 applies to M1's
+  calibration constants: an undefined input fails or abstains, it does not default.
 - M2q is **reported, not gated** in this revision — no threshold for it was registered before
   measurement, and inventing one now is precisely what §9 prohibits. It may gate G1b only once its
   threshold is registered before B2a's first run, under the same rule as M1 and M2.
@@ -584,8 +610,11 @@ Every citation of M1 or M2 carries the capture-compliance rate from R1's calibra
 reported without its compliance rate is uninterpretable and may not be cited — in a pitch, a price,
 or an internal decision.
 
-**Output:** per-clinic, per-period — M1, M2, compliance, and the settling window. This *is* the
-corpus.
+**Output:** per-clinic, per-period — M1, M2, compliance, and the settling window, **and every field
+the gate cannot be reproduced without**: `M1_low`/`M1_high` and `M2_low`/`M2_high` (§7 R2 (d)), the
+matchable denominator, the unresolved rate, and M2q or `NOT APPLICABLE` (§7 R2 (c-bis)). A report
+carrying only the four headline numbers is incomplete — the thresholds are decided on the bounds,
+so a reader who cannot see them cannot check the verdict. This *is* the corpus.
 **Musk test:** ✅ for accounts held (§3's reclassification — a compounding switching cost, not a
 market-wide barrier), and only under §3's load-bearing-workflow condition.
 **Unblocks:** M1 → the category claim and the pitch · M2 → 0.6 pricing and 2.4's ROI Ledger.
