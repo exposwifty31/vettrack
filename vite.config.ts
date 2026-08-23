@@ -166,6 +166,34 @@ export default defineConfig(({ mode }) => {
         "tests/expiry-api.test.js",
         "tests/expiry-check-worker.test.js",
         "tests/returns-api.test.js",
+        // #221: 18 more DB-backed suites the comment above already claimed got
+        // this treatment but didn't. Confirmed via git-stash-clean repro with
+        // Postgres genuinely stopped (not merely unset — tests/vitest-setup.ts
+        // unconditionally injects a localhost DATABASE_URL, so "unset the env
+        // var" alone doesn't reproduce this): 18 failed, 20 tests, all
+        // ECONNREFUSED 127.0.0.1:5432, 0 assertion failures. No dedicated
+        // runner exists yet for these — same status as
+        // tests/restock.service.test.ts and tests/migrations/** above; invoke
+        // directly via `pnpm exec tsx <file>` or `pnpm exec vitest run <file>`
+        // with DATABASE_URL exported, same as any file in this list.
+        "tests/dock-return-anchor.integration.test.ts",
+        "tests/docking-anchor-contradictions.integration.test.ts",
+        "tests/docking-citizen-anchor.integration.test.ts",
+        "tests/docking-home-assign.integration.test.ts",
+        "tests/docking-route.integration.test.ts",
+        "tests/equipment-anchor.service.integration.test.ts",
+        "tests/equipment-coordinator.integration.test.ts",
+        "tests/equipment-missing-alert.integration.test.ts",
+        "tests/reconciliation-buckets.integration.test.ts",
+        "tests/room-last-swept.integration.test.ts",
+        "tests/room-readiness.integration.test.ts",
+        "tests/room-sweep.integration.test.ts",
+        "tests/senior-doctor-eligible.integration.test.ts",
+        "tests/shift-handover-generator.test.ts",
+        "tests/shift-handover-observed.test.ts",
+        "tests/shift-handover-patient-worklist.test.ts",
+        "tests/shift-handover-surface.test.tsx",
+        "tests/sweep-escalation.test.ts",
       ],
     },
   };
