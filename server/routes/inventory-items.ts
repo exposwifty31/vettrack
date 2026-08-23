@@ -15,8 +15,7 @@ import { validateBody, validateUuid } from "../middleware/validate.js";
 import { logAudit, resolveAuditActorRole } from "../lib/audit.js";
 import { resolveRequestId, apiError } from "../lib/route-utils.js";
 import { listLowStockItems } from "../services/inventory-console.service.js";
-
-// TODO(constraint-handler): unify with db-constraint-errors.ts when adding inventory_items mappings (post-PR #366)
+import { isUniqueViolation, ITEM_CODE_UNIQUE_CONSTRAINT, ITEM_NFC_TAG_UNIQUE_CONSTRAINT } from "../lib/pg-errors.js";
 
 const router = Router();
 
@@ -220,10 +219,14 @@ router.post("/", requireAuth, requireAdmin, validateBody(createItemSchema), asyn
 
     res.status(201).json(row);
   } catch (err: unknown) {
-    const pgErr = err as { code?: string };
-    if (pgErr?.code === "23505") {
+    if (isUniqueViolation(err, ITEM_CODE_UNIQUE_CONSTRAINT)) {
       return res.status(409).json(
         apiError({ code: "CONFLICT", reason: "CODE_EXISTS", message: "An item with this code already exists", requestId }),
+      );
+    }
+    if (isUniqueViolation(err, ITEM_NFC_TAG_UNIQUE_CONSTRAINT)) {
+      return res.status(409).json(
+        apiError({ code: "CONFLICT", reason: "NFC_TAG_EXISTS", message: "This NFC tag is already assigned to another item", requestId }),
       );
     }
     console.error(err);
