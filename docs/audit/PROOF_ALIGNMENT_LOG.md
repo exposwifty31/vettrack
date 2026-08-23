@@ -10800,3 +10800,17 @@ on that dirty tree.
   `1020 claims: 1009 verified, 10 registered, 1 attested, 0 FAILED`.
 
 **Verdict:** VERIFIED
+
+## 2026-08-23 — Hebrew homePage.elapsedDays compact day unit (cursor/hebrew-elapsed-days-unit-32c8)
+
+**Claim:** Hebrew on-shift elapsed days no longer shows English `d`; `locales/he.json` `homePage.elapsedDays` is `{count} י׳`. English remains `{count}d`. No other English unit-suffix leftovers found in `he.json` on a pattern scan. Parity still passes.
+
+**Evidence:**
+- `locales/he.json` — `homePage.elapsedDays` Read as `"{count} י׳"` (was `"{count}d"`).
+- `locales/en.json` — `homePage.elapsedDays` still `"{count}d"` (unchanged; confirmed via grep).
+- Scan: python walk of `locales/he.json` for `{…}d`/`h`/`m`/`min`/`hrs`/`days` English unit leftovers → only match before fix was `homePage.elapsedDays`; after fix, zero matches for English `d` suffix. Left `admin.crashCart.expiryWarnSuffix` `{days}ד` untouched (Hebrew dalet, not English d).
+- `src/lib/i18n.ts:815` — hand-built `elapsedDays: (count) => tr(d.homePage.elapsedDays, { count })` unchanged (value-only fix; no codegen).
+- Test: `pnpm test -- tests/i18n-home-elapsed-days.test.ts tests/i18n-parity.test.ts` → 2 files, 7 tests passed.
+- Command: `pnpm i18n:check` → `✓ locales/en.json and locales/he.json are in deep key parity.`
+
+**Verdict:** VERIFIED
