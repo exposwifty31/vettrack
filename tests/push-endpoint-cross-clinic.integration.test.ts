@@ -40,17 +40,36 @@ if (DATABASE_URL) {
   probePool = new Pool({ connectionString: DATABASE_URL, connectionTimeoutMillis: 2000, max: 2 });
   try {
     await probePool.query("SELECT 1");
+    dbReachable = true;
+  } catch {
+    // Genuinely unavailable (no DATABASE_URL wired, or nothing listening) — the
+    // one case describe.skipIf should silently skip for, same as a developer
+    // laptop with no Postgres running.
+    dbReachable = false;
+  }
+
+  if (dbReachable) {
     // Deliberately NOT a migration-187 marker — the whole point is to run this
     // suite against the table's stable, pre-187 shape too, so it can prove the
     // RED state (a real unique-violation) on an unpatched schema, not just skip
     // past it. clinic_id/endpoint have existed since migrations 003 and 180.
+    //
+    // A reachable database with a STALE schema is a different failure than an
+    // unreachable one and must not silently skip the same way: skipIf would
+    // report 0 assertions as a pass, so `pnpm test:integration:ops` could go
+    // green having never touched migration 187 at all. Throwing here (module
+    // load, before any describe/it runs) fails the whole file loudly instead.
     const { rows } = await probePool.query<{ column_name: string }>(
       `SELECT column_name FROM information_schema.columns
        WHERE table_name = 'vt_push_subscriptions' AND column_name IN ('clinic_id', 'endpoint')`,
     );
-    dbReachable = rows.length === 2;
-  } catch {
-    dbReachable = false;
+    if (rows.length !== 2) {
+      throw new Error(
+        "DATABASE_URL is reachable but vt_push_subscriptions is missing clinic_id and/or " +
+          "endpoint (migrations 003/180 not applied) — refusing to silently skip this suite. " +
+          "Run `pnpm migrate` against this database and re-run.",
+      );
+    }
   }
 }
 
