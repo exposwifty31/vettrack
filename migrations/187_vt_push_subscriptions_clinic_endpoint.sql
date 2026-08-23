@@ -20,6 +20,14 @@ ALTER TABLE vt_push_subscriptions
 -- Partial + CLINIC-SCOPED, mirroring ux_vt_push_subscriptions_clinic_token exactly.
 -- Native rows have endpoint NULL (platform_columns_check) and are excluded (Postgres
 -- permits many NULLs in a unique index).
+--
+-- CONCURRENTLY trade-off (same as 168_sweep_anchor_index.sql, accepted there for
+-- PR #106 CodeRabbit): the migration runner wraps each file in a single
+-- BEGIN/COMMIT (server/migrate.ts), and CREATE INDEX CONCURRENTLY cannot run
+-- inside a transaction — so this is a standard (briefly blocking) index build.
+-- Acceptable here: vt_push_subscriptions is one row per device/user/clinic, not
+-- an append-only log, and the build completes fast at current scale. Reworking
+-- the runner to special-case CONCURRENTLY files is out of scope for this fix.
 CREATE UNIQUE INDEX IF NOT EXISTS ux_vt_push_subscriptions_clinic_endpoint
   ON vt_push_subscriptions (clinic_id, endpoint)
   WHERE endpoint IS NOT NULL;

@@ -54,8 +54,25 @@ if (DATABASE_URL) {
   }
 }
 
+/**
+ * Centralizes the nullable-pool access every helper/test needs. Throws a
+ * contextual error instead of a bare `probePool!` non-null assertion — the
+ * invariant (non-null whenever the describe block actually runs) is real, but
+ * a plain `!` degrades to a generic "Cannot read properties of null" if it's
+ * ever violated, one layer removed from where the real cause is.
+ */
+function requireProbePool(): Pool {
+  if (!probePool) {
+    throw new Error(
+      "probePool is null — this test should have been skipped by describe.skipIf(!dbReachable). " +
+        "requireProbePool() was called outside that gate.",
+    );
+  }
+  return probePool;
+}
+
 async function insertSubscription(clinicId: string, endpoint: string, userId = randomUUID()) {
-  await probePool!.query(
+  await requireProbePool().query(
     `INSERT INTO vt_push_subscriptions (id, clinic_id, user_id, platform, endpoint, p256dh, auth)
      VALUES ($1, $2, $3, 'web', $4, 'p256dh-placeholder', 'auth-placeholder')`,
     [randomUUID(), clinicId, userId, endpoint],
@@ -64,16 +81,27 @@ async function insertSubscription(clinicId: string, endpoint: string, userId = r
 
 /** Mirrors server/routes/push.ts's POST /subscribe web-path delete-then-insert exactly. */
 async function subscribeLikeRoute(clinicId: string, endpoint: string, userId = randomUUID()) {
-  await probePool!.query(
-    `DELETE FROM vt_push_subscriptions WHERE clinic_id = $1 AND endpoint = $2`,
-    [clinicId, endpoint],
-  );
-  await probePool!.query(
+  const pool = requireProbePool();
+  await pool.query(`DELETE FROM vt_push_subscriptions WHERE clinic_id = $1 AND endpoint = $2`, [
+    clinicId,
+    endpoint,
+  ]);
+  await pool.query(
     `INSERT INTO vt_push_subscriptions (id, clinic_id, user_id, platform, endpoint, p256dh, auth)
      VALUES ($1, $2, $3, 'web', $4, 'p256dh-placeholder', 'auth-placeholder')`,
     [randomUUID(), clinicId, userId, endpoint],
   );
 }
+
+// Module scope, NOT inside the describe block below: describe.skipIf(!dbReachable)
+// skips its own afterAll along with everything else, so a probePool that was
+// successfully constructed (DATABASE_URL set, connection reachable) but then
+// failed the schema-marker check — reachable database, wrong/behind schema —
+// would leak its open connections for the lifetime of the test process. This
+// runs regardless of whether the suite below executed or skipped.
+afterAll(async () => {
+  if (probePool) await probePool.end();
+});
 
 describe.skipIf(!dbReachable)("vt_push_subscriptions.endpoint — cross-clinic scope (#226)", () => {
   let clinicA: string;
@@ -84,24 +112,21 @@ describe.skipIf(!dbReachable)("vt_push_subscriptions.endpoint — cross-clinic s
   });
 
   afterEach(async () => {
+    const pool = requireProbePool();
     if (clinicA) {
-      await probePool!.query(`DELETE FROM vt_push_subscriptions WHERE clinic_id = $1`, [clinicA]);
-      await probePool!.query(`DELETE FROM vt_clinics WHERE id = $1`, [clinicA]);
+      await pool.query(`DELETE FROM vt_push_subscriptions WHERE clinic_id = $1`, [clinicA]);
+      await pool.query(`DELETE FROM vt_clinics WHERE id = $1`, [clinicA]);
     }
     if (clinicB) {
-      await probePool!.query(`DELETE FROM vt_push_subscriptions WHERE clinic_id = $1`, [clinicB]);
-      await probePool!.query(`DELETE FROM vt_clinics WHERE id = $1`, [clinicB]);
+      await pool.query(`DELETE FROM vt_push_subscriptions WHERE clinic_id = $1`, [clinicB]);
+      await pool.query(`DELETE FROM vt_clinics WHERE id = $1`, [clinicB]);
     }
-  });
-
-  afterAll(async () => {
-    if (probePool) await probePool.end();
   });
 
   async function makeClinicPair() {
     clinicA = `zz-push-a-${randomUUID()}`;
     clinicB = `zz-push-b-${randomUUID()}`;
-    await probePool!.query(`INSERT INTO vt_clinics (id) VALUES ($1), ($2)`, [clinicA, clinicB]);
+    await requireProbePool().query(`INSERT INTO vt_clinics (id) VALUES ($1), ($2)`, [clinicA, clinicB]);
   }
 
   it("lets the same physical endpoint hold independent subscriptions in two clinics", async () => {
@@ -113,7 +138,7 @@ describe.skipIf(!dbReachable)("vt_push_subscriptions.endpoint — cross-clinic s
     // GLOBAL unique constraint, so clinic B's row collides with clinic A's.
     await expect(insertSubscription(clinicB, endpoint)).resolves.not.toThrow();
 
-    const { rows } = await probePool!.query<{ clinic_id: string }>(
+    const { rows } = await requireProbePool().query<{ clinic_id: string }>(
       `SELECT clinic_id FROM vt_push_subscriptions WHERE endpoint = $1 ORDER BY clinic_id`,
       [endpoint],
     );
@@ -137,7 +162,7 @@ describe.skipIf(!dbReachable)("vt_push_subscriptions.endpoint — cross-clinic s
     await subscribeLikeRoute(clinicA, endpoint, "user-1");
     await subscribeLikeRoute(clinicA, endpoint, "user-2");
 
-    const { rows } = await probePool!.query<{ user_id: string }>(
+    const { rows } = await requireProbePool().query<{ user_id: string }>(
       `SELECT user_id FROM vt_push_subscriptions WHERE clinic_id = $1 AND endpoint = $2`,
       [clinicA, endpoint],
     );
