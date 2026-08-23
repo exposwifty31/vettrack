@@ -34,7 +34,7 @@ let probePool: Pool | null = null;
 let dbReachable = false;
 
 const { createAnchor, getCurrentAnchor } = await import("../server/services/equipment-anchor.service.js");
-const { performEquipmentCheckout } = await import("../server/services/equipment-custody-toggle.service.js");
+const { performEquipmentCheckout, invalidateAnchorAfterCheckout } = await import("../server/services/equipment-custody-toggle.service.js");
 const { ingestRfidBatch } = await import("../server/lib/rfid-ingest.js");
 const { db } = await import("../server/db.js");
 
@@ -195,6 +195,11 @@ describe.skipIf(!DATABASE_URL)("docking anchor contradictions (T2.7) integration
       });
       expect(anchor.invalidatedAt).toBeNull();
 
+      // performEquipmentCheckout no longer invalidates the anchor itself — the
+      // caller must dispatch invalidateAnchorAfterCheckout() once its own
+      // db.transaction(...) has resolved (i.e. actually committed). Mirrors
+      // the real call sites in server/routes/equipment.ts and
+      // equipment-custody-toggle.service.ts's quickScanEquipmentCustody.
       const checkoutResult = await db.transaction((tx) =>
         performEquipmentCheckout(tx, {
           clinicId: ctx.clinicId,
@@ -204,6 +209,7 @@ describe.skipIf(!DATABASE_URL)("docking anchor contradictions (T2.7) integration
       );
       expect(checkoutResult).not.toBeNull();
       expect(checkoutResult?.updated.custodyState).toBe("checked_out");
+      invalidateAnchorAfterCheckout(ctx.clinicId, eqId);
 
       const row = await waitForAnchorInvalidated(anchor.id);
       expect(row.invalidated_reason).toBe("checkout");
@@ -225,6 +231,7 @@ describe.skipIf(!DATABASE_URL)("docking anchor contradictions (T2.7) integration
       );
       expect(checkoutResult).not.toBeNull();
       expect(checkoutResult?.updated.custodyState).toBe("checked_out");
+      invalidateAnchorAfterCheckout(ctx.clinicId, eqId);
 
       const current = await getCurrentAnchor(ctx.clinicId, eqId);
       expect(current).toBeNull();
