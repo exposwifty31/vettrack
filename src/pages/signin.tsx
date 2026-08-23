@@ -3,9 +3,7 @@ import { Link, useLocation } from "wouter";
 import { Helmet } from "react-helmet-async";
 import { Loader2 } from "lucide-react";
 import { t } from "@/lib/i18n";
-import { RoleChips, type SignupRequestedRole } from "@/features/auth/components/RoleChips";
 import { AuthDoorChrome } from "@/features/auth/components/AuthDoorChrome";
-import { readCarriedRole, writeCarriedRole } from "@/features/auth/requested-role-store";
 import { captureJoinCodeFromSearch } from "@/features/auth/join-code-store";
 import { ClerkFailed, ClerkLoaded, ClerkLoading, SignIn, useUser } from "@clerk/clerk-react";
 import { useAuth } from "@/hooks/use-auth";
@@ -58,8 +56,6 @@ export default function SignInPage() {
   const { isLoaded, isSignedIn } = useAuth();
   const [, navigate] = useLocation();
   const [usePhoneFlow, setUsePhoneFlow] = useState(false);
-  // C5: pre-choosing a role here carries it to the sign-up screen.
-  const [preRole, setPreRole] = useState<SignupRequestedRole | null>(() => readCarriedRole());
   const isDark = useIsDarkActive();
 
   // Invite link `?clinic=CODE` may land on /signin too (shared links, redirects) —
@@ -88,14 +84,6 @@ export default function SignInPage() {
         subtitle={t.authPage.signInSubtitle}
         footer={<LegalFooterLinks />}
       >
-        <RoleChips
-          selectedRole={preRole}
-          onSelectRole={(role) => {
-            setPreRole(role);
-            writeCarriedRole(role);
-          }}
-        />
-
         {CLERK_ENABLED ? (
           <div className="flex flex-col items-center gap-4">
             {usePhoneFlow ? (

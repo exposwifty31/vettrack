@@ -7,7 +7,6 @@ import { RoleChips, type SignupRequestedRole } from "@/features/auth/components/
 import { AuthDoorChrome } from "@/features/auth/components/AuthDoorChrome";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { readCarriedRole } from "@/features/auth/requested-role-store";
 import { captureJoinCodeFromSearch } from "@/features/auth/join-code-store";
 import { ClerkFailed, ClerkLoaded, ClerkLoading, SignUp } from "@clerk/clerk-react";
 import { useAuth } from "@/hooks/use-auth";
@@ -27,7 +26,7 @@ export default function SignUpPage() {
   const { isLoaded, isSignedIn } = useAuth();
   const [, navigate] = useLocation();
   const isDark = useIsDarkActive();
-  const [requestedRole, setRequestedRole] = useState<SignupRequestedRole | null>(() => readCarriedRole());
+  const [requestedRole, setRequestedRole] = useState<SignupRequestedRole | null>(null);
   const [vetLicenseNumber, setVetLicenseNumber] = useState("");
   const trimmedLicense = vetLicenseNumber.trim();
   // The license field sits outside Clerk's form, so `required` can't block its

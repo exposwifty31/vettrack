@@ -144,7 +144,7 @@ describe("Sign-in / Sign-up pages render the Ivory sheet", () => {
     vi.resetModules();
   });
 
-  it("sign-in mounts one Ivory sheet with the page title", async () => {
+  it("sign-in mounts one Ivory sheet with the page title and no role chips", async () => {
     const { default: SignInPage } = await import("@/pages/signin");
     const { hook } = memoryLocation({ path: "/signin", record: true });
     const { container } = render(
@@ -158,9 +158,12 @@ describe("Sign-in / Sign-up pages render the Ivory sheet", () => {
     expect(sheet!.className).toMatch(/border-ivory-border/);
     expect(container.querySelector(".vt-page-title")).toBeTruthy();
     expect(container.querySelector(".from-primary\\/5")).toBeNull();
+    expect(screen.queryByRole("radiogroup")).toBeNull();
+    expect(screen.queryByTestId("role-chip-vet")).toBeNull();
+    expect(screen.queryByTestId("role-chip-technician")).toBeNull();
   });
 
-  it("sign-up mounts one Ivory sheet with the page title", async () => {
+  it("sign-up mounts one Ivory sheet with interactive role chips", async () => {
     const { default: SignUpPage } = await import("@/pages/signup");
     const { hook } = memoryLocation({ path: "/signup", record: true });
     const { container } = render(
@@ -172,5 +175,10 @@ describe("Sign-in / Sign-up pages render the Ivory sheet", () => {
     expect(sheet).toBeTruthy();
     expect(sheet!.className).toMatch(/bg-ivory-surface/);
     expect(container.querySelector(".vt-page-title")).toBeTruthy();
+    const chips = screen.getAllByRole("radio");
+    expect(chips).toHaveLength(2);
+    for (const chip of chips) {
+      expect(chip.className).toMatch(/min-h-\[44px\]/);
+    }
   });
 });

@@ -10813,3 +10813,15 @@ on that dirty tree.
 - Command: `pnpm exec tsc --noEmit -p tsconfig.json` and `tsconfig.server.json` → exit 0
 
 **Verdict:** VERIFIED
+
+## 2026-08-23 — Sign-in: remove role chips (PR 237 follow-up)
+
+**Claim:** `/signin` no longer shows RoleChips or carries a pre-chosen role to sign-up; `/signup` keeps interactive 44px chips + vet license gate. Dead `requested-role-store` and non-interactive RoleChips mode removed.
+
+**Evidence:**
+- `src/pages/signin.tsx` — no `RoleChips` / `readCarriedRole` / `writeCarriedRole` / `preRole` (grep empty)
+- `src/pages/signup.tsx` — still mounts `<RoleChips selectedRole onSelectRole>`; `useState(null)` (no store)
+- `src/features/auth/requested-role-store.ts` — deleted; `RoleChips` requires `onSelectRole` (interactive-only)
+- Test: `pnpm test -- tests/auth-door-chrome.test.tsx tests/role-chips-signup.test.tsx tests/native-auth-surface.test.ts tests/stage-10-access-token-consistency.test.js tests/i18n-parity.test.ts` → 5 files, 38 passed
+
+**Verdict:** VERIFIED

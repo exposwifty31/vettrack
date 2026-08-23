@@ -16,18 +16,12 @@ const ROLE_OPTIONS: { role: SignupRequestedRole; label: () => string }[] = [
 ];
 
 interface RoleChipsProps {
-  /**
-   * When provided (together with `onSelectRole`), the chips become a
-   * single-select control (sign-up: pre-select the role to request).
-   * Omit both props for the informational, non-interactive display used
-   * on sign-in — the roles VetTrack serves, not a selectable control.
-   */
-  selectedRole?: SignupRequestedRole | null;
-  onSelectRole?: (role: SignupRequestedRole) => void;
+  selectedRole: SignupRequestedRole | null;
+  onSelectRole: (role: SignupRequestedRole) => void;
 }
 
-export function RoleChips({ selectedRole, onSelectRole }: RoleChipsProps = {}) {
-  const interactive = typeof onSelectRole === "function";
+/** Sign-up only: single-select role control (radiogroup + RTL roving focus). */
+export function RoleChips({ selectedRole, onSelectRole }: RoleChipsProps) {
   const dir = useDirection();
   const chipRefs = useRef<Partial<Record<SignupRequestedRole, HTMLButtonElement | null>>>({});
 
@@ -35,7 +29,6 @@ export function RoleChips({ selectedRole, onSelectRole }: RoleChipsProps = {}) {
   // tablist): Arrow/Home/End move focus AND selection together, RTL-aware so
   // the "next" key matches the chips' visual reading direction.
   function onChipKeyDown(event: KeyboardEvent<HTMLButtonElement>, index: number) {
-    if (!onSelectRole) return;
     const forwardKey = dir === "rtl" ? "ArrowLeft" : "ArrowRight";
     const backwardKey = dir === "rtl" ? "ArrowRight" : "ArrowLeft";
     let nextIndex: number | null = null;
@@ -53,25 +46,14 @@ export function RoleChips({ selectedRole, onSelectRole }: RoleChipsProps = {}) {
   return (
     <div className="mb-5 flex flex-col items-center gap-2">
       <span className="vt-text-xs font-semibold uppercase tracking-widest text-ivory-text3">
-        {interactive ? t.authPage.roleSelectLabel : t.authPage.roleLabel}
+        {t.authPage.roleSelectLabel}
       </span>
       <div
         className="flex w-full flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-center"
-        role={interactive ? "radiogroup" : undefined}
-        aria-label={interactive ? t.authPage.roleSelectLabel : undefined}
+        role="radiogroup"
+        aria-label={t.authPage.roleSelectLabel}
       >
         {ROLE_OPTIONS.map(({ role, label }, index) => {
-          if (!interactive) {
-            return (
-              <span
-                key={role}
-                className="inline-flex min-h-[44px] items-center justify-center rounded-md border border-ivory-border bg-ivory-surface px-4 vt-text-sm font-semibold text-ivory-text"
-              >
-                {label()}
-              </span>
-            );
-          }
-
           const isSelected = selectedRole === role;
           // Roving tabindex: the selected chip is the single Tab stop; before
           // any selection, the first chip is the stop (matches native radiogroup default).
@@ -102,11 +84,9 @@ export function RoleChips({ selectedRole, onSelectRole }: RoleChipsProps = {}) {
           );
         })}
       </div>
-      {interactive && (
-        <p className="vt-text-xs max-w-[16rem] text-center text-ivory-text3 text-pretty">
-          {t.authPage.roleSelectHint}
-        </p>
-      )}
+      <p className="vt-text-xs max-w-[16rem] text-center text-ivory-text3 text-pretty">
+        {t.authPage.roleSelectHint}
+      </p>
     </div>
   );
 }
