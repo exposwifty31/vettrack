@@ -1,7 +1,7 @@
 /**
- * Visual contract: /signin and /signup use the Stage 1 Ivory clinic door —
- * one canvas, one sheet, flattened Clerk card — not the stock purple wash +
- * floating Clerk card pattern.
+ * Visual contract: /signin and /signup use Stage 1 Ivory clinic door chrome.
+ * Web keeps a contained sheet; Capacitor phone/tablet use full-bleed top-aligned
+ * app doors (no floating card). Titles and chips stay page-specific.
  *
  * @vitest-environment happy-dom
  */
@@ -18,6 +18,7 @@ import {
   getClerkAppearance,
 } from "../src/lib/clerk-appearance";
 import { RoleChips, type SignupRequestedRole } from "@/features/auth/components/RoleChips";
+import { AuthDoorChrome } from "@/features/auth/components/AuthDoorChrome";
 import { useState } from "react";
 import { t } from "@/lib/i18n";
 
@@ -53,6 +54,11 @@ vi.mock("@/hooks/use-settings", () => ({
 
 vi.mock("@/lib/capacitor-runtime", () => ({
   isCapacitorNative: () => false,
+  capacitorPlatform: () => "web",
+}));
+
+vi.mock("@/native/tablet/useIsNativeTablet", () => ({
+  useIsNativeTablet: () => false,
 }));
 
 describe("Clerk appearance — Ivory inset form (not a second card)", () => {
@@ -83,15 +89,76 @@ describe("Clerk appearance — Ivory inset form (not a second card)", () => {
   });
 });
 
+describe("AuthDoorChrome — three platform layouts", () => {
+  afterEach(() => cleanup());
+
+  it("web: centered Ivory sheet with shadow-card (management console)", () => {
+    const { container } = render(
+      <AuthDoorChrome variant="web" title="Web Title" subtitle="Web sub">
+        <div>form</div>
+      </AuthDoorChrome>,
+    );
+    const root = container.querySelector("[data-auth-door-variant='web']");
+    const sheet = screen.getByTestId("auth-door-sheet");
+    expect(root).toBeTruthy();
+    expect(root!.className).toMatch(/min-h-\[100dvh\]/);
+    expect(root!.className).toMatch(/justify-center/);
+    expect(sheet.className).toMatch(/max-w-sm/);
+    expect(sheet.className).toMatch(/rounded-2xl/);
+    expect(sheet.className).toMatch(/border-ivory-border/);
+    expect(sheet.className).toMatch(/bg-ivory-surface/);
+    expect(sheet.className).toMatch(/shadow-card/);
+  });
+
+  it("phone: full-bleed top-aligned — no floating card, no 100dvh centering", () => {
+    const { container } = render(
+      <AuthDoorChrome variant="phone" title="Phone Title" subtitle="Phone sub">
+        <div>form</div>
+      </AuthDoorChrome>,
+    );
+    const root = container.querySelector("[data-auth-door-variant='phone']");
+    const sheet = screen.getByTestId("auth-door-sheet");
+    expect(root).toBeTruthy();
+    expect(root!.className).toMatch(/min-h-full/);
+    expect(root!.className).toMatch(/bg-ivory-bg/);
+    expect(root!.className).not.toMatch(/justify-center/);
+    expect(root!.className).not.toMatch(/min-h-\[100dvh\]/);
+    expect(sheet.className).not.toMatch(/rounded-2xl/);
+    expect(sheet.className).not.toMatch(/shadow-card/);
+    expect(sheet.className).not.toMatch(/border-ivory-border/);
+    expect(screen.getByTestId("auth-door-title").textContent).toBe("Phone Title");
+  });
+
+  it("tablet: full-bleed wider measure — not a tiny centered phone card", () => {
+    const { container } = render(
+      <AuthDoorChrome variant="tablet" title="Tablet Title" subtitle="Tablet sub">
+        <div>form</div>
+      </AuthDoorChrome>,
+    );
+    const root = container.querySelector("[data-auth-door-variant='tablet']");
+    const sheet = screen.getByTestId("auth-door-sheet");
+    expect(root).toBeTruthy();
+    expect(root!.className).toMatch(/min-h-full/);
+    expect(root!.className).not.toMatch(/justify-center/);
+    expect(sheet.className).toMatch(/max-w-lg/);
+    expect(sheet.className).not.toMatch(/max-w-sm/);
+    expect(sheet.className).not.toMatch(/shadow-card/);
+    expect(sheet.className).not.toMatch(/rounded-2xl/);
+  });
+});
+
 describe("Auth pages — Ivory door chrome (source contract)", () => {
-  it("AuthDoorChrome is the shared Ivory canvas + sheet", () => {
+  it("AuthDoorChrome encodes web sheet + native full-bleed doors", () => {
     const chrome = read("src/features/auth/components/AuthDoorChrome.tsx");
     expect(chrome).toMatch(/bg-ivory-bg/);
-    expect(chrome).toMatch(/bg-ivory-surface/);
-    expect(chrome).toMatch(/border-ivory-border/);
     expect(chrome).toMatch(/vt-page-title/);
-    expect(chrome).toMatch(/shadow-card/);
     expect(chrome).toMatch(/auth-door-sheet/);
+    expect(chrome).toMatch(/shadow-card/);
+    expect(chrome).toMatch(/useIsNativeTablet/);
+    expect(chrome).toMatch(/isCapacitorNative/);
+    expect(chrome).toMatch(/variant === "web"/);
+    expect(chrome).toMatch(/"phone"/);
+    expect(chrome).toMatch(/"tablet"/);
   });
 
   for (const page of ["src/pages/signin.tsx", "src/pages/signup.tsx"]) {
@@ -120,11 +187,20 @@ describe("Auth pages — Ivory door chrome (source contract)", () => {
     expect(source).toMatch(/bg-transparent|bg-ivory-surface|shadow-none/);
   });
 
-  it("native social uses designed Apple fill + Google outline on the sheet", () => {
+  it("native social uses designed Apple fill + Google outline", () => {
     const source = read("src/components/native-social-buttons.tsx");
     expect(source).toMatch(/bg-foreground|bg-ivory-text|bg-black/);
     expect(source).toMatch(/border-ivory-border/);
     expect(source).toMatch(/min-h-\[44px\]/);
+  });
+
+  it("NativeShell auth routes own safe-area — AuthDoorChrome must not re-pad SAT", () => {
+    const shell = read("src/native/NativeShell.tsx");
+    const chrome = read("src/features/auth/components/AuthDoorChrome.tsx");
+    expect(shell).toMatch(/AUTH_ROUTE_PATTERN/);
+    expect(shell).toMatch(/safe-area-inset-top/);
+    expect(chrome).not.toMatch(/safe-area-inset-top/);
+    expect(chrome).not.toMatch(/env\(safe-area/);
   });
 });
 
@@ -148,7 +224,7 @@ describe("RoleChips — 44px Ivory interactive rows", () => {
   });
 });
 
-describe("Sign-in / Sign-up pages render the Ivory sheet", () => {
+describe("Sign-in / Sign-up pages render the Ivory door (web default)", () => {
   beforeEach(() => {
     vi.stubEnv("VITE_CLERK_PUBLISHABLE_KEY", "pk_test_stub_key");
   });
@@ -159,19 +235,19 @@ describe("Sign-in / Sign-up pages render the Ivory sheet", () => {
     vi.resetModules();
   });
 
-  it("sign-in mounts one Ivory sheet with Welcome back only (no role chips, no create-account title)", async () => {
+  it("sign-in mounts Welcome back only (no role chips, no create-account title)", async () => {
     const { default: SignInPage } = await import("@/pages/signin");
     const { hook } = memoryLocation({ path: "/signin", record: true });
-    const { container } = render(
+    render(
       <Router hook={hook}>
         <SignInPage />
       </Router>,
     );
-    const sheet = container.querySelector("[data-testid='auth-door-sheet']");
+    const sheet = screen.getByTestId("auth-door-sheet");
     expect(sheet).toBeTruthy();
-    expect(sheet!.className).toMatch(/bg-ivory-surface/);
-    expect(sheet!.className).toMatch(/border-ivory-border/);
-    expect(container.querySelector(".from-primary\\/5")).toBeNull();
+    // Default mock is web → contained sheet
+    expect(sheet.className).toMatch(/bg-ivory-surface/);
+    expect(sheet.className).toMatch(/border-ivory-border/);
     expect(screen.queryByRole("radiogroup")).toBeNull();
     expect(screen.queryByTestId("role-chip-vet")).toBeNull();
     expect(screen.queryByTestId("role-chip-technician")).toBeNull();
@@ -184,14 +260,12 @@ describe("Sign-in / Sign-up pages render the Ivory sheet", () => {
   it("sign-up mounts Create account title (never Welcome back) with interactive role chips", async () => {
     const { default: SignUpPage } = await import("@/pages/signup");
     const { hook } = memoryLocation({ path: "/signup", record: true });
-    const { container } = render(
+    render(
       <Router hook={hook}>
         <SignUpPage />
       </Router>,
     );
-    const sheet = container.querySelector("[data-testid='auth-door-sheet']");
-    expect(sheet).toBeTruthy();
-    expect(sheet!.className).toMatch(/bg-ivory-surface/);
+    expect(screen.getByTestId("auth-door-sheet")).toBeTruthy();
 
     const title = screen.getByTestId("auth-door-title");
     expect(title.textContent).toBe(t.authPage.createAccount);

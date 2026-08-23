@@ -10836,3 +10836,16 @@ on that dirty tree.
 - Test: `pnpm test -- tests/auth-door-chrome.test.tsx tests/role-chips-signup.test.tsx tests/native-auth-surface.test.ts` → 29 passed (RTL asserts page-specific titles + source contract)
 
 **Verdict:** VERIFIED
+
+## 2026-08-23 — AuthDoorChrome native phone/tablet vs web sheet (PR 237)
+
+**Claim:** Auth door is full-bleed top-aligned on Capacitor phone/tablet (no floating card, no extra SAT); web management console keeps the centered Ivory sheet. Titles/chips rules unchanged.
+
+**Evidence:**
+- `src/features/auth/components/AuthDoorChrome.tsx` — variants `web` | `phone` | `tablet` via `isCapacitorNative` + `useIsNativeTablet` (override for tests); phone/tablet: `min-h-full`, no `rounded-2xl`/`shadow-card`/`justify-center`/`min-h-[100dvh]`; web keeps sheet; no `safe-area-inset` in chrome
+- `tests/auth-door-chrome.test.tsx` — asserts three layouts + page-specific titles + chips-only-on-signup
+- `tests/role-chips-signup.test.tsx` — mocks `capacitorPlatform` + `useIsNativeTablet`
+- Test: `pnpm test -- tests/auth-door-chrome.test.tsx tests/role-chips-signup.test.tsx tests/native-auth-surface.test.ts` → 3 files, 33 passed
+- Command: `pnpm exec tsc --noEmit -p tsconfig.json` → exit 0
+
+**Verdict:** VERIFIED

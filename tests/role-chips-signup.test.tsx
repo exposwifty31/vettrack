@@ -53,6 +53,11 @@ vi.mock("@/hooks/use-settings", () => ({
 
 vi.mock("@/lib/capacitor-runtime", () => ({
   isCapacitorNative: () => false,
+  capacitorPlatform: () => "web" as const,
+}));
+
+vi.mock("@/native/tablet/useIsNativeTablet", () => ({
+  useIsNativeTablet: () => false,
 }));
 
 vi.mock("@/lib/clerk-appearance", () => ({
