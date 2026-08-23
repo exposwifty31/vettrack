@@ -10372,3 +10372,63 @@ runs the wrapper. `pnpm` could not be used at all here: Node is v26.7.0 against 
 
 **Verdict:** VERIFIED for the claim-gate result and the two corrections. The vitest wrapper is
 **NOT RUN** and is left to CI. The G1 thresholds are registered, not yet measured — no data exists.
+
+## 2026-08-23 — the clause that binds G1a still mandated the estimator §7 R1 rejects (claude/competitive-moats-strategy-c03ca6)
+
+**Claim:** CodeRabbit's second review round on pull request 219 is closed on two of its three
+findings and declined with reasoning on the third. Verifying it surfaced two defects it left behind
+in `docs/vettrack-3.0-program.md`, one of them load-bearing: the previous commit fixed the
+selection-bias estimator in the method section (§7 R1) and left §9 — the clause that actually gates
+G1a — requiring the estimator §7 R1 had just rejected.
+
+**Evidence — the contradiction, read this session:**
+- `docs/vettrack-3.0-program.md:382` — §7 R1 states that scaling the observed ratio by
+  `c_ord ÷ c_unord` "does *not* correct it"; its worked check at `docs/vettrack-3.0-program.md:393`
+  gives 0.509 against a true 0.444, i.e. further from the truth than the uncorrected 0.364.
+- Before this change §9's selection-bias bullet required M1 to be "corrected by `c_ord ÷ c_unord`" —
+  the rejected rule, in the section that gates G1a. The method section and the gate contract
+  disagreed, and the binding one was wrong.
+- `docs/vettrack-3.0-program.md:823` — §9 now cites the reconstructed populations of §7 R1, applies
+  whenever the two rates differ rather than only when `c_unord > c_ord`, and fails G1a when either
+  reconstructed population is zero.
+
+**Evidence — the second defect, a threshold collision:**
+- `docs/vettrack-3.0-program.md:809` — G1a's PASS bar is "≥10%" of care events unordered, and
+  `docs/vettrack-3.0-program.md:433` already uses "the 10% threshold" to mean M1's.
+- The unresolved-rate bound introduced by the previous round was also 10%, in the opposite
+  direction. Beyond the collision it could not function as a gate: an excluded row is of unknown
+  class, so the discarded mass can move M1 by up to the unresolved rate in either direction.
+- `docs/vettrack-3.0-program.md:500` — now bounded at 5%, with the reason stated inline.
+
+**Evidence — round two's three findings, each checked against the text:**
+- `docs/vettrack-3.0-program.md:368` — R1's `captures` counts canonical care events after the §7 R2
+  allowlist and its deduplication rule, not physical-stream rows.
+- `docs/vettrack-3.0-program.md:474` — `(b-bis)` one-to-one pairing via a deterministic greedy pass
+  with a total tie-break order; `docs/vettrack-3.0-program.md:487` — `(c-bis)` split quantities;
+  `docs/vettrack-3.0-program.md:492` — `(d)` unresolved rows leave both metrics, with a published
+  matchable denominator and unresolved rate.
+- `docs/vettrack-3.0-program.md:546` — the manual-extract path no longer carries a liveness
+  requirement it cannot satisfy; liveness is required of the B1/Provet path and of G2.
+
+**Declined, with the mechanism checked rather than assumed:** the round asked for an inline
+`vt-claim: absent` marker on §2's source-absence sentence. `scripts/verify/claims.cjs:618` resolves
+that marker through `facts.grepCount(claim.pattern, claim.scope)`, and `scripts/verify/scan.cjs:328`
+defaults its scope to `package.json` — so the marker asserts that a string does not occur in a file
+in this repository, which is not what "without a source in hand" says.
+`docs/vettrack-3.0-program.md:971` already carries the declaration in prose under "Not established
+by evidence". Adding the marker would register a mechanically checkable assertion the sentence does
+not make. Reasoning posted on the review thread rather than silently skipped.
+
+**Evidence — the gates, run this session on Node v24.17.0:**
+- `pnpm architecture:gates` → exit 0. tenant-lint reported "no new findings vs baseline (203
+  known)"; claim verification reported **0 FAILED** with all claims accounted for.
+- `pnpm test -- tests/claims-ledger.test.ts` → "Test Files  1 passed (1) / Tests  88 passed (88)".
+  This closes the **NOT RUN** recorded in the 2026-08-22 entry above, which skipped the vitest
+  wrapper for want of `node_modules`. The install was done here with nvm's v24.17.0: the machine
+  default is v26.7.0, above the `>=22.12.0 <25` ceiling in `package.json`, and `engine-strict=true`
+  in `.npmrc` blocks an install on it.
+- Re-run after appending this entry, so the log does not exempt itself: claim verification **0
+  FAILED**.
+
+**Verdict:** VERIFIED for both defect fixes, the three round-two findings, and the gate results.
+The declined marker is a reasoned decline recorded on the review thread, not a verification.
