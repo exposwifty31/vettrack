@@ -460,6 +460,22 @@ and with whoever did the matching — and a threshold that moves is not a thresh
 - **Identity key shape:** `clinicId` + case/patient reference + item identity + actor + an
   event-time proximity window. The window's exact value is registered with the settling window
   (§9 precondition 4).
+- **That key is not unique, and collapsing on it alone would delete real care.** Two legitimate
+  administrations — same case, same item, same actor, minutes apart inside one window — match on
+  every field. Collapsing them yields one event where two occurred, and the missing event leaves
+  the M1 and M2 denominators altogether. This is the same one-to-one failure as (b-bis), one layer
+  earlier and in the more damaging direction: (b-bis) risks over-*matching*, this risks
+  over-*collapsing*.
+- **Dispense rows and scans are therefore paired one-to-one, by (b-bis)'s rule.** Within a key
+  group, process dispense rows in event-timestamp order and give each the still-unclaimed scan with
+  the smallest `|Δt|`; ties break by the scan's earlier timestamp, then its lower identifier. Each
+  scan is consumed by at most one dispense.
+- **Unpaired rows on either side stay whole — *n* real administrations yield *n* events.** A
+  dispense with no scan is a canonical care event on its own; the scan is corroboration, never a
+  precondition. A leftover consumable or case-tag scan is **not** discarded either: the allowlist
+  above admits it as a care event in its own right, and it enters the denominator as one. Only a
+  leftover row the allowlist does not admit, or one whose case or item cannot be determined, goes
+  to the unresolved figure of (d).
 
 **(b) M1 — when does a care event *correspond to* a PMS order?** A care event counts as *ordered*
 only on a deterministic match: same `clinicId`, same case/patient reference, same item identity, and

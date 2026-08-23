@@ -10495,3 +10495,52 @@ rest on CI. **Follow-up:** `tests/shift-handover-*` and the `*.integration.test.
 the exclusion list `CLAUDE.md` documents for `pnpm test`, so a developer without a local database
 sees 18 red files on a clean checkout. Either the exclusion list or those suites' setup is wrong;
 that is a pre-existing repository issue, not a product of this branch.
+
+## 2026-08-23 — the dedup rule could delete real care, and it had no review thread (claude/competitive-moats-strategy-c03ca6)
+
+**Claim:** Two findings that carried **no inline thread** — the review platform files them as "outside
+diff range" — are addressed. They were invisible to a check of unresolved threads, which reported
+zero at the time both were outstanding. One of them is a real defect in text this branch added.
+
+**Evidence — (a)'s canonical deduplication was not one-to-one:**
+- `docs/vettrack-3.0-program.md:455` — (a) collapses a `vt_dispense_events` row and a matching
+  `vt_scan_logs` row into one care event on the key `clinicId` + case reference + item identity +
+  actor + a proximity window.
+- That key is **not unique**. Two legitimate administrations of the same item, to the same case, by
+  the same actor, minutes apart inside one window, match on every field — so the rule as written
+  collapsed two real care events into one, and the missing event left the M1 and M2 denominators
+  entirely. The previous commit fixed one-to-one pairing for *cross-system* matching in (b-bis) and
+  left the same failure in the *intra-VetTrack* dedup one layer earlier, where it deletes care
+  rather than over-matching it.
+- `docs/vettrack-3.0-program.md:463`, `:469`, `:473` — the key is now stated to be non-unique;
+  dispense rows and scans pair one-to-one under (b-bis)'s ordering (event-timestamp order first,
+  then smallest `|Δt|`, then identifiers), each scan consumed by at most one dispense; and unpaired
+  rows on both sides stay whole, so *n* administrations yield *n* events. A leftover consumable or
+  case-tag scan is admitted as a care event on its own authority — `docs/vettrack-3.0-program.md:436`
+  lists it as allowlisted — rather than being dropped.
+
+**Evidence — a wording claim in an earlier entry, corrected here rather than edited:**
+- `docs/audit/PROOF_ALIGNMENT_LOG.md:10329` states that `pnpm verify:claims` "resolves every
+  statement in" the governed document. That reads more strongly than the run supports: the same
+  entry records ~1,939 dispositions as *excluded by rule*, which means the engine determined those
+  statements were not claims — it did not verify them. The accurate phrasing is that the gate
+  **accounts for** every statement, with `excluded by rule` one of the dispositions it can assign.
+- **Not edited.** That line belongs to an earlier entry, and this file's first rule is that entries
+  are never edited or deleted retroactively; a later check that contradicts an earlier one is
+  recorded as a new entry. This is that entry. The underlying gate result in the earlier entry
+  stands — only its summary sentence overstated the disposition mix.
+
+**Evidence — the gates on the tree carrying both fixes:**
+- `pnpm architecture:gates` → exit 0. tenant-lint "no new findings vs baseline (203 known)"; claim
+  verification **0 FAILED**, all claims accounted for.
+- Markdown integrity re-checked directly rather than trusting reported line numbers, which had
+  already shifted once under earlier edits in this branch: strikethrough runs balanced outside code
+  spans, fences balanced, zero unlanguaged opening fences.
+
+**Method note worth keeping.** A query for unresolved review threads returned **zero** while both of
+these findings were open, because a finding the platform cannot anchor to a diff line is filed in
+the review *body* and never becomes a thread. Thread state is not a complete list of outstanding
+review findings; the review bodies have to be read as well.
+
+**Verdict:** VERIFIED for the (a) one-to-one fix and for the gate results. The wording correction is
+a **recorded clarification** of an earlier entry, not a re-verification of it.
