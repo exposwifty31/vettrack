@@ -8,7 +8,18 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, "..");
 const audit = fs.readFileSync(path.join(repoRoot, "server", "lib", "audit.ts"), "utf8");
 const roleResolution = fs.readFileSync(path.join(repoRoot, "server", "lib", "role-resolution.ts"), "utf8");
-const usersRoute = fs.readFileSync(path.join(repoRoot, "server", "routes", "users.ts"), "utf8");
+// users.ts was split into server/routes/users/handlers/*.ts (see the file's
+// own TODO(arch) header); concatenate the outer router file with its handler
+// modules so this static check still sees the moved route bodies. Mirrors the
+// equipmentErrorContractSource construction in phase-5-route-error-contract.test.js.
+const usersRouteFile = fs.readFileSync(path.join(repoRoot, "server", "routes", "users.ts"), "utf8");
+const usersHandlersDir = path.join(repoRoot, "server", "routes", "users", "handlers");
+const usersHandlerSources = fs
+  .readdirSync(usersHandlersDir)
+  .filter((name) => name.endsWith(".ts"))
+  .map((name) => fs.readFileSync(path.join(usersHandlersDir, name), "utf8"))
+  .join("\n");
+const usersRoute = usersRouteFile + usersHandlerSources;
 const auth = fs.readFileSync(path.join(repoRoot, "server", "middleware", "auth.ts"), "utf8");
 
 describe("Phase 2 security hardening checks (static)", () => {

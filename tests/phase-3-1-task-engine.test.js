@@ -7,7 +7,12 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const repoRoot = path.resolve(__dirname, "..");
 const migration030 = fs.readFileSync(path.join(repoRoot, "migrations", "030_appointments_task_engine.sql"), "utf8");
-const serviceFile = fs.readFileSync(path.join(repoRoot, "server", "services", "appointments.service.ts"), "utf8");
+// Service source spans scheduling.service.ts + task-lifecycle.service.ts (ADR-002
+// split — see docs/architecture/adr-002-appointments-service-split.md).
+const serviceFile = [
+  fs.readFileSync(path.join(repoRoot, "server", "services", "scheduling.service.ts"), "utf8"),
+  fs.readFileSync(path.join(repoRoot, "server", "services", "task-lifecycle.service.ts"), "utf8"),
+].join("\n");
 const adapterFile = fs.readFileSync(path.join(repoRoot, "server", "domain", "service-task.adapter.ts"), "utf8");
 const tasksRoute = fs.readFileSync(path.join(repoRoot, "server", "routes", "tasks.ts"), "utf8");
 const auditFile = fs.readFileSync(path.join(repoRoot, "server", "lib", "audit.ts"), "utf8");

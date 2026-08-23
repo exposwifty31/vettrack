@@ -472,16 +472,21 @@ describe("PR 5.4 — container dispense / emergency carve-out (CI-7)", () => {
 // ─── Idempotency / forbidden-surface lock ──────────────────────────────────
 
 describe("PR 5.4 — forbidden-surface lock", () => {
-  it("the pre-existing legacy evaluateDispenseAgainstOrders direct call still exists in containers.ts source", async () => {
+  it("the pre-existing legacy evaluateDispenseAgainstOrders direct call still exists in the dispense handler source", async () => {
     // PR 5.4 does NOT remove the legacy production hard-block. PR 5.7
     // will consolidate. Verifying the legacy call is still present
     // protects against an accidental "while-here" removal.
+    //
+    // The handler body was extracted from server/routes/containers.ts into
+    // server/routes/containers/handlers/post-container-dispense.ts (route-file
+    // split, mirroring the equipment.ts / equipment/handlers/ pattern) — this
+    // test now reads the handler file, where the call actually lives.
     const fs = await import("node:fs");
     const path = await import("node:path");
     const url = await import("node:url");
     const __dirname = path.dirname(url.fileURLToPath(import.meta.url));
     const source = fs.readFileSync(
-      path.join(__dirname, "..", "server", "routes", "containers.ts"),
+      path.join(__dirname, "..", "server", "routes", "containers", "handlers", "post-container-dispense.ts"),
       "utf8",
     );
     // The legacy call invokes `evaluateDispenseAgainstOrders(tx, ...)`

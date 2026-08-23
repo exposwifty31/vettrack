@@ -4,7 +4,10 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 
-const serviceSource = readFileSync("server/services/appointments.service.ts", "utf8");
+// completeTask (and getTasksForTechnician, used below as the end-of-function
+// marker) live in task-lifecycle.service.ts after the ADR-002 split — see
+// docs/architecture/adr-002-appointments-service-split.md.
+const serviceSource = readFileSync("server/services/task-lifecycle.service.ts", "utf8");
 
 describe("completeTask (service tasks only)", () => {
   it("does not call deductMedicationInventoryInTx", () => {

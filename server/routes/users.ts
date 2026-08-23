@@ -3,29 +3,32 @@
 import { Router } from "express";
 import { randomUUID } from "crypto";
 import { z } from "zod";
-import { db, users, appleOauthTokens, shiftSessions } from "../db.js";
-import { eq, sql, isNull, isNotNull, desc, and } from "drizzle-orm";
+import { db, users } from "../db.js";
+import { eq, sql, isNull, and } from "drizzle-orm";
 import { requireAuth, requireAuthAny, requireAdmin } from "../middleware/auth.js";
 import { clerkClient } from "@clerk/express";
 import { validateBody, validateUuid } from "../middleware/validate.js";
 import { authSensitiveLimiter } from "../middleware/rate-limiters.js";
-import { encryptConfigValue } from "../lib/config-crypto.js";
-import {
-  AppleAuthError,
-  exchangeAppleAuthorizationCode,
-  isAppleRevocationConfigured,
-} from "../lib/apple-auth.js";
-import { deleteOwnAccount, AccountDeletionProtectedError, SoleClinicAdminError } from "../services/account-deletion.service.js";
 import { logAudit, resolveAuditActorRole } from "../lib/audit.js";
-import { resolveApprovalRole } from "../lib/approval-role.js";
-import { resolveCurrentRole } from "../lib/role-resolution.js";
-import { resolveAuthority } from "../lib/authority.js";
 import { invalidateForUser } from "../lib/authority-cache.js";
-import { ensureUserEmail } from "../services/user-sync.service.js";
-import { countPurgeCandidates, purgeDeletedUsers, PURGE_AFTER_DAYS } from "../lib/cleanup-scheduler.js";
-import { canManageErModeForUser } from "../lib/er-mode-permissions.js";
 import { resolveRequestId, apiError } from "../lib/route-utils.js";
-import { presignObjectUrl } from "../lib/object-storage.js";
+import { getUsersMeHandler } from "./users/handlers/get-users-me.js";
+import { getUsersMeShiftActivityHandler } from "./users/handlers/get-users-me-shift-activity.js";
+import { getUsersDeletedHandler } from "./users/handlers/get-users-deleted.js";
+import { getUsersListHandler } from "./users/handlers/get-users-list.js";
+import { patchUserSecondaryRoleHandler } from "./users/handlers/patch-user-secondary-role.js";
+import { patchUserEquipmentCoordinatorHandler } from "./users/handlers/patch-user-equipment-coordinator.js";
+import { patchUserSeniorDoctorEligibleHandler } from "./users/handlers/patch-user-senior-doctor-eligible.js";
+import { patchUserStatusHandler } from "./users/handlers/patch-user-status.js";
+import { patchUserDisplayNameHandler } from "./users/handlers/patch-user-display-name.js";
+import { patchUserRestoreHandler } from "./users/handlers/patch-user-restore.js";
+import { getUsersManagersHandler } from "./users/handlers/get-users-managers.js";
+import { postUserAppleLinkHandler } from "./users/handlers/post-user-apple-link.js";
+import { deleteUserAccountHandler } from "./users/handlers/delete-user-account.js";
+import { getUsersPurgeCandidatesHandler } from "./users/handlers/get-users-purge-candidates.js";
+import { postUsersPurgeDeletedHandler } from "./users/handlers/post-users-purge-deleted.js";
+import { patchUserRoleHandler } from "./users/handlers/patch-user-role.js";
+import { patchUserDeleteHandler } from "./users/handlers/patch-user-delete.js";
 
 /*
  * PERMISSIONS MATRIX — /api/users
@@ -51,15 +54,6 @@ const userFields = {
   role: users.role,
   status: users.status,
   createdAt: users.createdAt,
-};
-
-/** Admin list only: includes clerkId for self-healing missing emails from Clerk. */
-const adminListUserFields = {
-  ...userFields,
-  clerkId: users.clerkId,
-  secondaryRole: users.secondaryRole,
-  isEquipmentCoordinator: users.isEquipmentCoordinator,
-  seniorDoctorEligible: users.seniorDoctorEligible,
 };
 
 const VALID_ROLES = ["admin", "vet", "technician", "senior_technician", "student"] as const;
@@ -111,209 +105,13 @@ function serializeUser(user: typeof users.$inferSelect) {
   };
 }
 
-router.get("/me", requireAuth, async (req, res) => {
-  const requestId = resolveRequestId(res, req.headers["x-request-id"]);
-  try {
-    if (!req.authUser) {
-      return res.status(401).json(
-        apiError({
-          code: "UNAUTHORIZED",
-          reason: "MISSING_AUTH_USER",
-          message: "Unauthorized",
-          requestId,
-        }),
-      );
-    }
-    const now = new Date();
-    const resolved = await resolveCurrentRole({
-      clinicId: req.clinicId!,
-      userId: req.authUser.id,
-      userName: req.authUser.name,
-      fallbackRole: req.authUser.role,
-      now,
-    });
+router.get("/me", requireAuth, getUsersMeHandler);
 
-    const [profileRow] = await db
-      .select({
-        avatarUrl: users.avatarUrl,
-        preferredLocale: users.preferredLocale,
-        seniorDoctorEligible: users.seniorDoctorEligible,
-      })
-      .from(users)
-      .where(and(eq(users.clinicId, req.clinicId!), eq(users.id, req.authUser.id)))
-      .limit(1);
+router.get("/me/shift-activity", requireAuth, getUsersMeShiftActivityHandler);
 
-    // avatarUrl is stored as a private-bucket object key; presign for the client.
-    const avatarUrl = await presignObjectUrl(profileRow?.avatarUrl);
+router.get("/deleted", requireAuth, requireAdmin, getUsersDeletedHandler);
 
-    // Legacy effectiveRole remains authoritative in Phase 2A.
-    // Authority snapshot is advisory only.
-    // See docs/authority-model.md §1-§2.
-    let authority: Awaited<ReturnType<typeof resolveAuthority>> | undefined;
-    try {
-      authority = await resolveAuthority({
-        authUser: req.authUser,
-        clinicId: req.clinicId!,
-        now,
-      });
-    } catch (authorityErr) {
-      console.error("[users:me] resolveAuthority failed", authorityErr);
-    }
-
-    res.json({
-      ...req.authUser,
-      avatarUrl,
-      preferredLocale: profileRow?.preferredLocale ?? "he",
-      seniorDoctorEligible: profileRow?.seniorDoctorEligible ?? false,
-      effectiveRole: resolved.effectiveRole,
-      roleSource: resolved.source,
-      activeShift: resolved.activeShift,
-      resolvedAt: resolved.resolvedAt.toISOString(),
-      canManageErMode: canManageErModeForUser(req.authUser),
-      ...(authority ? { authority } : {}),
-    });
-  } catch (err) {
-    console.error("[users:me] resolveCurrentRole failed", err);
-    res.status(500).json(
-      apiError({
-        code: "INTERNAL_ERROR",
-        reason: "USER_ME_FAILED",
-        message: "Failed to get user",
-        requestId,
-      }),
-    );
-  }
-});
-
-router.get("/me/shift-activity", requireAuth, async (req, res) => {
-  const requestId = resolveRequestId(res, req.headers["x-request-id"]);
-  try {
-    const clinicId = req.clinicId!;
-    const userId = req.authUser!.id;
-    const sessions = await db
-      .select({
-        id: shiftSessions.id,
-        startedAt: shiftSessions.startedAt,
-        endedAt: shiftSessions.endedAt,
-        note: shiftSessions.note,
-      })
-      .from(shiftSessions)
-      .where(and(
-        eq(shiftSessions.clinicId, clinicId),
-        eq(shiftSessions.startedByUserId, userId),
-      ))
-      .orderBy(desc(shiftSessions.startedAt))
-      .limit(20);
-    res.json(sessions);
-  } catch (err) {
-    console.error("[users:me:shift-activity] failed", err);
-    res.status(500).json(apiError({
-      code: "INTERNAL_ERROR",
-      reason: "SHIFT_ACTIVITY_FETCH_FAILED",
-      message: "Failed to get shift activity",
-      requestId,
-    }));
-  }
-});
-
-router.get("/deleted", requireAuth, requireAdmin, async (req, res) => {
-  const requestId = resolveRequestId(res, req.headers["x-request-id"]);
-  try {
-    const clinicId = req.clinicId!;
-    const deletedUsers = await db
-      .select({ ...userFields, deletedAt: users.deletedAt })
-      .from(users)
-      .where(and(eq(users.clinicId, clinicId), isNotNull(users.deletedAt)))
-      .orderBy(desc(users.deletedAt));
-    res.json(deletedUsers);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json(
-      apiError({
-        code: "INTERNAL_ERROR",
-        reason: "USERS_LIST_DELETED_FAILED",
-        message: "Failed to list deleted users",
-        requestId,
-      }),
-    );
-  }
-});
-
-router.get("/", requireAuth, requireAdmin, async (req, res) => {
-  const requestId = resolveRequestId(res, req.headers["x-request-id"]);
-  try {
-    const clinicId = req.clinicId!;
-    const { status } = req.query;
-    const validStatuses = ["pending", "active", "blocked"];
-    if (status !== undefined && !validStatuses.includes(status as string)) {
-      return res.status(400).json(
-        apiError({
-          code: "VALIDATION_FAILED",
-          reason: "INVALID_STATUS_FILTER",
-          message: "Invalid status filter. Must be one of: pending, active, blocked",
-          requestId,
-        }),
-      );
-    }
-
-    const rawLimit = parseInt(req.query.limit as string, 10);
-    const rawPage = parseInt(req.query.page as string, 10);
-    const resolvedLimit = (!isNaN(rawLimit) && rawLimit > 0) ? Math.min(rawLimit, 200) : 100;
-    const page = (!isNaN(rawPage) && rawPage > 1) ? rawPage : 1;
-    const resolvedOffset = (page - 1) * resolvedLimit;
-
-    const baseQuery = status
-      ? db
-          .select(adminListUserFields)
-          .from(users)
-          .where(and(eq(users.clinicId, clinicId), eq(users.status, status as string), isNull(users.deletedAt)))
-          .orderBy(desc(users.createdAt))
-      : db
-          .select(adminListUserFields)
-          .from(users)
-          .where(and(eq(users.clinicId, clinicId), isNull(users.deletedAt)))
-          .orderBy(desc(users.createdAt));
-
-    const whereClause = status
-      ? and(eq(users.clinicId, clinicId), eq(users.status, status as string), isNull(users.deletedAt))
-      : and(eq(users.clinicId, clinicId), isNull(users.deletedAt));
-    const [{ total }] = await db
-      .select({ total: sql<number>`count(*)::int` })
-      .from(users)
-      .where(whereClause);
-    const items = await baseQuery.limit(resolvedLimit).offset(resolvedOffset);
-    const healedRows = await Promise.all(items.map((u) => ensureUserEmail(u)));
-    const healedItems = items.map((item, i) => ({
-      id: item.id,
-      email: healedRows[i].email,
-      name: item.name,
-      displayName: item.displayName,
-      role: item.role,
-      secondaryRole: item.secondaryRole ?? null,
-      isEquipmentCoordinator: item.isEquipmentCoordinator ?? false,
-      seniorDoctorEligible: item.seniorDoctorEligible ?? false,
-      status: item.status,
-      createdAt: item.createdAt,
-    }));
-    res.json({
-      items: healedItems,
-      total,
-      page,
-      pageSize: resolvedLimit,
-      hasMore: resolvedOffset + healedItems.length < total,
-    });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json(
-      apiError({
-        code: "INTERNAL_ERROR",
-        reason: "USERS_LIST_FAILED",
-        message: "Failed to list users",
-        requestId,
-      }),
-    );
-  }
-});
+router.get("/", requireAuth, requireAdmin, getUsersListHandler);
 
 router.get("/pending", requireAuth, requireAdmin, async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
@@ -344,135 +142,13 @@ router.get("/pending", requireAuth, requireAdmin, async (req, res) => {
   }
 });
 
-router.patch("/:id/role", requireAuth, requireAdmin, validateUuid("id"), validateBody(patchRoleSchema), async (req, res) => {
-  const requestId = resolveRequestId(res, req.headers["x-request-id"]);
-  try {
-    const clinicId = req.clinicId!;
-    const { role } = req.body as z.infer<typeof patchRoleSchema>;
-
-    const [target] = await db
-      .select()
-      .from(users)
-      .where(and(eq(users.clinicId, clinicId), eq(users.id, req.params.id), isNull(users.deletedAt)))
-      .limit(1);
-
-    if (!target) {
-      return res.status(404).json(
-        apiError({
-          code: "NOT_FOUND",
-          reason: "USER_NOT_FOUND",
-          message: "User not found",
-          requestId,
-        }),
-      );
-    }
-
-    if (target.role === "admin" && role !== "admin") {
-      const [{ count }] = await db
-        .select({ count: sql<number>`count(*)::int` })
-        .from(users)
-        .where(and(eq(users.clinicId, clinicId), eq(users.role, "admin"), isNull(users.deletedAt)));
-      if (count <= 1) {
-        return res.status(409).json(
-          apiError({
-            code: "CONFLICT",
-            reason: "LAST_ADMIN_DEMOTION_BLOCKED",
-            message: "Cannot demote the last admin. Promote another user to admin first.",
-            requestId,
-          }),
-        );
-      }
-    }
-
-    const [user] = await db
-      .update(users)
-      .set({ role })
-      .where(and(eq(users.clinicId, clinicId), eq(users.id, req.params.id), isNull(users.deletedAt)))
-      .returning();
-
-    invalidateForUser(clinicId, req.params.id);
-
-    logAudit({
-      actorRole: resolveAuditActorRole(req),
-      clinicId,
-      actionType: "user_role_changed",
-      performedBy: req.authUser!.id,
-      performedByEmail: req.authUser!.email,
-      targetId: req.params.id,
-      targetType: "user",
-      metadata: { previousRole: target.role, newRole: role, targetEmail: target.email },
-    });
-
-    res.json(user);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json(
-      apiError({
-        code: "INTERNAL_ERROR",
-        reason: "USER_ROLE_UPDATE_FAILED",
-        message: "Failed to update role",
-        requestId,
-      }),
-    );
-  }
-});
+router.patch("/:id/role", requireAuth, requireAdmin, validateUuid("id"), validateBody(patchRoleSchema), patchUserRoleHandler);
 
 const patchSecondaryRoleSchema = z.object({
   secondaryRole: z.enum(["technician", "senior_technician", "admin"]).nullable(),
 });
 
-router.patch("/:id/secondary-role", requireAuth, requireAdmin, validateUuid("id"), validateBody(patchSecondaryRoleSchema), async (req, res) => {
-  const requestId = resolveRequestId(res, req.headers["x-request-id"]);
-  try {
-    const clinicId = req.clinicId!;
-    const { secondaryRole } = req.body as z.infer<typeof patchSecondaryRoleSchema>;
-
-    await db
-      .update(users)
-      .set({ secondaryRole })
-      .where(and(eq(users.clinicId, clinicId), eq(users.id, req.params.id), isNull(users.deletedAt)));
-
-    const [updated] = await db
-      .select()
-      .from(users)
-      .where(and(eq(users.clinicId, clinicId), eq(users.id, req.params.id), isNull(users.deletedAt)))
-      .limit(1);
-
-    if (!updated) {
-      return res.status(404).json(
-        apiError({
-          code: "NOT_FOUND",
-          reason: "USER_NOT_FOUND",
-          message: "User not found",
-          requestId,
-        }),
-      );
-    }
-
-    logAudit({
-      actorRole: resolveAuditActorRole(req),
-      clinicId,
-      actionType: "user_secondary_role_changed",
-      performedBy: req.authUser!.id,
-      performedByEmail: req.authUser!.email,
-      targetId: req.params.id,
-      targetType: "user",
-      metadata: { newSecondaryRole: secondaryRole, targetEmail: updated.email },
-    });
-
-    return res.json({ user: updated });
-  } catch (err) {
-    console.error(err);
-    return res.status(500).json(
-      apiError({
-        code: "INTERNAL_ERROR",
-        reason: "USER_SECONDARY_ROLE_UPDATE_FAILED",
-        message: "Failed to update secondary role",
-        requestId,
-      }),
-    );
-  }
-});
+router.patch("/:id/secondary-role", requireAuth, requireAdmin, validateUuid("id"), validateBody(patchSecondaryRoleSchema), patchUserSecondaryRoleHandler);
 
 const patchEquipmentCoordinatorSchema = z.object({
   isEquipmentCoordinator: z.boolean(),
@@ -493,53 +169,7 @@ router.patch(
   requireAdmin,
   validateUuid("id"),
   validateBody(patchEquipmentCoordinatorSchema),
-  async (req, res) => {
-    const requestId = resolveRequestId(res, req.headers["x-request-id"]);
-    try {
-      const clinicId = req.clinicId!;
-      const { isEquipmentCoordinator } = req.body as z.infer<typeof patchEquipmentCoordinatorSchema>;
-
-      const [updated] = await db
-        .update(users)
-        .set({ isEquipmentCoordinator })
-        .where(and(eq(users.clinicId, clinicId), eq(users.id, req.params.id), isNull(users.deletedAt)))
-        .returning();
-
-      if (!updated) {
-        return res.status(404).json(
-          apiError({
-            code: "NOT_FOUND",
-            reason: "USER_NOT_FOUND",
-            message: "User not found",
-            requestId,
-          }),
-        );
-      }
-
-      logAudit({
-        actorRole: resolveAuditActorRole(req),
-        clinicId,
-        actionType: "equipment_coordinator_eligibility_set",
-        performedBy: req.authUser!.id,
-        performedByEmail: req.authUser!.email,
-        targetId: req.params.id,
-        targetType: "user",
-        metadata: { isEquipmentCoordinator, targetEmail: updated.email },
-      });
-
-      res.json(updated);
-    } catch (err) {
-      console.error(err);
-      res.status(500).json(
-        apiError({
-          code: "INTERNAL_ERROR",
-          reason: "EQUIPMENT_COORDINATOR_UPDATE_FAILED",
-          message: "Failed to update equipment coordinator eligibility",
-          requestId,
-        }),
-      );
-    }
-  },
+  patchUserEquipmentCoordinatorHandler,
 );
 
 const patchSeniorDoctorEligibleSchema = z.object({
@@ -562,426 +192,16 @@ router.patch(
   requireAdmin,
   validateUuid("id"),
   validateBody(patchSeniorDoctorEligibleSchema),
-  async (req, res) => {
-    const requestId = resolveRequestId(res, req.headers["x-request-id"]);
-    try {
-      const clinicId = req.clinicId!;
-      const { seniorDoctorEligible } = req.body as z.infer<typeof patchSeniorDoctorEligibleSchema>;
-
-      const [updated] = await db
-        .update(users)
-        .set({ seniorDoctorEligible })
-        .where(and(eq(users.clinicId, clinicId), eq(users.id, req.params.id), isNull(users.deletedAt)))
-        .returning();
-
-      if (!updated) {
-        return res.status(404).json(
-          apiError({
-            code: "NOT_FOUND",
-            reason: "USER_NOT_FOUND",
-            message: "User not found",
-            requestId,
-          }),
-        );
-      }
-
-      logAudit({
-        actorRole: resolveAuditActorRole(req),
-        clinicId,
-        actionType: "senior_doctor_eligible_set",
-        performedBy: req.authUser!.id,
-        performedByEmail: req.authUser!.email,
-        targetId: req.params.id,
-        targetType: "user",
-        metadata: { seniorDoctorEligible, targetEmail: updated.email },
-      });
-
-      res.json(updated);
-    } catch (err) {
-      console.error(err);
-      res.status(500).json(
-        apiError({
-          code: "INTERNAL_ERROR",
-          reason: "SENIOR_DOCTOR_ELIGIBLE_UPDATE_FAILED",
-          message: "Failed to update senior doctor eligibility",
-          requestId,
-        }),
-      );
-    }
-  },
+  patchUserSeniorDoctorEligibleHandler,
 );
 
-router.patch("/:id/status", requireAuth, requireAdmin, validateUuid("id"), validateBody(patchStatusSchema), async (req, res) => {
-  const requestId = resolveRequestId(res, req.headers["x-request-id"]);
-  try {
-    const clinicId = req.clinicId!;
-    const { status, role: overrideRole } = req.body as z.infer<typeof patchStatusSchema>;
+router.patch("/:id/status", requireAuth, requireAdmin, validateUuid("id"), validateBody(patchStatusSchema), patchUserStatusHandler);
 
-    const [existing] = await db
-      .select()
-      .from(users)
-      .where(and(eq(users.clinicId, clinicId), eq(users.id, req.params.id), isNull(users.deletedAt)))
-      .limit(1);
+router.patch("/:id/display_name", requireAuthAny, validateUuid("id"), validateBody(patchDisplayNameSchema), patchUserDisplayNameHandler);
 
-    if (!existing) {
-      return res.status(404).json(
-        apiError({
-          code: "NOT_FOUND",
-          reason: "USER_NOT_FOUND",
-          message: "User not found",
-          requestId,
-        }),
-      );
-    }
+router.patch("/:id/delete", requireAuth, validateUuid("id"), patchUserDeleteHandler);
 
-    // C3: on approval (pending → active), promote to the self-requested role so
-    // the admin doesn't re-select it. Vet is gated on a doctor/license number.
-    const approval = resolveApprovalRole({
-      currentStatus: existing.status,
-      newStatus: status,
-      requestedRole: existing.requestedRole,
-      overrideRole: overrideRole ?? null,
-      vetLicenseNumber: existing.vetLicenseNumber,
-    });
-    if (!approval.ok) {
-      return res.status(422).json(
-        apiError({
-          code: "VET_LICENSE_REQUIRED",
-          reason: "VET_LICENSE_REQUIRED",
-          message: "A doctor/license number is required to approve a veterinarian",
-          requestId,
-        }),
-      );
-    }
-
-    // Guard the update on the status we reviewed: two admins can both observe
-    // `pending`, and without this predicate the second write would clobber the
-    // first (overwriting a block, or re-granting a role). A null result on a
-    // row we already fetched means the status changed concurrently → 409.
-    const [user] = await db
-      .update(users)
-      .set(approval.roleToApply ? { status, role: approval.roleToApply } : { status })
-      .where(
-        and(
-          eq(users.clinicId, clinicId),
-          eq(users.id, req.params.id),
-          eq(users.status, existing.status),
-          isNull(users.deletedAt),
-        ),
-      )
-      .returning();
-
-    if (!user) {
-      return res.status(409).json(
-        apiError({
-          code: "CONFLICT",
-          reason: "USER_STATUS_CONFLICT",
-          message: "User status changed concurrently; reload and retry",
-          requestId,
-        }),
-      );
-    }
-
-    // A granted role changes clinical capabilities — drop the authority cache so
-    // the new role takes effect immediately (mirrors PATCH /:id/role).
-    if (approval.roleToApply) {
-      invalidateForUser(clinicId, user.id);
-    }
-
-    logAudit({
-      actorRole: resolveAuditActorRole(req),
-      clinicId,
-      actionType: "user_status_changed",
-      performedBy: req.authUser!.id,
-      performedByEmail: req.authUser!.email,
-      targetId: req.params.id,
-      targetType: "user",
-      metadata: {
-        previousStatus: existing.status,
-        newStatus: status,
-        targetEmail: user.email,
-        ...(approval.roleToApply ? { grantedRole: approval.roleToApply } : {}),
-      },
-    });
-
-    res.json(user);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json(
-      apiError({
-        code: "INTERNAL_ERROR",
-        reason: "USER_STATUS_UPDATE_FAILED",
-        message: "Failed to update status",
-        requestId,
-      }),
-    );
-  }
-});
-
-router.patch("/:id/display_name", requireAuthAny, validateUuid("id"), validateBody(patchDisplayNameSchema), async (req, res) => {
-  const requestId = resolveRequestId(res, req.headers["x-request-id"]);
-  try {
-    if (!req.authUser) {
-      return res.status(401).json(
-        apiError({
-          code: "UNAUTHORIZED",
-          reason: "MISSING_AUTH_USER",
-          message: "Unauthorized",
-          requestId,
-        }),
-      );
-    }
-    const clinicId = req.clinicId!;
-
-    const { display_name } = req.body as z.infer<typeof patchDisplayNameSchema>;
-    const actorId = req.authUser.id;
-
-    if (actorId !== req.params.id && req.authUser.role !== "admin") {
-      return res.status(403).json(
-        apiError({
-          code: "FORBIDDEN",
-          reason: "INSUFFICIENT_ROLE",
-          message: "Forbidden",
-          requestId,
-        }),
-      );
-    }
-
-    const [existing] = await db
-      .select()
-      .from(users)
-      .where(and(eq(users.clinicId, clinicId), eq(users.id, req.params.id), isNull(users.deletedAt)))
-      .limit(1);
-
-    if (!existing) {
-      return res.status(404).json(
-        apiError({
-          code: "NOT_FOUND",
-          reason: "USER_NOT_FOUND",
-          message: "User not found",
-          requestId,
-        }),
-      );
-    }
-
-    const [updated] = await db
-      .update(users)
-      .set({ displayName: display_name })
-      .where(and(eq(users.clinicId, clinicId), eq(users.id, req.params.id)))
-      .returning();
-
-    invalidateForUser(clinicId, req.params.id);
-
-    logAudit({
-      actorRole: resolveAuditActorRole(req),
-      clinicId,
-      actionType: "user_display_name_changed",
-      performedBy: actorId,
-      performedByEmail: req.authUser.email,
-      targetId: req.params.id,
-      targetType: "user",
-      metadata: {
-        field: "display_name",
-        previousDisplayName: existing.displayName,
-        newDisplayName: updated.displayName,
-      },
-    });
-
-    res.json(updated);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json(
-      apiError({
-        code: "INTERNAL_ERROR",
-        reason: "USER_DISPLAY_NAME_UPDATE_FAILED",
-        message: "Failed to update display name",
-        requestId,
-      }),
-    );
-  }
-});
-
-router.patch("/:id/delete", requireAuth, validateUuid("id"), async (req, res) => {
-  const requestId = resolveRequestId(res, req.headers["x-request-id"]);
-  try {
-    if (!req.authUser) {
-      return res.status(401).json(
-        apiError({
-          code: "UNAUTHORIZED",
-          reason: "MISSING_AUTH_USER",
-          message: "Unauthorized",
-          requestId,
-        }),
-      );
-    }
-    const clinicId = req.clinicId!;
-
-    const [existing] = await db
-      .select()
-      .from(users)
-      .where(and(eq(users.clinicId, clinicId), eq(users.id, req.params.id), isNull(users.deletedAt)))
-      .limit(1);
-
-    if (!existing) {
-      return res.status(404).json(
-        apiError({
-          code: "NOT_FOUND",
-          reason: "USER_NOT_FOUND",
-          message: "User not found",
-          requestId,
-        }),
-      );
-    }
-
-    const actorId = req.authUser.id;
-    const isSelf = actorId === req.params.id;
-    const isAdmin = req.authUser.role === "admin";
-    if (!isSelf && !isAdmin) {
-      return res.status(403).json(
-        apiError({
-          code: "FORBIDDEN",
-          reason: "INSUFFICIENT_ROLE",
-          message: "Forbidden",
-          requestId,
-        }),
-      );
-    }
-
-    if (existing.role === "admin" && isAdmin && !isSelf) {
-      const [{ count }] = await db
-        .select({ count: sql<number>`count(*)::int` })
-        .from(users)
-        .where(and(eq(users.clinicId, clinicId), eq(users.role, "admin"), isNull(users.deletedAt)));
-      if (count <= 1) {
-        return res.status(409).json(
-          apiError({
-            code: "CONFLICT",
-            reason: "LAST_ADMIN_DELETE_BLOCKED",
-            message: "Cannot delete the last admin. Promote another user to admin first.",
-            requestId,
-          }),
-        );
-      }
-    }
-
-    const [deleted] = await db
-      .update(users)
-      .set({ deletedAt: new Date(), deletedBy: actorId })
-      .where(and(eq(users.clinicId, clinicId), eq(users.id, req.params.id), isNull(users.deletedAt)))
-      .returning();
-
-    if (!deleted) {
-      return res.status(404).json(
-        apiError({
-          code: "NOT_FOUND",
-          reason: "USER_NOT_FOUND",
-          message: "User not found",
-          requestId,
-        }),
-      );
-    }
-
-    logAudit({
-      actorRole: resolveAuditActorRole(req),
-      clinicId,
-      actionType: "user_deleted",
-      performedBy: actorId,
-      performedByEmail: req.authUser.email,
-      targetId: req.params.id,
-      targetType: "user",
-      metadata: { email: deleted.email, role: deleted.role },
-    });
-
-    res.json(deleted);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json(
-      apiError({
-        code: "INTERNAL_ERROR",
-        reason: "USER_DELETE_FAILED",
-        message: "Failed to delete user",
-        requestId,
-      }),
-    );
-  }
-});
-
-router.patch("/:id/restore", requireAuth, validateUuid("id"), async (req, res) => {
-  const requestId = resolveRequestId(res, req.headers["x-request-id"]);
-  try {
-    if (!req.authUser) {
-      return res.status(401).json(
-        apiError({
-          code: "UNAUTHORIZED",
-          reason: "MISSING_AUTH_USER",
-          message: "Unauthorized",
-          requestId,
-        }),
-      );
-    }
-    const clinicId = req.clinicId!;
-
-    const actorId = req.authUser.id;
-    const isSelf = actorId === req.params.id;
-    const isAdmin = req.authUser.role === "admin";
-    if (!isSelf && !isAdmin) {
-      return res.status(403).json(
-        apiError({
-          code: "FORBIDDEN",
-          reason: "INSUFFICIENT_ROLE",
-          message: "Forbidden",
-          requestId,
-        }),
-      );
-    }
-
-    const [existing] = await db
-      .select()
-      .from(users)
-      .where(and(eq(users.clinicId, clinicId), eq(users.id, req.params.id), isNotNull(users.deletedAt)))
-      .limit(1);
-
-    if (!existing) {
-      return res.status(404).json(
-        apiError({
-          code: "NOT_FOUND",
-          reason: "USER_NOT_FOUND_OR_NOT_DELETED",
-          message: "User not found or not deleted",
-          requestId,
-        }),
-      );
-    }
-
-    const [restored] = await db
-      .update(users)
-      .set({ deletedAt: null, deletedBy: null })
-      .where(and(eq(users.clinicId, clinicId), eq(users.id, req.params.id)))
-      .returning();
-
-    logAudit({
-      actorRole: resolveAuditActorRole(req),
-      clinicId,
-      actionType: "user_restored",
-      performedBy: actorId,
-      performedByEmail: req.authUser.email,
-      targetId: req.params.id,
-      targetType: "user",
-      metadata: { email: restored.email, role: restored.role },
-    });
-
-    res.json(restored);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json(
-      apiError({
-        code: "INTERNAL_ERROR",
-        reason: "USER_RESTORE_FAILED",
-        message: "Failed to restore user",
-        requestId,
-      }),
-    );
-  }
-});
+router.patch("/:id/restore", requireAuth, validateUuid("id"), patchUserRestoreHandler);
 router.post("/sync", requireAuth, authSensitiveLimiter, validateBody(syncUserSchema), async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
   try {
@@ -1131,23 +351,7 @@ router.post("/sync", requireAuth, authSensitiveLimiter, validateBody(syncUserSch
  * Returns count of soft-deleted users eligible for permanent purge.
  * Admin only — informational endpoint before committing to purge.
  */
-router.get("/purge-candidates", requireAuth, requireAdmin, authSensitiveLimiter, async (req, res) => {
-  const requestId = resolveRequestId(res, req.headers["x-request-id"]);
-  try {
-    const count = await countPurgeCandidates();
-    res.json({ count, purgeAfterDays: PURGE_AFTER_DAYS });
-  } catch (err) {
-    console.error("users:purge-candidates", err);
-    return res.status(500).json(
-      apiError({
-        code: "INTERNAL_ERROR",
-        reason: "PURGE_CANDIDATES_FAILED",
-        message: "Failed to count purge candidates",
-        requestId,
-      }),
-    );
-  }
-});
+router.get("/purge-candidates", requireAuth, requireAdmin, authSensitiveLimiter, getUsersPurgeCandidatesHandler);
 
 /**
  * POST /api/users/purge-deleted
@@ -1156,62 +360,11 @@ router.get("/purge-candidates", requireAuth, requireAdmin, authSensitiveLimiter,
  * This is the ONLY way to permanently remove users — automatic cleanup
  * schedulers do not perform hard deletes.
  */
-router.post("/purge-deleted", requireAuth, requireAdmin, authSensitiveLimiter, async (req, res) => {
-  const requestId = resolveRequestId(res, req.headers["x-request-id"]);
-  try {
-    const clinicId = req.clinicId!;
-    const actor = req.authUser!;
-    const { purged } = await purgeDeletedUsers({
-      actorId: actor.id,
-      actorEmail: actor.email,
-      actorRole: actor.role,
-      clinicId,
-    });
-    return res.json({ ok: true, purged, purgeAfterDays: PURGE_AFTER_DAYS });
-  } catch (err) {
-    console.error("users:purge-deleted", err);
-    return res.status(500).json(
-      apiError({
-        code: "INTERNAL_ERROR",
-        reason: "PURGE_DELETED_FAILED",
-        message: "Failed to purge deleted users",
-        requestId,
-      }),
-    );
-  }
-});
+router.post("/purge-deleted", requireAuth, requireAdmin, authSensitiveLimiter, postUsersPurgeDeletedHandler);
 
 // Returns eligible managers (vet/admin) for the Code Blue manager picker.
 // All authenticated staff can see this list since they may need to designate a manager.
-router.get("/managers", requireAuth, async (req, res) => {
-  const requestId = resolveRequestId(res, req.headers["x-request-id"]);
-  try {
-    const clinicId = req.clinicId!;
-    const managers = await db
-      .select({ id: users.id, name: users.name, role: users.role })
-      .from(users)
-      .where(
-        and(
-          eq(users.clinicId, clinicId),
-          eq(users.status, "active"),
-          isNull(users.deletedAt),
-          sql`${users.role} IN ('vet', 'admin')`,
-        ),
-      )
-      .orderBy(users.name);
-    res.json({ managers });
-  } catch (err) {
-    console.error("users:managers", err);
-    res.status(500).json(
-      apiError({
-        code: "INTERNAL_ERROR",
-        reason: "USERS_MANAGERS_FAILED",
-        message: "Failed to list eligible managers",
-        requestId,
-      }),
-    );
-  }
-});
+router.get("/managers", requireAuth, getUsersManagersHandler);
 
 router.post("/backfill-clerk", requireAuth, requireAdmin, authSensitiveLimiter, async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
@@ -1350,75 +503,7 @@ const appleLinkSchema = z.object({
  *
  * Idempotent per user — re-linking replaces the stored token.
  */
-router.post("/apple-link", requireAuth, authSensitiveLimiter, validateBody(appleLinkSchema), async (req, res) => {
-  const requestId = resolveRequestId(res, req.headers["x-request-id"]);
-  try {
-    const clinicId = req.clinicId!;
-    const actor = req.authUser!;
-    const { authorizationCode } = req.body as z.infer<typeof appleLinkSchema>;
-
-    if (!isAppleRevocationConfigured()) {
-      return res.status(501).json(
-        apiError({
-          code: "NOT_CONFIGURED",
-          reason: "APPLE_REVOCATION_NOT_CONFIGURED",
-          message: "Apple token revocation is not configured on this server",
-          requestId,
-        }),
-      );
-    }
-
-    const { refreshToken, appleSub } = await exchangeAppleAuthorizationCode(authorizationCode);
-    const encrypted = encryptConfigValue(refreshToken);
-
-    await db
-      .insert(appleOauthTokens)
-      .values({
-        id: randomUUID(),
-        clinicId,
-        userId: actor.id,
-        refreshToken: encrypted,
-        appleSub,
-      })
-      .onConflictDoUpdate({
-        target: appleOauthTokens.userId,
-        set: { refreshToken: encrypted, appleSub, updatedAt: new Date() },
-      });
-
-    logAudit({
-      actorRole: resolveAuditActorRole(req),
-      clinicId,
-      actionType: "apple_token_linked",
-      performedBy: actor.id,
-      performedByEmail: actor.email,
-      targetId: actor.id,
-      targetType: "user",
-      metadata: { source: "apple_authorization_code_exchange" },
-    });
-
-    return res.json({ ok: true });
-  } catch (err) {
-    if (err instanceof AppleAuthError) {
-      return res.status(err.status === 501 ? 501 : 502).json(
-        apiError({
-          code: err.status === 501 ? "NOT_CONFIGURED" : "BAD_GATEWAY",
-          reason: "APPLE_TOKEN_EXCHANGE_FAILED",
-          message: "Could not link your Apple account. Please try again.",
-          requestId,
-        }),
-      );
-    }
-    console.error("users:apple-link", err);
-    return res.status(500).json(
-      apiError({
-        code: "INTERNAL_ERROR",
-        reason: "APPLE_LINK_FAILED",
-        message: "Failed to link Apple account",
-        requestId,
-      }),
-    );
-  }
-});
+router.post("/apple-link", requireAuth, authSensitiveLimiter, validateBody(appleLinkSchema), postUserAppleLinkHandler);
 
 /**
  * DELETE /api/users/delete-account
@@ -1437,45 +522,6 @@ router.post("/apple-link", requireAuth, authSensitiveLimiter, validateBody(apple
  * only), and the demo/reviewer protected-account 403 stays enforced in the
  * service layer.
  */
-router.delete("/delete-account", requireAuthAny, authSensitiveLimiter, async (req, res) => {
-  const requestId = resolveRequestId(res, req.headers["x-request-id"]);
-  try {
-    const actor = req.authUser!;
-    invalidateForUser(actor.clinicId, actor.id);
-    const result = await deleteOwnAccount(actor);
-
-    return res.status(200).json({ success: true, ...result });
-  } catch (err) {
-    if (err instanceof SoleClinicAdminError) {
-      return res.status(409).json(
-        apiError({
-          code: "CONFLICT",
-          reason: "SOLE_CLINIC_ADMIN",
-          message: "You are the only member of your clinic's organization; transfer or remove the clinic before deleting this account.",
-          requestId,
-        }),
-      );
-    }
-    if (err instanceof AccountDeletionProtectedError) {
-      return res.status(403).json(
-        apiError({
-          code: "FORBIDDEN",
-          reason: "ACCOUNT_DELETION_PROTECTED",
-          message: "This account cannot be deleted through the app.",
-          requestId,
-        }),
-      );
-    }
-    console.error("users:delete-account", err);
-    return res.status(500).json(
-      apiError({
-        code: "INTERNAL_ERROR",
-        reason: "ACCOUNT_DELETION_FAILED",
-        message: "Deletion failed. Please try again.",
-        requestId,
-      }),
-    );
-  }
-});
+router.delete("/delete-account", requireAuthAny, authSensitiveLimiter, deleteUserAccountHandler);
 
 export default router;
