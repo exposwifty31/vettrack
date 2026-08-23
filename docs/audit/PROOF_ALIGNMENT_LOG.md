@@ -10654,3 +10654,35 @@ this claim and should not have been offered as if they were.
 **Verdict:** the (a) fix is **VERIFIED as of the correction recorded in the entry above**, and
 **RETRACTED for the entry at `:10545`**, which claimed it one commit too early. The gate results in
 that entry stand; only its verdict on (a) does not.
+
+## 2026-08-23 — (b-bis) forbade greedy in step 2 and called itself greedy three lines above (claude/competitive-moats-strategy-c03ca6)
+
+**Claim:** A self-contradiction introduced by this branch's own maximum-cardinality fix is removed.
+No reviewer raised it; a fresh read of the finished section did.
+
+**Evidence:**
+- (b-bis)'s opening sentence still read "Assignment is therefore a deterministic **greedy pass**,
+  not a lookup", three lines above step 2's "Nearest-first greedy is *not* equivalent and must not
+  be used". The steps were replaced when maximum-cardinality matching went in; the sentence
+  introducing them was not.
+- `docs/vettrack-3.0-program.md:495` now reads "a deterministic **matching problem**, not a lookup".
+- Re-checked by grep rather than by eye: `greedy` now occurs **once** in the document,
+  at `docs/vettrack-3.0-program.md:500`, and that occurrence is the prohibition.
+
+**How it was found, since the method is the point.** Six rounds of review over an interlocking
+specification, edited by two different sessions, closed with **zero unresolved threads** and every
+gate green — and this contradiction survived all of it. It was caught by reading the finished
+section end to end and grepping for every rule the branch had superseded (`greedy`, the
+`c_ord ÷ c_unord` estimator, the retired `unmatched` terminology, the 10% unresolved bound), asking
+of each: does this still appear anywhere it is not explicitly being rejected? A review loop
+converging on zero findings is not the same as a document being consistent; the loop only sees what
+it is pointed at.
+
+**Also checked in the same pass, and clean:** every concept §7 R2 defines is honoured in §9, except
+`matchable denominator` and `maximum-cardinality`, which are absent from §9 correctly — §9 gates on
+the metric values and their bounds, not on the matching procedure that produced them.
+
+**Evidence — the gates:** `pnpm architecture:gates` → exit 0; tenant-lint "no new findings vs
+baseline (203 known)"; claim verification **0 FAILED**.
+
+**Verdict:** VERIFIED.

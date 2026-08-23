@@ -492,7 +492,7 @@ matches no such line after the settling window is uninvoiced.
 **(b-bis) The pairing is one-to-one, and its tie-breakers are fixed in advance.** A proximity
 window plus a field list is not a unique key — several orders, several invoice lines, or several
 repetitions of the same act can fall inside one window. Assignment is therefore a deterministic
-greedy pass, not a lookup:
+**matching problem**, not a lookup:
 
 1. Enumerate every candidate pair permitted by (b) or (c), grouped by `clinicId` + case reference +
    item identity.
