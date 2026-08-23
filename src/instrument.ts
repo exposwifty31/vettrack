@@ -8,7 +8,14 @@ if (import.meta.env.VITE_SENTRY_DSN) {
     environment: import.meta.env.MODE,
     release: typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : undefined,
 
-    sendDefaultPii: true,
+    // sendDefaultPii would attach the visitor's IP, cookies, and full
+    // request bodies to every event by default (Sentry docs: deprecated in
+    // favor of explicit dataCollection categories). This app already sets
+    // user context explicitly (see Sentry.setUser in server/middleware/auth.ts)
+    // and Session Replay masks its own content via maskAllText/blockAllMedia
+    // below — neither needs the blanket flag, and cookies here would include
+    // the live Clerk session.
+    sendDefaultPii: false,
     enableLogs: true,
 
     integrations: [
