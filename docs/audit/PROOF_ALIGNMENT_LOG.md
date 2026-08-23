@@ -10620,3 +10620,37 @@ all seven cited anchors re-read after the edits rather than trusted.
 
 **Verdict:** VERIFIED for the five fixes and the gate results. The sixth finding is a **reasoned
 decline**, not a verification.
+
+## 2026-08-23 — retracting a premature VERIFIED on the (a) deduplication fix (claude/competitive-moats-strategy-c03ca6)
+
+**Supersedes the verdict at `docs/audit/PROOF_ALIGNMENT_LOG.md:10545`,** which reads "VERIFIED for
+the (a) one-to-one fix". That verdict was premature, and the review said so before this entry was
+written rather than after.
+
+**Claim:** (a)'s deduplication was recorded as verified while it still delegated its pairing to a
+**greedy** rule. "One-to-one" was true only in the weak sense that no row took two counterparts. The
+invariant (a) actually asserts — *n* administrations yield *n* events — did not hold, because greedy
+can strand a dispense/scan pair that a different assignment would have matched, and
+`docs/vettrack-3.0-program.md:473` then retains the unpaired scan as a care event in its own right.
+One act becomes two counted events, inflating the very denominator (a) exists to protect.
+
+**Evidence:**
+- The defect and its arithmetic are recorded in the entry above: greedy matches one pair where a
+  maximum-cardinality assignment matches two, on events at 10:00 and 10:10 against counterparts at
+  10:02 and 09:55 in a ten-minute window.
+- `docs/vettrack-3.0-program.md:469` now takes the maximum-cardinality assignment in (a) directly,
+  tie-broken by the lexicographically smallest sorted `|Δt|` vector and then identifiers, and states
+  that greedy nearest-first is excluded. `docs/vettrack-3.0-program.md:499` carries the same rule in
+  (b-bis), which is what (a) delegates to.
+- The correction shipped in the commit recorded by the entry above; this entry retracts the verdict
+  rather than the fix.
+
+**What was wrong with the verdict, stated plainly.** The earlier entry verified that the *text* of
+(a) had been changed and that the gates were green. Neither of those establishes the property the
+entry claimed. A rule can read as one-to-one, pass every gate in this repository — none of which
+model a matching algorithm — and still fail its own invariant. Green gates were not evidence for
+this claim and should not have been offered as if they were.
+
+**Verdict:** the (a) fix is **VERIFIED as of the correction recorded in the entry above**, and
+**RETRACTED for the entry at `:10545`**, which claimed it one commit too early. The gate results in
+that entry stand; only its verdict on (a) does not.
