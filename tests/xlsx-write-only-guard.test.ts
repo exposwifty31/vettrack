@@ -201,12 +201,22 @@ function listSourceFiles(tree: string): string[] {
 }
 
 describe("xlsx (SheetJS CE) stays write-only and pinned", () => {
-  it("is imported by exactly one shipped file", () => {
-    const importers = SCANNED_TREES.flatMap(listSourceFiles).filter((rel) =>
-      importsXlsx(readFileSync(path.join(repoRoot, rel), "utf8"), rel),
-    );
-    expect(importers.sort()).toEqual([SOLE_IMPORTER]);
-  });
+  // 20s, not the 5s default: this does a synchronous readdirSync+readFileSync+
+  // full-TS-parse across every file in 5 trees (src/server/scripts/shared/
+  // packages). ~900ms on a quiet dev machine, but a shared CI runner under
+  // load (4 parallel vitest shards + neighboring jobs) has hit 5000ms and
+  // timed out — see the 2026-08-23 main-branch CI failure on an unrelated
+  // PR's merge commit. Bumping the budget, not the assertion.
+  it(
+    "is imported by exactly one shipped file",
+    () => {
+      const importers = SCANNED_TREES.flatMap(listSourceFiles).filter((rel) =>
+        importsXlsx(readFileSync(path.join(repoRoot, rel), "utf8"), rel),
+      );
+      expect(importers.sort()).toEqual([SOLE_IMPORTER]);
+    },
+    20_000,
+  );
 
   it("never reaches a SheetJS parse/read API", () => {
     const source = readFileSync(path.join(repoRoot, SOLE_IMPORTER), "utf8");
