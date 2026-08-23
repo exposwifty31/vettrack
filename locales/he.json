@@ -2659,9 +2659,6 @@
     "dispense": {
       "internalError": "שגיאה פנימית בעיבוד החלוקה."
     },
-    "stability": {
-      "notAvailableInProduction": "לא זמין בסביבת ייצור."
-    },
     "er": {
       "notAuthenticated": "נדרשת הזדהות.",
       "internalError": "שגיאה פנימית בפעולת ER מנהל."

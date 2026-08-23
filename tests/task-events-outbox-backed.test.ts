@@ -7,29 +7,27 @@
  * the ephemeral `/collab-ws` collab channel.
  *
  * Task lifecycle events were emitted exclusively through the legacy in-memory
- * `broadcast()` in `server/lib/realtime.ts` (its own header: "legacy path to be
- * removed after full outbox migration is confirmed"). Those rows never reached
- * `vt_event_outbox`, so they had no durability and no replay coverage — a client
- * that reconnected silently missed every task event. For AUTOMATION_TRIGGERED it
- * was worse: `scanAndEnqueueAutomationJobs` runs only in the notification worker
- * process, which holds no SSE connections, so those broadcasts reached zero
- * clients. The outbox fixes both. It is NOT cross-instance fan-out —
- * `outboxEmitter` is an in-process EventEmitter with no Redis adapter, so with
- * multiple API replicas only the claiming replica emits the live frame.
+ * `broadcast()` that used to live in `server/lib/realtime.ts`. Those rows never
+ * reached `vt_event_outbox`, so they had no durability and no replay coverage —
+ * a client that reconnected silently missed every task event. For
+ * AUTOMATION_TRIGGERED it was worse: `scanAndEnqueueAutomationJobs` runs only in
+ * the notification worker process, which holds no SSE connections, so those
+ * broadcasts reached zero clients. The outbox fixes both. It is NOT
+ * cross-instance fan-out — `outboxEmitter` is an in-process EventEmitter with no
+ * Redis adapter, so with multiple API replicas only the claiming replica emits
+ * the live frame.
  *
- * These tests pin BOTH halves of the fix:
- *   1. the events go through `insertRealtimeDomainEvent` (outbox), and
- *   2. they are NOT also pushed through `broadcast()` — dual-emission would
- *      double-deliver to every client on `GET /api/realtime/stream`, which
- *      registers with the legacy `clientsByClinic` registry AND the
- *      outboxEmitter at the same time.
+ * `broadcast()` itself is gone now (zero callers repo-wide, removed alongside
+ * the dual-emission guard tests that used to live here — see git history if you
+ * need them). What's left pins the half that's still load-bearing: task events
+ * go through `insertRealtimeDomainEvent` (outbox), in the right order, from the
+ * one helper that tags them `category: "TASK"`.
  *
  * No database is touched: `server/db.js` and the outbox helper are module-mocked.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import ts from "typescript";
-import { readdirSync, readFileSync } from "fs";
-import { join } from "path";
+import { readFileSync } from "fs";
 
 type Row = Record<string, unknown>;
 
@@ -120,14 +118,7 @@ vi.mock("../server/lib/queue.js", () => ({
   enqueueAutomationNotificationJobs: vi.fn(async () => undefined),
 }));
 
-// The two spies this lane is actually about.
-const broadcast = vi.fn();
-vi.mock("../server/lib/realtime.js", () => ({
-  broadcast: (...args: unknown[]) => broadcast(...args),
-  subscribe: vi.fn(),
-  unsubscribe: vi.fn(),
-}));
-
+// The spy this lane is actually about.
 const insertRealtimeDomainEvent = vi.fn(async () => 1);
 vi.mock("../server/lib/realtime-outbox.js", () => ({
   insertRealtimeDomainEvent: (...args: unknown[]) => insertRealtimeDomainEvent(...args),
@@ -171,15 +162,8 @@ function taskOutboxCalls(): Array<{ clinicId: string; type: string; payload: unk
     .filter((p) => p && (p.type.startsWith("TASK_") || p.type === "AUTOMATION_TRIGGERED"));
 }
 
-function legacyBroadcastTaskTypes(): string[] {
-  return broadcast.mock.calls
-    .map((c) => (c as unknown[])[1] as { type?: string } | undefined)
-    .map((e) => e?.type ?? "")
-    .filter((t) => t.startsWith("TASK_") || t === "AUTOMATION_TRIGGERED");
-}
 
 beforeEach(() => {
-  broadcast.mockClear();
   insertRealtimeDomainEvent.mockClear();
   logAudit.mockClear();
   state.selectRows = [];
@@ -207,14 +191,6 @@ describe("appointments.service — task lifecycle events are outbox-backed", () 
     }
   });
 
-  it("cancelAppointment does NOT also push through the legacy in-memory broadcast", async () => {
-    state.selectRows = [appointmentRow()];
-    state.updateRows = [appointmentRow({ status: "cancelled" })];
-
-    await cancelAppointment(CLINIC, "task-1", undefined, undefined);
-
-    expect(legacyBroadcastTaskTypes()).toEqual([]);
-  });
 
   it("a failing outbox insert never fails the clinical mutation", async () => {
     state.selectRows = [appointmentRow()];
@@ -229,7 +205,7 @@ describe("appointments.service — task lifecycle events are outbox-backed", () 
 });
 
 describe("task-automation.service — AUTOMATION_TRIGGERED is outbox-backed", () => {
-  it("scan emits AUTOMATION_TRIGGERED through the outbox, never through broadcast", async () => {
+  it("scan emits AUTOMATION_TRIGGERED through the outbox", async () => {
     const prev = process.env.ENABLE_AUTOMATION_ENGINE;
     process.env.ENABLE_AUTOMATION_ENGINE = "true";
     try {
@@ -251,49 +227,10 @@ describe("task-automation.service — AUTOMATION_TRIGGERED is outbox-backed", ()
       "prestart_reminder",
     ]);
     for (const e of emitted) expect(e.clinicId).toBe(CLINIC);
-    expect(legacyBroadcastTaskTypes()).toEqual([]);
   });
 });
 
-describe("no legacy broadcast emitters remain in the task services", () => {
-  const files = [
-    "server/services/appointments.service.ts",
-    "server/services/task-automation.service.ts",
-  ];
-
-  it.each(files)("%s does not import or call broadcast()", (file) => {
-    const source = readFileSync(file, "utf8");
-    expect(source).not.toMatch(/from\s+"\.\.\/lib\/realtime\.js"/);
-    expect(source).not.toMatch(/\bbroadcast\s*\(/);
-  });
-
-  /**
-   * Class guard, not an instance guard. A two-file allowlist would let a
-   * thirteenth emit site reopen the defect in a NEW file and still pass, so this
-   * walks every `.ts` under `server/` and allows `broadcast(` only in the file
-   * that defines it. Delete this test only together with `broadcast()` itself.
-   */
-  it("no file under server/ calls broadcast() except the file that defines it", () => {
-    const DEFINITION_FILE = "server/lib/realtime.ts";
-    const walk = (dir: string): string[] =>
-      readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
-        const full = join(dir, entry.name);
-        if (entry.isDirectory()) return entry.name === "node_modules" ? [] : walk(full);
-        return entry.isFile() && full.endsWith(".ts") ? [full] : [];
-      });
-
-    const offenders = walk("server")
-      .filter((file) => file !== DEFINITION_FILE)
-      .filter((file) => /\bbroadcast\s*\(/.test(readFileSync(file, "utf8")));
-
-    expect(
-      offenders,
-      `These files call the legacy in-memory broadcast(). Domain events must go through ` +
-        `insertRealtimeDomainEvent (vt_event_outbox) so they carry an id: cursor and are replayable:\n` +
-        offenders.join("\n"),
-    ).toEqual([]);
-  });
-
+describe("appointments.service — outbox emission is exclusive and ordered", () => {
   /**
    * Per-operation, not per-file. The previous version of this test read the whole
    * source and asserted the five type literals appeared SOMEWHERE in it, which passes

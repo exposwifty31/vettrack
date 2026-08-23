@@ -1,8 +1,8 @@
 /**
  * VetTrack 2.0, Task 1.1 §1 — client-side `action_proposal` types. Mirrors the
  * server wire shape (`server/routes/action-proposals.ts`); timestamps are ISO
- * strings. Shared across all 4 proposal kinds — no UI consumes these yet
- * (deferred to the next slice); this is API-client plumbing only.
+ * strings. Shared across all 4 proposal kinds, consumed by
+ * `src/features/autopilot/` (ProposalCard, per-kind cards, queue list/keys).
  */
 
 export type ActionProposalKind =

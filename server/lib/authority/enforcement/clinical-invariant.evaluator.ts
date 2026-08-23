@@ -107,11 +107,13 @@ export async function evaluateClinicalInvariant(
 
   // 3. Emergency carve-out (CI-7). Short-circuits BEFORE the
   //    evaluator's DB read so emergency requests never trigger a
-  //    SELECT. The emergency-bypass audit emitter lands in PR 5.7;
-  //    this branch is the documented placeholder until then.
+  //    SELECT. Same as the shadow verdict below: the audit
+  //    (`clinical_invariant_emergency_bypass`) and counter
+  //    (`_emergency_bypass_total`) are emitted at the wiring layer
+  //    (dispense.service.ts / containers.ts), not inline here, so a
+  //    request that rolls back after this point never produces a
+  //    false-positive audit row.
   if (ctx.isEmergency && typeof ctx.bypassReason === "string" && ctx.bypassReason.length > 0) {
-    // TODO(Phase 5 PR 5.7): emit `clinical_invariant_emergency_bypass`
-    // audit + increment `clinical_invariant_emergency_bypass_total`.
     return { action: "allow", disposition: "EMERGENCY_BYPASS" };
   }
 
@@ -164,18 +166,14 @@ export async function evaluateClinicalInvariant(
 
   // mode === "enforce" — return deny verdict.
   //
-  // PR 5.2 ships the verdict shape. The wired call site is the
-  // consumer that rolls back the mutation tx and returns 422 (lands
-  // in PR 5.7 via the JSON error helper from PR 5.6). PR 5.2 does
-  // NOT increment any enforce-only counter and does NOT attempt the
-  // denial audit — both land in PR 5.7 alongside their counter and
-  // audit-kind literals.
-  //
-  // TODO(Phase 5 PR 5.7):
-  //   - increment `clinical_invariant_blocked_total`;
-  //   - increment per-reason `clinical_invariant_orphan_reason_*`;
-  //   - attempt `clinical_invariant_orphan_dispense_denied` audit in
-  //     the same tx (best-effort, not durable — CI-26).
+  // The wired call site (dispense.service.ts / containers.ts) rolls
+  // back the mutation tx, returns 422 ORPHAN_DISPENSE_BLOCKED, and —
+  // same rationale as the shadow/emergency-bypass paths above —
+  // increments `clinical_invariant_blocked_total` and the per-reason
+  // `clinical_invariant_orphan_reason_*` counters, and attempts the
+  // `clinical_invariant_orphan_dispense_denied` audit in the same tx
+  // (best-effort, not durable — CI-26), rather than doing any of
+  // that inline here.
   return {
     action: "deny",
     reason: "ORPHAN_DISPENSE_BLOCKED",

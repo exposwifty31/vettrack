@@ -1,6 +1,8 @@
-// TODO(arch): two coexisting realtime paths. This file (in-memory clientsByClinic) is the
-// legacy broadcast path. New events must use the outbox-backed path in
-// server/routes/realtime.ts. Legacy path to be removed after full outbox migration is confirmed.
+// This file is now only the SSE connection registry (clientsByClinic):
+// subscribe()/unsubscribe() are consumed by the outbox-backed path in
+// server/routes/realtime.ts. It no longer delivers events itself — the
+// former in-memory broadcast() had zero callers (all domain events go
+// through insertRealtimeDomainEvent/the outbox) and was removed.
 import type { Response } from "express";
 import { incrementMetric } from "./metrics.js";
 
@@ -104,25 +106,5 @@ export function unsubscribe(res: Response): void {
     setConnectionMetric();
   } catch {
     // Best-effort cleanup.
-  }
-}
-
-/** Push lightweight SSE notifications to connected tabs (no outbox persistence). */
-export function broadcast(
-  clinicId: string,
-  event: { type: RealtimeEventType; payload: unknown; timestamp?: string },
-): void {
-  const normalizedClinicId = clinicId.trim();
-  if (!normalizedClinicId) return;
-  const set = clientsByClinic.get(normalizedClinicId);
-  if (!set || set.size === 0) return;
-  const envelope = {
-    type: event.type,
-    payload: event.payload,
-    timestamp: event.timestamp ?? new Date().toISOString(),
-  };
-  const chunk = `data: ${JSON.stringify(envelope)}\n\n`;
-  for (const res of set) {
-    safeWrite(res, chunk);
   }
 }
