@@ -43,6 +43,7 @@ vi.mock("drizzle-orm", () => ({
   and: (...a: unknown[]) => ({ _t: "and", a }),
   eq: (a: unknown, b: unknown) => ({ _t: "eq", a, b }),
   isNull: (x: unknown) => ({ _t: "isNull", x }),
+  sql: (strings: TemplateStringsArray, ...values: unknown[]) => ({ _t: "sql", strings, values }),
 }));
 
 // The push lib is stubbed so importing the route never loads real transports.
@@ -61,17 +62,20 @@ vi.mock("../server/lib/audit.js", () => ({
 }));
 
 // db.transaction runs the callback against a tx whose SELECT returns the
-// configured existing row for (clinicId, token); delete + insert resolve. When
-// `transactionRejects` is set, the transaction REJECTS — modelling a persistence
-// failure so the handler's catch path (500 PUSH_SUBSCRIBE_SAVE_FAILED, no audit)
-// can be exercised.
+// configured existing row for (clinicId, token); the upsert (insert ..
+// onConflictDoUpdate) resolves. When `transactionRejects` is set, the
+// transaction REJECTS — modelling a persistence failure so the handler's
+// catch path (500 PUSH_SUBSCRIBE_SAVE_FAILED, no audit) can be exercised.
 let existingRows: Array<{ userId: string }> = [];
 let transactionRejects = false;
 vi.mock("../server/db.js", () => {
   const tx = {
     select: () => ({ from: () => ({ where: () => Promise.resolve(existingRows) }) }),
-    delete: () => ({ where: () => Promise.resolve(undefined) }),
-    insert: () => ({ values: () => ({ returning: () => Promise.resolve([{ id: "new-sub-id" }]) }) }),
+    insert: () => ({
+      values: () => ({
+        onConflictDoUpdate: () => ({ returning: () => Promise.resolve([{ id: "new-sub-id" }]) }),
+      }),
+    }),
   };
   return {
     db: {
