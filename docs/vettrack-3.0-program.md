@@ -56,7 +56,7 @@ Three empirical findings reframed the problem:
    (IDEXX) and Provet Cloud (Nordhealth) was enumerated. Across both: **zero** endpoints for
    equipment, asset, custody, shift, roster, room, kennel, crash-cart, or device. ezyVet's
    "inventory" is a billable product catalog; "staff" is a contact type. Their data model is
-   patient/client/billing-shaped and *typed in afterwards*.
+   patient/client/billing-shaped and *typed in afterward*.
 
 2. **VetTrack has no inbound clinical intent.** A repo-wide search for `clinical order`,
    `treatment sheet`, `order intent`, `physician order` returns **zero results**. Without an
@@ -76,7 +76,7 @@ VetTrack 3.0 is the program that merges them and builds a moat that is real rath
 ## 2. The thesis — and the condition it depends on
 
 > **VetTrack is the only system in the hospital whose record is written by the physical world at
-> the moment of the act — not typed in afterwards.**
+> the moment of the act — not typed in afterward.**
 
 **Category: System of Execution, witnessed.**
 
@@ -202,7 +202,7 @@ Helmer asks whether *responding would damage them*, not whether they are respond
 player can hold CP against an incumbent that has not noticed it yet.
 
 The candidate argument: a PIMS that adds witnessed physical capture is publicly conceding that its
-record — the thing it sells — has always been typed in afterwards and is therefore incomplete.
+record — the thing it sells — has always been typed in afterward and is therefore incomplete.
 
 **Caveat that keeps this honest:** the damage is **positional, not P&L**. Classic CP (Vanguard's
 fee income, Blockbuster's late fees) involves a revenue stream that copying destroys. This one
@@ -365,7 +365,8 @@ If 80 unordered acts actually occurred and only 40 were captured, true complianc
 
 ```text
 r        = R1's observed ratio of unordered to ordered care acts   (in-room, days)
-captures = all physical-stream care rows in the period             (allowlist per §7 R2 / M1)
+captures = canonical care EVENTS in the period, after the §7 R2 allowlist
+           AND its deduplication rule — not raw rows
 orders   = inbound PMS orders in the period                        (B1 feed or §5 extract)
 
 compliance_calibrated  =  captures ÷ ( orders × (1 + r) )
@@ -470,13 +471,40 @@ disappointing M1 becomes an encouraging one.
 reference, same item identity, and quantity reconciled within the billing period. A dispense that
 matches no such line after the settling window is uninvoiced.
 
-**(d) Unmatchable rows are reported, never dropped.** Rows that cannot be resolved under (a)–(c)
-are counted and reported as a separate `unmatched` figure alongside M1 and M2. Silently discarding
-them would move both metrics in an unknown direction.
+**(b-bis) The pairing is one-to-one, and its tie-breakers are fixed in advance.** A proximity
+window plus a field list is not a unique key — several orders, several invoice lines, or several
+repetitions of the same act can fall inside one window. Assignment is therefore a deterministic
+greedy pass, not a lookup:
+
+1. Enumerate every candidate pair permitted by (b) or (c).
+2. Sort by `|Δt|` ascending; break ties by the lower row identifier on the VetTrack side, then the
+   lower identifier on the PMS side. The order is total, so the result does not depend on scan order.
+3. Assign greedily. **Each care event takes at most one order; each order is taken at most once.**
+   The same holds for dispense ↔ invoice line.
+4. **Repeated acts** (same case, same item, several administrations in one window) pair in
+   timestamp order — the *n*-th act to the *n*-th counterpart — never many-to-one.
+
+**(c-bis) Split quantities.** Where a dispense and its invoice line disagree on quantity, the event
+counts as **matched** and the difference is carried as a residual in the unresolved report (below).
+M2 stays an event-level ratio, because its 15% threshold was registered on events; reporting the
+quantity residual separately keeps that threshold meaningful without silently redefining it.
+
+**(d) Unresolved rows leave both the numerator and the denominator, and are gated.** A row that
+cannot be resolved under (a)–(c) — no determinable case reference, no item identity, an ambiguity
+the tie-breakers cannot close — is **not** an unordered event and must not be counted as one. It is
+excluded from M1 and M2 entirely, and:
+
+- the **matchable denominator** is published alongside every metric, so the reader can see what
+  share of the period the number actually describes;
+- the **unresolved rate** is published with it; and
+- **if the unresolved rate exceeds 5%, G1a and G1b cannot pass.** The bound sits deliberately below
+  G1a's own 10% bar: an excluded row is of unknown class, so the discarded mass can move M1 by up to
+  the unresolved rate in either direction. A tolerance equal to the threshold would let "difficult
+  to match" decide the verdict on its own.
 
 **Registration.** The concrete keys, the proximity window, and the item-identity rule are fixed and
 written into `docs/audit/PROOF_ALIGNMENT_LOG.md` **before B2a's first run**, alongside the
-thresholds. Changing any of them afterwards changes the gate and re-triggers the anti-HARKing rule
+thresholds. Changing any of them afterward changes the gate and re-triggers the anti-HARKing rule
 (§9) — the numbers before and after such a change are not comparable and may not be reported as a
 trend.
 
@@ -513,8 +541,9 @@ corpus.
 **Musk test:** ✅ for accounts held (§3's reclassification — a compounding switching cost, not a
 market-wide barrier), and only under §3's load-bearing-workflow condition.
 **Unblocks:** M1 → the category claim and the pitch · M2 → 0.6 pricing and 2.4's ROI Ledger.
-**Depends on B2a and a comparison side** — B1's feed **or** a labelled manual extract (§5, §7 R1) —
-and on both streams being live (§5, §9). B1 specifically is required for the Provet path and G2.
+**Depends on B2a and a comparison side** — B1's feed **or** a labelled manual extract (§5, §7 R1).
+Both sides must **cover the same period**; a labelled extract is by definition not live, so
+liveness is required of the B1/Provet path and of G2, never of the extract path (§5, §9).
 
 #### R5 · The Musk audit — *a standing exercise*
 
@@ -768,7 +797,7 @@ Checked **before** the measurement period begins, not discovered during it:
    pulled.** Any citation of a number derived from an extract states that it came from one.
 3. **Item-level billing verified per clinic** — required for G1b only; a bundled-billing clinic is
    not admissible as a G1b measurement site.
-4. **Settling window fixed and published** before the first computation, not tuned afterwards.
+4. **Settling window fixed and published** before the first computation, not tuned afterward.
 5. **R1's calibration constants exist** — `r`, `c_ord`, and `c_unord` (§7 R1). Without them the
    compliance bar cannot be computed on the calibrated formula, and the raw ratio is not a
    substitute.
@@ -791,9 +820,12 @@ Checked **before** the measurement period begins, not discovered during it:
   ratio.** The raw ratio is blind to unordered care, which is M1's entire subject, and can exceed
   100% while true compliance is failing. Below the bar, §2's condition fires: M1 is a floor, not a
   measurement, and G1a **cannot pass** regardless of its size.
-- **The selection-bias rule applies (§7 R1).** If `c_unord > c_ord`, M1 is inflated and must be
-  corrected by `c_ord ÷ c_unord`, with both values reported — or G1a cannot pass. If `c_ord` and
-  `c_unord` were not measured separately, G1a cannot pass.
+- **The selection-bias rule applies (§7 R1).** Whenever `c_ord` and `c_unord` differ, M1 taken from
+  captured rows is biased and must be recomputed from the **reconstructed populations** of §7 R1 —
+  **not** by scaling the observed ratio by `c_ord ÷ c_unord`, which that section's worked check
+  shows landing *further* from the truth than applying no correction at all. Both constants are
+  reported with the figure. If `c_ord` and `c_unord` were not measured separately, or either
+  reconstructed population is zero, G1a cannot pass.
 
 **FAIL:** M1 below 10%, or randomly scattered ⇒ **the witnessed-execution thesis is wrong and the
 program stops for redesign.** Calibrated compliance below 70%, or missing calibration constants
