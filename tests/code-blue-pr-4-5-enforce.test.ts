@@ -28,20 +28,47 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, "..");
 const routeFile = path.join(repoRoot, "server", "routes", "code-blue.ts");
 const routeSrc = fs.readFileSync(routeFile, "utf8");
+// Request-body schemas were also moved out of code-blue.ts, into
+// code-blue/schemas.ts (breaks a router → handler → router import cycle;
+// see that file's header comment). code-blue.ts re-exports every schema
+// name unchanged, but the schema BODIES — what assertions below actually
+// match against — now live only in schemas.ts.
+const schemasSrc = fs.readFileSync(
+  path.join(repoRoot, "server", "routes", "code-blue", "schemas.ts"),
+  "utf8",
+);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Static-analysis: route translates `verdict.action === "deny"` into 403
 // ─────────────────────────────────────────────────────────────────────────────
 
-function extractHandlerBlock(routeStartPattern: RegExp): string {
+// Some handler bodies referenced below were extracted out of code-blue.ts
+// into their own modules (mechanical file split, TODO(arch) in
+// code-blue.ts); the router file now only holds the registration +
+// middleware chain for those. When `handlerFile` is given, append that
+// handler's BODY (from `export const` onward, i.e. excluding its own
+// import block) so assertions below — unchanged — still see the same
+// combined text, in the same relative order, they did before the split.
+// Excluding the imports matters: a handler-file import can repeat a symbol
+// name that also appears at its real call site (e.g.
+// `enqueueNotificationJob` is both imported and called), and an
+// order-sensitive `indexOf` must land on the call site, not the import.
+function extractHandlerBlock(routeStartPattern: RegExp, handlerFile?: string): string {
   const start = routeSrc.search(routeStartPattern);
   expect(start, `route ${routeStartPattern} not found`).toBeGreaterThanOrEqual(0);
   const end = routeSrc.indexOf("\nrouter.", start + 1);
-  return routeSrc.slice(start, end > start ? end : start + 8000);
+  const registrationBlock = routeSrc.slice(start, end > start ? end : start + 8000);
+  if (!handlerFile) return registrationBlock;
+  const handlerFileSrc = fs.readFileSync(
+    path.join(repoRoot, "server", "routes", "code-blue", "handlers", handlerFile),
+    "utf8",
+  );
+  const handlerBody = handlerFileSrc.slice(handlerFileSrc.indexOf("export const"));
+  return `${registrationBlock}\n${handlerBody}`;
 }
 
 describe("PR 4.5 — POST /sessions enforce-mode 403", () => {
-  const block = extractHandlerBlock(/router\.post\(\s*["']\/sessions["']/);
+  const block = extractHandlerBlock(/router\.post\(\s*["']\/sessions["']/, "post-sessions.ts");
 
   it("acts on initiation verdict action === \"deny\" by returning 403", () => {
     expect(block).toMatch(/initiationVerdict\.action\s*===\s*["']deny["']/);
@@ -95,7 +122,7 @@ describe("PR 4.5 — POST /sessions enforce-mode 403", () => {
 });
 
 describe("PR 4.5 — PATCH /sessions/:id/end enforce-mode 403", () => {
-  const block = extractHandlerBlock(/router\.patch\(\s*["']\/sessions\/:id\/end["']/);
+  const block = extractHandlerBlock(/router\.patch\(\s*["']\/sessions\/:id\/end["']/, "patch-sessions-id-end.ts");
 
   it("acts on end-side verdict action === \"deny\" by returning 403", () => {
     expect(block).toMatch(/endVerdict\?\.action\s*===\s*["']deny["']/);
@@ -133,10 +160,10 @@ describe("PR 4.5 — PATCH /sessions/:id/end enforce-mode 403", () => {
 });
 
 describe("POST /sessions/:id/logs — equipment-focused categories", () => {
-  const block = extractHandlerBlock(/router\.post\(\s*["']\/sessions\/:id\/logs["']/);
+  const block = extractHandlerBlock(/router\.post\(\s*["']\/sessions\/:id\/logs["']/, "post-sessions-id-logs.ts");
 
   it("logEntrySchema allows only equipment and note", () => {
-    expect(routeSrc).toMatch(/category:\s*z\.enum\(\[["']equipment["'],\s*["']note["']\]\)/);
+    expect(schemasSrc).toMatch(/category:\s*z\.enum\(\[["']equipment["'],\s*["']note["']\]\)/);
   });
 
   it("does not invoke drug/shock authority evaluator on log writes", () => {

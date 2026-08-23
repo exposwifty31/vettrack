@@ -41,13 +41,29 @@ const helperSrc = fs.readFileSync(helperFile, "utf8");
 // Static-analysis: POST /sessions/:id/logs middleware chain + wiring
 // ─────────────────────────────────────────────────────────────────────────────
 
+// The POST /sessions/:id/logs handler body was extracted into its own
+// module (mechanical file split, TODO(arch) in code-blue.ts); the router
+// file now only holds the registration + middleware chain. Append the
+// handler file's BODY (from `export const` onward, i.e. excluding its own
+// import block) so assertions below — unchanged — still see the same
+// combined text, in the same relative order, they did before the split.
+// Excluding the imports matters: several handler-file imports repeat a
+// symbol name that also appears at its real call site (e.g.
+// `detectMidsessionManagerDrift` is both imported and called), and an
+// order-sensitive `indexOf` must land on the call site, not the import.
 function extractLogsHandlerBlock(): string {
   const start = routeSrc.search(
     /router\.post\(\s*["']\/sessions\/:id\/logs["']/,
   );
   expect(start, "POST /sessions/:id/logs declaration not found").toBeGreaterThanOrEqual(0);
   const end = routeSrc.indexOf("\nrouter.", start + 1);
-  return routeSrc.slice(start, end > start ? end : start + 4000);
+  const registrationBlock = routeSrc.slice(start, end > start ? end : start + 4000);
+  const handlerFileSrc = fs.readFileSync(
+    path.join(repoRoot, "server", "routes", "code-blue", "handlers", "post-sessions-id-logs.ts"),
+    "utf8",
+  );
+  const handlerBody = handlerFileSrc.slice(handlerFileSrc.indexOf("export const"));
+  return `${registrationBlock}\n${handlerBody}`;
 }
 
 const logsBlock = extractLogsHandlerBlock();

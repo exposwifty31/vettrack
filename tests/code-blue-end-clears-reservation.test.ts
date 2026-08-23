@@ -20,8 +20,14 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 
 describe("R-CBF-1 · /end clears the cart soft-reserve (panel #1)", () => {
-  const src = readFileSync("server/routes/code-blue.ts", "utf8");
-  const endHandler = src.slice(src.indexOf('router.patch("/sessions/:id/end"'));
+  // The PATCH /sessions/:id/end handler body was extracted into its own
+  // module (mechanical file split, TODO(arch) formerly in code-blue.ts) —
+  // read it directly rather than the router file, which now only holds the
+  // registration.
+  const endHandler = readFileSync(
+    "server/routes/code-blue/handlers/patch-sessions-id-end.ts",
+    "utf8",
+  );
   const txStart = endHandler.indexOf("db.transaction(async (tx)");
   // The end transaction block: from `db.transaction(...)` up to the archive step
   // that follows it. The reservation clear must live inside this window.

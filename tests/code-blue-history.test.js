@@ -23,6 +23,21 @@ const backendRoutes = read("server/routes/code-blue.ts");
 const apiTs = read("src/lib/api.ts");
 const historyPage = read("src/pages/code-blue-history.tsx");
 
+/**
+ * Several code-blue.ts handler bodies were extracted into their own modules
+ * (mechanical file split, TODO(arch) formerly in code-blue.ts). `backendRoutes`
+ * alone no longer contains every handler body — concatenate every extracted
+ * handler file too, so whole-file assertions below keep seeing the same
+ * combined text they did before the split, regardless of which specific
+ * handler a given string now lives in.
+ */
+const handlersDir = path.join("server", "routes", "code-blue", "handlers");
+const allHandlersSrc = fs
+  .readdirSync(path.join(root, handlersDir))
+  .map((f) => read(path.join(handlersDir, f)))
+  .join("\n");
+const backendRoutesWithHandlers = backendRoutes + "\n" + allHandlersSrc;
+
 // ─── Backend contract ─────────────────────────────────────────────────────────
 
 describe("Code Blue History — backend route contract", () => {
@@ -38,12 +53,12 @@ describe("Code Blue History — backend route contract", () => {
   });
 
   it("history route filters by status='ended'", () => {
-    expect(backendRoutes).toContain('"ended"');
+    expect(backendRoutesWithHandlers).toContain('"ended"');
   });
 
   it("history route returns sessions ordered by startedAt DESC", () => {
-    expect(backendRoutes).toContain("startedAt");
-    expect(backendRoutes).toContain("desc");
+    expect(backendRoutesWithHandlers).toContain("startedAt");
+    expect(backendRoutesWithHandlers).toContain("desc");
   });
 });
 

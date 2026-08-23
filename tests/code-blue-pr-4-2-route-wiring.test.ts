@@ -90,11 +90,28 @@ describe("POST /api/code-blue/sessions — middleware chain", () => {
 // Wiring + side-effect ordering on POST /sessions
 
 describe("POST /api/code-blue/sessions — manager evaluator wiring", () => {
+  // POST /sessions' handler body was extracted into its own module
+  // (mechanical file split, TODO(arch) in code-blue.ts); the router file
+  // now only holds the registration + middleware chain. Append the handler
+  // file's BODY (from `export const` onward, i.e. excluding its own import
+  // block) so the order-sensitive assertions below still see the same
+  // combined text, in the same relative order, they did before the split.
+  // Excluding the imports matters: several handler-file imports repeat a
+  // symbol name that also appears at its real call site (e.g.
+  // `enqueueNotificationJob` is both imported and called), and an
+  // order-sensitive `indexOf` must land on the call site, not the import.
   const sessionsIdx = routeSrc.indexOf('"/sessions"');
-  const handlerSlice = routeSrc.slice(
-    sessionsIdx,
-    routeSrc.indexOf("router.", sessionsIdx + 20),
+  const postSessionsFileSrc = fs.readFileSync(
+    path.join(repoRoot, "server", "routes", "code-blue", "handlers", "post-sessions.ts"),
+    "utf8",
   );
+  const handlerSlice =
+    routeSrc.slice(
+      sessionsIdx,
+      routeSrc.indexOf("router.", sessionsIdx + 20),
+    ) +
+    "\n" +
+    postSessionsFileSrc.slice(postSessionsFileSrc.indexOf("export const"));
 
   it("calls evaluateCodeBlueManagerForRoute with endpoint='initiation'", () => {
     expect(handlerSlice).toContain("evaluateCodeBlueManagerForRoute");
