@@ -2662,9 +2662,6 @@ export interface TStructure {
     dispense: {
       internalError: string;
     };
-    stability: {
-      notAvailableInProduction: string;
-    };
     er: {
       notAuthenticated: string;
       internalError: string;

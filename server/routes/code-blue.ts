@@ -1035,7 +1035,6 @@ router.patch("/sessions/:id/end", requireAuth, validateUuid("id"), validateBody(
     }
 
     // Verify manager still holds vet or admin role and is still active.
-    // TODO(Phase 4): activate enforce mode for end via per-clinic vt_server_config after shadow soak
     const [managerUser] = await db
       .select({ id: users.id, role: users.role, status: users.status })
       .from(users)
