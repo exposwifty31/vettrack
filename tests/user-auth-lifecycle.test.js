@@ -69,11 +69,23 @@ describe("cleanup-scheduler.ts", () => {
 // ---------------------------------------------------------------------------
 describe("users.ts — purge endpoints", () => {
   const src = read("server/routes/users.ts");
+  // GET /purge-candidates and POST /purge-deleted were split into
+  // server/routes/users/handlers/ (see users.ts's own TODO(arch) header) —
+  // concatenate the outer router file with its handler modules so this
+  // whole-file substring check still sees the moved bodies. Mirrors
+  // equipmentErrorContractSource in phase-5-route-error-contract.test.js.
+  const usersHandlersDir = path.join(ROOT, "server", "routes", "users", "handlers");
+  const usersHandlerSources = fs
+    .readdirSync(usersHandlersDir)
+    .filter((name) => name.endsWith(".ts"))
+    .map((name) => fs.readFileSync(path.join(usersHandlersDir, name), "utf8"))
+    .join("\n");
+  const srcWithHandlers = src + usersHandlerSources;
 
   it("imports purgeDeletedUsers and countPurgeCandidates from cleanup-scheduler", () => {
-    expect(src).toContain("purgeDeletedUsers");
-    expect(src).toContain("countPurgeCandidates");
-    expect(src).toContain("cleanup-scheduler");
+    expect(srcWithHandlers).toContain("purgeDeletedUsers");
+    expect(srcWithHandlers).toContain("countPurgeCandidates");
+    expect(srcWithHandlers).toContain("cleanup-scheduler");
   });
 
   it("POST /purge-deleted requires requireAdmin", () => {
