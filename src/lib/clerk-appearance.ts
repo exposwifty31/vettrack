@@ -37,7 +37,17 @@ export const clerkAppearance = {
     logoBox: "hidden",
     logoImage: "hidden",
     // Page chrome owns the sheet; Clerk is an inset form, not a second card.
+    // Clerk 5 draws the border/shadow/background on `cardBox` — the wrapper
+    // OUTSIDE `card` — so flattening `card` alone still leaves a floating white
+    // card inside the door (core-2 upgrade guide). `max-w-none` is load-bearing:
+    // `cardBox` otherwise caps at Clerk's own width and the form renders
+    // narrower than the social buttons stacked above it.
+    cardBox: "w-full max-w-none shadow-none border-0 bg-transparent p-0",
     card: "shadow-none border-0 bg-transparent p-0 w-full",
+    // `footer` is grey by default and sits outside `card` but inside `cardBox`
+    // — the band under the CTA. It has to match the door, not Clerk's card.
+    footer: "bg-transparent bg-none shadow-none border-0",
+    footerItem: "bg-transparent",
     // Kill every Clerk leftover title so page h1 is the only heading
     // (Sign-In's "Welcome back" must never appear on /signup).
     header: "hidden",

@@ -73,6 +73,25 @@ describe("Clerk appearance — Ivory inset form (not a second card)", () => {
     expect(clerkAppearance.elements.card).toMatch(/bg-transparent/);
   });
 
+  it("flattens Clerk's OUTER cardBox and its grey footer band", () => {
+    // Clerk 5 moved the border/shadow/background OUT of `card` into a new
+    // `cardBox` wrapper, and made `footer` grey and a sibling of `card` inside
+    // it (core-2 upgrade guide). Styling `card` alone therefore still paints a
+    // floating white card with a grey band — the exact thing the full-bleed
+    // native door removes at page level. `max-w-none` is load-bearing too:
+    // Clerk caps `cardBox` at its own width, so without it the form renders
+    // narrower than the social buttons above it (ragged column on iPad).
+    const box = clerkAppearance.elements.cardBox;
+    expect(box).toMatch(/shadow-none/);
+    expect(box).toMatch(/border-0|border-none/);
+    expect(box).toMatch(/bg-transparent/);
+    expect(box).toMatch(/w-full/);
+    expect(box).toMatch(/max-w-none/);
+    expect(clerkAppearance.elements.footer).toMatch(/bg-transparent/);
+    // The native variant spreads the shared elements — it must not regress.
+    expect(clerkAppearanceNative.elements.cardBox).toBe(box);
+  });
+
   it("keeps primary CTA on brand indigo with a 44px+ target and md radius", () => {
     const primary = clerkAppearance.elements.formButtonPrimary;
     expect(primary).toMatch(/bg-primary/);
