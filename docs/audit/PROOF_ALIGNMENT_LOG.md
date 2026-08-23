@@ -10323,3 +10323,424 @@ cannot silently shrink. The DB-only orphans (`tests/migrations/**`, `restock.ser
 `shift-chat-window`) are **still unwired** — they are a different setup and are not covered here.
 
 **Verdict:** VERIFIED
+## 2026-08-22 — `docs/vettrack-3.0-program.md` lands governed, and the gate caught two of its own claims
+
+**Claim:** The VetTrack 3.0 program plan is added as a *governed* document, not an ungoverned one —
+`pnpm verify:claims` resolves every statement in it. Two factual claims it made about this codebase
+were wrong and were corrected against the tree before commit. The G1a/G1b thresholds are registered
+here **before** R2's first run, which is that gate's own anti-HARKing requirement (§9).
+
+**Evidence — the two corrections, checked against the tree this session:**
+- "59 API route **mounts**" was wrong. `ls server/routes/*.ts | wc -l` → **59** (that is route
+  *files*); `grep -cE "app\.use\(" server/app/routes.ts` → **58** mounts. `CLAUDE.md` states 60
+  mounts / 57 distinct routers. The doc now claims only what was measured: 59 route files under
+  `server/routes/`.
+- "~200 hand-reviewed known violations" was imprecise. `.tenant-lint-known-violations.json` carries
+  `totalFindings: 203` across a `violations` object of **138** `file::table` keys. The doc now states
+  both numbers.
+
+**Evidence — claims verified, not asserted:** `ls migrations/*.sql | wc -l` → 189 ·
+`server/integrations/adapters/generic-pms.ts:110` is `requiredCredentials: ["base_url", "api_key"]` ·
+`generic-pms.ts:177` is `async exportBillingEntry(...)` · `migrations/185_rls_role_precondition_guard.sql`
+exists · a repo-wide grep for `clinical.?order|treatment.?sheet|order.?intent|physician.?order` over
+`server/` and `src/` returns **0 files**, which is the doc's central gap claim.
+
+**Evidence — the gate run (`node scripts/verify-claims.mjs`, Node v22.14.0):**
+- First run, doc in `governedDocs`, no cross-repo prefix: **15 FAILED**, all one class — paths owned
+  by `exposwifty31/aethel-orchestrator` or the RN repo, plus a bare ~~`api-evangelist/*`~~ (now a URL).
+- After rewriting those references with repo prefixes, registering `aethel-orchestrator/` in
+  `crossRepoPrefixes`, and turning the third-party catalogue into a URL:
+  **1058 claims — 1033 verified, 24 registered, 1 attested, 1939 excluded by rule, 0 FAILED.**
+- The gate also surfaced a real error, not just a formatting one: the doc claimed the RN repo vendors
+  ~~`@vettrack/shared`~~. This repo publishes only `@vettrack/contracts` (`ls packages/` → `contracts`,
+  `rfid-controller`). The sentence was rewritten to say what is true here.
+
+**Registered before measurement (§9 anti-HARKing) — neither may be revised downward after seeing data:**
+- **G1a (thesis, M1):** ≥10% of allowlisted physical-stream care events in a clinic-month have no
+  corresponding PMS order after the settling window · two consecutive clinic-months at ≥2 clinics ·
+  calibrated compliance ≥70% (`captures ÷ (orders × (1 + r))`, never the raw `captures ÷ orders`) ·
+  unordered events cluster systematically rather than scattering.
+- **G1b (commercial, M2):** ≥15% of dispense events with no invoice line, same window and cadence, at
+  item-level-billing clinics only.
+- Settling window starts at 24h, tuned by R1's observed order-entry latency.
+
+**NOT RUN, and why:** `tests/claims-ledger.test.ts` (the vitest wrapper around the same engine) was not
+executed — this worktree has no `node_modules` (`ls node_modules | wc -l` → 0) and a docs-only change
+did not justify a full install. The engine itself is zero-dependency and was run directly, green. CI
+runs the wrapper. `pnpm` could not be used at all here: Node is v26.7.0 against the repo's
+`>=22.12.0 <25` ceiling, so the run used nvm's v22.14.0 directly.
+
+**Verdict:** VERIFIED for the claim-gate result and the two corrections. The vitest wrapper is
+**NOT RUN** and is left to CI. The G1 thresholds are registered, not yet measured — no data exists.
+
+## 2026-08-23 — the clause that binds G1a still mandated the estimator §7 R1 rejects (claude/competitive-moats-strategy-c03ca6)
+
+**Claim:** CodeRabbit's second review round on pull request 219 is closed on two of its three
+findings and declined with reasoning on the third. Verifying it surfaced two defects it left behind
+in `docs/vettrack-3.0-program.md`, one of them load-bearing: the previous commit fixed the
+selection-bias estimator in the method section (§7 R1) and left §9 — the clause that actually gates
+G1a — requiring the estimator §7 R1 had just rejected.
+
+**Evidence — the contradiction, read this session:**
+- `docs/vettrack-3.0-program.md:382` — §7 R1 states that scaling the observed ratio by
+  `c_ord ÷ c_unord` "does *not* correct it"; its worked check at `docs/vettrack-3.0-program.md:393`
+  gives 0.509 against a true 0.444, i.e. further from the truth than the uncorrected 0.364.
+- Before this change §9's selection-bias bullet required M1 to be "corrected by `c_ord ÷ c_unord`" —
+  the rejected rule, in the section that gates G1a. The method section and the gate contract
+  disagreed, and the binding one was wrong.
+- `docs/vettrack-3.0-program.md:823` — §9 now cites the reconstructed populations of §7 R1, applies
+  whenever the two rates differ rather than only when `c_unord > c_ord`, and fails G1a when either
+  reconstructed population is zero.
+
+**Evidence — the second defect, a threshold collision:**
+- `docs/vettrack-3.0-program.md:809` — G1a's PASS bar is "≥10%" of care events unordered, and
+  `docs/vettrack-3.0-program.md:433` already uses "the 10% threshold" to mean M1's.
+- The unresolved-rate bound introduced by the previous round was also 10%, in the opposite
+  direction. Beyond the collision it could not function as a gate: an excluded row is of unknown
+  class, so the discarded mass can move M1 by up to the unresolved rate in either direction.
+- `docs/vettrack-3.0-program.md:500` — now bounded at 5%, with the reason stated inline.
+
+**Evidence — round two's three findings, each checked against the text:**
+- `docs/vettrack-3.0-program.md:368` — R1's `captures` counts canonical care events after the §7 R2
+  allowlist and its deduplication rule, not physical-stream rows.
+- `docs/vettrack-3.0-program.md:474` — `(b-bis)` one-to-one pairing via a deterministic greedy pass
+  with a total tie-break order; `docs/vettrack-3.0-program.md:487` — `(c-bis)` split quantities;
+  `docs/vettrack-3.0-program.md:492` — `(d)` unresolved rows leave both metrics, with a published
+  matchable denominator and unresolved rate.
+- `docs/vettrack-3.0-program.md:546` — the manual-extract path no longer carries a liveness
+  requirement it cannot satisfy; liveness is required of the B1/Provet path and of G2.
+
+**Declined, with the mechanism checked rather than assumed:** the round asked for an inline
+`vt-claim: absent` marker on §2's source-absence sentence. `scripts/verify/claims.cjs:618` resolves
+that marker through `facts.grepCount(claim.pattern, claim.scope)`, and `scripts/verify/scan.cjs:328`
+defaults its scope to `package.json` — so the marker asserts that a string does not occur in a file
+in this repository, which is not what "without a source in hand" says.
+`docs/vettrack-3.0-program.md:971` already carries the declaration in prose under "Not established
+by evidence". Adding the marker would register a mechanically checkable assertion the sentence does
+not make. Reasoning posted on the review thread rather than silently skipped.
+
+**Evidence — the gates, run this session on Node v24.17.0:**
+- `pnpm architecture:gates` → exit 0. tenant-lint reported "no new findings vs baseline (203
+  known)"; claim verification reported **0 FAILED** with all claims accounted for.
+- `pnpm test -- tests/claims-ledger.test.ts` → "Test Files  1 passed (1) / Tests  88 passed (88)".
+  This closes the **NOT RUN** recorded in the 2026-08-22 entry above, which skipped the vitest
+  wrapper for want of `node_modules`. The install was done here with nvm's v24.17.0: the machine
+  default is v26.7.0, above the `>=22.12.0 <25` ceiling in `package.json`, and `engine-strict=true`
+  in `.npmrc` blocks an install on it.
+- Re-run after appending this entry, so the log does not exempt itself: claim verification **0
+  FAILED**.
+
+**Verdict:** VERIFIED for both defect fixes, the three round-two findings, and the gate results.
+The declined marker is a reasoned decline recorded on the review thread, not a verification.
+
+## 2026-08-23 — a rate ceiling cannot stop a near-threshold flip; the interval can (claude/competitive-moats-strategy-c03ca6)
+
+**Supersedes the test-scope claim in the entry immediately above.** That entry recorded
+`pnpm test -- tests/claims-ledger.test.ts` → 88/88 as its test evidence. That is a *filtered*
+invocation and does not satisfy this repository's requirement to run `pnpm test`. The review round
+caught it. The full suite has now been run and its real result is recorded below, unrounded.
+
+**Claim:** CodeRabbit's third round raised five findings, all five valid on inspection. Four are
+document defects — two of them in text this branch had just added, including one that shows the
+previous round's 5% unresolved-rate bound was only a partial fix. The fifth is the test-scope error
+above.
+
+**Evidence — the 5% bound did not close the hole it was written for (checked arithmetically):**
+- Ten unordered rows in 100 matchable is exactly 10% and passes G1a. Four unresolved rows are a
+  3.8% unresolved rate — inside the 5% bound, therefore allowed — and if all four were ordered the
+  true figure is 10 ÷ 104 = **9.6%**, a fail. In the other direction, 9 ÷ 100 fails at 9% while
+  13 ÷ 104 = **12.5%** passes. A rate ceiling bounds how much mass is discarded; it does not stop
+  that mass from deciding a near-threshold verdict.
+- `docs/vettrack-3.0-program.md:511` — (d) now recomputes each metric at both extremes of the
+  unresolved set (`M1_low`/`M1_high`, `M2_low`/`M2_high`). PASS requires the low bound to clear the
+  threshold, FAIL requires the high bound to miss it, and a straddling interval is **INDETERMINATE**
+  — re-run, never rounded into either column. The 5% rate survives as a separate data-quality floor.
+
+**Evidence — the other three document fixes:**
+- `docs/vettrack-3.0-program.md:474` — (b-bis) steps 2 and 3 previously ordered candidates by `|Δt|`
+  while a separate step 4 demanded *n*-th-to-*n*-th timestamp pairing for repeated acts; the two
+  rules disagree when deltas or timestamps tie. Event-timestamp order is now applied first and the
+  repeated-act rule is a consequence of it, not a competing clause.
+- `docs/vettrack-3.0-program.md:491` — (c-bis) previously marked a dispense of 10 covered by an
+  invoice line for 1 as *matched*, so nine units left the commercial claim silently. Quantity is now
+  allocated in a second pass that cannot create an event-level match, the remainder is **M2q**, and
+  M2q is **reported, not gated**, because no threshold for it was registered before measurement —
+  inventing one now is the HARKing §9 forbids.
+- `docs/vettrack-3.0-program.md:862` and `docs/vettrack-3.0-program.md:886` — §9's G1a and G1b now
+  carry the interval rule and the INDETERMINATE state, and the four-outcomes table says explicitly
+  that the fifth state is not one of its rows. Propagating into §9 is the point: the defect fixed in
+  the previous commit was precisely a §7 rule that never reached the clause that binds the gate.
+
+**Evidence — the full test suite, exact command and exact result:**
+- `pnpm test` (Node v24.17.0) → **exit 1**. `Test Files 18 failed | 709 passed | 19 skipped (746)`;
+  `Tests 20 failed | 6601 passed | 270 skipped (6891)`.
+- **Every failure is one cause, and it is environmental:** 60 `ECONNREFUSED` against
+  `127.0.0.1:5432`, **zero** assertion failures, and 10 `TypeError: Cannot read properties of
+  undefined (reading 'close')` which are teardown cascades from a connection that never opened. All
+  18 files are DB-backed (`tests/*.integration.test.ts` plus the four `shift-handover-*` suites).
+- Cause confirmed rather than assumed: this worktree has no `.env`, `pg_isready -h 127.0.0.1 -p 5432`
+  gets no response, and `brew services list` reports its Homebrew PostgreSQL service (major
+  version 18) in `error` state — a machine-level service, not an npm dependency of this repo.
+- **Not repaired here.** Fixing a machine-level service and provisioning a migrated database to
+  re-derive a result CI already produces was judged out of scope for a documentation change. CI ran
+  all four `Tests (shard n/4)` jobs against this branch head with a database service and all four
+  passed, which is the stronger evidence for these 18 files.
+- `pnpm architecture:gates` → exit 0; tenant-lint "no new findings vs baseline (203 known)"; claim
+  verification 1108 claims, **0 FAILED**, including the tree that carries this entry.
+
+**Verdict:** VERIFIED for the four document fixes and for `pnpm architecture:gates`.
+**PARTIAL for `pnpm test`:** the command was run in full and exited 1; 6601 tests pass and the 20
+failures are all the absent local Postgres. The 18 DB-backed files are **NOT VERIFIED LOCALLY** and
+rest on CI. **Follow-up:** `tests/shift-handover-*` and the `*.integration.test.ts` group are not in
+the exclusion list `CLAUDE.md` documents for `pnpm test`, so a developer without a local database
+sees 18 red files on a clean checkout. Either the exclusion list or those suites' setup is wrong;
+that is a pre-existing repository issue, not a product of this branch.
+
+## 2026-08-23 — the dedup rule could delete real care, and it had no review thread (claude/competitive-moats-strategy-c03ca6)
+
+**Claim:** Two findings that carried **no inline thread** — the review platform files them as "outside
+diff range" — are addressed. They were invisible to a check of unresolved threads, which reported
+zero at the time both were outstanding. One of them is a real defect in text this branch added.
+
+**Evidence — (a)'s canonical deduplication was not one-to-one:**
+- `docs/vettrack-3.0-program.md:455` — (a) collapses a `vt_dispense_events` row and a matching
+  `vt_scan_logs` row into one care event on the key `clinicId` + case reference + item identity +
+  actor + a proximity window.
+- That key is **not unique**. Two legitimate administrations of the same item, to the same case, by
+  the same actor, minutes apart inside one window, match on every field — so the rule as written
+  collapsed two real care events into one, and the missing event left the M1 and M2 denominators
+  entirely. The previous commit fixed one-to-one pairing for *cross-system* matching in (b-bis) and
+  left the same failure in the *intra-VetTrack* dedup one layer earlier, where it deletes care
+  rather than over-matching it.
+- `docs/vettrack-3.0-program.md:463`, `:469`, `:473` — the key is now stated to be non-unique;
+  dispense rows and scans pair one-to-one under (b-bis)'s ordering (event-timestamp order first,
+  then smallest `|Δt|`, then identifiers), each scan consumed by at most one dispense; and unpaired
+  rows on both sides stay whole, so *n* administrations yield *n* events. A leftover consumable or
+  case-tag scan is admitted as a care event on its own authority — `docs/vettrack-3.0-program.md:436`
+  lists it as allowlisted — rather than being dropped.
+
+**Evidence — a wording claim in an earlier entry, corrected here rather than edited:**
+- `docs/audit/PROOF_ALIGNMENT_LOG.md:10329` states that `pnpm verify:claims` "resolves every
+  statement in" the governed document. That reads more strongly than the run supports: the same
+  entry records ~1,939 dispositions as *excluded by rule*, which means the engine determined those
+  statements were not claims — it did not verify them. The accurate phrasing is that the gate
+  **accounts for** every statement, with `excluded by rule` one of the dispositions it can assign.
+- **Not edited.** That line belongs to an earlier entry, and this file's first rule is that entries
+  are never edited or deleted retroactively; a later check that contradicts an earlier one is
+  recorded as a new entry. This is that entry. The underlying gate result in the earlier entry
+  stands — only its summary sentence overstated the disposition mix.
+
+**Evidence — the gates on the tree carrying both fixes:**
+- `pnpm architecture:gates` → exit 0. tenant-lint "no new findings vs baseline (203 known)"; claim
+  verification **0 FAILED**, all claims accounted for.
+- Markdown integrity re-checked directly rather than trusting reported line numbers, which had
+  already shifted once under earlier edits in this branch: strikethrough runs balanced outside code
+  spans, fences balanced, zero unlanguaged opening fences.
+
+**Method note worth keeping.** A query for unresolved review threads returned **zero** while both of
+these findings were open, because a finding the platform cannot anchor to a diff line is filed in
+the review *body* and never becomes a thread. Thread state is not a complete list of outstanding
+review findings; the review bodies have to be read as well.
+
+**Verdict:** VERIFIED for the (a) one-to-one fix and for the gate results. The wording correction is
+a **recorded clarification** of an earlier entry, not a re-verification of it.
+
+## 2026-08-23 — greedy matching was not cardinality-preserving, and it inflated the thesis metric (claude/competitive-moats-strategy-c03ca6)
+
+**Claim:** Six review findings, five acted on and one declined with the mechanism shown. The
+important one is algorithmic: the deterministic pairing rule this branch introduced was
+nearest-first greedy, which is not cardinality-preserving, and its failure mode moved M1 in the
+flattering direction.
+
+**Evidence — greedy strands a row that a valid assignment would have matched:**
+- Care events at 10:00 and 10:10, orders at 10:02 and 09:55, ten-minute window. Candidate pairs are
+  10:00–10:02 (Δ 2), 10:00–09:55 (Δ 5), 10:10–10:02 (Δ 8); 10:10–09:55 is Δ 15 and outside the
+  window. Greedy takes 10:00 → 10:02 and strands 10:10 — **one match**. The assignment
+  10:00 → 09:55 and 10:10 → 10:02 makes **two**. Computed, not reasoned about.
+- The stranded event is then counted **unordered**, so greedy inflates M1 — the metric G1a exists to
+  test — purely as a function of assignment order.
+- `docs/vettrack-3.0-program.md:499` requires a maximum-cardinality assignment and states the
+  counterexample inline at `docs/vettrack-3.0-program.md:504`; `docs/vettrack-3.0-program.md:509`
+  restricts tie-breaking to maximum-cardinality assignments (lexicographically smallest sorted
+  `|Δt|` vector, then identifiers), keeping the result order-independent.
+- The repeated-act clause is now derived rather than asserted: both keys are timestamps on one axis,
+  so the minimising assignment never crosses. One less rule that could contradict another.
+- `docs/vettrack-3.0-program.md:469` — (a) cites the same rule instead of paraphrasing the
+  superseded greedy one. Here a stranded pair is worse than an unmatched row: it splits one act into
+  two counted events.
+
+**Evidence — quantity allocation is now defined over units** (see the later entry retracting the
+order-independence half of this heading, which was proven for one dispense and stated generally)**:**
+- `docs/vettrack-3.0-program.md:526` — each allocation is
+  `min(remaining dispense quantity, remaining line quantity)`, the event-level matched line
+  contributes first, and lines carry residuals.
+- Checked by computing both orders: a dispense of 10 against lines of 1 and 9 yields **0** uninvoiced
+  whichever line matched at event level. A dispense of 4 against a line of 10 takes 4 and leaves 6,
+  so a line is never over-allocated. A dispense of 10 against a line of 1 alone leaves **9**
+  uninvoiced — the case that was previously recorded as fully invoiced.
+- `docs/vettrack-3.0-program.md:544` — a clinic-month with zero dispensed quantity reports M2q as
+  `NOT APPLICABLE`, never `0` and never `NaN`, matching the rule §7 R1 already applies to M1's
+  calibration constants.
+
+**Evidence — the output contract no longer omits what the gate is decided on:**
+- `docs/vettrack-3.0-program.md:613` — R2's output previously listed M1, M2, compliance and the
+  settling window only, while the verdict is now read off `M1_low`/`M1_high` and `M2_low`/`M2_high`.
+  A reader given the four headline numbers could not check the gate. The bounds, the matchable
+  denominator, the unresolved rate, and M2q are now part of the contract. This is the same
+  propagation failure as the §7/§9 estimator earlier in this branch: a rule added in one section
+  and not carried to the section that consumes it.
+
+**Evidence — CI on the branch head this entry describes:**
+- Workflow run `32609698672` — `CI — VetTrack`, status completed, conclusion **success**.
+- Test shards, all four green: `97120579234` (1/4), `97120579254` (2/4), `97120579210` (3/4),
+  `97120579177` (4/4). These are the jobs that cover the 18 DB-backed files an earlier entry
+  recorded as NOT VERIFIED LOCALLY.
+- **The head hash is deliberately not pinned here**, and the reason is a property of the gate rather
+  than an oversight. A hash in a code span next to commit vocabulary is read as a commit claim and
+  must be an ancestor of the default branch; a branch head is not one, so pinning it would fail the
+  gate today. `docs/claims-registry.json` is not the escape hatch either — after this branch is
+  integrated the hash *would* resolve on its own, and an exemption that has become resolvable is
+  itself a gate failure. The run and job identifiers above are stable and independently checkable,
+  and they are what the claim actually rests on.
+
+**Declined, with the mechanism shown:** the review asked that "all claims accounted for" be narrowed
+to "all **registered** claims accounted for". That replacement is inaccurate. `registered` is one
+specific disposition — an entry in `docs/claims-registry.json`, 25 of them in this run — so the
+proposed wording would describe a much smaller set than the sentence reports. "All claims accounted
+for" is the verifier's own summary line and means every extracted claim received *some* disposition:
+verified, registered, attested, or excluded by rule, with none left silent. The source-absence
+sentence the finding points at is not an unaccounted claim; the engine classifies it as
+not-claim-shaped, which is one of those dispositions. **Recorded precisely instead:** the run on the
+tree carrying this entry is 1139 claims — 1113 verified, 25 registered, 1 attested, 2082 excluded by
+rule, **0 FAILED**. "Accounted for" is not a synonym for "verified", and the breakdown is the honest
+form of it.
+
+**Evidence — the gates:** `pnpm architecture:gates` → exit 0; tenant-lint "no new findings vs
+baseline (203 known)"; claim verification **0 FAILED**. Markdown integrity re-checked directly;
+all seven cited anchors re-read after the edits rather than trusted.
+
+**Verdict:** VERIFIED for the five fixes and the gate results. The sixth finding is a **reasoned
+decline**, not a verification.
+
+## 2026-08-23 — retracting a premature VERIFIED on the (a) deduplication fix (claude/competitive-moats-strategy-c03ca6)
+
+**Supersedes the verdict at `docs/audit/PROOF_ALIGNMENT_LOG.md:10545`,** which reads "VERIFIED for
+the (a) one-to-one fix". That verdict was premature, and the review said so before this entry was
+written rather than after.
+
+**Claim:** (a)'s deduplication was recorded as verified while it still delegated its pairing to a
+**greedy** rule. "One-to-one" was true only in the weak sense that no row took two counterparts. The
+invariant (a) actually asserts — *n* administrations yield *n* events — did not hold, because greedy
+can strand a dispense/scan pair that a different assignment would have matched, and
+`docs/vettrack-3.0-program.md:473` then retains the unpaired scan as a care event in its own right.
+One act becomes two counted events, inflating the very denominator (a) exists to protect.
+
+**Evidence:**
+- The defect and its arithmetic are recorded in the entry above: greedy matches one pair where a
+  maximum-cardinality assignment matches two, on events at 10:00 and 10:10 against counterparts at
+  10:02 and 09:55 in a ten-minute window.
+- `docs/vettrack-3.0-program.md:469` now takes the maximum-cardinality assignment in (a) directly,
+  tie-broken by the lexicographically smallest sorted `|Δt|` vector and then identifiers, and states
+  that greedy nearest-first is excluded. `docs/vettrack-3.0-program.md:499` carries the same rule in
+  (b-bis), which is what (a) delegates to.
+- The correction shipped with the change described in the entry above, whose evidence is the CI run
+  and shard-job identifiers recorded there — that entry deliberately pins no branch-head hash, so
+  this one does not refer to a hash it does not contain. This entry retracts the verdict, not the
+  fix.
+
+**What was wrong with the verdict, stated plainly.** The earlier entry verified that the *text* of
+(a) had been changed and that the gates were green. Neither of those establishes the property the
+entry claimed. A rule can read as one-to-one, pass every gate in this repository — none of which
+model a matching algorithm — and still fail its own invariant. Green gates were not evidence for
+this claim and should not have been offered as if they were.
+
+**Verdict:** the (a) fix is **VERIFIED as of the correction recorded in the entry above**, and
+**RETRACTED for the entry at `:10545`**, which claimed it one commit too early. The gate results in
+that entry stand; only its verdict on (a) does not.
+
+## 2026-08-23 — (b-bis) forbade greedy in step 2 and called itself greedy three lines above (claude/competitive-moats-strategy-c03ca6)
+
+**Claim:** A self-contradiction introduced by this branch's own maximum-cardinality fix is removed.
+No reviewer raised it; a fresh read of the finished section did.
+
+**Evidence:**
+- (b-bis)'s opening sentence still read "Assignment is therefore a deterministic **greedy pass**,
+  not a lookup", three lines above step 2's "Nearest-first greedy is *not* equivalent and must not
+  be used". The steps were replaced when maximum-cardinality matching went in; the sentence
+  introducing them was not.
+- `docs/vettrack-3.0-program.md:495` now reads "a deterministic **matching problem**, not a lookup".
+- Re-checked by grep rather than by eye: `greedy` now occurs **once** in the document,
+  at `docs/vettrack-3.0-program.md:500`, and that occurrence is the prohibition.
+
+**How it was found, since the method is the point.** Six rounds of review over an interlocking
+specification, edited by two different sessions, closed with **zero unresolved threads** and every
+gate green — and this contradiction survived all of it. It was caught by reading the finished
+section end to end and grepping for every rule the branch had superseded (`greedy`, the
+`c_ord ÷ c_unord` estimator, the retired `unmatched` terminology, the 10% unresolved bound), asking
+of each: does this still appear anywhere it is not explicitly being rejected? A review loop
+converging on zero findings is not the same as a document being consistent; the loop only sees what
+it is pointed at.
+
+**Also checked in the same pass, and clean:** every concept §7 R2 defines is honoured in §9, except
+`matchable denominator` and `maximum-cardinality`, which are absent from §9 correctly — §9 gates on
+the metric values and their bounds, not on the matching procedure that produced them.
+
+**Evidence — the gates:** `pnpm architecture:gates` → exit 0; tenant-lint "no new findings vs
+baseline (203 known)"; claim verification **0 FAILED**.
+
+**Verdict:** VERIFIED.
+
+## 2026-08-23 — I proved order-independence on one dispense and wrote it as a general property (claude/competitive-moats-strategy-c03ca6)
+
+**Retracts the "order-independent" half of the heading at
+`docs/audit/PROOF_ALIGNMENT_LOG.md:10572`.** The bullet beneath it is accurate for the case it
+names; the heading generalised past it. Four findings this round, all four valid.
+
+**Evidence — the claim was false in general, computed rather than argued:**
+- Dispenses `D1` and `D2` of 10 each; `D1` eligible for lines `L1`(10) and `L2`(10); `D2` eligible
+  for `L2`(10) and `L3`(1). The event-level assignment `D1→L2`, `D2→L3` is permitted by the rules as
+  they stood, and the per-dispense residual sweep then leaves `L1` untouched: **9 units uninvoiced**.
+  The assignment `D1→L1`, `D2→L2` credits everything: **0**.
+- So M2q was a function of the event-level tie-break rather than of the billable quantity available.
+  What I actually verified was one dispense against two lines, where no such interaction exists. The
+  case I tested could not have exposed this, and I stated the conclusion as though it could.
+- `docs/vettrack-3.0-program.md:532` — residual allocation is now **global over the group**,
+  maximising total credited units, with a lexicographic tie-break by (dispense identifier, line
+  identifier) for uniqueness. `docs/vettrack-3.0-program.md:543` states the counterexample inline so
+  the rule carries its own reason. The event-level pass, and therefore M2, is untouched.
+
+**Evidence — (a) reused a procedure without defining what it operates on:**
+- (a) delegated dispense-to-scan pairing to (b-bis), but (b-bis) step 1 draws candidates from (b) and
+  (c), which define only care-event ↔ PMS-order and dispense ↔ invoice-line edges. Nothing defined a
+  dispense ↔ scan edge, so "maximum-cardinality over the candidates" had no candidate set in (a).
+- `docs/vettrack-3.0-program.md:469` now states (a)'s edge predicate explicitly — agreement on
+  `clinicId`, case reference, item identity and actor, plus the registered pairwise time window —
+  before the shared procedure is applied to it.
+
+**Evidence — a metric with no rows had no defined outcome:**
+- With `matchable` and `unresolved` both zero, the unresolved rate divides by zero and the interval
+  has no denominator; PASS and FAIL were both undefined for that clinic-month.
+- `docs/vettrack-3.0-program.md:587` makes it **NOT APPLICABLE** — never `0`, never `NaN`, never a
+  pass — and excludes it from the two-clinic-month cadence, which needs two months that measured
+  something. Propagated to `docs/vettrack-3.0-program.md:937` (G1a) and
+  `docs/vettrack-3.0-program.md:957` (G1b) in the same edit rather than left for a later round.
+
+**Evidence — a provenance reference that pointed at nothing:**
+- `docs/audit/PROOF_ALIGNMENT_LOG.md:10646` said the correction "shipped in the commit recorded by
+  the entry above", while that entry deliberately records no branch-head hash — only CI run and job
+  identifiers. Corrected to refer to what the entry actually contains. Both corrections are edits to
+  entries added on this unmerged branch, in response to review of them, and neither changes a
+  finding or a verdict; the retracted scope claim is recorded here rather than silently overwritten.
+
+**The pattern, since this is its fourth appearance in this branch.** A rule was fixed in one place
+and the place that consumes it was left behind — §7's estimator and §9's gate, (b-bis) and (a),
+(c-bis)'s M2q zero-denominator and M1/M2's own, and now a procedure reused without its input
+relation. Every one of them passed every gate in this repository, because none of these gates model
+a metric, a matching, or an allocation. **Green gates keep proving the document is well-formed and
+keep being offered as though they proved it was right.**
+
+**Evidence — the gates:** `pnpm architecture:gates` → exit 0; tenant-lint "no new findings vs
+baseline (203 known)"; claim verification **0 FAILED**.
+
+**Verdict:** VERIFIED for the four fixes. **RETRACTED** for the order-independence generalisation at
+`:10572`, which is now scoped to the case actually computed.
