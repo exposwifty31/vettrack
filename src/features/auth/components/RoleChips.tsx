@@ -51,12 +51,12 @@ export function RoleChips({ selectedRole, onSelectRole }: RoleChipsProps = {}) {
   }
 
   return (
-    <div className="mb-6 flex flex-col items-center gap-2">
-      <span className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground">
+    <div className="mb-5 flex flex-col items-center gap-2">
+      <span className="vt-text-xs font-semibold uppercase tracking-widest text-ivory-text3">
         {interactive ? t.authPage.roleSelectLabel : t.authPage.roleLabel}
       </span>
       <div
-        className="flex flex-wrap justify-center gap-2"
+        className="flex w-full flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-center"
         role={interactive ? "radiogroup" : undefined}
         aria-label={interactive ? t.authPage.roleSelectLabel : undefined}
       >
@@ -65,7 +65,7 @@ export function RoleChips({ selectedRole, onSelectRole }: RoleChipsProps = {}) {
             return (
               <span
                 key={role}
-                className="inline-flex h-8 items-center rounded-full border border-border bg-card px-3.5 text-xs font-semibold text-foreground"
+                className="inline-flex min-h-[44px] items-center justify-center rounded-md border border-ivory-border bg-ivory-surface px-4 vt-text-sm font-semibold text-ivory-text"
               >
                 {label()}
               </span>
@@ -90,11 +90,11 @@ export function RoleChips({ selectedRole, onSelectRole }: RoleChipsProps = {}) {
               onClick={() => onSelectRole(role)}
               onKeyDown={(event) => onChipKeyDown(event, index)}
               className={cn(
-                "inline-flex h-8 items-center rounded-full border px-3.5 text-xs font-semibold transition-colors",
-                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+                "inline-flex min-h-[44px] flex-1 items-center justify-center rounded-md border px-4 vt-text-sm font-semibold transition-colors",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-ivory-surface",
                 isSelected
                   ? "border-primary bg-primary text-primary-foreground"
-                  : "border-border bg-card text-foreground hover:bg-muted",
+                  : "border-ivory-border bg-ivory-surface text-ivory-text hover:bg-muted/50",
               )}
             >
               {label()}
@@ -103,7 +103,7 @@ export function RoleChips({ selectedRole, onSelectRole }: RoleChipsProps = {}) {
         })}
       </div>
       {interactive && (
-        <p className="text-center text-[11px] text-muted-foreground max-w-[15rem]">
+        <p className="vt-text-xs max-w-[16rem] text-center text-ivory-text3 text-pretty">
           {t.authPage.roleSelectHint}
         </p>
       )}

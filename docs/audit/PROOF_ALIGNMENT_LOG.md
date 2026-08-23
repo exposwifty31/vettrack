@@ -10800,3 +10800,16 @@ on that dirty tree.
   `1020 claims: 1009 verified, 10 registered, 1 attested, 0 FAILED`.
 
 **Verdict:** VERIFIED
+
+## 2026-08-23 — Auth Ivory door chrome (visual-only polish)
+
+**Claim:** `/signin` and `/signup` use one Ivory canvas + sheet (`AuthDoorChrome`), flattened Clerk card (hidden header, transparent card), 44px role chips, and matching phone/native-social sheet language — without changing auth logic.
+
+**Evidence:**
+- `src/features/auth/components/AuthDoorChrome.tsx` — `bg-ivory-bg` canvas, `data-testid="auth-door-sheet"` with `bg-ivory-surface border-ivory-border shadow-card`, `vt-page-title` for page `h1`
+- `src/lib/clerk-appearance.ts` — `card: "shadow-none border-0 bg-transparent…"`, `headerTitle`/`headerSubtitle: "hidden"`, `formButtonPrimary` includes `min-h-[44px] rounded-md bg-primary` (no `--action`)
+- `src/pages/signin.tsx` / `src/pages/signup.tsx` — no `from-primary/5`; mount `<AuthDoorChrome>`; keep `routing="hash"`, `unsafeMetadata`, `ClerkAuthFormShell`, OfflineAuthGate, dark appearance accessors
+- Test: `pnpm test -- tests/auth-door-chrome.test.tsx tests/role-chips-signup.test.tsx tests/native-auth-surface.test.ts tests/stage-10-access-token-consistency.test.js` → 4 files, 34 passed
+- Command: `pnpm exec tsc --noEmit -p tsconfig.json` and `tsconfig.server.json` → exit 0
+
+**Verdict:** VERIFIED

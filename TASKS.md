@@ -190,6 +190,7 @@ Full cards in the plan library. Summary only:
 
 ## Completed
 
+- 2026-08-23 — **Auth Ivory door chrome** (visual-only): `/signin` + `/signup` use shared `AuthDoorChrome` (Ivory canvas + one sheet), flattened Clerk appearance, 44px role chips, phone/native-social sheet language. Auth logic untouched. Tests: `tests/auth-door-chrome.test.tsx` + existing role/native/stage-10 suites green; `tsc --noEmit` clean.
 - 2026-08-13 — **The nine-blocker push + TV board** (PRs #167–#181 to `main`): native push +
   RFID readers, reviewer-demo seed (#175), Code Blue vet-QA persona + click-path runbook (#179),
   doctor shift gate + migrations 181–184 (#180, RN companion #59), TV Command Center board

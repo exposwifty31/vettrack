@@ -78,17 +78,11 @@ export function NativeSocialButtons({ mode }: { mode: Mode }) {
 
   return (
     <div className="w-full flex flex-col gap-3" dir="ltr">
-      <div className="flex items-center gap-3 py-1" aria-hidden="true">
-        <span className="h-px flex-1 bg-border" />
-        <span className="text-xs text-muted-foreground">or</span>
-        <span className="h-px flex-1 bg-border" />
-      </div>
-
       <button
         type="button"
         disabled={!ready || busy !== null}
         onClick={() => handle("oauth_apple")}
-        className="flex items-center justify-center gap-2 w-full h-11 rounded-xl border border-border bg-background text-foreground font-medium hover:bg-muted transition-colors disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+        className="flex min-h-[44px] w-full items-center justify-center gap-2 rounded-md bg-foreground text-background font-medium transition-colors hover:bg-foreground/90 disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-ivory-surface"
         aria-label={`${verb} with Apple`}
       >
         {busy === "oauth_apple" ? (
@@ -103,7 +97,7 @@ export function NativeSocialButtons({ mode }: { mode: Mode }) {
         type="button"
         disabled={!ready || busy !== null}
         onClick={() => handle("oauth_google")}
-        className="flex items-center justify-center gap-2 w-full h-11 rounded-xl border border-border bg-background text-foreground font-medium hover:bg-muted transition-colors disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+        className="flex min-h-[44px] w-full items-center justify-center gap-2 rounded-md border border-ivory-border bg-ivory-surface text-ivory-text font-medium transition-colors hover:bg-muted/50 disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-ivory-surface"
         aria-label={`${verb} with Google`}
       >
         {busy === "oauth_google" ? (
@@ -114,8 +108,14 @@ export function NativeSocialButtons({ mode }: { mode: Mode }) {
         <span>{verb} with Google</span>
       </button>
 
+      <div className="flex items-center gap-3 py-1" aria-hidden="true">
+        <span className="h-px flex-1 bg-ivory-border" />
+        <span className="vt-text-xs text-ivory-text3">or</span>
+        <span className="h-px flex-1 bg-ivory-border" />
+      </div>
+
       {error ? (
-        <p className="text-xs text-center text-destructive px-2" role="alert">
+        <p className="vt-text-xs text-center text-destructive px-2" role="alert">
           {error}
         </p>
       ) : null}

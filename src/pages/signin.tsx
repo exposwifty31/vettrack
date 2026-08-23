@@ -3,8 +3,8 @@ import { Link, useLocation } from "wouter";
 import { Helmet } from "react-helmet-async";
 import { Loader2 } from "lucide-react";
 import { t } from "@/lib/i18n";
-import { VetTrackMark } from "@/components/vettrack-mark";
 import { RoleChips, type SignupRequestedRole } from "@/features/auth/components/RoleChips";
+import { AuthDoorChrome } from "@/features/auth/components/AuthDoorChrome";
 import { readCarriedRole, writeCarriedRole } from "@/features/auth/requested-role-store";
 import { captureJoinCodeFromSearch } from "@/features/auth/join-code-store";
 import { ClerkFailed, ClerkLoaded, ClerkLoading, SignIn, useUser } from "@clerk/clerk-react";
@@ -83,103 +83,87 @@ export default function SignInPage() {
         <meta name="robots" content="noindex" />
       </Helmet>
 
-      <div className="min-h-[100dvh] bg-gradient-to-b from-primary/5 to-background flex flex-col items-center justify-center px-4">
-        <div className="w-full max-w-sm">
-          <div className="text-center mb-8">
-            <Link
-              href="/"
-              className="inline-flex items-center gap-2.5 mb-6 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-            >
-              <VetTrackMark size={40} />
-              <span className="text-2xl font-bold text-foreground">VetTrack</span>
-            </Link>
-            <h1 className="text-2xl font-bold text-foreground mb-2">{t.authPage.welcomeBack}</h1>
-            <p className="text-sm text-muted-foreground">{t.authPage.signInSubtitle}</p>
-          </div>
+      <AuthDoorChrome
+        title={t.authPage.welcomeBack}
+        subtitle={t.authPage.signInSubtitle}
+        footer={<LegalFooterLinks />}
+      >
+        <RoleChips
+          selectedRole={preRole}
+          onSelectRole={(role) => {
+            setPreRole(role);
+            writeCarriedRole(role);
+          }}
+        />
 
-          <RoleChips
-            selectedRole={preRole}
-            onSelectRole={(role) => {
-              setPreRole(role);
-              writeCarriedRole(role);
-            }}
-          />
-
-          {CLERK_ENABLED ? (
-            <div className="flex flex-col items-center gap-4">
-              {usePhoneFlow ? (
-                <>
-                  <OfflineAuthGate>
-                    <PhoneSignIn />
-                  </OfflineAuthGate>
+        {CLERK_ENABLED ? (
+          <div className="flex flex-col items-center gap-4">
+            {usePhoneFlow ? (
+              <>
+                <OfflineAuthGate>
+                  <PhoneSignIn />
+                </OfflineAuthGate>
+                <button
+                  type="button"
+                  onClick={() => setUsePhoneFlow(false)}
+                  className="vt-text-xs text-ivory-text3 hover:text-primary transition-colors underline rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                >
+                  → {t.authPage.backToRegularSignIn}
+                </button>
+              </>
+            ) : (
+              <>
+                <ClerkLoading>
+                  <div className="flex w-full min-h-[12rem] justify-center items-center" aria-busy>
+                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                  </div>
+                </ClerkLoading>
+                <ClerkFailed>
+                  <p className="vt-text-sm text-center text-destructive px-2" role="alert">
+                    {t.authPage.signInLoadError}
+                  </p>
+                </ClerkFailed>
+                <ClerkLoaded>
+                  <ClerkAuthFormShell>
+                    <OfflineAuthGate>
+                      <div className="w-full min-h-[24rem] flex flex-col items-center justify-start gap-4">
+                        {isNative ? <NativeSocialButtons mode="signIn" /> : null}
+                        <SignIn
+                          routing="hash"
+                          signUpUrl="/signup"
+                          fallbackRedirectUrl="/home"
+                          appearance={isNative ? getClerkAppearanceNative(isDark) : getClerkAppearance(isDark)}
+                        />
+                      </div>
+                    </OfflineAuthGate>
+                  </ClerkAuthFormShell>
+                </ClerkLoaded>
+                <p className="vt-text-xs text-ivory-text3 text-center max-w-xs text-pretty">
+                  {t.authPage.phonePrompt}{" "}
                   <button
                     type="button"
-                    onClick={() => setUsePhoneFlow(false)}
-                    className="text-xs text-muted-foreground hover:text-primary transition-colors underline rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    onClick={() => setUsePhoneFlow(true)}
+                    className="underline hover:text-primary transition-colors"
                   >
-                    → {t.authPage.backToRegularSignIn}
-                  </button>
-                </>
-              ) : (
-                <>
-                  <ClerkLoading>
-                    <div className="flex w-full min-h-[12rem] justify-center items-center" aria-busy>
-                      <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                    </div>
-                  </ClerkLoading>
-                  <ClerkFailed>
-                    <p className="text-sm text-center text-destructive px-2" role="alert">
-                      {t.authPage.signInLoadError}
-                    </p>
-                  </ClerkFailed>
-                  <ClerkLoaded>
-                    <ClerkAuthFormShell>
-                      <OfflineAuthGate>
-                        <div className="w-full min-h-[24rem] flex flex-col items-center justify-start gap-4">
-                          {isNative ? <NativeSocialButtons mode="signIn" /> : null}
-                          <SignIn
-                            routing="hash"
-                            signUpUrl="/signup"
-                            fallbackRedirectUrl="/home"
-                            appearance={isNative ? getClerkAppearanceNative(isDark) : getClerkAppearance(isDark)}
-                          />
-                        </div>
-                      </OfflineAuthGate>
-                    </ClerkAuthFormShell>
-                  </ClerkLoaded>
-                  <p className="text-xs text-muted-foreground text-center max-w-xs">
-                    {t.authPage.phonePrompt}{" "}
-                    <button
-                      type="button"
-                      onClick={() => setUsePhoneFlow(true)}
-                      className="underline hover:text-primary transition-colors"
-                    >
-                      {t.authPage.usePhoneSignIn}
-                    </button>{" "}
-                    {t.authPage.phoneFormatHint}
-                  </p>
-                </>
-              )}
-            </div>
-          ) : (
-            <div className="bg-card border border-border rounded-2xl p-6 shadow-sm text-center">
-              <p className="text-sm text-muted-foreground mb-4">
-                {t.authPage.devModeNotice}
-              </p>
-              <Link
-                href="/home"
-                className="inline-flex items-center justify-center gap-2 w-full bg-primary hover:bg-primary/90 text-primary-foreground font-semibold px-4 py-3 rounded-xl transition-colors"
-              >
-                {t.authPage.enterDashboard}
-              </Link>
-            </div>
-          )}
-
-          <div className="text-center mt-6 space-y-3">
-            <LegalFooterLinks />
+                    {t.authPage.usePhoneSignIn}
+                  </button>{" "}
+                  {t.authPage.phoneFormatHint}
+                </p>
+              </>
+            )}
           </div>
-        </div>
-      </div>
+        ) : (
+          <div className="rounded-md border border-ivory-border bg-ivory-bg/60 p-5 text-center">
+            <p className="vt-text-sm text-ivory-text2 mb-4">{t.authPage.devModeNotice}</p>
+            <Link
+              href="/home"
+              className="inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-md bg-primary px-4 py-3 font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
+            >
+              {t.authPage.enterDashboard}
+            </Link>
+          </div>
+        )}
+      </AuthDoorChrome>
     </>
   );
 
