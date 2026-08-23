@@ -251,6 +251,23 @@ export async function assertWaitlistCheckoutAllowed(
   }
 }
 
+/**
+ * D-13 anchor contradiction: the item is now in custody, so it is no longer
+ * at its station. Fire-and-forget via `db` (not `tx`) so a failure here can
+ * never poison or roll back the checkout transaction — but for that same
+ * reason it must only be called AFTER the checkout transaction has actually
+ * committed. Calling it from inside the transaction (as performEquipmentCheckout
+ * itself once did) let it run on a separate connection while the checkout
+ * could still roll back, leaving the anchor invalidated for an item that was
+ * never actually checked out. Every caller of performEquipmentCheckout must
+ * call this once its own `db.transaction(...)` wrapper has resolved.
+ */
+export function invalidateAnchorAfterCheckout(clinicId: string, equipmentId: string): void {
+  void invalidateCurrentAnchor(db, { clinicId, equipmentId, reason: "checkout" }).catch((err) => {
+    console.error("[docking] anchor invalidation failed (checkout, non-fatal):", err);
+  });
+}
+
 export async function performEquipmentCheckout(
   tx: Tx,
   params: PerformEquipmentCheckoutParams,
@@ -342,12 +359,8 @@ export async function performEquipmentCheckout(
     }
   }
 
-  // D-13 anchor contradiction: the item is now in custody, so it is no
-  // longer at its station. Fire-and-forget via `db` (not `tx`) so a failure
-  // here can never poison or roll back the checkout transaction.
-  void invalidateCurrentAnchor(db, { clinicId, equipmentId, reason: "checkout" }).catch((err) => {
-    console.error("[docking] anchor invalidation failed (checkout, non-fatal):", err);
-  });
+  // D-13 anchor contradiction — the caller must call
+  // invalidateAnchorAfterCheckout() once this transaction commits.
 
   const checkoutLogId = randomUUID();
 
@@ -858,6 +871,8 @@ export async function quickScanEquipmentCustody(
   });
 
   if (!txResult) return { kind: "not_found" };
+
+  invalidateAnchorAfterCheckout(clinicId, equipmentId);
 
   await finalizeCheckoutSideEffects({
     clinicId,
