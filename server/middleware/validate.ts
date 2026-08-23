@@ -30,7 +30,7 @@ export function validateUuid(paramName: string) {
   return (req: Request, res: Response, next: NextFunction): void => {
     const val = req.params[paramName];
     if (!val || typeof val !== "string" || !UUID_RE.test(val.trim())) {
-      res.status(400).json({ error: `Invalid ${paramName}: must be a valid UUID` });
+      res.status(400).json({ error: `Invalid ${paramName}: must be a valid UUID`, details: [] });
       return;
     }
     next();
