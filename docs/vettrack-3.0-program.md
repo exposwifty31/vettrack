@@ -466,12 +466,17 @@ and with whoever did the matching — and a threshold that moves is not a thresh
   the M1 and M2 denominators altogether. This is the same one-to-one failure as (b-bis), one layer
   earlier and in the more damaging direction: (b-bis) risks over-*matching*, this risks
   over-*collapsing*.
-- **Dispense rows and scans are therefore paired one-to-one, by (b-bis)'s rule — the same rule, not
-  a paraphrase of it.** Take the maximum-cardinality assignment within the key group, tie-broken by
-  the lexicographically smallest sorted `|Δt|` vector and then by identifiers. Each scan is consumed
-  by at most one dispense. Greedy nearest-first is excluded here for the same reason as in (b-bis),
-  and the consequence here is worse: a stranded pair does not merely go unmatched, it splits one act
-  into two counted events.
+- **(a)'s candidate edge, defined here rather than borrowed.** A `vt_dispense_events` row and a
+  `vt_scan_logs` row are candidates for collapse **iff** they agree on `clinicId`, case/patient
+  reference, item identity and actor, **and** their event times differ by no more than the registered
+  proximity window. That is a pairwise condition on two VetTrack rows; (b) and (c) define only
+  care-event ↔ PMS-order and dispense ↔ invoice-line edges, so neither of them supplies it.
+- **On those edges, (b-bis)'s procedure applies unchanged — the same rule, not a paraphrase.** Take
+  the maximum-cardinality assignment within the key group, tie-broken by the lexicographically
+  smallest sorted `|Δt|` vector and then by identifiers. Each scan is consumed by at most one
+  dispense. Greedy nearest-first is excluded here for the same reason as in (b-bis), and the
+  consequence here is worse: a stranded pair does not merely go unmatched, it splits one act into
+  two counted events.
 - **Unpaired rows on either side stay whole — *n* real administrations yield *n* events.** A
   dispense with no scan is a canonical care event on its own; the scan is corroboration, never a
   precondition. A leftover consumable or case-tag scan is **not** discarded either: the allowlist
@@ -524,16 +529,25 @@ accounted in a **second pass that never touches M2**, over units rather than row
 
 1. **The event-level matched line contributes first**, and it contributes only what it has: the
    allocation is `min(remaining dispense quantity, remaining line quantity)`.
-2. **Then any other candidate line in the same group**, in (b-bis)'s order, under the same `min(...)`
-   rule, until the dispensed quantity is met or no candidate line has quantity left.
+2. **Then the residual is allocated globally, not dispense-by-dispense.** Over all dispenses in the
+   group at once, choose the allocation of remaining line quantity to remaining dispense quantity —
+   across the candidate edges of (c), each allocation still capped at
+   `min(remaining dispense quantity, remaining line quantity)` — that **maximises total credited
+   units**. Among allocations achieving that maximum, take the one that is lexicographically smallest
+   by (dispense identifier, line identifier), so the result is unique.
 3. **Lines carry a residual and may serve more than one dispense** until exhausted; a line is never
    allocated beyond its own quantity, so a line of 10 against a dispense of 4 gives up 4 and keeps 6.
    A dispense is never credited beyond what it dispensed.
 4. Whatever the dispense still lacks is **uninvoiced quantity**.
 
-Allocating over units rather than whole lines is what makes the result order-independent: a dispense
-of 10 meeting lines of 1 and 9 yields the same M2q whichever line it matched at event level. The
-second pass creates no additional event-level match, so (b-bis)'s one-to-one rule is intact.
+**Why global and not per-dispense.** A per-dispense sweep makes M2q a function of the event-level
+tie-break rather than of the money actually available to bill. Take dispenses `D1` and `D2` of 10
+each, `D1` eligible for lines `L1`(10) and `L2`(10), `D2` eligible for `L2`(10) and `L3`(1). The
+event-level assignment `D1→L2`, `D2→L3` is permitted, and a per-dispense sweep then leaves `L1`
+entirely unused: **9 units uninvoiced**. The assignment `D1→L1`, `D2→L2` covers everything: **0**.
+Same data, same rules, different number — decided by a tie-break that was never about quantity.
+Maximising credited units globally removes that dependence; the event-level pass, and therefore M2,
+is untouched either way.
 
 M2 stays an event-level ratio — its 15% threshold was registered on events, and redefining the unit
 after measurement is the HARKing §9 forbids. But an event-level ratio counts a dispense of 10
@@ -570,6 +584,13 @@ make it harmless: its true class is unknown, so it can still decide the verdict.
   as a pass, quoted as a floor, or averaged with determinate months.
 - **Separately, an unresolved rate above 5% makes the clinic-month inadmissible** — a data-quality
   floor, independent of the bounds test. Both conditions must hold.
+- **No data is its own outcome, and it is never a pass.** If a clinic-month has no rows for a metric
+  at all — `matchable` and `unresolved` both zero — the unresolved rate is a division by zero and
+  the interval has no denominator. That clinic-month is **NOT APPLICABLE** for that metric: it is
+  not `0`, not `NaN`, not a pass, and it does not count toward the "two consecutive clinic-months at
+  ≥2 clinics" cadence, which needs two months that actually measured something. The same rule §7 R1
+  applies to M1's calibration constants and (c-bis) applies to M2q — an undefined input abstains, it
+  never defaults.
 
 *Why a bound and not just a rate.* Ten unordered rows in 100 matchable is exactly 10% and reads as a
 pass. Four unresolved rows — 3.8%, comfortably inside the 5% floor — put the true figure at
@@ -913,6 +934,9 @@ counted as unordered — or unordered events that scatter randomly instead of cl
 witnessed-execution thesis is wrong and the program stops for redesign.** Calibrated compliance
 below 70%, or missing calibration constants ⇒ G1a is suspended and B3 runs before re-attempt.
 
+**NOT APPLICABLE:** the clinic-month has no matchable and no unresolved rows for M1 (§7 R2 (d)).
+It is not a pass, not a fail, and does not count toward the two-clinic-month cadence.
+
 **INDETERMINATE:** the interval `[M1_low, M1_high]` straddles 10%, or the unresolved rate exceeds
 5%. The clinic-month is **neither passed nor failed**; it is re-run with the matching defect fixed.
 It may not be reported as a pass, quoted as a floor, or averaged with determinate months — an
@@ -930,7 +954,8 @@ without anyone editing a threshold.
 - Compliance is the same calibrated figure used by G1a.
 - **The interval rule of §7 R2 (d) applies identically.** PASS requires `M2_low` — every unresolved
   dispense counted as *invoiced* — to clear 15%; FAIL requires `M2_high` to miss it; anything
-  between is **INDETERMINATE**, on the same terms as G1a.
+  between is **INDETERMINATE**, on the same terms as G1a. A clinic-month with no dispense rows at
+  all is **NOT APPLICABLE** for M2 and does not count toward the cadence.
 - **M2q — uninvoiced quantity ÷ dispensed quantity (§7 R2 (c-bis)) — is reported alongside M2 and
   does not gate G1b in this revision.** M2 counts events with no invoice line at all; a dispense of
   10 billed as 1 is *matched* at event level, so the quantity shortfall is invisible to the

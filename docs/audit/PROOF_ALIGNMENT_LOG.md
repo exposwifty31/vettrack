@@ -10569,7 +10569,8 @@ flattering direction.
   superseded greedy one. Here a stranded pair is worse than an unmatched row: it splits one act into
   two counted events.
 
-**Evidence — quantity allocation is now defined over units, and is order-independent:**
+**Evidence — quantity allocation is now defined over units** (see the later entry retracting the
+order-independence half of this heading, which was proven for one dispense and stated generally)**:**
 - `docs/vettrack-3.0-program.md:526` — each allocation is
   `min(remaining dispense quantity, remaining line quantity)`, the event-level matched line
   contributes first, and lines carry residuals.
@@ -10642,8 +10643,10 @@ One act becomes two counted events, inflating the very denominator (a) exists to
   tie-broken by the lexicographically smallest sorted `|Δt|` vector and then identifiers, and states
   that greedy nearest-first is excluded. `docs/vettrack-3.0-program.md:499` carries the same rule in
   (b-bis), which is what (a) delegates to.
-- The correction shipped in the commit recorded by the entry above; this entry retracts the verdict
-  rather than the fix.
+- The correction shipped with the change described in the entry above, whose evidence is the CI run
+  and shard-job identifiers recorded there — that entry deliberately pins no branch-head hash, so
+  this one does not refer to a hash it does not contain. This entry retracts the verdict, not the
+  fix.
 
 **What was wrong with the verdict, stated plainly.** The earlier entry verified that the *text* of
 (a) had been changed and that the gates were green. Neither of those establishes the property the
@@ -10686,3 +10689,58 @@ the metric values and their bounds, not on the matching procedure that produced 
 baseline (203 known)"; claim verification **0 FAILED**.
 
 **Verdict:** VERIFIED.
+
+## 2026-08-23 — I proved order-independence on one dispense and wrote it as a general property (claude/competitive-moats-strategy-c03ca6)
+
+**Retracts the "order-independent" half of the heading at
+`docs/audit/PROOF_ALIGNMENT_LOG.md:10572`.** The bullet beneath it is accurate for the case it
+names; the heading generalised past it. Four findings this round, all four valid.
+
+**Evidence — the claim was false in general, computed rather than argued:**
+- Dispenses `D1` and `D2` of 10 each; `D1` eligible for lines `L1`(10) and `L2`(10); `D2` eligible
+  for `L2`(10) and `L3`(1). The event-level assignment `D1→L2`, `D2→L3` is permitted by the rules as
+  they stood, and the per-dispense residual sweep then leaves `L1` untouched: **9 units uninvoiced**.
+  The assignment `D1→L1`, `D2→L2` credits everything: **0**.
+- So M2q was a function of the event-level tie-break rather than of the billable quantity available.
+  What I actually verified was one dispense against two lines, where no such interaction exists. The
+  case I tested could not have exposed this, and I stated the conclusion as though it could.
+- `docs/vettrack-3.0-program.md:532` — residual allocation is now **global over the group**,
+  maximising total credited units, with a lexicographic tie-break by (dispense identifier, line
+  identifier) for uniqueness. `docs/vettrack-3.0-program.md:543` states the counterexample inline so
+  the rule carries its own reason. The event-level pass, and therefore M2, is untouched.
+
+**Evidence — (a) reused a procedure without defining what it operates on:**
+- (a) delegated dispense-to-scan pairing to (b-bis), but (b-bis) step 1 draws candidates from (b) and
+  (c), which define only care-event ↔ PMS-order and dispense ↔ invoice-line edges. Nothing defined a
+  dispense ↔ scan edge, so "maximum-cardinality over the candidates" had no candidate set in (a).
+- `docs/vettrack-3.0-program.md:469` now states (a)'s edge predicate explicitly — agreement on
+  `clinicId`, case reference, item identity and actor, plus the registered pairwise time window —
+  before the shared procedure is applied to it.
+
+**Evidence — a metric with no rows had no defined outcome:**
+- With `matchable` and `unresolved` both zero, the unresolved rate divides by zero and the interval
+  has no denominator; PASS and FAIL were both undefined for that clinic-month.
+- `docs/vettrack-3.0-program.md:587` makes it **NOT APPLICABLE** — never `0`, never `NaN`, never a
+  pass — and excludes it from the two-clinic-month cadence, which needs two months that measured
+  something. Propagated to `docs/vettrack-3.0-program.md:937` (G1a) and
+  `docs/vettrack-3.0-program.md:957` (G1b) in the same edit rather than left for a later round.
+
+**Evidence — a provenance reference that pointed at nothing:**
+- `docs/audit/PROOF_ALIGNMENT_LOG.md:10646` said the correction "shipped in the commit recorded by
+  the entry above", while that entry deliberately records no branch-head hash — only CI run and job
+  identifiers. Corrected to refer to what the entry actually contains. Both corrections are edits to
+  entries added on this unmerged branch, in response to review of them, and neither changes a
+  finding or a verdict; the retracted scope claim is recorded here rather than silently overwritten.
+
+**The pattern, since this is its fourth appearance in this branch.** A rule was fixed in one place
+and the place that consumes it was left behind — §7's estimator and §9's gate, (b-bis) and (a),
+(c-bis)'s M2q zero-denominator and M1/M2's own, and now a procedure reused without its input
+relation. Every one of them passed every gate in this repository, because none of these gates model
+a metric, a matching, or an allocation. **Green gates keep proving the document is well-formed and
+keep being offered as though they proved it was right.**
+
+**Evidence — the gates:** `pnpm architecture:gates` → exit 0; tenant-lint "no new findings vs
+baseline (203 known)"; claim verification **0 FAILED**.
+
+**Verdict:** VERIFIED for the four fixes. **RETRACTED** for the order-independence generalisation at
+`:10572`, which is now scoped to the case actually computed.
