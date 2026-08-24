@@ -13,7 +13,13 @@ const repoRoot = path.resolve(__dirname, "..");
 const migration026 = fs.readFileSync(path.join(repoRoot, "migrations", "026_appointments_scheduling.sql"), "utf8");
 const migration027 = fs.readFileSync(path.join(repoRoot, "migrations", "027_appointments_product_polish.sql"), "utf8");
 const migration028 = fs.readFileSync(path.join(repoRoot, "migrations", "028_appointments_service_task_fields.sql"), "utf8");
-const serviceFile = fs.readFileSync(path.join(repoRoot, "server", "services", "appointments.service.ts"), "utf8");
+// Service source spans scheduling.service.ts + task-lifecycle.service.ts (ADR-002
+// split — see docs/architecture/adr-002-appointments-service-split.md), the same
+// pattern as appointmentsPage below (Tasks.tsx + task-utils.tsx, R6 split).
+const serviceFile = [
+  fs.readFileSync(path.join(repoRoot, "server", "services", "scheduling.service.ts"), "utf8"),
+  fs.readFileSync(path.join(repoRoot, "server", "services", "task-lifecycle.service.ts"), "utf8"),
+].join("\n");
 const authFile = fs.readFileSync(path.join(repoRoot, "server", "middleware", "auth.ts"), "utf8");
 const routeFile = fs.readFileSync(path.join(repoRoot, "server", "routes", "appointments.ts"), "utf8");
 const taskRouteFile = fs.readFileSync(path.join(repoRoot, "server", "routes", "tasks.ts"), "utf8");

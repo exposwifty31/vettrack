@@ -187,18 +187,27 @@ describe("quick-scan checkout gates (F1 regression)", () => {
 describe("POST /api/equipment/scan route — gate error mapping contract", () => {
   const __dirname = path.dirname(fileURLToPath(import.meta.url));
   const routeSource = fs.readFileSync(path.resolve(__dirname, "../server/routes/equipment.ts"), "utf8");
+  // POST /:id/toggle's handler body was extracted to its own module (equipment
+  // god-files split plan, sanctioned first step — service already existed).
+  // Middleware + registration stay on the router in equipment.ts; the handler
+  // body — and its call into the shared gate-error mapper — now lives here.
+  const toggleHandler = fs.readFileSync(
+    path.resolve(__dirname, "../server/routes/equipment/handlers/post-equipment-toggle.ts"),
+    "utf8",
+  );
+  const routeUtilsSource = fs.readFileSync(
+    path.resolve(__dirname, "../server/routes/equipment/equipment-route-utils.ts"),
+    "utf8",
+  );
   const scanHandler = routeSource.slice(
     routeSource.indexOf('router.post("/scan"'),
     routeSource.indexOf("// POST /api/equipment/:id/toggle"),
   );
-  const toggleHandler = routeSource.slice(
-    routeSource.indexOf("// POST /api/equipment/:id/toggle"),
-    routeSource.indexOf("// POST /api/equipment/:id/checkout"),
-  );
-  const mapperSource = routeSource.slice(
-    routeSource.indexOf("function mapCheckoutGateError("),
-    routeSource.indexOf("router.get("),
-  );
+  // mapCheckoutGateError moved alongside the toggle extraction — it is a
+  // shared dependency of /scan (still inline) and /:id/toggle (extracted),
+  // so it now lives in the equipment-specific route-utils module rather than
+  // duplicated per handler.
+  const mapperSource = routeUtilsSource.slice(routeUtilsSource.indexOf("function mapCheckoutGateError("));
 
   it("scan and toggle share the checkout gate error mapper", () => {
     expect(scanHandler).toContain("mapCheckoutGateError(err, req, res)");

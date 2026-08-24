@@ -7,7 +7,12 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const repoRoot = path.resolve(__dirname, "..");
 const taskNotif = fs.readFileSync(path.join(repoRoot, "server", "lib", "task-notification.ts"), "utf8");
-const serviceFile = fs.readFileSync(path.join(repoRoot, "server", "services", "appointments.service.ts"), "utf8");
+// Service source spans scheduling.service.ts + task-lifecycle.service.ts (ADR-002
+// split — see docs/architecture/adr-002-appointments-service-split.md).
+const serviceFile = [
+  fs.readFileSync(path.join(repoRoot, "server", "services", "scheduling.service.ts"), "utf8"),
+  fs.readFileSync(path.join(repoRoot, "server", "services", "task-lifecycle.service.ts"), "utf8"),
+].join("\n");
 const auditFile = fs.readFileSync(path.join(repoRoot, "server", "lib", "audit.ts"), "utf8");
 
 describe("Phase 3.2 Task Notification Orchestration (static checks)", () => {
