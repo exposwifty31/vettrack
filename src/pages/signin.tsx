@@ -12,6 +12,7 @@ import { PhoneSignIn } from "@/components/phone-sign-in";
 import { getClerkAppearance, getClerkAppearanceNative } from "@/lib/clerk-appearance";
 import { useIsDarkActive } from "@/hooks/use-settings";
 import { isCapacitorNative } from "@/lib/capacitor-runtime";
+import { cn } from "@/lib/utils";
 import { ClerkAuthFormShell } from "@/components/clerk-auth-form-shell";
 import { AuthBootstrapSpinner } from "@/components/native-clerk-gate";
 import { NativeSocialButtons } from "@/components/native-social-buttons";
@@ -103,7 +104,7 @@ export default function SignInPage() {
               <>
                 <ClerkLoading>
                   <div className="flex w-full min-h-[12rem] justify-center items-center" aria-busy>
-                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                    <Loader2 className="h-8 w-8 animate-spin motion-reduce:animate-none text-primary" />
                   </div>
                 </ClerkLoading>
                 <ClerkFailed>
@@ -114,7 +115,15 @@ export default function SignInPage() {
                 <ClerkLoaded>
                   <ClerkAuthFormShell>
                     <OfflineAuthGate>
-                      <div className="w-full min-h-[24rem] flex flex-col items-center justify-start gap-4">
+                      {/* The 24rem reserve stops the centered web sheet resizing under the
+                          user as clerk-js mounts. The native door is top-aligned, so the same
+                          reserve only leaves dead space below a shorter form — drop it there. */}
+                      <div
+                        className={cn(
+                          "w-full flex flex-col items-center justify-start gap-4",
+                          !isNative && "min-h-[24rem]",
+                        )}
+                      >
                         {isNative ? <NativeSocialButtons mode="signIn" /> : null}
                         <SignIn
                           routing="hash"

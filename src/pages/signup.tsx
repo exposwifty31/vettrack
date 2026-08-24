@@ -14,6 +14,7 @@ import { isClerkEnabled } from "@/lib/auth-fetch";
 import { getClerkAppearance, getClerkAppearanceNative } from "@/lib/clerk-appearance";
 import { useIsDarkActive } from "@/hooks/use-settings";
 import { isCapacitorNative } from "@/lib/capacitor-runtime";
+import { cn } from "@/lib/utils";
 import { ClerkAuthFormShell } from "@/components/clerk-auth-form-shell";
 import { NativeSocialButtons } from "@/components/native-social-buttons";
 import { OfflineAuthGate } from "@/components/offline-auth-gate";
@@ -89,7 +90,7 @@ export default function SignUpPage() {
           <div className="flex w-full flex-col items-center gap-4">
             <ClerkLoading>
               <div className="flex w-full min-h-[12rem] justify-center items-center" aria-busy>
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                <Loader2 className="h-8 w-8 animate-spin motion-reduce:animate-none text-primary" />
               </div>
             </ClerkLoading>
             <ClerkFailed>
@@ -100,7 +101,15 @@ export default function SignUpPage() {
             <ClerkLoaded>
               <ClerkAuthFormShell>
                 <OfflineAuthGate>
-                  <div className="w-full min-h-[24rem] flex flex-col items-center justify-start gap-4">
+                  {/* The 24rem reserve stops the centered web sheet resizing under the
+                      user as clerk-js mounts. The native door is top-aligned, so the same
+                      reserve only leaves dead space below a shorter form — drop it there. */}
+                  <div
+                    className={cn(
+                      "w-full flex flex-col items-center justify-start gap-4",
+                      !isNative && "min-h-[24rem]",
+                    )}
+                  >
                     {!vetLicenseReady ? (
                       <p
                         className="vt-text-sm text-center text-ivory-text2 px-2 py-8"

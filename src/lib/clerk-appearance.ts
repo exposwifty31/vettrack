@@ -58,6 +58,33 @@ export const clerkAppearance = {
     formHeaderSubtitle: "hidden",
     socialButtonsBlockButton:
       "min-h-[44px] rounded-md border-ivory-border bg-ivory-surface text-ivory-text hover:bg-muted",
+    // ORDER is no longer handled here: `ClerkAuthFormShell` stopped forcing the
+    // whole form to `dir="ltr"` and now carries that on the inputs, so this row
+    // inherits the page direction like everything else.
+    //
+    // CLIPPING still is. The row's inline-end item sits flush against an
+    // ancestor's `overflow`, and Hebrew final forms carry ink past their advance
+    // width, so the last glyph was sheared (on device: the nun of the use-phone
+    // action and the yod of the "optional" hint, each surviving as a hairline).
+    // Measured, not guessed: `overflow-visible` on this row did NOT clear it
+    // (the clipping ancestor is higher up) and neither did `direction`. Only
+    // insetting the inline-end side does. Padding the row rather than the item
+    // keeps the label flush with the input below it.
+    formFieldLabelRow: "rtl:pe-2",
+    // Clerk collapses the password row on the identifier step with
+    // `height:0; opacity:0` and `overflow:visible`, and takes it off the keyboard
+    // (`tabindex="-1"`) and the pointer (`pointer-events:none`) — but not out of
+    // the accessibility tree: no `aria-hidden`, no `inert`, no `visibility`.
+    // Zero height with visible overflow does not clip children, so the input keeps
+    // a 232x35 box and the show-password button a 44x44 one, and VoiceOver
+    // announces a password field a sighted user cannot see, before the email one.
+    // `visibility` is the one property that removes it: measured against Chrome's
+    // AXTree on the live site, `overflow:hidden` changed nothing while
+    // `visibility:hidden` dropped all three nodes. Scoped to `cl-signIn-start`
+    // because that state class — present on BOTH cardBox and card — marks exactly
+    // the step where the row is collapsed; on the password step the rule releases
+    // and the field is exposed again (verified by swapping the class).
+    formFieldRow__password: "[.cl-signIn-start_&]:invisible",
     formFieldLabel: "vt-text-sm text-ivory-text",
     formFieldInput:
       "min-h-[44px] rounded-md border-ivory-border bg-ivory-surface text-ivory-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-ivory-surface",

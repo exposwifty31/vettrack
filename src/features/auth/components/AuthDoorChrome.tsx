@@ -13,8 +13,6 @@ interface AuthDoorChromeProps {
   children: ReactNode;
   footer?: ReactNode;
   className?: string;
-  /** Test override — production resolves from Capacitor + tablet hooks. */
-  variant?: AuthDoorVariant;
 }
 
 function AuthDoorBrand({
@@ -56,12 +54,13 @@ export function AuthDoorChrome({
   children,
   footer,
   className,
-  variant: variantOverride,
 }: AuthDoorChromeProps) {
   const isNativeTablet = useIsNativeTablet();
-  const variant: AuthDoorVariant =
-    variantOverride ??
-    (!isCapacitorNative() ? "web" : isNativeTablet ? "tablet" : "phone");
+  const variant: AuthDoorVariant = !isCapacitorNative()
+    ? "web"
+    : isNativeTablet
+      ? "tablet"
+      : "phone";
 
   if (variant === "web") {
     return (

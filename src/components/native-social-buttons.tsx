@@ -86,7 +86,7 @@ export function NativeSocialButtons({ mode }: { mode: Mode }) {
         aria-label={`${verb} with Apple`}
       >
         {busy === "oauth_apple" ? (
-          <Loader2 className="h-4 w-4 animate-spin" />
+          <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" />
         ) : (
           <Apple className="h-[18px] w-[18px]" />
         )}
@@ -101,18 +101,12 @@ export function NativeSocialButtons({ mode }: { mode: Mode }) {
         aria-label={`${verb} with Google`}
       >
         {busy === "oauth_google" ? (
-          <Loader2 className="h-4 w-4 animate-spin" />
+          <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" />
         ) : (
           <GoogleGlyph />
         )}
         <span>{verb} with Google</span>
       </button>
-
-      <div className="flex items-center gap-3 py-1" aria-hidden="true">
-        <span className="h-px flex-1 bg-ivory-border" />
-        <span className="vt-text-xs text-ivory-text3">or</span>
-        <span className="h-px flex-1 bg-ivory-border" />
-      </div>
 
       {error ? (
         <p className="vt-text-xs text-center text-destructive px-2" role="alert">

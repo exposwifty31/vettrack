@@ -52,13 +52,17 @@ vi.mock("@/hooks/use-settings", () => ({
   useIsDarkActive: () => false,
 }));
 
+// Mutable so one test can flip the pages into the Capacitor branch. Default
+// false — every other test in this file asserts the web door.
+const runtime = vi.hoisted(() => ({ isNative: false, isTablet: false }));
+
 vi.mock("@/lib/capacitor-runtime", () => ({
-  isCapacitorNative: () => false,
-  capacitorPlatform: () => "web",
+  isCapacitorNative: () => runtime.isNative,
+  capacitorPlatform: () => (runtime.isNative ? "ios" : "web"),
 }));
 
 vi.mock("@/native/tablet/useIsNativeTablet", () => ({
-  useIsNativeTablet: () => false,
+  useIsNativeTablet: () => runtime.isTablet,
 }));
 
 describe("Clerk appearance — Ivory inset form (not a second card)", () => {
@@ -92,6 +96,88 @@ describe("Clerk appearance — Ivory inset form (not a second card)", () => {
     expect(clerkAppearanceNative.elements.cardBox).toBe(box);
   });
 
+  it("insets the label row's inline-end so the final Hebrew glyph is not sheared", () => {
+    // ORDER is the shell's job now (see the direction test below) — this is only
+    // the clipping fix. The row's inline-end item sits flush against an
+    // ancestor's clipping edge and Hebrew final forms carry ink past their
+    // advance width. Verified on device that neither `overflow-visible` nor
+    // `direction` clears it; only insetting that side does.
+    const row = clerkAppearance.elements.formFieldLabelRow;
+    expect(row).toMatch(/pe-\d/);
+    // A blanket `p`/`px` would inset the label off the input's edge too.
+    expect(row).not.toMatch(/\bp-\d|\bpx-\d|\bps-\d/);
+    // Locale-scoped, or the English form gets a stray inset.
+    for (const cls of row.split(/\s+/)) expect(cls).toMatch(/^rtl:/);
+    expect(clerkAppearanceNative.elements.formFieldLabelRow).toBe(row);
+  });
+
+  it("keeps direction on the Clerk INPUTS, never on the form wrapper", () => {
+    // `dir="ltr"` on the wrapper put the whole form in an LTR box, so every row
+    // Clerk lays out with `justify-content` or a leading icon came out mirrored
+    // in Hebrew — label/hint swapped ends, alert icon on the wrong side, the
+    // continue arrow trailing the wrong way. One cause, many symptoms; patching
+    // them one at a time through `appearance` is what this replaces.
+    const shell = read("src/components/clerk-auth-form-shell.tsx");
+    expect(shell).not.toMatch(/<div[^>]*\bdir="ltr"/);
+    expect(shell).not.toMatch(/<div[^>]*\blang="en"/);
+    // ...but every typed field still has to be LTR, including ones that only
+    // mount on a later step, which is why the MutationObserver stays.
+    expect(shell).toMatch(/querySelectorAll\("input"\)/);
+    expect(shell).toMatch(/setAttribute\("dir", "ltr"\)/);
+    expect(shell).toMatch(/MutationObserver/);
+    // The keyboard half of the original fix must survive untouched.
+    expect(shell).toMatch(/autocapitalize/);
+    expect(shell).toMatch(/autocorrect/);
+  });
+
+  it("keeps the native social/divider hides and the flattened cardBox intact", () => {
+    // Guardrails the auth-door briefs call out by name — a later appearance edit
+    // must not quietly widen or drop them.
+    expect(clerkAppearanceNative.options.socialButtonsPlacement).toBe("bottom");
+    for (const key of [
+      "socialButtonsRoot",
+      "socialButtonsBlockButton",
+      "socialButtonsProviderIcon",
+      "dividerRow",
+      "dividerText",
+    ] as const) {
+      expect(clerkAppearanceNative.elements[key]).toBe("hidden");
+    }
+    // Web keeps Clerk's own social buttons — it only styles them.
+    expect(clerkAppearance.elements.socialButtonsRoot).toBeUndefined();
+    expect(clerkAppearance.elements.socialButtonsBlockButton).not.toBe("hidden");
+    expect(clerkAppearance.elements.cardBox).toMatch(/max-w-none/);
+  });
+
+  it("takes Clerk's collapsed password row out of the accessibility tree", () => {
+    // Clerk hides that row with height:0/opacity:0 and removes it from the
+    // keyboard and pointer, but not from AT — VoiceOver announced a password
+    // field, and a show-password button, that nobody can see, ahead of the email
+    // one. `visibility` is the only property that drops it (measured against
+    // Chrome's AXTree: `overflow:hidden` changed nothing), and it MUST stay
+    // scoped to the identifier step or the real password field goes with it.
+    const row = clerkAppearance.elements.formFieldRow__password;
+    expect(row).toMatch(/invisible/);
+    expect(row).toMatch(/cl-signIn-start/);
+    expect(clerkAppearanceNative.elements.formFieldRow__password).toBe(row);
+  });
+
+  it("lets the auth-door spinners stop under reduce-motion, like the rest of the app", () => {
+    // `prefers-reduced-motion` is plumbed (measured: `animate-shimmer
+    // motion-reduce:animate-none` resolves to animation-name:none), and
+    // `skeleton.tsx` is the house convention. These five were the outliers.
+    for (const page of [
+      "src/pages/signin.tsx",
+      "src/pages/signup.tsx",
+      "src/components/native-social-buttons.tsx",
+    ]) {
+      const source = read(page);
+      for (const spin of source.match(/className="[^"]*animate-spin[^"]*"/g) ?? []) {
+        expect(spin).toMatch(/motion-reduce:animate-none/);
+      }
+    }
+  });
+
   it("keeps primary CTA on brand indigo with a 44px+ target and md radius", () => {
     const primary = clerkAppearance.elements.formButtonPrimary;
     expect(primary).toMatch(/bg-primary/);
@@ -109,19 +195,34 @@ describe("Clerk appearance — Ivory inset form (not a second card)", () => {
 });
 
 describe("AuthDoorChrome — three platform layouts", () => {
-  afterEach(() => cleanup());
+  afterEach(() => {
+    cleanup();
+    runtime.isNative = false;
+    runtime.isTablet = false;
+  });
 
-  it("web: centered Ivory sheet with shadow-card (management console)", () => {
+  /**
+   * The layout is derived from `isCapacitorNative()` + `useIsNativeTablet()`, so
+   * the tests drive those — the component takes no variant prop. A prop that only
+   * exists so tests can force a layout is production surface nobody ships.
+   */
+  function renderDoor(platform: "web" | "phone" | "tablet", title: string) {
+    runtime.isNative = platform !== "web";
+    runtime.isTablet = platform === "tablet";
     const { container } = render(
-      <AuthDoorChrome variant="web" title="Web Title" subtitle="Web sub">
+      <AuthDoorChrome title={title} subtitle={`${title} sub`}>
         <div>form</div>
       </AuthDoorChrome>,
     );
-    const root = container.querySelector("[data-auth-door-variant='web']");
-    const sheet = screen.getByTestId("auth-door-sheet");
-    expect(root).toBeTruthy();
-    expect(root!.className).toMatch(/min-h-\[100dvh\]/);
-    expect(root!.className).toMatch(/justify-center/);
+    const root = container.querySelector<HTMLElement>(`[data-auth-door-variant='${platform}']`);
+    if (!root) throw new Error(`AuthDoorChrome did not resolve to the "${platform}" layout`);
+    return { root, sheet: screen.getByTestId("auth-door-sheet") };
+  }
+
+  it("web: centered Ivory sheet with shadow-card (management console)", () => {
+    const { root, sheet } = renderDoor("web", "Web Title");
+    expect(root.className).toMatch(/min-h-\[100dvh\]/);
+    expect(root.className).toMatch(/justify-center/);
     expect(sheet.className).toMatch(/max-w-sm/);
     expect(sheet.className).toMatch(/rounded-2xl/);
     expect(sheet.className).toMatch(/border-ivory-border/);
@@ -130,18 +231,11 @@ describe("AuthDoorChrome — three platform layouts", () => {
   });
 
   it("phone: full-bleed top-aligned — no floating card, no 100dvh centering", () => {
-    const { container } = render(
-      <AuthDoorChrome variant="phone" title="Phone Title" subtitle="Phone sub">
-        <div>form</div>
-      </AuthDoorChrome>,
-    );
-    const root = container.querySelector("[data-auth-door-variant='phone']");
-    const sheet = screen.getByTestId("auth-door-sheet");
-    expect(root).toBeTruthy();
-    expect(root!.className).toMatch(/min-h-full/);
-    expect(root!.className).toMatch(/bg-ivory-bg/);
-    expect(root!.className).not.toMatch(/justify-center/);
-    expect(root!.className).not.toMatch(/min-h-\[100dvh\]/);
+    const { root, sheet } = renderDoor("phone", "Phone Title");
+    expect(root.className).toMatch(/min-h-full/);
+    expect(root.className).toMatch(/bg-ivory-bg/);
+    expect(root.className).not.toMatch(/justify-center/);
+    expect(root.className).not.toMatch(/min-h-\[100dvh\]/);
     expect(sheet.className).not.toMatch(/rounded-2xl/);
     expect(sheet.className).not.toMatch(/shadow-card/);
     expect(sheet.className).not.toMatch(/border-ivory-border/);
@@ -149,16 +243,9 @@ describe("AuthDoorChrome — three platform layouts", () => {
   });
 
   it("tablet: full-bleed wider measure — not a tiny centered phone card", () => {
-    const { container } = render(
-      <AuthDoorChrome variant="tablet" title="Tablet Title" subtitle="Tablet sub">
-        <div>form</div>
-      </AuthDoorChrome>,
-    );
-    const root = container.querySelector("[data-auth-door-variant='tablet']");
-    const sheet = screen.getByTestId("auth-door-sheet");
-    expect(root).toBeTruthy();
-    expect(root!.className).toMatch(/min-h-full/);
-    expect(root!.className).not.toMatch(/justify-center/);
+    const { root, sheet } = renderDoor("tablet", "Tablet Title");
+    expect(root.className).toMatch(/min-h-full/);
+    expect(root.className).not.toMatch(/justify-center/);
     expect(sheet.className).toMatch(/max-w-lg/);
     expect(sheet.className).not.toMatch(/max-w-sm/);
     expect(sheet.className).not.toMatch(/shadow-card/);
@@ -213,6 +300,15 @@ describe("Auth pages — Ivory door chrome (source contract)", () => {
     expect(source).toMatch(/min-h-\[44px\]/);
   });
 
+  it("native social draws no `or` rule — Clerk's own divider already sits below", () => {
+    // On native, `clerkAppearanceNative` hides Clerk's `dividerRow`, so the only
+    // separator was this component's own. It read as a seam in the middle of a
+    // full-bleed door; the buttons run straight into the email field instead.
+    const source = read("src/components/native-social-buttons.tsx");
+    expect(source).not.toMatch(/>or</);
+    expect(source).not.toMatch(/h-px flex-1 bg-ivory-border/);
+  });
+
   it("NativeShell auth routes own safe-area — AuthDoorChrome must not re-pad SAT", () => {
     const shell = read("src/native/NativeShell.tsx");
     const chrome = read("src/features/auth/components/AuthDoorChrome.tsx");
@@ -238,8 +334,9 @@ describe("RoleChips — 44px Ivory interactive rows", () => {
       expect(chip.className).toMatch(/min-h-\[44px\]/);
       expect(chip.className).toMatch(/border-ivory-border|bg-ivory-surface/);
     }
-    fireEvent.click(chips[1]!);
-    expect(chips[1]!.className).toMatch(/bg-primary/);
+    const vetChip = screen.getByTestId("role-chip-vet");
+    fireEvent.click(vetChip);
+    expect(vetChip.className).toMatch(/bg-primary/);
   });
 });
 
@@ -250,9 +347,50 @@ describe("Sign-in / Sign-up pages render the Ivory door (web default)", () => {
 
   afterEach(() => {
     cleanup();
+    runtime.isNative = false;
     vi.unstubAllEnvs();
     vi.resetModules();
   });
+
+  // The 24rem reserve keeps the centered web sheet from resizing under the user
+  // while clerk-js mounts. The native door is top-aligned, so the same reserve is
+  // just dead space below a shorter form. Asserted through a render, not a source
+  // grep: the class sits on a `cn()` branch, and a grep cannot tell which branch
+  // it landed on — which is the whole thing under test.
+  for (const [page, importPath, stub] of [
+    ["sign-in", "@/pages/signin", "clerk-sign-in-stub"],
+    ["sign-up", "@/pages/signup", "clerk-sign-up-stub"],
+  ] as const) {
+    it(`${page}: the Clerk slot reserves 24rem on web and not on native`, async () => {
+      const { hook } = memoryLocation({ path: `/${page.replace("-", "")}`, record: true });
+
+      const { default: WebPage } = await import(importPath);
+      render(
+        <Router hook={hook}>
+          <WebPage />
+        </Router>,
+      );
+      const webSlot = screen.getByTestId(stub).parentElement;
+      if (!webSlot) throw new Error(`${stub} has no wrapping Clerk slot`);
+      expect(webSlot.className).toMatch(/min-h-\[24rem\]/);
+
+      cleanup();
+      vi.resetModules();
+      runtime.isNative = true;
+
+      const { default: NativePage } = await import(importPath);
+      render(
+        <Router hook={hook}>
+          <NativePage />
+        </Router>,
+      );
+      const nativeSlot = screen.getByTestId(stub).parentElement;
+      if (!nativeSlot) throw new Error(`${stub} has no wrapping Clerk slot`);
+      expect(nativeSlot.className).not.toMatch(/min-h-\[24rem\]/);
+      // Still the same flex column — only the reserve is gone.
+      expect(nativeSlot.className).toMatch(/flex-col/);
+    });
+  }
 
   it("sign-in mounts Welcome back only (no role chips, no create-account title)", async () => {
     const { default: SignInPage } = await import("@/pages/signin");
