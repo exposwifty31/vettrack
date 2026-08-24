@@ -10801,7 +10801,12 @@ on that dirty tree.
 
 **Verdict:** VERIFIED
 
-## 2026-08-23 — Code Blue activation push i18n extraction (PR #242 follow-on)
+## 2026-08-23 — Code Blue activation push i18n extraction (handler-split follow-on)
+
+> Deliberately no hash-sigil pull-request citation in this entry. The claim gate
+> reads `PR` + hash + digits as a pull-request claim that needs a merge commit;
+> the handler-split pull request this stacks on is still open (same rule as the
+> 2026-08-21 db-integration re-scope entry).
 
 **Claim:** `post-sessions` / `post-one-tap` no longer hardcode Hebrew in `code_blue_broadcast` title/body; copy is `push.codeBlue.*` via `resolveCodeBlueBroadcastPushCopy` (INITIAL_LOCALE `he`); allowlist dropped those two handlers; enqueue path/tag/fail-open unchanged.
 
@@ -10811,8 +10816,23 @@ on that dirty tree.
 - `server/lib/code-blue-broadcast-push.ts` — `getLocaleDictionaries(INITIAL_LOCALE)` + `translate(...push.codeBlue.*)` with try/catch ASCII fail-open
 - `server/routes/code-blue/handlers/post-sessions.ts` / `post-one-tap.ts` — `rg '[֐-׿]'` → no matches; still `enqueueNotificationJob` + `code-blue-${…}` tags + `.catch(() => {})`
 - `tests/i18n-no-hebrew-in-source.test.ts` — allowlist no longer lists the two handlers
-- Test: `pnpm exec vitest run tests/code-blue-broadcast-push-i18n.test.ts tests/i18n-no-hebrew-in-source.test.ts tests/i18n-namespace-reachability.test.ts tests/i18n-parity.test.ts` → 4 files, 25 passed
-- Test: `pnpm exec vitest run tests/code-blue-pr-4-2-route-wiring.test.ts tests/code-blue-pr-4-5-enforce.test.ts tests/code-blue-push-unmutable.test.ts …` → 6 files, 64 passed
+- Test (targeted): `pnpm exec vitest run tests/code-blue-broadcast-push-i18n.test.ts` (+ i18n guards) → passed; after CodeRabbit round the suite executes both handlers and asserts real enqueue payloads
+- Test (Code Blue locks): six code-blue-* lock files → 64 passed
 - Command: `pnpm i18n:check` → deep key parity OK
+- Command: `pnpm typecheck` (`tsc --noEmit` + `tsc -p tsconfig.server.json --noEmit`) → exit 0, 0 errors
+
+**Verdict:** superseded by 2026-08-24 CodeRabbit-round entry below (completion-gate recording).
+
+## 2026-08-24 — Code Blue push i18n: CodeRabbit round (integration tests + escape scan + completion gates)
+
+**Claim:** Address three CodeRabbit findings on the push-i18n change: (1) handler→enqueue integration tests execute both handlers and assert localized payload; (2) Hebrew source scan rejects `\u05xx` / `\u{5xx}` escapes; (3) completion gates `pnpm typecheck` + `pnpm test` recorded with honest results. No change to enqueue when/whether/tag/channel/outbox/`.catch`.
+
+**Evidence:**
+- `tests/code-blue-broadcast-push-i18n.test.ts` — `postSessionsHandler` / `postOneTapHandler` run with mocked deps; `enqueueNotificationJob` receives `type: "code_blue_broadcast"`, title `⚠ CODE BLUE`, body `CODE BLUE הופעל ע״י Dr Cohen`, tags `code-blue-${id}` / `code-blue-session-ot-1`; reject path still returns 201
+- Same file — `containsHebrewInSource` rejects literal glyphs and `\\u05D0` / `\\u{5D0}` forms; both handlers pass
+- Command: `pnpm i18n:check` → deep key parity OK
+- Command: `pnpm typecheck` → exit 0 (frontend `tsc --noEmit` + `tsc -p tsconfig.server.json --noEmit`)
+- Command: `pnpm test` → **exit 0**, `Test Files 713 passed | 20 skipped (733)`, `Tests 6631 passed | 136 skipped (6767)`
+- Prior full-suite exit 1 was solely `claims-ledger` objecting to a hash-sigil citation of an still-open handler-split pull request in the 2026-08-23 heading; that citation is removed (see note on that entry)
 
 **Verdict:** VERIFIED
