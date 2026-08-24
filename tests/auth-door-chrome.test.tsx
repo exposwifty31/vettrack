@@ -178,6 +178,51 @@ describe("Clerk appearance — Ivory inset form (not a second card)", () => {
     }
   });
 
+  it("gives every control that sits on the page a boundary that clears 3:1", () => {
+    // WCAG 1.4.11. Computed from the tokens, not matched as a string — a future
+    // edit that lightens the value has to fail here, and a string assertion
+    // would not notice. `--ivory-border` is deliberately NOT usable in this
+    // position: it is tuned for `--ivory-surface` and lands at 1.36:1 on the page.
+    const css = read("src/index.css");
+    const rel = (hex: string) => {
+      const ch = [0, 2, 4].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
+      const [r, g, b] = ch.map((c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
+      return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    };
+    const ratio = (a: string, b: string) => {
+      const [x, y] = [rel(a), rel(b)].sort((p, q) => q - p);
+      return (x + 0.05) / (y + 0.05);
+    };
+    const toHex = (channels: string) =>
+      channels
+        .trim()
+        .split(/\s+/)
+        .map((n) => Number(n).toString(16).padStart(2, "0"))
+        .join("");
+
+    // Pair each borderStrong with the --ivory-bg of its own theme block.
+    const blocks = [...css.matchAll(/--ivory-borderStrong:\s*([\d\s]+);/g)].map((m) => {
+      const before = css.slice(0, m.index);
+      const bg = [...before.matchAll(/--ivory-bg:\s*([\d\s]+);/g)].pop();
+      if (!bg) throw new Error("--ivory-borderStrong declared with no --ivory-bg above it");
+      return { border: toHex(m[1]), bg: toHex(bg[1]) };
+    });
+    expect(blocks.length).toBeGreaterThanOrEqual(2);
+    for (const { border, bg } of blocks) {
+      expect(ratio(border, bg)).toBeGreaterThanOrEqual(3);
+    }
+
+    // The chips must actually use it, and Google's button must carry Google's
+    // own stroke — both were on `ivory-border`, which fails in this position.
+    expect(read("src/features/auth/components/RoleChips.tsx")).toMatch(/border-ivory-borderStrong/);
+    const social = read("src/components/native-social-buttons.tsx");
+    const googleStrokes = [...social.matchAll(/border-\[#([0-9A-Fa-f]{6})\]/g)].map((m) => m[1]);
+    expect(googleStrokes.length).toBeGreaterThanOrEqual(2);
+    for (const [i, stroke] of googleStrokes.entries()) {
+      expect(ratio(stroke, i === 0 ? "F2F2F7" : "000000")).toBeGreaterThanOrEqual(3);
+    }
+  });
+
   it("keeps primary CTA on brand indigo with a 44px+ target and md radius", () => {
     const primary = clerkAppearance.elements.formButtonPrimary;
     expect(primary).toMatch(/bg-primary/);
@@ -296,7 +341,11 @@ describe("Auth pages — Ivory door chrome (source contract)", () => {
   it("native social uses designed Apple fill + Google outline", () => {
     const source = read("src/components/native-social-buttons.tsx");
     expect(source).toMatch(/bg-foreground|bg-ivory-text|bg-black/);
-    expect(source).toMatch(/border-ivory-border/);
+    // Google's half is the outlined one. The stroke used to be `ivory-border`;
+    // it is now Google's own, per theme — the contrast test below is what pins
+    // the values, so this only asserts the outline still exists.
+    expect(source).toMatch(/border border-\[#[0-9A-Fa-f]{6}\]/);
+    expect(source).toMatch(/dark:border-\[#[0-9A-Fa-f]{6}\]/);
     expect(source).toMatch(/min-h-\[44px\]/);
   });
 

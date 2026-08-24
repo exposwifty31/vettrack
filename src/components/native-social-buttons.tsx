@@ -97,7 +97,12 @@ export function NativeSocialButtons({ mode }: { mode: Mode }) {
         type="button"
         disabled={!ready || busy !== null}
         onClick={() => handle("oauth_google")}
-        className="flex min-h-[44px] w-full items-center justify-center gap-2 rounded-md border border-ivory-border bg-ivory-surface text-ivory-text font-medium transition-colors hover:bg-muted/50 disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-ivory-surface"
+        // Google's own stroke, not an Ivory token: the outline is part of the
+        // brand mark, and `ivory-border` reached only 1.36:1 against the page in
+        // light and 1.85:1 in dark — the button read as floating text. These
+        // measure 4.06:1 and 6.60:1 against the page, so brand and WCAG 1.4.11
+        // land together. Fixed hex like the glyph fills above.
+        className="flex min-h-[44px] w-full items-center justify-center gap-2 rounded-md border border-[#747775] dark:border-[#8E918F] bg-ivory-surface text-ivory-text font-medium transition-colors hover:bg-muted/50 disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-ivory-surface"
         aria-label={`${verb} with Google`}
       >
         {busy === "oauth_google" ? (

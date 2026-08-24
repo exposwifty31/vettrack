@@ -76,7 +76,12 @@ export function RoleChips({ selectedRole, onSelectRole }: RoleChipsProps) {
                 "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-ivory-surface",
                 isSelected
                   ? "border-primary bg-primary text-primary-foreground"
-                  : "border-ivory-border bg-ivory-surface text-ivory-text hover:bg-muted/50",
+                  // An unselected chip sits directly on the page, where
+                  // `ivory-border` reaches only 1.36:1 — below the 3:1 WCAG
+                  // 1.4.11 asks of a control's boundary, and the fill is white
+                  // on near-white, so the outline is the only thing that says
+                  // "tappable". `borderStrong` is the tier for that position.
+                  : "border-ivory-borderStrong bg-ivory-surface text-ivory-text hover:bg-muted/50",
               )}
             >
               {label()}
