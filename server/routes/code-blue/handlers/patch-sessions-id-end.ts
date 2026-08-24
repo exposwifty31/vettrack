@@ -178,7 +178,7 @@ export const patchSessionsIdEndHandler: RequestHandler = async (req, res) => {
     const logEntries = await db
       .select()
       .from(codeBlueLogEntries)
-      .where(eq(codeBlueLogEntries.sessionId, sessionId));
+      .where(and(eq(codeBlueLogEntries.clinicId, clinicId), eq(codeBlueLogEntries.sessionId, sessionId)));
 
     const participants = [...new Set(logEntries.map((e) => e.loggedByName))];
     if (!participants.includes(session.startedByName)) participants.unshift(session.startedByName);
@@ -252,9 +252,11 @@ export const patchSessionsIdEndHandler: RequestHandler = async (req, res) => {
     invalidateActiveCodeBlueCache(clinicId);
 
     postSystemMessage(clinicId, "code_blue_end", {
-      outcome: outcome ?? "unknown",
+      outcome,
       endedAt: endedAt.toISOString(),
-    }).catch(() => {});
+    }).catch((err) => {
+      console.error("[code-blue] end system message failed (non-critical)", err);
+    });
 
     res.json({ id: sessionId, endedAt: endedAt.toISOString(), summary: JSON.parse(summary) });
   } catch (err) {

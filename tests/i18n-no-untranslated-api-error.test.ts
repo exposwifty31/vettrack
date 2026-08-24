@@ -138,7 +138,8 @@ function listRouteFiles(): string[] {
       if (!SCAN_EXTS.has(ext)) continue;
       out.push(relative(cwd, full));
     }
-  } catch {
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException)?.code !== "ENOENT") throw err;
     // code-blue/handlers doesn't exist — nothing to add.
   }
   return out.sort();

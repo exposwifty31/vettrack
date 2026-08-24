@@ -25,7 +25,7 @@ const historyPage = read("src/pages/code-blue-history.tsx");
 
 /**
  * Several code-blue.ts handler bodies were extracted into their own modules
- * (mechanical file split, TODO(arch) formerly in code-blue.ts). `backendRoutes`
+ * (mechanical file split, the arch-split marker formerly in code-blue.ts). `backendRoutes`
  * alone no longer contains every handler body — concatenate every extracted
  * handler file too, so whole-file assertions below keep seeing the same
  * combined text they did before the split, regardless of which specific

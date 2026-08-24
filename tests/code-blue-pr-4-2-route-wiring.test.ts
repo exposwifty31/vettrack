@@ -91,7 +91,7 @@ describe("POST /api/code-blue/sessions — middleware chain", () => {
 
 describe("POST /api/code-blue/sessions — manager evaluator wiring", () => {
   // POST /sessions' handler body was extracted into its own module
-  // (mechanical file split, TODO(arch) in code-blue.ts); the router file
+  // (mechanical file split, the arch-split marker in code-blue.ts); the router file
   // now only holds the registration + middleware chain. Append the handler
   // file's BODY (from `export const` onward, i.e. excluding its own import
   // block) so the order-sensitive assertions below still see the same
@@ -100,9 +100,21 @@ describe("POST /api/code-blue/sessions — manager evaluator wiring", () => {
   // symbol name that also appears at its real call site (e.g.
   // `enqueueNotificationJob` is both imported and called), and an
   // order-sensitive `indexOf` must land on the call site, not the import.
+  //
+  // The manager-evaluator wiring call itself was extracted a layer further,
+  // into resolveNominatedManager() (server/routes/code-blue/resolve-nominated
+  // -manager.ts) — shared verbatim with POST /one-tap, which had the
+  // identical block duplicated inline before. Splice its body in BEFORE the
+  // handler body (matching where the inline call used to sit, logically
+  // before the side effects) so the "wiring runs before X" ordering checks
+  // below still hold against the real, current call order.
   const sessionsIdx = routeSrc.indexOf('"/sessions"');
   const postSessionsFileSrc = fs.readFileSync(
     path.join(repoRoot, "server", "routes", "code-blue", "handlers", "post-sessions.ts"),
+    "utf8",
+  );
+  const resolveManagerFileSrc = fs.readFileSync(
+    path.join(repoRoot, "server", "routes", "code-blue", "resolve-nominated-manager.ts"),
     "utf8",
   );
   const handlerSlice =
@@ -110,6 +122,8 @@ describe("POST /api/code-blue/sessions — manager evaluator wiring", () => {
       sessionsIdx,
       routeSrc.indexOf("router.", sessionsIdx + 20),
     ) +
+    "\n" +
+    resolveManagerFileSrc.slice(resolveManagerFileSrc.indexOf("export async function")) +
     "\n" +
     postSessionsFileSrc.slice(postSessionsFileSrc.indexOf("export const"));
 

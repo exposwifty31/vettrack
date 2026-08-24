@@ -31,7 +31,7 @@ try { appRoutes = read("server/app/routes.ts"); } catch {}
 /**
  * Several handler bodies referenced below were extracted out of
  * server/routes/code-blue.ts into their own modules (mechanical file split,
- * TODO(arch) in code-blue.ts). `routes` alone no longer contains their
+ * the arch-split marker in code-blue.ts). `routes` alone no longer contains their
  * bodies — read the specific handler file too wherever an assertion checks
  * content that now lives there.
  */

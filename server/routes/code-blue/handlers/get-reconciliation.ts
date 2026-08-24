@@ -37,7 +37,7 @@ export const getReconciliationHandler: RequestHandler = async (req, res) => {
     );
     res.json(rows.rows);
   } catch (err) {
-    console.error(err);
+    console.error("[code-blue] reconciliation list failed", err);
     res.status(500).json(
       apiError({ code: "INTERNAL_ERROR", reason: "RECONCILIATION_LIST_FAILED", message: "Failed to load reconciliation list", requestId }),
     );

@@ -8,7 +8,7 @@ describe("P1-5: Code Blue outbox event emission", () => {
   it("POST /sessions emits CODE_BLUE_STATUS_CHANGED in start TX", async () => {
     const fs = await import("fs");
     // POST /sessions' handler body was extracted into its own module
-    // (mechanical file split, TODO(arch) in code-blue.ts) — read it directly
+    // (mechanical file split, the arch-split marker in code-blue.ts) — read it directly
     // rather than the router file, which now only holds the registration.
     const source = fs.readFileSync(
       "server/routes/code-blue/handlers/post-sessions.ts",
@@ -25,7 +25,7 @@ describe("P1-5: Code Blue outbox event emission", () => {
   it("PATCH /end emits CODE_BLUE_STATUS_CHANGED in end TX", async () => {
     const fs = await import("fs");
     // PATCH /sessions/:id/end's handler body was extracted into its own
-    // module (mechanical file split, TODO(arch) formerly in code-blue.ts) —
+    // module (mechanical file split, the arch-split marker formerly in code-blue.ts) —
     // read it directly rather than the router file, which now only holds
     // the registration.
     const source = fs.readFileSync(

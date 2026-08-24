@@ -1,15 +1,17 @@
 import type { RequestHandler } from "express";
 import type { z } from "zod";
 import { randomUUID } from "crypto";
-import { db, codeBlueSessions, codeBlueLogEntries, users, equipment } from "../../../db.js";
-import { eq, and, inArray, isNull, sql } from "drizzle-orm";
+import { db, codeBlueSessions, codeBlueLogEntries, equipment } from "../../../db.js";
+import { eq, and, isNull, sql } from "drizzle-orm";
 import { logAudit, resolveAuditActorRole } from "../../../lib/audit.js";
 import { insertRealtimeDomainEvent } from "../../../lib/realtime-outbox.js";
 import { enqueueNotificationJob } from "../../../lib/queue.js";
 import { postSystemMessage } from "../../../lib/shift-chat-presence.js";
 import { invalidateActiveCodeBlueCache } from "../../../lib/code-blue-keepalive.js";
-import { evaluateCodeBlueManagerForRoute } from "../../../lib/authority/code-blue-manager.wiring.js";
 import { resolveRequestId, apiError } from "../../../lib/route-utils.js";
+import { getLocaleDictionaries } from "../../../../lib/i18n/loader.js";
+import { interpolate, translate } from "../../../../lib/i18n/index.js";
+import { resolveNominatedManager } from "../resolve-nominated-manager.js";
 import type { startSessionSchema } from "../schemas.js";
 
 // POST /api/code-blue/sessions — start a new live session
@@ -20,72 +22,11 @@ export const postSessionsHandler: RequestHandler = async (req, res) => {
     const userId = req.authUser!.id;
     const body = req.body as z.infer<typeof startSessionSchema>;
 
-    // Phase 4 PR 4.2 + PR 4.5 — Code Blue manager authority evaluator wiring.
-    // Runs BEFORE existing manager validation + any side effects (DB insert,
-    // push fan-out, system message, "started" audit). The evaluator emits
-    // audit/metric internally based on the resolved mode.
-    //
-    // PR 4.5: in enforce mode the evaluator returns `action: "deny"`. The
-    // route translates that into a 403 with a stable reason code in the
-    // response body BEFORE any side effect commits. In shadow / off / mode-
-    // inactive / fault-open paths the verdict is `action: "allow"` and the
-    // route proceeds as before. Per-clinic vt_server_config
-    // `code_blue.manager_enforce.<clinicId>.initiation = "enforce"` activates
-    // the deny path; default (`off`) is unchanged.
-    //
-    // Evaluator targets the *named manager* via the existing resolver
-    // framework. It MUST NOT read req.authoritySnapshot (which belongs to the
-    // request actor, not the manager). The wiring helper loads vt_users by
-    // id (clinic-scoped) and constructs a DB-only target user object.
-    const { verdict: initiationVerdict } = await evaluateCodeBlueManagerForRoute({
-      clinicId,
-      managerUserId: body.managerUserId,
-      endpoint: "initiation",
-      now: new Date(),
-    });
-    if (initiationVerdict.action === "deny") {
-      // Codex P2 (PR 4.5 review): the evaluator can deny with USER_MISSING
-      // or MANAGER_CROSS_CLINIC, which are INPUT VALIDATION failures (the
-      // nominated managerUserId points to a non-existent or cross-clinic
-      // user), distinct from operational-role denials. Let those reasons
-      // fall through to the existing INVALID_MANAGER 400 response so the
-      // API contract for input validation is preserved. Only operational-
-      // role denials (OPROLE_NOT_IN_CB_ALLOWLIST, NO_OPEN_CHECK_IN) return
-      // the new 403 MANAGER_NOT_CODE_BLUE_ELIGIBLE response.
-      const reason = initiationVerdict.reason;
-      if (reason === "OPROLE_NOT_IN_CB_ALLOWLIST" || reason === "NO_OPEN_CHECK_IN") {
-        return res.status(403).json(
-          apiError({
-            code: "MANAGER_NOT_CODE_BLUE_ELIGIBLE",
-            reason,
-            message:
-              "Nominated manager is not currently Code-Blue-eligible (operational role check)",
-            requestId,
-          }),
-        );
-      }
-      // USER_MISSING / MANAGER_CROSS_CLINIC: continue to the existing
-      // managerUser DB lookup below, which returns 400 INVALID_MANAGER.
-    }
-
-    // Validate that managerUserId is an active vet or admin in this clinic
-    const [managerUser] = await db
-      .select({ id: users.id, name: users.name })
-      .from(users)
-      .where(
-        and(
-          eq(users.id, body.managerUserId),
-          eq(users.clinicId, clinicId),
-          inArray(users.role, ["vet", "admin"]),
-          eq(users.status, "active"),
-        ),
-      )
-      .limit(1);
-    if (!managerUser) {
-      return res.status(400).json(
-        apiError({ code: "INVALID_MANAGER", reason: "INVALID_MANAGER", message: "Manager must be an active vet or admin in this clinic", requestId }),
-      );
-    }
+    // Manager authority evaluator + validation — see resolveNominatedManager
+    // for the full Phase 4 PR 4.2 + PR 4.5 evaluator wiring rationale.
+    // Identical contract to POST /one-tap.
+    const managerUser = await resolveNominatedManager(res, requestId, clinicId, body.managerUserId);
+    if (!managerUser) return;
 
     let primaryEquipment: { id: string; name: string } | null = null;
     if (body.equipmentId) {
@@ -199,7 +140,9 @@ export const postSessionsHandler: RequestHandler = async (req, res) => {
     postSystemMessage(clinicId, "code_blue_start", {
       startedBy: req.authUser!.name ?? req.authUser!.id,
       startedAt: startedAt.toISOString(),
-    }).catch(() => {});
+    }).catch((err) => {
+      console.error("[code-blue] start system message failed (non-critical)", err);
+    });
 
     logAudit({
       actorRole: resolveAuditActorRole(req),
@@ -212,17 +155,19 @@ export const postSessionsHandler: RequestHandler = async (req, res) => {
       metadata: { startedAt: startedAt.toISOString(), managerUserId: body.managerUserId },
     });
 
+    const { primary: broadcastPrimary, fallback: broadcastFallback, locale: broadcastLc } = getLocaleDictionaries("he");
+    const broadcastBodyTemplate = translate(broadcastPrimary, "codeBlue.pushBroadcastBody", undefined, { fallbackDict: broadcastFallback, locale: broadcastLc });
     void enqueueNotificationJob({
       type: "code_blue_broadcast",
       clinicId,
       title: "⚠ CODE BLUE",
-      body: `CODE BLUE הופעל ע״י ${req.authUser!.name}`,
+      body: interpolate(broadcastBodyTemplate, { name: req.authUser!.name }),
       tag: `code-blue-${id}`,
       ...(codeBlueNotificationRequestOutboxId !== undefined
         ? { notificationRequestOutboxId: codeBlueNotificationRequestOutboxId }
         : {}),
-    }).catch(() => {
-      /* non-critical */
+    }).catch((err) => {
+      console.error("[code-blue] start broadcast notification failed (non-critical)", err);
     });
 
     // Phase 9 PR 9.4 — invalidate the keepalive's active-session cache so

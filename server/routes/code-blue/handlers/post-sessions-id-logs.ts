@@ -54,6 +54,7 @@ export const postSessionsIdLogsHandler: RequestHandler = async (req, res) => {
       .select({ id: codeBlueLogEntries.id })
       .from(codeBlueLogEntries)
       .where(and(
+        eq(codeBlueLogEntries.clinicId, clinicId),
         eq(codeBlueLogEntries.sessionId, sessionId),
         eq(codeBlueLogEntries.idempotencyKey, body.idempotencyKey),
       ))

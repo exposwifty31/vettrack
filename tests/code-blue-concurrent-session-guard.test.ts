@@ -8,7 +8,7 @@ import path from "node:path";
 
 const source = fs.readFileSync("server/routes/code-blue.ts", "utf8");
 // POST /sessions' handler body was extracted into its own module
-// (mechanical file split, TODO(arch) in code-blue.ts); the router file now
+// (mechanical file split, the arch-split marker in code-blue.ts); the router file now
 // only holds the registration + middleware chain. Append the handler
 // file's BODY (from `export const` onward, i.e. excluding its own import
 // block) so the order-sensitive assertions below still see the same
@@ -27,7 +27,7 @@ const startHandler =
 
 /**
  * Several code-blue.ts handler bodies were extracted into their own modules
- * (mechanical file split, TODO(arch) in code-blue.ts). `source` alone no
+ * (mechanical file split, the arch-split marker in code-blue.ts). `source` alone no
  * longer contains every handler body — concatenate every extracted handler
  * file too, so whole-file assertions below keep seeing the same combined
  * text they did before the split, regardless of which specific handler a

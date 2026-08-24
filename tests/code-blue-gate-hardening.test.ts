@@ -23,7 +23,7 @@ const routes = read("server/routes/code-blue.ts");
 
 /**
  * Several code-blue.ts handler bodies were extracted into their own modules
- * (mechanical file split, TODO(arch) in code-blue.ts). Read one back and
+ * (mechanical file split, the arch-split marker in code-blue.ts). Read one back and
  * return only its BODY (from `export const` onward, excluding its own
  * import block — an import can repeat a symbol name that also appears at
  * its real call site, which would corrupt an order-sensitive `indexOf`).
