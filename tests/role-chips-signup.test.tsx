@@ -1,17 +1,15 @@
 /**
  * @vitest-environment happy-dom
  *
- * Role-preselect signup (C3): the sign-in/up role chips (`RoleChips.tsx`)
+ * Role-preselect signup (C3): the sign-up role chips (`RoleChips.tsx`)
  * offer the two self-selectable roles (technician, vet); the chosen role is
  * carried into the Clerk sign-up submission via `unsafeMetadata` (Clerk's own
  * mechanism for attaching data to a new account), reusing the existing Clerk
  * `<SignUp/>` flow. Admin approval later promotes the account to that role.
  *
- * Non-vacuous: against inert `RoleChips`, chips render as plain `<span>`s with
- * no `radio` role and no click handler, so the "select a chip" step could not
- * occur, and the sign-up flow would never pass `unsafeMetadata` — the
- * assertion on `capturedSignUpProps` would fail (prop absent), not pass
- * vacuously.
+ * Non-vacuous: without interactive chips, the sign-up flow would never pass
+ * `unsafeMetadata` — the assertion on `capturedSignUpProps` would fail
+ * (prop absent), not pass vacuously. Sign-in does not mount RoleChips.
  */
 import type { ReactNode } from "react";
 import { useState } from "react";
@@ -19,7 +17,6 @@ import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import { render, screen, fireEvent, cleanup, within } from "@testing-library/react";
 import { Router } from "wouter";
 import { memoryLocation } from "wouter/memory-location";
-import { t } from "@/lib/i18n";
 import { RoleChips, type SignupRequestedRole } from "@/features/auth/components/RoleChips";
 
 let mockDirection: "ltr" | "rtl" = "ltr";
@@ -56,6 +53,11 @@ vi.mock("@/hooks/use-settings", () => ({
 
 vi.mock("@/lib/capacitor-runtime", () => ({
   isCapacitorNative: () => false,
+  capacitorPlatform: () => "web" as const,
+}));
+
+vi.mock("@/native/tablet/useIsNativeTablet", () => ({
+  useIsNativeTablet: () => false,
 }));
 
 vi.mock("@/lib/clerk-appearance", () => ({
@@ -68,16 +70,22 @@ function RoleChipsHarness() {
   return <RoleChips selectedRole={role} onSelectRole={setRole} />;
 }
 
-function NonInteractiveRoleChipsHarness() {
-  return <RoleChips />;
-}
-
 async function renderSignUpPage() {
   const { default: SignUpPage } = await import("@/pages/signup");
   const { hook } = memoryLocation({ path: "/signup", record: true });
   return render(
     <Router hook={hook}>
       <SignUpPage />
+    </Router>,
+  );
+}
+
+async function renderSignInPage() {
+  const { default: SignInPage } = await import("@/pages/signin");
+  const { hook } = memoryLocation({ path: "/signin", record: true });
+  return render(
+    <Router hook={hook}>
+      <SignInPage />
     </Router>,
   );
 }
@@ -119,11 +127,11 @@ describe("RoleChips — sign-up role pre-selection (C3)", () => {
     expect(vetChip.getAttribute("aria-checked")).toBe("false");
   });
 
-  it("does not render as a selectable control when mounted without a selection handler", () => {
-    render(<NonInteractiveRoleChipsHarness />);
+  it("sign-in does not mount role chips (account already exists)", async () => {
+    await renderSignInPage();
     expect(screen.queryByRole("radiogroup")).toBeNull();
-    expect(screen.queryByRole("radio")).toBeNull();
-    expect(screen.getByText(t.authPage.roleVeterinarian).tagName).toBe("SPAN");
+    expect(screen.queryByTestId("role-chip-vet")).toBeNull();
+    expect(screen.queryByTestId("role-chip-technician")).toBeNull();
   });
 
   it("carries the selected role (technician, no license needed) into the sign-up submission", async () => {
