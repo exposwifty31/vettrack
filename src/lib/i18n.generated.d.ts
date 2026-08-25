@@ -3678,7 +3678,6 @@ export interface TStructure {
     createAccount: string;
     signUpSubtitle: string;
     signUpLoadError: string;
-    roleLabel: string;
     roleVetTech: string;
     roleVeterinarian: string;
     roleStudent: string;

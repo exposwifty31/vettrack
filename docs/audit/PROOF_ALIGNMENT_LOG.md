@@ -10801,6 +10801,94 @@ on that dirty tree.
 
 **Verdict:** VERIFIED
 
+## 2026-08-23 — Auth Ivory door chrome (visual-only polish)
+
+**Claim:** `/signin` and `/signup` use one Ivory canvas + sheet (`AuthDoorChrome`), flattened Clerk card (hidden header, transparent card), 44px role chips, and matching phone/native-social sheet language — without changing auth logic.
+
+**Evidence:**
+- `src/features/auth/components/AuthDoorChrome.tsx` — `bg-ivory-bg` canvas, `data-testid="auth-door-sheet"` with `bg-ivory-surface border-ivory-border shadow-card`, `vt-page-title` for page `h1`
+- `src/lib/clerk-appearance.ts` — `card: "shadow-none border-0 bg-transparent…"`, `headerTitle`/`headerSubtitle: "hidden"`, `formButtonPrimary` includes `min-h-[44px] rounded-md bg-primary` (no `--action`)
+- `src/pages/signin.tsx` / `src/pages/signup.tsx` — no `from-primary/5`; mount `<AuthDoorChrome>`; keep `routing="hash"`, `unsafeMetadata`, `ClerkAuthFormShell`, OfflineAuthGate, dark appearance accessors
+- Test: `pnpm test -- tests/auth-door-chrome.test.tsx tests/role-chips-signup.test.tsx tests/native-auth-surface.test.ts tests/stage-10-access-token-consistency.test.js` → 4 files, 34 passed
+- Command: `pnpm exec tsc --noEmit -p tsconfig.json` and `tsconfig.server.json` → exit 0
+
+**Verdict:** VERIFIED
+
+## 2026-08-23 — Sign-in: remove role chips (PR 237 follow-up)
+
+**Claim:** `/signin` no longer shows RoleChips or carries a pre-chosen role to sign-up; `/signup` keeps interactive 44px chips + vet license gate. Dead `requested-role-store` and non-interactive RoleChips mode removed.
+
+**Evidence:**
+- `src/pages/signin.tsx` — no `RoleChips` / `readCarriedRole` / `writeCarriedRole` / `preRole` (grep empty)
+- `src/pages/signup.tsx` — still mounts `<RoleChips selectedRole onSelectRole>`; `useState(null)` (no store)
+- `src/features/auth/requested-role-store.ts` — was deleted; `RoleChips` requires `onSelectRole` (interactive-only)
+- Test: `pnpm test -- tests/auth-door-chrome.test.tsx tests/role-chips-signup.test.tsx tests/native-auth-surface.test.ts tests/stage-10-access-token-consistency.test.js tests/i18n-parity.test.ts` → 5 files, 38 passed
+
+**Verdict:** VERIFIED
+
+## 2026-08-23 — Auth titles page-specific (Welcome back = sign-in only)
+
+**Claim:** `/signin` title is `t.authPage.welcomeBack`; `/signup` title is `t.authPage.createAccount` and never Welcome back. Clerk leftover headers (`header*`, `formHeader*`) stay hidden.
+
+**Evidence:**
+- `src/pages/signin.tsx` — `title={t.authPage.welcomeBack}`; `src/pages/signup.tsx` — `title={t.authPage.createAccount}` (no `welcomeBack`)
+- `src/lib/clerk-appearance.ts` — `header`, `headerTitle`, `headerSubtitle`, `formHeader`, `formHeaderTitle`, `formHeaderSubtitle` all `hidden`
+- Test: `pnpm test -- tests/auth-door-chrome.test.tsx tests/role-chips-signup.test.tsx tests/native-auth-surface.test.ts` → 29 passed (RTL asserts page-specific titles + source contract)
+
+**Verdict:** VERIFIED
+
+## 2026-08-23 — AuthDoorChrome native phone/tablet vs web sheet (PR 237)
+
+**Claim:** Auth door is full-bleed top-aligned on Capacitor phone/tablet (no floating card, no extra SAT); web management console keeps the centered Ivory sheet. Titles/chips rules unchanged.
+
+**Evidence:**
+- `src/features/auth/components/AuthDoorChrome.tsx` — variants `web` | `phone` | `tablet` via `isCapacitorNative` + `useIsNativeTablet` (override for tests); phone/tablet: `min-h-full`, no `rounded-2xl`/`shadow-card`/`justify-center`/`min-h-[100dvh]`; web keeps sheet; no `safe-area-inset` in chrome
+- `tests/auth-door-chrome.test.tsx` — asserts three layouts + page-specific titles + chips-only-on-signup
+- `tests/role-chips-signup.test.tsx` — mocks `capacitorPlatform` + `useIsNativeTablet`
+- Test: `pnpm test -- tests/auth-door-chrome.test.tsx tests/role-chips-signup.test.tsx tests/native-auth-surface.test.ts` → 3 files, 33 passed
+- Command: `pnpm exec tsc --noEmit -p tsconfig.json` → exit 0
+
+**Verdict:** VERIFIED
+
+## 2026-08-24 — Auth door: flatten Clerk's outer cardBox + grey footer (PR 237)
+
+**Claim:** The "no floating card" rule now actually holds on the native door. `AuthDoorChrome`
+already removed the page-level card, but Clerk 5 draws the border/shadow/background on `cardBox`
+— the wrapper OUTSIDE `card` — and paints `footer` grey, so the phone and iPad doors still showed
+a floating white card with a grey band, and the form rendered narrower than the social buttons
+above it. Flattening `cardBox` (incl. `max-w-none`) and `footer` closes both. Auth logic, routing,
+`unsafeMetadata`, join-code, native OAuth and `ClerkAuthFormShell` untouched.
+
+**Evidence:**
+- `src/lib/clerk-appearance.ts` — `cardBox: "w-full max-w-none shadow-none border-0 bg-transparent p-0"`, `footer: "bg-transparent bg-none shadow-none border-0"`, `footerItem: "bg-transparent"`; `clerkAppearanceNative` spreads the same elements
+- Upstream basis: Clerk core-2 upgrade guide via context7 — "Outside the `card` element, a new `cardBox` id was introduced"; "The `footer` now gray by default, and it's located outside `card`, but inside `cardBox`". `elevation: 'flush'` is NOT usable here: grep for `elevation`/`flush` in the installed `@clerk/clerk-js` 5.125.13 bundle returned zero hits
+- Blast radius: `grep -rn "getClerkAppearance" src/` → only `src/pages/signin.tsx:12,123` and `src/pages/signup.tsx:14,128`. No other Clerk surface is restyled
+- RED first: `pnpm test -- tests/auth-door-chrome.test.tsx` before the fix → `1 failed | 16 passed`, "TypeError: .toMatch() expects to receive a string, but got undefined" at `tests/auth-door-chrome.test.tsx` (`cardBox` unset)
+- GREEN: `pnpm test -- tests/auth-door-chrome.test.tsx tests/role-chips-signup.test.tsx tests/native-auth-surface.test.ts` → 3 files, 34 passed
+- Command: `pnpm exec tsc --noEmit -p tsconfig.json` → exit 0
+- Device (bundled Capacitor shell built by `scripts/build-native-shell.sh`, installed via `scripts/install-ios-sim.sh`): iPhone SE 3rd-gen (375pt), iPhone 17 and iPad Pro 11-inch. Phone `/signin` + `/signup` and iPad portrait + landscape all render one continuous Ivory column — no card outline, no grey band, Clerk form flush with the Apple/Google buttons. iPad landscape shows the mark+title / form two-column split
+- No double safe-area: `mcp__argent__describe` on the iPhone 17 door puts the `VetTrack` mark link text at y=0.108 (≈94pt of 874). `src/native/NativeShell.tsx` pads `env(safe-area-inset-top)` once and `AuthDoorChrome` adds `pt-6`; a second SAT would put it past 140pt
+- `pnpm test` (full, with the local `.env.local` moved aside — a local `VITE_CLERK_PUBLISHABLE_KEY` flips `isClerkEnabled()` and reds 3 unrelated dev-bypass suites): `1 failed | 735 passed` before the proof-log fix below, all green after
+
+**Verdict:** VERIFIED
+
+## 2026-08-24 — Unblock PR 237 CI: proof-log claimed a path this PR deleted
+
+**Claim:** PR 237's Merge gate, Claim-verification and Tests shard 2/4 were red before this session's
+change, on one line this branch itself added: the `2026-08-23 — Sign-in has no role chips` entry cites
+`src/features/auth/requested-role-store.ts` — was deleted by this same PR. `scripts/verify/scan.cjs`
+recognises a deletion only as `was deleted` / `has been deleted` / `no longer exists` (`NEGATED_AFTER`),
+not a bare `— deleted`, so the span was read as a live path claim.
+
+**Evidence:**
+- `scripts/verify/scan.cjs` — `NEGATED_AFTER` matches `was (?:removed|deleted)` / `has been (?:removed|deleted)` / `no longer exists?` / `is gone`; bare `deleted` after the span is not in the alternation
+- `git cat-file -e HEAD:src/features/auth/requested-role-store.ts` → `does not exist in 'HEAD'` (the claim of deletion is true; only its wording failed)
+- `gh pr checks 237` before the fix → `Merge gate fail`, `Claim verification (evidence) fail`, `Tests (shard 2/4) fail`
+- Failure text: `docs/audit/PROOF_ALIGNMENT_LOG.md:10824 [path] path does not exist: src/features/auth/requested-role-store.ts`
+- Fix is one word in that same unmerged entry (`— deleted` → `— was deleted`); no history rewritten, no registry or attestation entry added
+- Test: `pnpm test -- tests/claims-ledger.test.ts` → 88 passed
+
+**Verdict:** VERIFIED
 ## 2026-08-23 — Code Blue activation push i18n extraction (handler-split follow-on)
 
 > Deliberately no hash-sigil pull-request citation in this entry. The claim gate
@@ -10855,3 +10943,4 @@ on that dirty tree.
 - Full local suite, NOT green and not claimed as such: `npx vitest run` → `Test Files  12 failed | 734 passed (746)`. The identical command in a clean `origin/main` worktree → `Test Files  13 failed | 723 passed (736)`. The 12 are a strict subset of main's 13 — main additionally fails `tests/shift-csv-role-labels.test.ts` — so this merge introduces no new failure. The failures are a local-environment condition, not a branch condition.
 
 **Verdict:** VERIFIED for the merge resolution and the finding fix. Full local suite PARTIAL by pre-existing environment failures, quantified above against a clean-main baseline rather than waved through.
+||||||| d3ec38083
