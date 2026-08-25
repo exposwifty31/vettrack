@@ -47,7 +47,25 @@ const KNOWN_DEBT_ALLOWLIST = new Set<string>([
   "server/routes/appointments.ts", // owner: tasks
   "server/routes/audit-logs.ts", // owner: observability
   "server/routes/clinical-check-in.ts", // owner: authority
-  "server/routes/code-blue.ts", // owner: code-blue
+  // code-blue.ts was split into a thin router (no res.status(...) calls of
+  // its own left) plus per-handler modules under code-blue/handlers/
+  // (mechanical file split). The debt this allowlist is tracking moved with
+  // the handler bodies, not away — list each handler file instead.
+  "server/routes/code-blue/handlers/get-eligible-managers.ts", // owner: code-blue
+  "server/routes/code-blue/handlers/get-events.ts", // owner: code-blue
+  "server/routes/code-blue/handlers/get-history.ts", // owner: code-blue
+  "server/routes/code-blue/handlers/get-reconciliation.ts", // owner: code-blue
+  "server/routes/code-blue/handlers/get-sessions-active.ts", // owner: code-blue
+  "server/routes/code-blue/handlers/get-sessions-id-dispenses.ts", // owner: code-blue
+  "server/routes/code-blue/handlers/patch-events-id.ts", // owner: code-blue
+  "server/routes/code-blue/handlers/patch-sessions-id-end.ts", // owner: code-blue
+  "server/routes/code-blue/handlers/patch-sessions-id-presence.ts", // owner: code-blue
+  "server/routes/code-blue/handlers/patch-sessions-id-reconcile.ts", // owner: code-blue
+  "server/routes/code-blue/handlers/post-events.ts", // owner: code-blue
+  "server/routes/code-blue/handlers/post-one-tap.ts", // owner: code-blue
+  "server/routes/code-blue/handlers/post-sessions-id-logs.ts", // owner: code-blue
+  "server/routes/code-blue/handlers/post-sessions-id-manual-billing.ts", // owner: code-blue
+  "server/routes/code-blue/handlers/post-sessions.ts", // owner: code-blue
   "server/routes/containers.ts", // owner: inventory
   "server/routes/crash-cart.ts", // owner: code-blue
   "server/routes/cursor-bug-fixer.ts", // owner: admin
@@ -103,6 +121,26 @@ function listRouteFiles(): string[] {
     const ext = entry.includes(".") ? entry.slice(entry.lastIndexOf(".")) : "";
     if (!SCAN_EXTS.has(ext)) continue;
     out.push(relative(cwd, full));
+  }
+  // server/routes/code-blue.ts was split into a thin router plus per-handler
+  // modules under code-blue/handlers/ (mechanical file split). The scan
+  // above is intentionally non-recursive and would otherwise silently drop
+  // coverage: the actual res.status(...) response calls this governance
+  // test is checking now live one directory deeper, invisible to a flat
+  // readdirSync. Add them explicitly so the same check keeps applying to
+  // the code that actually responds.
+  const codeBlueHandlersDir = resolve(root, "code-blue", "handlers");
+  try {
+    for (const entry of readdirSync(codeBlueHandlersDir)) {
+      const full = resolve(codeBlueHandlersDir, entry);
+      if (!statSync(full).isFile()) continue;
+      const ext = entry.includes(".") ? entry.slice(entry.lastIndexOf(".")) : "";
+      if (!SCAN_EXTS.has(ext)) continue;
+      out.push(relative(cwd, full));
+    }
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException)?.code !== "ENOENT") throw err;
+    // code-blue/handlers doesn't exist — nothing to add.
   }
   return out.sort();
 }

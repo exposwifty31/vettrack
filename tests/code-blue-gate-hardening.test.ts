@@ -21,6 +21,18 @@ function read(rel: string) {
 
 const routes = read("server/routes/code-blue.ts");
 
+/**
+ * Several code-blue.ts handler bodies were extracted into their own modules
+ * (mechanical file split, the arch-split marker in code-blue.ts). Read one back and
+ * return only its BODY (from `export const` onward, excluding its own
+ * import block — an import can repeat a symbol name that also appears at
+ * its real call site, which would corrupt an order-sensitive `indexOf`).
+ */
+function readHandlerBody(name: string): string {
+  const src = read(path.join("server", "routes", "code-blue", "handlers", name));
+  return src.slice(src.indexOf("export const"));
+}
+
 // Extract only the POST /sessions handler body to scope assertions.
 // Phase 4 PR 4.2 expanded this route declaration onto multiple lines to add
 // the requireClinicalAuthority middleware chain; the regex tolerates the
@@ -29,10 +41,13 @@ const sessionsPostStart = routes.search(
   /router\.post\(\s*["']\/sessions["']/,
 );
 const sessionsPostEnd = routes.indexOf("\nrouter.", sessionsPostStart + 1);
-const sessionsPostBlock = routes.slice(
-  sessionsPostStart,
-  sessionsPostEnd > sessionsPostStart ? sessionsPostEnd : sessionsPostStart + 4000,
-);
+const sessionsPostBlock =
+  routes.slice(
+    sessionsPostStart,
+    sessionsPostEnd > sessionsPostStart ? sessionsPostEnd : sessionsPostStart + 4000,
+  ) +
+  "\n" +
+  readHandlerBody("post-sessions.ts");
 
 // Extract only the POST /events handler body
 const eventsPostStart = routes.indexOf("router.post(\"/events\"");
@@ -50,10 +65,13 @@ const endHandlerStart = routes.search(
   /router\.patch\(\s*["']\/sessions\/:id\/end["']/,
 );
 const endHandlerEnd = routes.indexOf("\nrouter.", endHandlerStart + 1);
-const endBlock = routes.slice(
-  endHandlerStart,
-  endHandlerEnd > endHandlerStart ? endHandlerEnd : endHandlerStart + 6000,
-);
+const endBlock =
+  routes.slice(
+    endHandlerStart,
+    endHandlerEnd > endHandlerStart ? endHandlerEnd : endHandlerStart + 6000,
+  ) +
+  "\n" +
+  readHandlerBody("patch-sessions-id-end.ts");
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Server-authoritative timestamp

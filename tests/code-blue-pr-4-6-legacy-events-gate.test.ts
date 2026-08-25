@@ -29,11 +29,22 @@ const repoRoot = path.resolve(__dirname, "..");
 const routeFile = path.join(repoRoot, "server", "routes", "code-blue.ts");
 const routeSrc = fs.readFileSync(routeFile, "utf8");
 
-function extractHandlerBlock(routeStartPattern: RegExp): string {
+// The handler bodies for POST /events and PATCH /events/:id were extracted
+// (mechanical file split, the arch-split marker in code-blue.ts) into their own handler
+// modules; the router file now only holds the registration + middleware
+// chain. Append the handler file's source so every assertion below —
+// unchanged — still sees the same combined text it did before the split.
+function extractHandlerBlock(routeStartPattern: RegExp, handlerFile?: string): string {
   const start = routeSrc.search(routeStartPattern);
   expect(start, `route ${routeStartPattern} not found`).toBeGreaterThanOrEqual(0);
   const end = routeSrc.indexOf("\nrouter.", start + 1);
-  return routeSrc.slice(start, end > start ? end : start + 4000);
+  const registrationBlock = routeSrc.slice(start, end > start ? end : start + 4000);
+  if (!handlerFile) return registrationBlock;
+  const handlerSrc = fs.readFileSync(
+    path.join(repoRoot, "server", "routes", "code-blue", "handlers", handlerFile),
+    "utf8",
+  );
+  return `${registrationBlock}\n${handlerSrc}`;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -41,7 +52,7 @@ function extractHandlerBlock(routeStartPattern: RegExp): string {
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe("POST /api/code-blue/events — clinical-gate (PR 4.6)", () => {
-  const block = extractHandlerBlock(/router\.post\(\s*["']\/events["']/);
+  const block = extractHandlerBlock(/router\.post\(\s*["']\/events["']/, "post-events.ts");
 
   it("uses requireClinicalUser before requireClinicalAuthority", () => {
     const userIdx = block.indexOf("requireClinicalUser");
@@ -91,7 +102,7 @@ describe("POST /api/code-blue/events — clinical-gate (PR 4.6)", () => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe("PATCH /api/code-blue/events/:id — clinical-gate (PR 4.6)", () => {
-  const block = extractHandlerBlock(/router\.patch\(\s*["']\/events\/:id["']/);
+  const block = extractHandlerBlock(/router\.patch\(\s*["']\/events\/:id["']/, "patch-events-id.ts");
 
   it("uses requireClinicalUser before requireClinicalAuthority", () => {
     const userIdx = block.indexOf("requireClinicalUser");

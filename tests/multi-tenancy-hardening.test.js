@@ -18,6 +18,22 @@ const routeFiles = fs
   .filter((f) => f.endsWith(".ts"))
   .map((f) => path.join(routesDir, f));
 
+// server/routes/code-blue.ts was split into a thin router (registrations +
+// middleware only) plus per-handler modules under code-blue/handlers/
+// (mechanical file split, the arch-split marker formerly in code-blue.ts). The scan
+// above is intentionally non-recursive and would otherwise silently drop
+// coverage: code-blue.ts itself no longer contains any inline `.from(...)`
+// query, so it stops matching `dbRouteFiles` below, while the handler files
+// that DO now hold those queries live one directory deeper and are never
+// discovered. Add them explicitly so the same clinicId invariant keeps
+// being checked against the code that actually runs it.
+const codeBlueHandlersDir = path.join(routesDir, "code-blue", "handlers");
+if (fs.existsSync(codeBlueHandlersDir)) {
+  for (const f of fs.readdirSync(codeBlueHandlersDir)) {
+    if (f.endsWith(".ts")) routeFiles.push(path.join(codeBlueHandlersDir, f));
+  }
+}
+
 // Routes that intentionally operate across all tenants (no clinicId scoping):
 //   webhooks.ts — Clerk webhook handler uses clerkId to find users across clinics;
 //                 it is unauthenticated and must not be tenant-scoped.
@@ -32,7 +48,12 @@ const dbRouteFiles = routeFiles.filter((filePath) => {
     src.includes("from(folders)") ||
     src.includes("from(rooms)") ||
     src.includes("from(hospitalizations)") ||
-    src.includes("from(animals)")
+    src.includes("from(animals)") ||
+    src.includes("from(codeBlueSessions)") ||
+    src.includes("from(codeBlueLogEntries)") ||
+    src.includes("from(codeBluePresence)") ||
+    src.includes("from(codeBlueEvents)") ||
+    src.includes("from(crashCartChecks)")
   );
 });
 

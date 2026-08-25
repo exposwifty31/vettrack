@@ -1,90 +1,52 @@
-// TODO(arch): file exceeds 1100 lines. Split into handler modules following
-// the equipment-route-utils.ts / handlers/ pattern already started in this directory.
 import { Router } from "express";
 import type { NextFunction, Request, Response } from "express";
-import { randomUUID } from "crypto";
-import { z } from "zod";
-import {
-  db,
-  pool,
-  codeBlueEvents,
-  codeBlueSessions,
-  codeBlueLogEntries,
-  codeBluePresence,
-  crashCartChecks,
-  users,
-  equipment,
-} from "../db.js";
-import { eq, and, desc, inArray, isNull } from "drizzle-orm";
-import { fetchLinkedEquipmentForSession } from "../lib/code-blue-linked-equipment.js";
-import {
-  orchestrateOneTapCodeBlue,
-  DrizzleOneTapSessionTransaction,
-  DrizzlePagingStateStore,
-} from "../lib/code-blue-one-tap.js";
-import { DrizzleStartClaimStore } from "../lib/code-blue-start-claim.js";
-import {
-  DrizzleCartReservationStore,
-  clearReservationForSession,
-} from "../lib/code-blue-soft-reserve.js";
-import {
-  resolveNearestReadyCart,
-  DrizzleInitiatingLocationSource,
-  DrizzleReadyCartCandidateSource,
-} from "../lib/code-blue-nearest-cart.js";
-import { sql } from "drizzle-orm";
 import { requireAuth, requireAdmin, requireClinicalUser } from "../middleware/auth.js";
 import { requireClinicalAuthority } from "../middleware/authority.js";
 import { validateBody, validateUuid } from "../middleware/validate.js";
 import { logAudit, resolveAuditActorRole } from "../lib/audit.js";
-import { insertRealtimeDomainEvent } from "../lib/realtime-outbox.js";
-import { enqueueNotificationJob } from "../lib/queue.js";
-import { postSystemMessage } from "../lib/shift-chat-presence.js";
-import { invalidateActiveCodeBlueCache } from "../lib/code-blue-keepalive.js";
-import { evaluateCodeBlueManagerForRoute } from "../lib/authority/code-blue-manager.wiring.js";
-import { listCodeBlueEligibleManagers } from "../lib/authority/code-blue-eligible-managers.js";
-import type { CodeBlueEligibleManagersResponse } from "@vettrack/contracts";
 import { codeBlueManagerMetrics } from "../lib/authority/enforcement/code-blue-manager.metrics.js";
-import { detectMidsessionManagerDrift } from "../lib/authority/code-blue-manager-midsession.js";
-import { resolveRequestId, apiError } from "../lib/route-utils.js";
+import { postEventsHandler } from "./code-blue/handlers/post-events.js";
+import { patchEventsIdHandler } from "./code-blue/handlers/patch-events-id.js";
+import { getEventsHandler } from "./code-blue/handlers/get-events.js";
+import { getSessionsActiveHandler } from "./code-blue/handlers/get-sessions-active.js";
+import { getEligibleManagersHandler } from "./code-blue/handlers/get-eligible-managers.js";
+import { patchSessionsIdPresenceHandler } from "./code-blue/handlers/patch-sessions-id-presence.js";
+import { getHistoryHandler } from "./code-blue/handlers/get-history.js";
+import { getReconciliationHandler } from "./code-blue/handlers/get-reconciliation.js";
+import { getSessionsIdDispensesHandler } from "./code-blue/handlers/get-sessions-id-dispenses.js";
+import { patchSessionsIdReconcileHandler } from "./code-blue/handlers/patch-sessions-id-reconcile.js";
+import { postSessionsIdManualBillingHandler } from "./code-blue/handlers/post-sessions-id-manual-billing.js";
+import { postOneTapHandler } from "./code-blue/handlers/post-one-tap.js";
+import { postSessionsIdLogsHandler } from "./code-blue/handlers/post-sessions-id-logs.js";
+import { postSessionsHandler } from "./code-blue/handlers/post-sessions.js";
+import { patchSessionsIdEndHandler } from "./code-blue/handlers/patch-sessions-id-end.js";
 const router = Router();
 
-export const startSchema = z.object({
-  localStartedAt: z.string().datetime().optional(),
-}).strict();
-
-export const endSchema = z.object({
-  outcome: z.enum(["rosc", "died", "transferred", "ongoing"]).optional(),
-  notes: z.string().max(2000).optional(),
-  timeline: z
-    .array(z.object({ elapsed: z.number(), label: z.string().max(200) }))
-    .max(500)
-    .optional(),
-}).strict();
-
-export const startSessionSchema = z.object({
-  managerUserId: z.string().min(1),
-  managerUserName: z.string().min(1),
-  preCheckPassed: z.boolean().optional(),
-  localStartedAt: z.string().datetime().optional(),
-  /** Primary unit for this event (logged at elapsed 0). */
-  equipmentId: z.string().min(1).optional(),
-  /** Accepted for client idempotency hygiene; not persisted on session start. */
-  idempotencyKey: z.string().min(1).max(128).optional(),
-}).strict();
-
-export const logEntrySchema = z.object({
-  idempotencyKey: z.string().uuid(),
-  elapsedMs: z.number().int().min(0),
-  label: z.string().min(1).max(200),
-  category: z.enum(["equipment", "note"]),
-  equipmentId: z.string().optional(),
-}).strict();
-
-export const endSessionSchema = z.object({
-  outcome: z.enum(["rosc", "died", "transferred", "ongoing"]),
-  earlyStopReason: z.string().min(1).max(500).optional(),
-}).strict();
+// Request-body schemas live in ./code-blue/schemas.ts (moved out to break a
+// router → handler → router import cycle — handlers need these types too;
+// see that file's header comment). Re-exported here unchanged so existing
+// consumers importing from this path (e.g. tests/strict-body-validation.test.ts)
+// keep resolving exactly as before.
+export {
+  startSchema,
+  endSchema,
+  startSessionSchema,
+  logEntrySchema,
+  endSessionSchema,
+  oneTapStartSchema,
+  reconcileSchema,
+  manualBillingSchema,
+} from "./code-blue/schemas.js";
+import {
+  startSchema,
+  endSchema,
+  startSessionSchema,
+  logEntrySchema,
+  endSessionSchema,
+  oneTapStartSchema,
+  reconcileSchema,
+  manualBillingSchema,
+} from "./code-blue/schemas.js";
 
 // POST /api/code-blue/events  — start a Code Blue event (fire-and-forget safe)
 //
@@ -107,41 +69,8 @@ router.post(
     allowSystemAdmin: false,
   }),
   validateBody(startSchema),
-  async (req, res) => {
-  const requestId = resolveRequestId(res, req.headers["x-request-id"]);
-  try {
-    const clinicId = req.clinicId!;
-    const userId = req.authUser!.id;
-
-    const id = randomUUID();
-    const startedAt = new Date();
-
-    await db.insert(codeBlueEvents).values({
-      id,
-      clinicId,
-      startedByUserId: userId,
-      startedAt,
-    });
-
-    logAudit({
-      actorRole: resolveAuditActorRole(req),
-      clinicId,
-      actionType: "code_blue_started",
-      performedBy: userId,
-      performedByEmail: req.authUser!.email ?? "",
-      targetId: id,
-      targetType: "code_blue_event",
-      metadata: { startedAt: startedAt.toISOString() },
-    });
-
-    res.status(201).json({ id, startedAt: startedAt.toISOString() });
-  } catch (err) {
-    console.error("[code-blue] start failed", err);
-    res.status(500).json(
-      apiError({ code: "INTERNAL_ERROR", reason: "CODE_BLUE_START_FAILED", message: "Failed to start Code Blue event", requestId }),
-    );
-  }
-});
+  postEventsHandler,
+);
 
 // PATCH /api/code-blue/events/:id  — close a Code Blue event with outcome + timeline
 //
@@ -166,70 +95,11 @@ router.patch(
   }),
   validateUuid("id"),
   validateBody(endSchema),
-  async (req, res) => {
-  const requestId = resolveRequestId(res, req.headers["x-request-id"]);
-  try {
-    const clinicId = req.clinicId!;
-    const { id } = req.params;
-    const body = req.body as z.infer<typeof endSchema>;
-
-    const [updated] = await db
-      .update(codeBlueEvents)
-      .set({
-        endedAt: new Date(),
-        ...(body.outcome ? { outcome: body.outcome } : {}),
-        ...(body.notes !== undefined ? { notes: body.notes } : {}),
-        ...(body.timeline ? { timeline: body.timeline } : {}),
-      })
-      .where(and(eq(codeBlueEvents.id, id), eq(codeBlueEvents.clinicId, clinicId)))
-      .returning({ id: codeBlueEvents.id, endedAt: codeBlueEvents.endedAt });
-
-    if (!updated) {
-      return res.status(404).json(
-        apiError({ code: "NOT_FOUND", reason: "EVENT_NOT_FOUND", message: "Code Blue event not found", requestId }),
-      );
-    }
-
-    logAudit({
-      actorRole: resolveAuditActorRole(req),
-      clinicId,
-      actionType: "code_blue_ended",
-      performedBy: req.authUser!.id,
-      performedByEmail: req.authUser!.email ?? "",
-      targetId: id,
-      targetType: "code_blue_event",
-      metadata: { outcome: body.outcome ?? null, endedAt: updated.endedAt?.toISOString() },
-    });
-
-    res.json({ id: updated.id, endedAt: updated.endedAt });
-  } catch (err) {
-    console.error("[code-blue] end failed", err);
-    res.status(500).json(
-      apiError({ code: "INTERNAL_ERROR", reason: "CODE_BLUE_END_FAILED", message: "Failed to end Code Blue event", requestId }),
-    );
-  }
-});
+  patchEventsIdHandler,
+);
 
 // GET /api/code-blue/events  — admin: list recent events for this clinic
-router.get("/events", requireAuth, requireAdmin, async (req, res) => {
-  const requestId = resolveRequestId(res, req.headers["x-request-id"]);
-  try {
-    const clinicId = req.clinicId!;
-    const items = await db
-      .select()
-      .from(codeBlueEvents)
-      .where(eq(codeBlueEvents.clinicId, clinicId))
-      .orderBy(desc(codeBlueEvents.startedAt))
-      .limit(50);
-
-    res.json(items);
-  } catch (err) {
-    console.error("[code-blue] list failed", err);
-    res.status(500).json(
-      apiError({ code: "INTERNAL_ERROR", reason: "CODE_BLUE_LIST_FAILED", message: "Failed to list Code Blue events", requestId }),
-    );
-  }
-});
+router.get("/events", requireAuth, requireAdmin, getEventsHandler);
 
 /**
  * Phase 4 PR 4.2 — Initiator clinical-gate denial observer.
@@ -305,242 +175,10 @@ router.post(
   }),
   codeBlueInitiatorGatePassedMarker,
   validateBody(startSessionSchema),
-  async (req, res) => {
-  const requestId = resolveRequestId(res, req.headers["x-request-id"]);
-  try {
-    const clinicId = req.clinicId!;
-    const userId = req.authUser!.id;
-    const body = req.body as z.infer<typeof startSessionSchema>;
-
-    // Phase 4 PR 4.2 + PR 4.5 — Code Blue manager authority evaluator wiring.
-    // Runs BEFORE existing manager validation + any side effects (DB insert,
-    // push fan-out, system message, "started" audit). The evaluator emits
-    // audit/metric internally based on the resolved mode.
-    //
-    // PR 4.5: in enforce mode the evaluator returns `action: "deny"`. The
-    // route translates that into a 403 with a stable reason code in the
-    // response body BEFORE any side effect commits. In shadow / off / mode-
-    // inactive / fault-open paths the verdict is `action: "allow"` and the
-    // route proceeds as before. Per-clinic vt_server_config
-    // `code_blue.manager_enforce.<clinicId>.initiation = "enforce"` activates
-    // the deny path; default (`off`) is unchanged.
-    //
-    // Evaluator targets the *named manager* via the existing resolver
-    // framework. It MUST NOT read req.authoritySnapshot (which belongs to the
-    // request actor, not the manager). The wiring helper loads vt_users by
-    // id (clinic-scoped) and constructs a DB-only target user object.
-    const { verdict: initiationVerdict } = await evaluateCodeBlueManagerForRoute({
-      clinicId,
-      managerUserId: body.managerUserId,
-      endpoint: "initiation",
-      now: new Date(),
-    });
-    if (initiationVerdict.action === "deny") {
-      // Codex P2 (PR 4.5 review): the evaluator can deny with USER_MISSING
-      // or MANAGER_CROSS_CLINIC, which are INPUT VALIDATION failures (the
-      // nominated managerUserId points to a non-existent or cross-clinic
-      // user), distinct from operational-role denials. Let those reasons
-      // fall through to the existing INVALID_MANAGER 400 response so the
-      // API contract for input validation is preserved. Only operational-
-      // role denials (OPROLE_NOT_IN_CB_ALLOWLIST, NO_OPEN_CHECK_IN) return
-      // the new 403 MANAGER_NOT_CODE_BLUE_ELIGIBLE response.
-      const reason = initiationVerdict.reason;
-      if (reason === "OPROLE_NOT_IN_CB_ALLOWLIST" || reason === "NO_OPEN_CHECK_IN") {
-        return res.status(403).json(
-          apiError({
-            code: "MANAGER_NOT_CODE_BLUE_ELIGIBLE",
-            reason,
-            message:
-              "Nominated manager is not currently Code-Blue-eligible (operational role check)",
-            requestId,
-          }),
-        );
-      }
-      // USER_MISSING / MANAGER_CROSS_CLINIC: continue to the existing
-      // managerUser DB lookup below, which returns 400 INVALID_MANAGER.
-    }
-
-    // Validate that managerUserId is an active vet or admin in this clinic
-    const [managerUser] = await db
-      .select({ id: users.id, name: users.name })
-      .from(users)
-      .where(
-        and(
-          eq(users.id, body.managerUserId),
-          eq(users.clinicId, clinicId),
-          inArray(users.role, ["vet", "admin"]),
-          eq(users.status, "active"),
-        ),
-      )
-      .limit(1);
-    if (!managerUser) {
-      return res.status(400).json(
-        apiError({ code: "INVALID_MANAGER", reason: "INVALID_MANAGER", message: "Manager must be an active vet or admin in this clinic", requestId }),
-      );
-    }
-
-    let primaryEquipment: { id: string; name: string } | null = null;
-    if (body.equipmentId) {
-      const [eqRow] = await db
-        .select({ id: equipment.id, name: equipment.name })
-        .from(equipment)
-        .where(
-          and(
-            eq(equipment.id, body.equipmentId),
-            eq(equipment.clinicId, clinicId),
-            isNull(equipment.deletedAt),
-          ),
-        )
-        .limit(1);
-      if (!eqRow) {
-        return res.status(400).json(
-          apiError({
-            code: "INVALID_EQUIPMENT",
-            reason: "INVALID_EQUIPMENT",
-            message: "Equipment not found in this clinic",
-            requestId,
-          }),
-        );
-      }
-      primaryEquipment = eqRow;
-    }
-
-    const id = randomUUID();
-    const startedAt = new Date();
-
-    let codeBlueNotificationRequestOutboxId: number | undefined;
-    let activeSessionExists = false;
-    await db.transaction(async (tx) => {
-      await tx.execute(sql`
-        SELECT pg_advisory_xact_lock(hashtextextended(${`code-blue-active-session:${clinicId}`}, 0))
-      `);
-
-      // P1-4: serialize the guard with the insert so concurrent starts cannot
-      // both observe "no active session" before either writes.
-      const [existingActive] = await tx
-        .select({ id: codeBlueSessions.id })
-        .from(codeBlueSessions)
-        .where(
-          and(
-            eq(codeBlueSessions.clinicId, clinicId),
-            eq(codeBlueSessions.status, "active"),
-          ),
-        )
-        .limit(1);
-      if (existingActive) {
-        activeSessionExists = true;
-        return;
-      }
-
-      await tx.insert(codeBlueSessions).values({
-        id,
-        clinicId,
-        startedAt,
-        startedBy: userId,
-        startedByName: req.authUser!.name,
-        managerUserId: managerUser.id,
-        managerUserName: managerUser.name,
-        preCheckPassed: body.preCheckPassed ?? null,
-        status: "active",
-      });
-
-      if (primaryEquipment) {
-        await tx.insert(codeBlueLogEntries).values({
-          id: randomUUID(),
-          sessionId: id,
-          clinicId,
-          idempotencyKey: randomUUID(),
-          elapsedMs: 0,
-          label: primaryEquipment.name,
-          category: "equipment",
-          equipmentId: primaryEquipment.id,
-          loggedByUserId: userId,
-          loggedByName: req.authUser!.name,
-        });
-      }
-
-      codeBlueNotificationRequestOutboxId = await insertRealtimeDomainEvent(tx, {
-        clinicId,
-        type: "NOTIFICATION_REQUESTED",
-        payload: {
-          channel: "code_blue_role_broadcast",
-          sessionId: id,
-          tag: `code-blue-${id}`,
-        },
-        occurredAt: startedAt,
-      });
-      await insertRealtimeDomainEvent(tx, {
-        clinicId,
-        type: "CODE_BLUE_STATUS_CHANGED",
-        payload: { sessionId: id, status: "active" },
-        occurredAt: startedAt,
-      });
-    });
-
-    if (activeSessionExists) {
-      return res.status(409).json(
-        apiError({
-          code: "ACTIVE_SESSION_EXISTS",
-          reason: "ACTIVE_SESSION_EXISTS",
-          message: "An active Code Blue session already exists for this clinic",
-          requestId,
-        }),
-      );
-    }
-
-    postSystemMessage(clinicId, "code_blue_start", {
-      startedBy: req.authUser!.name ?? req.authUser!.id,
-      startedAt: startedAt.toISOString(),
-    }).catch(() => {});
-
-    logAudit({
-      actorRole: resolveAuditActorRole(req),
-      clinicId,
-      actionType: "code_blue_started",
-      performedBy: userId,
-      performedByEmail: req.authUser!.email ?? "",
-      targetId: id,
-      targetType: "code_blue_session",
-      metadata: { startedAt: startedAt.toISOString(), managerUserId: body.managerUserId },
-    });
-
-    void enqueueNotificationJob({
-      type: "code_blue_broadcast",
-      clinicId,
-      title: "⚠ CODE BLUE",
-      body: `CODE BLUE הופעל ע״י ${req.authUser!.name}`,
-      tag: `code-blue-${id}`,
-      ...(codeBlueNotificationRequestOutboxId !== undefined
-        ? { notificationRequestOutboxId: codeBlueNotificationRequestOutboxId }
-        : {}),
-    }).catch(() => {
-      /* non-critical */
-    });
-
-    // Phase 9 PR 9.4 — invalidate the keepalive's active-session cache so
-    // the next SSE KEEPALIVE event reflects this start within ≤ 5 s.
-    invalidateActiveCodeBlueCache(clinicId);
-
-    res.status(201).json({ id, startedAt: startedAt.toISOString() });
-  } catch (err) {
-    console.error("[code-blue] start session failed", err);
-    res.status(500).json(
-      apiError({ code: "INTERNAL_ERROR", reason: "SESSION_START_FAILED", message: "Failed to start session", requestId }),
-    );
-  }
-});
+  postSessionsHandler,
+);
 
 // R-CBF-1.1 — one-tap Code Blue orchestration body.
-export const oneTapStartSchema = z.object({
-  /** Per-hold-gesture idempotency token (R-CBF-1.3), persisted across retries. */
-  idempotencyToken: z.string().min(1).max(128),
-  managerUserId: z.string().min(1),
-  managerUserName: z.string().min(1),
-  preCheckPassed: z.boolean().optional(),
-  /** Optimistic location hint — re-validated server-side, never trusted to steer cart selection. */
-  locationHint: z.object({ roomId: z.string().nullable() }).strict().optional(),
-}).strict();
-
 // POST /api/code-blue/one-tap — orchestrated "one tap, everything ready" start.
 // Composes: durable idempotency claim → server-authoritative nearest-ready cart
 // → CAS soft-reserve → session → outbox team page (+ status), all atomic. Same
@@ -558,155 +196,7 @@ router.post(
   }),
   codeBlueInitiatorGatePassedMarker,
   validateBody(oneTapStartSchema),
-  async (req, res) => {
-    const requestId = resolveRequestId(res, req.headers["x-request-id"]);
-    try {
-      const clinicId = req.clinicId!;
-      const userId = req.authUser!.id;
-      const body = req.body as z.infer<typeof oneTapStartSchema>;
-
-      // Manager authority evaluator + validation — identical contract to POST /sessions.
-      const { verdict } = await evaluateCodeBlueManagerForRoute({
-        clinicId,
-        managerUserId: body.managerUserId,
-        endpoint: "initiation",
-        now: new Date(),
-      });
-      if (verdict.action === "deny") {
-        const reason = verdict.reason;
-        if (reason === "OPROLE_NOT_IN_CB_ALLOWLIST" || reason === "NO_OPEN_CHECK_IN") {
-          return res.status(403).json(
-            apiError({
-              code: "MANAGER_NOT_CODE_BLUE_ELIGIBLE",
-              reason,
-              message:
-                "Nominated manager is not currently Code-Blue-eligible (operational role check)",
-              requestId,
-            }),
-          );
-        }
-        // USER_MISSING / MANAGER_CROSS_CLINIC fall through to the 400 below.
-      }
-
-      const [managerUser] = await db
-        .select({ id: users.id, name: users.name })
-        .from(users)
-        .where(
-          and(
-            eq(users.id, body.managerUserId),
-            eq(users.clinicId, clinicId),
-            inArray(users.role, ["vet", "admin"]),
-            eq(users.status, "active"),
-          ),
-        )
-        .limit(1);
-      if (!managerUser) {
-        return res.status(400).json(
-          apiError({
-            code: "INVALID_MANAGER",
-            reason: "INVALID_MANAGER",
-            message: "Manager must be an active vet or admin in this clinic",
-            requestId,
-          }),
-        );
-      }
-
-      const locationSource = new DrizzleInitiatingLocationSource();
-      const candidateSource = new DrizzleReadyCartCandidateSource();
-      const outcome = await orchestrateOneTapCodeBlue(
-        {
-          claimStore: new DrizzleStartClaimStore(),
-          resolveCart: (cId, uId, hint) =>
-            resolveNearestReadyCart(cId, uId, { locationSource, candidateSource }, hint),
-          sessionTx: new DrizzleOneTapSessionTransaction({
-            startedByUserId: userId,
-            startedByName: req.authUser!.name,
-            managerUserId: managerUser.id,
-            managerUserName: managerUser.name,
-            preCheckPassed: body.preCheckPassed ?? null,
-          }),
-          pagingStateStore: new DrizzlePagingStateStore(),
-        },
-        {
-          clinicId,
-          token: body.idempotencyToken,
-          initiatingUserId: userId,
-          ...(body.locationHint ? { clientHint: body.locationHint } : {}),
-        },
-      );
-
-      if (outcome.kind === "conflict") {
-        // Retryable: an in-flight owner, a superseded fence, or an existing
-        // active session. The client backs off and retries with the SAME token.
-        return res.status(409).json(
-          apiError({
-            code: "CODE_BLUE_START_CONFLICT",
-            reason: outcome.reason.toUpperCase(),
-            message: "Another Code Blue start is in progress; retry with the same token",
-            requestId,
-          }),
-        );
-      }
-
-      if (outcome.kind === "created") {
-        postSystemMessage(clinicId, "code_blue_start", {
-          startedBy: req.authUser!.name ?? userId,
-          startedAt: new Date().toISOString(),
-        }).catch(() => {});
-
-        logAudit({
-          actorRole: resolveAuditActorRole(req),
-          clinicId,
-          actionType: "code_blue_started",
-          performedBy: userId,
-          performedByEmail: req.authUser!.email ?? "",
-          targetId: outcome.sessionId,
-          targetType: "code_blue_session",
-          metadata: { via: "one_tap", managerUserId: managerUser.id },
-        });
-
-        void enqueueNotificationJob({
-          type: "code_blue_broadcast",
-          clinicId,
-          title: "⚠ CODE BLUE",
-          body: `CODE BLUE הופעל ע״י ${req.authUser!.name}`,
-          tag: `code-blue-${outcome.sessionId}`,
-          ...(outcome.pagingOutboxId !== null
-            ? { notificationRequestOutboxId: outcome.pagingOutboxId }
-            : {}),
-        }).catch(() => {
-          /* non-critical */
-        });
-
-        invalidateActiveCodeBlueCache(clinicId);
-
-        return res.status(201).json({
-          outcome: "created",
-          sessionId: outcome.sessionId,
-          reservedCartId: outcome.reservedCartId,
-          pagingState: outcome.pagingState,
-        });
-      }
-
-      // Idempotent replay of the committed session — NO side effects; report the
-      // CURRENT durable paging state (never a static success).
-      return res.status(200).json({
-        outcome: "replay",
-        sessionId: outcome.sessionId,
-        pagingState: outcome.pagingState,
-      });
-    } catch (err) {
-      console.error("[code-blue] one-tap start failed", err);
-      return res.status(500).json(
-        apiError({
-          code: "INTERNAL_ERROR",
-          reason: "ONE_TAP_START_FAILED",
-          message: "Failed to start Code Blue",
-          requestId,
-        }),
-      );
-    }
-  },
+  postOneTapHandler,
 );
 
 // GET /api/code-blue/eligible-managers — who would the manager check accept now?
@@ -724,97 +214,10 @@ router.post(
 // mutation it feeds. And the initiator gate's break-glass path emits a
 // break-glass audit/counter — on a repeatedly-polled GET that would manufacture
 // emergency-override signal out of ordinary reads.
-router.get("/eligible-managers", requireAuth, requireClinicalUser, async (req, res) => {
-  const requestId = resolveRequestId(res, req.headers["x-request-id"]);
-  try {
-    // Session-derived, never client-supplied: a query param or header here would be
-    // a cross-tenant read.
-    const clinicId = req.clinicId!;
-    const managers = await listCodeBlueEligibleManagers({ clinicId });
-    const body: CodeBlueEligibleManagersResponse = { managers };
-    return res.json(body);
-  } catch (err) {
-    console.error("[code-blue] eligible-managers failed", err);
-    return res.status(500).json(
-      apiError({
-        code: "INTERNAL_ERROR",
-        reason: "ELIGIBLE_MANAGERS_FAILED",
-        message: "Failed to list Code Blue eligible managers",
-        requestId,
-      }),
-    );
-  }
-});
+router.get("/eligible-managers", requireAuth, requireClinicalUser, getEligibleManagersHandler);
 
 // GET /api/code-blue/sessions/active — poll: session + log entries + presence + cart status
-router.get("/sessions/active", requireAuth, async (req, res) => {
-  const requestId = resolveRequestId(res, req.headers["x-request-id"]);
-  try {
-    const clinicId = req.clinicId!;
-
-    // Active session — order by startedAt desc so the most recent is returned
-    const [session] = await db
-      .select()
-      .from(codeBlueSessions)
-      .where(and(eq(codeBlueSessions.clinicId, clinicId), eq(codeBlueSessions.status, "active")))
-      .orderBy(desc(codeBlueSessions.startedAt))
-      .limit(1);
-
-    // Latest crash cart check (last 24h)
-    const [latestCheck] = await db
-      .select()
-      .from(crashCartChecks)
-      .where(
-        and(
-          eq(crashCartChecks.clinicId, clinicId),
-          sql`${crashCartChecks.performedAt} > NOW() - INTERVAL '24 hours'`,
-        ),
-      )
-      .orderBy(desc(crashCartChecks.performedAt))
-      .limit(1);
-
-    const cartStatus = latestCheck
-      ? { lastCheckedAt: latestCheck.performedAt.toISOString(), allPassed: latestCheck.allPassed, performedByName: latestCheck.performedByName }
-      : null;
-
-    if (!session) {
-      return res.json({ session: null, logEntries: [], presence: [], cartStatus, linkedEquipment: [] });
-    }
-
-    // Log entries ordered by elapsed time
-    const logEntries = await db
-      .select()
-      .from(codeBlueLogEntries)
-      .where(eq(codeBlueLogEntries.sessionId, session.id))
-      .orderBy(codeBlueLogEntries.elapsedMs);
-
-    // Presence — filter stale (>30s)
-    const presence = await db
-      .select()
-      .from(codeBluePresence)
-      .where(
-        and(
-          eq(codeBluePresence.sessionId, session.id),
-          sql`${codeBluePresence.lastSeenAt} > NOW() - INTERVAL '30 seconds'`,
-        ),
-      );
-
-    const linkedEquipment = await fetchLinkedEquipmentForSession(clinicId, logEntries);
-
-    res.json({
-      session,
-      logEntries,
-      presence,
-      cartStatus,
-      linkedEquipment,
-    });
-  } catch (err) {
-    console.error("[code-blue] poll failed", err);
-    res.status(500).json(
-      apiError({ code: "INTERNAL_ERROR", reason: "SESSION_POLL_FAILED", message: "Poll failed", requestId }),
-    );
-  }
-});
+router.get("/sessions/active", requireAuth, getSessionsActiveHandler);
 
 // POST /api/code-blue/sessions/:id/logs — add a log entry
 //
@@ -843,143 +246,11 @@ router.post(
   }),
   validateUuid("id"),
   validateBody(logEntrySchema),
-  async (req, res) => {
-  const requestId = resolveRequestId(res, req.headers["x-request-id"]);
-  try {
-    const clinicId = req.clinicId!;
-    const { id: sessionId } = req.params;
-    const body = req.body as z.infer<typeof logEntrySchema>;
-
-    // Verify session belongs to clinic. Phase 4 PR 4.4a selects
-    // managerUserId so mid-session detection has the persisted manager.
-    const [session] = await db
-      .select({
-        id: codeBlueSessions.id,
-        managerUserId: codeBlueSessions.managerUserId,
-      })
-      .from(codeBlueSessions)
-      .where(and(eq(codeBlueSessions.id, sessionId), eq(codeBlueSessions.clinicId, clinicId)))
-      .limit(1);
-
-    if (!session) {
-      return res.status(404).json(
-        apiError({ code: "NOT_FOUND", reason: "SESSION_NOT_FOUND", message: "Session not found", requestId }),
-      );
-    }
-
-    // Idempotency: check for existing key
-    const [existing] = await db
-      .select({ id: codeBlueLogEntries.id })
-      .from(codeBlueLogEntries)
-      .where(and(
-        eq(codeBlueLogEntries.sessionId, sessionId),
-        eq(codeBlueLogEntries.idempotencyKey, body.idempotencyKey),
-      ))
-      .limit(1);
-
-    if (existing) {
-      return res.json({ id: existing.id, duplicate: true });
-    }
-
-    const entryId = randomUUID();
-    await db.insert(codeBlueLogEntries).values({
-      id: entryId,
-      sessionId,
-      clinicId,
-      idempotencyKey: body.idempotencyKey,
-      elapsedMs: body.elapsedMs,
-      label: body.label,
-      category: body.category,
-      equipmentId: body.equipmentId ?? null,
-      loggedByUserId: req.authUser!.id,
-      loggedByName: req.authUser!.name,
-    });
-
-    logAudit({
-      actorRole: resolveAuditActorRole(req),
-      clinicId,
-      actionType: "code_blue_log_entry_created",
-      performedBy: req.authUser!.id,
-      performedByEmail: req.authUser!.email ?? "",
-      targetId: sessionId,
-      targetType: "code_blue_session",
-      metadata: { entryId, category: body.category },
-    });
-
-    // Phase 4 PR 4.4a — fire-and-forget mid-session manager-drift detection.
-    // Shadow-only; never blocks. The helper internally try/catches all
-    // dependencies (DB, resolver, audit, metrics) and never throws. The
-    // additional .catch here is belt-and-suspenders defense for the
-    // never-block contract.
-    void detectMidsessionManagerDrift({
-      clinicId,
-      sessionId,
-      managerUserId: session.managerUserId ?? null,
-      now: new Date(),
-    }).catch((err) => {
-      console.error(
-        "[code-blue] midsession manager-drift detection failed (shadow); log write already persisted",
-        err,
-      );
-    });
-
-    res.status(201).json({ id: entryId, duplicate: false });
-  } catch (err) {
-    console.error("[code-blue] add log entry failed", err);
-    res.status(500).json(
-      apiError({ code: "INTERNAL_ERROR", reason: "LOG_ENTRY_FAILED", message: "Failed to add log entry", requestId }),
-    );
-  }
-});
+  postSessionsIdLogsHandler,
+);
 
 // PATCH /api/code-blue/sessions/:id/presence — heartbeat (every 10s)
-router.patch("/sessions/:id/presence", requireAuth, validateUuid("id"), async (req, res) => {
-  const requestId = resolveRequestId(res, req.headers["x-request-id"]);
-  try {
-    const clinicId = req.clinicId!;
-    const { id: sessionId } = req.params;
-    const userId = req.authUser!.id;
-    const userName = req.authUser!.name;
-
-    // Verify session belongs to this clinic
-    const [session] = await db
-      .select({ id: codeBlueSessions.id })
-      .from(codeBlueSessions)
-      .where(and(eq(codeBlueSessions.id, sessionId), eq(codeBlueSessions.clinicId, clinicId)))
-      .limit(1);
-
-    if (!session) {
-      return res.status(404).json(
-        apiError({ code: "NOT_FOUND", reason: "SESSION_NOT_FOUND", message: "Session not found", requestId }),
-      );
-    }
-
-    await db
-      .insert(codeBluePresence)
-      .values({ sessionId, userId, userName, lastSeenAt: new Date() })
-      .onConflictDoUpdate({
-        target: [codeBluePresence.sessionId, codeBluePresence.userId],
-        set: { userName, lastSeenAt: new Date() },
-      });
-
-    logAudit({
-      actorRole: resolveAuditActorRole(req),
-      clinicId,
-      actionType: "code_blue_presence_heartbeat",
-      performedBy: req.authUser!.id,
-      performedByEmail: req.authUser!.email ?? "",
-      targetId: sessionId,
-      targetType: "code_blue_session",
-    });
-
-    res.json({ ok: true });
-  } catch (err) {
-    console.error("[code-blue] presence heartbeat failed", err);
-    res.status(500).json(
-      apiError({ code: "INTERNAL_ERROR", reason: "PRESENCE_FAILED", message: "Presence update failed", requestId }),
-    );
-  }
-});
+router.patch("/sessions/:id/presence", requireAuth, validateUuid("id"), patchSessionsIdPresenceHandler);
 
 // PATCH /api/code-blue/sessions/:id/end — close session (manager only for ALL outcomes)
 //
@@ -1002,254 +273,10 @@ router.patch("/sessions/:id/presence", requireAuth, validateUuid("id"), async (r
 // The PR 4.3 deliverable — the manager-authority evaluator at end-time and
 // the drift signal — is wired below inside the handler, AFTER session load
 // and identity validation. Shadow-only.
-router.patch("/sessions/:id/end", requireAuth, validateUuid("id"), validateBody(endSessionSchema), async (req, res) => {
-  const requestId = resolveRequestId(res, req.headers["x-request-id"]);
-  try {
-    const clinicId = req.clinicId!;
-    const { id: sessionId } = req.params;
-    const { outcome, earlyStopReason: rawEarlyStopReason } = req.body as z.infer<typeof endSessionSchema>;
-    const earlyStopReason = rawEarlyStopReason ? rawEarlyStopReason.trim() : undefined;
-    if (earlyStopReason !== undefined && earlyStopReason.length < 3) {
-      return res.status(400).json(
-        apiError({ code: "EARLY_STOP_REASON_REQUIRED", reason: "EARLY_STOP_REASON_REQUIRED", message: "earlyStopReason must be at least 3 characters", requestId }),
-      );
-    }
-
-    const [session] = await db
-      .select()
-      .from(codeBlueSessions)
-      .where(and(eq(codeBlueSessions.id, sessionId), eq(codeBlueSessions.clinicId, clinicId)))
-      .limit(1);
-
-    if (!session) {
-      return res.status(404).json(
-        apiError({ code: "NOT_FOUND", reason: "SESSION_NOT_FOUND", message: "Session not found", requestId }),
-      );
-    }
-
-    // Manager-only gate — applies to ALL outcomes
-    if (session.managerUserId !== req.authUser!.id) {
-      return res.status(403).json(
-        apiError({ code: "MANAGER_ONLY", reason: "MANAGER_ONLY", message: "Only the resuscitation manager can end this session", requestId }),
-      );
-    }
-
-    // Verify manager still holds vet or admin role and is still active.
-    const [managerUser] = await db
-      .select({ id: users.id, role: users.role, status: users.status })
-      .from(users)
-      .where(and(eq(users.id, session.managerUserId), eq(users.clinicId, clinicId)))
-      .limit(1);
-
-    if (!managerUser || !["vet", "admin"].includes(managerUser.role)) {
-      return res.status(422).json(
-        apiError({ code: "NO_VET_MANAGER", reason: "NO_VET_MANAGER", message: "Assigned manager must be a vet or admin to end this session", requestId }),
-      );
-    }
-
-    if (managerUser.status !== "active") {
-      return res.status(403).json(
-        apiError({ code: "MANAGER_INACTIVE", reason: "MANAGER_INACTIVE", message: "Assigned manager account is no longer active", requestId }),
-      );
-    }
-
-    // Phase 4 PR 4.3 — Code Blue manager authority evaluator wiring at end.
-    // Runs AFTER the existing persisted-manager identity and state validation,
-    // BEFORE the 15-minute gate and any write/update flow. Shadow-only in
-    // PR 4.3: the evaluator may emit audit/metric internally but the verdict
-    // is NOT acted on by this PR. PR 4.5 introduces the enforce-mode response.
-    //
-    // The evaluator targets the persisted session.managerUserId (NOT the
-    // request actor's id — that may coincide here because the manager-only
-    // identity check above requires it, but the evaluator semantically
-    // resolves the manager's authority via the existing resolver framework
-    // applied to the persisted manager identity, and would behave identically
-    // if a non-manager actor invoked end through some future code path).
-    //
-    // Drift signal: when the end-side evaluator shadow-denies or denies, the
-    // manager is no longer Code-Blue-eligible at end time. The session was
-    // accepted at init time (otherwise it would not exist to end here), so
-    // this is the "init eligible but end ineligible" crossover — the headline
-    // Phase 4 signal per master plan §10.
-    if (session.managerUserId) {
-      // Defensive try/catch: a throw from audit emission, metric increment,
-      // or a future edge case must NEVER strand session end. The
-      // shadow-only / never-blocks contract for the EVALUATOR's internal
-      // emission is preserved; ENFORCE-mode 403 is opt-in via per-clinic
-      // vt_server_config and is acceptable to the operator who flipped it.
-      //
-      // PR 4.5: in enforce mode the evaluator returns `action: "deny"`. The
-      // route returns 403 with a stable reason code. Per-clinic config
-      // `code_blue.manager_enforce.<clinicId>.end = "enforce"` activates
-      // this path; default (`off`) is unchanged.
-      //
-      // The evaluator's `resolver_fault` lookup branch returns
-      // `protected: "FAULT_OPEN"` even in enforce mode (DECISION-2:
-      // fail-open in emergency context), so resolver/cache infrastructure
-      // failures cannot strand session end.
-      let endVerdict:
-        | Awaited<ReturnType<typeof evaluateCodeBlueManagerForRoute>>["verdict"]
-        | null = null;
-      try {
-        const { verdict } = await evaluateCodeBlueManagerForRoute({
-          clinicId,
-          managerUserId: session.managerUserId,
-          endpoint: "end",
-          now: new Date(),
-        });
-        endVerdict = verdict;
-        const endWouldDeny =
-          verdict.action === "deny" ||
-          verdict.protected === "SHADOW_WOULD_HAVE_DENIED";
-        if (endWouldDeny) {
-          codeBlueManagerMetrics.driftBetweenInitAndEnd();
-        }
-      } catch (evalErr) {
-        console.error(
-          "[code-blue] manager evaluator threw at end; session-end continues (fault-open)",
-          evalErr,
-        );
-      }
-      if (endVerdict?.action === "deny") {
-        // Codex P2 lesson (initiation review): USER_MISSING and
-        // MANAGER_CROSS_CLINIC are input/data-corruption signals, not
-        // operational-role denials. For end specifically, the existing
-        // MANAGER_INACTIVE / NO_VET_MANAGER checks already ran above and
-        // passed, so USER_MISSING here would only fire on a race with
-        // user deletion mid-request. Conservative posture: also confine
-        // the new 403 to operational-role reasons; other deny reasons
-        // fall through to the existing flow (15-min gate + write), which
-        // is the pre-PR-4.5 behavior for those scenarios.
-        const reason = endVerdict.reason;
-        if (reason === "OPROLE_NOT_IN_CB_ALLOWLIST" || reason === "NO_OPEN_CHECK_IN") {
-          return res.status(403).json(
-            apiError({
-              code: "MANAGER_NOT_CODE_BLUE_ELIGIBLE",
-              reason,
-              message:
-                "Persisted manager is not currently Code-Blue-eligible (operational role check). Reconfigure the clinic to shadow / off to bypass.",
-              requestId,
-            }),
-          );
-        }
-        // USER_MISSING / MANAGER_CROSS_CLINIC: continue with the existing
-        // flow (pre-PR-4.5 behavior preserved for these edge cases).
-      }
-    }
-
-    const endedAt = new Date();
-
-    // Fetch log entries for auto-summary
-    const logEntries = await db
-      .select()
-      .from(codeBlueLogEntries)
-      .where(eq(codeBlueLogEntries.sessionId, sessionId));
-
-    const participants = [...new Set(logEntries.map((e) => e.loggedByName))];
-    if (!participants.includes(session.startedByName)) participants.unshift(session.startedByName);
-
-    const interventionCounts = logEntries.reduce<Record<string, number>>((acc, e) => {
-      acc[e.category] = (acc[e.category] ?? 0) + 1;
-      return acc;
-    }, {});
-
-    const equipmentAttached = logEntries
-      .filter((e) => e.category === "equipment")
-      .map((e) => e.label);
-
-    const durationMinutes = Math.round((endedAt.getTime() - session.startedAt.getTime()) / 60000);
-
-    const summary = JSON.stringify({
-      duration_minutes: durationMinutes,
-      manager: session.managerUserName,
-      interventions: interventionCounts,
-      equipment_attached: equipmentAttached,
-      participants,
-      pre_check_passed: session.preCheckPassed ?? null,
-      outcome,
-      ...(earlyStopReason ? { early_stop_reason: earlyStopReason } : {}),
-    });
-
-    // Update session + emit outbox event in same TX for display propagation
-    await db.transaction(async (tx) => {
-      await tx
-        .update(codeBlueSessions)
-        .set({ status: "ended", outcome, endedAt })
-        .where(and(eq(codeBlueSessions.id, sessionId), eq(codeBlueSessions.clinicId, clinicId)));
-      // R-CBF-1: release this session's advisory cart soft-reserve in the SAME txn,
-      // so the nearest-ready-cart resolver returns the cart to the ready pool on end.
-      // Without this, every ended one-tap session permanently removes its cart
-      // (the resolver excludes rows where reservedForSessionId IS NOT NULL).
-      await clearReservationForSession(new DrizzleCartReservationStore(tx), clinicId, sessionId);
-      await insertRealtimeDomainEvent(tx, {
-        clinicId,
-        type: "CODE_BLUE_STATUS_CHANGED",
-        payload: { sessionId, status: "ended", outcome },
-        occurredAt: endedAt,
-      });
-    });
-
-    // Archive to vt_code_blue_events (backward compat)
-    await db.insert(codeBlueEvents).values({
-      id: randomUUID(),
-      clinicId,
-      startedByUserId: session.startedBy,
-      startedAt: session.startedAt,
-      endedAt,
-      outcome,
-      notes: summary,
-      timeline: logEntries.map((e) => ({ elapsed: e.elapsedMs, label: e.label })),
-    });
-
-    logAudit({
-      actorRole: resolveAuditActorRole(req),
-      clinicId,
-      actionType: "code_blue_ended",
-      performedBy: req.authUser!.id,
-      performedByEmail: req.authUser!.email ?? "",
-      targetId: sessionId,
-      targetType: "code_blue_session",
-      metadata: { outcome, durationMinutes, ...(earlyStopReason ? { earlyStopReason } : {}) },
-    });
-
-    // Phase 9 PR 9.4 — invalidate the keepalive's active-session cache so
-    // the next SSE KEEPALIVE event reflects the end within ≤ 5 s.
-    invalidateActiveCodeBlueCache(clinicId);
-
-    postSystemMessage(clinicId, "code_blue_end", {
-      outcome: outcome ?? "unknown",
-      endedAt: endedAt.toISOString(),
-    }).catch(() => {});
-
-    res.json({ id: sessionId, endedAt: endedAt.toISOString(), summary: JSON.parse(summary) });
-  } catch (err) {
-    console.error("[code-blue] end session failed", err);
-    res.status(500).json(
-      apiError({ code: "INTERNAL_ERROR", reason: "SESSION_END_FAILED", message: "Failed to end session", requestId }),
-    );
-  }
-});
+router.patch("/sessions/:id/end", requireAuth, validateUuid("id"), validateBody(endSessionSchema), patchSessionsIdEndHandler);
 
 // GET /api/code-blue/history — admin: list ended sessions
-router.get("/history", requireAuth, requireAdmin, async (req, res) => {
-  const requestId = resolveRequestId(res, req.headers["x-request-id"]);
-  try {
-    const clinicId = req.clinicId!;
-    const sessions = await db
-      .select()
-      .from(codeBlueSessions)
-      .where(and(eq(codeBlueSessions.clinicId, clinicId), eq(codeBlueSessions.status, "ended")))
-      .orderBy(desc(codeBlueSessions.startedAt))
-      .limit(100);
-
-    res.json(sessions);
-  } catch (err) {
-    console.error("[code-blue] history list failed", err);
-    res.status(500).json(
-      apiError({ code: "INTERNAL_ERROR", reason: "HISTORY_FAILED", message: "Failed to list history", requestId }),
-    );
-  }
-});
+router.get("/history", requireAuth, requireAdmin, getHistoryHandler);
 
 // ─── Reconciliation endpoints ─────────────────────────────────────────────────
 
@@ -1257,169 +284,25 @@ router.get("/history", requireAuth, requireAdmin, async (req, res) => {
  * GET /api/code-blue/reconciliation
  * Lists ended Code Blue sessions with dispense + billing summary. Admin only.
  */
-router.get("/reconciliation", requireAuth, requireAdmin, async (req, res) => {
-  const requestId = resolveRequestId(res, req.headers["x-request-id"]);
-  try {
-    const clinicId = req.clinicId!;
-    const rows = await pool.query(
-      `SELECT
-         s.id,
-         s.started_at        AS "startedAt",
-         s.ended_at          AS "endedAt",
-         s.outcome,
-         s.is_reconciled     AS "isReconciled",
-         s.reconciled_at     AS "reconciledAt",
-         COUNT(il.id)::int   AS "dispenseCount",
-         0::int              AS "billedCount",
-         0::int              AS "totalBilledCents"
-       FROM vt_code_blue_sessions s
-       LEFT JOIN vt_inventory_logs il
-         ON il.clinic_id = s.clinic_id
-         AND il.quantity_added < 0
-         AND il.created_at >= s.started_at
-         AND il.created_at <= COALESCE(s.ended_at, NOW())
-       WHERE s.clinic_id = $1
-         AND s.status = 'ended'
-       GROUP BY s.id, s.started_at, s.ended_at, s.outcome,
-                s.is_reconciled, s.reconciled_at
-       ORDER BY s.started_at DESC
-       LIMIT 100`,
-      [clinicId],
-    );
-    res.json(rows.rows);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json(
-      apiError({ code: "INTERNAL_ERROR", reason: "RECONCILIATION_LIST_FAILED", message: "Failed to load reconciliation list", requestId }),
-    );
-  }
-});
+router.get("/reconciliation", requireAuth, requireAdmin, getReconciliationHandler);
 
 /**
  * GET /api/code-blue/sessions/:id/dispenses
  * Returns inventory dispenses during a Code Blue session with billing status. Admin only.
  */
-router.get("/sessions/:id/dispenses", requireAuth, requireAdmin, validateUuid("id"), async (req, res) => {
-  const requestId = resolveRequestId(res, req.headers["x-request-id"]);
-  try {
-    const clinicId = req.clinicId!;
-    const sessionId = req.params.id;
-    const [session] = await db
-      .select({ startedAt: codeBlueSessions.startedAt, endedAt: codeBlueSessions.endedAt })
-      .from(codeBlueSessions)
-      .where(and(eq(codeBlueSessions.id, sessionId), eq(codeBlueSessions.clinicId, clinicId)))
-      .limit(1);
-    if (!session) {
-      return res.status(404).json(apiError({ code: "NOT_FOUND", reason: "SESSION_NOT_FOUND", message: "Session not found", requestId }));
-    }
-    const rows = await pool.query(
-      `SELECT
-         il.id,
-         il.quantity_added       AS "quantityAdded",
-         il.created_at           AS "createdAt",
-         c.name                  AS "containerName",
-         NULL::text             AS "billingId",
-         NULL::int              AS "totalAmountCents",
-         NULL::text             AS "billingStatus"
-       FROM vt_inventory_logs il
-       JOIN vt_containers c ON c.id = il.container_id
-       WHERE il.clinic_id = $1
-         AND il.quantity_added < 0
-         AND il.created_at >= $2
-         AND il.created_at <= $3
-       ORDER BY il.created_at`,
-      [clinicId, session.startedAt.toISOString(), (session.endedAt ?? new Date()).toISOString()],
-    );
-    res.json(rows.rows);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json(
-      apiError({ code: "INTERNAL_ERROR", reason: "SESSION_DISPENSES_FAILED", message: "Failed to load session dispenses", requestId }),
-    );
-  }
-});
+router.get("/sessions/:id/dispenses", requireAuth, requireAdmin, validateUuid("id"), getSessionsIdDispensesHandler);
 
 /**
  * PATCH /api/code-blue/sessions/:id/reconcile
  * Fix D: Validates billing completeness + no failed inventory jobs before marking reconciled.
  * Pass ?force=true + body.forceReason to override gaps. Admin only.
  */
-export const reconcileSchema = z.object({
-  forceReason: z.string().min(1).max(500).optional(),
-}).strict();
-
-router.patch("/sessions/:id/reconcile", requireAuth, requireAdmin, validateUuid("id"), validateBody(reconcileSchema), async (req, res) => {
-  const requestId = resolveRequestId(res, req.headers["x-request-id"]);
-  try {
-    const clinicId = req.clinicId!;
-    const sessionId = req.params.id;
-    const force = req.query.force === "true";
-    const { forceReason } = req.body as z.infer<typeof reconcileSchema>;
-
-    if (force && !forceReason?.trim()) {
-      return res.status(400).json(apiError({ code: "FORCE_REASON_REQUIRED", reason: "FORCE_REASON_REQUIRED", message: "forceReason is required when force=true", requestId }));
-    }
-
-    const [session] = await db
-      .select({ startedAt: codeBlueSessions.startedAt, endedAt: codeBlueSessions.endedAt, isReconciled: codeBlueSessions.isReconciled })
-      .from(codeBlueSessions)
-      .where(and(eq(codeBlueSessions.id, sessionId), eq(codeBlueSessions.clinicId, clinicId)))
-      .limit(1);
-
-    if (!session) return res.status(404).json(apiError({ code: "NOT_FOUND", reason: "SESSION_NOT_FOUND", message: "Session not found", requestId }));
-    if (session.isReconciled) return res.json({ id: sessionId, isReconciled: true, alreadyReconciled: true });
-
-    const [updated] = await db
-      .update(codeBlueSessions)
-      .set({ isReconciled: true, reconciledAt: new Date(), reconciledByUserId: req.authUser!.id })
-      .where(and(eq(codeBlueSessions.id, sessionId), eq(codeBlueSessions.clinicId, clinicId)))
-      .returning({ id: codeBlueSessions.id, isReconciled: codeBlueSessions.isReconciled, reconciledAt: codeBlueSessions.reconciledAt });
-
-    if (!updated) return res.status(404).json(apiError({ code: "NOT_FOUND", reason: "SESSION_NOT_FOUND", message: "Session not found", requestId }));
-
-    logAudit({
-      clinicId,
-      actionType: "code_blue_session_reconciled",
-      performedBy: req.authUser!.id,
-      performedByEmail: req.authUser!.email ?? "",
-      targetId: sessionId,
-      targetType: "code_blue_session",
-      actorRole: resolveAuditActorRole(req),
-      metadata: { force, forceReason: forceReason?.trim() ?? null },
-    });
-
-    return res.json(updated);
-  } catch (err) {
-    console.error(err);
-    return res.status(500).json(
-      apiError({ code: "INTERNAL_ERROR", reason: "RECONCILE_FAILED", message: "Failed to reconcile session", requestId }),
-    );
-  }
-});
+router.patch("/sessions/:id/reconcile", requireAuth, requireAdmin, validateUuid("id"), validateBody(reconcileSchema), patchSessionsIdReconcileHandler);
 
 /**
  * POST /api/code-blue/sessions/:id/manual-billing
  * Creates a manual billing entry for an unbilled dispense. Admin only.
  */
-export const manualBillingSchema = z.object({
-  inventoryLogId: z.string().min(1),
-  itemId: z.string().min(1),
-  quantity: z.number().int().min(1),
-  unitPriceCents: z.number().int().min(0),
-  /** When set, clears matching `PROBABLE_ORPHAN_USAGE` Smart Cop alert after billing linkage. */
-  resolveTaskId: z.string().uuid().optional(),
-}).strict();
-
-router.post("/sessions/:id/manual-billing", requireAuth, requireAdmin, validateBody(manualBillingSchema), async (req, res) => {
-  const requestId = resolveRequestId(res, req.headers["x-request-id"]);
-  return res.status(410).json(
-    apiError({
-      code: "BILLING_REMOVED",
-      reason: "BILLING_SCHEMA_REMOVED",
-      message: "Manual billing is no longer available.",
-      requestId,
-    }),
-  );
-});
+router.post("/sessions/:id/manual-billing", requireAuth, requireAdmin, validateBody(manualBillingSchema), postSessionsIdManualBillingHandler);
 
 export default router;

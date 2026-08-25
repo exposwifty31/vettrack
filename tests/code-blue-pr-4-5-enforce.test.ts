@@ -28,23 +28,69 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, "..");
 const routeFile = path.join(repoRoot, "server", "routes", "code-blue.ts");
 const routeSrc = fs.readFileSync(routeFile, "utf8");
+// Request-body schemas were also moved out of code-blue.ts, into
+// code-blue/schemas.ts (breaks a router → handler → router import cycle;
+// see that file's header comment). code-blue.ts re-exports every schema
+// name unchanged, but the schema BODIES — what assertions below actually
+// match against — now live only in schemas.ts.
+const schemasSrc = fs.readFileSync(
+  path.join(repoRoot, "server", "routes", "code-blue", "schemas.ts"),
+  "utf8",
+);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Static-analysis: route translates `verdict.action === "deny"` into 403
 // ─────────────────────────────────────────────────────────────────────────────
 
-function extractHandlerBlock(routeStartPattern: RegExp): string {
+// Some handler bodies referenced below were extracted out of code-blue.ts
+// into their own modules (mechanical file split, the arch-split marker in
+// code-blue.ts); the router file now only holds the registration +
+// middleware chain for those. When `handlerFile` is given, append that
+// handler's BODY (from `export const` onward, i.e. excluding its own
+// import block) so assertions below — unchanged — still see the same
+// combined text, in the same relative order, they did before the split.
+// Excluding the imports matters: a handler-file import can repeat a symbol
+// name that also appears at its real call site (e.g.
+// `enqueueNotificationJob` is both imported and called), and an
+// order-sensitive `indexOf` must land on the call site, not the import.
+function extractHandlerBlock(routeStartPattern: RegExp, handlerFile?: string, sharedFile?: string): string {
   const start = routeSrc.search(routeStartPattern);
   expect(start, `route ${routeStartPattern} not found`).toBeGreaterThanOrEqual(0);
   const end = routeSrc.indexOf("\nrouter.", start + 1);
-  return routeSrc.slice(start, end > start ? end : start + 8000);
+  const registrationBlock = routeSrc.slice(start, end > start ? end : start + 8000);
+  if (!handlerFile) return registrationBlock;
+  const handlerFileSrc = fs.readFileSync(
+    path.join(repoRoot, "server", "routes", "code-blue", "handlers", handlerFile),
+    "utf8",
+  );
+  const handlerBody = handlerFileSrc.slice(handlerFileSrc.indexOf("export const"));
+  // The manager-evaluator deny/403 logic itself was extracted a layer
+  // further, into resolveNominatedManager() (server/routes/code-blue
+  // /resolve-nominated-manager.ts) — shared verbatim between POST /sessions
+  // and POST /one-tap, which had this whole block duplicated inline before.
+  // Splice its body in BEFORE the handler body — matching where the inline
+  // call used to sit, logically before the side effects — so order-sensitive
+  // assertions still hold against the real, current call order.
+  if (sharedFile) {
+    const sharedFileSrc = fs.readFileSync(
+      path.join(repoRoot, "server", "routes", "code-blue", sharedFile),
+      "utf8",
+    );
+    const sharedBody = sharedFileSrc.slice(sharedFileSrc.indexOf("export async function"));
+    return `${registrationBlock}\n${sharedBody}\n${handlerBody}`;
+  }
+  return `${registrationBlock}\n${handlerBody}`;
 }
 
 describe("PR 4.5 — POST /sessions enforce-mode 403", () => {
-  const block = extractHandlerBlock(/router\.post\(\s*["']\/sessions["']/);
+  const block = extractHandlerBlock(
+    /router\.post\(\s*["']\/sessions["']/,
+    "post-sessions.ts",
+    "resolve-nominated-manager.ts",
+  );
 
-  it("acts on initiation verdict action === \"deny\" by returning 403", () => {
-    expect(block).toMatch(/initiationVerdict\.action\s*===\s*["']deny["']/);
+  it("acts on the manager verdict action === \"deny\" by returning 403", () => {
+    expect(block).toMatch(/verdict\.action\s*===\s*["']deny["']/);
     expect(block).toContain("status(403)");
     expect(block).toContain("MANAGER_NOT_CODE_BLUE_ELIGIBLE");
   });
@@ -58,7 +104,7 @@ describe("PR 4.5 — POST /sessions enforce-mode 403", () => {
     expect(handlerIdx).toBeGreaterThan(0);
     const handlerSlice = block.slice(handlerIdx, handlerIdx + 400);
     expect(handlerSlice).toMatch(
-      /reason\s*[,:](\s*(initiationVerdict\.reason|reason\b))?/,
+      /reason\s*[,:](\s*(verdict\.reason|reason\b))?/,
     );
   });
 
@@ -80,7 +126,7 @@ describe("PR 4.5 — POST /sessions enforce-mode 403", () => {
     // response. Look at the slice between the deny-handler if-statement
     // and the actual INVALID_MANAGER apiError call site (skipping doc
     // comments that also mention "INVALID_MANAGER").
-    const denyHandlerIdx = block.indexOf('initiationVerdict.action === "deny"');
+    const denyHandlerIdx = block.indexOf('verdict.action === "deny"');
     expect(denyHandlerIdx).toBeGreaterThanOrEqual(0);
     const invalidManagerCodeIdx = block.indexOf('code: "INVALID_MANAGER"');
     expect(invalidManagerCodeIdx).toBeGreaterThan(denyHandlerIdx);
@@ -95,7 +141,7 @@ describe("PR 4.5 — POST /sessions enforce-mode 403", () => {
 });
 
 describe("PR 4.5 — PATCH /sessions/:id/end enforce-mode 403", () => {
-  const block = extractHandlerBlock(/router\.patch\(\s*["']\/sessions\/:id\/end["']/);
+  const block = extractHandlerBlock(/router\.patch\(\s*["']\/sessions\/:id\/end["']/, "patch-sessions-id-end.ts");
 
   it("acts on end-side verdict action === \"deny\" by returning 403", () => {
     expect(block).toMatch(/endVerdict\?\.action\s*===\s*["']deny["']/);
@@ -133,10 +179,10 @@ describe("PR 4.5 — PATCH /sessions/:id/end enforce-mode 403", () => {
 });
 
 describe("POST /sessions/:id/logs — equipment-focused categories", () => {
-  const block = extractHandlerBlock(/router\.post\(\s*["']\/sessions\/:id\/logs["']/);
+  const block = extractHandlerBlock(/router\.post\(\s*["']\/sessions\/:id\/logs["']/, "post-sessions-id-logs.ts");
 
   it("logEntrySchema allows only equipment and note", () => {
-    expect(routeSrc).toMatch(/category:\s*z\.enum\(\[["']equipment["'],\s*["']note["']\]\)/);
+    expect(schemasSrc).toMatch(/category:\s*z\.enum\(\[["']equipment["'],\s*["']note["']\]\)/);
   });
 
   it("does not invoke drug/shock authority evaluator on log writes", () => {
