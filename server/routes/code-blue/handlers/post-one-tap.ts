@@ -1,7 +1,5 @@
 import type { RequestHandler } from "express";
 import type { z } from "zod";
-import { db, users } from "../../../db.js";
-import { eq, and, inArray } from "drizzle-orm";
 import {
   orchestrateOneTapCodeBlue,
   DrizzleOneTapSessionTransaction,
@@ -18,8 +16,8 @@ import { enqueueNotificationJob } from "../../../lib/queue.js";
 import { resolveCodeBlueBroadcastPushCopy } from "../../../lib/code-blue-broadcast-push.js";
 import { postSystemMessage } from "../../../lib/shift-chat-presence.js";
 import { invalidateActiveCodeBlueCache } from "../../../lib/code-blue-keepalive.js";
-import { evaluateCodeBlueManagerForRoute } from "../../../lib/authority/code-blue-manager.wiring.js";
 import { resolveRequestId, apiError } from "../../../lib/route-utils.js";
+import { resolveNominatedManager } from "../resolve-nominated-manager.js";
 import type { oneTapStartSchema } from "../schemas.js";
 
 // POST /api/code-blue/one-tap — orchestrated "one tap, everything ready" start.
@@ -34,51 +32,11 @@ export const postOneTapHandler: RequestHandler = async (req, res) => {
     const userId = req.authUser!.id;
     const body = req.body as z.infer<typeof oneTapStartSchema>;
 
-    // Manager authority evaluator + validation — identical contract to POST /sessions.
-    const { verdict } = await evaluateCodeBlueManagerForRoute({
-      clinicId,
-      managerUserId: body.managerUserId,
-      endpoint: "initiation",
-      now: new Date(),
-    });
-    if (verdict.action === "deny") {
-      const reason = verdict.reason;
-      if (reason === "OPROLE_NOT_IN_CB_ALLOWLIST" || reason === "NO_OPEN_CHECK_IN") {
-        return res.status(403).json(
-          apiError({
-            code: "MANAGER_NOT_CODE_BLUE_ELIGIBLE",
-            reason,
-            message:
-              "Nominated manager is not currently Code-Blue-eligible (operational role check)",
-            requestId,
-          }),
-        );
-      }
-      // USER_MISSING / MANAGER_CROSS_CLINIC fall through to the 400 below.
-    }
-
-    const [managerUser] = await db
-      .select({ id: users.id, name: users.name })
-      .from(users)
-      .where(
-        and(
-          eq(users.id, body.managerUserId),
-          eq(users.clinicId, clinicId),
-          inArray(users.role, ["vet", "admin"]),
-          eq(users.status, "active"),
-        ),
-      )
-      .limit(1);
-    if (!managerUser) {
-      return res.status(400).json(
-        apiError({
-          code: "INVALID_MANAGER",
-          reason: "INVALID_MANAGER",
-          message: "Manager must be an active vet or admin in this clinic",
-          requestId,
-        }),
-      );
-    }
+    // Manager authority evaluator + validation — see resolveNominatedManager
+    // for the full Phase 4 PR 4.2 + PR 4.5 evaluator wiring rationale.
+    // Identical contract to POST /sessions.
+    const managerUser = await resolveNominatedManager(res, requestId, clinicId, body.managerUserId);
+    if (!managerUser) return;
 
     const locationSource = new DrizzleInitiatingLocationSource();
     const candidateSource = new DrizzleReadyCartCandidateSource();
@@ -121,7 +79,9 @@ export const postOneTapHandler: RequestHandler = async (req, res) => {
       postSystemMessage(clinicId, "code_blue_start", {
         startedBy: req.authUser!.name ?? userId,
         startedAt: new Date().toISOString(),
-      }).catch(() => {});
+      }).catch((err) => {
+        console.error("[code-blue] one-tap start system message failed (non-critical)", err);
+      });
 
       logAudit({
         actorRole: resolveAuditActorRole(req),
@@ -144,8 +104,8 @@ export const postOneTapHandler: RequestHandler = async (req, res) => {
         ...(outcome.pagingOutboxId !== null
           ? { notificationRequestOutboxId: outcome.pagingOutboxId }
           : {}),
-      }).catch(() => {
-        /* non-critical */
+      }).catch((err) => {
+        console.error("[code-blue] one-tap broadcast notification failed (non-critical)", err);
       });
 
       invalidateActiveCodeBlueCache(clinicId);

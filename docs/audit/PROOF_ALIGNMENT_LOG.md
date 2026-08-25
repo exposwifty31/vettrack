@@ -10836,3 +10836,22 @@ on that dirty tree.
 - Prior full-suite exit 1 was solely `claims-ledger` objecting to a hash-sigil citation of an still-open handler-split pull request in the 2026-08-23 heading; that citation is removed (see note on that entry)
 
 **Verdict:** VERIFIED
+
+## 2026-08-26 — Code Blue push i18n: merge the handler-split branch in, resolve the duplicate-extraction conflict, address the type-assertion finding
+
+**Claim:** `cursor/code-blue-push-i18n-1e7c` now merges `refactor/code-blue-route-handler-split` with no conflict markers. Both branches had independently extracted the `code_blue_broadcast` push copy; the four conflicting hunks resolve to the helper form (`resolveCodeBlueBroadcastPushCopy`), the three i18n imports the other side contributed are removed as dead, the locale key it orphaned is removed, and the five unexplained type assertions in the push-i18n test are replaced by runtime narrowing (three) or given an inline rationale as Express boundary casts (two).
+
+**Evidence:**
+- `server/routes/code-blue/handlers/post-sessions.ts:157` and `server/routes/code-blue/handlers/post-one-tap.ts:97` — `resolveCodeBlueBroadcastPushCopy(req.authUser!.name ?? "")`; `title` / `body` read from its result
+- Both handlers — `grep -c 'i18n/loader.js\|i18n/index.js'` → `0` each; the inline `getLocaleDictionaries` / `translate` / `interpolate` path is gone, so no import is left without a reader
+- `locales/he.json` and `locales/en.json` — `grep -c pushBroadcastBody` → `0` each; `grep -rn pushBroadcastBody` across all file types outside `node_modules` → no remaining reference of any kind
+- `tests/code-blue-broadcast-push-i18n.test.ts` — `requireString` and `isRecord` / `requireRecord` narrow the three captured values with no cast; the two `as unknown as Response` / `as unknown as Request` casts each carry an inline rationale naming the Express members these handlers never touch
+- Command: `npx tsc --noEmit` and `npx tsc -p tsconfig.server.json --noEmit` under node v24.17.0 → exit 0 both
+- Test: `npx vitest run tests/code-blue-broadcast-push-i18n.test.ts` → `Test Files  1 passed (1)`, `Tests  14 passed (14)`
+- Mutation (a guard not shown to go red is not a guard): `requireString(captured.body.id, ...)` pointed at a non-existent field → `Tests  1 failed | 13 passed (14)` with `Error: captured.body.id: expected a non-empty string, received undefined`; reverted → `14 passed (14)`
+- Command: `pnpm verify:claims` → `1113 claims: 1088 verified, 24 registered, 1 attested, 2072 excluded by rule, 0 FAILED`
+- Command: `pnpm architecture:gates` → `[tenant-lint] no new findings vs baseline (202 known)` and `[architecture-gates] All G1 checks passed.`
+- Command: `pnpm i18n:check` → `locales/en.json and locales/he.json are in deep key parity.`
+- Full local suite, NOT green and not claimed as such: `npx vitest run` → `Test Files  12 failed | 734 passed (746)`. The identical command in a clean `origin/main` worktree → `Test Files  13 failed | 723 passed (736)`. The 12 are a strict subset of main's 13 — main additionally fails `tests/shift-csv-role-labels.test.ts` — so this merge introduces no new failure. The failures are a local-environment condition, not a branch condition.
+
+**Verdict:** VERIFIED for the merge resolution and the finding fix. Full local suite PARTIAL by pre-existing environment failures, quantified above against a clean-main baseline rather than waved through.

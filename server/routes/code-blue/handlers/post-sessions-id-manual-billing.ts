@@ -3,9 +3,10 @@ import { resolveRequestId, apiError } from "../../../lib/route-utils.js";
 
 /**
  * POST /api/code-blue/sessions/:id/manual-billing
- * Creates a manual billing entry for an unbilled dispense. Admin only.
+ * Tombstone: manual billing was removed with the billing schema. Retained so
+ * existing clients receive a stable 410 instead of a 404.
  */
-export const postSessionsIdManualBillingHandler: RequestHandler = async (req, res) => {
+export const postSessionsIdManualBillingHandler: RequestHandler = (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
   return res.status(410).json(
     apiError({

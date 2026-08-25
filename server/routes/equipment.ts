@@ -1,6 +1,6 @@
 // TODO(arch): file exceeds 1100 lines. Split into handler modules following
 // the equipment-route-utils.ts / handlers/ pattern already started in this directory.
-import { Router, type Request, type Response } from "express";
+import { Router } from "express";
 import { randomUUID } from "crypto";
 import multer from "multer";
 import { z } from "zod";
@@ -25,16 +25,16 @@ import {
   evaluateCheckoutV1Preconditions,
   finalizeCheckoutSideEffects,
   finalizeReturnSideEffects,
+  invalidateAnchorAfterCheckout,
   performEquipmentCheckout,
   performEquipmentReturn,
   quickScanEquipmentCustody,
-  toggleEquipmentCustody,
 } from "../services/equipment-custody-toggle.service.js";
 import { EquipmentWaitlistError } from "../services/equipment-waitlist.service.js";
 import { mountEquipmentWaitlistRoutes } from "./equipment-waitlist.js";
 import { EQUIPMENT_REPLAY_IDEMPOTENCY_ENDPOINTS } from "../lib/equipment-replay-idempotency.js";
 import { equipmentReplayIdempotency } from "../middleware/equipment-replay-idempotency.js";
-import { apiError, resolveRequestId } from "./equipment/equipment-route-utils.js";
+import { apiError, mapCheckoutGateError, resolveRequestId } from "./equipment/equipment-route-utils.js";
 import { getCriticalEquipmentHandler } from "./equipment/handlers/get-critical-equipment.js";
 import { getDeletedEquipmentHandler } from "./equipment/handlers/get-deleted-equipment.js";
 import { getEquipmentByIdHandler } from "./equipment/handlers/get-equipment-by-id.js";
@@ -53,6 +53,7 @@ import { postEquipmentImportHandler } from "./equipment/handlers/post-equipment-
 import { postEquipmentBulkDeleteHandler } from "./equipment/handlers/post-equipment-bulk-delete.js";
 import { postEquipmentCreateHandler } from "./equipment/handlers/post-equipment-create.js";
 import { patchEquipmentHandler } from "./equipment/handlers/patch-equipment.js";
+import { postEquipmentToggleHandler } from "./equipment/handlers/post-equipment-toggle.js";
 import {
   insertEquipmentUndoToken,
   snapshotEquipmentState,
@@ -220,37 +221,6 @@ const router = Router();
 
 const FIELD_MAX_LENGTH = 500;
 
-/**
- * Shared response mapping for the checkout gate errors thrown by
- * evaluateCheckoutV1Preconditions / assertWaitlistCheckoutAllowed — used by
- * every custody-flip route (/scan, /:id/toggle) so a new gate code cannot be
- * mapped in one handler and missed in another. Returns null for other errors.
- */
-function mapCheckoutGateError(err: unknown, req: Request, res: Response): Response | null {
-  if (err instanceof CheckoutPreconditionError) {
-    if (err.code === "STAGING_CONFLICT") {
-      return res.status(409).json({
-        code: err.code,
-        error: "You are not the top priority claim holder",
-        queue: err.extra?.queue,
-      });
-    }
-    if (err.code === "BUNDLE_INCOMPLETE") {
-      return res.status(422).json({ code: err.code, ...err.extra });
-    }
-    return res.status(err.httpStatus).json({
-      code: err.code,
-      error: typeof err.extra?.error === "string" ? err.extra.error : err.message,
-      ...err.extra,
-    });
-  }
-  if (err instanceof EquipmentWaitlistError) {
-    const status = err.code === "WAITLIST_RESERVATION_HELD_BY_OTHER" ? 409 : 422;
-    return apiErrorI18n(req, res, `equipmentWaitlist.${err.code}`, undefined, status);
-  }
-  return null;
-}
-
 type EquipmentRow = typeof equipment.$inferSelect;
 
 export async function cleanExpiredUndoTokens(): Promise<void> {
@@ -412,79 +382,7 @@ router.post(
   validateUuid("id"),
   validateBody(equipmentToggleBodySchema),
   equipmentReplayIdempotency(EQUIPMENT_REPLAY_IDEMPOTENCY_ENDPOINTS.toggle),
-  async (req, res) => {
-    const requestId = resolveRequestId(res, req.headers["x-request-id"]);
-    try {
-      const clinicId = req.clinicId!;
-      const { isPluggedIn } = req.body as z.infer<typeof equipmentToggleBodySchema>;
-
-      const result = await toggleEquipmentCustody({
-        clinicId,
-        equipmentId: req.params.id,
-        actor: { id: req.authUser!.id, email: req.authUser!.email },
-        isPluggedIn: isPluggedIn ?? true,
-        actorRole: resolveAuditActorRole(req) ?? undefined,
-      });
-
-      if (result.kind === "not_found") {
-        return res.status(404).json(
-          apiError({
-            code: "NOT_FOUND",
-            reason: "EQUIPMENT_NOT_FOUND",
-            message: "Equipment not found",
-            requestId,
-          }),
-        );
-      }
-
-      if (result.kind === "blocked") {
-        return res.json({
-          equipment: result.equipment,
-          action: "blocked",
-          scanLogId: "",
-          undoToken: "",
-          checkedOutByEmail: result.checkedOutByEmail,
-        });
-      }
-
-      return res.json({
-        equipment: result.equipment,
-        action: result.kind,
-        scanLogId: result.scanLogId,
-        undoToken: result.undoToken,
-      });
-    } catch (err) {
-      const gateMapped = mapCheckoutGateError(err, req, res);
-      if (gateMapped) return gateMapped;
-      if (err instanceof CheckoutConflictError) {
-        return res.status(409).json({
-          code: "VERSION_CONFLICT",
-          error: "Version conflict, please retry",
-          checkedOutByEmail: err.checkedOutByEmail,
-        });
-      }
-      if (err instanceof CustodyReturnVersionConflictError) {
-        return res.status(409).json(
-          apiError({
-            code: "CONFLICT",
-            reason: "VERSION_CONFLICT",
-            message: "Equipment was updated concurrently; please retry",
-            requestId,
-          }),
-        );
-      }
-      console.error(err);
-      trackSyncFail();
-      return res.status(500).json(
-        apiError({
-          code: "INTERNAL_ERROR",
-          reason: "EQUIPMENT_TOGGLE_FAILED",
-          message: "Toggle failed",
-          requestId,
-        }),
-      );
-    }
-  },
+  postEquipmentToggleHandler,
 );
 
 // POST /api/equipment/:id/checkout
@@ -676,6 +574,8 @@ router.post(
 
     updated = txResult.updated;
     undoToken = txResult.undoToken;
+
+    invalidateAnchorAfterCheckout(clinicId, req.params.id);
 
     await finalizeCheckoutSideEffects({
       clinicId,

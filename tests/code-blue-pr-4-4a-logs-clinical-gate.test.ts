@@ -42,7 +42,7 @@ const helperSrc = fs.readFileSync(helperFile, "utf8");
 // ─────────────────────────────────────────────────────────────────────────────
 
 // The POST /sessions/:id/logs handler body was extracted into its own
-// module (mechanical file split, TODO(arch) in code-blue.ts); the router
+// module (mechanical file split, the arch-split marker in code-blue.ts); the router
 // file now only holds the registration + middleware chain. Append the
 // handler file's BODY (from `export const` onward, i.e. excluding its own
 // import block) so assertions below — unchanged — still see the same

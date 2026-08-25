@@ -1,5 +1,5 @@
 import type { RequestHandler } from "express";
-import { z } from "zod";
+import type { z } from "zod";
 import { db, codeBlueSessions } from "../../../db.js";
 import { eq, and } from "drizzle-orm";
 import { logAudit, resolveAuditActorRole } from "../../../lib/audit.js";
@@ -8,8 +8,9 @@ import type { reconcileSchema } from "../schemas.js";
 
 /**
  * PATCH /api/code-blue/sessions/:id/reconcile
- * Fix D: Validates billing completeness + no failed inventory jobs before marking reconciled.
- * Pass ?force=true + body.forceReason to override gaps. Admin only.
+ * Marks a Code Blue session reconciled. Requires ?force=true + body.forceReason
+ * (no gap check is computed — force is unconditional, not an override of a
+ * validated gap). Admin only. A no-op success if already reconciled.
  */
 export const patchSessionsIdReconcileHandler: RequestHandler = async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
@@ -53,7 +54,7 @@ export const patchSessionsIdReconcileHandler: RequestHandler = async (req, res) 
 
     return res.json(updated);
   } catch (err) {
-    console.error(err);
+    console.error("[code-blue] reconcile session failed", err);
     return res.status(500).json(
       apiError({ code: "INTERNAL_ERROR", reason: "RECONCILE_FAILED", message: "Failed to reconcile session", requestId }),
     );

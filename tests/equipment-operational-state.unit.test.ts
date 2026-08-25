@@ -197,6 +197,7 @@ describe("promoteStagingQueueNext", () => {
   beforeEach(() => {
     stagingPromotionDeps.findNextClaim = vi.fn();
     stagingPromotionDeps.getEquipmentName = vi.fn();
+    stagingPromotionDeps.resolveLocale = vi.fn().mockResolvedValue("he");
     stagingPromotionDeps.enqueueNotificationJob = vi.fn();
   });
 
@@ -284,5 +285,56 @@ describe("promoteStagingQueueNext", () => {
       new Error("DB error"),
     );
     await expect(promoteStagingQueueNext("eq-1", "clinic-1")).resolves.toBeUndefined();
+  });
+
+  it("localizes the push to the recipient's preferred locale, not a hardcoded language", async () => {
+    vi.mocked(stagingPromotionDeps.findNextClaim).mockResolvedValue({
+      id: "claim-en",
+      requestedById: "user-en",
+      clinicalPriority: "routine",
+    });
+    vi.mocked(stagingPromotionDeps.getEquipmentName).mockResolvedValue("Infusion Pump A");
+    vi.mocked(stagingPromotionDeps.resolveLocale).mockResolvedValue("en");
+    await promoteStagingQueueNext("eq-1", "clinic-1");
+    expect(stagingPromotionDeps.enqueueNotificationJob).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: "You are now #1 in queue",
+        body: "Checkout available for Infusion Pump A",
+      }),
+    );
+  });
+
+  it("defaults to Hebrew copy when the recipient's locale resolves to he", async () => {
+    vi.mocked(stagingPromotionDeps.findNextClaim).mockResolvedValue({
+      id: "claim-he",
+      requestedById: "user-he",
+      clinicalPriority: "routine",
+    });
+    vi.mocked(stagingPromotionDeps.getEquipmentName).mockResolvedValue("משאבת עירוי");
+    vi.mocked(stagingPromotionDeps.resolveLocale).mockResolvedValue("he");
+    await promoteStagingQueueNext("eq-1", "clinic-1");
+    expect(stagingPromotionDeps.enqueueNotificationJob).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: "אתה ראשון בתור",
+        body: "ניתן לבצע checkout של משאבת עירוי",
+      }),
+    );
+  });
+
+  it("still sends the notification (defaulting to Hebrew) when locale lookup rejects", async () => {
+    vi.mocked(stagingPromotionDeps.findNextClaim).mockResolvedValue({
+      id: "claim-locale-fail",
+      requestedById: "user-x",
+      clinicalPriority: "routine",
+    });
+    vi.mocked(stagingPromotionDeps.getEquipmentName).mockResolvedValue("Ventilator B");
+    vi.mocked(stagingPromotionDeps.resolveLocale).mockRejectedValue(new Error("connection reset"));
+    await promoteStagingQueueNext("eq-1", "clinic-1");
+    expect(stagingPromotionDeps.enqueueNotificationJob).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: "אתה ראשון בתור",
+        body: "ניתן לבצע checkout של Ventilator B",
+      }),
+    );
   });
 });

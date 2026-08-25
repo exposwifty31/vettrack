@@ -6,19 +6,10 @@ import { logAudit, resolveAuditActorRole } from "../../../lib/audit.js";
 import { resolveRequestId, apiError } from "../../../lib/route-utils.js";
 import type { endSchema } from "../schemas.js";
 
-// PATCH /api/code-blue/events/:id  — close a Code Blue event with outcome + timeline
-//
-// Phase 4 PR 4.6 — legacy archive clinical gate. Same posture as the POST
-// route above. PATCH for the legacy /events archive is a one-shot close-out
-// (analogous to PATCH /sessions/:id/end, which was deliberately NOT gated in
-// PR 4.3 to avoid stranding active sessions). For /events specifically:
-//   - the route is legacy / likely dead (modern flow → /sessions),
-//   - the data being archived is the outcome of an already-completed event,
-//   - the realistic call-pattern is a clinical user closing an event they
-//     themselves opened, so the gate aligns with intended usage.
-// Strand risk (shift-expired actor cannot finalize the archive entry) is
-// accepted given these routes are scheduled for removal in a future
-// cleanup phase (master plan §14).
+// PATCH /api/code-blue/events/:id — close a Code Blue event with outcome + timeline.
+// Legacy archive write; the clinical-gate rationale (same posture as POST
+// /events) lives with the middleware chain in server/routes/code-blue.ts,
+// next to this route's registration.
 export const patchEventsIdHandler: RequestHandler = async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
   try {

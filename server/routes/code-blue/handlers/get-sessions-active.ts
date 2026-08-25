@@ -43,7 +43,7 @@ export const getSessionsActiveHandler: RequestHandler = async (req, res) => {
     const logEntries = await db
       .select()
       .from(codeBlueLogEntries)
-      .where(eq(codeBlueLogEntries.sessionId, session.id))
+      .where(and(eq(codeBlueLogEntries.clinicId, clinicId), eq(codeBlueLogEntries.sessionId, session.id)))
       .orderBy(codeBlueLogEntries.elapsedMs);
 
     // Presence — filter stale (>30s)

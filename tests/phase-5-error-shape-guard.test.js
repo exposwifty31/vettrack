@@ -13,7 +13,7 @@ const routeFiles = fs
   .sort();
 
 // server/routes/code-blue.ts was split into a thin router plus per-handler
-// modules under code-blue/handlers/ (mechanical file split, TODO(arch)
+// modules under code-blue/handlers/ (mechanical file split, the arch-split marker
 // formerly in code-blue.ts). The scan above is intentionally non-recursive
 // and would otherwise silently drop coverage: the actual res.status(...)
 // .json(...) response calls this guard is checking now live one directory

@@ -21,7 +21,7 @@ import { readFileSync } from "node:fs";
 
 describe("R-CBF-1 · /end clears the cart soft-reserve (panel #1)", () => {
   // The PATCH /sessions/:id/end handler body was extracted into its own
-  // module (mechanical file split, TODO(arch) formerly in code-blue.ts) —
+  // module (mechanical file split, the arch-split marker formerly in code-blue.ts) —
   // read it directly rather than the router file, which now only holds the
   // registration.
   const endHandler = readFileSync(

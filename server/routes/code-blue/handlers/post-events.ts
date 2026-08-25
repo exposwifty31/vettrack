@@ -4,18 +4,9 @@ import { db, codeBlueEvents } from "../../../db.js";
 import { logAudit, resolveAuditActorRole } from "../../../lib/audit.js";
 import { resolveRequestId, apiError } from "../../../lib/route-utils.js";
 
-// POST /api/code-blue/events  — start a Code Blue event (fire-and-forget safe)
-//
-// Phase 4 PR 4.6 — legacy archive clinical gate. Master plan §14 notes that
-// these /events routes are likely near-dead (no live HTTP callers identified;
-// the modern flow uses /sessions). The clinical gate prevents NEW non-clinical
-// callers from creating archive rows. A future cleanup phase may grep the
-// frontend and remove the legacy routes entirely.
-//
-// allowSystemAdmin:false per master plan §17 — Code Blue clinical gates do
-// not admit system-admin identity. Strand risk for shift-expired actors is
-// accepted given these are legacy archive writes, not real-time emergency
-// recording (modern flow → /sessions).
+// POST /api/code-blue/events — start a Code Blue event (fire-and-forget safe).
+// Legacy archive write; the clinical-gate rationale lives with the middleware
+// chain in server/routes/code-blue.ts, next to this route's registration.
 export const postEventsHandler: RequestHandler = async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
   try {

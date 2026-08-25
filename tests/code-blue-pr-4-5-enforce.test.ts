@@ -43,7 +43,7 @@ const schemasSrc = fs.readFileSync(
 // ─────────────────────────────────────────────────────────────────────────────
 
 // Some handler bodies referenced below were extracted out of code-blue.ts
-// into their own modules (mechanical file split, TODO(arch) in
+// into their own modules (mechanical file split, the arch-split marker in
 // code-blue.ts); the router file now only holds the registration +
 // middleware chain for those. When `handlerFile` is given, append that
 // handler's BODY (from `export const` onward, i.e. excluding its own
@@ -53,7 +53,7 @@ const schemasSrc = fs.readFileSync(
 // name that also appears at its real call site (e.g.
 // `enqueueNotificationJob` is both imported and called), and an
 // order-sensitive `indexOf` must land on the call site, not the import.
-function extractHandlerBlock(routeStartPattern: RegExp, handlerFile?: string): string {
+function extractHandlerBlock(routeStartPattern: RegExp, handlerFile?: string, sharedFile?: string): string {
   const start = routeSrc.search(routeStartPattern);
   expect(start, `route ${routeStartPattern} not found`).toBeGreaterThanOrEqual(0);
   const end = routeSrc.indexOf("\nrouter.", start + 1);
@@ -64,14 +64,33 @@ function extractHandlerBlock(routeStartPattern: RegExp, handlerFile?: string): s
     "utf8",
   );
   const handlerBody = handlerFileSrc.slice(handlerFileSrc.indexOf("export const"));
+  // The manager-evaluator deny/403 logic itself was extracted a layer
+  // further, into resolveNominatedManager() (server/routes/code-blue
+  // /resolve-nominated-manager.ts) — shared verbatim between POST /sessions
+  // and POST /one-tap, which had this whole block duplicated inline before.
+  // Splice its body in BEFORE the handler body — matching where the inline
+  // call used to sit, logically before the side effects — so order-sensitive
+  // assertions still hold against the real, current call order.
+  if (sharedFile) {
+    const sharedFileSrc = fs.readFileSync(
+      path.join(repoRoot, "server", "routes", "code-blue", sharedFile),
+      "utf8",
+    );
+    const sharedBody = sharedFileSrc.slice(sharedFileSrc.indexOf("export async function"));
+    return `${registrationBlock}\n${sharedBody}\n${handlerBody}`;
+  }
   return `${registrationBlock}\n${handlerBody}`;
 }
 
 describe("PR 4.5 — POST /sessions enforce-mode 403", () => {
-  const block = extractHandlerBlock(/router\.post\(\s*["']\/sessions["']/, "post-sessions.ts");
+  const block = extractHandlerBlock(
+    /router\.post\(\s*["']\/sessions["']/,
+    "post-sessions.ts",
+    "resolve-nominated-manager.ts",
+  );
 
-  it("acts on initiation verdict action === \"deny\" by returning 403", () => {
-    expect(block).toMatch(/initiationVerdict\.action\s*===\s*["']deny["']/);
+  it("acts on the manager verdict action === \"deny\" by returning 403", () => {
+    expect(block).toMatch(/verdict\.action\s*===\s*["']deny["']/);
     expect(block).toContain("status(403)");
     expect(block).toContain("MANAGER_NOT_CODE_BLUE_ELIGIBLE");
   });
@@ -85,7 +104,7 @@ describe("PR 4.5 — POST /sessions enforce-mode 403", () => {
     expect(handlerIdx).toBeGreaterThan(0);
     const handlerSlice = block.slice(handlerIdx, handlerIdx + 400);
     expect(handlerSlice).toMatch(
-      /reason\s*[,:](\s*(initiationVerdict\.reason|reason\b))?/,
+      /reason\s*[,:](\s*(verdict\.reason|reason\b))?/,
     );
   });
 
@@ -107,7 +126,7 @@ describe("PR 4.5 — POST /sessions enforce-mode 403", () => {
     // response. Look at the slice between the deny-handler if-statement
     // and the actual INVALID_MANAGER apiError call site (skipping doc
     // comments that also mention "INVALID_MANAGER").
-    const denyHandlerIdx = block.indexOf('initiationVerdict.action === "deny"');
+    const denyHandlerIdx = block.indexOf('verdict.action === "deny"');
     expect(denyHandlerIdx).toBeGreaterThanOrEqual(0);
     const invalidManagerCodeIdx = block.indexOf('code: "INVALID_MANAGER"');
     expect(invalidManagerCodeIdx).toBeGreaterThan(denyHandlerIdx);

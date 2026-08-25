@@ -178,6 +178,30 @@ vi.mock("../server/lib/code-blue-nearest-cart.js", () => ({
 
 type Captured = { statusCode: number; body: Record<string, unknown>; responded: boolean };
 
+/**
+ * Runtime narrowing for values captured out of a handler. A blind `as` on a
+ * captured value moves the failure downstream: a missing `id` becomes
+ * `undefined.length` three assertions later. These check at the boundary and
+ * name the field, and they narrow via `typeof` / a type predicate — no cast.
+ */
+function requireString(value: unknown, label: string): string {
+  if (typeof value !== "string" || value.length === 0) {
+    throw new Error(`${label}: expected a non-empty string, received ${JSON.stringify(value)}`);
+  }
+  return value;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function requireRecord(value: unknown, label: string): Record<string, unknown> {
+  if (!isRecord(value)) {
+    throw new Error(`${label}: expected an object, received ${JSON.stringify(value)}`);
+  }
+  return value;
+}
+
 function makeRes(): { res: Response; captured: Captured } {
   const captured: Captured = { statusCode: 200, body: {}, responded: false };
   const headers = new Map<string, string>();
@@ -198,6 +222,13 @@ function makeRes(): { res: Response; captured: Captured } {
     getHeader(name: string) {
       return headers.get(name.toLowerCase());
     },
+    // EXPRESS BOUNDARY CAST, and the one place a cast is unavoidable. `Response`
+    // extends Node's `ServerResponse` and adds ~60 members (`app`, `req`,
+    // `sendFile`, `cookie`, `render`, `redirect`…). These handlers touch only
+    // status/json/setHeader/getHeader/locals, so a structurally complete fixture
+    // would be unbuildable noise that tests nothing. Anything the handler reaches
+    // for and this object does not define is `undefined`, so an unexpected call
+    // fails loudly here rather than silently reading a stub.
   } as unknown as Response;
   return { res, captured };
 }
@@ -217,6 +248,11 @@ function makeReq(body: Record<string, unknown>): Request {
       role: "vet",
       clinicId: CLINIC_ID,
     },
+    // EXPRESS BOUNDARY CAST — same reasoning as `makeRes`. `Request` extends
+    // Node's `IncomingMessage` and adds the routing/content-negotiation surface
+    // (`app`, `route`, `accepts`, `is`, `cookies`, `signedCookies`, `socket`…),
+    // plus this repo's `clinicId` / `authUser` augmentation. The handler reads
+    // only headers/params/query/body/clinicId/authUser.
   } as unknown as Request;
 }
 
@@ -335,12 +371,15 @@ describe("postSessionsHandler → enqueueNotificationJob integration", () => {
 
     expect(captured.responded).toBe(true);
     expect(captured.statusCode).toBe(201);
-    const sessionId = captured.body.id as string;
-    expect(typeof sessionId).toBe("string");
-    expect(sessionId.length).toBeGreaterThan(0);
+    // `requireString` enforces both conditions the two removed `expect`s asserted
+    // (string, non-empty) — earlier, and naming the field when it fails.
+    const sessionId = requireString(captured.body.id, "captured.body.id");
 
     expect(enqueueNotificationJob).toHaveBeenCalledTimes(1);
-    const job = enqueueNotificationJob.mock.calls[0]?.[0] as Record<string, unknown>;
+    const job = requireRecord(
+      enqueueNotificationJob.mock.calls[0]?.[0],
+      "enqueueNotificationJob job payload",
+    );
     expect(job).toMatchObject({
       type: "code_blue_broadcast",
       clinicId: CLINIC_ID,
@@ -392,7 +431,10 @@ describe("postOneTapHandler → enqueueNotificationJob integration", () => {
     expect(captured.body.sessionId).toBe(ONE_TAP_SESSION_ID);
 
     expect(enqueueNotificationJob).toHaveBeenCalledTimes(1);
-    const job = enqueueNotificationJob.mock.calls[0]?.[0] as Record<string, unknown>;
+    const job = requireRecord(
+      enqueueNotificationJob.mock.calls[0]?.[0],
+      "enqueueNotificationJob job payload",
+    );
     expect(job).toMatchObject({
       type: "code_blue_broadcast",
       clinicId: CLINIC_ID,

@@ -20,7 +20,7 @@ const routeFiles = fs
 
 // server/routes/code-blue.ts was split into a thin router (registrations +
 // middleware only) plus per-handler modules under code-blue/handlers/
-// (mechanical file split, TODO(arch) formerly in code-blue.ts). The scan
+// (mechanical file split, the arch-split marker formerly in code-blue.ts). The scan
 // above is intentionally non-recursive and would otherwise silently drop
 // coverage: code-blue.ts itself no longer contains any inline `.from(...)`
 // query, so it stops matching `dbRouteFiles` below, while the handler files
@@ -48,7 +48,12 @@ const dbRouteFiles = routeFiles.filter((filePath) => {
     src.includes("from(folders)") ||
     src.includes("from(rooms)") ||
     src.includes("from(hospitalizations)") ||
-    src.includes("from(animals)")
+    src.includes("from(animals)") ||
+    src.includes("from(codeBlueSessions)") ||
+    src.includes("from(codeBlueLogEntries)") ||
+    src.includes("from(codeBluePresence)") ||
+    src.includes("from(codeBlueEvents)") ||
+    src.includes("from(crashCartChecks)")
   );
 });
 

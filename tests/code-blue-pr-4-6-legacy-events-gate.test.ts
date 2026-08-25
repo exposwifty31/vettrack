@@ -30,7 +30,7 @@ const routeFile = path.join(repoRoot, "server", "routes", "code-blue.ts");
 const routeSrc = fs.readFileSync(routeFile, "utf8");
 
 // The handler bodies for POST /events and PATCH /events/:id were extracted
-// (mechanical file split, TODO(arch) in code-blue.ts) into their own handler
+// (mechanical file split, the arch-split marker in code-blue.ts) into their own handler
 // modules; the router file now only holds the registration + middleware
 // chain. Append the handler file's source so every assertion below —
 // unchanged — still sees the same combined text it did before the split.

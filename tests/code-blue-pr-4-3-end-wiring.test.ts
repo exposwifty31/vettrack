@@ -32,7 +32,7 @@ const routeSrc = fs.readFileSync(routeFile, "utf8");
 // ─────────────────────────────────────────────────────────────────────────────
 
 // PATCH /sessions/:id/end's handler body was extracted into its own module
-// (mechanical file split, TODO(arch) formerly in code-blue.ts); the router
+// (mechanical file split, the arch-split marker formerly in code-blue.ts); the router
 // file now only holds the registration + middleware chain. Append the
 // handler file's BODY (from `export const` onward, i.e. excluding its own
 // import block) so assertions below — unchanged — still see the same

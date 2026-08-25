@@ -30,7 +30,9 @@ export const getSessionsIdDispensesHandler: RequestHandler = async (req, res) =>
          NULL::int              AS "totalAmountCents",
          NULL::text             AS "billingStatus"
        FROM vt_inventory_logs il
-       JOIN vt_containers c ON c.id = il.container_id
+       JOIN vt_containers c
+         ON c.id = il.container_id
+         AND c.clinic_id = il.clinic_id
        WHERE il.clinic_id = $1
          AND il.quantity_added < 0
          AND il.created_at >= $2
@@ -40,7 +42,7 @@ export const getSessionsIdDispensesHandler: RequestHandler = async (req, res) =>
     );
     res.json(rows.rows);
   } catch (err) {
-    console.error(err);
+    console.error("[code-blue] session dispenses failed", err);
     res.status(500).json(
       apiError({ code: "INTERNAL_ERROR", reason: "SESSION_DISPENSES_FAILED", message: "Failed to load session dispenses", requestId }),
     );
