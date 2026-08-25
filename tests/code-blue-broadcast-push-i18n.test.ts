@@ -202,6 +202,21 @@ function requireRecord(value: unknown, label: string): Record<string, unknown> {
   return value;
 }
 
+/**
+ * `push.codeBlue.{title,body}` out of an imported locale JSON, narrowed one key
+ * at a time. The alternative is casting the whole dictionary to an asserted
+ * shape, which turns a missing key into `expect(undefined).toBe(...)` — a
+ * failure that names the expected string but not the key that went missing.
+ */
+function localePushCopy(dict: unknown, label: string): { title: string; body: string } {
+  const push = requireRecord(requireRecord(dict, label).push, `${label} push`);
+  const codeBlue = requireRecord(push.codeBlue, `${label} push.codeBlue`);
+  return {
+    title: requireString(codeBlue.title, `${label} push.codeBlue.title`),
+    body: requireString(codeBlue.body, `${label} push.codeBlue.body`),
+  };
+}
+
 function makeRes(): { res: Response; captured: Captured } {
   const captured: Captured = { statusCode: 200, body: {}, responded: false };
   const headers = new Map<string, string>();
@@ -293,15 +308,15 @@ beforeEach(() => {
 
 describe("push.codeBlue locale keys (parity + clinical wording)", () => {
   it("Hebrew title and body match today's clinic-known wording", () => {
-    const push = (heDict as { push: { codeBlue?: { title?: string; body?: string } } }).push;
-    expect(push.codeBlue?.title).toBe("⚠ CODE BLUE");
-    expect(push.codeBlue?.body).toBe("CODE BLUE הופעל ע״י {name}");
+    const copy = localePushCopy(heDict, "locales/he.json");
+    expect(copy.title).toBe("⚠ CODE BLUE");
+    expect(copy.body).toBe("CODE BLUE הופעל ע״י {name}");
   });
 
   it("English body keeps CODE BLUE clinical term and interpolates {name}", () => {
-    const push = (enDict as { push: { codeBlue?: { title?: string; body?: string } } }).push;
-    expect(push.codeBlue?.title).toBe("⚠ CODE BLUE");
-    expect(push.codeBlue?.body).toBe("CODE BLUE activated by {name}");
+    const copy = localePushCopy(enDict, "locales/en.json");
+    expect(copy.title).toBe("⚠ CODE BLUE");
+    expect(copy.body).toBe("CODE BLUE activated by {name}");
   });
 });
 

@@ -10944,3 +10944,20 @@ not a bare `— deleted`, so the span was read as a live path claim.
 
 **Verdict:** VERIFIED for the merge resolution and the finding fix. Full local suite PARTIAL by pre-existing environment failures, quantified above against a clean-main baseline rather than waved through.
 ||||||| d3ec38083
+
+## 2026-08-26 — Correction: the cast count in the entry above was wrong (two locale-dictionary casts uncounted)
+
+**Supersedes** the assertion-count claim in the 2026-08-26 merge entry above. That entry said five type assertions, three narrowed and two kept as documented Express boundary casts. The file held **six**. Two locale-dictionary casts were missed and are now narrowed as well; the earlier entry's other claims stand.
+
+**Why it was missed, since that is the reusable part:** the search that produced "only the two Express casts remain" was `grep -nE ' as unknown as | as Record<| as string;'` — three literal spellings. A cast written `as { push: { codeBlue?: ... } }` matches none of them, so the grep reported absence it had never looked for. The broad pattern `grep -nE '\bas [A-Za-z{(]'` finds all six. Same failure shape as the finding it was meant to close: one search is not evidence of absence.
+
+**Claim:** `tests/code-blue-broadcast-push-i18n.test.ts` no longer casts an imported locale dictionary to an asserted shape. `localePushCopy` narrows `push` → `push.codeBlue` → `title` / `body` one key at a time through the existing `requireRecord` / `requireString` helpers.
+
+**Evidence:**
+- `tests/code-blue-broadcast-push-i18n.test.ts` — `grep -nE '\bas [A-Za-z{(]'` excluding `as const` now returns four lines: `:73` and `:77` are `as Array<...>` widening annotations on seed literals (they assert no shape and were not flagged), `:247` and `:271` are the two documented Express boundary casts. The two `(heDict as { push: ... })` / `(enDict as { push: ... })` casts are gone.
+- Same file — the two locale tests call `localePushCopy(heDict, "locales/he.json")` / `localePushCopy(enDict, "locales/en.json")`; the previous `push.codeBlue?.title` optional chaining is gone, so a missing key can no longer degrade into `expect(undefined).toBe(...)`
+- Test: `npx vitest run tests/code-blue-broadcast-push-i18n.test.ts` → `Test Files  1 passed (1)`, `Tests  14 passed (14)`
+- Mutation: `requireRecord(push.codeBlue, ...)` pointed at `push.codeBlueX` → `Tests  2 failed | 12 passed (14)` with `Error: locales/he.json push.codeBlue: expected an object, received undefined` and the matching `locales/en.json` line; reverted → `14 passed (14)`
+- Command: `npx tsc --noEmit` and `npx tsc -p tsconfig.server.json --noEmit` → exit 0 both
+
+**Verdict:** VERIFIED
