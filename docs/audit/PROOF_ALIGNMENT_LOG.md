@@ -10925,7 +10925,7 @@ not a bare `— deleted`, so the span was read as a live path claim.
 
 **Verdict:** VERIFIED
 
-## 2026-08-26 — Code Blue push i18n: merge the handler-split branch in, resolve the duplicate-extraction conflict, address the type-assertion finding
+## 2026-08-25 — Code Blue push i18n: merge the handler-split branch in, resolve the duplicate-extraction conflict, address the type-assertion finding
 
 **Claim:** `cursor/code-blue-push-i18n-1e7c` now merges `refactor/code-blue-route-handler-split` with no conflict markers. Both branches had independently extracted the `code_blue_broadcast` push copy; the four conflicting hunks resolve to the helper form (`resolveCodeBlueBroadcastPushCopy`), the three i18n imports the other side contributed are removed as dead, the locale key it orphaned is removed, and the five unexplained type assertions in the push-i18n test are replaced by runtime narrowing (three) or given an inline rationale as Express boundary casts (two).
 
@@ -10943,4 +10943,3 @@ not a bare `— deleted`, so the span was read as a live path claim.
 - Full local suite, NOT green and not claimed as such: `npx vitest run` → `Test Files  12 failed | 734 passed (746)`. The identical command in a clean `origin/main` worktree → `Test Files  13 failed | 723 passed (736)`. The 12 are a strict subset of main's 13 — main additionally fails `tests/shift-csv-role-labels.test.ts` — so this merge introduces no new failure. The failures are a local-environment condition, not a branch condition.
 
 **Verdict:** VERIFIED for the merge resolution and the finding fix. Full local suite PARTIAL by pre-existing environment failures, quantified above against a clean-main baseline rather than waved through.
-||||||| d3ec38083
