@@ -10925,7 +10925,7 @@ not a bare `— deleted`, so the span was read as a live path claim.
 
 **Verdict:** VERIFIED
 
-## 2026-08-26 — Code Blue push i18n: merge the handler-split branch in, resolve the duplicate-extraction conflict, address the type-assertion finding
+## 2026-08-25 — Code Blue push i18n: merge the handler-split branch in, resolve the duplicate-extraction conflict, address the type-assertion finding
 
 **Claim:** `cursor/code-blue-push-i18n-1e7c` now merges `refactor/code-blue-route-handler-split` with no conflict markers. Both branches had independently extracted the `code_blue_broadcast` push copy; the four conflicting hunks resolve to the helper form (`resolveCodeBlueBroadcastPushCopy`), the three i18n imports the other side contributed are removed as dead, the locale key it orphaned is removed, and the five unexplained type assertions in the push-i18n test are replaced by runtime narrowing (three) or given an inline rationale as Express boundary casts (two).
 
@@ -10943,11 +10943,10 @@ not a bare `— deleted`, so the span was read as a live path claim.
 - Full local suite, NOT green and not claimed as such: `npx vitest run` → `Test Files  12 failed | 734 passed (746)`. The identical command in a clean `origin/main` worktree → `Test Files  13 failed | 723 passed (736)`. The 12 are a strict subset of main's 13 — main additionally fails `tests/shift-csv-role-labels.test.ts` — so this merge introduces no new failure. The failures are a local-environment condition, not a branch condition.
 
 **Verdict:** VERIFIED for the merge resolution and the finding fix. Full local suite PARTIAL by pre-existing environment failures, quantified above against a clean-main baseline rather than waved through.
-||||||| d3ec38083
 
 ## 2026-08-26 — Correction: the cast count in the entry above was wrong (two locale-dictionary casts uncounted)
 
-**Supersedes** the assertion-count claim in the 2026-08-26 merge entry above. That entry said five type assertions, three narrowed and two kept as documented Express boundary casts. The file held **six**. Two locale-dictionary casts were missed and are now narrowed as well; the earlier entry's other claims stand.
+**Supersedes** the assertion-count claim in the merge entry immediately above. That entry said five type assertions, three narrowed and two kept as documented Express boundary casts. The file held **six**. Two locale-dictionary casts were missed and are now narrowed as well; the earlier entry's other claims stand.
 
 **Why it was missed, since that is the reusable part:** the search that produced "only the two Express casts remain" was `grep -nE ' as unknown as | as Record<| as string;'` — three literal spellings. A cast written `as { push: { codeBlue?: ... } }` matches none of them, so the grep reported absence it had never looked for. The broad pattern `grep -nE '\bas [A-Za-z{(]'` finds all six. Same failure shape as the finding it was meant to close: one search is not evidence of absence.
 
@@ -10961,3 +10960,8 @@ not a bare `— deleted`, so the span was read as a live path claim.
 - Command: `npx tsc --noEmit` and `npx tsc -p tsconfig.server.json --noEmit` → exit 0 both
 
 **Verdict:** VERIFIED
+
+**Recorded, not re-flipped — the heading date of the entry above.** It was written `2026-08-26` and another agent re-dated it to `2026-08-25` in `c67ecd8ac`, acting on a review comment that read the date as being in the future. This file's own rules section says entry dates are the author's local date, Asia/Jerusalem (`server/schema/core.ts` defaults `timezone` to it), so an entry written after 21:00 UTC carries the next day's date; the commands in that entry ran at 02:24 local, which is why the vitest output it quotes reads `Start at 02:24:11`. By that rule `2026-08-26` was correct. The re-date is left standing rather than reverted — a heading flipping back and forth between two agents is worse than either value — and the discrepancy is logged here instead, which is what this file's rule about a later check contradicting an earlier one prescribes.
+
+That same commit also removed a stray `||||||| d3ec38083` line this branch left at the end of the file, and that half was a real defect: the marker survived because the grep used to confirm "no residual markers" covered `<<<<<<<`, `=======` and `>>>>>>>` but not `|||||||`, the diff3 base marker. Third instance this session of a search pattern narrower than the absence it was used to claim.
+
