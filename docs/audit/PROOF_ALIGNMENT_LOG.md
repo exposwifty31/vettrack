@@ -10889,3 +10889,79 @@ not a bare `— deleted`, so the span was read as a live path claim.
 - Test: `pnpm test -- tests/claims-ledger.test.ts` → 88 passed
 
 **Verdict:** VERIFIED
+## 2026-08-23 — Code Blue activation push i18n extraction (handler-split follow-on)
+
+> Deliberately no hash-sigil pull-request citation in this entry. The claim gate
+> reads `PR` + hash + digits as a pull-request claim that needs a merge commit;
+> the handler-split pull request this stacks on is still open (same rule as the
+> 2026-08-21 db-integration re-scope entry).
+
+**Claim:** `post-sessions` / `post-one-tap` no longer hardcode Hebrew in `code_blue_broadcast` title/body; copy is `push.codeBlue.*` via `resolveCodeBlueBroadcastPushCopy` (INITIAL_LOCALE `he`); allowlist dropped those two handlers; enqueue path/tag/fail-open unchanged.
+
+**Evidence:**
+- `locales/he.json` — `push.codeBlue.title` = `⚠ CODE BLUE`, `body` = `CODE BLUE הופעל ע״י {name}`
+- `locales/en.json` — `push.codeBlue.body` = `CODE BLUE activated by {name}`
+- `server/lib/code-blue-broadcast-push.ts` — `getLocaleDictionaries(INITIAL_LOCALE)` + `translate(...push.codeBlue.*)` with try/catch ASCII fail-open
+- `server/routes/code-blue/handlers/post-sessions.ts` / `post-one-tap.ts` — `rg '[֐-׿]'` → no matches; still `enqueueNotificationJob` + `code-blue-${…}` tags + `.catch(() => {})`
+- `tests/i18n-no-hebrew-in-source.test.ts` — allowlist no longer lists the two handlers
+- Test (targeted): `pnpm exec vitest run tests/code-blue-broadcast-push-i18n.test.ts` (+ i18n guards) → passed; after CodeRabbit round the suite executes both handlers and asserts real enqueue payloads
+- Test (Code Blue locks): six code-blue-* lock files → 64 passed
+- Command: `pnpm i18n:check` → deep key parity OK
+- Command: `pnpm typecheck` (`tsc --noEmit` + `tsc -p tsconfig.server.json --noEmit`) → exit 0, 0 errors
+
+**Verdict:** superseded by 2026-08-24 CodeRabbit-round entry below (completion-gate recording).
+
+## 2026-08-24 — Code Blue push i18n: CodeRabbit round (integration tests + escape scan + completion gates)
+
+**Claim:** Address three CodeRabbit findings on the push-i18n change: (1) handler→enqueue integration tests execute both handlers and assert localized payload; (2) Hebrew source scan rejects `\u05xx` / `\u{5xx}` escapes; (3) completion gates `pnpm typecheck` + `pnpm test` recorded with honest results. No change to enqueue when/whether/tag/channel/outbox/`.catch`.
+
+**Evidence:**
+- `tests/code-blue-broadcast-push-i18n.test.ts` — `postSessionsHandler` / `postOneTapHandler` run with mocked deps; `enqueueNotificationJob` receives `type: "code_blue_broadcast"`, title `⚠ CODE BLUE`, body `CODE BLUE הופעל ע״י Dr Cohen`, tags `code-blue-${id}` / `code-blue-session-ot-1`; reject path still returns 201
+- Same file — `containsHebrewInSource` rejects literal glyphs and `\\u05D0` / `\\u{5D0}` forms; both handlers pass
+- Command: `pnpm i18n:check` → deep key parity OK
+- Command: `pnpm typecheck` → exit 0 (frontend `tsc --noEmit` + `tsc -p tsconfig.server.json --noEmit`)
+- Command: `pnpm test` → **exit 0**, `Test Files 713 passed | 20 skipped (733)`, `Tests 6631 passed | 136 skipped (6767)`
+- Prior full-suite exit 1 was solely `claims-ledger` objecting to a hash-sigil citation of an still-open handler-split pull request in the 2026-08-23 heading; that citation is removed (see note on that entry)
+
+**Verdict:** VERIFIED
+
+## 2026-08-25 — Code Blue push i18n: merge the handler-split branch in, resolve the duplicate-extraction conflict, address the type-assertion finding
+
+**Claim:** `cursor/code-blue-push-i18n-1e7c` now merges `refactor/code-blue-route-handler-split` with no conflict markers. Both branches had independently extracted the `code_blue_broadcast` push copy; the four conflicting hunks resolve to the helper form (`resolveCodeBlueBroadcastPushCopy`), the three i18n imports the other side contributed are removed as dead, the locale key it orphaned is removed, and the five unexplained type assertions in the push-i18n test are replaced by runtime narrowing (three) or given an inline rationale as Express boundary casts (two).
+
+**Evidence:**
+- `server/routes/code-blue/handlers/post-sessions.ts:157` and `server/routes/code-blue/handlers/post-one-tap.ts:97` — `resolveCodeBlueBroadcastPushCopy(req.authUser!.name ?? "")`; `title` / `body` read from its result
+- Both handlers — `grep -c 'i18n/loader.js\|i18n/index.js'` → `0` each; the inline `getLocaleDictionaries` / `translate` / `interpolate` path is gone, so no import is left without a reader
+- `locales/he.json` and `locales/en.json` — `grep -c pushBroadcastBody` → `0` each; `grep -rn pushBroadcastBody` across all file types outside `node_modules` → no remaining reference of any kind
+- `tests/code-blue-broadcast-push-i18n.test.ts` — `requireString` and `isRecord` / `requireRecord` narrow the three captured values with no cast; the two `as unknown as Response` / `as unknown as Request` casts each carry an inline rationale naming the Express members these handlers never touch
+- Command: `npx tsc --noEmit` and `npx tsc -p tsconfig.server.json --noEmit` under node v24.17.0 → exit 0 both
+- Test: `npx vitest run tests/code-blue-broadcast-push-i18n.test.ts` → `Test Files  1 passed (1)`, `Tests  14 passed (14)`
+- Mutation (a guard not shown to go red is not a guard): `requireString(captured.body.id, ...)` pointed at a non-existent field → `Tests  1 failed | 13 passed (14)` with `Error: captured.body.id: expected a non-empty string, received undefined`; reverted → `14 passed (14)`
+- Command: `pnpm verify:claims` → `1113 claims: 1088 verified, 24 registered, 1 attested, 2072 excluded by rule, 0 FAILED`
+- Command: `pnpm architecture:gates` → `[tenant-lint] no new findings vs baseline (202 known)` and `[architecture-gates] All G1 checks passed.`
+- Command: `pnpm i18n:check` → `locales/en.json and locales/he.json are in deep key parity.`
+- Full local suite, NOT green and not claimed as such: `npx vitest run` → `Test Files  12 failed | 734 passed (746)`. The identical command in a clean `origin/main` worktree → `Test Files  13 failed | 723 passed (736)`. The 12 are a strict subset of main's 13 — main additionally fails `tests/shift-csv-role-labels.test.ts` — so this merge introduces no new failure. The failures are a local-environment condition, not a branch condition.
+
+**Verdict:** VERIFIED for the merge resolution and the finding fix. Full local suite PARTIAL by pre-existing environment failures, quantified above against a clean-main baseline rather than waved through.
+
+## 2026-08-26 — Correction: the cast count in the entry above was wrong (two locale-dictionary casts uncounted)
+
+**Supersedes** the assertion-count claim in the merge entry immediately above. That entry said five type assertions, three narrowed and two kept as documented Express boundary casts. The file held **six**. Two locale-dictionary casts were missed and are now narrowed as well; the earlier entry's other claims stand.
+
+**Why it was missed, since that is the reusable part:** the search that produced "only the two Express casts remain" was `grep -nE ' as unknown as | as Record<| as string;'` — three literal spellings. A cast written `as { push: { codeBlue?: ... } }` matches none of them, so the grep reported absence it had never looked for. The broad pattern `grep -nE '\bas [A-Za-z{(]'` finds all six. Same failure shape as the finding it was meant to close: one search is not evidence of absence.
+
+**Claim:** `tests/code-blue-broadcast-push-i18n.test.ts` no longer casts an imported locale dictionary to an asserted shape. `localePushCopy` narrows `push` → `push.codeBlue` → `title` / `body` one key at a time through the existing `requireRecord` / `requireString` helpers.
+
+**Evidence:**
+- `tests/code-blue-broadcast-push-i18n.test.ts` — `grep -nE '\bas [A-Za-z{(]'` excluding `as const` now returns four lines: `:73` and `:77` are `as Array<...>` widening annotations on seed literals (they assert no shape and were not flagged), `:247` and `:271` are the two documented Express boundary casts. The two `(heDict as { push: ... })` / `(enDict as { push: ... })` casts are gone.
+- Same file — the two locale tests call `localePushCopy(heDict, "locales/he.json")` / `localePushCopy(enDict, "locales/en.json")`; the previous `push.codeBlue?.title` optional chaining is gone, so a missing key can no longer degrade into `expect(undefined).toBe(...)`
+- Test: `npx vitest run tests/code-blue-broadcast-push-i18n.test.ts` → `Test Files  1 passed (1)`, `Tests  14 passed (14)`
+- Mutation: `requireRecord(push.codeBlue, ...)` pointed at `push.codeBlueX` → `Tests  2 failed | 12 passed (14)` with `Error: locales/he.json push.codeBlue: expected an object, received undefined` and the matching `locales/en.json` line; reverted → `14 passed (14)`
+- Command: `npx tsc --noEmit` and `npx tsc -p tsconfig.server.json --noEmit` → exit 0 both
+
+**Verdict:** VERIFIED
+
+**Recorded, not re-flipped — the heading date of the entry above.** It was written `2026-08-26` and another agent re-dated it to `2026-08-25` in `c67ecd8ac`, acting on a review comment that read the date as being in the future. This file's own rules section says entry dates are the author's local date, Asia/Jerusalem (`server/schema/core.ts` defaults `timezone` to it), so an entry written after 21:00 UTC carries the next day's date; the commands in that entry ran at 02:24 local, which is why the vitest output it quotes reads `Start at 02:24:11`. By that rule `2026-08-26` was correct. The re-date is left standing rather than reverted — a heading flipping back and forth between two agents is worse than either value — and the discrepancy is logged here instead, which is what this file's rule about a later check contradicting an earlier one prescribes.
+
+That same commit also removed a stray `||||||| d3ec38083` line this branch left at the end of the file, and that half was a real defect: the marker survived because the grep used to confirm "no residual markers" covered `<<<<<<<`, `=======` and `>>>>>>>` but not `|||||||`, the diff3 base marker. Third instance this session of a search pattern narrower than the absence it was used to claim.
+

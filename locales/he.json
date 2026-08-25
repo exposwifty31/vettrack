@@ -2401,7 +2401,6 @@
     "clinicalAuthorityRequired": "רק צוות קליני במשמרת יכול לפתוח Code Blue. בקשו מהרופא האחראי לפתוח את האירוע.",
     "startSessionFailed": "פתיחת מפגש Code Blue נכשלה",
     "endSessionFailed": "סיום מפגש Code Blue נכשל",
-    "pushBroadcastBody": "CODE BLUE הופעל ע״י {name}",
     "elapsedSinceStart": "זמן מאז תחילת האירוע",
     "equipmentLogCount": "{n} רשומות ציוד",
     "presetUnitDeployed": "יחידה פרוסה לזירה",
@@ -2710,6 +2709,10 @@
     "handover": {
       "title": "מסירת המשמרת מוכנה",
       "body": "המשמרת היוצאת השאירה לך מסירה. הקש לצפייה."
+    },
+    "codeBlue": {
+      "title": "⚠ CODE BLUE",
+      "body": "CODE BLUE הופעל ע״י {name}"
     }
   },
   "shiftChat": {

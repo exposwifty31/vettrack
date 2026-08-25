@@ -2401,7 +2401,6 @@
     "clinicalAuthorityRequired": "Only clinical staff on shift can open a Code Blue. Ask the responsible clinician to start the event.",
     "startSessionFailed": "Failed to start Code Blue session",
     "endSessionFailed": "Failed to end Code Blue session",
-    "pushBroadcastBody": "CODE BLUE activated by {name}",
     "elapsedSinceStart": "Elapsed since event start",
     "equipmentLogCount": "{n} equipment entries",
     "presetUnitDeployed": "Unit deployed to scene",
@@ -2710,6 +2709,10 @@
     "handover": {
       "title": "Shift handover ready",
       "body": "The outgoing shift left a handover for you. Tap to review."
+    },
+    "codeBlue": {
+      "title": "⚠ CODE BLUE",
+      "body": "CODE BLUE activated by {name}"
     }
   },
   "shiftChat": {

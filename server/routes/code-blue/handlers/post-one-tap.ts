@@ -13,11 +13,10 @@ import {
 } from "../../../lib/code-blue-nearest-cart.js";
 import { logAudit, resolveAuditActorRole } from "../../../lib/audit.js";
 import { enqueueNotificationJob } from "../../../lib/queue.js";
+import { resolveCodeBlueBroadcastPushCopy } from "../../../lib/code-blue-broadcast-push.js";
 import { postSystemMessage } from "../../../lib/shift-chat-presence.js";
 import { invalidateActiveCodeBlueCache } from "../../../lib/code-blue-keepalive.js";
 import { resolveRequestId, apiError } from "../../../lib/route-utils.js";
-import { getLocaleDictionaries } from "../../../../lib/i18n/loader.js";
-import { interpolate, translate } from "../../../../lib/i18n/index.js";
 import { resolveNominatedManager } from "../resolve-nominated-manager.js";
 import type { oneTapStartSchema } from "../schemas.js";
 
@@ -95,13 +94,12 @@ export const postOneTapHandler: RequestHandler = async (req, res) => {
         metadata: { via: "one_tap", managerUserId: managerUser.id },
       });
 
-      const { primary: broadcastPrimary, fallback: broadcastFallback, locale: broadcastLc } = getLocaleDictionaries("he");
-      const broadcastBodyTemplate = translate(broadcastPrimary, "codeBlue.pushBroadcastBody", undefined, { fallbackDict: broadcastFallback, locale: broadcastLc });
+      const pushCopy = resolveCodeBlueBroadcastPushCopy(req.authUser!.name ?? "");
       void enqueueNotificationJob({
         type: "code_blue_broadcast",
         clinicId,
-        title: "⚠ CODE BLUE",
-        body: interpolate(broadcastBodyTemplate, { name: req.authUser!.name }),
+        title: pushCopy.title,
+        body: pushCopy.body,
         tag: `code-blue-${outcome.sessionId}`,
         ...(outcome.pagingOutboxId !== null
           ? { notificationRequestOutboxId: outcome.pagingOutboxId }
