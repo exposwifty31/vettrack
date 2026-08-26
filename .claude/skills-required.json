@@ -1,0 +1,45 @@
+{
+  "$comment": [
+    "Glob -> skills that MUST have been invoked (via the Skill tool) before a Write/Edit to a matching path.",
+    "Enforced by .claude/hooks/skills-required.js, a PreToolUse(Write|Edit) hook that exits 2 to block.",
+    "Source of truth: the skills table in the QA remediation master plan. Moving it here is the point:",
+    "the mapping stops being an agent's memory and becomes a reviewable file.",
+    "'exempt' paths are checked FIRST and never require anything - docs, QA artifacts, and this",
+    "enforcement machinery itself (otherwise the guard cannot be edited without tripping itself)."
+  ],
+  "exempt": [
+    ".claude/**", "docs/**", ".qa/**", "*.md", "scripts/**", "**/__tests__/**", "**/*.test.ts", "**/*.test.tsx"
+  ],
+  "rules": [
+    {
+      "globs": ["src/i18n/**", "src/components/inventory/**", "src/components/alerts/**", "src/components/home/ActivityFeed.tsx", "src/components/home/ShiftHeroCard.tsx"],
+      "skills": ["hebrew-rtl-best-practices", "cursor-i18n-rtl"],
+      "why": "S4 bidi. writingDirection is dead on Android; these are the sites where composed strings reorder."
+    },
+    {
+      "globs": ["src/components/**"],
+      "skills": ["cursor-accessibility-native"],
+      "why": "S9/S10. Shared primitives with a missing branch - disabled state, scrims, target size, names."
+    },
+    {
+      "globs": ["src/screens/**", "src/navigation/**", "src/app/**", "src/features/**"],
+      "skills": ["react-native-architecture"],
+      "why": "S1/S3/S10. Navigation destinations, auth root, screen composition."
+    },
+    {
+      "globs": ["src/hooks/**", "src/lib/api.ts", "src/lib/api/**"],
+      "skills": ["cursor-data-fetching"],
+      "why": "S14. refetchOnWindowFocus is inert in RN until focusManager is wired, and staleTime:Infinity opts out even then."
+    },
+    {
+      "globs": ["server/**", "shared/**", "migrations/**"],
+      "skills": ["cursor-security"],
+      "why": "S2/S7/S8/S12/S16/S17a. Route guards, role floors, revert snapshots, tenancy."
+    }
+  ],
+  "always": {
+    "globs": ["src/**", "server/**", "shared/**", "migrations/**"],
+    "skills": ["systematic-debugging"],
+    "why": "Owner instruction 2026-08-26: additive to every slice, never a substitute. Iron Law - no fix without root-cause investigation first."
+  }
+}
