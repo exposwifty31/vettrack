@@ -19,7 +19,9 @@ const { equipmentList, acksList, ackSpy, removeSpy } = vi.hoisted(() => {
   const fixture = [
     // status "issue" → urgent section + worst-first hero
     { id: "eq-issue", name: "Ventilator ICU-2", status: "issue" },
-    // no lastVerifiedAt → isInactive → maintenance section
+    // lastVerifiedAt omitted deliberately: under the old lastSeen rule a row
+    // with no verification still read as fresh, so this row landing in the
+    // maintenance section is what fails if that rule ever comes back.
     { id: "eq-stale", name: "Syringe pump 7", status: "available" },
   ];
   return {

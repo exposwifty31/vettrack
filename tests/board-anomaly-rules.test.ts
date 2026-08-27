@@ -282,23 +282,36 @@ describe("deriveBoardAnomalies — cart_unverified", () => {
     });
   });
 
-  it("a never-verified cart's since is epoch-anchored: STABLE across snapshots and ranks OLDEST", () => {
-    const cart = { clinicId: CLINIC, equipmentId: "cart-null", lastVerifiedAt: null };
-    const first = byType(deriveBoardAnomalies(baseInput({ carts: [cart] })), "cart_unverified")[0];
+  // Three independent contracts, three cases. They were one case, and that made
+  // the first `expect` a mask: an epoch-anchoring regression aborted the test
+  // before the stability and ranking assertions ever ran, so a ranking bug could
+  // sit behind an epoch bug indefinitely and the failure name named all three.
+  const neverVerifiedCart = { clinicId: CLINIC, equipmentId: "cart-null", lastVerifiedAt: null };
+
+  it("a never-verified cart anchors `since` at the epoch, not at `now`", () => {
+    const first = byType(deriveBoardAnomalies(baseInput({ carts: [neverVerifiedCart] })), "cart_unverified")[0];
 
     // Epoch (0) is the effective verification instant, so since = 0 + 7d — deterministic,
     // survives restart/scale-out, and needs no volatile onset store (unlike battery_critical).
     expect(first.since).toBe(new Date(CART_UNVERIFIED_MAX_AGE_MS).toISOString());
+  });
 
-    // STABILITY: a later snapshot yields the SAME since (a `now`-anchored since would drift
-    // forward every poll and, via board-anomaly-ranking.ts, sort NEWEST instead of oldest).
+  it("a never-verified cart's `since` is identical in a later snapshot", () => {
+    const first = byType(deriveBoardAnomalies(baseInput({ carts: [neverVerifiedCart] })), "cart_unverified")[0];
+
+    // A `now`-anchored since would drift forward every poll and, via
+    // board-anomaly-ranking.ts, sort NEWEST instead of oldest.
     const later = byType(
-      deriveBoardAnomalies(baseInput({ now: new Date(NOW.getTime() + 5000), carts: [cart] })),
+      deriveBoardAnomalies(baseInput({ now: new Date(NOW.getTime() + 5000), carts: [neverVerifiedCart] })),
       "cart_unverified",
     )[0];
     expect(later.since).toBe(first.since);
+  });
 
-    // Ranks oldest-first against a merely-stale cart (ranking compares `since` as strings).
+  it("a never-verified cart ranks ahead of a merely-stale one", () => {
+    const first = byType(deriveBoardAnomalies(baseInput({ carts: [neverVerifiedCart] })), "cart_unverified")[0];
+
+    // Ranking compares `since` as strings, so oldest-first is a string comparison.
     const staleSince = new Date(
       agoMs(CART_UNVERIFIED_MAX_AGE_MS + 60_000).getTime() + CART_UNVERIFIED_MAX_AGE_MS,
     ).toISOString();

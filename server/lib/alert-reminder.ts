@@ -19,7 +19,6 @@ export function isAlertStillActive(alertType: string, eq_row: {
   status: string;
   lastMaintenanceDate: Date | string | null;
   lastSterilizationDate: Date | string | null;
-  lastSeen: Date | string | null;
   lastVerifiedAt: Date | string | null;
   maintenanceIntervalDays: number | null;
 }): boolean {
@@ -81,7 +80,6 @@ async function processDueAcksForClinic(clinicId: string, now: Date): Promise<voi
           status: equipment.status,
           lastMaintenanceDate: equipment.lastMaintenanceDate,
           lastSterilizationDate: equipment.lastSterilizationDate,
-          lastSeen: equipment.lastSeen,
           lastVerifiedAt: equipment.lastVerifiedAt,
           maintenanceIntervalDays: equipment.maintenanceIntervalDays,
           name: equipment.name,
