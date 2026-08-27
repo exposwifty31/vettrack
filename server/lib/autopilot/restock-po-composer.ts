@@ -27,6 +27,7 @@
  */
 import { getLocaleDictionaries } from "../../../lib/i18n/loader.js";
 import { translate, type Locale, type TranslationParams } from "../../../lib/i18n/index.js";
+import { formatProposalDate } from "./format-proposal-date.js";
 import type { RestockItemReadResult } from "./restock-burn-reader.port.js";
 import type { ActionProposalCitedFact, NewActionProposalInput } from "./action-proposal-types.js";
 
@@ -117,9 +118,12 @@ export function composeRestockPoProposal(input: ComposeRestockPoProposalInput): 
     clinicId,
     kind: "restock_po_on_burn",
     sourceSessionId: scanDate,
+    // PROSE gets the locale-formatted day. `sourceSessionId`, `sourceRef`,
+    // `draftContent.scanDate` and `citedFacts[].at` keep the raw ISO value —
+    // they are keys and stored data, not copy.
     summary: t("autopilotQueue.kinds.restockPoOnBurn.summaryTemplate", {
       itemCount: flaggedItems.length,
-      scanDate,
+      scanDate: formatProposalDate(scanDate, resolvedLocale),
     }),
     citedFacts,
     draftContent,
