@@ -44,20 +44,24 @@ afterAll(() => {
   vi.useRealTimers();
 });
 
+// `satisfies` rather than `as`: a cast would let this fixture silently omit a
+// required Equipment field, hiding a production contract change from every
+// computeAlerts assertion below. The base must type-check on its own.
+const BASE_EQUIPMENT = {
+  id: "eq-1",
+  clinicId: "clinic-1",
+  name: "Crash cart",
+  status: "ok",
+  lastStatus: "ok",
+  maintenanceIntervalDays: null,
+  lastMaintenanceDate: null,
+  lastSterilizationDate: null,
+  lastSeen: null,
+  lastVerifiedAt: null,
+} satisfies Equipment;
+
 function equipmentFixture(overrides: Partial<Equipment> = {}): Equipment {
-  return {
-    id: "eq-1",
-    clinicId: "clinic-1",
-    name: "Crash cart",
-    status: "ok",
-    lastStatus: "ok",
-    maintenanceIntervalDays: null,
-    lastMaintenanceDate: null,
-    lastSterilizationDate: null,
-    lastSeen: null,
-    lastVerifiedAt: null,
-    ...overrides,
-  } as Equipment;
+  return { ...BASE_EQUIPMENT, ...overrides };
 }
 
 describe("client isInactive — verification, not sightings", () => {
@@ -144,5 +148,43 @@ describe("analytics statusBreakdown.inactive — same field, same window", () =>
     expect(isEquipmentInactive({ lastVerifiedAt: new Date(lastVerifiedAt) }, NOW)).toBe(
       isInactive(equipmentFixture({ lastVerifiedAt })),
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Cross-layer edges. Both cases are asserted against ALL THREE derivations in
+// one block on purpose: the point of this slice is that they agree, and a
+// per-layer test lets one drift while the other two stay green.
+// ---------------------------------------------------------------------------
+
+describe("all three derivations agree on the edges", () => {
+  const exactly = daysAgo(INACTIVE_THRESHOLD_DAYS);
+  const row = (overrides: Partial<Parameters<typeof isAlertStillActive>[1]> = {}) => ({
+    status: "ok",
+    lastMaintenanceDate: null,
+    lastSterilizationDate: null,
+    lastSeen: null,
+    lastVerifiedAt: null,
+    maintenanceIntervalDays: null,
+    ...overrides,
+  });
+
+  it("EXACTLY at the threshold is still active — the comparison is strict", () => {
+    // Day 13 and day 15 were covered; day 14 was not, so a strict -> inclusive
+    // change would misclassify the boundary without failing anything.
+    expect(isInactive(equipmentFixture({ lastVerifiedAt: exactly }))).toBe(false);
+    expect(isAlertStillActive("inactive", row({ lastVerifiedAt: exactly }))).toBe(false);
+    expect(isEquipmentInactive({ lastVerifiedAt: new Date(exactly) }, NOW)).toBe(false);
+  });
+
+  it("an UNPARSEABLE timestamp is inactive — all three fail CLOSED", () => {
+    // date-fns `isAfter` answers false for an Invalid Date, `<` compares false
+    // against everything, and `now - NaN > threshold` is false. So before this
+    // slice all three read corrupted data as RECENTLY VERIFIED: the alert
+    // cleared itself on exactly the rows you can trust least.
+    const garbage = "not-a-date";
+    expect(isInactive(equipmentFixture({ lastVerifiedAt: garbage }))).toBe(true);
+    expect(isAlertStillActive("inactive", row({ lastVerifiedAt: garbage }))).toBe(true);
+    expect(isEquipmentInactive({ lastVerifiedAt: garbage }, NOW)).toBe(true);
   });
 });

@@ -46,7 +46,12 @@ export function isAlertStillActive(alertType: string, eq_row: {
     // lastVerifiedAt, not lastSeen: a checkout bumps lastSeen, which would
     // silently close an ack nobody actually resolved. Same column and window as
     // the client bell (src/lib/utils.ts isInactive).
-    const lastVerified = eq_row.lastVerifiedAt ? new Date(eq_row.lastVerifiedAt).getTime() : 0;
+    // Epoch 0 for BOTH null and an unparseable value, so each keeps the ack
+    // open. Without the NaN guard `now - NaN > threshold` is false and a
+    // corrupted timestamp would silently close an ack nobody resolved. Matches
+    // src/lib/utils.ts isInactive and server/routes/analytics.ts.
+    const parsed = eq_row.lastVerifiedAt ? new Date(eq_row.lastVerifiedAt).getTime() : 0;
+    const lastVerified = Number.isNaN(parsed) ? 0 : parsed;
     const INACTIVE_THRESHOLD_MS = INACTIVE_THRESHOLD_DAYS * 24 * 60 * 60 * 1000;
     return now - lastVerified > INACTIVE_THRESHOLD_MS;
   }

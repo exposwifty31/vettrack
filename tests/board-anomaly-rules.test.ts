@@ -268,11 +268,18 @@ describe("deriveBoardAnomalies — cart_unverified", () => {
     );
     const hits = byType(result, "cart_unverified");
     expect(hits.map((h) => h.unitId).sort()).toEqual(["cart-null", "cart-stale"]);
-    // All 5 fields on the never-verified hit, same contract as every other cart anomaly.
-    const nullHit = hits.find((h) => h.unitId === "cart-null")!;
-    expect(nullHit.type).toBe("cart_unverified");
-    expect(nullHit.severity).toBe("calm");
-    expect(nullHit.sourceRef).toEqual({ table: "vt_equipment", id: "cart-null" });
+    // The never-verified hit, asserted as ONE object rather than field by field.
+    // `hits.find()` returns `T | undefined` and no matcher above narrows it, so a
+    // non-null assertion here would turn a missing hit into a confusing TypeError
+    // instead of a readable diff. `since` is checked by the epoch-anchoring test
+    // below, so it is matched loosely here rather than restated.
+    const nullHit = hits.find((h) => h.unitId === "cart-null");
+    expect(nullHit).toMatchObject({
+      unitId: "cart-null",
+      type: "cart_unverified",
+      severity: "calm",
+      sourceRef: { table: "vt_equipment", id: "cart-null" },
+    });
   });
 
   it("a never-verified cart's since is epoch-anchored: STABLE across snapshots and ranks OLDEST", () => {

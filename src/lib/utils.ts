@@ -86,8 +86,15 @@ export function isSterilizationDue(equipment: Equipment): boolean {
  */
 export function isInactive(equipment: Equipment): boolean {
   if (!equipment.lastVerifiedAt) return true;
+  // Parse ONCE and reject an unparseable value as inactive. date-fns `isAfter`
+  // answers false for an Invalid Date, so a corrupted timestamp used to read as
+  // ACTIVE — the alert would clear itself on exactly the data you can trust
+  // least. All three derivations fail closed the same way; see
+  // server/routes/analytics.ts and server/lib/alert-reminder.ts.
+  const verifiedAt = new Date(equipment.lastVerifiedAt);
+  if (Number.isNaN(verifiedAt.getTime())) return true;
   const cutoff = subDays(new Date(), INACTIVE_THRESHOLD_DAYS);
-  return isAfter(cutoff, new Date(equipment.lastVerifiedAt));
+  return isAfter(cutoff, verifiedAt);
 }
 
 export type ExpiryBadgeState = "expired" | "expiring_soon" | "healthy";

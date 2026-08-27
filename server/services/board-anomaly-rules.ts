@@ -116,7 +116,8 @@ function isUsableDate(value: Date | null): value is Date {
 }
 
 /**
- * Effective last-verification instant (ms) for cart_unverified; `null` => fail-safe skip.
+ * Effective last-verification instant (ms) for cart_unverified; `null` => epoch 0, which
+ * KEEPS the unit flagged. An Invalid Date is the only value that skips.
  *
  * REVERSED 2026-08-27 (owner decision — Dan): a `null` lastVerifiedAt used to skip. It now
  * resolves to EPOCH 0 (maximally stale), so a NEVER-verified cart fires — the strongest form

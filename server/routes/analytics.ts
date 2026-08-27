@@ -45,7 +45,12 @@ export function isEquipmentInactive(
   now: Date,
 ): boolean {
   if (!row.lastVerifiedAt) return true;
-  return new Date(row.lastVerifiedAt) < subDays(now, INACTIVE_THRESHOLD_DAYS);
+  // Fail CLOSED on an unparseable timestamp: an Invalid Date compares false
+  // against everything, so garbage used to count as recently verified. Matches
+  // src/lib/utils.ts isInactive and server/lib/alert-reminder.ts.
+  const verifiedAt = new Date(row.lastVerifiedAt);
+  if (Number.isNaN(verifiedAt.getTime())) return true;
+  return verifiedAt < subDays(now, INACTIVE_THRESHOLD_DAYS);
 }
 
 
