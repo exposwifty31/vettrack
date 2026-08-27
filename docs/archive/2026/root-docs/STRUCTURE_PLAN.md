@@ -48,7 +48,7 @@ Proposed **safe** end state (multiple small PRs):
 /shared          → already exists
 /tests
   /e2e
-    /flows       → new (this PR)
+    /flows       → exists
     /simulation  → workday (staging-only)
   /vitest        → optional: group *.test.* by domain
 /playwright      → configs at repo root today — may move configs only
@@ -66,7 +66,6 @@ Proposed **safe** end state (multiple small PRs):
 
 | PR | Move | Importers | Risk | Validation |
 |----|------|-----------|------|------------|
-| 1 | `tests/e2e/flows/` (additive) | None | Low | `PLAYWRIGHT_E2E=1` safe runner |
 | 2 | Merge `scripts/staging/*` from `staging` → `main` | `package.json` scripts | Medium | Manual staging E2E |
 | 3 | Move `playwright*.config.ts` → `playwright/` | CI workflow paths | Medium | Update workflow YAML |
 | 4 | Group `tests/authority-*` → `tests/authority/` | Vitest glob unchanged if `tests/**` | Low | `pnpm test` |
