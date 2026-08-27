@@ -1,5 +1,5 @@
 import type { RequestHandler } from "express";
-import { db, equipment, scanLogs } from "../../../db.js";
+import { db, equipment } from "../../../db.js";
 import { and, eq, isNull, sql } from "drizzle-orm";
 import { invalidateAnalyticsCache } from "../../../lib/analytics-cache.js";
 import { logAudit, resolveAuditActorRole } from "../../../lib/audit.js";
@@ -55,6 +55,15 @@ export const postEquipmentRevertHandler: RequestHandler = async (req, res) => {
             checkedOutByEmail: prev.checkedOutByEmail,
             checkedOutAt: prev.checkedOutAt ? new Date(prev.checkedOutAt) : null,
             checkedOutLocation: prev.checkedOutLocation,
+            // Checkout writes custody/usage state alongside the holder columns;
+            // restoring the holder without these leaves a row that renders
+            // "checked out" with nobody holding it and no return action.
+            custodyState: prev.custodyState,
+            custodyStateSince: prev.custodyStateSince ? new Date(prev.custodyStateSince) : null,
+            readinessState: prev.readinessState,
+            readinessStateSince: prev.readinessStateSince ? new Date(prev.readinessStateSince) : null,
+            usageState: prev.usageState,
+            usageStateSince: prev.usageStateSince ? new Date(prev.usageStateSince) : null,
             version: sql`${equipment.version} + 1`,
           })
           .where(
@@ -72,15 +81,12 @@ export const postEquipmentRevertHandler: RequestHandler = async (req, res) => {
 
         updated = result;
 
-        await tx
-          .delete(scanLogs)
-          .where(
-            and(
-              eq(scanLogs.clinicId, clinicId),
-              eq(scanLogs.id, token.scanLogId),
-              eq(scanLogs.equipmentId, req.params.id),
-            ),
-          );
+        // The scan log is deliberately kept. The scan really happened, and
+        // deleting it made History read "no scans yet" after a real custody
+        // event. `vt_audit_logs` carries both `equipment_checked_out` and
+        // `equipment_reverted`, so the honest history shows the event and its
+        // undo. "Scans today" therefore counts a withdrawn scan — correct, not
+        // a regression.
       });
     } catch (err) {
       if (err instanceof Error && err.message === "UNDO_TOKEN_INVALID") {
