@@ -151,7 +151,22 @@ describe(`${FILE} — a superseded scan response reaches no consumer`, () => {
     // which accepts an earlier response while a newer scan is still pending —
     // scan 5 answers, counter drops back to 5, and a third scan started in that
     // window posts 6 instead of 7.
-    const hits = inHandlers((n) => isMapMutation(n, "nfcItemCountsRef.current"));
+    //
+    // The per-tag fallback chain also bumps the counter to `newCount` at issue
+    // time inside its `.then` — that is not a response mutation and must not
+    // be mistaken for one.
+    const hits = inHandlers((n) => {
+      if (!isMapMutation(n, "nfcItemCountsRef.current")) return false;
+      if (
+        ts.isPropertyAccessExpression(n.expression) &&
+        n.expression.name.text === "set" &&
+        n.arguments.length >= 2 &&
+        n.arguments[1].getText(sourceFile) === "newCount"
+      ) {
+        return false;
+      }
+      return true;
+    });
     expect(hits.length).toBeGreaterThan(0);
     expect(hits.filter((h) => !h.guarded("issuedTicketByTagRef", "tagId")).map((h) => h.line)).toEqual([]);
   });
@@ -181,5 +196,91 @@ describe(`${FILE} — a superseded scan response reaches no consumer`, () => {
 
     expect(persists.length).toBe(1);
     expect(persists.filter((n) => !isUnderClaimGuard(n)).map(lineOf)).toEqual([]);
+  });
+});
+
+/**
+ * Negative coverage for the ownership-predicate checker itself. The production
+ * assertions above only fail when the live page regresses; these snippets prove
+ * the checker rejects the incomplete forms CodeRabbit named — a condition that
+ * merely mentions the ref, and a `noNewerIssued` call with the wrong ticket.
+ */
+describe("ownership predicate checker rejects incomplete guards", () => {
+  function parseSnippet(snippet: string): ts.SourceFile {
+    return ts.createSourceFile("snippet.tsx", snippet, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+  }
+
+  function mutationGuarded(
+    snippet: string,
+    mutationName: string,
+    ref: string,
+    key: string,
+  ): boolean {
+    const sf = parseSnippet(snippet);
+    function walkSf(node: ts.Node, visit: (n: ts.Node) => void): void {
+      visit(node);
+      node.forEachChild((child) => walkSf(child, visit));
+    }
+    let mutation: ts.CallExpression | undefined;
+    walkSf(sf, (n) => {
+      if (!ts.isCallExpression(n)) return;
+      if (ts.isIdentifier(n.expression) && n.expression.text === mutationName) {
+        mutation = n;
+      }
+    });
+    if (!mutation) throw new Error(`mutation ${mutationName} not found in snippet`);
+    for (let p: ts.Node | undefined = mutation.parent; p; p = p.parent) {
+      if (!ts.isIfStatement(p)) continue;
+      let ok = false;
+      walkSf(p.expression, (n) => {
+        if (!ts.isCallExpression(n)) return;
+        if (!ts.isIdentifier(n.expression) || n.expression.text !== "noNewerIssued") return;
+        if (n.arguments.length !== 3) return;
+        const args = n.arguments.map((a) => a.getText(sf));
+        if (args[0] !== `${ref}.current` || args[1] !== key || args[2] !== "writeTicket") return;
+        ok = true;
+      });
+      if (ok) return true;
+    }
+    return false;
+  }
+
+  it("rejects a condition that only names the ticket map", () => {
+    const weak = `
+      .then((result) => {
+        if (issuedTicketByCodeRef.current) {
+          setOptimisticActualByCode((prev) => ({ ...prev, [result.item.code]: result.observedQuantity }));
+        }
+      })
+    `;
+    expect(mutationGuarded(weak, "setOptimisticActualByCode", "issuedTicketByCodeRef", "result.item.code")).toBe(
+      false,
+    );
+  });
+
+  it("rejects a noNewerIssued call that does not validate writeTicket", () => {
+    const wrongTicket = `
+      .then((result) => {
+        if (noNewerIssued(issuedTicketByCodeRef.current, result.item.code, 0)) {
+          setOptimisticActualByCode((prev) => ({ ...prev, [result.item.code]: result.observedQuantity }));
+        }
+      })
+    `;
+    expect(
+      mutationGuarded(wrongTicket, "setOptimisticActualByCode", "issuedTicketByCodeRef", "result.item.code"),
+    ).toBe(false);
+  });
+
+  it("accepts the full ownership predicate", () => {
+    const full = `
+      .then((result) => {
+        if (noNewerIssued(issuedTicketByCodeRef.current, result.item.code, writeTicket)) {
+          setOptimisticActualByCode((prev) => ({ ...prev, [result.item.code]: result.observedQuantity }));
+        }
+      })
+    `;
+    expect(mutationGuarded(full, "setOptimisticActualByCode", "issuedTicketByCodeRef", "result.item.code")).toBe(
+      true,
+    );
   });
 });

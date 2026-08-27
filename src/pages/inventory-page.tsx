@@ -194,6 +194,16 @@ export default function InventoryPage() {
   // Monotonically-increasing observed count per NFC tag for the current session.
   // Using a ref so updates don't trigger re-renders. Cleared when session changes.
   const nfcItemCountsRef = useRef<Map<string, number>>(new Map<string, number>());
+  // Fallback NFC writes for one unresolved tag must not race: a later tap's
+  // code is unknown until a response lands, so concurrent issue lets an earlier
+  // response set the row baseline while a newer tag write is still pending.
+  // Chain per tagId; different tags stay concurrent. Cleared with the session.
+  const fallbackNfcChainByTagRef = useRef(new Map<string, Promise<void>>());
+  // Once a fallback response resolves the item, later chained taps for that
+  // tag route through scanLine so the row bumps optimistically at issue time.
+  const nfcTagResolvedItemRef = useRef(
+    new Map<string, { itemId: string; code: string; label: string }>(),
+  );
   // Stable ref to the latest handleNFCTag — avoids stale closure in ndef.onreading.
   const handleNFCTagRef = useRef<(tagId: string) => void>(() => {});
 
@@ -205,6 +215,8 @@ export default function InventoryPage() {
   // merges any layout.tsx seed (layout→inventory NFC transition).
   useEffect(() => {
     nfcItemCountsRef.current.clear();
+    fallbackNfcChainByTagRef.current.clear();
+    nfcTagResolvedItemRef.current.clear();
     if (!sessionState.activeSessionId) {
       safeStorageRemoveItem("vt_nfc_counts", "session");
       return;
@@ -680,87 +692,129 @@ export default function InventoryPage() {
     // Fallback: item tag found in NFC table but not yet resolved in cache — direct scan path.
     // Abort if cache is cold to avoid sending observedQuantity from a zero baseline.
     if (!detailsQ.data) { toast.error(p.openSessionFirst); return; }
-    const prevCount = nfcItemCountsRef.current.get(tagId) ?? (cachedLine?.sessionObservedQuantity ?? cachedLine?.actual ?? 0);
-    const newCount = prevCount + 1;
-    nfcItemCountsRef.current.set(tagId, newCount);
-    dispatch({ type: "scan-request" });
-    // Same ordering rule as scanLine — this path awaits its scan too, so its
-    // count can be superseded by a row tap or inline edit that lands first.
-    const writeTicket = ++writeTicketRef.current;
-    issuedTicketByTagRef.current.set(tagId, writeTicket);
-    scanMut
-      .mutateAsync({ sessionId, nfcTagId: tagId, observedQuantity: newCount })
-      .then((result) => {
-        // Three writes, three different questions — this is the whole ordering
-        // rule in one place. The CACHE holds server-confirmed values, so it is
-        // ordered by what LANDED (`claimLatestWrite`). The NFC counter and the
-        // row's optimistic quantity both feed the NEXT request, so they defer
-        // to what was ISSUED, in their own keyspaces: tag for the counter, code
-        // for the row. Collapsing all three onto `claimLatestWrite` is what let
-        // an earlier response reset a baseline a pending scan already owned.
-        if (claimLatestWrite(result.item.code, writeTicket)) {
-          // The counter is the baseline for the NEXT scan of this TAG, so it
-          // defers to what was issued, not to what landed. `claimLatestWrite`
-          // alone accepts an earlier response while a newer scan is still in
-          // flight: 5 answers, the counter drops back to 5, and a third scan
-          // started in that window posts 6 instead of 7.
+    // Serialize per tagId. Concurrent taps on the same unresolved tag used to
+    // race: only `issuedTicketByTagRef` advanced at issue time, so an earlier
+    // response could set the row (optimistic + landed cache) while a newer tag
+    // write was still pending, and a later +1 submitted from that stale
+    // baseline. prevCount/newCount must be computed INSIDE the chain. Different
+    // tags stay concurrent; scanLine is untouched.
+    const prior = fallbackNfcChainByTagRef.current.get(tagId) ?? Promise.resolve();
+    const chained = prior.catch(() => {}).then(async () => {
+      const resolved = nfcTagResolvedItemRef.current.get(tagId);
+      if (resolved) {
+        await scanLine(resolved.itemId, resolved.code, resolved.label, { kind: "relative", delta: 1 });
+        return;
+      }
+      const liveDetails = selectedId
+        ? qc.getQueryData<ContainerItemsResponse>(["/api/restock/container-items", selectedId])
+        : undefined;
+      const liveLine = liveDetails?.lines.find((l) => l.nfcTagId === tagId);
+      if (liveLine?.itemId && liveLine.code) {
+        nfcTagResolvedItemRef.current.set(tagId, {
+          itemId: liveLine.itemId,
+          code: liveLine.code,
+          label: liveLine.label,
+        });
+        await scanLine(liveLine.itemId, liveLine.code, liveLine.label, { kind: "relative", delta: 1 });
+        return;
+      }
+
+      const prevCount =
+        nfcItemCountsRef.current.get(tagId) ??
+        (liveLine?.sessionObservedQuantity ?? liveLine?.actual ?? 0);
+      const newCount = prevCount + 1;
+      nfcItemCountsRef.current.set(tagId, newCount);
+      dispatch({ type: "scan-request" });
+      // Same ordering rule as scanLine — this path awaits its scan too, so its
+      // count can be superseded by a row tap or inline edit that lands first.
+      const writeTicket = ++writeTicketRef.current;
+      issuedTicketByTagRef.current.set(tagId, writeTicket);
+      await scanMut
+        .mutateAsync({ sessionId, nfcTagId: tagId, observedQuantity: newCount })
+        .then((result) => {
+          nfcTagResolvedItemRef.current.set(tagId, {
+            itemId: result.item.id,
+            code: result.item.code,
+            label: result.item.label,
+          });
+          // Three writes, three different questions — this is the whole ordering
+          // rule in one place. The CACHE holds server-confirmed values, so it is
+          // ordered by what LANDED (`claimLatestWrite`). The NFC counter and the
+          // row's optimistic quantity both feed the NEXT request, so they defer
+          // to what was ISSUED, in their own keyspaces: tag for the counter, code
+          // for the row. Collapsing all three onto `claimLatestWrite` is what let
+          // an earlier response reset a baseline a pending scan already owned.
+          if (claimLatestWrite(result.item.code, writeTicket)) {
+            // The counter is the baseline for the NEXT scan of this TAG, so it
+            // defers to what was issued, not to what landed. `claimLatestWrite`
+            // alone accepts an earlier response while a newer scan is still in
+            // flight: 5 answers, the counter drops back to 5, and a third scan
+            // started in that window posts 6 instead of 7.
+            if (noNewerIssued(issuedTicketByTagRef.current, tagId, writeTicket)) {
+              nfcItemCountsRef.current.set(tagId, result.observedQuantity);
+              // Persist counts so they survive a page reload within the same session.
+              // sessionStorage is tab-scoped and is automatically cleared on tab close.
+              if (sessionIdRef.current) {
+                const countsObj: Record<string, number> = {};
+                nfcItemCountsRef.current.forEach((v, k) => { countsObj[k] = v; });
+                safeStorageSetItem(
+                  "vt_nfc_counts",
+                  JSON.stringify({ sessionId: sessionIdRef.current, counts: countsObj }),
+                  "session"
+                );
+              }
+            }
+            // Same rule in the other keyspace: the ROW is keyed by code, and an
+            // inline edit already issued against it owns what the row shows.
+            if (noNewerIssued(issuedTicketByCodeRef.current, result.item.code, writeTicket)) {
+              setOptimisticActualByCode((prev) => ({ ...prev, [result.item.code]: result.observedQuantity }));
+            }
+            qc.setQueryData<ContainerItemsResponse>(
+              ["/api/restock/container-items", selectedId ?? ""],
+              (old) => {
+                if (!old) return old;
+                return {
+                  ...old,
+                  lines: old.lines.map((l) =>
+                    l.itemId === result.item.id
+                      ? { ...l, actual: result.observedQuantity, sessionObservedQuantity: result.observedQuantity }
+                      : l
+                  ),
+                };
+              }
+            );
+          }
+          showScanOverlay(result.item.label, 1);
+          haptics.tap();
+          setScanGeneration((g) => g + 1);
+        })
+        .catch(() => {
+          // Same rule as scanLine's rollback, and for the same reason: undo only
+          // while this write still owns the tag's baseline. Restoring `prevCount`
+          // unconditionally is what let a FAILING earlier scan walk the counter
+          // backwards past a newer one that had already succeeded — post 5, post
+          // 6, the 6 lands, the 5 rejects, counter back to 4, next scan posts 5
+          // over a server holding 6.
+          //
+          // And it DROPS the entry rather than restoring a number, so the next
+          // read falls back to the cached line (see `prevCount` above) — which is
+          // what actually succeeded. Restoring is wrong whenever a second scan
+          // for the tag also failed: each would restore its own stale baseline.
           if (noNewerIssued(issuedTicketByTagRef.current, tagId, writeTicket)) {
-            nfcItemCountsRef.current.set(tagId, result.observedQuantity);
-            // Persist counts so they survive a page reload within the same session.
-            // sessionStorage is tab-scoped and is automatically cleared on tab close.
-            if (sessionIdRef.current) {
-              const countsObj: Record<string, number> = {};
-              nfcItemCountsRef.current.forEach((v, k) => { countsObj[k] = v; });
-              safeStorageSetItem(
-                "vt_nfc_counts",
-                JSON.stringify({ sessionId: sessionIdRef.current, counts: countsObj }),
-                "session"
-              );
-            }
+            nfcItemCountsRef.current.delete(tagId);
           }
-          // Same rule in the other keyspace: the ROW is keyed by code, and an
-          // inline edit already issued against it owns what the row shows.
-          if (noNewerIssued(issuedTicketByCodeRef.current, result.item.code, writeTicket)) {
-            setOptimisticActualByCode((prev) => ({ ...prev, [result.item.code]: result.observedQuantity }));
-          }
-          qc.setQueryData<ContainerItemsResponse>(
-            ["/api/restock/container-items", selectedId ?? ""],
-            (old) => {
-              if (!old) return old;
-              return {
-                ...old,
-                lines: old.lines.map((l) =>
-                  l.itemId === result.item.id
-                    ? { ...l, actual: result.observedQuantity, sessionObservedQuantity: result.observedQuantity }
-                    : l
-                ),
-              };
-            }
-          );
-        }
-        showScanOverlay(result.item.label, 1);
-        haptics.tap();
-        setScanGeneration((g) => g + 1);
-      })
-      .catch(() => {
-        // Same rule as scanLine's rollback, and for the same reason: undo only
-        // while this write still owns the tag's baseline. Restoring `prevCount`
-        // unconditionally is what let a FAILING earlier scan walk the counter
-        // backwards past a newer one that had already succeeded — post 5, post
-        // 6, the 6 lands, the 5 rejects, counter back to 4, next scan posts 5
-        // over a server holding 6.
-        //
-        // And it DROPS the entry rather than restoring a number, so the next
-        // read falls back to the cached line (see `prevCount` above) — which is
-        // what actually succeeded. Restoring is wrong whenever a second scan
-        // for the tag also failed: each would restore its own stale baseline.
-        if (noNewerIssued(issuedTicketByTagRef.current, tagId, writeTicket)) {
-          nfcItemCountsRef.current.delete(tagId);
-        }
-        showScanOverlay(p.unknownNfcTag, null);
-        haptics.error();
-      });
-  }, [claimLatestWrite, containersQ.data, detailsQ.data, isRestocking, selectedId, startSessionMut, scanMut, showScanOverlay, scanLine]);
+          showScanOverlay(p.unknownNfcTag, null);
+          haptics.error();
+        });
+    });
+    fallbackNfcChainByTagRef.current.set(
+      tagId,
+      chained.then(
+        () => undefined,
+        () => undefined,
+      ),
+    );
+  }, [claimLatestWrite, containersQ.data, detailsQ.data, isRestocking, p.finishRestockWarning, p.openSessionFirst, p.unknownNfcTag, qc, selectedId, startSessionMut, scanMut, showScanOverlay, scanLine]);
 
   // Keep ref pointing at the latest version — ndef.onreading uses the ref so it
   // is never bound to a stale closure when handleNFCTag deps change.
