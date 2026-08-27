@@ -1377,6 +1377,8 @@ export interface TStructure {
     loadFailed: string;
     shiftLeaderboardLink: string;
     noScanActivity: string;
+    statusDistributionChartDesc: string;
+    scanActivityChartDesc: string;
     issueCountBadge: string;
   };
   monthlyReport: {
@@ -2095,6 +2097,7 @@ export interface TStructure {
     itemDeleteFailed: string;
     itemInUse: string;
     codeExists: string;
+    nfcTagExists: string;
     loadError: string;
     noItems: string;
     searchPlaceholder: string;

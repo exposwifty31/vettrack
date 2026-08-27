@@ -2,7 +2,7 @@
 // Desktop counterpart to the mobile NativeHeader gear dropdown (src/native/NativeHeader.tsx).
 // Kept self-contained rather than shared so the device-verified mobile header stays untouched;
 // both consume the same nav.* i18n keys and useSettings hook, so copy/behavior stay in lockstep.
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { Settings, Moon, Globe, User } from "lucide-react";
 import { ForwardChevron } from "@/components/ui/directional-chevron";
@@ -16,6 +16,7 @@ export function TopbarSettingsMenu() {
   const [open, setOpen] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
+  const panelId = useId();
 
   useEffect(() => {
     if (!open) return;
@@ -37,12 +38,15 @@ export function TopbarSettingsMenu() {
 
   return (
     <div className="relative">
+      {/* Disclosure, not a menu button — see TopbarManagementMenu for the full
+          reasoning. The panel here is a set of toggles and two navigations, so it
+          gets no landmark role either. */}
       <button
         ref={triggerRef}
         type="button"
         aria-label={t.nav.settings}
-        aria-haspopup="true"
         aria-expanded={open}
+        aria-controls={open ? panelId : undefined}
         onClick={() => setOpen((o) => !o)}
         className="flex items-center justify-center w-7 h-7 rounded-full text-white/70 hover:text-white transition-colors"
       >
@@ -56,8 +60,13 @@ export function TopbarSettingsMenu() {
             onClick={() => setOpen(false)}
             className="fixed inset-0 z-40"
           />
+          {/* role="group" (not a landmark) so the aria-label below is an actual
+              accessible name — on a role-less div it computes to nothing, and the
+              panel takes focus on open. */}
           <div
             ref={panelRef}
+            id={panelId}
+            role="group"
             tabIndex={-1}
             aria-label={t.nav.quickSettings}
             className="absolute z-50 mt-2 w-64 end-0 rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--popover))] text-[hsl(var(--popover-foreground))] shadow-[0_18px_48px_rgba(0,0,0,0.22)] p-1.5 outline-none"
