@@ -26,6 +26,13 @@ export interface AuthUser {
   clerkId: string;
   email: string;
   name: string;
+  /**
+   * vt_users.display_name — the user-chosen label, NOT NULL DEFAULT ''.
+   * Required so every AuthUser construction site is forced to carry it:
+   * `GET /api/users/me` responds with `{ ...req.authUser }`, so a field missing
+   * here is a field the client can never read back after PATCH /:id/display_name.
+   */
+  displayName: string;
   role: UserRole;
   secondaryRole?: string | null;
   status: string;
@@ -130,6 +137,7 @@ const DEV_USER: AuthUser = {
   clerkId: "dev-admin-001",
   email: "admin@vettrack.dev",
   name: "Dev Admin",
+  displayName: "Dev Admin",
   role: "admin",
   status: "active",
   clinicId: "dev-clinic-default",
@@ -235,6 +243,7 @@ async function ensureDevUserRecord(devUser: AuthUser): Promise<AuthUser> {
     clerkId: row.clerkId,
     email: row.email,
     name: row.name,
+    displayName: row.displayName,
     role: normalizeUserRole(row.role),
     status: row.status,
     clinicId: devUser.clinicId,
@@ -635,6 +644,7 @@ export async function resolveAuthUser(req: Request): Promise<ResolveResult> {
       clerkId: user.clerkId,
       email: user.email,
       name: user.name,
+      displayName: user.displayName,
       role: normalizeUserRole(user.role),
       secondaryRole: user.secondaryRole ?? null,
       status: user.status,
