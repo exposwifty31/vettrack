@@ -80,6 +80,57 @@ describe(`${FILE} — a superseded scan response reaches no consumer`, () => {
     expect(unguarded).toEqual([]);
   });
 
+  it("mutates the NFC counter from a response handler only under an ownership guard", () => {
+    // Both directions of the same rule. The success side used to sync above the
+    // guard; the FAILURE side restored `prevCount` unconditionally, so with two
+    // fallback scans posting 5 and 6 where the 6 succeeds and the 5 then fails,
+    // the counter fell back to 4 and the next scan posted 5 over a server that
+    // already held 6. A response that lost the race is stale whether it
+    // resolved or rejected.
+    const GUARD_NAMES = ["claimLatestWrite", "issuedTicketByTagRef"];
+
+    function isUnderOwnershipGuard(node: ts.Node, stopAt: ts.Node): boolean {
+      for (let p: ts.Node | undefined = node.parent; p && p !== stopAt.parent; p = p.parent) {
+        if (!ts.isIfStatement(p)) continue;
+        let named = false;
+        walk(p.expression, (n) => {
+          if (ts.isIdentifier(n) && GUARD_NAMES.includes(n.text)) named = true;
+        });
+        if (named) return true;
+      }
+      return false;
+    }
+
+    const handlers: ts.Node[] = [];
+    walk(sourceFile, (n) => {
+      if (!ts.isCallExpression(n)) return;
+      const callee = n.expression;
+      if (!ts.isPropertyAccessExpression(callee)) return;
+      if (callee.name.text !== "then" && callee.name.text !== "catch") return;
+      for (const arg of n.arguments) {
+        if (ts.isArrowFunction(arg) || ts.isFunctionExpression(arg)) handlers.push(arg);
+      }
+    });
+
+    const unguarded: number[] = [];
+    let mutations = 0;
+    for (const handler of handlers) {
+      walk(handler, (n) => {
+        if (!ts.isCallExpression(n) || !ts.isPropertyAccessExpression(n.expression)) return;
+        const method = n.expression.name.text;
+        if (method !== "set" && method !== "delete") return;
+        if (!n.expression.expression.getText(sourceFile).startsWith("nfcItemCountsRef.current")) return;
+        mutations += 1;
+        if (!isUnderOwnershipGuard(n, handler)) unguarded.push(lineOf(n));
+      });
+    }
+
+    // Guard the guard: if the handlers stop mutating the counter entirely, the
+    // assertion below would pass on an empty set and prove nothing.
+    expect(mutations).toBeGreaterThan(0);
+    expect(unguarded).toEqual([]);
+  });
+
   it("persists the NFC counter map only from inside that guard", () => {
     const persists: ts.CallExpression[] = [];
     walk(sourceFile, (n) => {

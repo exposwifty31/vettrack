@@ -406,6 +406,10 @@ export default function InventoryPage() {
   // is still in flight sees an empty applied map, out-ranks nothing, and writes
   // its stale pre-await value over a row the pending write already owns.
   const issuedTicketByCodeRef = useRef<Map<string, number>>(new Map<string, number>());
+  // The NFC fallback path needs the same ownership answer keyed by TAG: it is
+  // the only key it holds when it issues, because the item code arrives with
+  // the response — that is what makes it the fallback path.
+  const issuedTicketByTagRef = useRef<Map<string, number>>(new Map<string, number>());
 
   /**
    * Claims the right to apply this write's result for `itemId`, returning false
@@ -679,6 +683,7 @@ export default function InventoryPage() {
     // Same ordering rule as scanLine — this path awaits its scan too, so its
     // count can be superseded by a row tap or inline edit that lands first.
     const writeTicket = ++writeTicketRef.current;
+    issuedTicketByTagRef.current.set(tagId, writeTicket);
     scanMut
       .mutateAsync({ sessionId, nfcTagId: tagId, observedQuantity: newCount })
       .then((result) => {
@@ -727,7 +732,20 @@ export default function InventoryPage() {
         setScanGeneration((g) => g + 1);
       })
       .catch(() => {
-        nfcItemCountsRef.current.set(tagId, prevCount);
+        // Same rule as scanLine's rollback, and for the same reason: undo only
+        // while this write still owns the tag's baseline. Restoring `prevCount`
+        // unconditionally is what let a FAILING earlier scan walk the counter
+        // backwards past a newer one that had already succeeded — post 5, post
+        // 6, the 6 lands, the 5 rejects, counter back to 4, next scan posts 5
+        // over a server holding 6.
+        //
+        // And it DROPS the entry rather than restoring a number, so the next
+        // read falls back to the cached line (see `prevCount` above) — which is
+        // what actually succeeded. Restoring is wrong whenever a second scan
+        // for the tag also failed: each would restore its own stale baseline.
+        if (issuedTicketByTagRef.current.get(tagId) === writeTicket) {
+          nfcItemCountsRef.current.delete(tagId);
+        }
         showScanOverlay(p.unknownNfcTag, null);
         haptics.error();
       });
