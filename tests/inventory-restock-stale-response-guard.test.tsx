@@ -188,6 +188,49 @@ describe("InventoryPage — a late scan response cannot overwrite a newer count 
     });
   });
 
+  it("a FAILING earlier scan does not roll back over a newer count that succeeded", async () => {
+    // The mirror image of the test below, and the one the rollback paths get
+    // wrong when they are not ticket-gated. The success path claimed the write
+    // ticket; the two rollbacks did not, and both write the `currentValue`
+    // captured BEFORE their awaits.
+    //
+    //   1. tap Increment  -> captures currentValue 4, shows 5, scan hangs
+    //   2. inline count 7 -> succeeds, claims a higher ticket, row and cache 7
+    //   3. the tap's scan REJECTS -> ungated, it writes 4 back
+    //
+    // The row would then read 4 while server and cache hold 7 — and the S13a
+    // no-op predicate would swallow a re-commit of 7, so the technician could
+    // not restore the right number without a refetch.
+    let rejectIncrement: ((reason?: unknown) => void) | undefined;
+    scanMock.mockImplementationOnce(
+      () => new Promise((_resolve, reject) => { rejectIncrement = reject; }),
+    );
+    scanMock.mockImplementation((_sessionId: string, params: ScanParams) =>
+      Promise.resolve({
+        item: { id: "i1", code: "SKU1", label: "Saline" },
+        observedQuantity: params.observedQuantity,
+      }),
+    );
+
+    const { qc } = renderPage();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Increment Saline" }));
+    await waitFor(() => expect(scanMock).toHaveBeenCalledTimes(1));
+
+    await commitInlineCount("Saline", "7");
+    await waitFor(() => expect(scanMock).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(cachedLine(qc, "SKU1").sessionObservedQuantity).toBe(7));
+
+    rejectIncrement?.(new Error("network"));
+
+    // Settle on the syncing indicator clearing, not on a condition that already
+    // holds — see the note in the sibling test.
+    await waitFor(() => expect(screen.queryByText(/Syncing/i)).toBeNull());
+
+    expect(quantityButton("Saline").textContent).toBe("7");
+    expect(cachedLine(qc, "SKU1").sessionObservedQuantity).toBe(7);
+  });
+
   it("keeps the newer count in cache, so a later re-count to the superseded number is still posted", async () => {
     // The +1 tap's scan hangs; the inline-edited absolute 7 overtakes it.
     let resolveIncrement: ((value: unknown) => void) | undefined;
@@ -223,13 +266,18 @@ describe("InventoryPage — a late scan response cannot overwrite a newer count 
       item: { id: "i1", code: "SKU1", label: "Saline" },
       observedQuantity: 5,
     });
-    await waitFor(() => expect(scanMock).toHaveBeenCalledTimes(2));
+    // Wait on an OBSERVABLE EFFECT of the late response, not on a condition
+    // that already holds. `scanMock` had already been called twice before this
+    // resolve, and the cache already read 7 — so both of those barriers passed
+    // on their first poll and proved nothing about the late response being
+    // processed. `scanLine`'s `finally` clears rowPendingByCode, so the row's
+    // syncing indicator disappears only once the response has settled.
+    await waitFor(() => expect(screen.queryByText(/Syncing/i)).toBeNull());
 
-    // The cache must still describe the newest count the client sent.
-    await waitFor(() => {
-      expect(cachedLine(qc, "SKU1").sessionObservedQuantity).toBe(7);
-      expect(cachedLine(qc, "SKU1").actual).toBe(7);
-    });
+    // Now the assertion is load-bearing: the cache must still describe the
+    // NEWEST count, even though the late response carried the superseded 5.
+    expect(cachedLine(qc, "SKU1").sessionObservedQuantity).toBe(7);
+    expect(cachedLine(qc, "SKU1").actual).toBe(7);
 
     // The consumer that proves it: the user re-counts the row down to 5. That
     // is a real count the server has never recorded. With a stale cached

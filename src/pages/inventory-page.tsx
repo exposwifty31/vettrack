@@ -395,7 +395,11 @@ export default function InventoryPage() {
   // data to stay memoized (see the FIX note on its deps), and a state dep here
   // would undo exactly that.
   const writeTicketRef = useRef(0);
-  const appliedTicketByItemRef = useRef<Map<string, number>>(new Map<string, number>());
+  // Keyed by row CODE, not item id. `code` is what the optimistic state itself
+  // is keyed by (`optimisticActualByCode`), and it is the only key available on
+  // EVERY path — the session-failure rollback runs before `resolvedItemId`
+  // exists, so an id-keyed ticket could not guard it at all.
+  const appliedTicketByCodeRef = useRef<Map<string, number>>(new Map<string, number>());
 
   /**
    * Claims the right to apply this write's result for `itemId`, returning false
@@ -406,10 +410,10 @@ export default function InventoryPage() {
    * container is always lower than a live ticket and can never block one; the
    * map holds one number per item ever scanned in this page's lifetime.
    */
-  const claimLatestWrite = useCallback((itemId: string, ticket: number): boolean => {
-    const applied = appliedTicketByItemRef.current.get(itemId) ?? 0;
+  const claimLatestWrite = useCallback((code: string, ticket: number): boolean => {
+    const applied = appliedTicketByCodeRef.current.get(code) ?? 0;
     if (applied > ticket) return false;
-    appliedTicketByItemRef.current.set(itemId, ticket);
+    appliedTicketByCodeRef.current.set(code, ticket);
     return true;
   }, []);
 
@@ -441,8 +445,13 @@ export default function InventoryPage() {
       const sessionId = await getOrCreateSession();
 
       if (!sessionId) {
-        // Session failed — roll back
-        setOptimisticActualByCode((prev) => ({ ...prev, [code]: currentValue }));
+        // Session failed — roll back, but only if no LATER write has landed for
+        // this row. `currentValue` was captured before the await; writing it
+        // back unconditionally would undo a newer count that already succeeded
+        // and leave the row showing a number the server does not hold.
+        if (claimLatestWrite(code, writeTicket)) {
+          setOptimisticActualByCode((prev) => ({ ...prev, [code]: currentValue }));
+        }
         setRowPendingByCode((prev) => ({ ...prev, [code]: Math.max(0, (prev[code] ?? 1) - 1) }));
         return;
       }
@@ -495,7 +504,7 @@ export default function InventoryPage() {
         // either way. What must not regress is the persisted-quantity mirror:
         // `nextValue` was decided before this call's two awaits, so it may only
         // be written while no later-issued scan for this item has landed.
-        if (!claimLatestWrite(confirmedItemId, writeTicket)) return;
+        if (!claimLatestWrite(code, writeTicket)) return;
 
         // ── 4. Patch cache in-place — no network refetch ───────────────────
         // FIX: replaced invalidateQueries() here with setQueryData().
@@ -516,8 +525,12 @@ export default function InventoryPage() {
           }
         );
       } catch {
-        // Roll back optimistic value on any error
-        setOptimisticActualByCode((prev) => ({ ...prev, [code]: currentValue }));
+        // Roll back optimistic value on any error — same ticket gate as the
+        // session-failure path above and the success path below. A failing
+        // EARLIER scan must not overwrite a newer count that already landed.
+        if (claimLatestWrite(code, writeTicket)) {
+          setOptimisticActualByCode((prev) => ({ ...prev, [code]: currentValue }));
+        }
 
         if (resolvedItemId) {
           setFlashRowId({ id: resolvedItemId, type: "error" });
@@ -656,7 +669,7 @@ export default function InventoryPage() {
         // absolute count and doesn't regress the server value back toward 0.
         // Guarded by the write ticket: a response that lost the race carries a
         // superseded count, and applying it is what re-poisons that baseline.
-        if (claimLatestWrite(result.item.id, writeTicket)) {
+        if (claimLatestWrite(result.item.code, writeTicket)) {
           setOptimisticActualByCode((prev) => ({ ...prev, [result.item.code]: result.observedQuantity }));
           qc.setQueryData<ContainerItemsResponse>(
             ["/api/restock/container-items", selectedId ?? ""],
@@ -1071,7 +1084,7 @@ export default function InventoryPage() {
                                 size="icon"
                                 className="h-11 w-11 rounded-xl shrink-0 text-[var(--action)] border-[var(--action-border)]"
                                 disabled={otherUserHasSession || optimisticActual >= line.expected}
-                                onClick={() => scanLine(line.itemId, line.code, line.label, { kind: "relative", delta: line.expected - optimisticActual })}
+                                onClick={() => scanLine(line.itemId, line.code, line.label, { kind: "absolute", observedQuantity: line.expected })}
                                 aria-label={`Full restock ${line.label}`}
                               >
                                 <CheckCircle2 className="w-4 h-4" />
