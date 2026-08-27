@@ -70,6 +70,33 @@ export const patchEquipmentHandler: RequestHandler = async (req, res) => {
       );
     }
 
+    // Binding a physical sticker to an asset is an admin act. Both clients already
+    // hide the control (`showWriteNfc = isAdmin && …` on web, an admin check in the
+    // RN `NfcProvisionCard`), but this route only requires effective-role
+    // "technician" — a UI gate is not an authorization control. Keyed on `nfcTagId`
+    // alone: the console's edit form sends `rfidTagEpc` on every save, so widening
+    // this would 403 ordinary non-admin equipment edits.
+    //
+    // secondaryRole counts, unlike the identity-only `requireAdmin`: it is the
+    // account-RBAC admin flag, the console's `isAdmin` includes it, and
+    // `requireEffectiveRole` on this route already treats it as an admin bypass.
+    // Excluding it would show a secondary-admin the button, let them program the
+    // sticker, then 403 the bind — a written tag bound to nothing.
+    if (
+      nfcTagId !== undefined &&
+      req.authUser?.role !== "admin" &&
+      req.authUser?.secondaryRole !== "admin"
+    ) {
+      return res.status(403).json(
+        apiError({
+          code: "FORBIDDEN",
+          reason: "NFC_TAG_ID_ADMIN_ONLY",
+          message: "Only admins can bind or clear an NFC tag",
+          requestId,
+        }),
+      );
+    }
+
     let result: EquipmentRow | null = null;
     let versionConflict = false;
 
