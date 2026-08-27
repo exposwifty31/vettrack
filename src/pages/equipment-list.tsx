@@ -551,6 +551,8 @@ function EquipmentListPageDesktop() {
             {STATUS_OPTIONS.map((opt) => (
               <button
                 key={opt.value}
+                type="button"
+                aria-pressed={statusFilter === opt.value}
                 onClick={() => setStatusFilter(opt.value)}
                 className={`shrink-0 flex items-center px-3 min-h-[44px] rounded-full vt-text-xs font-medium border transition-colors whitespace-nowrap ${
                   statusFilter === opt.value
@@ -565,6 +567,7 @@ function EquipmentListPageDesktop() {
             {isEquipmentRecoveryUiEnabled && (
               <button
                 type="button"
+                aria-pressed={recoveryAttentionFilterActive}
                 onClick={() => {
                   setRecoveryAttentionFilterActive((prev) => !prev);
                   setPage(1);

@@ -29,8 +29,11 @@ export function WebOnlyGuard({ children, fallback = "/home" }: Props) {
 
   if (!isDesktop) {
     return (
+      // z-[70] clears the shift-chat launcher (FAB z-[60], panel z-[65]): at z-50
+      // the chat floated over the very screen that says this surface is
+      // unavailable at this width.
       <div
-        className="dark fixed inset-0 z-50 flex flex-col items-center justify-center gap-5 bg-background px-8 text-center text-foreground"
+        className="dark fixed inset-0 z-[70] flex flex-col items-center justify-center gap-5 bg-background px-8 text-center text-foreground"
         data-testid="web-only-guard-screen"
       >
         <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-border bg-muted/40 text-muted-foreground">

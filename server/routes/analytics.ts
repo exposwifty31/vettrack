@@ -29,6 +29,25 @@ import { getReadinessForecast } from "../services/readiness-forecast.service.js"
 
 const router = Router();
 
+/**
+ * `statusBreakdown.inactive` — same column and same window as the alert bell
+ * (src/lib/utils.ts isInactive) and the reminder sweep
+ * (server/lib/alert-reminder.ts isAlertStillActive).
+ *
+ * Reads `lastVerifiedAt`, not `lastSeen`: custody mutations write `lastSeen`, so
+ * the KPI used to fall as soon as equipment was handled rather than verified,
+ * and disagreed with the count the bell was showing on the same fleet.
+ *
+ * Exported so the rule is testable without standing up the route.
+ */
+export function isEquipmentInactive(
+  row: { lastVerifiedAt: Date | string | null },
+  now: Date,
+): boolean {
+  if (!row.lastVerifiedAt) return true;
+  return new Date(row.lastVerifiedAt) < subDays(now, INACTIVE_THRESHOLD_DAYS);
+}
+
 
 
 router.get("/", requireAuth, requireEffectiveRole("student"), async (req, res) => {
@@ -57,7 +76,6 @@ router.get("/", requireAuth, requireEffectiveRole("student"), async (req, res) =
     };
 
     const now = new Date();
-    const inactiveCutoff = subDays(now, INACTIVE_THRESHOLD_DAYS);
     const sevenDaysAgo = subDays(now, 7);
 
     for (const item of allEquipment) {
@@ -72,7 +90,7 @@ router.get("/", requireAuth, requireEffectiveRole("student"), async (req, res) =
         if (now > dueDate) statusBreakdown.overdue++;
       }
 
-      if (!item.lastSeen || new Date(item.lastSeen) < inactiveCutoff) {
+      if (isEquipmentInactive(item, now)) {
         statusBreakdown.inactive++;
       }
     }

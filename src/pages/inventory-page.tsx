@@ -43,6 +43,16 @@ import { safeStorageGetItem, safeStorageRemoveItem, safeStorageSetItem } from "@
 // exported from @/types already, import it from there instead.
 type ContainerItemsResponse = Awaited<ReturnType<typeof api.restock.containerItems>>;
 
+// How a caller expresses the quantity change it wants scanLine to persist.
+// `relative` is a nudge off whatever the row currently shows (+1, -1, fill to
+// expected); `absolute` is a counted quantity the user stated outright. The
+// distinction is load-bearing: a relative change has to be resolved against the
+// live optimistic value at call time, while an absolute one must survive
+// untouched — resolving it against anything is how a typed 7 became a persisted 8.
+type RestockQuantityChange =
+  | { kind: "relative"; delta: number }
+  | { kind: "absolute"; observedQuantity: number };
+
 function containerDotClass(container: InventoryContainer): string {
   if (container.targetQuantity === 0) return "bg-muted-foreground";
   const ratio = container.currentQuantity / container.targetQuantity;
@@ -318,6 +328,16 @@ export default function InventoryPage() {
     onError: (err) => {
       // Phase 5 PR 5.4 — diagnostic logging; see scanMut.onError above.
       console.error("[restock] finish failed", err);
+      // NO_ITEMS_COUNTED is not a fault — the server refused to close a session
+      // that counted nothing. "Please try again" is wrong guidance there (a
+      // retry can never succeed), so it gets its own actionable message and no
+      // request-id suffix, which would frame user guidance as something to report.
+      if (err instanceof ApiError && err.code === "NO_ITEMS_COUNTED") {
+        const message = p.finishSessionNoItems;
+        dispatch({ type: "failure", payload: { message } });
+        toast.error(message);
+        return;
+      }
       const fallback = p.finishSessionFailed;
       const requestId = err instanceof ApiError ? err.requestId : undefined;
       const display = requestId ? p.errorWithRequestId(fallback, requestId) : fallback;
@@ -358,15 +378,59 @@ export default function InventoryPage() {
     return promise;
   }, [selectedId, startSessionMut]);
 
+  // ── write ordering ────────────────────────────────────────────────────────
+  // Every restock write decides its quantity BEFORE it awaits, so the order the
+  // network answers in is not the order the user acted in: a call issued first
+  // can come back last and patch its superseded count over a newer one. The
+  // damage is invisible — rows render `optimisticActualByCode`, which still
+  // holds the newest number — and surfaces one interaction later in
+  // `commitInlineEdit`, where a stale cached `sessionObservedQuantity` makes a
+  // genuine re-count to that number look like an already-recorded no-op and
+  // silently drops it.
+  //
+  // So each write takes a monotonic ticket before its first await and may only
+  // apply its result if no higher-numbered ticket for the SAME item has applied
+  // already. Per item, because two rows scanned at once are not a race.
+  // Refs rather than state: `scanLine`'s dep array deliberately excludes cache
+  // data to stay memoized (see the FIX note on its deps), and a state dep here
+  // would undo exactly that.
+  const writeTicketRef = useRef(0);
+  const appliedTicketByItemRef = useRef<Map<string, number>>(new Map<string, number>());
+
+  /**
+   * Claims the right to apply this write's result for `itemId`, returning false
+   * when a later-issued write for that item already landed — the caller then
+   * drops its patch instead of resurrecting a superseded quantity.
+   *
+   * The ticket counter never resets, so an entry left behind by a previous
+   * container is always lower than a live ticket and can never block one; the
+   * map holds one number per item ever scanned in this page's lifetime.
+   */
+  const claimLatestWrite = useCallback((itemId: string, ticket: number): boolean => {
+    const applied = appliedTicketByItemRef.current.get(itemId) ?? 0;
+    if (applied > ticket) return false;
+    appliedTicketByItemRef.current.set(itemId, ticket);
+    return true;
+  }, []);
+
   // ── scan line ─────────────────────────────────────────────────────────────
 
   const scanLine = useCallback(
-    async (itemId: string | null, code: string, label: string, delta: number) => {
+    async (itemId: string | null, code: string, label: string, change: RestockQuantityChange) => {
       if (!selectedId) return;
+
+      // Taken before any await, so ordering follows when the write was ISSUED.
+      const writeTicket = ++writeTicketRef.current;
 
       // ── 1. Instant optimistic update (synchronous, <1ms) ──────────────────
       const currentValue = optimisticActualByCode[code] ?? lines.find((l) => l.code === code)?.actual ?? 0;
-      const nextValue = Math.max(0, currentValue + delta);
+      const nextValue =
+        change.kind === "absolute"
+          ? Math.max(0, change.observedQuantity)
+          : Math.max(0, currentValue + change.delta);
+      // What the row actually moves by — the overlay reports the movement the
+      // user sees, which for an absolute count is not the number they typed.
+      const delta = nextValue - currentValue;
 
       setOptimisticActualByCode((prev) => ({ ...prev, [code]: nextValue }));
       setRowPendingByCode((prev) => ({ ...prev, [code]: (prev[code] ?? 0) + 1 }));
@@ -427,6 +491,12 @@ export default function InventoryPage() {
         showScanOverlay(name, delta);
         setScanGeneration((g) => g + 1);
 
+        // The scan itself succeeded, so the acknowledgement above is truthful
+        // either way. What must not regress is the persisted-quantity mirror:
+        // `nextValue` was decided before this call's two awaits, so it may only
+        // be written while no later-issued scan for this item has landed.
+        if (!claimLatestWrite(confirmedItemId, writeTicket)) return;
+
         // ── 4. Patch cache in-place — no network refetch ───────────────────
         // FIX: replaced invalidateQueries() here with setQueryData().
         // invalidateQueries was causing a full refetch on every tap, which
@@ -465,6 +535,7 @@ export default function InventoryPage() {
       }
     },
     [
+      claimLatestWrite,
       getOrCreateSession,
       lines,
       optimisticActualByCode,
@@ -483,15 +554,26 @@ export default function InventoryPage() {
   const startInlineEdit = useCallback((line: RestockContainerLine) => {
     if (!line.itemId || otherUserHasSession) return;
     setEditingCode(line.code);
-    setEditValue(String(line.actual));
+    // Seed from the value the ROW IS SHOWING, not the raw cache value. While a
+    // tap's scan is in flight the two differ, and seeding from the cache put the
+    // editor in a different reference frame than the number the user is reading.
+    setEditValue(String(optimisticActualByCode[line.code] ?? line.actual));
     setTimeout(() => editInputRef.current?.select(), 30);
-  }, [otherUserHasSession]);
+  }, [optimisticActualByCode, otherUserHasSession]);
 
   const commitInlineEdit = useCallback(async (line: RestockContainerLine) => {
     setEditingCode(null);
     const parsed = parseInt(editValue, 10);
-    if (isNaN(parsed) || parsed < 0 || parsed === line.actual) return;
-    await scanLine(line.itemId, line.code, line.label, parsed - line.actual);
+    if (isNaN(parsed) || parsed < 0) return;
+    // A count that merely equals the HELD stock is still a count: recording it
+    // is what separates "counted, and it matched" from "never counted". The one
+    // genuine no-op is a count the server has ALREADY recorded this session, so
+    // re-committing the same number doesn't re-post it.
+    if (line.sessionObservedQuantity != null && parsed === line.sessionObservedQuantity) return;
+    // An inline edit is a stated count, not a nudge: post it as-is. Deriving a
+    // delta here and applying it against the optimistic base later is what made
+    // the persisted quantity drift from the typed one.
+    await scanLine(line.itemId, line.code, line.label, { kind: "absolute", observedQuantity: parsed });
   }, [editValue, scanLine]);
 
   // ── tab selection ─────────────────────────────────────────────────────────
@@ -541,7 +623,7 @@ export default function InventoryPage() {
     if (!sessionId) { toast.error(p.openSessionFirst); return; }
     const cachedLine = detailsQ.data?.lines.find((l) => l.nfcTagId === tagId);
     if (cachedLine?.itemId && cachedLine.code) {
-      scanLine(cachedLine.itemId, cachedLine.code, cachedLine.label, 1);
+      scanLine(cachedLine.itemId, cachedLine.code, cachedLine.label, { kind: "relative", delta: 1 });
       return;
     }
     // Fallback: item tag found in NFC table but not yet resolved in cache — direct scan path.
@@ -551,6 +633,9 @@ export default function InventoryPage() {
     const newCount = prevCount + 1;
     nfcItemCountsRef.current.set(tagId, newCount);
     dispatch({ type: "scan-request" });
+    // Same ordering rule as scanLine — this path awaits its scan too, so its
+    // count can be superseded by a row tap or inline edit that lands first.
+    const writeTicket = ++writeTicketRef.current;
     scanMut
       .mutateAsync({ sessionId, nfcTagId: tagId, observedQuantity: newCount })
       .then((result) => {
@@ -569,21 +654,25 @@ export default function InventoryPage() {
         }
         // Sync manual-scan baseline so a subsequent scanLine tap uses the correct
         // absolute count and doesn't regress the server value back toward 0.
-        setOptimisticActualByCode((prev) => ({ ...prev, [result.item.code]: result.observedQuantity }));
-        qc.setQueryData<ContainerItemsResponse>(
-          ["/api/restock/container-items", selectedId ?? ""],
-          (old) => {
-            if (!old) return old;
-            return {
-              ...old,
-              lines: old.lines.map((l) =>
-                l.itemId === result.item.id
-                  ? { ...l, actual: result.observedQuantity, sessionObservedQuantity: result.observedQuantity }
-                  : l
-              ),
-            };
-          }
-        );
+        // Guarded by the write ticket: a response that lost the race carries a
+        // superseded count, and applying it is what re-poisons that baseline.
+        if (claimLatestWrite(result.item.id, writeTicket)) {
+          setOptimisticActualByCode((prev) => ({ ...prev, [result.item.code]: result.observedQuantity }));
+          qc.setQueryData<ContainerItemsResponse>(
+            ["/api/restock/container-items", selectedId ?? ""],
+            (old) => {
+              if (!old) return old;
+              return {
+                ...old,
+                lines: old.lines.map((l) =>
+                  l.itemId === result.item.id
+                    ? { ...l, actual: result.observedQuantity, sessionObservedQuantity: result.observedQuantity }
+                    : l
+                ),
+              };
+            }
+          );
+        }
         showScanOverlay(result.item.label, 1);
         haptics.tap();
         setScanGeneration((g) => g + 1);
@@ -593,7 +682,7 @@ export default function InventoryPage() {
         showScanOverlay(p.unknownNfcTag, null);
         haptics.error();
       });
-  }, [containersQ.data, detailsQ.data, isRestocking, selectedId, startSessionMut, scanMut, showScanOverlay, scanLine]);
+  }, [claimLatestWrite, containersQ.data, detailsQ.data, isRestocking, selectedId, startSessionMut, scanMut, showScanOverlay, scanLine]);
 
   // Keep ref pointing at the latest version — ndef.onreading uses the ref so it
   // is never bound to a stale closure when handleNFCTag deps change.
@@ -924,7 +1013,7 @@ export default function InventoryPage() {
                               size="icon"
                               className="h-11 w-11 rounded-xl shrink-0"
                               disabled={otherUserHasSession || pendingOps > 0}
-                              onClick={() => scanLine(line.itemId, line.code, line.label, -1)}
+                              onClick={() => scanLine(line.itemId, line.code, line.label, { kind: "relative", delta: -1 })}
                               aria-label={`Decrement ${line.label}`}
                             >
                               <Minus className="w-4 h-4" />
@@ -970,7 +1059,7 @@ export default function InventoryPage() {
                               size="icon"
                               className="h-11 w-11 rounded-xl shrink-0"
                               disabled={otherUserHasSession || pendingOps > 0}
-                              onClick={() => scanLine(line.itemId, line.code, line.label, +1)}
+                              onClick={() => scanLine(line.itemId, line.code, line.label, { kind: "relative", delta: +1 })}
                               aria-label={`Increment ${line.label}`}
                             >
                               <Plus className="w-4 h-4" />
@@ -982,7 +1071,7 @@ export default function InventoryPage() {
                                 size="icon"
                                 className="h-11 w-11 rounded-xl shrink-0 text-[var(--action)] border-[var(--action-border)]"
                                 disabled={otherUserHasSession || optimisticActual >= line.expected}
-                                onClick={() => scanLine(line.itemId, line.code, line.label, line.expected - optimisticActual)}
+                                onClick={() => scanLine(line.itemId, line.code, line.label, { kind: "relative", delta: line.expected - optimisticActual })}
                                 aria-label={`Full restock ${line.label}`}
                               >
                                 <CheckCircle2 className="w-4 h-4" />

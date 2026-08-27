@@ -22,7 +22,7 @@ const { equipmentList, acksList, homeDashboard, roomsList } = vi.hoisted(() => {
   const equipment = [
     // status "issue" → attention tier + urgent alert
     { id: "eq-issue", name: "Ventilator ICU-2", status: "issue" },
-    // never scanned → isInactive → not-verified readout
+    // no lastVerifiedAt → isInactive → not-verified readout
     { id: "eq-a", name: "Syringe pump 7", status: "ok" },
     { id: "eq-b", name: "Infusion pump 3", status: "ok" },
   ];
@@ -93,7 +93,8 @@ describe("HomeTabletDashboard — M3 iPad bento", () => {
 
   it("shows the Phase-2 not-verified readout from the same isInactive predicate", async () => {
     renderDashboard();
-    // All three fixtures have no scan timestamps → all not-verified.
+    // All three fixtures carry no lastVerifiedAt → all not-verified (S5b: the
+    // readout keys on verification, not on the last sighting).
     expect(await screen.findByText(t.equipmentList.verifiedSplit(0, 3, 14))).toBeTruthy();
   });
 
@@ -117,7 +118,7 @@ describe("HomeTabletDashboard — M3 iPad bento", () => {
   // the native EquipmentLargeTitle: when nothing is verified, the availability
   // figure must not paint the celebratory green even at 100%.
   it("does not celebrate 100% availability when nothing has been verified", async () => {
-    // All operational (no attention) but never scanned → 100% available, 0 verified.
+    // All operational (no attention) but never verified → 100% available, 0 verified.
     equipmentList.mockResolvedValueOnce([
       { id: "eq-a", name: "Syringe pump 7", status: "ok" },
       { id: "eq-b", name: "Infusion pump 3", status: "ok" },

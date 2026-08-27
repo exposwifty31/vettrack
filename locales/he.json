@@ -354,6 +354,7 @@
     "noContainers": "אין עגלות במערכת",
     "startSessionFailed": "לא ניתן להתחיל סשן מילוי — נסה שוב",
     "finishSessionFailed": "לא ניתן לסיים את המילוי — נסה שוב",
+    "finishSessionNoItems": "עדיין לא נספר דבר — ספור לפחות פריט אחד, או בטל את המילוי",
     "errorWithRequestId": "{message} (קוד תמיכה: {requestId})",
     "departments": {
       "hospital": "בית חולים",
@@ -1374,7 +1375,9 @@
     "loadFailed": "טעינת הנתונים נכשלה. נסה שוב.",
     "shiftLeaderboardLink": "לוח מובילים — סריקות משמרת",
     "noScanActivity": "אין פעילות סריקה ב־14 הימים האחרונים",
-    "issueCountBadge": "{count} תקלות"
+    "issueCountBadge": "{count} תקלות",
+    "statusDistributionChartDesc": "תרשים טבעת המציג כמה פריטי ציוד נמצאים בכל סטטוס: תקין, תקלה, תחזוקה ועבר חיטוי.",
+    "scanActivityChartDesc": "תרשים עמודות המציג כמה סריקות נרשמו בכל אחד מ־14 הימים האחרונים."
   },
   "monthlyReport": {
     "title": "דוח חודשי VetTrack",
@@ -1822,7 +1825,7 @@
     "tabSupport": "תמיכה",
     "tabLogs": "לוגים",
     "foldersTitle": "תיקיות",
-    "pendingUsersTitle": "ממתינים משתמשים",
+    "pendingUsersTitle": "משתמשים ממתינים",
     "pendingEmpty": "אין משתמשים ממתינים. כל ההרשמות נסקרו.",
     "usersTitle": "משתמשים",
     "folderCreated": "התיקייה נוצרה",
