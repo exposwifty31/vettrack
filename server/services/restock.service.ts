@@ -359,6 +359,18 @@ export async function finishSession(params: {
       }
     }
 
+    // Finishing a session that counted nothing would close it as a completed
+    // restock with zero counts — an uncounted container that reads as audited.
+    // Refuse before any mutation: the transaction rolls back, so the session
+    // stays active and can still be counted, or cancelled deliberately.
+    if (latestByItemId.size === 0) {
+      throw new RestockServiceError(
+        "NO_ITEMS_COUNTED",
+        400,
+        "No items were counted in this restock session",
+      );
+    }
+
     const committedItems: Array<{
       itemId: string;
       observedQuantity: number;
