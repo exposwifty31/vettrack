@@ -80,16 +80,31 @@ describe(`${FILE} — a superseded scan response reaches no consumer`, () => {
     expect(unguarded).toEqual([]);
   });
 
-  /** Identifier names appearing in the conditions of every enclosing `if`, up to `stopAt`. */
-  function guardNamesAround(node: ts.Node, stopAt: ts.Node): Set<string> {
-    const names = new Set<string>();
+  /**
+   * True when some enclosing `if` (up to `stopAt`) carries the FULL ownership
+   * predicate — `noNewerIssued(<ref>.current, <key>, writeTicket)` — with the
+   * receiver, key and ticket all checked.
+   *
+   * Naming the ref is not enough. `if (issuedTicketByTagRef.current)` mentions
+   * it and verifies nothing, and an assertion that accepted that would be the
+   * very defect this suite exists to catch, one level up. So it reads the call,
+   * not the identifiers in it.
+   */
+  function hasOwnershipGuard(node: ts.Node, stopAt: ts.Node, ref: string, key: string): boolean {
     for (let p: ts.Node | undefined = node.parent; p && p !== stopAt.parent; p = p.parent) {
       if (!ts.isIfStatement(p)) continue;
+      let ok = false;
       walk(p.expression, (n) => {
-        if (ts.isIdentifier(n)) names.add(n.text);
+        if (!ts.isCallExpression(n)) return;
+        if (!ts.isIdentifier(n.expression) || n.expression.text !== "noNewerIssued") return;
+        if (n.arguments.length !== 3) return;
+        const args = n.arguments.map((a) => a.getText(sourceFile));
+        if (args[0] !== `${ref}.current` || args[1] !== key || args[2] !== "writeTicket") return;
+        ok = true;
       });
+      if (ok) return true;
     }
-    return names;
+    return false;
   }
 
   /** The arrow/function bodies passed to `.then(...)` / `.catch(...)` anywhere in the file. */
@@ -106,13 +121,16 @@ describe(`${FILE} — a superseded scan response reaches no consumer`, () => {
     return found;
   })();
 
-  /** Calls inside a response handler that match `predicate`, with their enclosing guard names. */
+  /** Calls inside a response handler that match `predicate`, each able to report its guard. */
   function inHandlers(predicate: (n: ts.CallExpression) => boolean) {
-    const hits: { line: number; guards: Set<string> }[] = [];
+    const hits: { line: number; guarded: (ref: string, key: string) => boolean }[] = [];
     for (const handler of responseHandlers) {
       walk(handler, (n) => {
         if (!ts.isCallExpression(n) || !predicate(n)) return;
-        hits.push({ line: lineOf(n), guards: guardNamesAround(n, handler) });
+        hits.push({
+          line: lineOf(n),
+          guarded: (ref: string, key: string) => hasOwnershipGuard(n, handler, ref, key),
+        });
       });
     }
     return hits;
@@ -135,7 +153,7 @@ describe(`${FILE} — a superseded scan response reaches no consumer`, () => {
     // window posts 6 instead of 7.
     const hits = inHandlers((n) => isMapMutation(n, "nfcItemCountsRef.current"));
     expect(hits.length).toBeGreaterThan(0);
-    expect(hits.filter((h) => !h.guards.has("issuedTicketByTagRef")).map((h) => h.line)).toEqual([]);
+    expect(hits.filter((h) => !h.guarded("issuedTicketByTagRef", "tagId")).map((h) => h.line)).toEqual([]);
   });
 
   it("changes a row's optimistic quantity from a response handler only when no newer write for that ROW was issued", () => {
@@ -145,7 +163,9 @@ describe(`${FILE} — a superseded scan response reaches no consumer`, () => {
       (n) => ts.isIdentifier(n.expression) && n.expression.text === "setOptimisticActualByCode",
     );
     expect(hits.length).toBeGreaterThan(0);
-    expect(hits.filter((h) => !h.guards.has("issuedTicketByCodeRef")).map((h) => h.line)).toEqual([]);
+    expect(
+      hits.filter((h) => !h.guarded("issuedTicketByCodeRef", "result.item.code")).map((h) => h.line),
+    ).toEqual([]);
   });
 
   it("persists the NFC counter map only from inside that guard", () => {
