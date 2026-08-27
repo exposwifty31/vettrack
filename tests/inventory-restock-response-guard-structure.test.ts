@@ -33,20 +33,72 @@ function walk(node: ts.Node, visit: (n: ts.Node) => void): void {
   node.forEachChild((child) => walk(child, visit));
 }
 
-function containsClaimCall(node: ts.Node): boolean {
-  let found = false;
-  walk(node, (n) => {
-    if (ts.isCallExpression(n) && ts.isIdentifier(n.expression) && n.expression.text === "claimLatestWrite") {
-      found = true;
-    }
-  });
-  return found;
+/**
+ * The operands that must ALL hold for a condition to be true — the condition
+ * flattened on `&&`, with anything else (a `||`, a `!`, a call) left opaque.
+ *
+ * Without this, a guard only had to APPEAR in the condition, so
+ * `if (allowStale || noNewerIssued(...))` passed while permitting exactly the
+ * stale mutation the suite exists to forbid. Presence is not a guarantee; a
+ * mandatory conjunct is.
+ */
+function mandatoryConjuncts(expr: ts.Expression): ts.Expression[] {
+  if (ts.isParenthesizedExpression(expr)) return mandatoryConjuncts(expr.expression);
+  if (ts.isBinaryExpression(expr) && expr.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken) {
+    return [...mandatoryConjuncts(expr.left), ...mandatoryConjuncts(expr.right)];
+  }
+  return [expr];
 }
 
-/** True when some ancestor is an `if` whose CONDITION calls claimLatestWrite. */
+/** A bare positive `claimLatestWrite(...)` call — `!claimLatestWrite(...)` is a PrefixUnary and does not match. */
+function isClaimCall(expr: ts.Expression): boolean {
+  const e = ts.isParenthesizedExpression(expr) ? expr.expression : expr;
+  return ts.isCallExpression(e) && ts.isIdentifier(e.expression) && e.expression.text === "claimLatestWrite";
+}
+
+/**
+ * True when the node sits in the THEN branch of an `if` whose condition makes a
+ * positive `claimLatestWrite(...)` call mandatory. Ancestry alone is not
+ * control flow: the ELSE branch of that very `if` runs exactly when the claim
+ * is FALSE, and a negated condition inverts the branches — both used to pass.
+ */
 function isUnderClaimGuard(node: ts.Node): boolean {
-  for (let p: ts.Node | undefined = node.parent; p; p = p.parent) {
-    if (ts.isIfStatement(p) && containsClaimCall(p.expression)) return true;
+  let child: ts.Node = node;
+  for (let p: ts.Node | undefined = node.parent; p; child = p, p = p.parent) {
+    if (!ts.isIfStatement(p)) continue;
+    if (child !== p.thenStatement) continue;
+    if (mandatoryConjuncts(p.expression).some(isClaimCall)) return true;
+  }
+  return false;
+}
+
+/** Exactly `noNewerIssued(<ref>.current, <key>, writeTicket)` — receiver, key and ticket. */
+function isOwnershipCall(node: ts.Node, ref: string, key: string): boolean {
+  if (!ts.isCallExpression(node)) return false;
+  if (!ts.isIdentifier(node.expression) || node.expression.text !== "noNewerIssued") return false;
+  if (node.arguments.length !== 3) return false;
+  const args = node.arguments.map((a) => a.getText());
+  return args[0] === `${ref}.current` && args[1] === key && args[2] === "writeTicket";
+}
+
+/**
+ * True when the node sits in the THEN branch of some enclosing `if` (up to
+ * `stopAt`) that makes the FULL ownership predicate —
+ * `noNewerIssued(<ref>.current, <key>, writeTicket)` — a mandatory conjunct.
+ *
+ * Naming the ref is not enough. `if (issuedTicketByTagRef.current)` mentions
+ * it and verifies nothing. Ancestry is not enough either: the ELSE branch of
+ * the guarding `if` runs exactly when the predicate is FALSE. So it reads the
+ * call, not the identifiers in it, and the branch, not the ancestry.
+ */
+function hasOwnershipGuard(node: ts.Node, stopAt: ts.Node, ref: string, key: string): boolean {
+  let child: ts.Node = node;
+  for (let p: ts.Node | undefined = node.parent; p && p !== stopAt.parent; child = p, p = p.parent) {
+    if (!ts.isIfStatement(p)) continue;
+    // Only the THEN branch runs with the predicate TRUE. The ELSE branch is
+    // the predicate's false side, and the condition itself decides nothing.
+    if (child !== p.thenStatement) continue;
+    if (mandatoryConjuncts(p.expression).some((c) => isOwnershipCall(c, ref, key))) return true;
   }
   return false;
 }
@@ -79,50 +131,6 @@ describe(`${FILE} — a superseded scan response reaches no consumer`, () => {
     const unguarded = observedQuantityReads.filter((n) => !isUnderClaimGuard(n)).map(lineOf);
     expect(unguarded).toEqual([]);
   });
-
-  /**
-   * The operands that must ALL hold for a condition to be true — the condition
-   * flattened on `&&`, with anything else (a `||`, a `!`, a call) left opaque.
-   *
-   * Without this, a guard only had to APPEAR in the condition, so
-   * `if (allowStale || noNewerIssued(...))` passed while permitting exactly the
-   * stale mutation the suite exists to forbid. Presence is not a guarantee; a
-   * mandatory conjunct is.
-   */
-  function mandatoryConjuncts(expr: ts.Expression): ts.Expression[] {
-    if (ts.isParenthesizedExpression(expr)) return mandatoryConjuncts(expr.expression);
-    if (ts.isBinaryExpression(expr) && expr.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken) {
-      return [...mandatoryConjuncts(expr.left), ...mandatoryConjuncts(expr.right)];
-    }
-    return [expr];
-  }
-
-  /** Exactly `noNewerIssued(<ref>.current, <key>, writeTicket)` — receiver, key and ticket. */
-  function isOwnershipCall(node: ts.Node, ref: string, key: string): boolean {
-    if (!ts.isCallExpression(node)) return false;
-    if (!ts.isIdentifier(node.expression) || node.expression.text !== "noNewerIssued") return false;
-    if (node.arguments.length !== 3) return false;
-    const args = node.arguments.map((a) => a.getText());
-    return args[0] === `${ref}.current` && args[1] === key && args[2] === "writeTicket";
-  }
-
-  /**
-   * True when some enclosing `if` (up to `stopAt`) carries the FULL ownership
-   * predicate — `noNewerIssued(<ref>.current, <key>, writeTicket)` — with the
-   * receiver, key and ticket all checked.
-   *
-   * Naming the ref is not enough. `if (issuedTicketByTagRef.current)` mentions
-   * it and verifies nothing, and an assertion that accepted that would be the
-   * very defect this suite exists to catch, one level up. So it reads the call,
-   * not the identifiers in it.
-   */
-  function hasOwnershipGuard(node: ts.Node, stopAt: ts.Node, ref: string, key: string): boolean {
-    for (let p: ts.Node | undefined = node.parent; p && p !== stopAt.parent; p = p.parent) {
-      if (!ts.isIfStatement(p)) continue;
-      if (mandatoryConjuncts(p.expression).some((c) => isOwnershipCall(c, ref, key))) return true;
-    }
-    return false;
-  }
 
   /** The arrow/function bodies passed to `.then(...)` / `.catch(...)` anywhere in the file. */
   const responseHandlers: ts.Node[] = (() => {
@@ -180,6 +188,20 @@ describe(`${FILE} — a superseded scan response reaches no consumer`, () => {
     return hasOwnershipGuard(target, snippet, "issuedTicketByTagRef", "tagId");
   }
 
+  /** Same oracle, but the caller writes the WHOLE statement — branch placement included. */
+  function statementAccepts(statement: string): boolean {
+    const snippet = ts.createSourceFile("snippet.ts", statement, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+    let target: ts.Node | undefined;
+    walk(snippet, (n) => {
+      if (!ts.isCallExpression(n) || !ts.isPropertyAccessExpression(n.expression)) return;
+      if (n.expression.name.text !== "set") return;
+      if (!n.expression.expression.getText().startsWith("nfcItemCountsRef.current")) return;
+      target = n;
+    });
+    if (!target) throw new Error("snippet built no mutation to test");
+    return hasOwnershipGuard(target, snippet, "issuedTicketByTagRef", "tagId");
+  }
+
   it("accepts the ownership predicate only where it is MANDATORY, not merely present", () => {
     const GUARD = "noNewerIssued(issuedTicketByTagRef.current, tagId, writeTicket)";
 
@@ -198,6 +220,16 @@ describe(`${FILE} — a superseded scan response reaches no consumer`, () => {
     expect(conditionAccepts("noNewerIssued(issuedTicketByCodeRef.current, tagId, writeTicket)")).toBe(false);
     expect(conditionAccepts("noNewerIssued(issuedTicketByTagRef.current, code, writeTicket)")).toBe(false);
     expect(conditionAccepts("noNewerIssued(issuedTicketByTagRef.current, tagId, 0)")).toBe(false);
+  });
+
+  it("rejects the ownership predicate when the mutation sits in the ELSE branch", () => {
+    // The else branch runs exactly when the predicate is FALSE — the mutation
+    // there is the stale write the guard exists to forbid, and an ancestry
+    // check that ignores which branch it ascended through calls it guarded.
+    const GUARD = "noNewerIssued(issuedTicketByTagRef.current, tagId, writeTicket)";
+    expect(statementAccepts(`if (${GUARD}) { keep(); } else { nfcItemCountsRef.current.set(tagId, 1); }`)).toBe(false);
+    // Positive control: the same statement with the mutation in the THEN branch.
+    expect(statementAccepts(`if (${GUARD}) { nfcItemCountsRef.current.set(tagId, 1); } else { keep(); }`)).toBe(true);
   });
 
   it("changes the NFC counter from a response handler only when this write still owns the TAG", () => {
@@ -273,33 +305,19 @@ describe("ownership predicate checker rejects incomplete guards", () => {
     ref: string,
     key: string,
   ): boolean {
+    // Delegates to the ONE real checker. A private loose copy here is how a
+    // checker and its negative-proof drift apart — the proof keeps passing
+    // against the copy while the checker it vouches for has moved on.
     const sf = parseSnippet(snippet);
-    function walkSf(node: ts.Node, visit: (n: ts.Node) => void): void {
-      visit(node);
-      node.forEachChild((child) => walkSf(child, visit));
-    }
     let mutation: ts.CallExpression | undefined;
-    walkSf(sf, (n) => {
+    walk(sf, (n) => {
       if (!ts.isCallExpression(n)) return;
       if (ts.isIdentifier(n.expression) && n.expression.text === mutationName) {
         mutation = n;
       }
     });
     if (!mutation) throw new Error(`mutation ${mutationName} not found in snippet`);
-    for (let p: ts.Node | undefined = mutation.parent; p; p = p.parent) {
-      if (!ts.isIfStatement(p)) continue;
-      let ok = false;
-      walkSf(p.expression, (n) => {
-        if (!ts.isCallExpression(n)) return;
-        if (!ts.isIdentifier(n.expression) || n.expression.text !== "noNewerIssued") return;
-        if (n.arguments.length !== 3) return;
-        const args = n.arguments.map((a) => a.getText(sf));
-        if (args[0] !== `${ref}.current` || args[1] !== key || args[2] !== "writeTicket") return;
-        ok = true;
-      });
-      if (ok) return true;
-    }
-    return false;
+    return hasOwnershipGuard(mutation, sf, ref, key);
   }
 
   it("rejects a condition that only names the ticket map", () => {
@@ -339,5 +357,36 @@ describe("ownership predicate checker rejects incomplete guards", () => {
     expect(mutationGuarded(full, "setOptimisticActualByCode", "issuedTicketByCodeRef", "result.item.code")).toBe(
       true,
     );
+  });
+});
+
+/**
+ * Negative coverage for the claim-guard checker itself: `isUnderClaimGuard`
+ * must read control flow, not ancestry. A persist in the ELSE branch runs when
+ * the claim is FALSE, and a persist under `!claimLatestWrite(...)` runs only
+ * on the losing side — both are exactly the stale writes the suite forbids.
+ */
+describe("claim guard checker rejects inverted control flow", () => {
+  function persistGuarded(statement: string): boolean {
+    const sf = ts.createSourceFile("snippet.ts", statement, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+    let persist: ts.Node | undefined;
+    walk(sf, (n) => {
+      if (!ts.isCallExpression(n)) return;
+      if (ts.isIdentifier(n.expression) && n.expression.text === "safeStorageSetItem") persist = n;
+    });
+    if (!persist) throw new Error("snippet built no persist to test");
+    return isUnderClaimGuard(persist);
+  }
+
+  it("accepts a persist in the THEN branch of a positive claim", () => {
+    expect(persistGuarded(`if (claimLatestWrite(code, writeTicket)) { safeStorageSetItem("k", v); }`)).toBe(true);
+  });
+
+  it("rejects a persist in the ELSE branch", () => {
+    expect(persistGuarded(`if (claimLatestWrite(code, writeTicket)) { keep(); } else { safeStorageSetItem("k", v); }`)).toBe(false);
+  });
+
+  it("rejects a persist under a NEGATED claim", () => {
+    expect(persistGuarded(`if (!claimLatestWrite(code, writeTicket)) { safeStorageSetItem("k", v); }`)).toBe(false);
   });
 });

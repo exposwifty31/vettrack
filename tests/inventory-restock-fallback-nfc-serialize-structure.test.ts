@@ -261,12 +261,33 @@ describe(`${FILE} — fallback NFC writes serialize per tagId`, () => {
     });
     if (!guardName) return { capturedName, guardName: null, guardedSites: 0 };
 
-    // Early returns gated on that predicate.
+    // Early returns gated on that predicate. A site counts only when a
+    // top-level `||`-disjunct of the condition is exactly `!guard()`: that is
+    // the one shape that GUARANTEES the bail fires whenever the session is
+    // stale. The inverted call and a negation buried under `&&` both reach the
+    // mutation on a stale session, so neither counts.
+    function bailDisjuncts(expr: ts.Expression): ts.Expression[] {
+      if (ts.isParenthesizedExpression(expr)) return bailDisjuncts(expr.expression);
+      if (ts.isBinaryExpression(expr) && expr.operatorToken.kind === ts.SyntaxKind.BarBarToken) {
+        return [...bailDisjuncts(expr.left), ...bailDisjuncts(expr.right)];
+      }
+      return [expr];
+    }
+    function isNegatedGuardCall(expr: ts.Expression): boolean {
+      const e = ts.isParenthesizedExpression(expr) ? expr.expression : expr;
+      if (!ts.isPrefixUnaryExpression(e) || e.operator !== ts.SyntaxKind.ExclamationToken) return false;
+      const operand = ts.isParenthesizedExpression(e.operand) ? e.operand.expression : e.operand;
+      return (
+        ts.isCallExpression(operand) &&
+        ts.isIdentifier(operand.expression) &&
+        operand.expression.text === guardName &&
+        operand.arguments.length === 0
+      );
+    }
     let guardedSites = 0;
     walk(body, (n) => {
       if (!ts.isIfStatement(n)) return;
-      const cond = n.expression.getText().replace(/\s+/g, "");
-      if (!cond.includes(`${guardName}()`)) return;
+      if (!bailDisjuncts(n.expression).some(isNegatedGuardCall)) return;
       const thenText = n.thenStatement.getText().replace(/\s+/g, "");
       if (thenText === "return;" || thenText === "{return;}") guardedSites += 1;
     });
@@ -280,6 +301,33 @@ describe(`${FILE} — fallback NFC writes serialize per tagId`, () => {
     // Three places a stale callback can do damage: before issuing, on success,
     // on failure. All three must bail.
     expect(guardedSites).toBeGreaterThanOrEqual(3);
+  });
+
+  it("counts only sites that bail when the guard is FALSE", () => {
+    // An inverted site — `if (stillThisSession()) return;` — drops every live
+    // response and never stops a stale one; a negation buried under `&&` bails
+    // only when the OTHER conjunct also holds. Neither may count as a guard.
+    function guardSitesIn(code: string): number {
+      const sf = ts.createSourceFile(
+        "snippet.ts",
+        `const f = () => { const queuedGeneration = sessionGenerationRef.current; ` +
+          `const stillThisSession = () => sessionGenerationRef.current === queuedGeneration; ${code} };`,
+        ts.ScriptTarget.Latest,
+        true,
+        ts.ScriptKind.TS,
+      );
+      let snippetBody: ts.Node | undefined;
+      walk(sf, (n) => {
+        if (!snippetBody && ts.isArrowFunction(n) && ts.isBlock(n.body)) snippetBody = n.body;
+      });
+      if (!snippetBody) throw new Error("snippet built no body to test");
+      return sessionGuard(snippetBody).guardedSites;
+    }
+
+    expect(guardSitesIn("if (!stillThisSession()) return;")).toBe(1);
+    expect(guardSitesIn("if (!stillThisSession() || staleTicket) return;")).toBe(1);
+    expect(guardSitesIn("if (stillThisSession()) return;")).toBe(0);
+    expect(guardSitesIn("if (!stillThisSession() && other) return;")).toBe(0);
   });
 
   it("bumps the session generation wherever the chain map is cleared", () => {
