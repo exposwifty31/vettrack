@@ -26,7 +26,9 @@ export function useEquipmentList({
 
   // Full-list truth for the "not verified" readout — same query key AND same
   // isInactive predicate the alert bell uses (NativeHeader/computeAlerts), so
-  // the equipment header can never disagree with the bell again (H1).
+  // the equipment header can never disagree with the bell again (H1). That
+  // predicate reads `lastVerifiedAt` (S5b), so this readout now counts units
+  // nobody has actually verified rather than units nobody has handled.
   const allEquipmentQ = useQuery({
     queryKey: ["/api/equipment"],
     queryFn: api.equipment.list,

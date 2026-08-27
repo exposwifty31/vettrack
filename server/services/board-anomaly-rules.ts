@@ -3,21 +3,24 @@
  *
  * A PURE rules pass (no DB, no fetch) the command-board producer calls to derive a
  * FIXED v1 closed set of EXACTLY THREE high-precision anomalies from data already in
- * the snapshot. It NEVER queries, NEVER mutates custody, and is FAIL-SAFE: null or
+ * the snapshot. It NEVER queries, NEVER mutates custody, and is FAIL-SAFE: missing or
  * malformed source data for a unit yields no anomaly for that unit and never throws
- * or suppresses anomalies for other units.
+ * or suppresses anomalies for other units. ONE deliberate exception (owner decision,
+ * 2026-08-27): a null `lastVerifiedAt` is not "missing data" but the business fact
+ * "never verified", so cart_unverified FIRES on it — see `resolveCartVerifiedMs`.
  *
  * The three rules (v1 — no others; empty-dock / waitlist are a later, trust-earned
  * expansion), each with a PINNED equality boundary:
  *   - battery_critical   : battery <= critical threshold (AT the threshold FIRES); severity=pressure
  *   - cart_unverified    : crash-cart last-verified age > 7 days (STRICTLY greater; exactly 7d
- *                          does NOT fire); severity=calm
+ *                          does NOT fire); a NEVER-verified cart (null lastVerifiedAt) resolves
+ *                          to epoch 0 and therefore FIRES; severity=calm
  *   - rfid_reader_offline: reader heartbeat age > the R-M1.1d reader-offline threshold (STRICTLY
  *                          greater; exactly at the window does NOT fire); severity=pressure
  *
  * `since` = the condition's FIRST-OBSERVED ISO instant. Where derivable from an existing
  * snapshot timestamp it is computed deterministically and survives restart/scale-out:
- *   - cart_unverified    => lastVerifiedAt + 7d
+ *   - cart_unverified    => lastVerifiedAt + 7d (never-verified => epoch 0 + 7d)
  *   - rfid_reader_offline => lastReaderHeartbeatAt + threshold
  * `battery_critical` has NO snapshot onset, so its `since` is tracked in PROCESS-LOCAL
  * VOLATILE memory (the `(type, unitId)` absent→active transition time). Volatile means a
@@ -39,7 +42,17 @@ import type {
 // (and the RED fixtures) can import the type alongside the derivation function.
 export type { BoardAnomaly, BoardAnomalySeverity, BoardAnomalyType };
 
-/** Crash-cart re-verification budget: last-verified age STRICTLY over this trips cart_unverified. */
+/**
+ * Crash-cart re-verification budget: last-verified age STRICTLY over this trips cart_unverified.
+ *
+ * DELIBERATELY 7d, not the fleet-wide INACTIVE_THRESHOLD_DAYS (=14) that the app's
+ * staleness alert uses (shared/constants.ts). S5b aligned the two rules on the same
+ * FIELD — both read `lastVerifiedAt`, so neither can be cleared by a checkout — and
+ * left the WINDOW split on purpose: this is a stricter re-verification SLA on a
+ * single high-stakes asset class, whereas the 14d rule is fleet-wide hygiene.
+ * Widening this to 14d would weaken a crash-cart safety check; narrowing the
+ * fleet-wide rule to 7d is a separate product decision, not a consistency fix.
+ */
 export const CART_UNVERIFIED_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
 /** Backing rows the `sourceRef` of each anomaly points at. */
@@ -58,7 +71,7 @@ export interface BatteryAnomalySource {
 export interface CartAnomalySource {
   clinicId: string;
   equipmentId: string;
-  /** null/invalid => fail-safe skip. */
+  /** null => NEVER verified (fires, epoch-anchored); malformed Date => fail-safe skip. */
   lastVerifiedAt: Date | null;
 }
 
@@ -103,6 +116,29 @@ function isUsableDate(value: Date | null): value is Date {
 }
 
 /**
+ * Effective last-verification instant (ms) for cart_unverified; `null` => fail-safe skip.
+ *
+ * REVERSED 2026-08-27 (owner decision — Dan): a `null` lastVerifiedAt used to skip. It now
+ * resolves to EPOCH 0 (maximally stale), so a NEVER-verified cart fires — the strongest form
+ * of unverified. This is the substitution every other surface reading this column already
+ * makes: `server/lib/alert-reminder.ts:49` (`... ? new Date(...).getTime() : 0`), and the
+ * boolean equivalent in `server/routes/analytics.ts:47` / `src/lib/utils.ts:88`
+ * (`if (!row.lastVerifiedAt) return true`). The board was the lone holdout.
+ *
+ * Epoch (not `now`) keeps `since` DETERMINISTIC and restart/scale-out-stable with no volatile
+ * onset store, and makes a never-verified cart rank OLDEST in `board-anomaly-ranking.ts`
+ * (which orders by `since` age, oldest first) — which is exactly what it is. A `now`-anchored
+ * onset would drift forward every poll and rank newest.
+ *
+ * Only the NULL meaning was reversed. An Invalid Date is CORRUPT DATA, not the business fact
+ * "never verified", so it stays a fail-safe skip per this module's header contract.
+ */
+function resolveCartVerifiedMs(value: Date | null): number | null {
+  if (value == null) return 0;
+  return isUsableDate(value) ? value.getTime() : null;
+}
+
+/**
  * Derive the closed v1 anomaly set for one board clinic. Pure + fail-safe: each rule is
  * evaluated per unit inside its own guard, so a malformed row yields no anomaly for that
  * unit and never affects the others. Every source row is clinicId-filtered first so a
@@ -144,15 +180,17 @@ export function deriveBoardAnomalies(input: BoardAnomalyInput): BoardAnomaly[] {
   // ── cart_unverified (severity=calm; onset derivable from lastVerifiedAt + 7d) ──
   for (const c of input.carts) {
     if (c.clinicId !== input.clinicId) continue;
-    if (!isUsableDate(c.lastVerifiedAt)) continue;
-    const ageMs = input.now.getTime() - c.lastVerifiedAt.getTime();
+    // null => epoch 0 (never verified, FIRES); malformed => null (fail-safe skip).
+    const lastVerifiedMs = resolveCartVerifiedMs(c.lastVerifiedAt);
+    if (lastVerifiedMs == null) continue;
+    const ageMs = input.now.getTime() - lastVerifiedMs;
     // STRICTLY greater: exactly 7 days old does NOT fire.
     if (ageMs <= CART_UNVERIFIED_MAX_AGE_MS) continue;
     anomalies.push({
       type: "cart_unverified",
       unitId: c.equipmentId,
       severity: "calm",
-      since: new Date(c.lastVerifiedAt.getTime() + CART_UNVERIFIED_MAX_AGE_MS).toISOString(),
+      since: new Date(lastVerifiedMs + CART_UNVERIFIED_MAX_AGE_MS).toISOString(),
       sourceRef: { table: EQUIPMENT_TABLE, id: c.equipmentId },
     });
   }

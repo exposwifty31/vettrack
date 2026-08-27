@@ -246,12 +246,65 @@ describe("deriveBoardAnomalies — cart_unverified", () => {
     expect(new Date(since3).getTime()).toBeGreaterThan(new Date(since1).getTime());
   });
 
-  it("FAIL-SAFE: null / invalid lastVerifiedAt yields NO anomaly and does not suppress others", () => {
+  /**
+   * REVERSED 2026-08-27 (owner decision — Dan): this test previously pinned
+   * `null lastVerifiedAt` as a fail-safe SKIP. A null means the cart has NEVER been
+   * verified, which is the strongest form of unverified, so the board now FIRES —
+   * aligning it with the same rule every other surface already applied to this column:
+   * `server/routes/analytics.ts:47` (`if (!row.lastVerifiedAt) return true`),
+   * `src/lib/utils.ts:88` (same), and `server/lib/alert-reminder.ts:49` (null => epoch 0,
+   * i.e. maximally stale). Only the NULL meaning was reversed — the 7-day board SLA
+   * (`CART_UNVERIFIED_MAX_AGE_MS`) is unchanged and is deliberately NOT the fleet-wide 14d.
+   */
+  it("REVERSED: a NEVER-verified cart (null lastVerifiedAt) FIRES and does not suppress others", () => {
     const stale = agoMs(CART_UNVERIFIED_MAX_AGE_MS + 60_000);
     const result = deriveBoardAnomalies(
       baseInput({
         carts: [
           { clinicId: CLINIC, equipmentId: "cart-null", lastVerifiedAt: null },
+          { clinicId: CLINIC, equipmentId: "cart-stale", lastVerifiedAt: stale },
+        ],
+      }),
+    );
+    const hits = byType(result, "cart_unverified");
+    expect(hits.map((h) => h.unitId).sort()).toEqual(["cart-null", "cart-stale"]);
+    // All 5 fields on the never-verified hit, same contract as every other cart anomaly.
+    const nullHit = hits.find((h) => h.unitId === "cart-null")!;
+    expect(nullHit.type).toBe("cart_unverified");
+    expect(nullHit.severity).toBe("calm");
+    expect(nullHit.sourceRef).toEqual({ table: "vt_equipment", id: "cart-null" });
+  });
+
+  it("a never-verified cart's since is epoch-anchored: STABLE across snapshots and ranks OLDEST", () => {
+    const cart = { clinicId: CLINIC, equipmentId: "cart-null", lastVerifiedAt: null };
+    const first = byType(deriveBoardAnomalies(baseInput({ carts: [cart] })), "cart_unverified")[0];
+
+    // Epoch (0) is the effective verification instant, so since = 0 + 7d — deterministic,
+    // survives restart/scale-out, and needs no volatile onset store (unlike battery_critical).
+    expect(first.since).toBe(new Date(CART_UNVERIFIED_MAX_AGE_MS).toISOString());
+
+    // STABILITY: a later snapshot yields the SAME since (a `now`-anchored since would drift
+    // forward every poll and, via board-anomaly-ranking.ts, sort NEWEST instead of oldest).
+    const later = byType(
+      deriveBoardAnomalies(baseInput({ now: new Date(NOW.getTime() + 5000), carts: [cart] })),
+      "cart_unverified",
+    )[0];
+    expect(later.since).toBe(first.since);
+
+    // Ranks oldest-first against a merely-stale cart (ranking compares `since` as strings).
+    const staleSince = new Date(
+      agoMs(CART_UNVERIFIED_MAX_AGE_MS + 60_000).getTime() + CART_UNVERIFIED_MAX_AGE_MS,
+    ).toISOString();
+    expect(first.since < staleSince).toBe(true);
+  });
+
+  it("FAIL-SAFE HELD: a MALFORMED lastVerifiedAt yields NO anomaly and does not suppress others", () => {
+    // Only the NULL meaning was reversed. An Invalid Date is corrupt data, not the business
+    // fact "never verified", so it stays a fail-safe skip per the module's header contract.
+    const stale = agoMs(CART_UNVERIFIED_MAX_AGE_MS + 60_000);
+    const result = deriveBoardAnomalies(
+      baseInput({
+        carts: [
           { clinicId: CLINIC, equipmentId: "cart-bad", lastVerifiedAt: new Date("not-a-date") },
           { clinicId: CLINIC, equipmentId: "cart-stale", lastVerifiedAt: stale },
         ],

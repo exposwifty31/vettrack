@@ -19,7 +19,7 @@ const { equipmentList, acksList, ackSpy, removeSpy } = vi.hoisted(() => {
   const fixture = [
     // status "issue" → urgent section + worst-first hero
     { id: "eq-issue", name: "Ventilator ICU-2", status: "issue" },
-    // no lastSeen → isInactive → maintenance section
+    // no lastVerifiedAt → isInactive → maintenance section
     { id: "eq-stale", name: "Syringe pump 7", status: "available" },
   ];
   return {

@@ -71,10 +71,23 @@ export function isSterilizationDue(equipment: Equipment): boolean {
   return isAfter(sevenDaysAgo, new Date(equipment.lastSterilizationDate));
 }
 
+/**
+ * "Not verified recently" — derived from `lastVerifiedAt`, never `lastSeen`.
+ *
+ * `lastSeen` is bumped by custody mutations (checkout/return), so taking a cart
+ * off the wall used to clear this alert without anyone having actually looked at
+ * the unit. `lastVerifiedAt` is written only by a real verification, which is
+ * the thing the alert is claiming.
+ *
+ * Not `resolveEquipmentConfirm()` from equipment-recovery-state.ts: that returns
+ * the NEWER of the two timestamps, so the checkout's `lastSeen` bump would still
+ * win and the alert would still clear. The two rules differ on exactly the case
+ * this predicate exists to catch.
+ */
 export function isInactive(equipment: Equipment): boolean {
-  if (!equipment.lastSeen) return true;
+  if (!equipment.lastVerifiedAt) return true;
   const cutoff = subDays(new Date(), INACTIVE_THRESHOLD_DAYS);
-  return isAfter(cutoff, new Date(equipment.lastSeen));
+  return isAfter(cutoff, new Date(equipment.lastVerifiedAt));
 }
 
 export type ExpiryBadgeState = "expired" | "expiring_soon" | "healthy";
