@@ -149,7 +149,17 @@ export function formatDateTimeByLocale(date: Date | string, options?: Intl.DateT
   return new Date(date).toLocaleString(localeTag, options);
 }
 
-export function formatDateByLocale(date: Date | string, options?: Intl.DateTimeFormatOptions): string {
+/**
+ * Locale-aware date formatting. Defaults to a MEDIUM date (named month) rather
+ * than `toLocaleDateString`'s bare numeric form: "26.8.2026" / "8/26/2026" is
+ * read as day-month by a Hebrew reader and month-day by an English one, and a
+ * screen reader gives no clue which. Callers that need another shape pass their
+ * own options, which win outright.
+ */
+export function formatDateByLocale(
+  date: Date | string,
+  options: Intl.DateTimeFormatOptions = { dateStyle: "medium" },
+): string {
   const locale = getStoredLocale();
   const localeTag = locale === "he" ? "he-IL" : "en-US";
   return new Date(date).toLocaleDateString(localeTag, options);

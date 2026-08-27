@@ -100,22 +100,6 @@ This plan converts governance audits into **product-outcome-ranked** work. Every
 
 ---
 
-### P0-4 — Document and enforce frozen-surface change protocol
-
-| Field | Value |
-|-------|-------|
-| **Objective** | Publish a single checklist in `docs/governance/` (or extend `CLAUDE.md` pointer) for any change touching SSE/outbox, PWA SW denylist, Code Blue online-only path, or authority evaluators: Phase 9 drills, `pnpm test:playwright:ci`, no transport replacement. |
-| **Business impact** | **Very high** — ward board and emergency coordination are mission-critical; regression cost exceeds feature value of shortcuts. |
-| **Engineering impact** | **Medium** — adds ~5–10 min per frozen-surface PR; **reduces** catastrophic rework. |
-| **Risk** | **Critical** — F6 (ward board stale), offline Code Blue queue (forbidden). Risk of **accepting** necessary friction, not removing it. |
-| **Estimated effort** | **S** (2–4 hours doc + link from PR template) |
-| **Expected ROI** | **High** — converts implicit Phase 9 knowledge into repeatable gate; protects CRITICAL paths without refactoring frozen surfaces. |
-| **Status** | ✅ Done — 2026-06-18. `docs/governance/FROZEN_SURFACE_CHANGE_PROTOCOL.md` created with per-surface checklists, exception-approval table, and PR template. |
-
-**Evidence:** [`PRODUCT_MODEL.md`](./PRODUCT_MODEL.md) §Critical paths; [`ENGINEERING_FRICTION_REPORT.md`](./ENGINEERING_FRICTION_REPORT.md) §1.3.
-
----
-
 ### P0-5 — Capacitor legal pages + resubmission readiness
 
 | Field | Value |
@@ -129,21 +113,6 @@ This plan converts governance audits into **product-outcome-ranked** work. Every
 | **Status** | ✅ Done — 2026-06-18. iOS 1.0.1 approved by Apple and auto-releasing. 16/16 resubmission gates passed (2026-06-16). |
 
 **Evidence:** `docs/mobile/README.md`; `RESUBMISSION_RUNBOOK.md`; open MR !19.
-
----
-
-### P0-6 — Tenancy invariant on all new/changed queries
-
-| Field | Value |
-|-------|-------|
-| **Objective** | Treat `clinicId` filter on target table as merge-blocking review criterion; reduce G3 waiver fatigue by scoping lint to changed files where possible (G6 backlog). |
-| **Business impact** | **Critical** — cross-clinic leak destroys multi-clinic trust and commercial viability. |
-| **Engineering impact** | **Medium** — review discipline + incremental lint scope improvement. |
-| **Risk** | **Critical** — F5 (tenant miss). |
-| **Estimated effort** | **S** ongoing review + **M** for G6 lint scope fix |
-| **Expected ROI** | **Very high** — prevents highest-severity product defect class. |
-
-**Evidence:** `.cursorrules` multi-tenancy; [`ENGINEERING_FRICTION_REPORT.md`](./ENGINEERING_FRICTION_REPORT.md) §2.1.
 
 ---
 
@@ -214,22 +183,6 @@ This plan converts governance audits into **product-outcome-ranked** work. Every
 
 ---
 
-### P1-5 — Dependabot + SECURITY.md
-
-| Field | Value |
-|-------|-------|
-| **Objective** | Add `.github/dependabot.yml` (npm + GitHub Actions); add `SECURITY.md` with disclosure contact. |
-| **Business impact** | **Medium** — enterprise integrators and store review increasingly expect dependency hygiene. |
-| **Engineering impact** | **Medium** — automated PR noise manageable with grouping. |
-| **Risk** | **High** (security) if ignored on public repo. |
-| **Estimated effort** | **S** (2–4 hours) |
-| **Expected ROI** | **High** — baseline compliance; low effort. |
-| **Status** | ✅ Done — 2026-06-18. `.github/dependabot.yml` (npm + GitHub Actions, weekly grouped), `SECURITY.md` (disclosure policy, `security@vettrack.uk` — verify address), and `.github/CODEOWNERS` created. Branch protection + labels require manual `gh auth refresh` — see `docs/devops/github-setup.md`. |
-
-**Evidence:** [`docs/devops/github-setup.md`](../devops/github-setup.md) §Security P2 items 7–8.
-
----
-
 ### P1-6 — Fix top stale documentation (agent wrong-path prevention)
 
 | Field | Value |
@@ -243,37 +196,6 @@ This plan converts governance audits into **product-outcome-ranked** work. Every
 | **Status** | ✅ Done — 2026-06-18. `docs/integrations-guide.md` (removed `vt_animals`, June 2026 scope callouts), `CONTRIBUTING.md` (canonical remote corrected to GitHub), `docs/runbooks/activate-admin-email.md` (P1-8 re-promotion bug documented). |
 
 **Evidence:** [`ENGINEERING_FRICTION_REPORT.md`](./ENGINEERING_FRICTION_REPORT.md) §5.2; [`PRODUCT_ALIGNMENT_REPORT.md`](./PRODUCT_ALIGNMENT_REPORT.md) §Misalignment matrix.
-
----
-
-### P1-7 — i18n parity in PR CI lane
-
-| Field | Value |
-|-------|-------|
-| **Objective** | Run `scripts/i18n/check-parity.ts` or ensure `tests/i18n-parity.test.ts` visibility in `ci.yml` merge gate. |
-| **Business impact** | **High** for Hebrew-default market — broken EN/HE parity ships to floor staff. |
-| **Engineering impact** | **Medium** — catches missing keys before `main`. |
-| **Risk** | **Medium** — locale drift reaches production. |
-| **Estimated effort** | **S** (half day) |
-| **Expected ROI** | **High** — aligns with bilingual differentiator. |
-| **Status** | ✅ Done — 2026-06-18. `tests/i18n-parity.test.ts` is included in the vitest glob and not excluded; `pnpm test` runs it in both the GitHub Actions `test` job and GitLab `test:vitest` — both are merge-gate requirements. No additional CI step needed. |
-
-**Evidence:** [`CI_CD_GOVERNANCE.md`](./CI_CD_GOVERNANCE.md) §P1 #6.
-
----
-
-### P1-8 — ADMIN_EMAILS promotion fix (backlog item 6)
-
-| Field | Value |
-|-------|-------|
-| **Objective** | Stop per-request re-promotion of demoted admins via `ADMIN_EMAILS` env; align with `docs/runbooks/activate-admin-email.md`. |
-| **Business impact** | **Medium** — admin access control integrity for multi-user clinics. |
-| **Engineering impact** | **Medium** — auth path change; needs tests. |
-| **Risk** | **High** — authorization surprise if misimplemented. |
-| **Estimated effort** | **M** (2–3 days) |
-| **Expected ROI** | **Medium–High** — security-adjacent; smaller user surface than equipment paths. |
-
-**Evidence:** [`ENGINEERING_FRICTION_REPORT.md`](./ENGINEERING_FRICTION_REPORT.md) §2.2; backlog hyper-plan item 6.
 
 ---
 
@@ -323,34 +245,6 @@ This plan converts governance audits into **product-outcome-ranked** work. Every
 | **Expected ROI** | **Medium** — cheap clarity win; classified REMOVE in alignment report. |
 
 **Evidence:** [`PRODUCT_ALIGNMENT_REPORT.md`](./PRODUCT_ALIGNMENT_REPORT.md) §Workers; Removal Protocol in `.cursorrules`.
-
----
-
-### P2-4 — CODEOWNERS for high-risk paths
-
-| Field | Value |
-|-------|-------|
-| **Objective** | Add `.github/CODEOWNERS` for `server/middleware/auth.ts`, `server/routes/equipment.ts`, `migrations/`, `src/lib/offline-emergency-block.ts`, `.github/workflows/`. |
-| **Business impact** | **Medium** — ensures critical paths get review when team grows. |
-| **Engineering impact** | **Medium** — GitHub auto-request review. |
-| **Risk** | **Low** |
-| **Estimated effort** | **S** (1 hour) |
-| **Expected ROI** | **Medium** — more valuable when multiple contributors; still worth adding now. |
-| **Status** | ✅ Done — 2026-06-18. `.github/CODEOWNERS` created covering `server/middleware/auth.ts`, `server/routes/equipment.ts`, `migrations/`, `src/lib/offline-emergency-block.ts`, `.github/workflows/`. Branch protection rule "Require review from Code Owners" must be enabled once CODEOWNERS lands on `main` — see `docs/devops/github-setup.md`. |
-
----
-
-### P2-5 — Governance code tour (`.tours/`)
-
-| Field | Value |
-|-------|-------|
-| **Objective** | Create `.tours/governance-architect-delivery.tour` per `code-tour-integration.md` — auth → equipment checkout → outbox → board. |
-| **Business impact** | **Medium** — faster agent and human onboarding to CRITICAL paths. |
-| **Engineering impact** | **Medium** — reduces 10–15% onboarding tax. |
-| **Risk** | **Low** — doc artifact only. |
-| **Estimated effort** | **S** (half day) |
-| **Expected ROI** | **Medium** — complements [`ARCHITECTURE_MAP.md`](./ARCHITECTURE_MAP.md). |
-| **Status** | ✅ Done — 2026-06-18. `.tours/governance-architect-delivery.tour` created with 12 stops and verified line numbers: auth → equipment checkout → outbox fan-out → ward board SSE + SW denylist. |
 
 ---
 

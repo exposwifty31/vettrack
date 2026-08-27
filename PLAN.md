@@ -22,14 +22,13 @@
 
 ---
 
-> ## ⚠ 2026-08-13 — READ THIS FIRST; everything below it is historical
+> ## ⚠ 2026-08-13 — READ THIS FIRST
 >
 > **This plan is SUPERSEDED. Do not execute it, and do not treat its gates as blocking.**
-> The whole "Phase 0 / T-16 exit drill / do not start Phase 1" ladder below refers to a July
+> The whole "Phase 0 / T-16 exit drill / do not start Phase 1" ladder refers to a July
 > program that finished. Between 2026-07-28 and 2026-08-13, PRs **#167–#181** merged to `main`
 > (native push, RFID, reviewer-demo seed, the nine UX blockers, the doctor shift gate +
-> migrations 181–184, and the TV Command Center board). An agent obeying the "Current focus:
-> Phase 0" line below would refuse to start work that has already shipped.
+> migrations 181–184, and the TV Command Center board).
 >
 > **The active program is the RN store push**, tracked in `~/.claude/plans/store-submission-runbook.md`
 > (owner track ‖ agent track) — get the React Native successor app into review on both stores.
@@ -37,57 +36,14 @@
 >
 > **This repo's role in that program is now supporting, not primary.** The RN app lives in
 > `exposwifty31/VetTrack---RN-Migration-`. What this repo still owns for the push:
-> the server the RN app calls, the `@vettrack/contracts` package, `well-known-assetlinks.ts`
-> (needs the Play App Signing SHA-256 once the first AAB is uploaded), and the reviewer-demo
-> seed that must be run against production before submission — that last one writes to a
-> production database, so it is gated on the tenant-isolation / idempotency / synthetic-data /
-> cleanup conditions recorded in **TASKS.md § In Progress**. Do not run it without reading them.
+> the server the RN app calls, the `@vettrack/contracts` package, and `well-known-assetlinks.ts`
+> (needs the Play App Signing SHA-256 once the first AAB is uploaded).
 >
 > Phase 0A (T-05, T-01…T-04) COMPLETED 2026-07-12 — proof-logged (PROOF_ALIGNMENT_LOG
 > "2026-07-12 — Consolidated Audit × 10x"; fixes re-verified in-code 2026-07-28:
 > `src/hooks/use-sync.tsx:170` passes QueryClient, `src/pages/code-blue.tsx:328` dedicated
 > Cancel path). The 2.0 roadmap (`docs/vettrack-2.0-roadmap.md`) resumes after the two
 > submissions are in review — that ordering is the standing owner decision.
-
-## Problem
-
-A behavioral flow audit (36 findings: 6 HIGH · 21 MED · 9 LOW) plus a 12-item 10x feature library need one sequenced program so features are never built on broken surfaces, and App Store re-review (Guideline 2.1 reviewer reachability) is unblocked first.
-
-Scope change (June 2026) still holds: ER/patient/hospitalization, medication tasks, drug formulary, and pharmacy forecast remain removed (`docs/scope-change-2026.md`).
-
----
-
-## Goal
-
-Execute the consolidated remediation + 10x program **stabilize → extend**, phased:
-
-| Phase | Theme | Plan doc |
-|---|---|---|
-| **0** | Stabilize + ship-ready (6 HIGH + 0B submission gate + on-device exit drill) | `docs/plans/consolidated-audit-10x/phase-0-1.plan.md` |
-| **1** | Do-Now: equipment / shift / inventory fixes + small features + web admin-gate | same |
-| **2** | Native MED sweep + Do-Next features (Code Blue / board / predictive) | `phase-2-3.plan.md` + sub-specs |
-| **3** | LOW cleanup | `phase-2-3.plan.md` |
-| **4** | Gated Massives (on hold except RFID-gate `R-M1`) | `phase-4.plan.md` + `subspecs/R-M1-*.plan.md` |
-
-**Current focus (2026-08-13):** none of the above — this ladder is closed out; see the banner.
-The old "do not start Phase 1 until T-16 passes" gate is **void**: Phase 1–3 work either shipped
-or was superseded by the RN migration. T-16 survives only in store-lane form, as the G3 on-device
-verdict (owner gate) tracked in the store-submission runbook — not here.
-
----
-
-## Source of truth
-
-| Doc | Role |
-|---|---|
-| `docs/superpowers/specs/2026-07-12-audit-10x-consolidated-plan-design.md` | Design spec (requirements) |
-| `docs/plans/consolidated-audit-10x/*.plan.md` + `subspecs/` | Executable TDD task cards |
-| `docs/audit/flow-audit-behavioral-2026-07-11.md` | 36 findings |
-| `docs/audit/PROOF_ALIGNMENT_LOG.md` | Evidence log per completed requirement |
-
-Agents execute **plan cards**, not free-form interpretations of this file. Card contract: RED → GREEN → verify; ≤2 code files + 1 test; exact anchors; commit per card; log proof.
-
----
 
 ## Out of Scope
 
@@ -99,7 +55,6 @@ Agents execute **plan cards**, not free-form interpretations of this file. Card 
 - Appointment → task renames of internal surfaces (only copy changed)
 - Any work in the external RN mobile repo (separate **public** repo `exposwifty31/VetTrack---RN-Migration-`; `literate-dollop` is retired as the active target, while its physical delete-versus-archive decision remains open — see `docs/plans/master-plan-2026-07.md` Layer 4)
 - Phase 4 parked items until entry conditions clear: **massive-03** (clinic network), **medium-04** (copilot/voice)
-- ~~Starting Phase 1+ before Phase 0 exit drill (T-16) passes~~ — **historical; void as of 2026-08-13** (see banner)
 
 ---
 
@@ -119,62 +74,6 @@ Agents execute **plan cards**, not free-form interpretations of this file. Card 
 
 ---
 
-## Active Work Areas (COMPLETED 2026-07-12 — historical reference only; see status banner)
-
-### Phase 0A — HIGH fixes (code, TDD)
-
-All five cards below shipped 2026-07-12 (see banner + PROOF log). Retained for card-contract reference — do NOT re-execute.
-
-| ID | Summary | Tier |
-|---|---|---|
-| T-05 | Pass QueryClient into `initSyncEngine()` | S +R |
-| T-01 | Code Blue outcome Cancel dismisses without ending session | S +R |
-| T-02 | Dock-Return + RFID sheets mount at page level | S |
-| T-03 | QR auto-decode last-scanned-wins exactly once | S |
-| T-04 | Room-radar Return works after canceled dialog | S |
-
-### Phase 0B — Submission gate (Owner)
-
-T-06…T-15: binary ops/config/account/build checks. **Not RED→GREEN.** See plan cards.
-
-### Phase 0 exit
-
-~~**T-16** on-device drill blocks leaving Phase 0.~~
-**Historical — this gate no longer blocks anything (void 2026-08-13; see banner).** Its only
-surviving descendant is the store-lane **G3 on-device verdict** (owner gate: iPhone 16 Plus +
-Pixel 7), tracked in `~/.claude/plans/store-submission-runbook.md` as **O8** — not here.
-
-### Later phases (queued — not Ready)
-
-- **Phase 1:** T-17…T-31 (+ sub-spec R-SH-F1 handover)
-- **Phase 2–3:** T-34…T-53 + Code Blue / board / predictive sub-specs
-- **Phase 4 / unblocked Massive:** R-M1 RFID-gate e2e (authored); massive-03 / medium-04 on hold
-
----
-
-## Testing Plan
-
-Per card (unless Owner / delete-only / DB-integration):
-
-```bash
-pnpm test -- <card RED test file> && pnpm typecheck
-```
-
-Also as needed:
-
-- `pnpm i18n:check` for new copy
-- `pnpm test:playwright:phase9` for realtime/PWA frozen cards that require the browser drill
-- DB-integration runner when a card says so
-- Log evidence in `docs/audit/PROOF_ALIGNMENT_LOG.md` before marking a requirement done
-
----
-
-## Rollback Plan
-
-All changes land on feature branches merged via PR. Rollback = revert the merge commit on `main`. Database migrations include down migrations. No data-destructive operations without explicit sign-off.
-
----
-
 ## Open Questions
 
 | Question | Owner | Status |
@@ -184,12 +83,3 @@ All changes land on feature branches merged via PR. Rollback = revert the merge 
 
 ---
 
-## Decisions Made
-
-| Decision | Rationale |
-|----------|-----------|
-| Consolidate audit + 10x into one phased program | Stabilize before extend; App Store 2.1 reachability first |
-| Surface-bundled sequencing | Never ship a feature onto an open HIGH on its own surface |
-| Sonnet-sized cards + Tier routing | Executable by lower-reasoning agents; frozen work gets review/drill floor |
-| Phase 4 parks massive-03 + medium-04 | Highest-risk / data-quality gated; R-M1 already unblocked |
-| ER/medication scope removed (June 2026) | Product decision — out of core ops platform scope |

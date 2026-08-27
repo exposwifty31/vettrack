@@ -10323,3 +10323,88 @@ cannot silently shrink. The DB-only orphans (`tests/migrations/**`, `restock.ser
 `shift-chat-window`) are **still unwired** — they are a different setup and are not covered here.
 
 **Verdict:** VERIFIED
+
+---
+
+## 2026-08-27 — Governed-doc truth pass: correcting statements, not deleting them (chore/cursor-rules)
+
+**Why.** A markdown sweep had deleted 27 plan files and, in the same motion, edited governed
+documents to remove the sentences that cited them — and `docs/claims-registry.json` carried six
+exemptions holding the residue green, one of them verbatim: *"R-CB-stabilize shipped on main;
+TASKS.md still cites the retired subspec. Do not recreate the file."* An exemption is for a claim
+that is TRUE but unverifiable here; it is never for one that is FALSE. A prior lane restored all 27
+files and deleted those six entries. This pass fixes what the sweep left false, and what had simply
+rotted. **No `.ts` / `.tsx` / `locales/*.json` file was opened for edit, and nothing was committed.**
+
+**Corrections, each proved before it was written:**
+
+- `ARCHITECTURE.md` — the archived-planning-docs list had lost `INFRA_CLEANUP_PLAN.md` and
+  `IMPLEMENTATION_PLAN.md` because the sweep deleted the files. Both are back in
+  `docs/archive/2026/root-docs/` (all six named files present), so the list was false by omission.
+  Restored.
+- `PLAN.md:73` names "README model routing (`S` / `S +R` / `O +R` / `Owner`)" as a binding
+  constraint. The sweep had stripped the *Execution driver — per-card model routing* section out of
+  `docs/plans/consolidated-audit-10x/README.md`, together with the index rows for eight plan files
+  that now exist again. The constraint pointed at nothing. That README is restored to its committed
+  state; `PLAN.md:73` resolves again. Its remaining anchors were re-checked and hold:
+  `src/hooks/use-sync.tsx:170` is `initSyncEngine(queryClient)`, `src/pages/code-blue.tsx:328` is
+  inside the dedicated Cancel path, and `claude/audit-10x-consolidated-plan` is indeed gone.
+- `CONTEXT.md` — "shift handover product surface" sat under **Removed domains (do not reintroduce
+  without explicit product decision)**. The decision was taken: dropped by
+  `migrations/142_drop_er_patients_shift_handover.sql`, then rebuilt under sub-spec R-SH-F1 and
+  shipped. It is live and wired, not removed — `migrations/177_vt_shift_handover.sql`,
+  `server/routes/shift-handover.ts` mounted at `server/app/routes.ts:154`, `/handoff` routed at
+  `src/app/routes.tsx:217`. Corrected in place, history kept.
+- `FLOW_MATRIX.md` — three of its twelve numbered sections (§5 Medications, §6 Billing, §12 ER mode)
+  document routes that are redirect stubs (`src/app/routes.tsx:287`, `:292`, `:294`) and APIs that
+  `server/app/routes.ts` mounts nowhere. `ARCHITECTURE.md` has said so since 2026-08-13; the file
+  itself said only that no tests were written from it. Dated banner added, with the row-level
+  evidence. The matrix is kept — it is history, not a lie, once labelled.
+- `docs/migrations.md` — "the directory grew to 188 `*.sql` files (187 applied; `185_…` is the
+  highest-numbered)" was stale on **both** refs: this tree has 189 top-level files / 188 applied /
+  tail `186_vt_event_outbox_clinic_seq.sql`; `origin/main` `bf1e0480c` has 191 / 190 / tail 188.
+  The authoring step that told a reader to start from 185 would now collide, so it points at the
+  command instead of a number.
+- `TASKS.md` — every line count in the >800-LOC splitting task was wrong (`admin.tsx` 204 not 219,
+  `equipment-list.tsx` 1421 not 1351, `equipment-detail.tsx` 1824 not 2075, `Tasks.tsx` 1420 not
+  1590, `inventory-page.tsx` 1079 not 1033), and two route files it listed as pending had already
+  shipped: `server/routes/containers.ts` split by `80edf7c63` and `server/routes/users.ts` by
+  `e55ec8f82`, both 2026-08-23, both ancestors of `origin/main`, leaving them at 180 and 527 lines.
+  `server/routes/equipment.ts` (954) is the only route file still over the ceiling.
+
+**The one that matters most — an open test-coverage gap understated by 18 suites.** `TASKS.md`
+claimed `vite.config.ts` "excludes 10 entries" and that **three** remain covered by no workflow.
+On `origin/main` the exclude block now holds **32** entries and **21** are named by nothing:
+commit `4f48620e1` (PR #225, closing issue 221) added 18 more DB-backed suites, and
+`vite.config.ts` annotates that very block *"No dedicated runner exists yet for these."* Verified by
+grepping all six workflow files for each suite name — zero hits — and `pnpm test:db-integration`
+likewise runs nowhere, appearing only inside a `#` comment at `.github/workflows/ci.yml:279`.
+This supersedes the closing "Scope" paragraph of the 2026-08-22 live-server entry above, which named
+the same three orphans; that entry is append-only and stands as written.
+
+**Deliberately NOT changed, because verification said they were right:**
+- `CLAUDE.md`'s excluded-suite list. `origin/main` already carries the matching 18-suite text; this
+  branch carries the older list *and the older `vite.config.ts`*, so doc and code agree here.
+  Porting main's paragraph would have made this checkout false. The branch being behind is the
+  finding, not a defect in the file.
+- `CONTEXT.md`'s role hierarchy — byte-for-byte the `ROLE_LEVELS` map in
+  `server/lib/role-resolution.ts` (admin 40 · vet 30 · senior_technician 25 · lead_technician 22 ·
+  vet_tech/technician 20 · student 10).
+- `TASKS.md` § Completed — PRs #167, #175, #178, #179, #180, #181 all resolve to real merge commits
+  on `origin/main` whose branch names match the described work.
+- `docs/README.md` / `TASKS.md` on `docs/design-handoff/` — 240 tracked files, exactly as claimed.
+
+**A structural note the next reader should not have to rediscover:** three of my own first-draft
+citations failed the gate, and each failure was correct. `#221` is an *issue*, not a PR — the
+18-suite fix merged as **#225**. The per-route handler directories those two split commits added
+under `server/routes/` exist on `origin/main` but **not in this checkout**, because this
+branch is behind. Facts were checked against `origin/main` as instructed, but a backticked path is
+resolved against the working tree — so a claim can be true of the repo and still unverifiable from
+the branch you are standing on. Say which ref you mean.
+
+**Gate on this tree:** `pnpm verify:claims` →
+`1020 claims: 1009 verified, 10 registered, 1 attested, 0 FAILED` before this entry was appended,
+and `1074 claims: 1063 verified, 10 registered, 1 attested, 0 FAILED` after it. No registry entry was added: every correction above stands on its own evidence, which
+is the point.
+
+**Verdict:** VERIFIED

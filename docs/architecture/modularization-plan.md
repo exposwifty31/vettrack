@@ -16,19 +16,6 @@
 - Database schema changes as part of modularization
 - Renaming frozen surfaces (`/api/appointments`, `appointmentsPage.*`, outbox event names, queue names)
 
-## Current baseline (2026-05)
-
-| Area | Scale | Primary pain |
-|------|-------|----------------|
-| Backend routes | 55 modules; largest `equipment.ts` ~1,386 lines (post–Slice 4j/4k/4l) | HTTP + DB + business mixed in routes |
-| Backend services | 28 files; `appointments.service.ts` ~2,186 lines | ADR-002 accepted, not implemented |
-| Schema | `server/schema/*` ~2,045 lines | Already domain-split — keep |
-| Frontend API | `src/lib/api.ts` ~2,159 lines | Monolithic `api` object |
-| Frontend pages | 50+ under `src/pages/` | Few `src/features/` extractions |
-| Shared | 18 modules under `shared/` | Small; grow via `contracts/` |
-
-**Validation baseline:** `npx tsc --noEmit` passes on `main`.
-
 ## Known import cycles (fix before large barrels)
 
 **Server (4):**

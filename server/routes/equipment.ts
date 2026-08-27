@@ -7,7 +7,7 @@ import { z } from "zod";
 import { db, equipment, equipmentReturns, folders, rooms, scanLogs, transferLogs, undoTokens, users, stagingQueue } from "../db.js";
 import { eq, inArray, desc, asc, and, or, ilike, lt, gte, sql, isNull } from "drizzle-orm";
 import { requireAuth, requireAdmin, requireEffectiveRole } from "../middleware/auth.js";
-import { validateBody, validateUuid } from "../middleware/validate.js";
+import { validateBody } from "../middleware/validate.js";
 import { scanLimiter, checkoutLimiter, writeLimiter } from "../middleware/rate-limiters.js";
 import { checkDedupe, sendPushToAll, shouldSendPilotEnglishEquipmentPush } from "../lib/push.js";
 import { invalidateAnalyticsCache } from "../lib/analytics-cache.js";
@@ -21,6 +21,7 @@ import {
   assertWaitlistCheckoutAllowed,
   CheckoutConflictError,
   CheckoutPreconditionError,
+  CustodyReturnNotHolderError,
   CustodyReturnVersionConflictError,
   evaluateCheckoutV1Preconditions,
   finalizeCheckoutSideEffects,
@@ -150,6 +151,12 @@ const PLUG_IN_DEADLINE_DEFAULT_MINUTES = 30;
 export const equipmentReturnBodySchema = z.object({
   isPluggedIn: z.boolean().optional(),
   plugInDeadlineMinutes: z.number().int().min(1).max(PLUG_IN_DEADLINE_MAX_MINUTES).optional(),
+  /**
+   * Admin-only override: return a unit held by someone else, or repair an
+   * orphaned `checked_out` row that has no holder at all. Honoured only for an
+   * admin — a non-admin sending it still gets 403.
+   */
+  force: z.boolean().optional(),
 }).strict();
 
 /** Optional body for POST /:id/toggle — NFC quick custody flip. */
@@ -299,7 +306,6 @@ router.patch(
   requireAuth,
   writeLimiter,
   requireEffectiveRole("technician"),
-  validateUuid("id"),
   validateBody(patchEquipmentSchema),
   equipmentReplayIdempotency(EQUIPMENT_REPLAY_IDEMPOTENCY_ENDPOINTS.update),
   patchEquipmentHandler,
@@ -310,18 +316,17 @@ router.delete(
   requireAuth,
   writeLimiter,
   requireAdmin,
-  validateUuid("id"),
   equipmentReplayIdempotency(EQUIPMENT_REPLAY_IDEMPOTENCY_ENDPOINTS.delete),
   deleteEquipmentHandler,
 );
 
 // POST /api/equipment/:id/restore — admin only, restore a soft-deleted equipment record
-router.post("/:id/restore", requireAuth, requireAdmin, validateUuid("id"), postEquipmentRestoreHandler);
+router.post("/:id/restore", requireAuth, requireAdmin, postEquipmentRestoreHandler);
 
 // POST /api/equipment/scan — quick-scan alias for pilot/demo flows.
 // Body: { equipmentId: string }  (accepts plain string IDs like "eq1", not UUID-only)
 // Toggle semantics: available → checkout · held by caller → return · held by other → 409
-router.post("/scan", requireAuth, checkoutLimiter, requireEffectiveRole("student"), validateBody(quickScanBodySchema), async (req, res) => {
+router.post("/scan", requireAuth, checkoutLimiter, requireEffectiveRole("student"), validateBody(quickScanBodySchema), equipmentReplayIdempotency(EQUIPMENT_REPLAY_IDEMPOTENCY_ENDPOINTS.quickScan), async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
   try {
     const clinicId = req.clinicId!;
@@ -409,7 +414,6 @@ router.post(
   requireAuth,
   checkoutLimiter,
   requireEffectiveRole("student"),
-  validateUuid("id"),
   validateBody(equipmentToggleBodySchema),
   equipmentReplayIdempotency(EQUIPMENT_REPLAY_IDEMPOTENCY_ENDPOINTS.toggle),
   async (req, res) => {
@@ -493,7 +497,6 @@ router.post(
   requireAuth,
   checkoutLimiter,
   requireEffectiveRole("student"),
-  validateUuid("id"),
   validateBody(checkoutSchema),
   equipmentReplayIdempotency(EQUIPMENT_REPLAY_IDEMPOTENCY_ENDPOINTS.checkout),
   async (req, res) => {
@@ -725,7 +728,6 @@ router.post(
   requireAuth,
   checkoutLimiter,
   requireEffectiveRole("student"),
-  validateUuid("id"),
   validateBody(equipmentReturnBodySchema),
   equipmentReplayIdempotency(EQUIPMENT_REPLAY_IDEMPOTENCY_ENDPOINTS.return),
   async (req, res) => {
@@ -733,7 +735,15 @@ router.post(
   try {
     const clinicId = req.clinicId!;
     const clientTimestamp = parseInt(req.headers["x-client-timestamp"] as string || "0", 10);
-    const { isPluggedIn, plugInDeadlineMinutes } = req.body as z.infer<typeof equipmentReturnBodySchema>;
+    const { isPluggedIn, plugInDeadlineMinutes, force } = req.body as z.infer<typeof equipmentReturnBodySchema>;
+
+    // Only an admin may return a unit they do not hold. Read the persisted role,
+    // NOT req.effectiveRole: requireEffectiveRole overwrites effectiveRole with the
+    // roster shift's role, so an admin rostered as a technician would be refused
+    // the repair exactly when they are on shift. This mirrors the admin bypass in
+    // requireEffectiveRole itself.
+    const isAdmin = req.authUser!.role === "admin" || req.authUser!.secondaryRole === "admin";
+    const allowForeignHolder = isAdmin && force === true;
 
     const txResult = await db.transaction(async (tx) =>
       performEquipmentReturn(tx, {
@@ -741,6 +751,7 @@ router.post(
         equipmentId: req.params.id,
         actor: { id: req.authUser!.id, email: req.authUser!.email },
         clientTimestamp,
+        allowForeignHolder,
       }),
     );
 
@@ -772,6 +783,7 @@ router.post(
       isPluggedIn,
       plugInDeadlineMinutes,
       waitlistPromotedOnReturn: txResult.waitlistPromotedOnReturn,
+      auditMetadata: allowForeignHolder ? { forcedByAdmin: true } : undefined,
     });
 
     res.json({
@@ -780,6 +792,16 @@ router.post(
       returnRecord,
     });
   } catch (err) {
+    if (err instanceof CustodyReturnNotHolderError) {
+      return res.status(403).json(
+        apiError({
+          code: "FORBIDDEN",
+          reason: "NOT_CURRENT_HOLDER",
+          message: "Only the current holder can return this equipment",
+          requestId,
+        }),
+      );
+    }
     if (err instanceof CustodyReturnVersionConflictError) {
       trackSyncFail();
       return res.status(409).json(
@@ -810,7 +832,6 @@ router.post(
   "/:id/seen",
   requireAuth,
   writeLimiter,
-  validateUuid("id"),
   validateBody(seenSchema),
   equipmentReplayIdempotency(EQUIPMENT_REPLAY_IDEMPOTENCY_ENDPOINTS.seen),
   async (req, res) => {
@@ -858,7 +879,6 @@ router.post(
   requireAuth,
   scanLimiter,
   requireEffectiveRole("student"),
-  validateUuid("id"),
   validateBody(scanSchema),
   equipmentReplayIdempotency(EQUIPMENT_REPLAY_IDEMPOTENCY_ENDPOINTS.scan),
   async (req, res) => {
@@ -1026,7 +1046,7 @@ router.post(
 });
 
 // POST /api/equipment/:id/revert
-router.post("/:id/revert", requireAuth, requireEffectiveRole("vet"), validateUuid("id"), validateBody(revertSchema), postEquipmentRevertHandler);
+router.post("/:id/revert", requireAuth, requireEffectiveRole("vet"), validateBody(revertSchema), postEquipmentRevertHandler);
 
 router.get("/:id/logs", requireAuth, getEquipmentLogsHandler);
 

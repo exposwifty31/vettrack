@@ -404,14 +404,6 @@ Order of `export *` lines matters only if two domains exported the same name —
 
 | Sub-slice | Action | Validation |
 |-----------|--------|------------|
-| **6a** | Extract `platform.ts` | **merged** (#571) |
-| **6b** | Extract `patients.ts` (leaf) | **merged** (#572) |
-| **6c** | Extract `equipment.ts` (alerts, rooms, scan, ops state) | **merged** (#573) |
-| **6d** | Extract `tasks.ts` | **merged** (#574) |
-| **6e** | Extract `billing.ts` | **merged** (#575) |
-| **6f** | Extract `inventory.ts` | **merged** (#576) |
-| **6g** | Extract `forecast.ts` | **merged** (#577; see pilot F9 audit in [#580](https://github.com/dboy3156/VetTrack/pull/580)) |
-| **6h** | Extract `er.ts` (display + Code Blue + crash cart) | **merged** (#589) — [slice-6h-er-display-types-plan.md](./slice-6h-er-display-types-plan.md) |
 | **6i** | Optional `handoff.ts` wrapper for shared re-exports | shift-handover-page |
 | **6j** | Pilot import migration: `api/equipment.ts` → `@/types/equipment` | knip, no unused exports |
 | **6k+** | Gradual importer migration; keep barrel until knip clean | per-domain PRs |

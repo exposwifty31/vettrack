@@ -18,6 +18,7 @@
  */
 import { getLocaleDictionaries } from "../../../lib/i18n/loader.js";
 import { translate, type Locale, type TranslationParams } from "../../../lib/i18n/index.js";
+import { formatProposalDate } from "./format-proposal-date.js";
 import type { CoordinatorCandidate } from "../../services/equipment-coordinator.service.js";
 import type { CoordinatorRosterReadResult } from "./coordinator-roster-reader.port.js";
 import type { ActionProposalCitedFact, NewActionProposalInput } from "./action-proposal-types.js";
@@ -103,7 +104,12 @@ export function composeCoordinatorReassignProposal(input: ComposeCoordinatorReas
     clinicId,
     kind: "coordinator_reassign_off_roster",
     sourceSessionId: shiftDate,
-    summary: t("autopilotQueue.kinds.coordinatorReassignOffRoster.summaryTemplate", { shiftDate }),
+    // PROSE gets the locale-formatted day. `sourceSessionId`, `sourceRef`,
+    // `draftContent.shiftDate` and `citedFacts[].at` keep the raw ISO value —
+    // they are keys and stored data, not copy.
+    summary: t("autopilotQueue.kinds.coordinatorReassignOffRoster.summaryTemplate", {
+      shiftDate: formatProposalDate(shiftDate, resolvedLocale),
+    }),
     citedFacts,
     draftContent,
     sourceRef: { clinicId, shiftDate, persistedCoordinatorRowId: persistedRow.id },

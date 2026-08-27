@@ -354,6 +354,7 @@
     "noContainers": "No containers in the system",
     "startSessionFailed": "Could not start the restock session — please try again",
     "finishSessionFailed": "Could not finish the restock — please try again",
+    "finishSessionNoItems": "Nothing counted yet — count at least one item, or cancel the restock",
     "errorWithRequestId": "{message} (ref: {requestId})",
     "departments": {
       "hospital": "Hospital",
@@ -1374,7 +1375,9 @@
     "loadFailed": "Failed to load analytics data. Try again.",
     "shiftLeaderboardLink": "Shift scan leaderboard",
     "noScanActivity": "No scan activity in the last 14 days",
-    "issueCountBadge": "{count} issues"
+    "issueCountBadge": "{count} issues",
+    "statusDistributionChartDesc": "Doughnut chart showing how many equipment items are in each status: ready, issue, maintenance and sterilized.",
+    "scanActivityChartDesc": "Bar chart showing how many scans were recorded on each of the last 14 days."
   },
   "monthlyReport": {
     "title": "VetTrack Monthly Report",

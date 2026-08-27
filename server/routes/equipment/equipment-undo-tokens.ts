@@ -9,6 +9,20 @@ type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 const _parsedUndoTtl = parseInt(process.env.UNDO_TTL_MS ?? "", 10);
 const UNDO_TTL_MS = Number.isFinite(_parsedUndoTtl) && _parsedUndoTtl > 0 ? _parsedUndoTtl : 90_000;
 
+/**
+ * Every column an undoable mutation writes must appear here, or undo leaves the
+ * row half-reverted. Migration 133's operational-state columns were missed for
+ * exactly that reason: `snapshotEquipmentState` takes a whole row and picks
+ * fields, so adding a column the checkout writes produces no compile error.
+ * `tests/equipment-undo-snapshot-coverage.test.ts` derives the required set from
+ * the checkout/return mutations instead of trusting this list.
+ *
+ * Deliberately excluded, because no undo-token-issuing path writes them:
+ * `assetTypeId` (catalog attribute), `dockId` / `dockConfirmedReadyAt` /
+ * `dockConfirmedById` (dock-return route), `untrackedDepartureAt` (no writer),
+ * and `emergencyOverrideAt` / `emergencyOverrideById` (emergency checkout
+ * returns an empty undo token, so it is not revertible at all).
+ */
 export interface EquipmentPreviousState {
   status: string;
   lastSeen: Date | string | null;
@@ -19,6 +33,12 @@ export interface EquipmentPreviousState {
   checkedOutByEmail: string | null;
   checkedOutAt: Date | string | null;
   checkedOutLocation: string | null;
+  custodyState: string;
+  custodyStateSince: Date | string | null;
+  readinessState: string;
+  readinessStateSince: Date | string | null;
+  usageState: string;
+  usageStateSince: Date | string | null;
 }
 
 type DbExecutor = AuditDbExecutor | typeof db;
@@ -34,6 +54,12 @@ export function snapshotEquipmentState(row: EquipmentRow): EquipmentPreviousStat
     checkedOutByEmail: row.checkedOutByEmail,
     checkedOutAt: row.checkedOutAt,
     checkedOutLocation: row.checkedOutLocation,
+    custodyState: row.custodyState,
+    custodyStateSince: row.custodyStateSince,
+    readinessState: row.readinessState,
+    readinessStateSince: row.readinessStateSince,
+    usageState: row.usageState,
+    usageStateSince: row.usageStateSince,
   };
 }
 

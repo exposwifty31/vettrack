@@ -4,8 +4,6 @@
 - **Spec:** `../../superpowers/specs/2026-07-12-audit-10x-consolidated-plan-design.md`
 - **These are not task cards.** Each item is parked with its **standing blocker** and the **entry conditions** that must be met before it earns its own SDD sub-spec (same SDD+TDD+Sonnet contract as `R-M1`). Do not start code until the blocker clears.
 
-> **Note:** massive-01 is nominally a Phase-4 Massive but is **already unblocked and planned** — see `subspecs/R-M1-rfid-gate-e2e.plan.md`. It is not parked here.
-
 ---
 
 ## massive-03 — Clinic network (equipment sharing + peer benchmarking)

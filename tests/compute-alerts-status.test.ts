@@ -19,6 +19,11 @@ function baseEquipment(overrides: Partial<Equipment> = {}): Equipment {
     lastMaintenanceDate: null,
     lastSterilizationDate: null,
     lastSeen: new Date().toISOString(),
+    // Staleness is derived from lastVerifiedAt (S5b), so a fixture meant to be
+    // "healthy apart from the field under test" has to carry a recent
+    // verification — a fresh lastSeen alone now (correctly) reads as unverified
+    // and would add an unintended `inactive` alert to every row here.
+    lastVerifiedAt: new Date().toISOString(),
     checkedOutById: null,
     checkedOutAt: null,
     checkedOutLocation: null,

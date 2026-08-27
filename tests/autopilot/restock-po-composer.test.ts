@@ -112,6 +112,28 @@ describe("composeRestockPoProposal", () => {
     expect(heInput.summary).not.toBe(input.summary);
   });
 
+  it("renders scanDate as a locale-formatted date in the PROSE summary while every stored key stays byte-identical", () => {
+    const en = composeRestockPoProposal({ clinicId: CLINIC_A, scanDate: SCAN_DATE, flaggedItems: [buildFlaggedItem()], locale: "en" });
+    const he = composeRestockPoProposal({ clinicId: CLINIC_A, scanDate: SCAN_DATE, flaggedItems: [buildFlaggedItem()], locale: "he" });
+
+    // Prose: formatted, never the machine-readable ISO day.
+    expect(en.summary).not.toContain(SCAN_DATE);
+    expect(he.summary).not.toContain(SCAN_DATE);
+    expect(en.summary).toContain("7/22/2026");
+    expect(he.summary).toContain("22.7.2026");
+
+    // Keys and stored data: unchanged. sourceSessionId backs the
+    // (clinicId, kind, sourceSessionId) unique index — formatting it would
+    // break autopilot idempotency.
+    for (const input of [en, he]) {
+      expect(input.sourceSessionId).toBe(SCAN_DATE);
+      expect((input.sourceRef as { scanDate: string }).scanDate).toBe(SCAN_DATE);
+      expect((input.draftContent as RestockPoDraftContent).scanDate).toBe(SCAN_DATE);
+      // citedFacts[].at on the vt_items row is derived from scanDate as a timestamp.
+      expect(input.citedFacts[0]!.at).toBe(`${SCAN_DATE}T00:00:00.000Z`);
+    }
+  });
+
   it("throws when given an empty flaggedItems array (nothing to propose)", () => {
     expect(() =>
       composeRestockPoProposal({ clinicId: CLINIC_A, scanDate: SCAN_DATE, flaggedItems: [], locale: "en" }),

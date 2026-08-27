@@ -1268,34 +1268,6 @@ tracker box"), get that review before changing `- [ ] 2.3 "Who's on the floor" g
 
 ---
 
-## Already complete (no tasks needed — cited, not re-derived)
-
-**Layer 3 — RN-migration + stack-currency research.** Done as research this session, folded into this
-same file's history (see git log for this file) and summarized in the Program Map above. The full 3a
-report is now salvaged onto this branch at **`docs/design/react-native-migration-research.md`** (193
-lines, all 7 questions answered — recovered from the closed PR #132's branch, `git show`'d in rather than
-merged, so that branch's stale master-plan version isn't dragged along). Framed per the owner's directive:
-3a is the **research basis feeding the migration** (Layer 5), not a stopping point in itself.
-- Bare-RN-CLI vs Expo: New Architecture default since 0.76 (0.82 deleted the legacy Bridge); **Clerk has no
-  official bare-RN SDK** — the report's one blocker-adjacent risk, three mitigation options given, with
-  `install-expo-modules` + `@clerk/expo` (Expo's own first-party path for bare-RN-CLI) recommended as the
-  spike to run first. This is a named risk **ADR-008 must explicitly resolve**, not merely acknowledge —
-  see Layer 4/5 below. MMKV's JSI-synchronous design is the New-Architecture-native offline-storage
-  pattern; `@vettrack/contracts` (`packages/contracts/`) is confirmed framework-free (zero deps, zero
-  non-relative imports).
-- Stack currency: React 19 non-urgent, Express 5 worth scheduling (no forcing function), Drizzle ORM has
-  an active v1.0.0-beta with a breaking migration — do not touch yet.
-- Indoor positioning (RFID/BLE/geo-location merged into one question): a real business-case doc already
-  exists — `docs/business-case/2026-07-12-massive-01-passive-tracking-cost-benefit.md` — recommending an
-  RFID-gate pilot first. `react-native-ble-plx` has an open New Architecture compatibility issue (#1277) —
-  a real spike risk for a future Layer 5. Handheld RFID readers are a distinct hardware category from the
-  existing fixed-gate system (ADR-004).
-- Several report items are marked **[verify locally]** (the remote research session's primary-doc fetcher
-  was blocked by clerk.com/reactnative.dev and corroborated via secondary sources instead) — these carry
-  forward as required checks during ADR-008 drafting, not settled facts.
-
----
-
 ## Scoped, not bite-sized (blocked on decisions or foundations that don't exist yet)
 
 Per this skill's own "No Placeholders" rule, these are deliberately **not** broken into fake 5-minute
@@ -1445,11 +1417,10 @@ every comment mapped to a real, verifiable gap in the actual file content.
 
 ## Immediate next steps (across the whole program, not just Tasks 1–9)
 
-1. **Merge `docs/2.0-planning-corpus` to `main`** — closes Layer 0.
-2. **Greenlight the first Layer 1 screen** (Home/Today, turn 1) — per the owner's screen-by-screen decision.
-3. **Run Task 0.7's on-device physical confirmation** (haptics + edge-to-edge on real hardware) — the hard
+1. **Greenlight the first Layer 1 screen** (Home/Today, turn 1) — per the owner's screen-by-screen decision.
+2. **Run Task 0.7's on-device physical confirmation** (haptics + edge-to-edge on real hardware) — the hard
    gate blocking Layer 2 from starting.
-4. **Prep ADR-008**: run the Clerk spike (`install-expo-modules` + `@clerk/expo`, working sign-in on a real
+3. **Prep ADR-008**: run the Clerk spike (`install-expo-modules` + `@clerk/expo`, working sign-in on a real
    device) before The Architect drafts the ADR — a spike result, not a memo, is what unblocks Layer 4.
 
 Per-layer verification now also includes real deployment evidence where applicable — App Store Connect

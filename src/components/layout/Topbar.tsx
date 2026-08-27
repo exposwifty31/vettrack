@@ -110,8 +110,11 @@ export function Topbar() {
           T22: at intermediate desktop widths (~1227px) this strip doesn't fit every
           item and used to show a raw horizontal scrollbar. scrollbar-none (same
           utility as the admin tab strip / equipment filter chips) keeps the strip
-          scrollable — nothing is unreachable — without the visible scrollbar. */}
-      <nav ref={navRef} className="flex items-center gap-0.5 flex-1 overflow-x-auto scrollbar-none min-w-0">
+          scrollable — nothing is unreachable — without the visible scrollbar.
+          aria-label: the management dropdown below is a second <nav> landmark, so
+          an unnamed strip would leave a screen-reader's landmark list with two
+          indistinguishable "navigation" entries. */}
+      <nav ref={navRef} aria-label={t.nav.operationsSection} className="flex items-center gap-0.5 flex-1 overflow-x-auto scrollbar-none min-w-0">
         {visibleItems.map(renderNavLink)}
       </nav>
 

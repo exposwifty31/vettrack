@@ -26,6 +26,7 @@
  */
 import { getLocaleDictionaries } from "../../../lib/i18n/loader.js";
 import { translate, type Locale, type TranslationParams } from "../../../lib/i18n/index.js";
+import { formatProposalDate } from "./format-proposal-date.js";
 import type { CrashCartDriftReadResult, CrashCartFailedItem } from "./crash-cart-drift-reader.port.js";
 import type { ActionProposalCitedFact, NewActionProposalInput } from "./action-proposal-types.js";
 
@@ -64,6 +65,7 @@ function composeMissingItems(
   scanDate: string,
   reader: CrashCartDriftReadResult,
   t: Translator,
+  locale: Locale,
 ): NewActionProposalInput {
   const lastCheck = reader.lastCheck;
   if (!lastCheck) {
@@ -94,9 +96,12 @@ function composeMissingItems(
     clinicId,
     kind: "crash_cart_drift",
     sourceSessionId: scanDate,
+    // PROSE gets the locale-formatted day; `sourceSessionId`, `sourceRef`,
+    // `draftContent.scanDate` and `citedFacts[].at` above keep the raw ISO
+    // value — they are keys and stored data, not copy.
     summary: t("autopilotQueue.kinds.crashCartDrift.missingItemSummaryTemplate", {
       itemCount: reader.failedItems.length,
-      scanDate,
+      scanDate: formatProposalDate(scanDate, locale),
     }),
     citedFacts,
     draftContent,
@@ -169,6 +174,6 @@ export function composeCrashCartDriftProposal(input: ComposeCrashCartDriftPropos
   const { primary, fallback, locale: resolvedLocale } = getLocaleDictionaries(locale);
   const t: Translator = (key, params) => translate(primary, key, params, { fallbackDict: fallback, locale: resolvedLocale });
 
-  if (reader.missingItemsFlagged) return composeMissingItems(clinicId, scanDate, reader, t);
+  if (reader.missingItemsFlagged) return composeMissingItems(clinicId, scanDate, reader, t, resolvedLocale);
   return composeStaleCheck(clinicId, scanDate, reader, t);
 }

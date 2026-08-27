@@ -58,7 +58,7 @@ Dexie cache + sync engine for operational mutations. **Code Blue mutations never
 
 Documented in [`docs/scope-change-2026.md`](docs/scope-change-2026.md):
 
-- ER Mode, ER board, intake routing, shift handover product surface
+- ER Mode, ER board, intake routing, ~~shift handover product surface~~ — *corrected 2026-08-27: shift handover belongs in this list only as history.* It was dropped by `migrations/142_drop_er_patients_shift_handover.sql` (June 2026) and then **deliberately reintroduced** under sub-spec R-SH-F1, so the "explicit product decision" this heading asks for has already been taken. It is live on `origin/main` and in this tree: `migrations/177_vt_shift_handover.sql`, `server/lib/shift-handover-generator.ts`, `server/routes/shift-handover.ts` mounted as `/api/shift-handover` at `server/app/routes.ts:154`, and the `/handoff` page routed at `src/app/routes.tsx:217`. Treating it as a forbidden domain would be wrong.
 - Patients / animals / hospitalizations as first-class UI
 - Medication tasks, drug formulary, pharmacy forecast
 - Pilot mode route gating

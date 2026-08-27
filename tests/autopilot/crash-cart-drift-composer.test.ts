@@ -169,6 +169,52 @@ describe("composeCrashCartDriftProposal", () => {
     }
   });
 
+  it("renders scanDate as a locale-formatted date in the PROSE summary while every stored key stays byte-identical", () => {
+    const en = composeCrashCartDriftProposal({
+      clinicId: CLINIC_A,
+      scanDate: SCAN_DATE,
+      reader: buildMissingItemsResult(),
+      locale: "en",
+    });
+    const he = composeCrashCartDriftProposal({
+      clinicId: CLINIC_A,
+      scanDate: SCAN_DATE,
+      reader: buildMissingItemsResult(),
+      locale: "he",
+    });
+
+    // Prose: formatted, never the machine-readable ISO day.
+    expect(en.summary).not.toContain(SCAN_DATE);
+    expect(he.summary).not.toContain(SCAN_DATE);
+    expect(en.summary).toContain("7/22/2026");
+    expect(he.summary).toContain("22.7.2026");
+
+    // Keys and stored data: unchanged. sourceSessionId backs the
+    // (clinicId, kind, sourceSessionId) unique index — formatting it would
+    // break autopilot idempotency.
+    for (const input of [en, he]) {
+      expect(input.sourceSessionId).toBe(SCAN_DATE);
+      expect((input.sourceRef as { scanDate: string }).scanDate).toBe(SCAN_DATE);
+      expect((input.draftContent as CrashCartMissingItemsDraftContent).scanDate).toBe(SCAN_DATE);
+    }
+  });
+
+  it("keeps citedFacts[].at a raw ISO timestamp when the never-checked branch derives it from scanDate", () => {
+    const never = composeCrashCartDriftProposal({
+      clinicId: CLINIC_A,
+      scanDate: SCAN_DATE,
+      reader: buildStaleResult({
+        hasNeverBeenChecked: true,
+        lastCheck: null,
+        hoursSinceLastCheck: null,
+        activeItems: [{ id: "item-epi", key: "epinephrine", label: "Epinephrine" }],
+      }),
+      locale: "he",
+    });
+    expect(never.citedFacts[0]!.at).toBe(`${SCAN_DATE}T00:00:00.000Z`);
+    expect((never.draftContent as CrashCartStaleCheckDraftContent).scanDate).toBe(SCAN_DATE);
+  });
+
   it("throws when neither missingItemsFlagged nor staleFlagged is true (nothing to propose)", () => {
     const reader = buildMissingItemsResult({ missingItemsFlagged: false, failedItems: [], staleFlagged: false });
     expect(() =>

@@ -271,40 +271,6 @@ Verify: `pnpm architecture:gates` fails if copilot **transitively** reaches a fo
 
 ## 4. Milestones with break-proof exit criteria
 
-### Milestone 0 — Foundations (Weeks 1–2)
-
-**Deliverables**
-
-| Item | Path / artifact |
-|------|-----------------|
-| Shared contracts | `shared/contracts/asset-copilot.v1.ts` |
-| Evidence Graph loader | `server/domain/equipment/evidence/graph.loader.ts` |
-| Four resolvers | `resolver/{location,deployability,custodian,waitlist}.ts` |
-| Citation validator + unit tests | `copilot/citation-validator.ts` (validity only) |
-| Golden tests | `tests/asset-copilot/resolver-golden.test.ts` (30 synthetics) |
-| Freshness policy | `evidence-metadata.ts` — per-type thresholds (§3.5) |
-| Depcruise no-mutation rule | `scripts/architecture/` or `.dependency-cruiser.cjs` (§3.8) |
-| ADR | [adr-003-asset-copilot-evidence-resolver.md](./adr-003-asset-copilot-evidence-resolver.md) |
-
-**Exit criteria (all required)**
-
-- [ ] `pnpm architecture:gates` pass (no new cycles + **no-mutation import rule**)
-- [ ] `npx tsc --noEmit` pass (including `AuditActionType` exhaustiveness if audit kinds added early)
-- [ ] `pnpm test` pass (including new golden file)
-- [ ] `knip` — no orphan exports from new modules
-- [ ] **M0 golden (coarse gate, n=30):** see §6.1 — not “>95%” statistical claims
-- [ ] **No** HTTP routes exposed to clients yet (or routes return 404 when flag off)
-- [ ] **Deployability parity:** semantic deep-equal vs `GET /equipment/:id/deployability` on **≥10 fixtures** (normalized JSON shape — **not** byte-match)
-- [ ] Location / custodian / waitlist: **golden fixtures are the oracle** (no existing HTTP parity endpoint)
-
-**Break checks**
-
-- Resolver imports only `equipment-operational-state.service.ts` for gates — not copy-paste logic
-- Graph loader: every query includes `eq(table.clinicId, clinicId)`
-- Every golden miss **triaged in writing** (fixture wrong vs resolver bug) before M0 sign-off
-
----
-
 ### Milestone 0.5 — Shadow Mode (Weeks 3–4)
 
 **Prerequisite:** §15 M0.5 blockers cleared (custody freshness in §3.5 agreed; **named** shadow reviewers posted by product).
@@ -331,42 +297,6 @@ Verify: `pnpm architecture:gates` fails if copilot **transitively** reaches a fo
 
 - Shadow endpoint rate-limited; not mounted in production until M1
 - No writes to `vt_equipment`, `pendingSync`, or outbox from shadow pipeline
-
----
-
-### Milestone 1 — Asset Copilot Lite (Weeks 5–9)
-
-**Skills:** Explain state · Find asset · Explain conflict
-
-**Deliverables**
-
-- User-facing drawer + suggested questions
-- `ENABLE_ASSET_COPILOT` (default `false`)
-- Audit kinds added to closed union: `ai_equipment_query`, `ai_equipment_explain`, `ai_equipment_suggestion_accepted`
-- 15-minute answer cache (**observedAt-only** citations — §3.6); SSE invalidation
-- Token cap — §8.1 (user + clinic scope)
-- i18n keys in `locales/he.json` + `locales/en.json` (parity script) + **manual RTL QA** for citation chip layout (§13)
-
-**Exit criteria**
-
-- [ ] All M0 + M0.5 gates still pass on `main` merge
-- [ ] `pnpm routes:contract` updated
-- [ ] `pnpm query-keys:audit` updated
-- [ ] `tests/offline-mutation-registry.test.ts` still pass — copilot not in offline registry
-- [ ] Manual: Demo 1 + Demo 2 scripts on staging
-- [ ] **Blocking:** Vitest render smoke — mount equipment detail (or copilot drawer), toggle drawer, assert citation region exists (non-flaky, no network)
-- [ ] **Blocking:** M1-d offline UX — no copilot CTA when offline; CTA works online (§3.7)
-- [ ] Hard gate: depcruise no-mutation rule still passes + **0** custody audit correlation (belt and suspenders)
-
-**PR slicing (zero-break)**
-
-| PR | Contents | Touches paused routes? |
-|----|----------|------------------------|
-| M1-a | Contracts + validator + orchestrator + routes (flag off) | No |
-| M1-b | `equipment-copilot.ts` API | No |
-| M1-c | `features/equipment/copilot` UI + drawer on detail + render smoke test | No |
-| M1-d | Conflict modal coach (**post-reconnect only**, §3.7) | No |
-| M1-e | i18n + audit kinds + metrics + flags | No |
 
 ---
 
