@@ -224,43 +224,15 @@ describe("POST /api/equipment/:id/return — admin force override", () => {
   });
 
   /**
-   * SOURCE-ANCHORED, NOT BEHAVIOURAL — and that distinction is the point.
+   * The route-level claims that used to live here as string searches — a
+   * non-admin's forced return getting 403, an admin's reaching the transaction
+   * with `allowForeignHolder: true`, and the forced return being audited — are
+   * now DRIVEN in tests/equipment-return-force-route.test.ts against the real
+   * handler. They were removed rather than kept alongside it, because a string
+   * search that survives the behaviour it describes is worse than no test:
+   * rewriting the guard as `allowForeignHolder = force === true` grants the
+   * override to every role and leaves every token in place.
    *
-   * The three cases below read `server/routes/equipment.ts` as text. They prove
-   * the wiring exists; they do NOT prove that a non-admin `force` request gets
-   * 403, that an admin request reaches the service with `allowForeignHolder:
-   * true`, or that a forced return writes audit metadata.
-   *
-   * The SERVICE half of those claims is already covered behaviourally above
-   * (lines 134-179): the holder check throws `CustodyReturnNotHolderError`, and
-   * `allowForeignHolder: true` lets both the foreign-holder and the orphaned-
-   * repair case through, driven against the real service with a fake tx.
-   *
-   * The ROUTE half has no home yet. Every one of this repo's 14 equipment route
-   * tests either reads source text or needs a live `DATABASE_URL`; none mocks
-   * the database to drive a handler. Building that harness is its own slice —
-   * it belongs beside the `.integration.test.ts` suites, not smuggled in here
-   * as a stronger-looking assertion over the same string search.
+   * What remains below is the one claim with no behavioural equivalent.
    */
-  it("wires the resolved override into the transaction, not a route-level pre-check (source-anchored)", () => {
-    expect(returnRouteSource).toContain("allowForeignHolder");
-    const guardInService = fs.readFileSync(
-      path.join(__dirname, "..", "server", "services", "equipment-custody-toggle.service.ts"),
-      "utf8",
-    );
-    const fnStart = guardInService.indexOf("export async function performEquipmentReturn");
-    const fnBody = guardInService.slice(fnStart);
-    expect(fnBody).toContain("CustodyReturnNotHolderError");
-    expect(fnBody).toContain("allowForeignHolder");
-  });
-
-  it("wires the holder violation to 403 NOT_CURRENT_HOLDER (source-anchored)", () => {
-    expect(returnRouteSource).toContain("CustodyReturnNotHolderError");
-    expect(returnRouteSource).toContain("res.status(403)");
-    expect(returnRouteSource).toContain('reason: "NOT_CURRENT_HOLDER"');
-  });
-
-  it("wires audit metadata onto a forced return (source-anchored)", () => {
-    expect(returnRouteSource).toContain("forcedByAdmin");
-  });
 });
