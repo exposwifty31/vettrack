@@ -80,55 +80,72 @@ describe(`${FILE} — a superseded scan response reaches no consumer`, () => {
     expect(unguarded).toEqual([]);
   });
 
-  it("mutates the NFC counter from a response handler only under an ownership guard", () => {
-    // Both directions of the same rule. The success side used to sync above the
-    // guard; the FAILURE side restored `prevCount` unconditionally, so with two
-    // fallback scans posting 5 and 6 where the 6 succeeds and the 5 then fails,
-    // the counter fell back to 4 and the next scan posted 5 over a server that
-    // already held 6. A response that lost the race is stale whether it
-    // resolved or rejected.
-    const GUARD_NAMES = ["claimLatestWrite", "issuedTicketByTagRef"];
-
-    function isUnderOwnershipGuard(node: ts.Node, stopAt: ts.Node): boolean {
-      for (let p: ts.Node | undefined = node.parent; p && p !== stopAt.parent; p = p.parent) {
-        if (!ts.isIfStatement(p)) continue;
-        let named = false;
-        walk(p.expression, (n) => {
-          if (ts.isIdentifier(n) && GUARD_NAMES.includes(n.text)) named = true;
-        });
-        if (named) return true;
-      }
-      return false;
-    }
-
-    const handlers: ts.Node[] = [];
-    walk(sourceFile, (n) => {
-      if (!ts.isCallExpression(n)) return;
-      const callee = n.expression;
-      if (!ts.isPropertyAccessExpression(callee)) return;
-      if (callee.name.text !== "then" && callee.name.text !== "catch") return;
-      for (const arg of n.arguments) {
-        if (ts.isArrowFunction(arg) || ts.isFunctionExpression(arg)) handlers.push(arg);
-      }
-    });
-
-    const unguarded: number[] = [];
-    let mutations = 0;
-    for (const handler of handlers) {
-      walk(handler, (n) => {
-        if (!ts.isCallExpression(n) || !ts.isPropertyAccessExpression(n.expression)) return;
-        const method = n.expression.name.text;
-        if (method !== "set" && method !== "delete") return;
-        if (!n.expression.expression.getText(sourceFile).startsWith("nfcItemCountsRef.current")) return;
-        mutations += 1;
-        if (!isUnderOwnershipGuard(n, handler)) unguarded.push(lineOf(n));
+  /** Identifier names appearing in the conditions of every enclosing `if`, up to `stopAt`. */
+  function guardNamesAround(node: ts.Node, stopAt: ts.Node): Set<string> {
+    const names = new Set<string>();
+    for (let p: ts.Node | undefined = node.parent; p && p !== stopAt.parent; p = p.parent) {
+      if (!ts.isIfStatement(p)) continue;
+      walk(p.expression, (n) => {
+        if (ts.isIdentifier(n)) names.add(n.text);
       });
     }
+    return names;
+  }
 
-    // Guard the guard: if the handlers stop mutating the counter entirely, the
-    // assertion below would pass on an empty set and prove nothing.
-    expect(mutations).toBeGreaterThan(0);
-    expect(unguarded).toEqual([]);
+  /** The arrow/function bodies passed to `.then(...)` / `.catch(...)` anywhere in the file. */
+  const responseHandlers: ts.Node[] = (() => {
+    const found: ts.Node[] = [];
+    walk(sourceFile, (n) => {
+      if (!ts.isCallExpression(n) || !ts.isPropertyAccessExpression(n.expression)) return;
+      const method = n.expression.name.text;
+      if (method !== "then" && method !== "catch") return;
+      for (const arg of n.arguments) {
+        if (ts.isArrowFunction(arg) || ts.isFunctionExpression(arg)) found.push(arg);
+      }
+    });
+    return found;
+  })();
+
+  /** Calls inside a response handler that match `predicate`, with their enclosing guard names. */
+  function inHandlers(predicate: (n: ts.CallExpression) => boolean) {
+    const hits: { line: number; guards: Set<string> }[] = [];
+    for (const handler of responseHandlers) {
+      walk(handler, (n) => {
+        if (!ts.isCallExpression(n) || !predicate(n)) return;
+        hits.push({ line: lineOf(n), guards: guardNamesAround(n, handler) });
+      });
+    }
+    return hits;
+  }
+
+  function isMapMutation(n: ts.CallExpression, receiver: string): boolean {
+    if (!ts.isPropertyAccessExpression(n.expression)) return false;
+    const method = n.expression.name.text;
+    if (method !== "set" && method !== "delete") return false;
+    return n.expression.expression.getText(sourceFile).startsWith(receiver);
+  }
+
+  it("changes the NFC counter from a response handler only when this write still owns the TAG", () => {
+    // `claimLatestWrite` answers "has a newer write LANDED". The NFC counter is
+    // the baseline for the NEXT request, so it needs the other question. Both
+    // sides got this wrong in turn: the failure side restored `prevCount`
+    // unconditionally, and the success side sat under `claimLatestWrite` alone,
+    // which accepts an earlier response while a newer scan is still pending —
+    // scan 5 answers, counter drops back to 5, and a third scan started in that
+    // window posts 6 instead of 7.
+    const hits = inHandlers((n) => isMapMutation(n, "nfcItemCountsRef.current"));
+    expect(hits.length).toBeGreaterThan(0);
+    expect(hits.filter((h) => !h.guards.has("issuedTicketByTagRef")).map((h) => h.line)).toEqual([]);
+  });
+
+  it("changes a row's optimistic quantity from a response handler only when no newer write for that ROW was issued", () => {
+    // Same rule, different keyspace: the row is keyed by code, and a newer
+    // inline edit already issued against it owns what the row shows.
+    const hits = inHandlers(
+      (n) => ts.isIdentifier(n.expression) && n.expression.text === "setOptimisticActualByCode",
+    );
+    expect(hits.length).toBeGreaterThan(0);
+    expect(hits.filter((h) => !h.guards.has("issuedTicketByCodeRef")).map((h) => h.line)).toEqual([]);
   });
 
   it("persists the NFC counter map only from inside that guard", () => {
