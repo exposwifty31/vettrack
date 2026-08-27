@@ -231,6 +231,56 @@ describe("InventoryPage — a late scan response cannot overwrite a newer count 
     expect(cachedLine(qc, "SKU1").sessionObservedQuantity).toBe(7);
   });
 
+  it("a FAILING earlier scan does not roll back over a newer write that is still PENDING", async () => {
+    // The previous test's blind spot, and the reason a ticket gate alone is not
+    // enough. `claimLatestWrite` compares writes that have LANDED. Here the
+    // newer write has been ISSUED but has not come back yet, so at the moment
+    // the earlier one rejects there is nothing in the applied map to out-rank
+    // it — the gate says yes and the rollback writes a stale number.
+    //
+    //   1. tap Increment  -> ticket 1, captures 4, shows 5, scan hangs
+    //   2. inline count 7 -> ticket 2, shows 7, scan ALSO hangs
+    //   3. the tap REJECTS -> nothing has landed, so the gate passes and 4 is
+    //      written back
+    //   4. the inline count SUCCEEDS -> patches the cache to 7, but the success
+    //      path never touches optimisticActualByCode
+    //
+    // Row 4, cache 7, server 7. And S13a then swallows a re-commit of 7 as a
+    // no-op, so the technician cannot type the right number back.
+    let rejectIncrement: ((reason?: unknown) => void) | undefined;
+    let resolveInline: ((value: unknown) => void) | undefined;
+    scanMock.mockImplementationOnce(
+      () => new Promise((_resolve, reject) => { rejectIncrement = reject; }),
+    );
+    scanMock.mockImplementationOnce(
+      () => new Promise((resolve) => { resolveInline = resolve; }),
+    );
+
+    const { qc } = renderPage();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Increment Saline" }));
+    await waitFor(() => expect(scanMock).toHaveBeenCalledTimes(1));
+    expect(quantityButton("Saline").textContent).toBe("5");
+
+    await commitInlineCount("Saline", "7");
+    await waitFor(() => expect(scanMock).toHaveBeenCalledTimes(2));
+    expect(quantityButton("Saline").textContent).toBe("7");
+
+    // The earlier scan fails while the newer one is STILL in flight.
+    rejectIncrement?.(new Error("network"));
+    await waitFor(() => expect(scanMock.mock.results[0].value).rejects.toThrow());
+
+    resolveInline?.({
+      item: { id: "i1", code: "SKU1", label: "Saline" },
+      observedQuantity: 7,
+    });
+    await waitFor(() => expect(screen.queryByText(/Syncing/i)).toBeNull());
+
+    expect(cachedLine(qc, "SKU1").sessionObservedQuantity).toBe(7);
+    // The load-bearing one: what the technician actually sees.
+    expect(quantityButton("Saline").textContent).toBe("7");
+  });
+
   it("keeps the newer count in cache, so a later re-count to the superseded number is still posted", async () => {
     // The +1 tap's scan hangs; the inline-edited absolute 7 overtakes it.
     let resolveIncrement: ((value: unknown) => void) | undefined;

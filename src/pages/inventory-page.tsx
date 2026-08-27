@@ -400,6 +400,12 @@ export default function InventoryPage() {
   // EVERY path — the session-failure rollback runs before `resolvedItemId`
   // exists, so an id-keyed ticket could not guard it at all.
   const appliedTicketByCodeRef = useRef<Map<string, number>>(new Map<string, number>());
+  // The applied map answers "has a newer write LANDED". A rollback needs the
+  // other question — "has a newer write been ISSUED" — and the two differ for
+  // exactly the window that matters: an earlier write failing while a later one
+  // is still in flight sees an empty applied map, out-ranks nothing, and writes
+  // its stale pre-await value over a row the pending write already owns.
+  const issuedTicketByCodeRef = useRef<Map<string, number>>(new Map<string, number>());
 
   /**
    * Claims the right to apply this write's result for `itemId`, returning false
@@ -417,6 +423,35 @@ export default function InventoryPage() {
     return true;
   }, []);
 
+  /**
+   * True while this write is still the newest one ISSUED for the row — the
+   * condition a rollback needs. A later-issued write already computed its own
+   * value from the newer baseline and owns what the row displays, whether or
+   * not it has answered yet, so an earlier failure must leave it alone.
+   */
+  const ownsRowDisplay = useCallback(
+    (code: string, ticket: number): boolean => issuedTicketByCodeRef.current.get(code) === ticket,
+    [],
+  );
+
+  /**
+   * Undo this write's optimistic patch by DROPPING the row's override rather
+   * than restoring the value captured before the awaits. The row then falls
+   * back to `line.actual` (see the row render), which is the cache — and the
+   * cache holds exactly what succeeded. Restoring a captured number instead is
+   * wrong whenever any other write for the row also failed: two failures would
+   * each restore their own pre-await value and the survivor would be a quantity
+   * the server never held.
+   */
+  const dropOptimisticRow = useCallback((code: string) => {
+    setOptimisticActualByCode((prev) => {
+      if (!(code in prev)) return prev;
+      const next = { ...prev };
+      delete next[code];
+      return next;
+    });
+  }, []);
+
   // ── scan line ─────────────────────────────────────────────────────────────
 
   const scanLine = useCallback(
@@ -425,6 +460,7 @@ export default function InventoryPage() {
 
       // Taken before any await, so ordering follows when the write was ISSUED.
       const writeTicket = ++writeTicketRef.current;
+      issuedTicketByCodeRef.current.set(code, writeTicket);
 
       // ── 1. Instant optimistic update (synchronous, <1ms) ──────────────────
       const currentValue = optimisticActualByCode[code] ?? lines.find((l) => l.code === code)?.actual ?? 0;
@@ -445,13 +481,10 @@ export default function InventoryPage() {
       const sessionId = await getOrCreateSession();
 
       if (!sessionId) {
-        // Session failed — roll back, but only if no LATER write has landed for
-        // this row. `currentValue` was captured before the await; writing it
-        // back unconditionally would undo a newer count that already succeeded
-        // and leave the row showing a number the server does not hold.
-        if (claimLatestWrite(code, writeTicket)) {
-          setOptimisticActualByCode((prev) => ({ ...prev, [code]: currentValue }));
-        }
+        // Session failed — undo this write's optimistic patch, but only while
+        // it is still the newest write ISSUED for the row. A later write, landed
+        // or merely in flight, owns the display and will settle it itself.
+        if (ownsRowDisplay(code, writeTicket)) dropOptimisticRow(code);
         setRowPendingByCode((prev) => ({ ...prev, [code]: Math.max(0, (prev[code] ?? 1) - 1) }));
         return;
       }
@@ -525,12 +558,9 @@ export default function InventoryPage() {
           }
         );
       } catch {
-        // Roll back optimistic value on any error — same ticket gate as the
-        // session-failure path above and the success path below. A failing
-        // EARLIER scan must not overwrite a newer count that already landed.
-        if (claimLatestWrite(code, writeTicket)) {
-          setOptimisticActualByCode((prev) => ({ ...prev, [code]: currentValue }));
-        }
+        // Same rule as the session-failure path: a failing EARLIER scan must not
+        // overwrite a newer count, and "newer" means issued, not landed.
+        if (ownsRowDisplay(code, writeTicket)) dropOptimisticRow(code);
 
         if (resolvedItemId) {
           setFlashRowId({ id: resolvedItemId, type: "error" });
@@ -652,24 +682,30 @@ export default function InventoryPage() {
     scanMut
       .mutateAsync({ sessionId, nfcTagId: tagId, observedQuantity: newCount })
       .then((result) => {
-        // Sync local NFC counter to server-confirmed value
-        nfcItemCountsRef.current.set(tagId, result.observedQuantity);
-        // Persist counts so they survive a page reload within the same session.
-        // sessionStorage is tab-scoped and is automatically cleared on tab close.
-        if (sessionIdRef.current) {
-          const countsObj: Record<string, number> = {};
-          nfcItemCountsRef.current.forEach((v, k) => { countsObj[k] = v; });
-          safeStorageSetItem(
-            "vt_nfc_counts",
-            JSON.stringify({ sessionId: sessionIdRef.current, counts: countsObj }),
-            "session"
-          );
-        }
-        // Sync manual-scan baseline so a subsequent scanLine tap uses the correct
-        // absolute count and doesn't regress the server value back toward 0.
-        // Guarded by the write ticket: a response that lost the race carries a
-        // superseded count, and applying it is what re-poisons that baseline.
+        // Everything this response writes is gated on the SAME ticket, the NFC
+        // counter included. It used to sync unconditionally, one line above the
+        // guard: two fallback scans posting 5 and 6 with the 5 answering last
+        // left the cache correctly at 6 and the counter poisoned back to 5, so
+        // the next tap posted 6 a second time instead of 7 — and the persist
+        // below wrote that poisoned map to sessionStorage, where it survived a
+        // reload. A response that lost the race is stale for every consumer,
+        // not only for the ones that happen to sit under the guard.
         if (claimLatestWrite(result.item.code, writeTicket)) {
+          // Sync local NFC counter to the server-confirmed value.
+          nfcItemCountsRef.current.set(tagId, result.observedQuantity);
+          // Persist counts so they survive a page reload within the same session.
+          // sessionStorage is tab-scoped and is automatically cleared on tab close.
+          if (sessionIdRef.current) {
+            const countsObj: Record<string, number> = {};
+            nfcItemCountsRef.current.forEach((v, k) => { countsObj[k] = v; });
+            safeStorageSetItem(
+              "vt_nfc_counts",
+              JSON.stringify({ sessionId: sessionIdRef.current, counts: countsObj }),
+              "session"
+            );
+          }
+          // Sync the manual-scan baseline so a subsequent scanLine tap uses the
+          // correct absolute count and doesn't regress the server value toward 0.
           setOptimisticActualByCode((prev) => ({ ...prev, [result.item.code]: result.observedQuantity }));
           qc.setQueryData<ContainerItemsResponse>(
             ["/api/restock/container-items", selectedId ?? ""],
