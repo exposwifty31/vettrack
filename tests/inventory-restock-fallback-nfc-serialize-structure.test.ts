@@ -118,6 +118,185 @@ describe(`${FILE} — fallback NFC writes serialize per tagId`, () => {
     }
   });
 
+  /**
+   * The chain's DATAFLOW, not its vocabulary.
+   *
+   * Checking that the file mentions `fallbackNfcChainByTagRef`, declares a
+   * `prevCount` inside some `.then`, and calls `.set(tagId, …)` somewhere
+   * proves nothing: an implementation can read `.get(tagId)` and ignore the
+   * value, build `Promise.resolve().then(…)`, and satisfy all three while
+   * same-tag scans still run concurrently. Serialization exists only if the
+   * stored chain is DERIVED from the previously stored one.
+   *
+   * Returns the three links, checked by name binding:
+   *   prior   <- fallbackNfcChainByTagRef.current.get(tagId)
+   *   chained <- a call chain whose ROOT receiver is `prior`
+   *   set(tagId, …) referencing `chained`
+   */
+  function chainLinks(body: ts.Node) {
+    const rootOf = (expr: ts.Node): ts.Node => {
+      let e: ts.Node = expr;
+      for (;;) {
+        if (ts.isCallExpression(e) || ts.isPropertyAccessExpression(e)) { e = e.expression; continue; }
+        if (ts.isParenthesizedExpression(e) || ts.isAwaitExpression(e)) { e = e.expression; continue; }
+        return e;
+      }
+    };
+
+    let priorName: string | null = null;
+    walk(body, (n) => {
+      if (!ts.isVariableDeclaration(n) || !n.initializer || !ts.isIdentifier(n.name)) return;
+      let readsGet = false;
+      walk(n.initializer, (m) => {
+        if (!ts.isCallExpression(m) || !ts.isPropertyAccessExpression(m.expression)) return;
+        if (m.expression.name.text !== "get") return;
+        if (!m.expression.expression.getText().includes("fallbackNfcChainByTagRef")) return;
+        if (m.arguments.length !== 1 || m.arguments[0].getText() !== "tagId") return;
+        readsGet = true;
+      });
+      if (readsGet) priorName = n.name.text;
+    });
+
+    let chainedName: string | null = null;
+    if (priorName) {
+      walk(body, (n) => {
+        if (!ts.isVariableDeclaration(n) || !n.initializer || !ts.isIdentifier(n.name)) return;
+        const root = rootOf(n.initializer);
+        if (ts.isIdentifier(root) && root.text === priorName) chainedName = n.name.text;
+      });
+    }
+
+    let storesChained = false;
+    if (chainedName) {
+      walk(body, (n) => {
+        if (!ts.isCallExpression(n) || !ts.isPropertyAccessExpression(n.expression)) return;
+        if (n.expression.name.text !== "set") return;
+        if (!n.expression.expression.getText().includes("fallbackNfcChainByTagRef")) return;
+        if (n.arguments.length !== 2 || n.arguments[0].getText() !== "tagId") return;
+        let refsChained = false;
+        walk(n.arguments[1], (m) => {
+          if (ts.isIdentifier(m) && m.text === chainedName) refsChained = true;
+        });
+        if (refsChained) storesChained = true;
+      });
+    }
+
+    return { priorName, chainedName, storesChained };
+  }
+
+  it("derives the stored chain from the previously stored one", () => {
+    const { priorName, chainedName, storesChained } = chainLinks(handleBody);
+    expect(priorName).not.toBeNull();
+    expect(chainedName).not.toBeNull();
+    expect(storesChained).toBe(true);
+  });
+
+  it("rejects a chain that reads the prior promise and does not build on it", () => {
+    const snippet = (body: string) =>
+      chainLinks(
+        ts.createSourceFile("snippet.ts", body, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS),
+      );
+
+    // The real shape.
+    const good = snippet(`
+      const prior = fallbackNfcChainByTagRef.current.get(tagId) ?? Promise.resolve();
+      const chained = prior.catch(() => {}).then(async () => { doWork(); });
+      fallbackNfcChainByTagRef.current.set(tagId, chained.catch(() => {}));
+    `);
+    expect(good.storesChained).toBe(true);
+
+    // Reads the prior promise, then ignores it — every vocabulary check still
+    // passes and same-tag scans stay concurrent. This is the defect.
+    const detached = snippet(`
+      const prior = fallbackNfcChainByTagRef.current.get(tagId) ?? Promise.resolve();
+      const chained = Promise.resolve().then(async () => { doWork(); });
+      fallbackNfcChainByTagRef.current.set(tagId, chained.catch(() => {}));
+    `);
+    expect(detached.priorName).toBe("prior");
+    expect(detached.chainedName).toBeNull();
+    expect(detached.storesChained).toBe(false);
+
+    // Builds on prior but never stores it, so the NEXT tap chains off nothing.
+    const unstored = snippet(`
+      const prior = fallbackNfcChainByTagRef.current.get(tagId) ?? Promise.resolve();
+      const chained = prior.then(async () => { doWork(); });
+      fallbackNfcChainByTagRef.current.set(tagId, Promise.resolve());
+    `);
+    expect(unstored.chainedName).toBe("chained");
+    expect(unstored.storesChained).toBe(false);
+  });
+
+  /**
+   * A queued callback cannot be cancelled — `fallbackNfcChainByTagRef.clear()`
+   * drops map entries, not the `.then`s already attached to them. So a tap
+   * queued before the session finished still runs, still holds the old
+   * sessionId in its closure, and a response landing either side of the finish
+   * can repopulate the counter and the cache; the next queued callback then
+   * opens a NEW session and posts into it.
+   *
+   * The predicate's NAME is derived, not assumed: whatever function compares
+   * `sessionGenerationRef.current` against a value captured at enqueue time is
+   * the guard, and every issue/apply site must be behind it.
+   */
+  function sessionGuard(body: ts.Node) {
+    // The captured generation: `const X = sessionGenerationRef.current`.
+    let capturedName: string | null = null;
+    walk(body, (n) => {
+      if (!ts.isVariableDeclaration(n) || !n.initializer || !ts.isIdentifier(n.name)) return;
+      if (n.initializer.getText().replace(/\s+/g, "") === "sessionGenerationRef.current") {
+        capturedName = n.name.text;
+      }
+    });
+    if (!capturedName) return { capturedName: null, guardName: null, guardedSites: 0 };
+
+    // The predicate: a function whose body compares the ref to that capture.
+    let guardName: string | null = null;
+    walk(body, (n) => {
+      if (!ts.isVariableDeclaration(n) || !n.initializer || !ts.isIdentifier(n.name)) return;
+      if (!ts.isArrowFunction(n.initializer) && !ts.isFunctionExpression(n.initializer)) return;
+      const t = n.initializer.getText().replace(/\s+/g, "");
+      if (t.includes("sessionGenerationRef.current") && t.includes(capturedName as string)) {
+        guardName = n.name.text;
+      }
+    });
+    if (!guardName) return { capturedName, guardName: null, guardedSites: 0 };
+
+    // Early returns gated on that predicate.
+    let guardedSites = 0;
+    walk(body, (n) => {
+      if (!ts.isIfStatement(n)) return;
+      const cond = n.expression.getText().replace(/\s+/g, "");
+      if (!cond.includes(`${guardName}()`)) return;
+      const thenText = n.thenStatement.getText().replace(/\s+/g, "");
+      if (thenText === "return;" || thenText === "{return;}") guardedSites += 1;
+    });
+    return { capturedName, guardName, guardedSites };
+  }
+
+  it("captures the session generation at enqueue and refuses to issue or apply across a finish", () => {
+    const { capturedName, guardName, guardedSites } = sessionGuard(handleBody);
+    expect(capturedName).not.toBeNull();
+    expect(guardName).not.toBeNull();
+    // Three places a stale callback can do damage: before issuing, on success,
+    // on failure. All three must bail.
+    expect(guardedSites).toBeGreaterThanOrEqual(3);
+  });
+
+  it("bumps the session generation wherever the chain map is cleared", () => {
+    // Clearing without bumping leaves every queued callback believing it is
+    // still current — the map looks reset and nothing actually stopped.
+    let bumpedBesideClear = false;
+    walk(sourceFile, (n) => {
+      if (!ts.isBlock(n)) return;
+      const t = n.getText().replace(/\s+/g, "");
+      if (!t.includes("fallbackNfcChainByTagRef.current.clear()")) return;
+      if (/sessionGenerationRef\.current(\+=1|\+\+|=sessionGenerationRef\.current\+1)/.test(t)) {
+        bumpedBesideClear = true;
+      }
+    });
+    expect(bumpedBesideClear).toBe(true);
+  });
+
   it("enqueues fallback work onto fallbackNfcChainByTagRef for the scanned tagId", () => {
     let setsChain = false;
     walk(handleBody, (n) => {

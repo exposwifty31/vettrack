@@ -199,6 +199,14 @@ export default function InventoryPage() {
   // response set the row baseline while a newer tag write is still pending.
   // Chain per tagId; different tags stay concurrent. Cleared with the session.
   const fallbackNfcChainByTagRef = useRef(new Map<string, Promise<void>>());
+  // Clearing the chain map drops the ENTRIES; it cannot cancel a `.then` that is
+  // already attached. A callback queued before the session finished still holds
+  // the old `sessionId`/`selectedId` in its closure and will run. The server
+  // refuses a scan on a closed session, but a response landing either side of
+  // the finish can still repopulate the NFC counter and the cache — and the
+  // next queued callback would then open a NEW session and post into it. This
+  // counter is the cancellation the promises do not have.
+  const sessionGenerationRef = useRef(0);
   // Once a fallback response resolves the item, later chained taps for that
   // tag route through scanLine so the row bumps optimistically at issue time.
   const nfcTagResolvedItemRef = useRef(
@@ -217,6 +225,8 @@ export default function InventoryPage() {
     nfcItemCountsRef.current.clear();
     fallbackNfcChainByTagRef.current.clear();
     nfcTagResolvedItemRef.current.clear();
+    // Anything already queued belongs to the session that just ended.
+    sessionGenerationRef.current += 1;
     if (!sessionState.activeSessionId) {
       safeStorageRemoveItem("vt_nfc_counts", "session");
       return;
@@ -626,8 +636,16 @@ export default function InventoryPage() {
 
   const commitInlineEdit = useCallback(async (line: RestockContainerLine) => {
     setEditingCode(null);
-    const parsed = parseInt(editValue, 10);
-    if (isNaN(parsed) || parsed < 0) return;
+    // Parse the WHOLE value, not its integer prefix. `parseInt("1.5", 10)` is 1,
+    // and 1 clears both of the old guards, so a technician who typed 1.5 had 1
+    // recorded against their name with nothing on screen saying the number had
+    // changed — a silently different count, which is the one failure S13a/S13b
+    // exist to remove. Refusing is the honest answer: the shelf holds a whole
+    // number of items. The empty check must come first, because `Number("")`
+    // is 0 and 0 is a legitimate count.
+    const typed = editValue.trim();
+    const parsed = Number(typed);
+    if (typed === "" || !Number.isSafeInteger(parsed) || parsed < 0) return;
     // A count that merely equals the HELD stock is still a count: recording it
     // is what separates "counted, and it matched" from "never counted". The one
     // genuine no-op is a count the server has ALREADY recorded this session, so
@@ -698,8 +716,14 @@ export default function InventoryPage() {
     // write was still pending, and a later +1 submitted from that stale
     // baseline. prevCount/newCount must be computed INSIDE the chain. Different
     // tags stay concurrent; scanLine is untouched.
+    const queuedGeneration = sessionGenerationRef.current;
+    const stillThisSession = () => sessionGenerationRef.current === queuedGeneration;
     const prior = fallbackNfcChainByTagRef.current.get(tagId) ?? Promise.resolve();
     const chained = prior.catch(() => {}).then(async () => {
+      // The session moved on while this callback sat in the queue — issue
+      // nothing. Without this the queued tap opens a new session and posts a
+      // count the user never asked for into it.
+      if (!stillThisSession()) return;
       const resolved = nfcTagResolvedItemRef.current.get(tagId);
       if (resolved) {
         await scanLine(resolved.itemId, resolved.code, resolved.label, { kind: "relative", delta: 1 });
@@ -732,6 +756,9 @@ export default function InventoryPage() {
       await scanMut
         .mutateAsync({ sessionId, nfcTagId: tagId, observedQuantity: newCount })
         .then((result) => {
+          // A response can land either side of the finish. Applying it would
+          // repopulate the counter and the cache for a session that is gone.
+          if (!stillThisSession()) return;
           nfcTagResolvedItemRef.current.set(tagId, {
             itemId: result.item.id,
             code: result.item.code,
@@ -789,6 +816,7 @@ export default function InventoryPage() {
           setScanGeneration((g) => g + 1);
         })
         .catch(() => {
+          if (!stillThisSession()) return;
           // Same rule as scanLine's rollback, and for the same reason: undo only
           // while this write still owns the tag's baseline. Restoring `prevCount`
           // unconditionally is what let a FAILING earlier scan walk the counter

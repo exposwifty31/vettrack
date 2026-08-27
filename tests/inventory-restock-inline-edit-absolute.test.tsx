@@ -202,6 +202,55 @@ describe("InventoryPage — the restock inline edit persists the typed number (S
     });
   });
 
+  /** Every observedQuantity this render actually sent, in order. */
+  const postedQuantities = () =>
+    scanMock.mock.calls.map((c) => (c[1] as { observedQuantity: number }).observedQuantity);
+
+  it("refuses a fractional count instead of silently recording the truncation", async () => {
+    // `parseInt("1.5", 10)` is 1, and 1 clears both of the old guards, so a
+    // technician who typed 1.5 had 1 recorded against their name with nothing
+    // on screen saying the number had changed.
+    //
+    // The assertion is the WHOLE call list, and that is not stylistic. A
+    // `waitFor(() => expect(scanMock).toHaveBeenCalledTimes(1))` passes here
+    // even when the bug is present, because it catches the transient moment
+    // after the rejected 1 posts and before the valid 6 does — the count is 1,
+    // just from the wrong call. Measured: under `parseInt` this render sends
+    // [1, 6]. Only the full ordered list can tell those apart.
+    scanMock.mockResolvedValue({
+      item: { id: "i1", code: "SKU1", label: "Saline" },
+      observedQuantity: 6,
+    });
+
+    renderPage();
+    await screen.findByRole("button", { name: "Set quantity for Saline" });
+
+    await commitInlineCount("1.5");
+    await commitInlineCount("6");
+
+    // The valid commit is the positive control: it must arrive, and when it
+    // does it must be the ONLY thing that ever went out.
+    await waitFor(() => expect(postedQuantities()).toContain(6));
+    expect(postedQuantities()).toEqual([6]);
+  });
+
+  it("refuses an empty and a negative count the same way", async () => {
+    scanMock.mockResolvedValue({
+      item: { id: "i1", code: "SKU1", label: "Saline" },
+      observedQuantity: 6,
+    });
+
+    renderPage();
+    await screen.findByRole("button", { name: "Set quantity for Saline" });
+
+    await commitInlineCount("");
+    await commitInlineCount("-2");
+    await commitInlineCount("6");
+
+    await waitFor(() => expect(postedQuantities()).toContain(6));
+    expect(postedQuantities()).toEqual([6]);
+  });
+
   it("still posts an unchanged commit — seeding from the displayed value is not a no-op (S13a)", async () => {
     scanMock.mockResolvedValue({
       item: { id: "i1", code: "SKU1", label: "Saline" },

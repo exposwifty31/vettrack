@@ -81,6 +81,32 @@ describe(`${FILE} — a superseded scan response reaches no consumer`, () => {
   });
 
   /**
+   * The operands that must ALL hold for a condition to be true — the condition
+   * flattened on `&&`, with anything else (a `||`, a `!`, a call) left opaque.
+   *
+   * Without this, a guard only had to APPEAR in the condition, so
+   * `if (allowStale || noNewerIssued(...))` passed while permitting exactly the
+   * stale mutation the suite exists to forbid. Presence is not a guarantee; a
+   * mandatory conjunct is.
+   */
+  function mandatoryConjuncts(expr: ts.Expression): ts.Expression[] {
+    if (ts.isParenthesizedExpression(expr)) return mandatoryConjuncts(expr.expression);
+    if (ts.isBinaryExpression(expr) && expr.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken) {
+      return [...mandatoryConjuncts(expr.left), ...mandatoryConjuncts(expr.right)];
+    }
+    return [expr];
+  }
+
+  /** Exactly `noNewerIssued(<ref>.current, <key>, writeTicket)` — receiver, key and ticket. */
+  function isOwnershipCall(node: ts.Node, ref: string, key: string): boolean {
+    if (!ts.isCallExpression(node)) return false;
+    if (!ts.isIdentifier(node.expression) || node.expression.text !== "noNewerIssued") return false;
+    if (node.arguments.length !== 3) return false;
+    const args = node.arguments.map((a) => a.getText());
+    return args[0] === `${ref}.current` && args[1] === key && args[2] === "writeTicket";
+  }
+
+  /**
    * True when some enclosing `if` (up to `stopAt`) carries the FULL ownership
    * predicate — `noNewerIssued(<ref>.current, <key>, writeTicket)` — with the
    * receiver, key and ticket all checked.
@@ -93,16 +119,7 @@ describe(`${FILE} — a superseded scan response reaches no consumer`, () => {
   function hasOwnershipGuard(node: ts.Node, stopAt: ts.Node, ref: string, key: string): boolean {
     for (let p: ts.Node | undefined = node.parent; p && p !== stopAt.parent; p = p.parent) {
       if (!ts.isIfStatement(p)) continue;
-      let ok = false;
-      walk(p.expression, (n) => {
-        if (!ts.isCallExpression(n)) return;
-        if (!ts.isIdentifier(n.expression) || n.expression.text !== "noNewerIssued") return;
-        if (n.arguments.length !== 3) return;
-        const args = n.arguments.map((a) => a.getText(sourceFile));
-        if (args[0] !== `${ref}.current` || args[1] !== key || args[2] !== "writeTicket") return;
-        ok = true;
-      });
-      if (ok) return true;
+      if (mandatoryConjuncts(p.expression).some((c) => isOwnershipCall(c, ref, key))) return true;
     }
     return false;
   }
@@ -142,6 +159,46 @@ describe(`${FILE} — a superseded scan response reaches no consumer`, () => {
     if (method !== "set" && method !== "delete") return false;
     return n.expression.expression.getText(sourceFile).startsWith(receiver);
   }
+
+  /** Does `if (<cond>) { nfcItemCountsRef.current.set(tagId, 1) }` count as guarded? */
+  function conditionAccepts(cond: string): boolean {
+    const snippet = ts.createSourceFile(
+      "snippet.ts",
+      `if (${cond}) { nfcItemCountsRef.current.set(tagId, 1); }`,
+      ts.ScriptTarget.Latest,
+      true,
+      ts.ScriptKind.TS,
+    );
+    let target: ts.Node | undefined;
+    walk(snippet, (n) => {
+      if (!ts.isCallExpression(n) || !ts.isPropertyAccessExpression(n.expression)) return;
+      if (n.expression.name.text !== "set") return;
+      if (!n.expression.expression.getText().startsWith("nfcItemCountsRef.current")) return;
+      target = n;
+    });
+    if (!target) throw new Error("snippet built no mutation to test");
+    return hasOwnershipGuard(target, snippet, "issuedTicketByTagRef", "tagId");
+  }
+
+  it("accepts the ownership predicate only where it is MANDATORY, not merely present", () => {
+    const GUARD = "noNewerIssued(issuedTicketByTagRef.current, tagId, writeTicket)";
+
+    // Accepted: the predicate must hold for the branch to run.
+    expect(conditionAccepts(GUARD)).toBe(true);
+    expect(conditionAccepts(`sessionIdRef.current && ${GUARD}`)).toBe(true);
+    expect(conditionAccepts(`(${GUARD}) && sessionIdRef.current`)).toBe(true);
+
+    // Rejected: each of these lets the mutation run on a stale response.
+    expect(conditionAccepts(`allowStale || ${GUARD}`)).toBe(false);
+    expect(conditionAccepts(`!${GUARD}`)).toBe(false);
+    expect(conditionAccepts(`allowStale || (sessionIdRef.current && ${GUARD})`)).toBe(false);
+
+    // Rejected: right shape, wrong operands — the reason the call is read
+    // rather than the identifiers in it.
+    expect(conditionAccepts("noNewerIssued(issuedTicketByCodeRef.current, tagId, writeTicket)")).toBe(false);
+    expect(conditionAccepts("noNewerIssued(issuedTicketByTagRef.current, code, writeTicket)")).toBe(false);
+    expect(conditionAccepts("noNewerIssued(issuedTicketByTagRef.current, tagId, 0)")).toBe(false);
+  });
 
   it("changes the NFC counter from a response handler only when this write still owns the TAG", () => {
     // `claimLatestWrite` answers "has a newer write LANDED". The NFC counter is
