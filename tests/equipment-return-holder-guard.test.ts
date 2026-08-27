@@ -184,9 +184,12 @@ describe("performEquipmentReturn — offline replay must not regress", () => {
       { checkedOutById: null, custodyState: "checked_out", lastSeen: new Date(5_000) },
       { clientTimestamp: 3_000 },
     );
-    expect(result).not.toBeNull();
-    expect(result!.alreadyReturned).toBe(true);
-    expect(result!.didTransitionCustody).toBe(false);
+    // `expect().not.toBeNull()` does not narrow for TypeScript, so the reads
+    // below were non-null assertions. An explicit throw narrows and says what
+    // went wrong if the premise ever breaks.
+    if (!result) throw new Error("expected a stale return replay to produce an already-returned result");
+    expect(result.alreadyReturned).toBe(true);
+    expect(result.didTransitionCustody).toBe(false);
   });
 
   it("still reports a missing row as not-found rather than a holder violation", async () => {
@@ -220,7 +223,26 @@ describe("POST /api/equipment/:id/return — admin force override", () => {
     expect(returnRouteCode).not.toContain("effectiveRole");
   });
 
-  it("passes the resolved override into the transaction, not a route-level pre-check", () => {
+  /**
+   * SOURCE-ANCHORED, NOT BEHAVIOURAL — and that distinction is the point.
+   *
+   * The three cases below read `server/routes/equipment.ts` as text. They prove
+   * the wiring exists; they do NOT prove that a non-admin `force` request gets
+   * 403, that an admin request reaches the service with `allowForeignHolder:
+   * true`, or that a forced return writes audit metadata.
+   *
+   * The SERVICE half of those claims is already covered behaviourally above
+   * (lines 134-179): the holder check throws `CustodyReturnNotHolderError`, and
+   * `allowForeignHolder: true` lets both the foreign-holder and the orphaned-
+   * repair case through, driven against the real service with a fake tx.
+   *
+   * The ROUTE half has no home yet. Every one of this repo's 14 equipment route
+   * tests either reads source text or needs a live `DATABASE_URL`; none mocks
+   * the database to drive a handler. Building that harness is its own slice —
+   * it belongs beside the `.integration.test.ts` suites, not smuggled in here
+   * as a stronger-looking assertion over the same string search.
+   */
+  it("wires the resolved override into the transaction, not a route-level pre-check (source-anchored)", () => {
     expect(returnRouteSource).toContain("allowForeignHolder");
     const guardInService = fs.readFileSync(
       path.join(__dirname, "..", "server", "services", "equipment-custody-toggle.service.ts"),
@@ -232,13 +254,13 @@ describe("POST /api/equipment/:id/return — admin force override", () => {
     expect(fnBody).toContain("allowForeignHolder");
   });
 
-  it("maps the holder violation to 403 NOT_CURRENT_HOLDER", () => {
+  it("wires the holder violation to 403 NOT_CURRENT_HOLDER (source-anchored)", () => {
     expect(returnRouteSource).toContain("CustodyReturnNotHolderError");
     expect(returnRouteSource).toContain("res.status(403)");
     expect(returnRouteSource).toContain('reason: "NOT_CURRENT_HOLDER"');
   });
 
-  it("audits a forced return so the override is not invisible", () => {
+  it("wires audit metadata onto a forced return (source-anchored)", () => {
     expect(returnRouteSource).toContain("forcedByAdmin");
   });
 });

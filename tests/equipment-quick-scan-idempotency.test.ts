@@ -21,6 +21,18 @@ import { EQUIPMENT_REPLAY_IDEMPOTENCY_ENDPOINTS } from "../server/lib/equipment-
 const DATABASE_URL = process.env.DATABASE_URL ?? "";
 
 let probePool: Pool | null = null;
+
+/**
+ * `describe.skipIf` does not narrow `probePool` for TypeScript inside the suite
+ * body, which is why every use was written `db()`. A non-null assertion
+ * per call site is 13 separate promises that the value is set; this is one
+ * check that says so out loud and fails with a readable message if it is ever
+ * wrong.
+ */
+function db(): Pool {
+  if (!probePool) throw new Error("probePool is not initialised — this suite must not have run");
+  return probePool;
+}
 let dbReachable = false;
 let schemaReady = false;
 
@@ -48,9 +60,27 @@ if (DATABASE_URL) {
       names.has("custody_state") &&
       names.has("version") &&
       idempotencyTable.rows[0]?.regclass != null;
-  } catch {
-    dbReachable = false;
-    schemaReady = false;
+  } catch (err) {
+    // DATABASE_URL is SET, so someone meant this suite to run. Swallowing the
+    // failure turned "the database is unreachable" and "the guard works" into
+    // the same green result — a silent skip and a passing check look identical
+    // from outside, and only one of them is honest. Skipping stays legitimate
+    // only when no database was configured at all (see the guard below).
+    await probePool.end().catch(() => {});
+    probePool = null;
+    throw new Error(
+      `DATABASE_URL is configured but the equipment quick-scan idempotency suite cannot use it: ${
+        err instanceof Error ? err.message : String(err)
+      }`,
+    );
+  }
+  if (!schemaReady) {
+    await probePool.end().catch(() => {});
+    probePool = null;
+    throw new Error(
+      "DATABASE_URL is configured but vt_equipment is missing custody_state/version, " +
+        "or vt_idempotency_keys does not exist. Run the migrations, or unset DATABASE_URL to skip this suite.",
+    );
   }
 }
 
@@ -136,8 +166,8 @@ describe.skipIf(!dbReachable || !schemaReady)(
       currentClinicId = clinicId;
       currentUserId = userId;
 
-      await probePool!.query(`INSERT INTO vt_clinics (id) VALUES ($1)`, [clinicId]);
-      await probePool!.query(
+      await db().query(`INSERT INTO vt_clinics (id) VALUES ($1)`, [clinicId]);
+      await db().query(
         `INSERT INTO vt_users (id, clinic_id, clerk_id, email, name, status)
          VALUES ($1, $2, $3, $4, $5, 'active')`,
         [
@@ -148,7 +178,7 @@ describe.skipIf(!dbReachable || !schemaReady)(
           "Quick Scan Actor",
         ],
       );
-      await probePool!.query(
+      await db().query(
         `INSERT INTO vt_equipment (
            id, clinic_id, name, status, custody_state, usage_state, checked_out_by_id
          ) VALUES ($1, $2, $3, 'ok', 'returned', 'available', NULL)`,
@@ -159,17 +189,17 @@ describe.skipIf(!dbReachable || !schemaReady)(
     }
 
     async function purgeClinic(clinicId: string) {
-      await probePool!.query(`DELETE FROM vt_idempotency_keys WHERE clinic_id = $1`, [clinicId]);
-      await probePool!.query(`DELETE FROM vt_scan_logs WHERE clinic_id = $1`, [clinicId]);
-      await probePool!.query(`DELETE FROM vt_undo_tokens WHERE clinic_id = $1`, [clinicId]);
-      await probePool!.query(`DELETE FROM vt_equipment_returns WHERE clinic_id = $1`, [clinicId]);
-      await probePool!.query(`DELETE FROM vt_equipment WHERE clinic_id = $1`, [clinicId]);
-      await probePool!.query(`DELETE FROM vt_users WHERE clinic_id = $1`, [clinicId]);
-      await probePool!.query(`DELETE FROM vt_clinics WHERE id = $1`, [clinicId]);
+      await db().query(`DELETE FROM vt_idempotency_keys WHERE clinic_id = $1`, [clinicId]);
+      await db().query(`DELETE FROM vt_scan_logs WHERE clinic_id = $1`, [clinicId]);
+      await db().query(`DELETE FROM vt_undo_tokens WHERE clinic_id = $1`, [clinicId]);
+      await db().query(`DELETE FROM vt_equipment_returns WHERE clinic_id = $1`, [clinicId]);
+      await db().query(`DELETE FROM vt_equipment WHERE clinic_id = $1`, [clinicId]);
+      await db().query(`DELETE FROM vt_users WHERE clinic_id = $1`, [clinicId]);
+      await db().query(`DELETE FROM vt_clinics WHERE id = $1`, [clinicId]);
     }
 
     async function countScanLogs(clinicId: string, equipmentId: string) {
-      const { rows } = await probePool!.query<{ count: string }>(
+      const { rows } = await db().query<{ count: string }>(
         `SELECT count(*)::text AS count FROM vt_scan_logs
           WHERE clinic_id = $1 AND equipment_id = $2`,
         [clinicId, equipmentId],
@@ -177,10 +207,13 @@ describe.skipIf(!dbReachable || !schemaReady)(
       return Number(rows[0]?.count ?? 0);
     }
 
-    async function readCustodyHolder(equipmentId: string) {
-      const { rows } = await probePool!.query<{ checked_out_by_id: string | null }>(
-        `SELECT checked_out_by_id FROM vt_equipment WHERE id = $1`,
-        [equipmentId],
+    // Scoped by clinicId like every other query in this codebase. A fixture
+    // helper that reads across tenants is how a tenancy regression passes its
+    // own test: the row would still be found after the guard stopped scoping it.
+    async function readCustodyHolder(equipmentId: string, clinicId: string) {
+      const { rows } = await db().query<{ checked_out_by_id: string | null }>(
+        `SELECT checked_out_by_id FROM vt_equipment WHERE id = $1 AND clinic_id = $2`,
+        [equipmentId, clinicId],
       );
       return rows[0]?.checked_out_by_id ?? null;
     }
@@ -230,7 +263,7 @@ describe.skipIf(!dbReachable || !schemaReady)(
         expect(secondBody.action).toBe("checkout");
         expect(secondBody.scanLogId).toBe(firstBody.scanLogId);
         expect(await countScanLogs(clinicId, equipmentId)).toBe(1);
-        expect(await readCustodyHolder(equipmentId)).toBe(userId);
+        expect(await readCustodyHolder(equipmentId, clinicId)).toBe(userId);
       } finally {
         await purgeClinic(clinicId);
       }
@@ -241,7 +274,7 @@ describe.skipIf(!dbReachable || !schemaReady)(
       const otherEquipmentId = randomUUID();
       const idempotencyKey = randomUUID();
       try {
-        await probePool!.query(
+        await db().query(
           `INSERT INTO vt_equipment (
              id, clinic_id, name, status, custody_state, usage_state, checked_out_by_id
            ) VALUES ($1, $2, $3, 'ok', 'returned', 'available', NULL)`,
@@ -287,7 +320,7 @@ describe.skipIf(!dbReachable || !schemaReady)(
         expect(second.status).toBe(200);
         expect((await second.json()).action).toBe("return");
 
-        expect(await readCustodyHolder(equipmentId)).toBeNull();
+        expect(await readCustodyHolder(equipmentId, clinicId)).toBeNull();
       } finally {
         await purgeClinic(clinicId);
       }

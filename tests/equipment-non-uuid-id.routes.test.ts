@@ -44,6 +44,11 @@ interface RouteLayer {
 }
 
 function layersOf(method: string, path: string) {
+  // Express does not expose its router stack on any public type, and this test
+  // is specifically about which middleware are MOUNTED — the one question the
+  // public API cannot answer. Hence the cast; `RouteLayer` above is the shape
+  // this file depends on, so a future Express change breaks compilation here
+  // rather than silently matching nothing.
   const stack = (router as unknown as { stack: RouteLayer[] }).stack;
   const found = stack.filter(
     (l) => l.route?.path === path && l.route.methods[method] === true,
@@ -54,6 +59,8 @@ function layersOf(method: string, path: string) {
     `route ${method.toUpperCase()} ${path} is not mounted on the equipment router — ` +
       `update this test deliberately, do not let it pass by absence`,
   ).toBe(1);
+  // Safe: the assertion above throws unless exactly one layer matched, and a
+  // matched layer has a `route` by construction of the filter.
   return found[0]!.route!.stack;
 }
 
@@ -63,7 +70,18 @@ function layersOf(method: string, path: string) {
  * synchronous response counts: `validateUuid` does no I/O, so anything async is
  * by definition a different middleware.
  */
-function probe(handle: (...args: unknown[]) => unknown, method: string, path: string) {
+/**
+ * What one middleware did when handed a non-UUID id. Three outcomes, kept
+ * DISTINCT on purpose: `probe` used to collapse all of them into `null`, so a
+ * middleware that CRASHED was indistinguishable from one that correctly
+ * deferred — and the suite then reported the route as accepting a slug id.
+ */
+type ProbeOutcome =
+  | { kind: "responded"; status: number; body: unknown }
+  | { kind: "deferred" }
+  | { kind: "threw"; error: string };
+
+function probe(handle: (...args: unknown[]) => unknown, method: string, path: string): ProbeOutcome {
   let status: number | null = null;
   let body: unknown = null;
   const res = {
@@ -115,14 +133,17 @@ function probe(handle: (...args: unknown[]) => unknown, method: string, path: st
 
   try {
     const result = handle(req, res, () => {});
-    // Swallow async rejections from DB-backed middleware probed out of context.
+    // An ASYNC rejection is expected noise: `validateUuid` does no I/O, so any
+    // middleware that returns a promise is a DB-backed one being probed out of
+    // context, and it has already been established that it is not the guard.
+    // A SYNCHRONOUS throw is a different animal and is reported below.
     if (result && typeof (result as Promise<unknown>).catch === "function") {
       (result as Promise<unknown>).catch(() => {});
     }
-  } catch {
-    return null;
+  } catch (err) {
+    return { kind: "threw", error: err instanceof Error ? err.message : String(err) };
   }
-  return status === null ? null : { status, body };
+  return status === null ? { kind: "deferred" } : { kind: "responded", status, body };
 }
 
 describe("equipment routes — a non-UUID equipment id is not rejected as malformed", () => {
@@ -134,14 +155,37 @@ describe("equipment routes — a non-UUID equipment id is not rejected as malfor
       // the database out of context.
       const middleware = stack.slice(0, -1);
 
-      const rejections = middleware
-        .map((layer, index) => ({ index, result: probe(layer.handle, method, path) }))
+      const outcomes = middleware.map((layer, index) => ({
+        index,
+        outcome: probe(layer.handle, method, path),
+      }));
+
+      // A crash is not a pass. This assertion comes FIRST because a thrown
+      // middleware produces no status, so the rejection filter below would
+      // quietly count it as "did not reject".
+      const crashed = outcomes
+        .filter(({ outcome }) => outcome.kind === "threw")
+        .map(({ index, outcome }) =>
+          `position ${index}: ${(outcome as { kind: "threw"; error: string }).error}`,
+        );
+      expect(
+        crashed,
+        `${method.toUpperCase()} ${path} had middleware throw on the legal text id ` +
+          `"${NON_UUID_ID}". That is a failure, not an acceptance — the old probe ` +
+          `returned null for a crash and the suite read it as "no rejection".`,
+      ).toEqual([]);
+
+      const rejections = outcomes
         .filter(
-          ({ result }) =>
-            result?.status === 400 &&
-            UUID_REJECTION.test(JSON.stringify(result.body ?? "")),
+          ({ outcome }) =>
+            outcome.kind === "responded" &&
+            outcome.status === 400 &&
+            UUID_REJECTION.test(JSON.stringify(outcome.body ?? "")),
         )
-        .map(({ index, result }) => `position ${index}: ${JSON.stringify(result!.body)}`);
+        .map(
+          ({ index, outcome }) =>
+            `position ${index}: ${JSON.stringify((outcome as { body: unknown }).body)}`,
+        );
 
       expect(
         rejections,
