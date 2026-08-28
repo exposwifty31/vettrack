@@ -11,6 +11,7 @@
  * Run: pnpm exec vitest run tests/restock-finish-no-items-counted.test.ts
  */
 import "dotenv/config";
+import { readFileSync } from "node:fs";
 import { randomUUID } from "crypto";
 import { and, eq } from "drizzle-orm";
 import { afterAll, describe, expect, it } from "vitest";
@@ -74,10 +75,11 @@ describe.skipIf(!DATABASE_URL)("finishSession with nothing counted", () => {
     const { clinicId, userId, containerId } = await seedHospitalCart();
     try {
       const session = await startRestockSession({ clinicId, containerId, userId });
-      expect(session?.status).toBe("active");
+      if (!session) throw new Error("setup failed: startRestockSession returned nothing");
+      expect(session.status).toBe("active");
 
       await expect(
-        finishSession({ clinicId, sessionId: session!.id, userId }),
+        finishSession({ clinicId, sessionId: session.id, userId }),
       ).rejects.toMatchObject({
         name: "RestockServiceError",
         code: "NO_ITEMS_COUNTED",
@@ -89,7 +91,7 @@ describe.skipIf(!DATABASE_URL)("finishSession with nothing counted", () => {
       const [row] = await db
         .select({ status: restockSessions.status, finishedAt: restockSessions.finishedAt })
         .from(restockSessions)
-        .where(and(eq(restockSessions.clinicId, clinicId), eq(restockSessions.id, session!.id)))
+        .where(and(eq(restockSessions.clinicId, clinicId), eq(restockSessions.id, session.id)))
         .limit(1);
       expect(row?.status).toBe("active");
       expect(row?.finishedAt).toBeNull();
@@ -98,11 +100,32 @@ describe.skipIf(!DATABASE_URL)("finishSession with nothing counted", () => {
     }
   });
 
+  it("guards BEFORE container/seed work — structurally, since a rollback leaves no behavioural trace", () => {
+    // The observable difference only appears when the seed WRITE fails — an
+    // infra fault a real-database test cannot stage cheaply (deleting the
+    // container instead just cascades the session away: SESSION_NOT_FOUND).
+    // So this contract is pinned structurally, and stated as the weaker
+    // oracle it is: within finishSession's body, the NO_ITEMS_COUNTED throw
+    // must precede the ensureTemplateItemsSeededInTx call, so an empty
+    // session reports the one honest thing it knows instead of a seed
+    // failure, and seeds nothing it has no use for.
+    const src = readFileSync("server/services/restock.service.ts", "utf8");
+    const fnStart = src.indexOf("export async function finishSession");
+    expect(fnStart).toBeGreaterThan(-1);
+    const body = src.slice(fnStart, src.indexOf("\nexport ", fnStart + 1));
+    const guardAt = body.indexOf('"NO_ITEMS_COUNTED"');
+    const seedAt = body.indexOf("ensureTemplateItemsSeededInTx(");
+    expect(guardAt).toBeGreaterThan(-1);
+    expect(seedAt).toBeGreaterThan(-1);
+    expect(guardAt).toBeLessThan(seedAt);
+  });
+
   it("throws a RestockServiceError, so the route maps it to a 400", async () => {
     const { clinicId, userId, containerId } = await seedHospitalCart();
     try {
       const session = await startRestockSession({ clinicId, containerId, userId });
-      const err = await finishSession({ clinicId, sessionId: session!.id, userId }).then(
+      if (!session) throw new Error("setup failed: startRestockSession returned nothing");
+      const err = await finishSession({ clinicId, sessionId: session.id, userId }).then(
         () => null,
         (e: unknown) => e,
       );
