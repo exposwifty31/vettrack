@@ -203,4 +203,22 @@ describe("admin return of a unit held by someone else (D4 client half)", () => {
     await confirmPluggedInReturn();
     expect(returnMock).toHaveBeenCalledWith("eq1", expect.objectContaining({ force: true }));
   });
+
+  it("a NON-admin viewing a foreign holder's unit gets NO return affordance at all", async () => {
+    authState.isAdmin = false;
+    authState.role = "technician";
+    authState.userId = "tech-2";
+    authState.effectiveRole = "technician";
+    try {
+      await renderDetailPage(heldEquipment("other-user", "tech@clinic.test"));
+      expect(screen.queryByTestId("btn-return")).toBeNull();
+      expect(screen.queryByTestId("btn-scan-action-return")).toBeNull();
+      expect(returnMock).not.toHaveBeenCalled();
+    } finally {
+      authState.isAdmin = true;
+      authState.role = "admin";
+      authState.userId = "admin-1";
+      authState.effectiveRole = "admin";
+    }
+  });
 });
