@@ -296,8 +296,15 @@ describe.skipIf(!dbReachable || !schemaReady)(
         const [first, second] = await Promise.all([fetch(url, init), fetch(url, init)]);
         expect(first.status).toBe(200);
         expect(second.status).toBe(200);
-        const firstBody = await first.json();
-        const secondBody = await second.json();
+        const readScanBody = async (res: Response) => {
+          const body: unknown = await res.json();
+          expect(body).toEqual(
+            expect.objectContaining({ action: expect.any(String), scanLogId: expect.any(String) }),
+          );
+          return body as { action: string; scanLogId: string };
+        };
+        const firstBody = await readScanBody(first);
+        const secondBody = await readScanBody(second);
 
         expect(firstBody.action).toBe("checkout");
         expect(secondBody.action).toBe("checkout");

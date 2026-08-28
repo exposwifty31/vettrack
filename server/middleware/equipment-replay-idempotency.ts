@@ -88,7 +88,9 @@ function schedulePersistThenSend(
  * run reverses the first. Chaining same-key requests through this map closes
  * that window inside one process (the deployment is single-instance); a
  * cross-instance duplicate is still caught by the stored-row hash check once
- * the first response persists. Entries are deleted when their chain drains,
+ * the first response persists. Adding a second replica re-opens the window —
+ * at that point the claim must move into vt_idempotency_keys (a pending row
+ * reserved before next()), not stay in this map. Entries are deleted when their chain drains,
  * so the map is bounded by concurrently in-flight keyed requests.
  */
 const inFlightReplayGates = new Map<string, Promise<void>>();
