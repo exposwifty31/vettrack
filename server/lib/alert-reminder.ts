@@ -9,11 +9,17 @@ const REMINDER_DELAY_MS = Number(process.env.ALERT_REMINDER_DELAY_MS) || 30 * 60
 
 const CRITICAL_HIGH_ALERT_TYPES = new Set(["issue", "overdue"]);
 
-function isAlertStillActive(alertType: string, eq_row: {
+/**
+ * Exported for tests/equipment-staleness-last-verified.test.ts — the `inactive`
+ * branch below is otherwise unreachable in production (processDueAcksForClinic
+ * only selects acks whose type is in CRITICAL_HIGH_ALERT_TYPES), so nothing
+ * would have caught it still reading the wrong column.
+ */
+export function isAlertStillActive(alertType: string, eq_row: {
   status: string;
   lastMaintenanceDate: Date | string | null;
   lastSterilizationDate: Date | string | null;
-  lastSeen: Date | string | null;
+  lastVerifiedAt: Date | string | null;
   maintenanceIntervalDays: number | null;
 }): boolean {
   const now = Date.now();
@@ -36,9 +42,17 @@ function isAlertStillActive(alertType: string, eq_row: {
   }
 
   if (alertType === "inactive") {
-    const lastSeen = eq_row.lastSeen ? new Date(eq_row.lastSeen).getTime() : 0;
+    // lastVerifiedAt, not lastSeen: a checkout bumps lastSeen, which would
+    // silently close an ack nobody actually resolved. Same column and window as
+    // the client bell (src/lib/utils.ts isInactive).
+    // Epoch 0 for BOTH null and an unparseable value, so each keeps the ack
+    // open. Without the NaN guard `now - NaN > threshold` is false and a
+    // corrupted timestamp would silently close an ack nobody resolved. Matches
+    // src/lib/utils.ts isInactive and server/routes/analytics.ts.
+    const parsed = eq_row.lastVerifiedAt ? new Date(eq_row.lastVerifiedAt).getTime() : 0;
+    const lastVerified = Number.isNaN(parsed) ? 0 : parsed;
     const INACTIVE_THRESHOLD_MS = INACTIVE_THRESHOLD_DAYS * 24 * 60 * 60 * 1000;
-    return now - lastSeen > INACTIVE_THRESHOLD_MS;
+    return now - lastVerified > INACTIVE_THRESHOLD_MS;
   }
 
   return false;
@@ -66,7 +80,7 @@ async function processDueAcksForClinic(clinicId: string, now: Date): Promise<voi
           status: equipment.status,
           lastMaintenanceDate: equipment.lastMaintenanceDate,
           lastSterilizationDate: equipment.lastSterilizationDate,
-          lastSeen: equipment.lastSeen,
+          lastVerifiedAt: equipment.lastVerifiedAt,
           maintenanceIntervalDays: equipment.maintenanceIntervalDays,
           name: equipment.name,
         })
