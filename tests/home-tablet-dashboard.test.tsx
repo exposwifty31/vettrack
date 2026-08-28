@@ -22,7 +22,8 @@ const { equipmentList, acksList, homeDashboard, roomsList } = vi.hoisted(() => {
   const equipment = [
     // status "issue" → attention tier + urgent alert
     { id: "eq-issue", name: "Ventilator ICU-2", status: "issue" },
-    // never scanned → isInactive → not-verified readout
+    // lastVerifiedAt omitted deliberately — see the readout test below: a
+    // predicate that fell back to lastSeen would report this row as verified.
     { id: "eq-a", name: "Syringe pump 7", status: "ok" },
     { id: "eq-b", name: "Infusion pump 3", status: "ok" },
   ];
@@ -93,7 +94,9 @@ describe("HomeTabletDashboard — M3 iPad bento", () => {
 
   it("shows the Phase-2 not-verified readout from the same isInactive predicate", async () => {
     renderDashboard();
-    // All three fixtures have no scan timestamps → all not-verified.
+    // No fixture carries lastVerifiedAt, which is what makes 0-of-3 the only
+    // passing answer: a readout that fell back to the last sighting would say
+    // 3 of 3 here, and 0/3-vs-3/3 is the whole S5b regression in one number.
     expect(await screen.findByText(t.equipmentList.verifiedSplit(0, 3, 14))).toBeTruthy();
   });
 
@@ -117,7 +120,9 @@ describe("HomeTabletDashboard — M3 iPad bento", () => {
   // the native EquipmentLargeTitle: when nothing is verified, the availability
   // figure must not paint the celebratory green even at 100%.
   it("does not celebrate 100% availability when nothing has been verified", async () => {
-    // All operational (no attention) but never scanned → 100% available, 0 verified.
+    // The two figures are read off different columns — status for availability,
+    // lastVerifiedAt for the count — so this fixture is the only way to catch a
+    // renderer that lets one of them decide the celebratory treatment.
     equipmentList.mockResolvedValueOnce([
       { id: "eq-a", name: "Syringe pump 7", status: "ok" },
       { id: "eq-b", name: "Infusion pump 3", status: "ok" },

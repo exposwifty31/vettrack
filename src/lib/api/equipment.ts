@@ -480,7 +480,7 @@ export const equipmentApi = {
     },
     return: async (
       id: string,
-      options?: { isPluggedIn?: boolean; plugInDeadlineMinutes?: number }
+      options?: { isPluggedIn?: boolean; plugInDeadlineMinutes?: number; force?: boolean }
     ): Promise<ReturnMutationResponse> => {
       const cached = await getCachedEquipmentById(id);
       const now = new Date().toISOString();
@@ -488,6 +488,11 @@ export const equipmentApi = {
       const returnRequest = {
         isPluggedIn,
         ...(options?.plugInDeadlineMinutes !== undefined && { plugInDeadlineMinutes: options.plugInDeadlineMinutes }),
+        // Admin-only foreign return: the holder guard refuses a unit held by
+        // someone else unless an admin explicitly forces it. Sent only when
+        // true — force is what stamps `forcedByAdmin` into the audit record,
+        // so a routine self-return must not carry it.
+        ...(options?.force === true && { force: true }),
       };
       const response = await handleOptimisticMutation({
         id,
