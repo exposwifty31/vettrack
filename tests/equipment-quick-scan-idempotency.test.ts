@@ -16,7 +16,11 @@ import { Pool } from "pg";
 import { createServer, type Server } from "node:http";
 import express from "express";
 import { randomUUID } from "crypto";
-import { EQUIPMENT_REPLAY_IDEMPOTENCY_ENDPOINTS } from "../server/lib/equipment-replay-idempotency.js";
+import {
+  EQUIPMENT_REPLAY_IDEMPOTENCY_ENDPOINTS,
+  buildEquipmentReplayStorageKey,
+  hashEquipmentReplayRequest,
+} from "../server/lib/equipment-replay-idempotency.js";
 
 const DATABASE_URL = process.env.DATABASE_URL ?? "";
 
@@ -143,6 +147,11 @@ vi.mock("../server/middleware/auth.js", () => ({
 
 const equipmentRoutes = (await import("../server/routes/equipment.js")).default;
 
+// One shared pool for every describe in this file — closed only when the FILE ends.
+afterAll(async () => {
+  if (probePool) await probePool.end();
+});
+
 describe("equipment replay registry — quick-scan alias", () => {
   it("registers POST /api/equipment/scan under its own endpoint key", () => {
     expect(EQUIPMENT_REPLAY_IDEMPOTENCY_ENDPOINTS).toHaveProperty("quickScan");
@@ -240,7 +249,6 @@ describe.skipIf(!dbReachable || !schemaReady)(
       await new Promise<void>((resolve, reject) => {
         server.close((err) => (err ? reject(err) : resolve()));
       });
-      if (probePool) await probePool.end();
     });
 
     it("replays the first checkout instead of toggling back to returned", async () => {
@@ -370,6 +378,142 @@ describe.skipIf(!dbReachable || !schemaReady)(
         expect(await readCustodyHolder(equipmentId, clinicId)).toBeNull();
       } finally {
         await purgeClinic(clinicId);
+      }
+    });
+  },
+);
+
+describe.skipIf(!dbReachable || !schemaReady)(
+  "POST /api/equipment/scan — roster gate vs replay ordering (D1×D2)",
+  () => {
+    let server: Server;
+    let baseUrl: string;
+
+    beforeAll(async () => {
+      const app = express();
+      app.use(express.json());
+      app.use("/api/equipment", equipmentRoutes);
+      server = createServer(app);
+      await new Promise<void>((resolve) => server.listen(0, resolve));
+      const addr = server.address();
+      const port = typeof addr === "object" && addr ? addr.port : 0;
+      baseUrl = `http://127.0.0.1:${port}`;
+    });
+
+    afterAll(async () => {
+      await new Promise<void>((resolve, reject) => {
+        server.close((err) => (err ? reject(err) : resolve()));
+      });
+    });
+
+    async function seedEnforcedFixture() {
+      const clinicId = randomUUID();
+      const userId = randomUUID();
+      const equipmentId = randomUUID();
+      currentClinicId = clinicId;
+      currentUserId = userId;
+      await db().query(`INSERT INTO vt_clinics (id) VALUES ($1)`, [clinicId]);
+      await db().query(
+        `INSERT INTO vt_users (id, clinic_id, clerk_id, email, name, status)
+         VALUES ($1, $2, $3, $4, $5, 'active')`,
+        [userId, clinicId, `clerk_${randomUUID()}`, `roster_${randomUUID()}@test.local`, "Off Shift Tech"],
+      );
+      await db().query(
+        `INSERT INTO vt_equipment (
+           id, clinic_id, name, status, custody_state, usage_state, checked_out_by_id
+         ) VALUES ($1, $2, $3, 'ok', 'returned', 'available', NULL)`,
+        [equipmentId, clinicId, "Roster Gate Device"],
+      );
+      // Per-clinic enforce envelope — the key is clinic-scoped, the table is global.
+      await db().query(
+        `INSERT INTO vt_server_config (key, value) VALUES ($1, 'enforce')
+         ON CONFLICT (key) DO UPDATE SET value = 'enforce'`,
+        [`authority.custody_roster_enforce.${clinicId}`],
+      );
+      return { clinicId, equipmentId, userId };
+    }
+
+    async function purgeEnforcedFixture(clinicId: string) {
+      await db().query(`DELETE FROM vt_server_config WHERE key = $1`, [
+        `authority.custody_roster_enforce.${clinicId}`,
+      ]);
+      await db().query(`DELETE FROM vt_idempotency_keys WHERE clinic_id = $1`, [clinicId]);
+      await db().query(`DELETE FROM vt_scan_logs WHERE clinic_id = $1`, [clinicId]);
+      await db().query(`DELETE FROM vt_undo_tokens WHERE clinic_id = $1`, [clinicId]);
+      await db().query(`DELETE FROM vt_equipment_returns WHERE clinic_id = $1`, [clinicId]);
+      await db().query(`DELETE FROM vt_equipment WHERE clinic_id = $1`, [clinicId]);
+      await db().query(`DELETE FROM vt_users WHERE clinic_id = $1`, [clinicId]);
+      await db().query(`DELETE FROM vt_clinics WHERE id = $1`, [clinicId]);
+    }
+
+    it("a KEYED REPLAY outranks a roster change — the stored outcome is served, not 403", async () => {
+      const { clinicId, equipmentId } = await seedEnforcedFixture();
+      const headerKey = `replay-${randomUUID()}`;
+      try {
+        // The original request committed while the user was ON shift; by the
+        // time the offline queue replays it the shift has ended. The replay
+        // middleware must serve the stored response BEFORE the roster gate
+        // can refuse — otherwise the client shows an error for a write that
+        // already happened (the exact ambiguity D2 exists to kill).
+        const storedBody = { action: "checkout", scanLogId: randomUUID(), equipmentId };
+        await db().query(
+          `INSERT INTO vt_idempotency_keys (clinic_id, key, endpoint, request_hash, status_code, response_body)
+           VALUES ($1, $2, $3, $4, 200, $5)`,
+          [
+            clinicId,
+            buildEquipmentReplayStorageKey(currentUserId, headerKey),
+            EQUIPMENT_REPLAY_IDEMPOTENCY_ENDPOINTS.quickScan,
+            hashEquipmentReplayRequest("POST", "/api/equipment/scan", { equipmentId }),
+            JSON.stringify(storedBody),
+          ],
+        );
+        const res = await fetch(`${baseUrl}/api/equipment/scan`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Idempotency-Key": headerKey },
+          body: JSON.stringify({ equipmentId }),
+        });
+        expect(res.status).toBe(200);
+        const body: unknown = await res.json();
+        expect(body).toMatchObject({ action: "checkout", equipmentId });
+      } finally {
+        await purgeEnforcedFixture(clinicId);
+      }
+    });
+
+    it("a FRESH off-shift request under enforce is refused 403 OFF_SHIFT end-to-end", async () => {
+      const { clinicId, equipmentId } = await seedEnforcedFixture();
+      try {
+        const res = await fetch(`${baseUrl}/api/equipment/scan`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Idempotency-Key": `fresh-${randomUUID()}` },
+          body: JSON.stringify({ equipmentId }),
+        });
+        expect(res.status).toBe(403);
+        const body: unknown = await res.json();
+        expect(body).toMatchObject({ reason: "OFF_SHIFT" });
+        // The refusal is NOT persisted as the key's outcome (non-2xx): a later
+        // on-shift retry with the same key must execute fresh.
+        const { rows } = await db().query<{ count: string }>(
+          `SELECT count(*)::text AS count FROM vt_idempotency_keys WHERE clinic_id = $1`,
+          [clinicId],
+        );
+        expect(Number(rows[0]?.count ?? 0)).toBe(0);
+      } finally {
+        await purgeEnforcedFixture(clinicId);
+      }
+    });
+
+    it("an INVALID body gets its schema error, not 403 OFF_SHIFT — validation precedes the gate", async () => {
+      const { clinicId } = await seedEnforcedFixture();
+      try {
+        const res = await fetch(`${baseUrl}/api/equipment/scan`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({}),
+        });
+        expect(res.status).toBe(400);
+      } finally {
+        await purgeEnforcedFixture(clinicId);
       }
     });
   },

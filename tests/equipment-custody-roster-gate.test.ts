@@ -50,7 +50,7 @@ type GateRequestDouble = {
 /** Exactly the response surface the gate writes: status(...).json(...). */
 type GateResponseDouble = {
   statusCode: number;
-  body: { reason?: string } | undefined;
+  body: unknown;
   status(code: number): GateResponseDouble;
   json(payload: unknown): GateResponseDouble;
 };
@@ -76,7 +76,7 @@ function makeRes(): GateResponseDouble {
       return res;
     },
     json(payload: unknown) {
-      res.body = payload as { reason?: string };
+      res.body = payload;
       return res;
     },
   };
@@ -102,7 +102,7 @@ describe("custodyRosterGate — D1 server half", () => {
     const { res, next } = await run(makeReq());
     expect(next).not.toHaveBeenCalled();
     expect(res.statusCode).toBe(403);
-    expect(res.body?.reason).toBe("OFF_SHIFT");
+    expect(res.body).toMatchObject({ reason: "OFF_SHIFT" });
   });
 
   it("enforce: a rostered technician passes, whatever the shift role", async () => {
@@ -177,18 +177,25 @@ describe("custodyRosterGate — D1 server half", () => {
 });
 
 describe("custodyRosterGate — wiring", () => {
-  it("guards all four custody-creating routes, after requireEffectiveRole", async () => {
+  it("guards all four custody routes in the load-bearing order: validate → role → replay → gate", async () => {
     const { readFileSync } = await import("node:fs");
     const src = readFileSync("server/routes/equipment.ts", "utf8");
     for (const route of ['"/scan"', '"/:id/toggle"', '"/:id/checkout"', '"/:id/return"']) {
       const at = src.indexOf(`router.post(\n  ${route}`) >= 0 ? src.indexOf(`router.post(\n  ${route}`) : src.indexOf(`router.post(${route}`);
       expect(at, `route ${route} not found`).toBeGreaterThan(-1);
       const windowText = src.slice(at, at + 700);
-      expect(windowText, `route ${route} lacks the roster gate`).toContain("custodyRosterGate(");
+      // Order is load-bearing (see the gate's docblock): a schema error must
+      // beat 403 OFF_SHIFT, and a stored replay must outrank a roster change.
+      const validateAt = windowText.indexOf("validateBody(");
       const roleAt = windowText.indexOf("requireEffectiveRole(");
+      const replayAt = windowText.indexOf("equipmentReplayIdempotency(");
       const gateAt = windowText.indexOf("custodyRosterGate(");
-      expect(roleAt, `route ${route} order`).toBeGreaterThan(-1);
-      expect(gateAt).toBeGreaterThan(roleAt);
+      for (const [name, idx] of [["validateBody", validateAt], ["requireEffectiveRole", roleAt], ["equipmentReplayIdempotency", replayAt], ["custodyRosterGate", gateAt]] as const) {
+        expect(idx, `route ${route} lacks ${name}`).toBeGreaterThan(-1);
+      }
+      expect(validateAt, `route ${route}: validation precedes the role floor`).toBeLessThan(roleAt);
+      expect(roleAt, `route ${route}: the role floor precedes replay`).toBeLessThan(replayAt);
+      expect(replayAt, `route ${route}: replay precedes the roster gate`).toBeLessThan(gateAt);
     }
   });
 });

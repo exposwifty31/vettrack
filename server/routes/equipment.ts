@@ -302,7 +302,7 @@ router.post("/:id/restore", requireAuth, requireAdmin, postEquipmentRestoreHandl
 // D2 server half: a replayed offline scan (Idempotency-Key) must collapse to
 // its first outcome — /scan is TOGGLE semantics, so a blind duplicate flips
 // custody back. No header → pass-through (web callers unchanged).
-router.post("/scan", requireAuth, checkoutLimiter, requireEffectiveRole("student"), custodyRosterGate(), validateBody(quickScanBodySchema), equipmentReplayIdempotency(EQUIPMENT_REPLAY_IDEMPOTENCY_ENDPOINTS.quickScan), async (req, res) => {
+router.post("/scan", requireAuth, checkoutLimiter, validateBody(quickScanBodySchema), requireEffectiveRole("student"), equipmentReplayIdempotency(EQUIPMENT_REPLAY_IDEMPOTENCY_ENDPOINTS.quickScan), custodyRosterGate(), async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
   try {
     const clinicId = req.clinicId!;
@@ -389,10 +389,10 @@ router.post(
   "/:id/toggle",
   requireAuth,
   checkoutLimiter,
-  requireEffectiveRole("student"),
-  custodyRosterGate(),
   validateBody(equipmentToggleBodySchema),
+  requireEffectiveRole("student"),
   equipmentReplayIdempotency(EQUIPMENT_REPLAY_IDEMPOTENCY_ENDPOINTS.toggle),
+  custodyRosterGate(),
   postEquipmentToggleHandler,
 );
 
@@ -401,10 +401,10 @@ router.post(
   "/:id/checkout",
   requireAuth,
   checkoutLimiter,
-  requireEffectiveRole("student"),
-  custodyRosterGate(),
   validateBody(checkoutSchema),
+  requireEffectiveRole("student"),
   equipmentReplayIdempotency(EQUIPMENT_REPLAY_IDEMPOTENCY_ENDPOINTS.checkout),
+  custodyRosterGate(),
   async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
   try {
@@ -635,10 +635,10 @@ router.post(
   "/:id/return",
   requireAuth,
   checkoutLimiter,
-  requireEffectiveRole("student"),
-  custodyRosterGate(),
   validateBody(equipmentReturnBodySchema),
+  requireEffectiveRole("student"),
   equipmentReplayIdempotency(EQUIPMENT_REPLAY_IDEMPOTENCY_ENDPOINTS.return),
+  custodyRosterGate(),
   async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
   try {

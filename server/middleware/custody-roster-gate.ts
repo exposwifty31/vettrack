@@ -7,8 +7,14 @@
  * accountability spine, and it was enforced only by our own UI — not against
  * a replayed offline write, not against curl.
  *
- * Placement contract: runs AFTER requireEffectiveRole, which has already
- * resolved and stamped `req.activeShift` — this middleware adds NO query.
+ * Placement contract — LAST in the chain, and the order is load-bearing:
+ * `validateBody` → `requireEffectiveRole` → `equipmentReplayIdempotency` →
+ * this gate. Validation first: a malformed request earns its schema error,
+ * never 403 OFF_SHIFT. requireEffectiveRole has already resolved and stamped
+ * `req.activeShift` — this middleware adds NO query. Replay BEFORE the gate:
+ * a keyed replay of a write that committed on-shift must serve the stored
+ * outcome even after the shift ended — a roster change cannot un-happen the
+ * original write, and a 403 here would recreate the ambiguity D2 kills.
  *
  * The rule mirrors src/lib/shift-gate.ts exactly:
  *   - Permanent admins (role or secondaryRole) and vets are exempt — the
