@@ -50,10 +50,21 @@ function mandatoryConjuncts(expr: ts.Expression): ts.Expression[] {
   return [expr];
 }
 
-/** A bare positive `claimLatestWrite(...)` call — `!claimLatestWrite(...)` is a PrefixUnary and does not match. */
-function isClaimCall(expr: ts.Expression): boolean {
+/**
+ * Exactly `claimLatestWrite(<key>, writeTicket)`, positive — `!claim(...)` is a
+ * PrefixUnary and does not match. Operands are read, not just the callee: a
+ * claim on some OTHER row's code, or on a ticket that is not this write's,
+ * proves nothing about THIS response's landed-ness — the same rule
+ * `isOwnershipCall` already enforces for `noNewerIssued`.
+ */
+function isClaimCall(expr: ts.Expression, key: string): boolean {
   const e = ts.isParenthesizedExpression(expr) ? expr.expression : expr;
-  return ts.isCallExpression(e) && ts.isIdentifier(e.expression) && e.expression.text === "claimLatestWrite";
+  if (!ts.isCallExpression(e) || !ts.isIdentifier(e.expression) || e.expression.text !== "claimLatestWrite") {
+    return false;
+  }
+  if (e.arguments.length !== 2) return false;
+  const args = e.arguments.map((a) => a.getText());
+  return args[0] === key && args[1] === "writeTicket";
 }
 
 /**
@@ -62,12 +73,12 @@ function isClaimCall(expr: ts.Expression): boolean {
  * control flow: the ELSE branch of that very `if` runs exactly when the claim
  * is FALSE, and a negated condition inverts the branches — both used to pass.
  */
-function isUnderClaimGuard(node: ts.Node): boolean {
+function isUnderClaimGuard(node: ts.Node, key: string): boolean {
   let child: ts.Node = node;
   for (let p: ts.Node | undefined = node.parent; p; child = p, p = p.parent) {
     if (!ts.isIfStatement(p)) continue;
     if (child !== p.thenStatement) continue;
-    if (mandatoryConjuncts(p.expression).some(isClaimCall)) return true;
+    if (mandatoryConjuncts(p.expression).some((c) => isClaimCall(c, key))) return true;
   }
   return false;
 }
@@ -128,7 +139,7 @@ describe(`${FILE} — a superseded scan response reaches no consumer`, () => {
   });
 
   it("never reads the responded quantity outside a claimLatestWrite guard", () => {
-    const unguarded = observedQuantityReads.filter((n) => !isUnderClaimGuard(n)).map(lineOf);
+    const unguarded = observedQuantityReads.filter((n) => !isUnderClaimGuard(n, "result.item.code")).map(lineOf);
     expect(unguarded).toEqual([]);
   });
 
@@ -284,7 +295,7 @@ describe(`${FILE} — a superseded scan response reaches no consumer`, () => {
     });
 
     expect(persists.length).toBe(1);
-    expect(persists.filter((n) => !isUnderClaimGuard(n)).map(lineOf)).toEqual([]);
+    expect(persists.filter((n) => !isUnderClaimGuard(n, "result.item.code")).map(lineOf)).toEqual([]);
   });
 });
 
@@ -375,18 +386,27 @@ describe("claim guard checker rejects inverted control flow", () => {
       if (ts.isIdentifier(n.expression) && n.expression.text === "safeStorageSetItem") persist = n;
     });
     if (!persist) throw new Error("snippet built no persist to test");
-    return isUnderClaimGuard(persist);
+    return isUnderClaimGuard(persist, "result.item.code");
   }
 
   it("accepts a persist in the THEN branch of a positive claim", () => {
-    expect(persistGuarded(`if (claimLatestWrite(code, writeTicket)) { safeStorageSetItem("k", v); }`)).toBe(true);
+    expect(persistGuarded(`if (claimLatestWrite(result.item.code, writeTicket)) { safeStorageSetItem("k", v); }`)).toBe(true);
   });
 
   it("rejects a persist in the ELSE branch", () => {
-    expect(persistGuarded(`if (claimLatestWrite(code, writeTicket)) { keep(); } else { safeStorageSetItem("k", v); }`)).toBe(false);
+    expect(persistGuarded(`if (claimLatestWrite(result.item.code, writeTicket)) { keep(); } else { safeStorageSetItem("k", v); }`)).toBe(false);
   });
 
   it("rejects a persist under a NEGATED claim", () => {
-    expect(persistGuarded(`if (!claimLatestWrite(code, writeTicket)) { safeStorageSetItem("k", v); }`)).toBe(false);
+    expect(persistGuarded(`if (!claimLatestWrite(result.item.code, writeTicket)) { safeStorageSetItem("k", v); }`)).toBe(false);
+  });
+
+  it("rejects a claim with the wrong ticket — landed-ness of some OTHER write proves nothing", () => {
+    expect(persistGuarded(`if (claimLatestWrite(result.item.code, 0)) { safeStorageSetItem("k", v); }`)).toBe(false);
+    expect(persistGuarded(`if (claimLatestWrite(result.item.code, otherTicket)) { safeStorageSetItem("k", v); }`)).toBe(false);
+  });
+
+  it("rejects a claim keyed by the wrong code — this row's landed-ness, not a neighbour's", () => {
+    expect(persistGuarded(`if (claimLatestWrite(someOtherCode, writeTicket)) { safeStorageSetItem("k", v); }`)).toBe(false);
   });
 });
