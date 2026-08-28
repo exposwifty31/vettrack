@@ -1,5 +1,25 @@
 # VetTrack — Flow Verification Matrix (Section D)
 
+> ## ⚠ 2026-08-27 — NOT MAINTAINED. Verify every row against the code before relying on it.
+>
+> This matrix is a **dated snapshot, not current state.** Three of its twelve numbered sections
+> document domains that were removed from the product by migrations 142–143 (June 2026), and the
+> header below discloses only that no tests were written from it — not that the surfaces are gone.
+>
+> | Section | Documented as live | Actually, in this tree |
+> |---|---|---|
+> | **§5 Medications** (MED-01…MED-05) | `/meds`, `POST /api/medication-tasks` | `/meds` is a redirect stub to `/equipment/tasks` (`src/app/routes.tsx:287`); no `/api/medication-tasks` mount exists in `server/app/routes.ts` |
+> | **§6 Billing** (BIL-01…BIL-07) | `/billing`, `GET /api/billing` | `/billing` redirects to `/equipment` (`src/app/routes.tsx:292`); no `/api/billing` mount |
+> | **§12 ER mode** (ER-01…) | `/er`, `/api/er/board`, `/api/er/stream` | `/er` redirects to `/equipment` (`src/app/routes.tsx:294`); no `/api/er` mount |
+>
+> Two further rows sit under still-live sections but name the same removed `/billing` surface:
+> **CB-07** (`/billing/code-blue-reconciliation`) and **INV-08** (`/billing/inventory-jobs`).
+>
+> `ARCHITECTURE.md` has carried this warning since 2026-08-13; it is repeated here because a reader
+> who opens this file directly never sees it. Removed domains are listed in `CONTEXT.md` and
+> `docs/scope-change-2026.md`. The rest of the matrix has **not** been re-verified row by row — treat
+> every row as unconfirmed until checked against the code.
+
 **Status:** Planning only — no automated flow tests implemented from this matrix yet.  
 **Branch:** `cursor/flow-matrix` → **base:** `staging`  
 **Generated:** 2026-05-21  

@@ -34,10 +34,14 @@ export const EQUIPMENT_REPLAY_IDEMPOTENCY_ENDPOINTS = {
   update: "PATCH /api/equipment/:id",
   delete: "DELETE /api/equipment/:id",
   checkout: "POST /api/equipment/:id/checkout",
-  /** The body-identified quick toggle — the RN offline queue's replay target. */
-  quickScan: "POST /api/equipment/scan",
   return: "POST /api/equipment/:id/return",
   toggle: "POST /api/equipment/:id/toggle",
   seen: "POST /api/equipment/:id/seen",
   scan: "POST /api/equipment/:id/scan",
+  // Flat quick-scan alias — its own key, not a second use of `scan`. Cross-route
+  // serving is already blocked by the request hash (it covers the URL), but
+  // `endpoint` is the label written to vt_idempotency_keys and emitted as `route`
+  // on collision telemetry, so reusing `scan` would file every quick-scan replay
+  // under the per-id route.
+  quickScan: "POST /api/equipment/scan",
 } as const;
