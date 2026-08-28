@@ -1,3 +1,10 @@
+// Workflow-tool script (.claude/workflows convention): the runner wraps this
+// whole body in an async entry function and injects `args`, `agent`,
+// `parallel`, `pipeline`, `log`, `phase` as globals — top-level `await`,
+// top-level `return`, and bare `args` reads are the format, not accidents.
+// Do NOT wrap the body in a function: the runner already does, and an inner
+// wrapper would hide the script's returns from it.
+/* global args, agent, parallel, pipeline, log, phase */
 export const meta = {
   name: 'react-skills-audit',
   description: 'Audit RN-migration work (completed / in-progress / planned) for five-React-skills compliance; verify violations adversarially',

@@ -17,6 +17,10 @@ Two files exceed comfortable review size and mix concerns:
 | `server/routes/equipment.ts` | ~1054 | Router + inline checkout/return/scan mutations + middleware stacks |
 | `src/pages/equipment-detail.tsx` | ~2037 | Single page: custody, scans, dialogs, tabs, waitlist, operational state |
 
+> **Snapshot scope:** every line count and line-range in this document is as of main
+> `442dd2a` — the split-planning baseline. Both files have moved since; re-measure before
+> cutting, and treat the numbers here as the plan's coordinates, not the current truth.
+
 Item 4 extracted **toggle business logic** to `server/services/equipment-custody-toggle.service.ts` but left route wrappers inline. Checkout/return/scan remain inline and **paused** per inline-mutations inventory.
 
 ---
