@@ -321,7 +321,10 @@ export default function AnalyticsPage() {
               <Skeleton className="h-48 rounded-xl" />
             ) : pieData.length > 0 ? (
               <ResponsiveContainer width="100%" height={200}>
-                <PieChart>
+                <PieChart
+                  title={t.analyticsPage.statusDistribution}
+                  desc={t.analyticsPage.statusDistributionChartDesc}
+                >
                   <Pie
                     data={pieData}
                     cx="50%"
@@ -366,7 +369,12 @@ export default function AnalyticsPage() {
               <Skeleton className="h-44 rounded-xl" />
             ) : hasScanActivity ? (
               <ResponsiveContainer width="100%" height={180}>
-                <BarChart data={chartData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
+                <BarChart
+                  data={chartData}
+                  margin={{ top: 0, right: 0, left: -20, bottom: 0 }}
+                  title={t.analyticsPage.scanActivity14Days}
+                  desc={t.analyticsPage.scanActivityChartDesc}
+                >
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.5} />
                   <XAxis dataKey="date" tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} interval={1} />
                   <YAxis tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} allowDecimals={false} />
@@ -403,6 +411,7 @@ export default function AnalyticsPage() {
                   subMessage={t.analyticsPage.topProblemSubMessage}
                   iconBg="bg-muted"
                   iconColor="text-muted-foreground"
+                  headingLevel="h3"
                 />
               ) : (
                 <div className="flex flex-col gap-3">

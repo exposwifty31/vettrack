@@ -1378,6 +1378,8 @@ export interface TStructure {
     loadFailed: string;
     shiftLeaderboardLink: string;
     noScanActivity: string;
+    statusDistributionChartDesc: string;
+    scanActivityChartDesc: string;
     issueCountBadge: string;
   };
   monthlyReport: {

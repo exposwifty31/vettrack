@@ -14,7 +14,7 @@ import {
   CalendarClock,
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
-import { cn } from "@/lib/utils";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AdminShiftRequestsSection } from "@/features/shift-adjustments/AdminShiftRequestsSection";
 import { ManagementAccessDenied } from "@/desktop/management";
 import { t } from "@/lib/i18n";
@@ -24,11 +24,33 @@ import { UsersSection } from "@/pages/admin/UsersSection";
 import { DeletedItemsSection } from "@/pages/admin/DeletedItemsSection";
 import { SupportSection } from "@/pages/admin/SupportSection";
 
+const ADMIN_TABS = [
+  "folders",
+  "users",
+  "pending",
+  "shift-requests",
+  "support",
+  "deleted",
+] as const;
+
+type AdminTab = (typeof ADMIN_TABS)[number];
+
+function isAdminTab(value: string): value is AdminTab {
+  return (ADMIN_TABS as readonly string[]).includes(value);
+}
+
+/**
+ * Underline-strip look on top of the shared Radix trigger. The base
+ * `TabsTrigger` styles a segmented pill (rounded, filled active state); these
+ * overrides restore the admin strip's border-bottom treatment while keeping the
+ * primitive's focus ring, roving tabindex and arrow-key navigation.
+ */
+const tabTriggerClass =
+  "flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-3 py-2 text-sm font-medium text-muted-foreground shadow-none transition-colors hover:text-foreground data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:shadow-none";
+
 export default function AdminPage() {
   const { isAdmin, userId } = useAuth();
-  const [activeTab, setActiveTab] = useState<
-    "folders" | "users" | "pending" | "shift-requests" | "support" | "deleted"
-  >("folders");
+  const [activeTab, setActiveTab] = useState<AdminTab>("folders");
 
   const { data: supportUnresolved } = useQuery({
     queryKey: ["/api/support/unresolved-count"],
@@ -94,109 +116,68 @@ export default function AdminPage() {
           </h1>
         </div>
 
-        {/* Tab bar */}
-        <div className="flex items-center gap-3 border-b border-border pb-0 overflow-x-auto scrollbar-none px-1 -mx-1">
-          <button
-            onClick={() => setActiveTab("folders")}
-            data-testid="admin-tab-folders"
-            className={cn(
-              "flex shrink-0 items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 transition-colors whitespace-nowrap",
-              activeTab === "folders"
-                ? "border-primary text-primary"
-                : "border-transparent text-muted-foreground hover:text-foreground",
-            )}
-          >
-            <FolderOpen className="w-4 h-4" />
-            {t.adminPage.tabFolders}
-          </button>
-          <button
-            onClick={() => setActiveTab("pending")}
-            data-testid="admin-tab-pending"
-            className={cn(
-              "flex shrink-0 items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 transition-colors relative whitespace-nowrap",
-              activeTab === "pending"
-                ? "border-primary text-primary"
-                : "border-transparent text-muted-foreground hover:text-foreground",
-            )}
-          >
-            <Clock className="w-4 h-4" />
-            {t.adminPage.tabPending}
-            {pendingCount > 0 && (
-              <span className="ms-1 inline-flex items-center justify-center w-5 h-5 rounded-full bg-[var(--status-stale-fg)] text-white text-[10px] font-bold">
-                {pendingCount > 9 ? "9+" : pendingCount}
-              </span>
-            )}
-          </button>
-          <button
-            onClick={() => setActiveTab("users")}
-            data-testid="admin-tab-users"
-            className={cn(
-              "flex shrink-0 items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 transition-colors whitespace-nowrap",
-              activeTab === "users"
-                ? "border-primary text-primary"
-                : "border-transparent text-muted-foreground hover:text-foreground",
-            )}
-          >
-            <Users className="w-4 h-4" />
-            {t.adminPage.tabUsers}
-          </button>
-          <button
-            onClick={() => setActiveTab("support")}
-            data-testid="admin-tab-support"
-            className={cn(
-              "flex shrink-0 items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 transition-colors relative whitespace-nowrap",
-              activeTab === "support"
-                ? "border-primary text-primary"
-                : "border-transparent text-muted-foreground hover:text-foreground",
-            )}
-          >
-            <LifeBuoy className="w-4 h-4" />
-            {t.adminPage.tabSupport}
-            {unresolvedCount > 0 && (
-              <span className="ms-1 inline-flex items-center justify-center w-5 h-5 rounded-full bg-primary text-white text-[10px] font-bold">
-                {unresolvedCount > 9 ? "9+" : unresolvedCount}
-              </span>
-            )}
-          </button>
-          <button
-            onClick={() => setActiveTab("shift-requests")}
-            data-testid="admin-tab-shift-requests"
-            className={cn(
-              "flex shrink-0 items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 transition-colors relative whitespace-nowrap",
-              activeTab === "shift-requests"
-                ? "border-primary text-primary"
-                : "border-transparent text-muted-foreground hover:text-foreground",
-            )}
-          >
-            <CalendarClock className="w-4 h-4" />
-            {t.shiftAdjustments.admin.tab}
-            {shiftRequestCount > 0 && (
-              <span className="ms-1 inline-flex items-center justify-center w-5 h-5 rounded-full bg-[var(--status-stale-fg)] text-white text-[10px] font-bold">
-                {shiftRequestCount > 9 ? "9+" : shiftRequestCount}
-              </span>
-            )}
-          </button>
-          <button
-            onClick={() => setActiveTab("deleted")}
-            data-testid="admin-tab-deleted"
-            className={cn(
-              "flex shrink-0 items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 transition-colors whitespace-nowrap",
-              activeTab === "deleted"
-                ? "border-primary text-primary"
-                : "border-transparent text-muted-foreground hover:text-foreground",
-            )}
-          >
-            <Trash2 className="w-4 h-4" />
-            {t.adminPage.tabDeleted}
-          </button>
-        </div>
+        {/* Tab bar — Radix Tabs supplies tablist/tab/tabpanel roles, aria-selected,
+            the roving tabindex and arrow-key navigation the hand-rolled strip had none of. */}
+        <Tabs
+          value={activeTab}
+          onValueChange={(value) => {
+            if (isAdminTab(value)) setActiveTab(value);
+          }}
+          className="flex flex-col gap-6"
+        >
+          <TabsList className="flex h-auto items-center justify-start gap-3 rounded-none border-b border-border bg-transparent p-0 pb-0 -mx-1 px-1 overflow-x-auto scrollbar-none">
+            <TabsTrigger value="folders" data-testid="admin-tab-folders" className={tabTriggerClass}>
+              <FolderOpen className="w-4 h-4" />
+              {t.adminPage.tabFolders}
+            </TabsTrigger>
+            <TabsTrigger value="pending" data-testid="admin-tab-pending" className={tabTriggerClass}>
+              <Clock className="w-4 h-4" />
+              {t.adminPage.tabPending}
+              {pendingCount > 0 && (
+                <span className="ms-1 inline-flex items-center justify-center w-5 h-5 rounded-full bg-[var(--status-stale-fg)] text-white text-[10px] font-bold">
+                  {pendingCount > 9 ? "9+" : pendingCount}
+                </span>
+              )}
+            </TabsTrigger>
+            <TabsTrigger value="users" data-testid="admin-tab-users" className={tabTriggerClass}>
+              <Users className="w-4 h-4" />
+              {t.adminPage.tabUsers}
+            </TabsTrigger>
+            <TabsTrigger value="support" data-testid="admin-tab-support" className={tabTriggerClass}>
+              <LifeBuoy className="w-4 h-4" />
+              {t.adminPage.tabSupport}
+              {unresolvedCount > 0 && (
+                <span className="ms-1 inline-flex items-center justify-center w-5 h-5 rounded-full bg-primary text-white text-[10px] font-bold">
+                  {unresolvedCount > 9 ? "9+" : unresolvedCount}
+                </span>
+              )}
+            </TabsTrigger>
+            <TabsTrigger
+              value="shift-requests"
+              data-testid="admin-tab-shift-requests"
+              className={tabTriggerClass}
+            >
+              <CalendarClock className="w-4 h-4" />
+              {t.shiftAdjustments.admin.tab}
+              {shiftRequestCount > 0 && (
+                <span className="ms-1 inline-flex items-center justify-center w-5 h-5 rounded-full bg-[var(--status-stale-fg)] text-white text-[10px] font-bold">
+                  {shiftRequestCount > 9 ? "9+" : shiftRequestCount}
+                </span>
+              )}
+            </TabsTrigger>
+            <TabsTrigger value="deleted" data-testid="admin-tab-deleted" className={tabTriggerClass}>
+              <Trash2 className="w-4 h-4" />
+              {t.adminPage.tabDeleted}
+            </TabsTrigger>
+          </TabsList>
 
-        {activeTab === "folders" && <FoldersSection />}
-        {activeTab === "pending" && <PendingUsersSection />}
-        {activeTab === "users" && <UsersSection />}
-        {activeTab === "shift-requests" && <AdminShiftRequestsSection />}
-        {activeTab === "support" && <SupportSection />}
-        {activeTab === "deleted" && <DeletedItemsSection />}
+          <TabsContent value="folders" className="mt-0"><FoldersSection /></TabsContent>
+          <TabsContent value="pending" className="mt-0"><PendingUsersSection /></TabsContent>
+          <TabsContent value="users" className="mt-0"><UsersSection /></TabsContent>
+          <TabsContent value="shift-requests" className="mt-0"><AdminShiftRequestsSection /></TabsContent>
+          <TabsContent value="support" className="mt-0"><SupportSection /></TabsContent>
+          <TabsContent value="deleted" className="mt-0"><DeletedItemsSection /></TabsContent>
+        </Tabs>
       </div>
     </>
   );

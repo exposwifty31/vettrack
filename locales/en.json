@@ -1375,6 +1375,8 @@
     "loadFailed": "Failed to load analytics data. Try again.",
     "shiftLeaderboardLink": "Shift scan leaderboard",
     "noScanActivity": "No scan activity in the last 14 days",
+    "statusDistributionChartDesc": "Doughnut chart showing how many equipment items are in each status: ready, issue, maintenance and sterilized.",
+    "scanActivityChartDesc": "Bar chart showing how many scans were recorded on each of the last 14 days.",
     "issueCountBadge": "{count} issues"
   },
   "monthlyReport": {

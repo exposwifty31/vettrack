@@ -4,7 +4,7 @@
 // the Topbar's horizontal overflow strip they scrolled out of view at common desktop widths
 // (M2). A labeled dropdown always fits and keeps the links discoverable. Mirrors the
 // hand-rolled dropdown pattern in TopbarSettingsMenu (click-outside + Escape, no Radix dep).
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { Link } from "wouter";
 import { LayoutGrid } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -19,8 +19,9 @@ interface ManagementNavItem {
 
 export function TopbarManagementMenu({ items, activeHref }: { items: ManagementNavItem[]; activeHref: string }) {
   const [open, setOpen] = useState(false);
-  const panelRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
+  const panelId = useId();
 
   useEffect(() => {
     if (!open) return;
@@ -41,11 +42,16 @@ export function TopbarManagementMenu({ items, activeHref }: { items: ManagementN
 
   return (
     <div className="relative shrink-0">
+      {/* Disclosure, not a menu button. aria-haspopup="true" aliases to "menu",
+          promising role=menu/menuitem semantics and arrow-key traversal that this
+          panel of plain links deliberately does not have (Ctrl/middle-click and
+          the link role are worth more here). aria-controls is set only while the
+          panel is mounted so it never dangles. */}
       <button
         ref={triggerRef}
         type="button"
-        aria-haspopup="true"
         aria-expanded={open}
+        aria-controls={open ? panelId : undefined}
         onClick={() => setOpen((o) => !o)}
         className={cn(
           "flex items-center gap-1.5 text-sm font-medium px-2.5 py-1 rounded-[4px] whitespace-nowrap transition-colors duration-100",
@@ -62,8 +68,9 @@ export function TopbarManagementMenu({ items, activeHref }: { items: ManagementN
       {open && (
         <>
           <div aria-hidden onClick={() => setOpen(false)} className="fixed inset-0 z-40" />
-          <div
+          <nav
             ref={panelRef}
+            id={panelId}
             tabIndex={-1}
             aria-label={t.nav.management}
             className="absolute z-50 mt-2 w-60 end-0 rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--popover))] text-[hsl(var(--popover-foreground))] shadow-[0_18px_48px_rgba(0,0,0,0.22)] p-1.5 outline-none max-h-[70vh] overflow-y-auto"
@@ -84,7 +91,7 @@ export function TopbarManagementMenu({ items, activeHref }: { items: ManagementN
                 {navLabel(n.labelKey)}
               </Link>
             ))}
-          </div>
+          </nav>
         </>
       )}
     </div>
