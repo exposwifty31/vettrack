@@ -194,8 +194,8 @@ describe("composeCrashCartDriftProposal", () => {
     // break autopilot idempotency.
     for (const input of [en, he]) {
       expect(input.sourceSessionId).toBe(SCAN_DATE);
-      expect((input.sourceRef as { scanDate: string }).scanDate).toBe(SCAN_DATE);
-      expect((input.draftContent as CrashCartMissingItemsDraftContent).scanDate).toBe(SCAN_DATE);
+      expect(input.sourceRef).toMatchObject({ scanDate: SCAN_DATE });
+      expect(input.draftContent).toMatchObject({ scanDate: SCAN_DATE });
     }
   });
 
@@ -211,8 +211,10 @@ describe("composeCrashCartDriftProposal", () => {
       }),
       locale: "he",
     });
-    expect(never.citedFacts[0]!.at).toBe(`${SCAN_DATE}T00:00:00.000Z`);
-    expect((never.draftContent as CrashCartStaleCheckDraftContent).scanDate).toBe(SCAN_DATE);
+    expect(never.citedFacts).toContainEqual(
+      expect.objectContaining({ at: `${SCAN_DATE}T00:00:00.000Z` }),
+    );
+    expect(never.draftContent).toMatchObject({ scanDate: SCAN_DATE });
   });
 
   it("throws when neither missingItemsFlagged nor staleFlagged is true (nothing to propose)", () => {

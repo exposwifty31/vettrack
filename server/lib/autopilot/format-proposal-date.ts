@@ -24,9 +24,20 @@
  */
 import type { Locale } from "../../../lib/i18n/index.js";
 
+const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
+
 export function formatProposalDate(isoDay: string, locale: Locale): string {
+  if (!ISO_DAY.test(isoDay)) {
+    return isoDay;
+  }
   const parsed = new Date(`${isoDay}T00:00:00.000Z`);
   if (Number.isNaN(parsed.getTime())) {
+    return isoDay;
+  }
+  // The UTC parser NORMALIZES calendar overflow (2026-02-30 parses as Mar 2),
+  // which NaN cannot catch — render only a day that round-trips intact, so an
+  // invalid calendar value falls back to the raw input instead of the wrong day.
+  if (parsed.toISOString().slice(0, 10) !== isoDay) {
     return isoDay;
   }
   return parsed.toLocaleDateString(locale === "he" ? "he-IL" : "en-US", { timeZone: "UTC" });

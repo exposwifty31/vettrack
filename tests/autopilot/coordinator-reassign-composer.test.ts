@@ -122,10 +122,12 @@ describe("coordinator-reassign-composer", () => {
     // break autopilot idempotency.
     for (const input of [en, he]) {
       expect(input.sourceSessionId).toBe(SHIFT_DATE);
-      expect((input.sourceRef as { shiftDate: string }).shiftDate).toBe(SHIFT_DATE);
-      expect((input.draftContent as { shiftDate: string }).shiftDate).toBe(SHIFT_DATE);
+      expect(input.sourceRef).toMatchObject({ shiftDate: SHIFT_DATE });
+      expect(input.draftContent).toMatchObject({ shiftDate: SHIFT_DATE });
       // the roster-row citation derives its `at` from shiftDate as a timestamp
-      expect(input.citedFacts.some((f) => f.at === `${SHIFT_DATE}T00:00:00.000Z`)).toBe(true);
+      expect(input.citedFacts).toContainEqual(
+        expect.objectContaining({ at: `${SHIFT_DATE}T00:00:00.000Z` }),
+      );
     }
   });
 

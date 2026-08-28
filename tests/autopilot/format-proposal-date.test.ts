@@ -36,3 +36,23 @@ describe("formatProposalDate", () => {
     expect(formatProposalDate(ISO_DAY, "en")).toBe("7/22/2026");
   });
 });
+
+describe("calendar-overflow rejection (round-trip guard)", () => {
+  it("returns overflow days unchanged instead of the normalized WRONG day", () => {
+    // Date.parse normalizes these (2026-02-30 → Mar 2) — NaN cannot catch them.
+    expect(formatProposalDate("2026-02-30", "en")).toBe("2026-02-30");
+    expect(formatProposalDate("2026-02-29", "en")).toBe("2026-02-29"); // 2026 is not a leap year
+    expect(formatProposalDate("2026-04-31", "he")).toBe("2026-04-31");
+  });
+
+  it("still formats a real leap day", () => {
+    expect(formatProposalDate("2024-02-29", "en")).toBe(
+      new Date("2024-02-29T00:00:00.000Z").toLocaleDateString("en-US", { timeZone: "UTC" }),
+    );
+  });
+
+  it("rejects non-ISO-day shapes outright", () => {
+    expect(formatProposalDate("29/02/2024", "en")).toBe("29/02/2024");
+    expect(formatProposalDate("2024-2-9", "en")).toBe("2024-2-9");
+  });
+});

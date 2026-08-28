@@ -127,10 +127,12 @@ describe("composeRestockPoProposal", () => {
     // break autopilot idempotency.
     for (const input of [en, he]) {
       expect(input.sourceSessionId).toBe(SCAN_DATE);
-      expect((input.sourceRef as { scanDate: string }).scanDate).toBe(SCAN_DATE);
-      expect((input.draftContent as RestockPoDraftContent).scanDate).toBe(SCAN_DATE);
+      expect(input.sourceRef).toMatchObject({ scanDate: SCAN_DATE });
+      expect(input.draftContent).toMatchObject({ scanDate: SCAN_DATE });
       // citedFacts[].at on the vt_items row is derived from scanDate as a timestamp.
-      expect(input.citedFacts[0]!.at).toBe(`${SCAN_DATE}T00:00:00.000Z`);
+      expect(input.citedFacts).toContainEqual(
+        expect.objectContaining({ at: `${SCAN_DATE}T00:00:00.000Z` }),
+      );
     }
   });
 
