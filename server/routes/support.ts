@@ -6,6 +6,7 @@ import { eq, desc, ne, and } from "drizzle-orm";
 import { requireAuth, requireAdmin } from "../middleware/auth.js";
 import { requireClinicId } from "../middleware/tenant-context.js";
 import { validateBody, validateUuid } from "../middleware/validate.js";
+import { equipmentReplayIdempotency } from "../middleware/equipment-replay-idempotency.js";
 import { sendPushToAll } from "../lib/push.js";
 import { resolveRequestId, apiError } from "../lib/route-utils.js";
 
@@ -42,7 +43,10 @@ const patchTicketSchema = z.object({
   message: "חובה לספק לפחות סטטוס או הערת מנהל",
 });
 
-router.post("/", requireAuth, validateBody(createTicketSchema), async (req, res) => {
+// Idempotency-Key dedup (RN #147 sends a caller-owned key per logical
+// submission). Mounted AFTER validateBody so the request hash covers the
+// Zod-defaulted body; keyless online callers pass through unchanged.
+router.post("/", requireAuth, validateBody(createTicketSchema), equipmentReplayIdempotency("POST /api/support"), async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
   try {
     if (!req.authUser) {

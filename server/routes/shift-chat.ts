@@ -12,6 +12,7 @@ import { combineLocal, parseWindowSessionId, windowBounds } from "../lib/shift-w
 import { requireAuth, requireEffectiveRole } from "../middleware/auth.js";
 import { writeLimiter } from "../middleware/rate-limiters.js";
 import { validateBody } from "../middleware/validate.js";
+import { equipmentReplayIdempotency } from "../middleware/equipment-replay-idempotency.js";
 import { sendPushToUser, sendPushToRole } from "../lib/push.js";
 import { enqueueNotificationJob, enqueuePushNotification } from "../lib/queue.js";
 import { insertRealtimeDomainEvent } from "../lib/realtime-outbox.js";
@@ -175,6 +176,15 @@ router.post(
   requireEffectiveRole("technician"),
   writeLimiter,
   validateBody(postMessageSchema),
+  // Idempotency-Key dedup (RN #148 sends a caller-owned key on broadcast; a
+  // duplicated broadcast re-pages every technician because the per-role push
+  // keys derive from the fresh message.id). AFTER validateBody so the hash
+  // covers the defaulted body; regular keyless messages pass through — the
+  // client's header discipline makes this de-facto broadcast scoping. The
+  // in-handler 403/400/409 are non-2xx and never persist; a replay answers
+  // from the stored row without re-entering the handler, so pushes cannot
+  // re-fire.
+  equipmentReplayIdempotency("POST /api/shift-chat/messages"),
   async (req, res) => {
     const clinicId = req.clinicId!;
     const user = req.authUser!;

@@ -115,7 +115,7 @@ export function equipmentReplayIdempotency(endpoint: string): RequestHandler {
         code: "VALIDATION_FAILED",
         error: "VALIDATION_FAILED",
         reason: "CLINIC_AND_USER_REQUIRED",
-        message: "Clinic and authenticated user required for idempotent equipment replay",
+        message: "Clinic and authenticated user required for idempotent replay",
       });
       return;
     }
