@@ -651,6 +651,11 @@ function EquipmentDetailPageDesktop() {
       const result = await api.equipment.return(id!, {
         isPluggedIn: nextPluggedIn,
         plugInDeadlineMinutes: nextPluggedIn ? undefined : nextDeadline,
+        // The button is offered to admins for units they do not hold
+        // (checkedOutByMe || isAdmin below); the server's holder guard 403s
+        // that return unless the admin explicitly forces it. Only the foreign
+        // case carries the flag — see api.equipment.return.
+        force: isAdmin && !checkedOutByMe ? true : undefined,
       });
       return { result, prev, usedPluggedIn: nextPluggedIn, usedDeadline: nextDeadline, suppressUndoToast };
     },
