@@ -336,7 +336,7 @@ export default function NewEquipmentPage() {
 
               <div className="flex flex-col gap-2">
                 <Label htmlFor="name" className="text-sm font-medium">
-                  Name <span className="text-destructive" aria-hidden>*</span>
+                  {t.newEquipment.fields.name.label} <span className="text-destructive" aria-hidden>*</span>
                 </Label>
                 <Input
                   id="name"
@@ -366,7 +366,7 @@ export default function NewEquipmentPage() {
               </div>
 
               <div className="flex flex-col gap-2">
-                <Label htmlFor="serialNumber" className="text-sm font-medium">Serial Number</Label>
+                <Label htmlFor="serialNumber" className="text-sm font-medium">{t.newEquipment.fields.serialNumber.label}</Label>
                 <Input
                   id="serialNumber"
                   placeholder={t.newEquipment.fields.serialNumber.placeholder}
@@ -391,7 +391,7 @@ export default function NewEquipmentPage() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="flex flex-col gap-2">
-                  <Label htmlFor="model" className="text-sm font-medium">Model</Label>
+                  <Label htmlFor="model" className="text-sm font-medium">{t.newEquipment.fields.model.label}</Label>
                   <Input
                     id="model"
                     placeholder={t.newEquipment.fields.model.placeholder}
@@ -400,7 +400,7 @@ export default function NewEquipmentPage() {
                   />
                 </div>
                 <div className="flex flex-col gap-2">
-                  <Label htmlFor="manufacturer" className="text-sm font-medium">Manufacturer</Label>
+                  <Label htmlFor="manufacturer" className="text-sm font-medium">{t.newEquipment.fields.manufacturer.label}</Label>
                   <Input
                     id="manufacturer"
                     placeholder={t.newEquipment.fields.manufacturer.placeholder}
@@ -419,7 +419,7 @@ export default function NewEquipmentPage() {
               </h2>
 
               <div className="flex flex-col gap-2">
-                <Label className="text-sm font-medium">Folder / Category</Label>
+                <Label className="text-sm font-medium">{t.newEquipment.fields.folder.label}</Label>
                 <Select
                   value={watch("folderId") || "none"}
                   onValueChange={(v) => setValue("folderId", v)}
@@ -439,7 +439,7 @@ export default function NewEquipmentPage() {
               </div>
 
               <div className="flex flex-col gap-2">
-                <Label htmlFor="location" className="text-sm font-medium">Location</Label>
+                <Label htmlFor="location" className="text-sm font-medium">{t.newEquipment.fields.location.label}</Label>
                 <Input
                   id="location"
                   placeholder={t.newEquipment.fields.location.placeholder}
@@ -450,7 +450,7 @@ export default function NewEquipmentPage() {
               </div>
 
               <div className="flex flex-col gap-2">
-                <Label htmlFor="usuallyFoundHere" className="text-sm font-medium">Floor note</Label>
+                <Label htmlFor="usuallyFoundHere" className="text-sm font-medium">{t.newEquipment.fields.usuallyFoundHere.label}</Label>
                 <Textarea
                   id="usuallyFoundHere"
                   placeholder={t.newEquipment.fields.usuallyFoundHere.placeholder}
@@ -464,7 +464,7 @@ export default function NewEquipmentPage() {
               </div>
 
               <div className="flex flex-col gap-2">
-                <Label htmlFor="searchAlias" className="text-sm font-medium">Also known as</Label>
+                <Label htmlFor="searchAlias" className="text-sm font-medium">{t.newEquipment.fields.searchAlias.label}</Label>
                 <Input
                   id="searchAlias"
                   placeholder={t.newEquipment.fields.searchAlias.placeholder}
@@ -478,7 +478,7 @@ export default function NewEquipmentPage() {
               </div>
 
               <div className="flex flex-col gap-2">
-                <Label htmlFor="staffNote" className="text-sm font-medium">Staff note</Label>
+                <Label htmlFor="staffNote" className="text-sm font-medium">{t.newEquipment.fields.staffNote.label}</Label>
                 <Textarea
                   id="staffNote"
                   placeholder={t.newEquipment.fields.staffNote.placeholder}
@@ -492,7 +492,7 @@ export default function NewEquipmentPage() {
               </div>
 
               <div className="flex flex-col gap-2">
-                <Label htmlFor="purchaseDate" className="text-sm font-medium">Purchase Date</Label>
+                <Label htmlFor="purchaseDate" className="text-sm font-medium">{t.newEquipment.fields.purchaseDate.label}</Label>
                 <Input
                   id="purchaseDate"
                   type="date"
@@ -503,7 +503,7 @@ export default function NewEquipmentPage() {
               </div>
 
               <div className="flex flex-col gap-2">
-                <Label htmlFor="expiryDate" className="text-sm font-medium">תאריך תפוגה</Label>
+                <Label htmlFor="expiryDate" className="text-sm font-medium">{t.newEquipment.fields.expiryDate.label}</Label>
                 <Input
                   id="expiryDate"
                   type="date"
@@ -523,7 +523,7 @@ export default function NewEquipmentPage() {
 
               <div className="flex flex-col gap-2">
                 <Label htmlFor="maintenanceIntervalDays" className="text-sm font-medium">
-                  Maintenance Interval (days)
+                  {t.newEquipment.fields.maintenanceIntervalDays.label}
                 </Label>
                 <Input
                   id="maintenanceIntervalDays"

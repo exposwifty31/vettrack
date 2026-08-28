@@ -581,27 +581,33 @@
     "fields": {
       "name": {
         "placeholder": "לדוגמה: אוטוקלב יחידה א׳",
-        "error": "שם הוא שדה חובה"
+        "error": "שם הוא שדה חובה",
+        "label": "שם"
       },
       "nameHe": {
         "label": "שם (עברית)",
         "placeholder": "לדוגמה: אוטוקלב יחידה א׳"
       },
       "serialNumber": {
-        "placeholder": "SN-12345"
+        "placeholder": "SN-12345",
+        "label": "מספר סידורי"
       },
       "model": {
-        "placeholder": "שם דגם"
+        "placeholder": "שם דגם",
+        "label": "דגם"
       },
       "manufacturer": {
-        "placeholder": "יצרן"
+        "placeholder": "יצרן",
+        "label": "יצרן"
       },
       "folder": {
         "placeholder": "ללא תיקייה",
-        "none": "ללא תיקייה"
+        "none": "ללא תיקייה",
+        "label": "תיקייה / קטגוריה"
       },
       "location": {
-        "placeholder": "לדוגמה: חדר ניתוח 1"
+        "placeholder": "לדוגמה: חדר ניתוח 1",
+        "label": "מיקום"
       },
       "expectedReturnMinutes": {
         "label": "זמן שימוש צפוי (דקות)",
@@ -609,16 +615,26 @@
         "description": "נדרש לתזכורות החזרה חכמות לפי תפקיד."
       },
       "usuallyFoundHere": {
-        "placeholder": "לדוגמה: ליד מכונת החמצן ביחידה לטיפול נמרץ"
+        "placeholder": "לדוגמה: ליד מכונת החמצן ביחידה לטיפול נמרץ",
+        "label": "הערת רצפה"
       },
       "searchAlias": {
-        "placeholder": "לדוגמה: אולטרסאונד, דופלר, פרבו"
+        "placeholder": "לדוגמה: אולטרסאונד, דופלר, פרבו",
+        "label": "שמות נוספים"
       },
       "staffNote": {
-        "placeholder": "לדוגמה: החיישן מאבד מגע מצד ימין"
+        "placeholder": "לדוגמה: החיישן מאבד מגע מצד ימין",
+        "label": "הערת צוות"
       },
       "maintenanceIntervalDays": {
-        "placeholder": "לדוגמה: 30"
+        "placeholder": "לדוגמה: 30",
+        "label": "מרווח תחזוקה (ימים)"
+      },
+      "purchaseDate": {
+        "label": "תאריך רכישה"
+      },
+      "expiryDate": {
+        "label": "תאריך תפוגה"
       }
     },
     "saveChanges": "שמור שינויים",

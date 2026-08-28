@@ -581,27 +581,33 @@
     "fields": {
       "name": {
         "placeholder": "e.g. Autoclave Unit A",
-        "error": "Name is required"
+        "error": "Name is required",
+        "label": "Name"
       },
       "nameHe": {
         "label": "Hebrew name",
         "placeholder": "e.g. Autoclave Unit A (Hebrew)"
       },
       "serialNumber": {
-        "placeholder": "SN-12345"
+        "placeholder": "SN-12345",
+        "label": "Serial number"
       },
       "model": {
-        "placeholder": "Model name"
+        "placeholder": "Model name",
+        "label": "Model"
       },
       "manufacturer": {
-        "placeholder": "Manufacturer"
+        "placeholder": "Manufacturer",
+        "label": "Manufacturer"
       },
       "folder": {
         "placeholder": "Unfiled",
-        "none": "Unfiled"
+        "none": "Unfiled",
+        "label": "Folder / category"
       },
       "location": {
-        "placeholder": "e.g. Surgery Room 1"
+        "placeholder": "e.g. Surgery Room 1",
+        "label": "Location"
       },
       "expectedReturnMinutes": {
         "label": "Expected return time (minutes)",
@@ -609,16 +615,26 @@
         "description": "Required for smart role-based return reminders."
       },
       "usuallyFoundHere": {
-        "placeholder": "e.g. Usually near ICU prep alcove beside oxygen tanks"
+        "placeholder": "e.g. Usually near ICU prep alcove beside oxygen tanks",
+        "label": "Floor note"
       },
       "searchAlias": {
-        "placeholder": "e.g. good FAST, parvo pump, doppler probe"
+        "placeholder": "e.g. good FAST, parvo pump, doppler probe",
+        "label": "Also known as"
       },
       "staffNote": {
-        "placeholder": "e.g. Probe loses contact on right side"
+        "placeholder": "e.g. Probe loses contact on right side",
+        "label": "Staff note"
       },
       "maintenanceIntervalDays": {
-        "placeholder": "e.g. 30"
+        "placeholder": "e.g. 30",
+        "label": "Maintenance interval (days)"
+      },
+      "purchaseDate": {
+        "label": "Purchase date"
+      },
+      "expiryDate": {
+        "label": "Expiry date"
       }
     },
     "saveChanges": "Save changes",
