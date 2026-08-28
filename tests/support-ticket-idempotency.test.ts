@@ -11,11 +11,12 @@
  * vt_idempotency_keys). Harness cloned from equipment-quick-scan-idempotency.
  */
 import "dotenv/config";
-import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Pool } from "pg";
 import { createServer, type Server } from "node:http";
 import express from "express";
 import { randomUUID } from "crypto";
+import { z } from "zod";
 
 const DATABASE_URL = process.env.DATABASE_URL ?? "";
 
@@ -53,11 +54,15 @@ if (DATABASE_URL) {
     );
   }
   if (!schemaReady) {
-    await probePool.end().catch(() => {});
+    let cleanupErr: unknown = null;
+    await probePool.end().catch((e: unknown) => {
+      cleanupErr = e;
+    });
     probePool = null;
     throw new Error(
       "DATABASE_URL is configured but vt_support_tickets or vt_idempotency_keys is missing. " +
-        "Run the migrations, or unset DATABASE_URL to skip this suite.",
+        "Run the migrations, or unset DATABASE_URL to skip this suite." +
+        (cleanupErr ? ` (pool cleanup also failed: ${cleanupErr instanceof Error ? cleanupErr.message : String(cleanupErr)})` : ""),
     );
   }
 }
@@ -83,6 +88,10 @@ vi.mock("../server/lib/push.js", () => ({
   sendPushToAll: vi.fn().mockResolvedValue(undefined),
 }));
 
+
+const createdTicketSchema = z.object({ id: z.string() });
+const conflictSchema = z.object({ reason: z.string() });
+
 const supportRoutes = (await import("../server/routes/support.js")).default;
 
 afterAll(async () => {
@@ -105,6 +114,12 @@ describe.skipIf(!dbReachable || !schemaReady)("POST /api/support — Idempotency
         baseUrl = `http://127.0.0.1:${typeof address === "object" && address ? address.port : 0}`;
         resolve();
       });
+    });
+  });
+
+  afterEach(() => {
+    return new Promise<void>((resolve, reject) => {
+      server.close((err) => (err ? reject(err) : resolve()));
     });
   });
 
@@ -152,11 +167,11 @@ describe.skipIf(!dbReachable || !schemaReady)("POST /api/support — Idempotency
 
     const first = await post(TICKET, key);
     expect(first.status).toBe(201);
-    const firstBody = (await first.json()) as { id: string };
+    const firstBody = createdTicketSchema.parse((await first.json()) as unknown);
 
     const second = await post(TICKET, key);
     expect(second.status).toBe(201);
-    const secondBody = (await second.json()) as { id: string };
+    const secondBody = createdTicketSchema.parse((await second.json()) as unknown);
 
     expect(secondBody.id).toBe(firstBody.id);
     expect(await countTickets(clinicId)).toBe(1);
@@ -169,7 +184,7 @@ describe.skipIf(!dbReachable || !schemaReady)("POST /api/support — Idempotency
     expect((await post(TICKET, key)).status).toBe(201);
     const mismatch = await post({ ...TICKET, title: "Different title" }, key);
     expect(mismatch.status).toBe(409);
-    const body = (await mismatch.json()) as { reason?: string };
+    const body = conflictSchema.parse((await mismatch.json()) as unknown);
     expect(body.reason).toBe("IDEMPOTENCY_KEY_BODY_MISMATCH");
     expect(await countTickets(clinicId)).toBe(1);
   });

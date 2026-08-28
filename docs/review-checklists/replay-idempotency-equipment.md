@@ -1,4 +1,4 @@
-# Replay Idempotency Equipment Review Checklist
+# Replay Idempotency Review Checklist (equipment · support · shift-chat)
 
 ## Scope
 - [ ] Headers are added on replay paths only, not initial writes.

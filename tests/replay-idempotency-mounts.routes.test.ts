@@ -19,8 +19,9 @@ function source(rel: string): string {
 describe("replay-idempotency mounts — support + shift-chat", () => {
   it("POST /api/support mounts equipmentReplayIdempotency directly after validateBody", () => {
     const src = source("server/routes/support.ts");
+    // ^-anchored (m): a commented-out copy starts with `//` and cannot match.
     expect(src).toMatch(
-      /router\.post\(\s*"\/",\s*requireAuth,\s*validateBody\(createTicketSchema\),\s*equipmentReplayIdempotency\("POST \/api\/support"\),/,
+      /^router\.post\(\s*"\/",\s*requireAuth,\s*validateBody\(createTicketSchema\),\s*equipmentReplayIdempotency\("POST \/api\/support"\),/m,
     );
   });
 
@@ -29,7 +30,7 @@ describe("replay-idempotency mounts — support + shift-chat", () => {
     expect(src).toMatch(
       // (?:\s|\/\/[^\n]*)* — whitespace or full-line comments may sit between
       // the two middlewares; anything else (another middleware) breaks the pin.
-      /router\.post\(\s*"\/messages",\s*requireAuth,\s*requireEffectiveRole\("technician"\),\s*writeLimiter,\s*validateBody\(postMessageSchema\),(?:\s|\/\/[^\n]*)*equipmentReplayIdempotency\("POST \/api\/shift-chat\/messages"\),/,
+      /^router\.post\(\s*"\/messages",\s*requireAuth,\s*requireEffectiveRole\("technician"\),\s*writeLimiter,\s*validateBody\(postMessageSchema\),(?:\s|\/\/[^\n]*)*equipmentReplayIdempotency\("POST \/api\/shift-chat\/messages"\),/m,
     );
   });
 });

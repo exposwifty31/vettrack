@@ -14,11 +14,12 @@
  * vt_idempotency_keys). Harness cloned from equipment-quick-scan-idempotency.
  */
 import "dotenv/config";
-import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Pool } from "pg";
 import { createServer, type Server } from "node:http";
 import express from "express";
 import { randomUUID } from "crypto";
+import { z } from "zod";
 
 const DATABASE_URL = process.env.DATABASE_URL ?? "";
 
@@ -56,11 +57,15 @@ if (DATABASE_URL) {
     );
   }
   if (!schemaReady) {
-    await probePool.end().catch(() => {});
+    let cleanupErr: unknown = null;
+    await probePool.end().catch((e: unknown) => {
+      cleanupErr = e;
+    });
     probePool = null;
     throw new Error(
       "DATABASE_URL is configured but vt_shift_messages or vt_idempotency_keys is missing. " +
-        "Run the migrations, or unset DATABASE_URL to skip this suite.",
+        "Run the migrations, or unset DATABASE_URL to skip this suite." +
+        (cleanupErr ? ` (pool cleanup also failed: ${cleanupErr instanceof Error ? cleanupErr.message : String(cleanupErr)})` : ""),
     );
   }
 }
@@ -134,6 +139,10 @@ vi.mock("../server/lib/shift-chat-window.js", () => ({
   windowMessagesWhere: vi.fn(() => undefined),
 }));
 
+
+const createdMessageSchema = z.object({ message: z.object({ id: z.string() }) });
+const conflictSchema = z.object({ reason: z.string() });
+
 const shiftChatRoutes = (await import("../server/routes/shift-chat.js")).default;
 
 afterAll(async () => {
@@ -159,6 +168,12 @@ describe.skipIf(!dbReachable || !schemaReady)(
           baseUrl = `http://127.0.0.1:${typeof address === "object" && address ? address.port : 0}`;
           resolve();
         });
+      });
+    });
+
+    afterEach(() => {
+      return new Promise<void>((resolve, reject) => {
+        server.close((err) => (err ? reject(err) : resolve()));
       });
     });
 
@@ -213,13 +228,13 @@ describe.skipIf(!dbReachable || !schemaReady)(
 
       const first = await post(BROADCAST, key);
       expect(first.status).toBe(201);
-      const firstBody = (await first.json()) as { message: { id: string } };
+      const firstBody = createdMessageSchema.parse((await first.json()) as unknown);
       const enqueuedAfterFirst = enqueuePushNotification.mock.calls.length;
       expect(enqueuedAfterFirst).toBeGreaterThan(0);
 
       const second = await post(BROADCAST, key);
       expect(second.status).toBe(201);
-      const secondBody = (await second.json()) as { message: { id: string } };
+      const secondBody = createdMessageSchema.parse((await second.json()) as unknown);
 
       expect(secondBody.message.id).toBe(firstBody.message.id);
       expect(await countMessages(clinicId)).toBe(1);
@@ -235,7 +250,7 @@ describe.skipIf(!dbReachable || !schemaReady)(
       expect((await post(BROADCAST, key)).status).toBe(201);
       const mismatch = await post({ ...BROADCAST, body: "נוסח אחר לגמרי" }, key);
       expect(mismatch.status).toBe(409);
-      const body = (await mismatch.json()) as { reason?: string };
+      const body = conflictSchema.parse((await mismatch.json()) as unknown);
       expect(body.reason).toBe("IDEMPOTENCY_KEY_BODY_MISMATCH");
       expect(await countMessages(clinicId)).toBe(1);
     });
