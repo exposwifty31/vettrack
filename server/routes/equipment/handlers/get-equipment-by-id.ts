@@ -15,6 +15,7 @@ export const getEquipmentByIdHandler: RequestHandler = async (req, res) => {
       .select({
         id: equipment.id,
         name: equipment.name,
+        nameHe: equipment.nameHe,
         serialNumber: equipment.serialNumber,
         model: equipment.model,
         manufacturer: equipment.manufacturer,
@@ -43,6 +44,10 @@ export const getEquipmentByIdHandler: RequestHandler = async (req, res) => {
         checkedOutLocation: equipment.checkedOutLocation,
         expectedReturnMinutes: equipment.expectedReturnMinutes,
         createdAt: equipment.createdAt,
+        // Optimistic concurrency: the row version the edit forms echo back on
+        // PATCH. Absent from this read until now, the echo guard in BOTH edit
+        // forms (web + RN) was permanently undefined - the 409 never armed.
+        version: equipment.version,
         usuallyFoundHere: equipment.usuallyFoundHere,
         searchAlias: equipment.searchAlias,
         staffNote: equipment.staffNote,

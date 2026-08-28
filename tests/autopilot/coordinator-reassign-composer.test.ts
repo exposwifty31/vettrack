@@ -100,7 +100,35 @@ describe("coordinator-reassign-composer", () => {
     expect(enInput.summary).not.toContain("autopilotQueue.kinds.coordinatorReassignOffRoster");
     expect(heInput.summary).not.toContain("autopilotQueue.kinds.coordinatorReassignOffRoster");
     expect(enInput.summary).not.toBe(heInput.summary);
-    expect(enInput.summary).toContain(SHIFT_DATE);
+    // The shiftDate param is still interpolated into the summary — but as the
+    // locale-formatted day, not the raw ISO one. This line previously asserted
+    // `toContain(SHIFT_DATE)`, which pinned the raw-date-in-prose defect; the
+    // intent (proving the param reaches the template) is unchanged.
+    expect(enInput.summary).toContain("7/22/2026");
+  });
+
+  it("renders shiftDate as a locale-formatted date in the PROSE summary while every stored key stays byte-identical", () => {
+    const en = composeCoordinatorReassignProposal({ clinicId: CLINIC_A, shiftDate: SHIFT_DATE, reader: buildReaderResult(), locale: "en" });
+    const he = composeCoordinatorReassignProposal({ clinicId: CLINIC_A, shiftDate: SHIFT_DATE, reader: buildReaderResult(), locale: "he" });
+
+    // Prose: formatted, never the machine-readable ISO day.
+    expect(en.summary).not.toContain(SHIFT_DATE);
+    expect(he.summary).not.toContain(SHIFT_DATE);
+    expect(en.summary).toContain("7/22/2026");
+    expect(he.summary).toContain("22.7.2026");
+
+    // Keys and stored data: unchanged. sourceSessionId backs the
+    // (clinicId, kind, sourceSessionId) unique index — formatting it would
+    // break autopilot idempotency.
+    for (const input of [en, he]) {
+      expect(input.sourceSessionId).toBe(SHIFT_DATE);
+      expect(input.sourceRef).toMatchObject({ shiftDate: SHIFT_DATE });
+      expect(input.draftContent).toMatchObject({ shiftDate: SHIFT_DATE });
+      // the roster-row citation derives its `at` from shiftDate as a timestamp
+      expect(input.citedFacts).toContainEqual(
+        expect.objectContaining({ at: `${SHIFT_DATE}T00:00:00.000Z` }),
+      );
+    }
   });
 
   it("throws if the reader did not actually detect an off-roster signal (contract guard)", () => {

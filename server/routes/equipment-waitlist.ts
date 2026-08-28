@@ -1,6 +1,5 @@
 import type { Router } from "express";
 import { requireAuth, requireEffectiveRole } from "../middleware/auth.js";
-import { validateUuid } from "../middleware/validate.js";
 import { logAudit } from "../lib/audit.js";
 import { apiError } from "../lib/apiError.js";
 import {
@@ -15,7 +14,6 @@ export function mountEquipmentWaitlistRoutes(router: Router): void {
     "/:id/waitlist",
     requireAuth,
     requireEffectiveRole("student"),
-    validateUuid("id"),
     async (req, res) => {
       const clinicId = req.clinicId!;
       const equipmentId = req.params.id;
@@ -28,7 +26,6 @@ export function mountEquipmentWaitlistRoutes(router: Router): void {
     "/:id/waitlist",
     requireAuth,
     requireEffectiveRole("student"),
-    validateUuid("id"),
     async (req, res) => {
       const clinicId = req.clinicId!;
       const equipmentId = req.params.id;
@@ -62,7 +59,6 @@ export function mountEquipmentWaitlistRoutes(router: Router): void {
     "/:id/waitlist",
     requireAuth,
     requireEffectiveRole("student"),
-    validateUuid("id"),
     async (req, res) => {
       const clinicId = req.clinicId!;
       const equipmentId = req.params.id;

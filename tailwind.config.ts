@@ -55,6 +55,7 @@ export default {
           surface:  "rgb(var(--ivory-surface) / <alpha-value>)",
           border:   "rgb(var(--ivory-border) / <alpha-value>)",
           borderMd: "rgb(var(--ivory-borderMd) / <alpha-value>)",
+          borderStrong: "rgb(var(--ivory-borderStrong) / <alpha-value>)",
           text:     "rgb(var(--ivory-text) / <alpha-value>)",
           text2:    "rgb(var(--ivory-text2) / <alpha-value>)",
           text3:    "rgb(var(--ivory-text3) / <alpha-value>)",

@@ -38,10 +38,11 @@ const SERVER_ONLY_NAMESPACES: ReadonlyArray<readonly [namespace: string, consume
   ["shiftImport", "server/routes/shifts.ts (translate(`shiftImport.${key}`))"],
   ["whatsapp", "server/routes/whatsapp.ts (tWhatsApp(locale, `whatsapp.*`))"],
   // Push-notification copy. Distinct from the sibling client namespaces — read
-  // by four server consumers: role-notification-scheduler.ts (push.role.*),
+  // by five server consumers: role-notification-scheduler.ts (push.role.*),
   // shift-handover-generator.ts (push.handover.*), notification.worker.ts
-  // (push.overdue.*), expiryCheckWorker.ts (push.expiry.*).
-  ["push", "server/lib/role-notification-scheduler.ts + shift-handover-generator.ts + workers/notification.worker.ts + workers/expiryCheckWorker.ts"],
+  // (push.overdue.*), expiryCheckWorker.ts (push.expiry.*),
+  // code-blue-broadcast-push.ts (push.codeBlue.*).
+  ["push", "server/lib/role-notification-scheduler.ts + shift-handover-generator.ts + workers/notification.worker.ts + workers/expiryCheckWorker.ts + code-blue-broadcast-push.ts"],
 ];
 
 const ALLOWLISTED = new Set(SERVER_ONLY_NAMESPACES.map(([ns]) => ns));

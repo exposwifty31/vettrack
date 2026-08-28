@@ -23,6 +23,8 @@ import type { OpenClinicalCheckInRow } from "../../check-in-resolution.js";
  */
 export type EnforcementMode = "off" | "shadow" | "enforce";
 export type StaleEnforcementMode = "off" | "shadow" | "enforce";
+/** D1 — off-shift custody gate. Same envelope contract as the other families. */
+export type CustodyRosterEnforcementMode = "off" | "shadow" | "enforce";
 export type OproleEnforcementMode = "off" | "enforce";
 
 /**

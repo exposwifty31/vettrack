@@ -354,6 +354,7 @@
     "noContainers": "אין עגלות במערכת",
     "startSessionFailed": "לא ניתן להתחיל סשן מילוי — נסה שוב",
     "finishSessionFailed": "לא ניתן לסיים את המילוי — נסה שוב",
+    "finishSessionNoItems": "עדיין לא נספר דבר — ספור לפחות פריט אחד, או בטל את המילוי",
     "errorWithRequestId": "{message} (קוד תמיכה: {requestId})",
     "departments": {
       "hospital": "בית חולים",
@@ -1374,6 +1375,8 @@
     "loadFailed": "טעינת הנתונים נכשלה. נסה שוב.",
     "shiftLeaderboardLink": "לוח מובילים — סריקות משמרת",
     "noScanActivity": "אין פעילות סריקה ב־14 הימים האחרונים",
+    "statusDistributionChartDesc": "תרשים טבעת המציג כמה פריטי ציוד נמצאים בכל סטטוס: תקין, תקלה, תחזוקה ועבר חיטוי.",
+    "scanActivityChartDesc": "תרשים עמודות המציג כמה סריקות נרשמו בכל אחד מ־14 הימים האחרונים.",
     "issueCountBadge": "{count} תקלות"
   },
   "monthlyReport": {
@@ -1822,7 +1825,7 @@
     "tabSupport": "תמיכה",
     "tabLogs": "לוגים",
     "foldersTitle": "תיקיות",
-    "pendingUsersTitle": "ממתינים משתמשים",
+    "pendingUsersTitle": "משתמשים ממתינים",
     "pendingEmpty": "אין משתמשים ממתינים. כל ההרשמות נסקרו.",
     "usersTitle": "משתמשים",
     "folderCreated": "התיקייה נוצרה",
@@ -2092,6 +2095,7 @@
     "itemDeleteFailed": "מחיקת פריט נכשלה",
     "itemInUse": "פריט בשימוש ולא ניתן למחוק",
     "codeExists": "פריט עם קוד זה כבר קיים",
+    "nfcTagExists": "תג ה-NFC הזה כבר משויך לפריט אחר",
     "loadError": "טעינת פריטי מלאי נכשלה",
     "noItems": "אין פריטי מלאי",
     "searchPlaceholder": "חיפוש לפי קוד או תווית...",
@@ -2708,6 +2712,10 @@
     "handover": {
       "title": "מסירת המשמרת מוכנה",
       "body": "המשמרת היוצאת השאירה לך מסירה. הקש לצפייה."
+    },
+    "codeBlue": {
+      "title": "⚠ CODE BLUE",
+      "body": "CODE BLUE הופעל ע״י {name}"
     }
   },
   "shiftChat": {
@@ -3671,7 +3679,6 @@
     "createAccount": "יצירת חשבון",
     "signUpSubtitle": "הירשם לניהול ציוד הוטרינרי שלך",
     "signUpLoadError": "דף ההרשמה לא נטען. בדוק את החיבור ורענן. אם הבעיה נמשכת, ודא ש-Clerk מוגדר לדומיין זה ושמפתח ה-Publishable Key תואם לסביבה.",
-    "roleLabel": "לכל תפקיד",
     "roleVetTech": "טכנאי/ת וטרינרי/ת",
     "roleVeterinarian": "וטרינר/ית",
     "roleStudent": "סטודנט/ית",

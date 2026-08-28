@@ -241,8 +241,22 @@ describe("appointments.service — outbox emission is exclusive and ordered", ()
    * This walks the AST and extracts the emitTaskEvent(...) calls inside each named
    * function body, in source order, so a lost or reordered emission fails here.
    */
+  // createAppointment/updateAppointment/cancelAppointment live in
+  // scheduling.service.ts; startTask/completeTask live in
+  // task-lifecycle.service.ts (ADR-002 split — see
+  // docs/architecture/adr-002-appointments-service-split.md). Parsing the
+  // concatenation as one synthetic source is sufficient here: this walk only
+  // matches function declarations by name and call expressions inside them,
+  // never type-checks, so the original-file boundary is irrelevant to it.
+  function serviceSource(): string {
+    return [
+      readFileSync("server/services/scheduling.service.ts", "utf8"),
+      readFileSync("server/services/task-lifecycle.service.ts", "utf8"),
+    ].join("\n");
+  }
+
   function emitSequenceFor(fnName: string): Array<{ type: string; firstArg: string }> {
-    const source = readFileSync("server/services/appointments.service.ts", "utf8");
+    const source = serviceSource();
     const sf = ts.createSourceFile(
       "appointments.service.ts",
       source,
@@ -313,7 +327,7 @@ describe("appointments.service — outbox emission is exclusive and ordered", ()
    * function each one sits in, so both the count and the containment are real.
    */
   function directOutboxCalls(): Array<{ enclosingFunction: string | null; category: string | null }> {
-    const source = readFileSync("server/services/appointments.service.ts", "utf8");
+    const source = serviceSource();
     const sf = ts.createSourceFile(
       "appointments.service.ts",
       source,

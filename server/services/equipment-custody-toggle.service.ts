@@ -70,6 +70,17 @@ export class CustodyReturnVersionConflictError extends Error {
   }
 }
 
+/**
+ * Raised when the actor is not the current holder of the unit being returned.
+ * Covers both a foreign holder and an orphaned row (`checked_out_by_id IS NULL`
+ * while `custody_state = 'checked_out'`), which only an admin override repairs.
+ */
+export class CustodyReturnNotHolderError extends Error {
+  constructor() {
+    super("CUSTODY_RETURN_NOT_HOLDER");
+  }
+}
+
 export type CheckoutPreCheckResult = {
   v1StageClaimId: string | null;
   v1NewUsageState: "in_use" | "emergency_use";
@@ -97,6 +108,12 @@ export type PerformEquipmentReturnParams = {
   equipmentId: string;
   actor: CustodyActor;
   clientTimestamp?: number;
+  /**
+   * Admin escape hatch: return a unit the actor does not hold, including an
+   * orphaned `checked_out` row with no holder. Resolved by the caller from the
+   * authenticated role — the service never infers it.
+   */
+  allowForeignHolder?: boolean;
 };
 
 export type EquipmentReturnTxResult = {
@@ -251,6 +268,23 @@ export async function assertWaitlistCheckoutAllowed(
   }
 }
 
+/**
+ * D-13 anchor contradiction: the item is now in custody, so it is no longer
+ * at its station. Fire-and-forget via `db` (not `tx`) so a failure here can
+ * never poison or roll back the checkout transaction — but for that same
+ * reason it must only be called AFTER the checkout transaction has actually
+ * committed. Calling it from inside the transaction (as performEquipmentCheckout
+ * itself once did) let it run on a separate connection while the checkout
+ * could still roll back, leaving the anchor invalidated for an item that was
+ * never actually checked out. Every caller of performEquipmentCheckout must
+ * call this once its own `db.transaction(...)` wrapper has resolved.
+ */
+export function invalidateAnchorAfterCheckout(clinicId: string, equipmentId: string): void {
+  void invalidateCurrentAnchor(db, { clinicId, equipmentId, reason: "checkout" }).catch((err) => {
+    console.error("[docking] anchor invalidation failed (checkout, non-fatal):", err);
+  });
+}
+
 export async function performEquipmentCheckout(
   tx: Tx,
   params: PerformEquipmentCheckoutParams,
@@ -342,12 +376,8 @@ export async function performEquipmentCheckout(
     }
   }
 
-  // D-13 anchor contradiction: the item is now in custody, so it is no
-  // longer at its station. Fire-and-forget via `db` (not `tx`) so a failure
-  // here can never poison or roll back the checkout transaction.
-  void invalidateCurrentAnchor(db, { clinicId, equipmentId, reason: "checkout" }).catch((err) => {
-    console.error("[docking] anchor invalidation failed (checkout, non-fatal):", err);
-  });
+  // D-13 anchor contradiction — the caller must call
+  // invalidateAnchorAfterCheckout() once this transaction commits.
 
   const checkoutLogId = randomUUID();
 
@@ -397,7 +427,7 @@ export async function performEquipmentReturn(
   tx: Tx,
   params: PerformEquipmentReturnParams,
 ): Promise<EquipmentReturnTxResult | null> {
-  const { clinicId, equipmentId, actor, clientTimestamp = 0 } = params;
+  const { clinicId, equipmentId, actor, clientTimestamp = 0, allowForeignHolder = false } = params;
 
   const [existing] = await tx
     .select()
@@ -419,6 +449,22 @@ export async function performEquipmentReturn(
         waitlistPromotedOnReturn: null,
       };
     }
+  }
+
+  // Authorization, inside the transaction where `existing` was read — a route-level
+  // check would need a second read outside the tx and reopen a TOCTOU window.
+  //
+  // Deliberately three-way rather than `checkedOutById !== actor.id`:
+  //   - orphaned is narrowed to custody_state 'checked_out', so a replayed offline
+  //     return of an already-returned unit (holder NULL, custody 'returned') keeps
+  //     its benign no-op path. The strict form would 403 a return that succeeded,
+  //     and the x-client-timestamp short-circuit above cannot cover it because some
+  //     callers omit that header.
+  const isSelf = existing.checkedOutById === actor.id;
+  const foreignHolder = existing.checkedOutById != null && !isSelf;
+  const orphanedCustody = existing.checkedOutById == null && existing.custodyState === "checked_out";
+  if ((foreignHolder || orphanedCustody) && !allowForeignHolder) {
+    throw new CustodyReturnNotHolderError();
   }
 
   const returnTime = clientTimestamp ? new Date(clientTimestamp) : new Date();
@@ -858,6 +904,8 @@ export async function quickScanEquipmentCustody(
   });
 
   if (!txResult) return { kind: "not_found" };
+
+  invalidateAnchorAfterCheckout(clinicId, equipmentId);
 
   await finalizeCheckoutSideEffects({
     clinicId,

@@ -357,6 +357,7 @@ export interface TStructure {
     noContainers: string;
     startSessionFailed: string;
     finishSessionFailed: string;
+    finishSessionNoItems: string;
     errorWithRequestId: string;
     departments: {
       hospital: string;
@@ -1377,6 +1378,8 @@ export interface TStructure {
     loadFailed: string;
     shiftLeaderboardLink: string;
     noScanActivity: string;
+    statusDistributionChartDesc: string;
+    scanActivityChartDesc: string;
     issueCountBadge: string;
   };
   monthlyReport: {
@@ -2095,6 +2098,7 @@ export interface TStructure {
     itemDeleteFailed: string;
     itemInUse: string;
     codeExists: string;
+    nfcTagExists: string;
     loadError: string;
     noItems: string;
     searchPlaceholder: string;
@@ -2709,6 +2713,10 @@ export interface TStructure {
       body: string;
     };
     handover: {
+      title: string;
+      body: string;
+    };
+    codeBlue: {
       title: string;
       body: string;
     };
@@ -3674,7 +3682,6 @@ export interface TStructure {
     createAccount: string;
     signUpSubtitle: string;
     signUpLoadError: string;
-    roleLabel: string;
     roleVetTech: string;
     roleVeterinarian: string;
     roleStudent: string;

@@ -10801,6 +10801,360 @@ on that dirty tree.
 
 **Verdict:** VERIFIED
 
+## 2026-08-23 — Auth Ivory door chrome (visual-only polish)
+
+**Claim:** `/signin` and `/signup` use one Ivory canvas + sheet (`AuthDoorChrome`), flattened Clerk card (hidden header, transparent card), 44px role chips, and matching phone/native-social sheet language — without changing auth logic.
+
+**Evidence:**
+- `src/features/auth/components/AuthDoorChrome.tsx` — `bg-ivory-bg` canvas, `data-testid="auth-door-sheet"` with `bg-ivory-surface border-ivory-border shadow-card`, `vt-page-title` for page `h1`
+- `src/lib/clerk-appearance.ts` — `card: "shadow-none border-0 bg-transparent…"`, `headerTitle`/`headerSubtitle: "hidden"`, `formButtonPrimary` includes `min-h-[44px] rounded-md bg-primary` (no `--action`)
+- `src/pages/signin.tsx` / `src/pages/signup.tsx` — no `from-primary/5`; mount `<AuthDoorChrome>`; keep `routing="hash"`, `unsafeMetadata`, `ClerkAuthFormShell`, OfflineAuthGate, dark appearance accessors
+- Test: `pnpm test -- tests/auth-door-chrome.test.tsx tests/role-chips-signup.test.tsx tests/native-auth-surface.test.ts tests/stage-10-access-token-consistency.test.js` → 4 files, 34 passed
+- Command: `pnpm exec tsc --noEmit -p tsconfig.json` and `tsconfig.server.json` → exit 0
+
+**Verdict:** VERIFIED
+
+## 2026-08-23 — Sign-in: remove role chips (PR 237 follow-up)
+
+**Claim:** `/signin` no longer shows RoleChips or carries a pre-chosen role to sign-up; `/signup` keeps interactive 44px chips + vet license gate. Dead `requested-role-store` and non-interactive RoleChips mode removed.
+
+**Evidence:**
+- `src/pages/signin.tsx` — no `RoleChips` / `readCarriedRole` / `writeCarriedRole` / `preRole` (grep empty)
+- `src/pages/signup.tsx` — still mounts `<RoleChips selectedRole onSelectRole>`; `useState(null)` (no store)
+- `src/features/auth/requested-role-store.ts` — was deleted; `RoleChips` requires `onSelectRole` (interactive-only)
+- Test: `pnpm test -- tests/auth-door-chrome.test.tsx tests/role-chips-signup.test.tsx tests/native-auth-surface.test.ts tests/stage-10-access-token-consistency.test.js tests/i18n-parity.test.ts` → 5 files, 38 passed
+
+**Verdict:** VERIFIED
+
+## 2026-08-23 — Auth titles page-specific (Welcome back = sign-in only)
+
+**Claim:** `/signin` title is `t.authPage.welcomeBack`; `/signup` title is `t.authPage.createAccount` and never Welcome back. Clerk leftover headers (`header*`, `formHeader*`) stay hidden.
+
+**Evidence:**
+- `src/pages/signin.tsx` — `title={t.authPage.welcomeBack}`; `src/pages/signup.tsx` — `title={t.authPage.createAccount}` (no `welcomeBack`)
+- `src/lib/clerk-appearance.ts` — `header`, `headerTitle`, `headerSubtitle`, `formHeader`, `formHeaderTitle`, `formHeaderSubtitle` all `hidden`
+- Test: `pnpm test -- tests/auth-door-chrome.test.tsx tests/role-chips-signup.test.tsx tests/native-auth-surface.test.ts` → 29 passed (RTL asserts page-specific titles + source contract)
+
+**Verdict:** VERIFIED
+
+## 2026-08-23 — AuthDoorChrome native phone/tablet vs web sheet (PR 237)
+
+**Claim:** Auth door is full-bleed top-aligned on Capacitor phone/tablet (no floating card, no extra SAT); web management console keeps the centered Ivory sheet. Titles/chips rules unchanged.
+
+**Evidence:**
+- `src/features/auth/components/AuthDoorChrome.tsx` — variants `web` | `phone` | `tablet` via `isCapacitorNative` + `useIsNativeTablet` (override for tests); phone/tablet: `min-h-full`, no `rounded-2xl`/`shadow-card`/`justify-center`/`min-h-[100dvh]`; web keeps sheet; no `safe-area-inset` in chrome
+- `tests/auth-door-chrome.test.tsx` — asserts three layouts + page-specific titles + chips-only-on-signup
+- `tests/role-chips-signup.test.tsx` — mocks `capacitorPlatform` + `useIsNativeTablet`
+- Test: `pnpm test -- tests/auth-door-chrome.test.tsx tests/role-chips-signup.test.tsx tests/native-auth-surface.test.ts` → 3 files, 33 passed
+- Command: `pnpm exec tsc --noEmit -p tsconfig.json` → exit 0
+
+**Verdict:** VERIFIED
+
+## 2026-08-24 — Auth door: flatten Clerk's outer cardBox + grey footer (PR 237)
+
+**Claim:** The "no floating card" rule now actually holds on the native door. `AuthDoorChrome`
+already removed the page-level card, but Clerk 5 draws the border/shadow/background on `cardBox`
+— the wrapper OUTSIDE `card` — and paints `footer` grey, so the phone and iPad doors still showed
+a floating white card with a grey band, and the form rendered narrower than the social buttons
+above it. Flattening `cardBox` (incl. `max-w-none`) and `footer` closes both. Auth logic, routing,
+`unsafeMetadata`, join-code, native OAuth and `ClerkAuthFormShell` untouched.
+
+**Evidence:**
+- `src/lib/clerk-appearance.ts` — `cardBox: "w-full max-w-none shadow-none border-0 bg-transparent p-0"`, `footer: "bg-transparent bg-none shadow-none border-0"`, `footerItem: "bg-transparent"`; `clerkAppearanceNative` spreads the same elements
+- Upstream basis: Clerk core-2 upgrade guide via context7 — "Outside the `card` element, a new `cardBox` id was introduced"; "The `footer` now gray by default, and it's located outside `card`, but inside `cardBox`". `elevation: 'flush'` is NOT usable here: grep for `elevation`/`flush` in the installed `@clerk/clerk-js` 5.125.13 bundle returned zero hits
+- Blast radius: `grep -rn "getClerkAppearance" src/` → only `src/pages/signin.tsx:12,123` and `src/pages/signup.tsx:14,128`. No other Clerk surface is restyled
+- RED first: `pnpm test -- tests/auth-door-chrome.test.tsx` before the fix → `1 failed | 16 passed`, "TypeError: .toMatch() expects to receive a string, but got undefined" at `tests/auth-door-chrome.test.tsx` (`cardBox` unset)
+- GREEN: `pnpm test -- tests/auth-door-chrome.test.tsx tests/role-chips-signup.test.tsx tests/native-auth-surface.test.ts` → 3 files, 34 passed
+- Command: `pnpm exec tsc --noEmit -p tsconfig.json` → exit 0
+- Device (bundled Capacitor shell built by `scripts/build-native-shell.sh`, installed via `scripts/install-ios-sim.sh`): iPhone SE 3rd-gen (375pt), iPhone 17 and iPad Pro 11-inch. Phone `/signin` + `/signup` and iPad portrait + landscape all render one continuous Ivory column — no card outline, no grey band, Clerk form flush with the Apple/Google buttons. iPad landscape shows the mark+title / form two-column split
+- No double safe-area: `mcp__argent__describe` on the iPhone 17 door puts the `VetTrack` mark link text at y=0.108 (≈94pt of 874). `src/native/NativeShell.tsx` pads `env(safe-area-inset-top)` once and `AuthDoorChrome` adds `pt-6`; a second SAT would put it past 140pt
+- `pnpm test` (full, with the local `.env.local` moved aside — a local `VITE_CLERK_PUBLISHABLE_KEY` flips `isClerkEnabled()` and reds 3 unrelated dev-bypass suites): `1 failed | 735 passed` before the proof-log fix below, all green after
+
+**Verdict:** VERIFIED
+
+## 2026-08-24 — Unblock PR 237 CI: proof-log claimed a path this PR deleted
+
+**Claim:** PR 237's Merge gate, Claim-verification and Tests shard 2/4 were red before this session's
+change, on one line this branch itself added: the `2026-08-23 — Sign-in has no role chips` entry cites
+`src/features/auth/requested-role-store.ts` — was deleted by this same PR. `scripts/verify/scan.cjs`
+recognises a deletion only as `was deleted` / `has been deleted` / `no longer exists` (`NEGATED_AFTER`),
+not a bare `— deleted`, so the span was read as a live path claim.
+
+**Evidence:**
+- `scripts/verify/scan.cjs` — `NEGATED_AFTER` matches `was (?:removed|deleted)` / `has been (?:removed|deleted)` / `no longer exists?` / `is gone`; bare `deleted` after the span is not in the alternation
+- `git cat-file -e HEAD:src/features/auth/requested-role-store.ts` → `does not exist in 'HEAD'` (the claim of deletion is true; only its wording failed)
+- `gh pr checks 237` before the fix → `Merge gate fail`, `Claim verification (evidence) fail`, `Tests (shard 2/4) fail`
+- Failure text: `docs/audit/PROOF_ALIGNMENT_LOG.md:10824 [path] path does not exist: src/features/auth/requested-role-store.ts`
+- Fix is one word in that same unmerged entry (`— deleted` → `— was deleted`); no history rewritten, no registry or attestation entry added
+- Test: `pnpm test -- tests/claims-ledger.test.ts` → 88 passed
+
+**Verdict:** VERIFIED
+## 2026-08-23 — Code Blue activation push i18n extraction (handler-split follow-on)
+
+> Deliberately no hash-sigil pull-request citation in this entry. The claim gate
+> reads `PR` + hash + digits as a pull-request claim that needs a merge commit;
+> the handler-split pull request this stacks on is still open (same rule as the
+> 2026-08-21 db-integration re-scope entry).
+
+**Claim:** `post-sessions` / `post-one-tap` no longer hardcode Hebrew in `code_blue_broadcast` title/body; copy is `push.codeBlue.*` via `resolveCodeBlueBroadcastPushCopy` (INITIAL_LOCALE `he`); allowlist dropped those two handlers; enqueue path/tag/fail-open unchanged.
+
+**Evidence:**
+- `locales/he.json` — `push.codeBlue.title` = `⚠ CODE BLUE`, `body` = `CODE BLUE הופעל ע״י {name}`
+- `locales/en.json` — `push.codeBlue.body` = `CODE BLUE activated by {name}`
+- `server/lib/code-blue-broadcast-push.ts` — `getLocaleDictionaries(INITIAL_LOCALE)` + `translate(...push.codeBlue.*)` with try/catch ASCII fail-open
+- `server/routes/code-blue/handlers/post-sessions.ts` / `post-one-tap.ts` — `rg '[֐-׿]'` → no matches; still `enqueueNotificationJob` + `code-blue-${…}` tags + `.catch(() => {})`
+- `tests/i18n-no-hebrew-in-source.test.ts` — allowlist no longer lists the two handlers
+- Test (targeted): `pnpm exec vitest run tests/code-blue-broadcast-push-i18n.test.ts` (+ i18n guards) → passed; after CodeRabbit round the suite executes both handlers and asserts real enqueue payloads
+- Test (Code Blue locks): six code-blue-* lock files → 64 passed
+- Command: `pnpm i18n:check` → deep key parity OK
+- Command: `pnpm typecheck` (`tsc --noEmit` + `tsc -p tsconfig.server.json --noEmit`) → exit 0, 0 errors
+
+**Verdict:** superseded by 2026-08-24 CodeRabbit-round entry below (completion-gate recording).
+
+## 2026-08-24 — Code Blue push i18n: CodeRabbit round (integration tests + escape scan + completion gates)
+
+**Claim:** Address three CodeRabbit findings on the push-i18n change: (1) handler→enqueue integration tests execute both handlers and assert localized payload; (2) Hebrew source scan rejects `\u05xx` / `\u{5xx}` escapes; (3) completion gates `pnpm typecheck` + `pnpm test` recorded with honest results. No change to enqueue when/whether/tag/channel/outbox/`.catch`.
+
+**Evidence:**
+- `tests/code-blue-broadcast-push-i18n.test.ts` — `postSessionsHandler` / `postOneTapHandler` run with mocked deps; `enqueueNotificationJob` receives `type: "code_blue_broadcast"`, title `⚠ CODE BLUE`, body `CODE BLUE הופעל ע״י Dr Cohen`, tags `code-blue-${id}` / `code-blue-session-ot-1`; reject path still returns 201
+- Same file — `containsHebrewInSource` rejects literal glyphs and `\\u05D0` / `\\u{5D0}` forms; both handlers pass
+- Command: `pnpm i18n:check` → deep key parity OK
+- Command: `pnpm typecheck` → exit 0 (frontend `tsc --noEmit` + `tsc -p tsconfig.server.json --noEmit`)
+- Command: `pnpm test` → **exit 0**, `Test Files 713 passed | 20 skipped (733)`, `Tests 6631 passed | 136 skipped (6767)`
+- Prior full-suite exit 1 was solely `claims-ledger` objecting to a hash-sigil citation of an still-open handler-split pull request in the 2026-08-23 heading; that citation is removed (see note on that entry)
+
+**Verdict:** VERIFIED
+
+## 2026-08-25 — Code Blue push i18n: merge the handler-split branch in, resolve the duplicate-extraction conflict, address the type-assertion finding
+
+**Claim:** `cursor/code-blue-push-i18n-1e7c` now merges `refactor/code-blue-route-handler-split` with no conflict markers. Both branches had independently extracted the `code_blue_broadcast` push copy; the four conflicting hunks resolve to the helper form (`resolveCodeBlueBroadcastPushCopy`), the three i18n imports the other side contributed are removed as dead, the locale key it orphaned is removed, and the five unexplained type assertions in the push-i18n test are replaced by runtime narrowing (three) or given an inline rationale as Express boundary casts (two).
+
+**Evidence:**
+- `server/routes/code-blue/handlers/post-sessions.ts:157` and `server/routes/code-blue/handlers/post-one-tap.ts:97` — `resolveCodeBlueBroadcastPushCopy(req.authUser!.name ?? "")`; `title` / `body` read from its result
+- Both handlers — `grep -c 'i18n/loader.js\|i18n/index.js'` → `0` each; the inline `getLocaleDictionaries` / `translate` / `interpolate` path is gone, so no import is left without a reader
+- `locales/he.json` and `locales/en.json` — `grep -c pushBroadcastBody` → `0` each; `grep -rn pushBroadcastBody` across all file types outside `node_modules` → no remaining reference of any kind
+- `tests/code-blue-broadcast-push-i18n.test.ts` — `requireString` and `isRecord` / `requireRecord` narrow the three captured values with no cast; the two `as unknown as Response` / `as unknown as Request` casts each carry an inline rationale naming the Express members these handlers never touch
+- Command: `npx tsc --noEmit` and `npx tsc -p tsconfig.server.json --noEmit` under node v24.17.0 → exit 0 both
+- Test: `npx vitest run tests/code-blue-broadcast-push-i18n.test.ts` → `Test Files  1 passed (1)`, `Tests  14 passed (14)`
+- Mutation (a guard not shown to go red is not a guard): `requireString(captured.body.id, ...)` pointed at a non-existent field → `Tests  1 failed | 13 passed (14)` with `Error: captured.body.id: expected a non-empty string, received undefined`; reverted → `14 passed (14)`
+- Command: `pnpm verify:claims` → `1113 claims: 1088 verified, 24 registered, 1 attested, 2072 excluded by rule, 0 FAILED`
+- Command: `pnpm architecture:gates` → `[tenant-lint] no new findings vs baseline (202 known)` and `[architecture-gates] All G1 checks passed.`
+- Command: `pnpm i18n:check` → `locales/en.json and locales/he.json are in deep key parity.`
+- Full local suite, NOT green and not claimed as such: `npx vitest run` → `Test Files  12 failed | 734 passed (746)`. The identical command in a clean `origin/main` worktree → `Test Files  13 failed | 723 passed (736)`. The 12 are a strict subset of main's 13 — main additionally fails `tests/shift-csv-role-labels.test.ts` — so this merge introduces no new failure. The failures are a local-environment condition, not a branch condition.
+
+**Verdict:** VERIFIED for the merge resolution and the finding fix. Full local suite PARTIAL by pre-existing environment failures, quantified above against a clean-main baseline rather than waved through.
+
+## 2026-08-26 — Correction: the cast count in the entry above was wrong (two locale-dictionary casts uncounted)
+
+**Supersedes** the assertion-count claim in the merge entry immediately above. That entry said five type assertions, three narrowed and two kept as documented Express boundary casts. The file held **six**. Two locale-dictionary casts were missed and are now narrowed as well; the earlier entry's other claims stand.
+
+**Why it was missed, since that is the reusable part:** the search that produced "only the two Express casts remain" was `grep -nE ' as unknown as | as Record<| as string;'` — three literal spellings. A cast written `as { push: { codeBlue?: ... } }` matches none of them, so the grep reported absence it had never looked for. The broad pattern `grep -nE '\bas [A-Za-z{(]'` finds all six. Same failure shape as the finding it was meant to close: one search is not evidence of absence.
+
+**Claim:** `tests/code-blue-broadcast-push-i18n.test.ts` no longer casts an imported locale dictionary to an asserted shape. `localePushCopy` narrows `push` → `push.codeBlue` → `title` / `body` one key at a time through the existing `requireRecord` / `requireString` helpers.
+
+**Evidence:**
+- `tests/code-blue-broadcast-push-i18n.test.ts` — `grep -nE '\bas [A-Za-z{(]'` excluding `as const` now returns four lines: `:73` and `:77` are `as Array<...>` widening annotations on seed literals (they assert no shape and were not flagged), `:247` and `:271` are the two documented Express boundary casts. The two `(heDict as { push: ... })` / `(enDict as { push: ... })` casts are gone.
+- Same file — the two locale tests call `localePushCopy(heDict, "locales/he.json")` / `localePushCopy(enDict, "locales/en.json")`; the previous `push.codeBlue?.title` optional chaining is gone, so a missing key can no longer degrade into `expect(undefined).toBe(...)`
+- Test: `npx vitest run tests/code-blue-broadcast-push-i18n.test.ts` → `Test Files  1 passed (1)`, `Tests  14 passed (14)`
+- Mutation: `requireRecord(push.codeBlue, ...)` pointed at `push.codeBlueX` → `Tests  2 failed | 12 passed (14)` with `Error: locales/he.json push.codeBlue: expected an object, received undefined` and the matching `locales/en.json` line; reverted → `14 passed (14)`
+- Command: `npx tsc --noEmit` and `npx tsc -p tsconfig.server.json --noEmit` → exit 0 both
+
+**Verdict:** VERIFIED
+
+**Recorded, not re-flipped — the heading date of the entry above.** It was written `2026-08-26` and another agent re-dated it to `2026-08-25` in `c67ecd8ac`, acting on a review comment that read the date as being in the future. This file's own rules section says entry dates are the author's local date, Asia/Jerusalem (`server/schema/core.ts` defaults `timezone` to it), so an entry written after 21:00 UTC carries the next day's date; the commands in that entry ran at 02:24 local, which is why the vitest output it quotes reads `Start at 02:24:11`. By that rule `2026-08-26` was correct. The re-date is left standing rather than reverted — a heading flipping back and forth between two agents is worse than either value — and the discrepancy is logged here instead, which is what this file's rule about a later check contradicting an earlier one prescribes.
+
+That same commit also removed a stray `||||||| d3ec38083` line this branch left at the end of the file, and that half was a real defect: the marker survived because the grep used to confirm "no residual markers" covered `<<<<<<<`, `=======` and `>>>>>>>` but not `|||||||`, the diff3 base marker. Third instance this session of a search pattern narrower than the absence it was used to claim.
+
+---
+
+## 2026-08-27 — Governed-doc truth pass: correcting statements, not deleting them (chore/cursor-rules)
+
+**Why.** A markdown sweep had deleted 27 plan files and, in the same motion, edited governed
+documents to remove the sentences that cited them — and `docs/claims-registry.json` carried six
+exemptions holding the residue green, one of them verbatim: *"R-CB-stabilize shipped on main;
+TASKS.md still cites the retired subspec. Do not recreate the file."* An exemption is for a claim
+that is TRUE but unverifiable here; it is never for one that is FALSE. A prior lane restored all 27
+files and deleted those six entries. This pass fixes what the sweep left false, and what had simply
+rotted. **No `.ts` / `.tsx` / `locales/*.json` file was opened for edit, and nothing was committed.**
+
+**Corrections, each proved before it was written:**
+
+- `ARCHITECTURE.md` — the archived-planning-docs list had lost `INFRA_CLEANUP_PLAN.md` and
+  `IMPLEMENTATION_PLAN.md` because the sweep deleted the files. Both are back in
+  `docs/archive/2026/root-docs/` (all six named files present), so the list was false by omission.
+  Restored.
+- `PLAN.md` names "README model routing (`S` / `S +R` / `O +R` / `Owner`)" as a binding
+  constraint. The sweep had stripped the *Execution driver — per-card model routing* section out of
+  `docs/plans/consolidated-audit-10x/README.md`, together with the index rows for eight plan files
+  that now exist again. The constraint pointed at nothing. That README is restored to its committed
+  state; that `PLAN.md` constraint resolves again. Its remaining anchors were re-checked and hold:
+  `src/hooks/use-sync.tsx:170` is `initSyncEngine(queryClient)`, `src/pages/code-blue.tsx:328` is
+  inside the dedicated Cancel path, and `claude/audit-10x-consolidated-plan` is indeed gone.
+- `CONTEXT.md` — "shift handover product surface" sat under **Removed domains (do not reintroduce
+  without explicit product decision)**. The decision was taken: dropped by
+  `migrations/142_drop_er_patients_shift_handover.sql`, then rebuilt under sub-spec R-SH-F1 and
+  shipped. It is live and wired, not removed — `migrations/177_vt_shift_handover.sql`,
+  `server/routes/shift-handover.ts` mounted at `server/app/routes.ts:154`, `/handoff` routed at
+  `src/app/routes.tsx:217`. Corrected in place, history kept.
+- `FLOW_MATRIX.md` — three of its twelve numbered sections (§5 Medications, §6 Billing, §12 ER mode)
+  document routes that are redirect stubs (`src/app/routes.tsx:287`, `:292`, `:294`) and APIs that
+  `server/app/routes.ts` mounts nowhere. `ARCHITECTURE.md` has said so since 2026-08-13; the file
+  itself said only that no tests were written from it. Dated banner added, with the row-level
+  evidence. The matrix is kept — it is history, not a lie, once labelled.
+- `docs/migrations.md` — "the directory grew to 188 `*.sql` files (187 applied; `185_…` is the
+  highest-numbered)" was stale on **both** refs: this tree has 189 top-level files / 188 applied /
+  tail `186_vt_event_outbox_clinic_seq.sql`; `origin/main` `bf1e0480c` has 191 / 190 / tail 188.
+  The authoring step that told a reader to start from 185 would now collide, so it points at the
+  command instead of a number.
+- `TASKS.md` — every line count in the >800-LOC splitting task was wrong (`admin.tsx` 204 not 219,
+  `equipment-list.tsx` 1421 not 1351, `equipment-detail.tsx` 1824 not 2075, `Tasks.tsx` 1420 not
+  1590, `inventory-page.tsx` 1079 not 1033), and two route files it listed as pending had already
+  shipped: `server/routes/containers.ts` split by `80edf7c63` and `server/routes/users.ts` by
+  `e55ec8f82`, both 2026-08-23, both ancestors of `origin/main`, leaving them at 180 and 527 lines.
+  `server/routes/equipment.ts` (954) is the only route file still over the ceiling.
+
+**The one that matters most — an open test-coverage gap understated by 18 suites.** `TASKS.md`
+claimed `vite.config.ts` "excludes 10 entries" and that **three** remain covered by no workflow.
+On `origin/main` the exclude block now holds **32** entries and **21** are named by nothing:
+commit `4f48620e1` (PR #225, closing issue 221) added 18 more DB-backed suites, and
+`vite.config.ts` annotates that very block *"No dedicated runner exists yet for these."* Verified by
+grepping all six workflow files for each suite name — zero hits — and `pnpm test:db-integration`
+likewise runs nowhere, appearing only inside a `#` comment at `.github/workflows/ci.yml:279`.
+This supersedes the closing "Scope" paragraph of the 2026-08-22 live-server entry above, which named
+the same three orphans; that entry is append-only and stands as written.
+
+**Deliberately NOT changed, because verification said they were right:**
+- `CLAUDE.md`'s excluded-suite list. `origin/main` already carries the matching 18-suite text; this
+  branch carries the older list *and the older `vite.config.ts`*, so doc and code agree here.
+  Porting main's paragraph would have made this checkout false. The branch being behind is the
+  finding, not a defect in the file.
+- `CONTEXT.md`'s role hierarchy — byte-for-byte the `ROLE_LEVELS` map in
+  `server/lib/role-resolution.ts` (admin 40 · vet 30 · senior_technician 25 · lead_technician 22 ·
+  vet_tech/technician 20 · student 10).
+- `TASKS.md` § Completed — PRs #167, #175, #178, #179, #180, #181 all resolve to real merge commits
+  on `origin/main` whose branch names match the described work.
+- `docs/README.md` / `TASKS.md` on `docs/design-handoff/` — 240 tracked files, exactly as claimed.
+
+**A structural note the next reader should not have to rediscover:** three of my own first-draft
+citations failed the gate, and each failure was correct. `#221` is an *issue*, not a PR — the
+18-suite fix merged as **#225**. The per-route handler directories those two split commits added
+under `server/routes/` exist on `origin/main` but **not in this checkout**, because this
+branch is behind. Facts were checked against `origin/main` as instructed, but a backticked path is
+resolved against the working tree — so a claim can be true of the repo and still unverifiable from
+the branch you are standing on. Say which ref you mean.
+
+**Gate on this tree:** `pnpm verify:claims` →
+`1020 claims: 1009 verified, 10 registered, 1 attested, 0 FAILED` before this entry was appended,
+and `1074 claims: 1063 verified, 10 registered, 1 attested, 0 FAILED` after it. No registry entry was added: every correction above stands on its own evidence, which
+is the point.
+
+**Verdict:** VERIFIED
+
+## 2026-08-27 — VT-0: the QA remediation half re-derived on `origin/main`, and the merge that looked clean wasn't
+
+**Claim:** The 78-file QA-remediation payload archived on `wip/qa-remediation-holding` is now based on
+`origin/main` `bf1e0480c`, with every gate green, and three of the executing plan's expectations about
+that move were wrong.
+
+**Evidence — the rebase was two commits, not ninety-nine.** `git log --oneline origin/main..HEAD`
+returned exactly `aa69dda34` and `cc325f36e`. `git merge-base --is-ancestor 88ac0c199 origin/main`
+exits 0, so every other `chore/cursor-rules` commit was already merged. The 99 is how far `main` moved,
+not how much local work had to travel.
+
+**Evidence — `server/routes/equipment.ts` did NOT need re-deriving, and the audit is why we know.**
+`main` extracted the `/:id/toggle` body into `server/routes/equipment/handlers/post-equipment-toggle.ts`
+and hoisted `mapCheckoutGateError` into `server/routes/equipment/equipment-route-utils.ts`. S2 removes
+`validateUuid` from route *registrations* and S16.1 adds a holder guard inside `/:id/return`, which
+`main` never touched — disjoint, so git's auto-merge was correct here. Confirmed by reading rather than
+by trusting the merge: a grep for `validateUuid` across `server/routes/equipment.ts`,
+`server/routes/equipment-waitlist.ts` and the whole `server/routes/equipment/` tree returns nothing;
+`CustodyReturnNotHolderError` is thrown in
+`server/services/equipment-custody-toggle.service.ts` and mapped to a 403 `NOT_CURRENT_HOLDER` in
+`server/routes/equipment.ts`; and `/scan` carries
+`equipmentReplayIdempotency(EQUIPMENT_REPLAY_IDEMPOTENCY_ENDPOINTS.quickScan)`. The 12 `validateUuid`
+removals S2 claims are 9 in `server/routes/equipment.ts` plus 3 in `server/routes/equipment-waitlist.ts`.
+
+**Evidence — the generated i18n types WERE mis-merged, silently.** `src/lib/i18n.generated.d.ts` is
+produced by `scripts/i18n/generate-types.ts`. Its 3-way merge kept `finishSessionNoItems` and dropped
+`statusDistributionChartDesc`, `scanActivityChartDesc` and `nfcTagExists`. Two of the three are live
+call sites in `src/pages/analytics.tsx`. Regenerating restored all four, and
+`scripts/i18n/check-parity.ts` reports `locales/en.json` and `locales/he.json` in deep key parity.
+**`tsc` did not catch this** — the root `tsconfig.json` includes only `src` and `lib`, and `t` is
+hand-built in `src/lib/i18n.ts` rather than typed off `TStructure`, so a missing key in the generated
+declaration is not a type error. A generated file must be regenerated, never merged.
+
+**Evidence — a latent time bomb, found by the rebase and not caused by it.**
+`tests/equipment-staleness-last-verified.test.ts` pins fixtures to a frozen `NOW` of 2026-08-26 while
+`isInactive` (`src/lib/utils.ts`), `isAlertStillActive` (`server/lib/alert-reminder.ts`) and
+`isEquipmentInactive` (`server/routes/analytics.ts`) all read the wall clock. The boundary assertion at
+`INACTIVE_THRESHOLD_DAYS - 1` therefore drifted one day per day and went red on 2026-08-27, the day
+after the slice was authored — `expected true to be false`. Fixed by pinning the clock with fake
+timers, not by moving the boundary. Proven to be a class fix, not an instance fix: with `NOW` set to
+`2024-01-15T03:00:00.000Z` and to `2027-12-31T23:59:00.000Z` the file is 12/12 both times.
+
+**Evidence — the gates, each run on this tree:**
+- `tsc --noEmit` → exit 0, and `tsc -p tsconfig.server.json --noEmit` → exit 0. Both were **proven able
+  to go red** by injecting `const x: number = "boom"` into `src/` and `server/` respectively: exit 2,
+  one `error TS` each. The first attempt at this proof put the probe only in `server/`, saw exit 0, and
+  briefly read as a disarmed gate — the root `tsconfig.json` simply does not include `server/`.
+- `vitest run` → `750 passed (750)` files, `6921 passed | 11 skipped (6932)` tests, exit 0.
+- `node scripts/verify-claims.mjs` → `1166 claims`, `0 FAILED`.
+- `depcruise` over `server` and `src` → no violations, 1046 modules, 10 known ignored.
+
+**Contradicts an earlier claim, recorded here rather than edited there:** the executing plan states
+that this repo's full `vitest` run is "already red — 12 files / 53 failures, all one pre-existing
+`happy-dom` × `vitest` fault … do not chase it". That is **false on `origin/main`**: the suite is fully
+green. The claim was true of the pre-rebase branch. Any failure from here belongs to us.
+
+**The residue filter was too narrow, and the claim gate is what proved it.** The executing plan
+excludes doc-sweep residue by the rule "deletions with zero insertions", which caught nine files. It
+missed three more, because each carries a handful of insertions that are **truncations of the
+surrounding text rather than new content**: `PLAN.md` (+5 / -115),
+`docs/plans/master-plan-2026-07.md` (+3 / -32) and
+`docs/superpowers/specs/2026-07-12-audit-10x-consolidated-plan-design.md` (+1 / -157). The first is
+the serious one: its five "added" lines are a shortened copy of a `READ THIS FIRST` banner
+`origin/main` itself added, and the shortening drops the warning that the reviewer-demo seed writes to
+a **production** database under conditions recorded in `TASKS.md`. All three are restored to
+`origin/main`.
+
+They were found because deleting them broke something measurable: with `PLAN.md` truncated,
+`node scripts/verify-claims.mjs` reported **2 FAILED** — the citation `PLAN.md:100` in this log's
+2026-08-22 entry, and this entry's own quotation of it, both pointing past the end of an 85-line file.
+A prose-only residue check would not have caught any of this. Two further citations in this log,
+`PLAN.md:73` in the 2026-08-23 entry, resolved only by coincidence: that constraint sits at line 118
+on `origin/main`. They are left verbatim, because this log is append-only.
+
+**NOT RUN, and why:** there is no lint step here to run — this repo ships no ESLint configuration and
+`package.json` declares no lint script, which the claim gate confirmed by refusing an earlier draft of
+this very sentence for naming one. `pnpm verify:evidence` — the claim gate reports `evidence not current` because the working
+copy was dirty throughout; CI regenerates `docs/audit/evidence-run.json` on a clean tree, which is the
+only place that check is meaningful. No device or browser verification was performed: this change is a
+rebase plus a test-clock fix, and it alters no rendered surface.
+
+**Verdict:** VERIFIED for the rebase, the three corrections, and the five gates listed above.
+**NOT RUN** for `verify:evidence`. No PR is opened from this branch; it is the integration base the
+vettrack PRs are cut from.
+
+---
+
+## 2026-08-28 — fix(restock): serialize fallback NFC writes per tagId (CodeRabbit, open restock PR)
+
+**Heading note — the PR is deliberately NOT written as a `#`-number.** The claim gate reads any
+`#NNN` in a governed document as a *landing* claim and demands a merge commit or a `docs/pr-ledger.json`
+entry for it. This PR is still open, so the token made the gate fail — three checks at once, since
+`tests/claims-ledger.test.ts` runs the same engine and the merge gate follows both. Older entries in
+this file cite `PR #184` freely and pass only because #184 actually merged. Cite an OPEN pull request
+by branch name, never by `#`, until the day it lands.
+
+**Claim:** Fallback NFC scans of the same unresolved `tagId` are serialized so `prevCount`/`newCount` are computed inside a per-tag chain; after the first response resolves the item, later chained taps route through `scanLine` (optimistic row bump at issue time). Ownership-predicate structural tests reject incomplete guards. Bridge-only was verified insufficient (cache patch still sets `line.actual`).
+
+**Evidence:**
+- `src/pages/inventory-page.tsx` — `fallbackNfcChainByTagRef` + `nfcTagResolvedItemRef`; fallback path enqueues via `prior.catch(() => {}).then(async () => { … prevCount … })`; success stores resolved item; resolved taps `await scanLine(...)`.
+- RED→GREEN: `pnpm exec vitest run tests/inventory-restock-fallback-nfc-serialize-structure.test.ts` failed 5/5 on pre-fix tree; after fix all 5 pass.
+- Test: `pnpm exec vitest run tests/inventory-restock-*.test.ts* tests/inventory-nfc-hardening.test.ts` → 7 files / 34 passed.
+- Command: `pnpm typecheck` → exit 0 (client + server).
+- Finding 2: `tests/inventory-restock-response-guard-structure.test.ts` negative snippets reject `if (issuedTicketByCodeRef.current)` and `noNewerIssued(..., 0)`; accept full `noNewerIssued(ref.current, key, writeTicket)`.
+
 ## 2026-08-23 — Hebrew homePage.elapsedDays compact day unit (cursor/hebrew-elapsed-days-unit-32c8)
 
 **Claim:** Hebrew on-shift elapsed days no longer shows English `d`; `locales/he.json` `homePage.elapsedDays` is `{count} י׳`. English remains `{count}d`. No other English unit-suffix leftovers found in `he.json` on a pattern scan. Parity still passes.

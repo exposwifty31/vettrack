@@ -114,6 +114,7 @@
     --ivory-surface:  255 255 255;  /* #ffffff */
     --ivory-border:   209 209 214;  /* #D1D1D6 — iOS opaque separator */
     --ivory-borderMd: 174 174 178;  /* #AEAEB2 — mid-weight separator */
+    --ivory-borderStrong: 134 134 138; /* #86868A — boundary for a control that sits DIRECTLY on --ivory-bg (3.25:1). --ivory-border/-Md are tuned for --ivory-surface and only reach 1.36:1 / 1.98:1 on the page. */
     --ivory-text:     28 28 30;     /* #1C1C1E — iOS label */
     --ivory-text2:    99 99 102;    /* #636366 — secondary label (AA) */
     --ivory-text3:    108 108 112;  /* #6C6C70 — tertiary label (darkened for WCAG AA: 5.25:1 on surface, 4.68:1 on bg; was #8E8E93 ≈3.0:1) */
@@ -323,6 +324,7 @@
     --ivory-surface:  28 28 30;     /* #1C1C1E — card/sheet surface */
     --ivory-border:   58 58 60;     /* #3A3A3C — subtle border */
     --ivory-borderMd: 84 84 88;     /* #545458 — mid-weight border */
+    --ivory-borderStrong: 142 142 147; /* #8E8E93 — same role on the dark page (6.44:1). */
     --ivory-text:     255 255 255;  /* label */
     --ivory-text2:    152 152 157;  /* secondary label */
     --ivory-text3:    120 120 128;  /* tertiary label */
@@ -365,6 +367,7 @@
     --ivory-surface:  255 255 255;
     --ivory-border:   209 209 214;
     --ivory-borderMd: 174 174 178;
+    --ivory-borderStrong: 134 134 138; /* #86868A — boundary for a control that sits DIRECTLY on --ivory-bg (3.25:1). --ivory-border/-Md are tuned for --ivory-surface and only reach 1.36:1 / 1.98:1 on the page. */
     --ivory-text:     28 28 30;
     --ivory-text2:    99 99 102;
     --ivory-text3:    108 108 112;  /* AA-darkened, matches base light theme */
@@ -441,6 +444,7 @@
     --ivory-surface:  28 28 30;
     --ivory-border:   58 58 60;
     --ivory-borderMd: 84 84 88;
+    --ivory-borderStrong: 142 142 147; /* #8E8E93 — same role on the dark page (6.44:1). */
     --ivory-text:     255 255 255;
     --ivory-text2:    152 152 157;
     --ivory-text3:    120 120 128;

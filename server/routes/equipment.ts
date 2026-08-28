@@ -1,13 +1,13 @@
 // TODO(arch): file exceeds 1100 lines. Split into handler modules following
 // the equipment-route-utils.ts / handlers/ pattern already started in this directory.
-import { Router, type Request, type Response } from "express";
+import { Router } from "express";
 import { randomUUID } from "crypto";
 import multer from "multer";
 import { z } from "zod";
 import { db, equipment, equipmentReturns, folders, rooms, scanLogs, transferLogs, undoTokens, users, stagingQueue } from "../db.js";
 import { eq, inArray, desc, asc, and, or, ilike, lt, gte, sql, isNull } from "drizzle-orm";
 import { requireAuth, requireAdmin, requireEffectiveRole } from "../middleware/auth.js";
-import { validateBody, validateUuid } from "../middleware/validate.js";
+import { validateBody } from "../middleware/validate.js";
 import { scanLimiter, checkoutLimiter, writeLimiter } from "../middleware/rate-limiters.js";
 import { checkDedupe, sendPushToAll, shouldSendPilotEnglishEquipmentPush } from "../lib/push.js";
 import { invalidateAnalyticsCache } from "../lib/analytics-cache.js";
@@ -21,20 +21,22 @@ import {
   assertWaitlistCheckoutAllowed,
   CheckoutConflictError,
   CheckoutPreconditionError,
+  CustodyReturnNotHolderError,
   CustodyReturnVersionConflictError,
   evaluateCheckoutV1Preconditions,
   finalizeCheckoutSideEffects,
   finalizeReturnSideEffects,
+  invalidateAnchorAfterCheckout,
   performEquipmentCheckout,
   performEquipmentReturn,
   quickScanEquipmentCustody,
-  toggleEquipmentCustody,
 } from "../services/equipment-custody-toggle.service.js";
 import { EquipmentWaitlistError } from "../services/equipment-waitlist.service.js";
 import { mountEquipmentWaitlistRoutes } from "./equipment-waitlist.js";
 import { EQUIPMENT_REPLAY_IDEMPOTENCY_ENDPOINTS } from "../lib/equipment-replay-idempotency.js";
 import { equipmentReplayIdempotency } from "../middleware/equipment-replay-idempotency.js";
-import { apiError, resolveRequestId } from "./equipment/equipment-route-utils.js";
+import { custodyRosterGate } from "../middleware/custody-roster-gate.js";
+import { apiError, mapCheckoutGateError, resolveRequestId } from "./equipment/equipment-route-utils.js";
 import { getCriticalEquipmentHandler } from "./equipment/handlers/get-critical-equipment.js";
 import { getDeletedEquipmentHandler } from "./equipment/handlers/get-deleted-equipment.js";
 import { getEquipmentByIdHandler } from "./equipment/handlers/get-equipment-by-id.js";
@@ -53,6 +55,7 @@ import { postEquipmentImportHandler } from "./equipment/handlers/post-equipment-
 import { postEquipmentBulkDeleteHandler } from "./equipment/handlers/post-equipment-bulk-delete.js";
 import { postEquipmentCreateHandler } from "./equipment/handlers/post-equipment-create.js";
 import { patchEquipmentHandler } from "./equipment/handlers/patch-equipment.js";
+import { postEquipmentToggleHandler } from "./equipment/handlers/post-equipment-toggle.js";
 import {
   insertEquipmentUndoToken,
   snapshotEquipmentState,
@@ -150,6 +153,14 @@ const PLUG_IN_DEADLINE_DEFAULT_MINUTES = 30;
 export const equipmentReturnBodySchema = z.object({
   isPluggedIn: z.boolean().optional(),
   plugInDeadlineMinutes: z.number().int().min(1).max(PLUG_IN_DEADLINE_MAX_MINUTES).optional(),
+  /**
+   * Admin-only override: return a unit held by someone else, or repair an
+   * orphaned `checked_out` row that has no holder at all. Effective only for
+   * an admin (`allowForeignHolder = isAdmin && force`). A NON-admin sending
+   * it on their own return is simply ignored — the normal return proceeds;
+   * a non-admin forcing a FOREIGN return still hits the holder guard's 403.
+   */
+  force: z.boolean().optional(),
 }).strict();
 
 /** Optional body for POST /:id/toggle — NFC quick custody flip. */
@@ -220,37 +231,6 @@ const router = Router();
 
 const FIELD_MAX_LENGTH = 500;
 
-/**
- * Shared response mapping for the checkout gate errors thrown by
- * evaluateCheckoutV1Preconditions / assertWaitlistCheckoutAllowed — used by
- * every custody-flip route (/scan, /:id/toggle) so a new gate code cannot be
- * mapped in one handler and missed in another. Returns null for other errors.
- */
-function mapCheckoutGateError(err: unknown, req: Request, res: Response): Response | null {
-  if (err instanceof CheckoutPreconditionError) {
-    if (err.code === "STAGING_CONFLICT") {
-      return res.status(409).json({
-        code: err.code,
-        error: "You are not the top priority claim holder",
-        queue: err.extra?.queue,
-      });
-    }
-    if (err.code === "BUNDLE_INCOMPLETE") {
-      return res.status(422).json({ code: err.code, ...err.extra });
-    }
-    return res.status(err.httpStatus).json({
-      code: err.code,
-      error: typeof err.extra?.error === "string" ? err.extra.error : err.message,
-      ...err.extra,
-    });
-  }
-  if (err instanceof EquipmentWaitlistError) {
-    const status = err.code === "WAITLIST_RESERVATION_HELD_BY_OTHER" ? 409 : 422;
-    return apiErrorI18n(req, res, `equipmentWaitlist.${err.code}`, undefined, status);
-  }
-  return null;
-}
-
 type EquipmentRow = typeof equipment.$inferSelect;
 
 export async function cleanExpiredUndoTokens(): Promise<void> {
@@ -299,7 +279,6 @@ router.patch(
   requireAuth,
   writeLimiter,
   requireEffectiveRole("technician"),
-  validateUuid("id"),
   validateBody(patchEquipmentSchema),
   equipmentReplayIdempotency(EQUIPMENT_REPLAY_IDEMPOTENCY_ENDPOINTS.update),
   patchEquipmentHandler,
@@ -310,18 +289,20 @@ router.delete(
   requireAuth,
   writeLimiter,
   requireAdmin,
-  validateUuid("id"),
   equipmentReplayIdempotency(EQUIPMENT_REPLAY_IDEMPOTENCY_ENDPOINTS.delete),
   deleteEquipmentHandler,
 );
 
 // POST /api/equipment/:id/restore — admin only, restore a soft-deleted equipment record
-router.post("/:id/restore", requireAuth, requireAdmin, validateUuid("id"), postEquipmentRestoreHandler);
+router.post("/:id/restore", requireAuth, requireAdmin, postEquipmentRestoreHandler);
 
 // POST /api/equipment/scan — quick-scan alias for pilot/demo flows.
 // Body: { equipmentId: string }  (accepts plain string IDs like "eq1", not UUID-only)
 // Toggle semantics: available → checkout · held by caller → return · held by other → 409
-router.post("/scan", requireAuth, checkoutLimiter, requireEffectiveRole("student"), validateBody(quickScanBodySchema), async (req, res) => {
+// D2 server half: a replayed offline scan (Idempotency-Key) must collapse to
+// its first outcome — /scan is TOGGLE semantics, so a blind duplicate flips
+// custody back. No header → pass-through (web callers unchanged).
+router.post("/scan", requireAuth, checkoutLimiter, validateBody(quickScanBodySchema), requireEffectiveRole("student"), equipmentReplayIdempotency(EQUIPMENT_REPLAY_IDEMPOTENCY_ENDPOINTS.quickScan), custodyRosterGate(), async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
   try {
     const clinicId = req.clinicId!;
@@ -408,83 +389,11 @@ router.post(
   "/:id/toggle",
   requireAuth,
   checkoutLimiter,
-  requireEffectiveRole("student"),
-  validateUuid("id"),
   validateBody(equipmentToggleBodySchema),
+  requireEffectiveRole("student"),
   equipmentReplayIdempotency(EQUIPMENT_REPLAY_IDEMPOTENCY_ENDPOINTS.toggle),
-  async (req, res) => {
-    const requestId = resolveRequestId(res, req.headers["x-request-id"]);
-    try {
-      const clinicId = req.clinicId!;
-      const { isPluggedIn } = req.body as z.infer<typeof equipmentToggleBodySchema>;
-
-      const result = await toggleEquipmentCustody({
-        clinicId,
-        equipmentId: req.params.id,
-        actor: { id: req.authUser!.id, email: req.authUser!.email },
-        isPluggedIn: isPluggedIn ?? true,
-        actorRole: resolveAuditActorRole(req) ?? undefined,
-      });
-
-      if (result.kind === "not_found") {
-        return res.status(404).json(
-          apiError({
-            code: "NOT_FOUND",
-            reason: "EQUIPMENT_NOT_FOUND",
-            message: "Equipment not found",
-            requestId,
-          }),
-        );
-      }
-
-      if (result.kind === "blocked") {
-        return res.json({
-          equipment: result.equipment,
-          action: "blocked",
-          scanLogId: "",
-          undoToken: "",
-          checkedOutByEmail: result.checkedOutByEmail,
-        });
-      }
-
-      return res.json({
-        equipment: result.equipment,
-        action: result.kind,
-        scanLogId: result.scanLogId,
-        undoToken: result.undoToken,
-      });
-    } catch (err) {
-      const gateMapped = mapCheckoutGateError(err, req, res);
-      if (gateMapped) return gateMapped;
-      if (err instanceof CheckoutConflictError) {
-        return res.status(409).json({
-          code: "VERSION_CONFLICT",
-          error: "Version conflict, please retry",
-          checkedOutByEmail: err.checkedOutByEmail,
-        });
-      }
-      if (err instanceof CustodyReturnVersionConflictError) {
-        return res.status(409).json(
-          apiError({
-            code: "CONFLICT",
-            reason: "VERSION_CONFLICT",
-            message: "Equipment was updated concurrently; please retry",
-            requestId,
-          }),
-        );
-      }
-      console.error(err);
-      trackSyncFail();
-      return res.status(500).json(
-        apiError({
-          code: "INTERNAL_ERROR",
-          reason: "EQUIPMENT_TOGGLE_FAILED",
-          message: "Toggle failed",
-          requestId,
-        }),
-      );
-    }
-  },
+  custodyRosterGate(),
+  postEquipmentToggleHandler,
 );
 
 // POST /api/equipment/:id/checkout
@@ -492,10 +401,10 @@ router.post(
   "/:id/checkout",
   requireAuth,
   checkoutLimiter,
-  requireEffectiveRole("student"),
-  validateUuid("id"),
   validateBody(checkoutSchema),
+  requireEffectiveRole("student"),
   equipmentReplayIdempotency(EQUIPMENT_REPLAY_IDEMPOTENCY_ENDPOINTS.checkout),
+  custodyRosterGate(),
   async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
   try {
@@ -677,6 +586,8 @@ router.post(
     updated = txResult.updated;
     undoToken = txResult.undoToken;
 
+    invalidateAnchorAfterCheckout(clinicId, req.params.id);
+
     await finalizeCheckoutSideEffects({
       clinicId,
       equipmentId: req.params.id,
@@ -724,16 +635,24 @@ router.post(
   "/:id/return",
   requireAuth,
   checkoutLimiter,
-  requireEffectiveRole("student"),
-  validateUuid("id"),
   validateBody(equipmentReturnBodySchema),
+  requireEffectiveRole("student"),
   equipmentReplayIdempotency(EQUIPMENT_REPLAY_IDEMPOTENCY_ENDPOINTS.return),
+  custodyRosterGate(),
   async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
   try {
     const clinicId = req.clinicId!;
     const clientTimestamp = parseInt(req.headers["x-client-timestamp"] as string || "0", 10);
-    const { isPluggedIn, plugInDeadlineMinutes } = req.body as z.infer<typeof equipmentReturnBodySchema>;
+    const { isPluggedIn, plugInDeadlineMinutes, force } = req.body as z.infer<typeof equipmentReturnBodySchema>;
+
+    // Only an admin may return a unit they do not hold. Read the persisted role,
+    // NOT req.effectiveRole: requireEffectiveRole overwrites effectiveRole with the
+    // roster shift's role, so an admin rostered as a technician would be refused
+    // the repair exactly when they are on shift. This mirrors the admin bypass in
+    // requireEffectiveRole itself.
+    const isAdmin = req.authUser!.role === "admin" || req.authUser!.secondaryRole === "admin";
+    const allowForeignHolder = isAdmin && force === true;
 
     const txResult = await db.transaction(async (tx) =>
       performEquipmentReturn(tx, {
@@ -741,6 +660,7 @@ router.post(
         equipmentId: req.params.id,
         actor: { id: req.authUser!.id, email: req.authUser!.email },
         clientTimestamp,
+        allowForeignHolder,
       }),
     );
 
@@ -772,6 +692,7 @@ router.post(
       isPluggedIn,
       plugInDeadlineMinutes,
       waitlistPromotedOnReturn: txResult.waitlistPromotedOnReturn,
+      auditMetadata: allowForeignHolder ? { forcedByAdmin: true } : undefined,
     });
 
     res.json({
@@ -780,6 +701,16 @@ router.post(
       returnRecord,
     });
   } catch (err) {
+    if (err instanceof CustodyReturnNotHolderError) {
+      return res.status(403).json(
+        apiError({
+          code: "FORBIDDEN",
+          reason: "NOT_CURRENT_HOLDER",
+          message: "Only the current holder can return this equipment",
+          requestId,
+        }),
+      );
+    }
     if (err instanceof CustodyReturnVersionConflictError) {
       trackSyncFail();
       return res.status(409).json(
@@ -810,7 +741,6 @@ router.post(
   "/:id/seen",
   requireAuth,
   writeLimiter,
-  validateUuid("id"),
   validateBody(seenSchema),
   equipmentReplayIdempotency(EQUIPMENT_REPLAY_IDEMPOTENCY_ENDPOINTS.seen),
   async (req, res) => {
@@ -858,7 +788,6 @@ router.post(
   requireAuth,
   scanLimiter,
   requireEffectiveRole("student"),
-  validateUuid("id"),
   validateBody(scanSchema),
   equipmentReplayIdempotency(EQUIPMENT_REPLAY_IDEMPOTENCY_ENDPOINTS.scan),
   async (req, res) => {
@@ -1026,7 +955,7 @@ router.post(
 });
 
 // POST /api/equipment/:id/revert
-router.post("/:id/revert", requireAuth, requireEffectiveRole("vet"), validateUuid("id"), validateBody(revertSchema), postEquipmentRevertHandler);
+router.post("/:id/revert", requireAuth, requireEffectiveRole("vet"), validateBody(revertSchema), postEquipmentRevertHandler);
 
 router.get("/:id/logs", requireAuth, getEquipmentLogsHandler);
 

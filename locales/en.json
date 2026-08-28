@@ -354,6 +354,7 @@
     "noContainers": "No containers in the system",
     "startSessionFailed": "Could not start the restock session — please try again",
     "finishSessionFailed": "Could not finish the restock — please try again",
+    "finishSessionNoItems": "Nothing counted yet — count at least one item, or cancel the restock",
     "errorWithRequestId": "{message} (ref: {requestId})",
     "departments": {
       "hospital": "Hospital",
@@ -1374,6 +1375,8 @@
     "loadFailed": "Failed to load analytics data. Try again.",
     "shiftLeaderboardLink": "Shift scan leaderboard",
     "noScanActivity": "No scan activity in the last 14 days",
+    "statusDistributionChartDesc": "Doughnut chart showing how many equipment items are in each status: ready, issue, maintenance and sterilized.",
+    "scanActivityChartDesc": "Bar chart showing how many scans were recorded on each of the last 14 days.",
     "issueCountBadge": "{count} issues"
   },
   "monthlyReport": {
@@ -2092,6 +2095,7 @@
     "itemDeleteFailed": "Failed to delete item",
     "itemInUse": "Item is in use and cannot be deleted",
     "codeExists": "An item with this code already exists",
+    "nfcTagExists": "This NFC tag is already assigned to another item",
     "loadError": "Failed to load inventory items",
     "noItems": "No inventory items",
     "searchPlaceholder": "Search by code or label...",
@@ -2708,6 +2712,10 @@
     "handover": {
       "title": "Shift handover ready",
       "body": "The outgoing shift left a handover for you. Tap to review."
+    },
+    "codeBlue": {
+      "title": "⚠ CODE BLUE",
+      "body": "CODE BLUE activated by {name}"
     }
   },
   "shiftChat": {
@@ -3671,7 +3679,6 @@
     "createAccount": "Create account",
     "signUpSubtitle": "Sign up to manage your veterinary equipment",
     "signUpLoadError": "The sign-up page failed to load. Check your connection and refresh. If the problem persists, make sure Clerk is configured for this domain and the Publishable Key matches the environment.",
-    "roleLabel": "For every role",
     "roleVetTech": "Vet Tech",
     "roleVeterinarian": "Veterinarian",
     "roleStudent": "Student",

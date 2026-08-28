@@ -12,26 +12,20 @@
 
 Two files exceed comfortable review size and mix concerns:
 
-| File | Lines (2026-06-13) | Problem |
+| File | Lines (main `442dd2a`) | Problem |
 |------|-------------------|---------|
-| `server/routes/equipment.ts` | ~1,131 | Router + 6 inline write handlers + middleware stacks |
-| `src/pages/equipment-detail.tsx` | ~1,995 | Single page: custody, scans, dialogs, tabs, waitlist, operational state |
+| `server/routes/equipment.ts` | ~1054 | Router + inline checkout/return/scan mutations + middleware stacks |
+| `src/pages/equipment-detail.tsx` | ~2037 | Single page: custody, scans, dialogs, tabs, waitlist, operational state |
+
+> **Snapshot scope:** every line count and line-range in this document is as of main
+> `442dd2a` — the split-planning baseline. Both files have moved since; re-measure before
+> cutting, and treat the numbers here as the plan's coordinates, not the current truth.
 
 Item 4 extracted **toggle business logic** to `server/services/equipment-custody-toggle.service.ts` but left route wrappers inline. Checkout/return/scan remain inline and **paused** per inline-mutations inventory.
 
 ---
 
 ## `server/routes/equipment.ts` — handler groups
-
-### Extracted (thin router mounts)
-
-| Lines (approx) | Method / path | Module |
-|----------------|---------------|--------|
-| 229–251 | GET list/read (`/my`, `/`, `/deleted`, `/critical`, `/:id/truth`, `/:id`) | `server/routes/equipment/handlers/*` |
-| 242–249 | POST `/:id/confirm-in-room` | handler module |
-| 253–285 | POST `/`, PATCH `/:id`, DELETE `/:id`, POST `/:id/restore` | create / patch / delete / restore handlers |
-| 1106–1127 | POST `/:id/revert`, GET logs/transfers, import, bulk-* | handler modules |
-| 1129 | Waitlist sub-router | `server/routes/equipment-waitlist.ts` |
 
 ### Inline mutations (paused — see inline inventory)
 

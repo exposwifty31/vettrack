@@ -39,8 +39,11 @@ const workerSource = fs.readFileSync(
   "utf8",
 );
 
+// serializeAppointment (the containerId query site) lives in
+// task-lifecycle.service.ts after the ADR-002 appointments.service.ts split —
+// see docs/architecture/adr-002-appointments-service-split.md.
 const appointmentsServiceSource = fs.readFileSync(
-  path.resolve(__dirname, "../server/services/appointments.service.ts"),
+  path.resolve(__dirname, "../server/services/task-lifecycle.service.ts"),
   "utf8",
 );
 
@@ -115,7 +118,7 @@ describe("Query site — inventory-deduction.worker.ts", () => {
   });
 });
 
-describe("Query site — appointments.service.ts", () => {
+describe("Query site — task-lifecycle.service.ts", () => {
   it("serializes containerId from persisted column when present", () => {
     expect(appointmentsServiceSource).toContain("containerId: col");
   });

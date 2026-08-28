@@ -61,6 +61,24 @@ export const postEquipmentCreateHandler: RequestHandler = async (req, res) => {
       );
     }
 
+    // Same admin floor as PATCH: create is the second write path for `nfcTagId`,
+    // so guarding only the update route would leave this one open as a bind path.
+    // secondaryRole counts here too — see the note on the PATCH handler.
+    if (
+      nfcTagId !== undefined &&
+      req.authUser?.role !== "admin" &&
+      req.authUser?.secondaryRole !== "admin"
+    ) {
+      return res.status(403).json(
+        apiError({
+          code: "FORBIDDEN",
+          reason: "NFC_TAG_ID_ADMIN_ONLY",
+          message: "Only admins can bind or clear an NFC tag",
+          requestId,
+        }),
+      );
+    }
+
     const createdAt = new Date();
     const [item] = await db
       .insert(equipment)

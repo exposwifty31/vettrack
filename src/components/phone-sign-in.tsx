@@ -6,6 +6,12 @@ import { t } from "@/lib/i18n";
 type Step = "phone" | "code" | "error";
 type PhoneErrorCode = "NOT_AVAILABLE" | "GENERIC" | null;
 
+const fieldClassName =
+  "w-full min-h-[44px] border border-ivory-border rounded-md px-4 py-3 vt-text-sm bg-ivory-surface text-ivory-text focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-ivory-surface focus:border-transparent";
+
+const primaryButtonClassName =
+  "w-full min-h-[44px] bg-primary hover:bg-primary/90 disabled:opacity-50 text-primary-foreground font-semibold px-4 rounded-md transition-colors vt-text-sm";
+
 export function PhoneSignIn() {
   const { isLoaded, signIn, setActive } = useSignIn();
   const [step, setStep] = useState<Step>("phone");
@@ -96,12 +102,18 @@ export function PhoneSignIn() {
 
   if (step === "phone") {
     return (
-      <div className="bg-card border border-border rounded-2xl p-6 shadow-sm w-full">
-        <h2 className="text-base font-semibold text-foreground mb-1">{t.phoneSignIn.title}</h2>
-        <p className="text-xs text-muted-foreground mb-4">
+      <div className="w-full bg-transparent shadow-none">
+        <h2 className="vt-text-sm font-semibold text-ivory-text mb-1">{t.phoneSignIn.title}</h2>
+        <p className="vt-text-xs text-ivory-text3 mb-4 text-pretty">
           {t.phoneSignIn.phoneFormatHintA}{" "}
-          <span className="font-mono">+972501234567</span>{t.phoneSignIn.phoneFormatHintB}{" "}
-          <span className="font-mono">0501234567</span>{t.phoneSignIn.phoneFormatHintC}
+          <span className="font-mono" dir="ltr">
+            +972501234567
+          </span>
+          {t.phoneSignIn.phoneFormatHintB}{" "}
+          <span className="font-mono" dir="ltr">
+            0501234567
+          </span>
+          {t.phoneSignIn.phoneFormatHintC}
         </p>
         <form onSubmit={handlePhoneSubmit} className="flex flex-col gap-3">
           <div>
@@ -111,6 +123,7 @@ export function PhoneSignIn() {
             <input
               id="phone-sign-in-input"
               type="tel"
+              dir="ltr"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
               placeholder={t.phoneSignIn.phoneInputPlaceholder}
@@ -118,10 +131,10 @@ export function PhoneSignIn() {
               required
               aria-required="true"
               aria-describedby={errorMsg ? "phone-sign-in-error" : undefined}
-              className="w-full border border-input rounded-xl px-4 py-3 text-sm bg-background focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus:border-transparent"
+              className={fieldClassName}
             />
             {isILLocal && e164Preview && (
-              <p className="text-xs text-primary mt-1">
+              <p className="vt-text-xs text-primary mt-1" dir="ltr">
                 {t.phoneSignIn.sendingAs} <span className="font-mono">{e164Preview}</span>
               </p>
             )}
@@ -129,7 +142,7 @@ export function PhoneSignIn() {
           {errorMsg && (
             <p
               id="phone-sign-in-error"
-              className="text-sm text-destructive bg-destructive/10 border border-destructive/25 rounded-lg px-3 py-2"
+              className="vt-text-sm text-destructive bg-destructive/10 border border-destructive/25 rounded-md px-3 py-2"
               role="alert"
             >
               {phoneErrorCode === "NOT_AVAILABLE"
@@ -142,7 +155,7 @@ export function PhoneSignIn() {
           <button
             type="submit"
             disabled={loading || !phone.trim()}
-            className="w-full bg-primary hover:bg-primary/90 disabled:opacity-50 text-primary-foreground font-semibold px-4 py-3 rounded-xl transition-colors text-sm"
+            className={primaryButtonClassName}
           >
             {loading ? t.phoneSignIn.sendingCode : t.phoneSignIn.sendCode}
           </button>
@@ -152,10 +165,13 @@ export function PhoneSignIn() {
   }
 
   return (
-    <div className="bg-card border border-border rounded-2xl p-6 shadow-sm w-full">
-      <h2 className="text-base font-semibold text-foreground mb-1">{t.phoneSignIn.codeStepTitle}</h2>
-      <p className="text-xs text-muted-foreground mb-4">
-        {t.phoneSignIn.codeSentTo} <span className="font-mono font-medium">{normalizePhoneE164(phone)}</span>
+    <div className="w-full bg-transparent shadow-none">
+      <h2 className="vt-text-sm font-semibold text-ivory-text mb-1">{t.phoneSignIn.codeStepTitle}</h2>
+      <p className="vt-text-xs text-ivory-text3 mb-4">
+        {t.phoneSignIn.codeSentTo}{" "}
+        <span className="font-mono font-medium" dir="ltr">
+          {normalizePhoneE164(phone)}
+        </span>
       </p>
       <form onSubmit={handleCodeSubmit} className="flex flex-col gap-3">
         <label htmlFor="verification-code-input" className="sr-only">
@@ -165,6 +181,7 @@ export function PhoneSignIn() {
           id="verification-code-input"
           type="text"
           inputMode="numeric"
+          dir="ltr"
           value={code}
           onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
           placeholder={t.phoneSignIn.codeInputPlaceholder}
@@ -172,11 +189,11 @@ export function PhoneSignIn() {
           autoComplete="one-time-code"
           required
           aria-required="true"
-          className="w-full border border-input rounded-xl px-4 py-3 text-sm text-center tracking-widest bg-background text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus:border-transparent"
+          className={`${fieldClassName} text-center tracking-widest`}
         />
         {errorMsg && (
           <p
-            className="text-xs text-destructive bg-destructive/10 border border-destructive/25 rounded-lg px-3 py-2"
+            className="vt-text-xs text-destructive bg-destructive/10 border border-destructive/25 rounded-md px-3 py-2"
             role="alert"
           >
             {errorMsg}
@@ -185,14 +202,14 @@ export function PhoneSignIn() {
         <button
           type="submit"
           disabled={loading || code.length < 4}
-          className="w-full bg-primary hover:bg-primary/90 disabled:opacity-50 text-primary-foreground font-semibold px-4 py-3 rounded-xl transition-colors text-sm"
+          className={primaryButtonClassName}
         >
           {loading ? t.phoneSignIn.verifying : t.phoneSignIn.verify}
         </button>
         <button
           type="button"
           onClick={() => { setStep("phone"); setCode(""); setErrorMsg(null); }}
-          className="text-xs text-muted-foreground hover:text-primary transition-colors underline"
+          className="vt-text-xs text-ivory-text3 hover:text-primary transition-colors underline rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           {t.phoneSignIn.changePhone}
         </button>

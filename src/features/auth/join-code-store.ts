@@ -1,9 +1,9 @@
 /**
  * Carries a clinic join code from the sign-up link (`/signup?clinic=CODE`)
  * across Clerk's OAuth-redirect dance to the post-auth JoinClinicScreen, where
- * it pre-fills (and auto-submits) the join form. sessionStorage mirrors
- * requested-role-store.ts — the code survives same-tab redirects but is not a
- * durable credential on the device.
+ * it pre-fills (and auto-submits) the join form. sessionStorage keeps the code
+ * out of shareable URLs after the first capture — it survives same-tab
+ * redirects but is not a durable credential on the device.
  */
 const KEY = "vt_clinic_join_code";
 

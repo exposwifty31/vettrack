@@ -28,6 +28,26 @@ let appRoutes = null;
 try { crashCart = read("server/routes/crash-cart.ts"); } catch {}
 try { appRoutes = read("server/app/routes.ts"); } catch {}
 
+/**
+ * Several handler bodies referenced below were extracted out of
+ * server/routes/code-blue.ts into their own modules (mechanical file split,
+ * the arch-split marker in code-blue.ts). `routes` alone no longer contains their
+ * bodies — read the specific handler file too wherever an assertion checks
+ * content that now lives there.
+ */
+function readHandler(name) {
+  return read(path.join("server", "routes", "code-blue", "handlers", name));
+}
+const getSessionsActiveSrc = readHandler("get-sessions-active.ts");
+const postSessionsIdLogsSrc = readHandler("post-sessions-id-logs.ts");
+const patchSessionsIdEndSrc = readHandler("patch-sessions-id-end.ts");
+const postSessionsSrc = readHandler("post-sessions.ts");
+// Request-body schemas were also moved out of code-blue.ts, into
+// code-blue/schemas.ts (breaks a router → handler → router import cycle).
+// code-blue.ts re-exports every schema name unchanged, but the schema
+// bodies now live only in schemas.ts.
+const schemasSrc = read(path.join("server", "routes", "code-blue", "schemas.ts"));
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Route structure
 // ─────────────────────────────────────────────────────────────────────────────
@@ -64,7 +84,7 @@ describe("Code Blue sessions — server route structure", () => {
 
 describe("Code Blue sessions — manager enforcement", () => {
   it("end route checks managerUserId against caller", () => {
-    expect(routes).toContain("managerUserId");
+    expect(routes + schemasSrc).toContain("managerUserId");
     expect(routes).toContain("403");
     expect(routes).toContain("MANAGER_ONLY");
   });
@@ -75,10 +95,13 @@ describe("Code Blue sessions — manager enforcement", () => {
       /router\.patch\(\s*["']\/sessions\/:id\/end["']/,
     );
     const endHandlerEnd = routes.indexOf("\nrouter.", endHandlerStart + 1);
-    const endBlock = routes.slice(
-      endHandlerStart,
-      endHandlerEnd > endHandlerStart ? endHandlerEnd : endHandlerStart + 2000,
-    );
+    const endBlock =
+      routes.slice(
+        endHandlerStart,
+        endHandlerEnd > endHandlerStart ? endHandlerEnd : endHandlerStart + 2000,
+      ) +
+      "\n" +
+      patchSessionsIdEndSrc;
     const manager403Pos = endBlock.indexOf("MANAGER_ONLY");
     const diedPos = endBlock.indexOf('"died"');
     // If no 'died' string, the check is outcome-agnostic — correct
@@ -96,8 +119,8 @@ describe("Code Blue sessions — manager enforcement", () => {
 
 describe("Code Blue sessions — idempotency", () => {
   it("log entries route uses idempotencyKey for deduplication", () => {
-    expect(routes).toContain("idempotencyKey");
-    expect(routes).toContain("duplicate");
+    expect(routes + schemasSrc).toContain("idempotencyKey");
+    expect(postSessionsIdLogsSrc).toContain("duplicate");
   });
 });
 
@@ -108,47 +131,31 @@ describe("Code Blue sessions — idempotency", () => {
 describe("Code Blue sessions — no auto-checkout on equipment log", () => {
   it("equipment log entry does NOT update equipment checkout state", () => {
     // PR 1.6: auto-checkout removed; equipment table must not be mutated via Code Blue log
-    const logBlock = routes.slice(
-      routes.search(/router\.post\(\s*["']\/sessions\/:id\/logs["']/),
-    );
-    const nextRoute = logBlock.indexOf("router.", 10);
-    const logHandler = nextRoute === -1 ? logBlock : logBlock.slice(0, nextRoute);
-    expect(logHandler).not.toContain("checkedOutById");
-    expect(logHandler).not.toContain(".update(equipment");
+    expect(postSessionsIdLogsSrc).not.toContain("checkedOutById");
+    expect(postSessionsIdLogsSrc).not.toContain(".update(equipment");
   });
 
   it("session end route does not perform equipment mutations", () => {
-    const endBlock = routes.slice(
-      routes.search(/router\.patch\(\s*["']\/sessions\/:id\/end["']/),
-    );
-    const nextRoute = endBlock.indexOf("router.", 10);
-    const endHandler = nextRoute === -1 ? endBlock : endBlock.slice(0, nextRoute);
-    expect(endHandler).not.toContain("checkedOutById");
+    expect(patchSessionsIdEndSrc).not.toContain("checkedOutById");
   });
 
   it("session end route still closes the session", () => {
-    const endBlock = routes.slice(
-      routes.search(/router\.patch\(\s*["']\/sessions\/:id\/end["']/),
-    );
-    expect(endBlock).toContain('status: "ended"');
-    expect(endBlock).toContain("endedAt");
+    expect(patchSessionsIdEndSrc).toContain('status: "ended"');
+    expect(patchSessionsIdEndSrc).toContain("endedAt");
   });
 
   it("log entry history still persists via codeBlueLogEntries insert", () => {
-    const logBlock = routes.slice(
-      routes.search(/router\.post\(\s*["']\/sessions\/:id\/logs["']/),
-    );
-    const nextRoute = logBlock.indexOf("router.", 10);
-    const logHandler = nextRoute === -1 ? logBlock : logBlock.slice(0, nextRoute);
-    expect(logHandler).toContain("codeBlueLogEntries");
-    expect(logHandler).toContain("insert");
+    expect(postSessionsIdLogsSrc).toContain("codeBlueLogEntries");
+    expect(postSessionsIdLogsSrc).toContain("insert");
   });
 
   it("equipment import is read-only for linked equipment (no checkout mutation)", () => {
-    const importBlock = routes.slice(0, routes.indexOf("const router"));
-    expect(importBlock).toContain("equipment");
-    expect(routes).toContain("fetchLinkedEquipmentForSession");
-    expect(routes).not.toMatch(/\.update\(equipment/);
+    // The `equipment` table import moved from code-blue.ts's own import
+    // block into post-sessions.ts (mechanical file split) — it's the only
+    // extracted handler that reads it (validating body.equipmentId).
+    expect(postSessionsSrc).toContain("equipment");
+    expect(routes + getSessionsActiveSrc).toContain("fetchLinkedEquipmentForSession");
+    expect(routes + getSessionsActiveSrc + postSessionsSrc).not.toMatch(/\.update\(equipment/);
   });
 });
 
@@ -158,7 +165,7 @@ describe("Code Blue sessions — no auto-checkout on equipment log", () => {
 
 describe("Code Blue sessions — poll response includes cartStatus", () => {
   it("active session response includes cartStatus field", () => {
-    expect(routes).toContain("cartStatus");
+    expect(getSessionsActiveSrc).toContain("cartStatus");
   });
 });
 

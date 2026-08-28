@@ -25,10 +25,24 @@ const ALLOWED_ROUTE_FILES: ReadonlySet<string> = new Set([
 ]);
 
 function listRouteFiles(): string[] {
-  return fs
+  const top = fs
     .readdirSync(routesDir)
     .filter((f) => f.endsWith(".ts") || f.endsWith(".js"))
     .map((f) => path.join(routesDir, f));
+  // server/routes/code-blue.ts was split into a thin router plus per-handler
+  // modules under code-blue/handlers/ (mechanical file split). This scan is
+  // intentionally non-recursive and would otherwise silently drop coverage:
+  // the handler files are invisible to a flat readdirSync. Add them
+  // explicitly so the resolveAuthority consumption guard keeps applying to
+  // the code that actually runs.
+  const codeBlueHandlersDir = path.join(routesDir, "code-blue", "handlers");
+  const handlers = fs.existsSync(codeBlueHandlersDir)
+    ? fs
+        .readdirSync(codeBlueHandlersDir)
+        .filter((f) => f.endsWith(".ts") || f.endsWith(".js"))
+        .map((f) => path.join(codeBlueHandlersDir, f))
+    : [];
+  return [...top, ...handlers];
 }
 
 const allRouteFiles = listRouteFiles();

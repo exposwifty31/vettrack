@@ -85,12 +85,24 @@ describe("NFC fallback — monotonic count tracking", () => {
     expect(page).toContain("nfcItemCountsRef.current.get(tagId)");
   });
 
-  it("count is rolled back in .catch() on scan failure", () => {
+  it("count is undone in .catch() on scan failure, and only by the write that still owns the tag", () => {
+    // This assertion used to require the literal
+    // `nfcItemCountsRef.current.set(tagId, prevCount)` — which pinned a BUG as
+    // the contract. Restoring `prevCount` unconditionally walks the counter
+    // backwards past a newer scan that already succeeded (post 5, post 6, the 6
+    // lands, the 5 rejects, counter back to 4, next scan posts 5 over a server
+    // holding 6). The rollback now drops the entry under a tag-ownership guard.
+    //
+    // Kept here as a smoke check only. The real oracle is the AST assertion in
+    // tests/inventory-restock-response-guard-structure.test.ts — a string index
+    // cannot tell a guarded mutation from an unguarded one, which is precisely
+    // how this file blessed the defect in the first place.
     const fallbackIdx = page.indexOf("nfcItemCountsRef.current.set(tagId");
     const catchIdx = page.indexOf(".catch(", fallbackIdx);
     expect(catchIdx).toBeGreaterThan(fallbackIdx);
-    const catchBlock = page.slice(catchIdx, catchIdx + 200);
-    expect(catchBlock).toContain("nfcItemCountsRef.current.set(tagId, prevCount)");
+    const catchBlock = page.slice(catchIdx);
+    expect(catchBlock).toContain("nfcItemCountsRef.current.delete(tagId)");
+    expect(catchBlock).not.toContain("nfcItemCountsRef.current.set(tagId, prevCount)");
   });
 });
 
