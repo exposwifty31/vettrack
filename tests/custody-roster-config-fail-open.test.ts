@@ -14,8 +14,23 @@ vi.mock("../server/lib/server-config.js", () => ({
 
 import {
   __resetEnforcementConfigCacheForTests,
+  enforcementConfigLogger,
   resolveCustodyRosterEnforcementMode,
 } from "../server/lib/authority/enforcement/config.js";
+
+/** Arrange: env=enforce + a rejecting store; returns a restore function. */
+function armEnforcedOutage(): () => void {
+  const prev = process.env.AUTHORITY_CUSTODY_ROSTER_ENFORCE_V1;
+  process.env.AUTHORITY_CUSTODY_ROSTER_ENFORCE_V1 = "enforce";
+  mockGetServerConfigValue.mockRejectedValue(new Error("store down"));
+  return () => {
+    if (prev === undefined) {
+      delete process.env.AUTHORITY_CUSTODY_ROSTER_ENFORCE_V1;
+    } else {
+      process.env.AUTHORITY_CUSTODY_ROSTER_ENFORCE_V1 = prev;
+    }
+  };
+}
 
 describe("custody-roster resolver — envelope outage", () => {
   beforeEach(() => {
@@ -23,27 +38,42 @@ describe("custody-roster resolver — envelope outage", () => {
     __resetEnforcementConfigCacheForTests();
   });
 
-  it("fails OPEN to off on a read failure — even with env=enforce — and does not cache it", async () => {
-    const prev = process.env.AUTHORITY_CUSTODY_ROSTER_ENFORCE_V1;
-    process.env.AUTHORITY_CUSTODY_ROSTER_ENFORCE_V1 = "enforce";
-    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+  it("fails OPEN to off on a read failure, even with env=enforce", async () => {
+    const restore = armEnforcedOutage();
+    const spy = vi.spyOn(enforcementConfigLogger, "custodyRosterReadFailed").mockImplementation(() => {});
     try {
-      mockGetServerConfigValue.mockRejectedValue(new Error("store down"));
       await expect(resolveCustodyRosterEnforcementMode("c1")).resolves.toBe("off");
-      expect(warn).toHaveBeenCalledWith(
-        "[authority-enforcement]",
-        expect.objectContaining({ event: "custody_roster_config_read_failed" }),
+    } finally {
+      spy.mockRestore();
+      restore();
+    }
+  });
+
+  it("emits the structured read-failure event", async () => {
+    const restore = armEnforcedOutage();
+    const spy = vi.spyOn(enforcementConfigLogger, "custodyRosterReadFailed").mockImplementation(() => {});
+    try {
+      await resolveCustodyRosterEnforcementMode("c1");
+      expect(spy).toHaveBeenCalledTimes(1);
+      expect(spy).toHaveBeenCalledWith(
+        expect.objectContaining({ clinicId: "c1", error: "store down" }),
       );
-      // The failure was NOT cached: the store recovering is honoured at once.
+    } finally {
+      spy.mockRestore();
+      restore();
+    }
+  });
+
+  it("does not cache the failure — the store recovering is honoured at once", async () => {
+    const restore = armEnforcedOutage();
+    const spy = vi.spyOn(enforcementConfigLogger, "custodyRosterReadFailed").mockImplementation(() => {});
+    try {
+      await expect(resolveCustodyRosterEnforcementMode("c1")).resolves.toBe("off");
       mockGetServerConfigValue.mockResolvedValue("shadow");
       await expect(resolveCustodyRosterEnforcementMode("c1")).resolves.toBe("shadow");
     } finally {
-      warn.mockRestore();
-      if (prev === undefined) {
-        delete process.env.AUTHORITY_CUSTODY_ROSTER_ENFORCE_V1;
-      } else {
-        process.env.AUTHORITY_CUSTODY_ROSTER_ENFORCE_V1 = prev;
-      }
+      spy.mockRestore();
+      restore();
     }
   });
 

@@ -62,6 +62,21 @@ const codeBlueManagerCache = new Map<string, CacheEntry<CodeBlueManagerEnforceme
 // D1 — off-shift custody roster gate. Independent cache, same 10s TTL /
 // rollback contract as every other family.
 const custodyRosterCache = new Map<string, CacheEntry<CustodyRosterEnforcementMode>>();
+
+/**
+ * Structured enforcement-config events (console transport — the house
+ * pattern). Exported so tests assert the EVENT, and so an enforcement bypass
+ * is queryable, not prose.
+ */
+export const enforcementConfigLogger = {
+  custodyRosterReadFailed(fields: { clinicId: string; error: string }): void {
+    console.warn("[authority-enforcement]", {
+      event: "custody_roster_config_read_failed",
+      outcome: "fail_open_off",
+      ...fields,
+    });
+  },
+};
 // Phase 4 PR 4.4b — drug/shock actor authority enforcement flag.
 // Independent cache, single sub-key per clinic (no endpoint sub-key — this
 // is per-route, not per-endpoint).
@@ -148,9 +163,7 @@ export async function resolveCustodyRosterEnforcementMode(
     // its env default may be `enforce`, so a config-store outage falling back
     // to the env would 403 off-shift clinicians exactly when nothing can be
     // fixed. Fail OPEN to `off`, uncached — recovery re-reads immediately.
-    console.warn("[authority-enforcement]", {
-      event: "custody_roster_config_read_failed",
-      outcome: "fail_open_off",
+    enforcementConfigLogger.custodyRosterReadFailed({
       clinicId,
       error: err instanceof Error ? err.message : String(err),
     });

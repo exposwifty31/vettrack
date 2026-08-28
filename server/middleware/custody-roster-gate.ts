@@ -51,6 +51,13 @@ function logSafe(value: string): string {
  * assert the EVENT, not a prose string.
  */
 export const custodyRosterLogger = {
+  resolverFailed(fields: { clinicId: string; userId: string; error: string }): void {
+    console.warn("[custody-roster-gate]", {
+      event: "custody_roster_resolver_failed",
+      outcome: "fail_open_pass",
+      ...fields,
+    });
+  },
   shadowRefusal(fields: {
     clinicId: string;
     userId: string;
@@ -86,7 +93,13 @@ export function custodyRosterGate() {
     let mode: "off" | "shadow" | "enforce";
     try {
       mode = await resolveCustodyRosterEnforcementMode(req.clinicId!);
-    } catch {
+    } catch (err) {
+      // Fail OPEN — but never silently: a bypassed gate must be queryable.
+      custodyRosterLogger.resolverFailed({
+        clinicId: req.clinicId ?? "",
+        userId: user.id,
+        error: err instanceof Error ? err.message : String(err),
+      });
       next();
       return;
     }
