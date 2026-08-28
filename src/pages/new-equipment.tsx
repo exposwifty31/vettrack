@@ -7,6 +7,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { api } from "@/lib/api";
+import { buildEquipmentUpdatePayload } from "@/lib/equipment-update-payload";
 import { AppShell } from "@/components/layout/AppShell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -231,27 +232,14 @@ export default function NewEquipmentPage() {
   }
 
   function buildUpdatePayload(data: FormValues): UpdateEquipmentPayload {
-    return {
-      name: data.name,
-      nameHe: normalizeOptionalString(data.nameHe ?? undefined) ?? null,
-      serialNumber: normalizeOptionalString(data.serialNumber) ?? null,
-      model: normalizeOptionalString(data.model) ?? null,
-      manufacturer: normalizeOptionalString(data.manufacturer) ?? null,
-      purchaseDate: normalizeOptionalString(data.purchaseDate) ?? null,
-      expiryDate: data.expiryDate ? normalizeOptionalString(data.expiryDate) ?? null : null,
-      location: normalizeOptionalString(data.location) ?? null,
-      folderId: data.folderId === "none" ? null : data.folderId,
-      maintenanceIntervalDays: data.maintenanceIntervalDays ?? null,
-      ...(showExpectedReturnField && { expectedReturnMinutes: data.expectedReturnMinutes ?? null }),
-      imageUrl: normalizeOptionalString(data.imageUrl) ?? null,
-      usuallyFoundHere: normalizeOptionalString(data.usuallyFoundHere ?? undefined) ?? null,
-      searchAlias: normalizeOptionalString(data.searchAlias ?? undefined) ?? null,
-      staffNote: normalizeOptionalString(data.staffNote ?? undefined) ?? null,
-      rfidTagEpc: normalizeOptionalString(data.rfidTagEpc ?? undefined) ?? null,
-      // Optimistic concurrency: echo back the version we loaded so the
-      // server can 409 if someone else edited the row meanwhile.
-      ...(existingEquipment?.version !== undefined && { version: existingEquipment.version }),
-    };
+    // Extracted to src/lib/equipment-update-payload.ts so the clear-a-field
+    // wire contract is unit-tested: serialNumber/model/manufacturer/location
+    // clear as "" (patchEquipmentSchema is .strict() and those four are NOT
+    // nullable — `null` used to 400 the whole PATCH).
+    return buildEquipmentUpdatePayload(data, {
+      includeExpectedReturn: showExpectedReturnField,
+      version: existingEquipment?.version,
+    });
   }
 
   function clearSubmitTimeout() {
