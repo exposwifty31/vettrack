@@ -585,6 +585,7 @@ export interface TStructure {
       name: {
         placeholder: string;
         error: string;
+        label: string;
       };
       nameHe: {
         label: string;
@@ -592,19 +593,24 @@ export interface TStructure {
       };
       serialNumber: {
         placeholder: string;
+        label: string;
       };
       model: {
         placeholder: string;
+        label: string;
       };
       manufacturer: {
         placeholder: string;
+        label: string;
       };
       folder: {
         placeholder: string;
         none: string;
+        label: string;
       };
       location: {
         placeholder: string;
+        label: string;
       };
       expectedReturnMinutes: {
         label: string;
@@ -613,15 +619,25 @@ export interface TStructure {
       };
       usuallyFoundHere: {
         placeholder: string;
+        label: string;
       };
       searchAlias: {
         placeholder: string;
+        label: string;
       };
       staffNote: {
         placeholder: string;
+        label: string;
       };
       maintenanceIntervalDays: {
         placeholder: string;
+        label: string;
+      };
+      purchaseDate: {
+        label: string;
+      };
+      expiryDate: {
+        label: string;
       };
     };
     saveChanges: string;
