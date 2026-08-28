@@ -357,6 +357,7 @@ export interface TStructure {
     noContainers: string;
     startSessionFailed: string;
     finishSessionFailed: string;
+    finishSessionNoItems: string;
     errorWithRequestId: string;
     departments: {
       hospital: string;
@@ -2095,6 +2096,7 @@ export interface TStructure {
     itemDeleteFailed: string;
     itemInUse: string;
     codeExists: string;
+    nfcTagExists: string;
     loadError: string;
     noItems: string;
     searchPlaceholder: string;

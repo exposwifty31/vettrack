@@ -1,3 +1,4 @@
+import { EventEmitter } from "node:events";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { Request, Response } from "express";
 import {
@@ -36,6 +37,10 @@ const PATH = "/api/equipment/eq-1/scan";
 function makeRes(): { res: Response; statusCode: number; body: unknown } {
   let statusCode = 200;
   let body: unknown;
+  // The middleware holds a per-key gate until the response finishes, wired
+  // via res.once("finish"/"close") — the mock must be emitter-shaped and emit
+  // finish when the body lands, or the gate leaks and same-key tests hang.
+  const emitter = new EventEmitter();
   const res = {
     get statusCode() {
       return statusCode;
@@ -46,9 +51,15 @@ function makeRes(): { res: Response; statusCode: number; body: unknown } {
     },
     json(payload: unknown) {
       body = payload;
+      emitter.emit("finish");
       return this;
     },
     send() {
+      emitter.emit("finish");
+      return this;
+    },
+    once(event: string, listener: (...args: unknown[]) => void) {
+      emitter.once(event, listener);
       return this;
     },
   } as unknown as Response;
@@ -63,7 +74,12 @@ function makeRes(): { res: Response; statusCode: number; body: unknown } {
   };
 }
 
-function makeReq(body: unknown, idempotencyKey = "key-1"): Request {
+let keySeq = 0;
+
+// Unique per call: the middleware serializes concurrent requests sharing a key,
+// and a unit test that never sends a response would otherwise hold that key's
+// gate and hang every later test using the same default.
+function makeReq(body: unknown, idempotencyKey = `key-${++keySeq}`): Request {
   return {
     method: "POST",
     originalUrl: PATH,
