@@ -22,9 +22,17 @@ describe("POST /scan replay idempotency (D2 server half)", () => {
     expect(EQUIPMENT_REPLAY_IDEMPOTENCY_ENDPOINTS.quickScan).toBe("POST /api/equipment/scan");
   });
 
-  it("the /scan registration carries the replay middleware", () => {
+  it("the /scan registration carries the replay middleware, after body validation", () => {
     const registration = ROUTES_SRC.match(/router\.post\(\s*"\/scan",[\s\S]{0,700}?async \(req, res\)/)?.[0] ?? "";
     expect(registration.length).toBeGreaterThan(0);
-    expect(registration).toContain("equipmentReplayIdempotency(EQUIPMENT_REPLAY_IDEMPOTENCY_ENDPOINTS.quickScan)");
+    const validateAt = registration.indexOf("validateBody(quickScanBodySchema)");
+    const replayAt = registration.indexOf(
+      "equipmentReplayIdempotency(EQUIPMENT_REPLAY_IDEMPOTENCY_ENDPOINTS.quickScan)",
+    );
+    expect(validateAt).toBeGreaterThan(-1);
+    expect(replayAt).toBeGreaterThan(-1);
+    // Order matters: the replay hash covers req.body, so a malformed request
+    // must be rejected BEFORE it can be recorded as the key's stored outcome.
+    expect(validateAt).toBeLessThan(replayAt);
   });
 });

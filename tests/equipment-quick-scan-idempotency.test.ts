@@ -276,6 +276,39 @@ describe.skipIf(!dbReachable || !schemaReady)(
       }
     });
 
+    it("serializes two CONCURRENT requests on one key — the toggle runs once", async () => {
+      const { clinicId, equipmentId, userId } = await seedFixture();
+      const idempotencyKey = randomUUID();
+      try {
+        const url = `${baseUrl}/api/equipment/scan`;
+        const init = {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Idempotency-Key": idempotencyKey,
+          },
+          body: JSON.stringify({ equipmentId }),
+        };
+
+        // Both in flight before either response persists: without per-key
+        // serialization both miss the stored row, the toggle runs twice, and
+        // the second run flips custody straight back to returned.
+        const [first, second] = await Promise.all([fetch(url, init), fetch(url, init)]);
+        expect(first.status).toBe(200);
+        expect(second.status).toBe(200);
+        const firstBody = await first.json();
+        const secondBody = await second.json();
+
+        expect(firstBody.action).toBe("checkout");
+        expect(secondBody.action).toBe("checkout");
+        expect(secondBody.scanLogId).toBe(firstBody.scanLogId);
+        expect(await countScanLogs(clinicId, equipmentId)).toBe(1);
+        expect(await readCustodyHolder(equipmentId, clinicId)).toBe(userId);
+      } finally {
+        await purgeClinic(clinicId);
+      }
+    });
+
     it("rejects a reused key carrying a different equipmentId", async () => {
       const { clinicId, equipmentId } = await seedFixture();
       const otherEquipmentId = randomUUID();

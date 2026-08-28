@@ -82,6 +82,18 @@ function schedulePersistThenSend(
 }
 
 /**
+ * In-flight same-key gates. The lookup→execute→persist window below is not
+ * atomic: two concurrent requests carrying the SAME Idempotency-Key can both
+ * miss the stored row and both run the handler — on a toggle route the second
+ * run reverses the first. Chaining same-key requests through this map closes
+ * that window inside one process (the deployment is single-instance); a
+ * cross-instance duplicate is still caught by the stored-row hash check once
+ * the first response persists. Entries are deleted when their chain drains,
+ * so the map is bounded by concurrently in-flight keyed requests.
+ */
+const inFlightReplayGates = new Map<string, Promise<void>>();
+
+/**
  * Optional offline replay idempotency for equipment mutations.
  * When `Idempotency-Key` is absent, the request proceeds unchanged (online callers).
  */
@@ -113,6 +125,27 @@ export function equipmentReplayIdempotency(endpoint: string): RequestHandler {
       req.body,
     );
 
+    const gateKey = `${clinicId}:${storageKey}`;
+    let settleGate!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      settleGate = resolve;
+    });
+    const prior = inFlightReplayGates.get(gateKey) ?? Promise.resolve();
+    const chainTail = prior.then(() => gate);
+    inFlightReplayGates.set(gateKey, chainTail);
+    let gateReleased = false;
+    const releaseGate = () => {
+      if (gateReleased) {
+        return;
+      }
+      gateReleased = true;
+      settleGate();
+      if (inFlightReplayGates.get(gateKey) === chainTail) {
+        inFlightReplayGates.delete(gateKey);
+      }
+    };
+    await prior;
+
     try {
       const [existing] = await db
         .select()
@@ -134,14 +167,17 @@ export function equipmentReplayIdempotency(endpoint: string): RequestHandler {
             reason: "IDEMPOTENCY_KEY_BODY_MISMATCH",
             message: "Idempotency-Key was reused with a different request body",
           });
+          releaseGate();
           return;
         }
         incrementMetric("offline_sync_idempotency_replay_served");
         if (existing.statusCode === 204) {
           res.status(204).send();
+          releaseGate();
           return;
         }
         res.status(existing.statusCode).json(existing.responseBody);
+        releaseGate();
         return;
       }
     } catch (err) {
@@ -152,6 +188,7 @@ export function equipmentReplayIdempotency(endpoint: string): RequestHandler {
         reason: "IDEMPOTENCY_STORE_UNAVAILABLE",
         message: "Could not verify idempotency; try again",
       });
+      releaseGate();
       return;
     }
 
@@ -222,6 +259,17 @@ export function equipmentReplayIdempotency(endpoint: string): RequestHandler {
     res.json = jsonWithReplay;
     res.send = sendWithReplay;
 
-    next();
+    // Pass-through: hold the gate until this response has persisted and been
+    // sent (finish), or the connection died (close) — whichever comes first.
+    // If wiring the hooks (or dispatch itself) throws, release rather than
+    // poisoning every later request on this key.
+    try {
+      res.once("finish", releaseGate);
+      res.once("close", releaseGate);
+      next();
+    } catch (err) {
+      releaseGate();
+      throw err;
+    }
   };
 }
