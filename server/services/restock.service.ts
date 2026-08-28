@@ -287,7 +287,7 @@ export async function scanItem(params: {
   const template = blueprintEntryForContainerName(
     (await db.select({ name: containers.name })
       .from(containers)
-      .where(eq(containers.id, session.containerId))
+      .where(and(eq(containers.clinicId, params.clinicId), eq(containers.id, session.containerId)))
       .limit(1))[0]?.name ?? "",
   );
 
@@ -334,16 +334,6 @@ export async function finishSession(params: {
     const session = await getSessionForMutation(tx, params.clinicId, params.sessionId);
     assertSessionOwned(session, params.userId);
 
-    const [container] = await tx
-      .select()
-      .from(containers)
-      .where(and(eq(containers.clinicId, params.clinicId), eq(containers.id, session.containerId)))
-      .limit(1);
-    if (!container) {
-      throw new RestockServiceError("CONTAINER_NOT_FOUND", 404, "Container not found");
-    }
-    const template = await ensureTemplateItemsSeededInTx(tx, params.clinicId, container.name, session.containerId);
-
     // Get the latest scan per item for this session (last scan wins)
     const allEvents = await tx
       .select()
@@ -358,6 +348,31 @@ export async function finishSession(params: {
         latestByItemId.set(ev.itemId, ev);
       }
     }
+
+    // Finishing a session that counted nothing would close it as a completed
+    // restock with zero counts — an uncounted container that reads as audited.
+    // Refuse BEFORE the container load and template seeding: the guard needs
+    // only the events, seeding writes rows this session then has no use for,
+    // and an empty session whose container vanished (or whose seed fails)
+    // should still report the one honest thing it knows — nothing was counted.
+    if (latestByItemId.size === 0) {
+      throw new RestockServiceError(
+        "NO_ITEMS_COUNTED",
+        400,
+        "No items were counted in this restock session",
+      );
+    }
+
+    const [container] = await tx
+      .select()
+      // tenant-lint:scoped the where() below pins containers.clinicId to params.clinicId; the nearest-block heuristic reads only the NO_ITEMS_COUNTED guard
+      .from(containers)
+      .where(and(eq(containers.clinicId, params.clinicId), eq(containers.id, session.containerId)))
+      .limit(1);
+    if (!container) {
+      throw new RestockServiceError("CONTAINER_NOT_FOUND", 404, "Container not found");
+    }
+    const template = await ensureTemplateItemsSeededInTx(tx, params.clinicId, container.name, session.containerId);
 
     const committedItems: Array<{
       itemId: string;

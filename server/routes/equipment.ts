@@ -155,8 +155,10 @@ export const equipmentReturnBodySchema = z.object({
   plugInDeadlineMinutes: z.number().int().min(1).max(PLUG_IN_DEADLINE_MAX_MINUTES).optional(),
   /**
    * Admin-only override: return a unit held by someone else, or repair an
-   * orphaned `checked_out` row that has no holder at all. Honoured only for an
-   * admin — a non-admin sending it still gets 403.
+   * orphaned `checked_out` row that has no holder at all. Effective only for
+   * an admin (`allowForeignHolder = isAdmin && force`). A NON-admin sending
+   * it on their own return is simply ignored — the normal return proceeds;
+   * a non-admin forcing a FOREIGN return still hits the holder guard's 403.
    */
   force: z.boolean().optional(),
 }).strict();
@@ -297,6 +299,9 @@ router.post("/:id/restore", requireAuth, requireAdmin, postEquipmentRestoreHandl
 // POST /api/equipment/scan — quick-scan alias for pilot/demo flows.
 // Body: { equipmentId: string }  (accepts plain string IDs like "eq1", not UUID-only)
 // Toggle semantics: available → checkout · held by caller → return · held by other → 409
+// D2 server half: a replayed offline scan (Idempotency-Key) must collapse to
+// its first outcome — /scan is TOGGLE semantics, so a blind duplicate flips
+// custody back. No header → pass-through (web callers unchanged).
 router.post("/scan", requireAuth, checkoutLimiter, requireEffectiveRole("student"), custodyRosterGate(), validateBody(quickScanBodySchema), equipmentReplayIdempotency(EQUIPMENT_REPLAY_IDEMPOTENCY_ENDPOINTS.quickScan), async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
   try {

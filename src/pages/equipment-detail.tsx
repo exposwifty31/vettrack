@@ -1033,7 +1033,14 @@ function EquipmentDetailPageDesktop() {
 
   const overdue = isOverdue(equipment);
   const sterilizationDue = isSterilizationDue(equipment);
-  const isCheckedOut = !!equipment.checkedOutById;
+  // Orphan-aware: a `checked_out` row with a NULL holder (an orphan) must
+  // offer RETURN (admin-gated below), never checkout — a checkout on it 409s.
+  // Falls back to the holder-id derive when an older server omits
+  // custodyState (the field is capability-sensed everywhere on this page).
+  const isCheckedOut =
+    equipment.custodyState != null
+      ? equipment.custodyState === "checked_out"
+      : !!equipment.checkedOutById;
   const checkedOutByMe = equipment.checkedOutById === userId;
   const showReservationBanner = shouldShowReservationBanner(
     waitlistQ.data?.myStatus,

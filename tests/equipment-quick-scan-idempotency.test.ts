@@ -66,20 +66,27 @@ if (DATABASE_URL) {
     // the same green result — a silent skip and a passing check look identical
     // from outside, and only one of them is honest. Skipping stays legitimate
     // only when no database was configured at all (see the guard below).
-    await probePool.end().catch(() => {});
+    let cleanupErr: unknown = null;
+    await probePool.end().catch((e: unknown) => {
+      cleanupErr = e;
+    });
     probePool = null;
     throw new Error(
       `DATABASE_URL is configured but the equipment quick-scan idempotency suite cannot use it: ${
         err instanceof Error ? err.message : String(err)
-      }`,
+      }${cleanupErr ? `; pool cleanup also failed: ${cleanupErr instanceof Error ? cleanupErr.message : String(cleanupErr)}` : ""}`,
     );
   }
   if (!schemaReady) {
-    await probePool.end().catch(() => {});
+    let cleanupErr: unknown = null;
+    await probePool.end().catch((e: unknown) => {
+      cleanupErr = e;
+    });
     probePool = null;
     throw new Error(
       "DATABASE_URL is configured but vt_equipment is missing custody_state/version, " +
-        "or vt_idempotency_keys does not exist. Run the migrations, or unset DATABASE_URL to skip this suite.",
+        "or vt_idempotency_keys does not exist. Run the migrations, or unset DATABASE_URL to skip this suite." +
+        (cleanupErr ? ` (pool cleanup also failed: ${cleanupErr instanceof Error ? cleanupErr.message : String(cleanupErr)})` : ""),
     );
   }
 }
@@ -260,6 +267,46 @@ describe.skipIf(!dbReachable || !schemaReady)(
         const secondBody = await second.json();
 
         // Without the replay guard the toggle runs again and returns the device.
+        expect(secondBody.action).toBe("checkout");
+        expect(secondBody.scanLogId).toBe(firstBody.scanLogId);
+        expect(await countScanLogs(clinicId, equipmentId)).toBe(1);
+        expect(await readCustodyHolder(equipmentId, clinicId)).toBe(userId);
+      } finally {
+        await purgeClinic(clinicId);
+      }
+    });
+
+    it("serializes two CONCURRENT requests on one key — the toggle runs once", async () => {
+      const { clinicId, equipmentId, userId } = await seedFixture();
+      const idempotencyKey = randomUUID();
+      try {
+        const url = `${baseUrl}/api/equipment/scan`;
+        const init = {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Idempotency-Key": idempotencyKey,
+          },
+          body: JSON.stringify({ equipmentId }),
+        };
+
+        // Both in flight before either response persists: without per-key
+        // serialization both miss the stored row, the toggle runs twice, and
+        // the second run flips custody straight back to returned.
+        const [first, second] = await Promise.all([fetch(url, init), fetch(url, init)]);
+        expect(first.status).toBe(200);
+        expect(second.status).toBe(200);
+        const readScanBody = async (res: Response) => {
+          const body: unknown = await res.json();
+          expect(body).toEqual(
+            expect.objectContaining({ action: expect.any(String), scanLogId: expect.any(String) }),
+          );
+          return body as { action: string; scanLogId: string };
+        };
+        const firstBody = await readScanBody(first);
+        const secondBody = await readScanBody(second);
+
+        expect(firstBody.action).toBe("checkout");
         expect(secondBody.action).toBe("checkout");
         expect(secondBody.scanLogId).toBe(firstBody.scanLogId);
         expect(await countScanLogs(clinicId, equipmentId)).toBe(1);

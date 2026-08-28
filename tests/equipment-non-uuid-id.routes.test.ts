@@ -132,13 +132,24 @@ function probe(handle: (...args: unknown[]) => unknown, method: string, path: st
   };
 
   try {
-    const result = handle(req, res, () => {});
+    // next(err) is a REPORTED failure, not a deferral — a uuid guard that
+    // delegates its 400 to Express error middleware must not read as passing.
+    let nextErr: unknown = null;
+    const result = handle(req, res, (err?: unknown) => {
+      if (err != null) nextErr = err;
+    });
     // An ASYNC rejection is expected noise: `validateUuid` does no I/O, so any
     // middleware that returns a promise is a DB-backed one being probed out of
     // context, and it has already been established that it is not the guard.
     // A SYNCHRONOUS throw is a different animal and is reported below.
     if (result && typeof (result as Promise<unknown>).catch === "function") {
       (result as Promise<unknown>).catch(() => {});
+    }
+    if (nextErr != null) {
+      return {
+        kind: "threw",
+        error: `next(err): ${nextErr instanceof Error ? nextErr.message : String(nextErr)}`,
+      };
     }
   } catch (err) {
     return { kind: "threw", error: err instanceof Error ? err.message : String(err) };
