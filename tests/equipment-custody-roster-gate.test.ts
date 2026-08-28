@@ -33,11 +33,29 @@ vi.mock("../server/lib/authority/enforcement/config.js", async (importOriginal) 
   return { ...actual, resolveCustodyRosterEnforcementMode: configMock.resolveCustodyRosterEnforcementMode };
 });
 
-import { custodyRosterGate } from "../server/middleware/custody-roster-gate.js";
+import type { Request, Response } from "express";
 
-type AnyRecord = Record<string, unknown>;
+import { custodyRosterGate, custodyRosterLogger } from "../server/middleware/custody-roster-gate.js";
 
-function makeReq(over: AnyRecord = {}): AnyRecord {
+/** Exactly the request surface the gate reads — nothing else is modeled. */
+type GateRequestDouble = {
+  clinicId: string;
+  authUser: { id: string; name: string; role: string; secondaryRole: string | null } | null;
+  activeShift: { id: string; role: string; date: string } | null;
+  method: string;
+  path: string;
+  headers: Record<string, string>;
+};
+
+/** Exactly the response surface the gate writes: status(...).json(...). */
+type GateResponseDouble = {
+  statusCode: number;
+  body: { reason?: string } | undefined;
+  status(code: number): GateResponseDouble;
+  json(payload: unknown): GateResponseDouble;
+};
+
+function makeReq(over: Partial<GateRequestDouble> = {}): GateRequestDouble {
   return {
     clinicId: "clinic-1",
     authUser: { id: "u1", name: "Tech", role: "technician", secondaryRole: null },
@@ -49,27 +67,28 @@ function makeReq(over: AnyRecord = {}): AnyRecord {
   };
 }
 
-function makeRes() {
-  const res: AnyRecord = {
+function makeRes(): GateResponseDouble {
+  const res: GateResponseDouble = {
     statusCode: 0,
-    body: undefined as unknown,
+    body: undefined,
     status(code: number) {
       res.statusCode = code;
       return res;
     },
     json(payload: unknown) {
-      res.body = payload;
+      res.body = payload as { reason?: string };
       return res;
     },
   };
-  return res as { statusCode: number; body: { reason?: string } | undefined } & AnyRecord;
+  return res;
 }
 
-async function run(req: AnyRecord) {
+async function run(req: GateRequestDouble) {
   const res = makeRes();
   const next = vi.fn();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  await custodyRosterGate()(req as any, res as any, next);
+  // One unknown-boundary cast per argument: the doubles model exactly the
+  // fields the gate touches (see the two types above), not all of Express.
+  await custodyRosterGate()(req as unknown as Request, res as unknown as Response, next);
   return { res, next };
 }
 
@@ -122,11 +141,25 @@ describe("custodyRosterGate — D1 server half", () => {
     expect(configMock.resolveCustodyRosterEnforcementMode).not.toHaveBeenCalled();
   });
 
-  it("shadow: logs and passes the same off-shift technician enforce refuses", async () => {
+  it("shadow: passes AND emits exactly one structured audit event", async () => {
     configMock.resolveCustodyRosterEnforcementMode.mockResolvedValue("shadow");
-    const { res, next } = await run(makeReq());
-    expect(next).toHaveBeenCalledTimes(1);
-    expect(res.statusCode).toBe(0);
+    const shadowSpy = vi.spyOn(custodyRosterLogger, "shadowRefusal");
+    try {
+      const { res, next } = await run(makeReq({ path: `/api/equipment/scan-${Date.now()}` }));
+      expect(next).toHaveBeenCalledTimes(1);
+      expect(res.statusCode).toBe(0);
+      expect(shadowSpy).toHaveBeenCalledTimes(1);
+      expect(shadowSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          clinicId: "clinic-1",
+          userId: "u1",
+          role: "technician",
+          method: "POST",
+        }),
+      );
+    } finally {
+      shadowSpy.mockRestore();
+    }
   });
 
   it("off (the default): a no-op for everyone", async () => {

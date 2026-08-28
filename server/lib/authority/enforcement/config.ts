@@ -143,8 +143,18 @@ export async function resolveCustodyRosterEnforcementMode(
       clinicId,
       `authority.custody_roster_enforce.${clinicId}`,
     );
-  } catch {
-    override = null;
+  } catch (err) {
+    // This family diverges from Strategy A (throw → env default) on purpose:
+    // its env default may be `enforce`, so a config-store outage falling back
+    // to the env would 403 off-shift clinicians exactly when nothing can be
+    // fixed. Fail OPEN to `off`, uncached — recovery re-reads immediately.
+    console.warn("[authority-enforcement]", {
+      event: "custody_roster_config_read_failed",
+      outcome: "fail_open_off",
+      clinicId,
+      error: err instanceof Error ? err.message : String(err),
+    });
+    return "off";
   }
   if (isCustodyRosterMode(override)) {
     writeCache(custodyRosterCache, clinicId, override);
@@ -415,6 +425,7 @@ export async function resolveOproleEnforcementMode(
 // ---------------------------------------------------------------------------
 
 export function __resetEnforcementConfigCacheForTests(): void {
+  custodyRosterCache.clear();
   staleCache.clear();
   oproleCache.clear();
   taskAssignmentCache.clear();

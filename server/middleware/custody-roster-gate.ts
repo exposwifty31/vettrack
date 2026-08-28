@@ -34,6 +34,32 @@ import { createLogLimiter } from "../lib/log-safety.js";
 
 const shadowLogLimiter = createLogLimiter({ dedupeWindowMs: 60_000 });
 
+/** Request-derived strings can carry CRLF — strip before they reach a log line. */
+function logSafe(value: string): string {
+  return value.replace(/[\r\n]+/g, " ").slice(0, 256);
+}
+
+/**
+ * Structured shadow-audit events. Console transport — the server's house
+ * pattern (auth.ts, equipment-replay-idempotency.ts) — exported so tests
+ * assert the EVENT, not a prose string.
+ */
+export const custodyRosterLogger = {
+  shadowRefusal(fields: {
+    clinicId: string;
+    userId: string;
+    role: string;
+    method: string;
+    path: string;
+  }): void {
+    console.warn("[custody-roster-gate]", {
+      event: "custody_roster_shadow_refusal",
+      outcome: "would_refuse_off_shift",
+      ...fields,
+    });
+  },
+};
+
 export function custodyRosterGate() {
   return async function custodyRosterGateMw(
     req: Request,
@@ -67,12 +93,12 @@ export function custodyRosterGate() {
       // Dedupe key: one line per user+path per window — a sweep of taps from
       // one off-shift user must not flood the log.
       if (shadowLogLimiter.shouldLog(`${req.clinicId}:${user.id}:${req.path}`)) {
-        console.warn("[custody-roster-gate] shadow: off-shift custody write would be refused", {
-          clinicId: req.clinicId,
+        custodyRosterLogger.shadowRefusal({
+          clinicId: req.clinicId ?? "",
           userId: user.id,
           role: user.role,
-          method: req.method,
-          path: req.path,
+          method: logSafe(req.method),
+          path: logSafe(req.path),
         });
       }
       next();
