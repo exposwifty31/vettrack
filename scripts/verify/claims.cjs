@@ -412,7 +412,8 @@ function terminationProblem(outcome) {
     return `taskkill could not stop the gate's process tree (exit ${code === null ? "unknown" : code})`;
   }
   if (code === "ESRCH") return null;
-  return `could not signal the gate's process group${code ? ` (${code})` : ""}: ${message ?? "unknown cause"}`;
+  const codeSuffix = code ? ` (${code})` : "";
+  return `could not signal the gate's process group${codeSuffix}: ${message ?? "unknown cause"}`;
 }
 
 
