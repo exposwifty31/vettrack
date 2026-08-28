@@ -78,6 +78,7 @@ vi.mock("recharts", async (importOriginal) => {
 afterEach(() => cleanup());
 
 import AnalyticsPage from "@/pages/analytics";
+import { api } from "@/lib/api";
 
 function renderAnalytics() {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -91,6 +92,14 @@ function renderAnalytics() {
     </HelmetProvider>,
   );
 }
+
+describe("S11.4 failure path — a rejected summary renders the scoped error, not a blank page", () => {
+  it("shows the load-failed error card when the summary query rejects", async () => {
+    vi.mocked(api.analytics.summary).mockRejectedValueOnce(new Error("summary down"));
+    renderAnalytics();
+    expect(await screen.findByText(t.analyticsPage.loadFailed)).toBeTruthy();
+  });
+});
 
 describe("S11.4a — analytics empty state does not walk the heading outline backwards", () => {
   it("renders the top-problem empty state as an h3 under its h3 CardTitle", async () => {

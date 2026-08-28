@@ -24,13 +24,20 @@ import { UsersSection } from "@/pages/admin/UsersSection";
 import { DeletedItemsSection } from "@/pages/admin/DeletedItemsSection";
 import { SupportSection } from "@/pages/admin/SupportSection";
 
-type AdminTab =
-  | "folders"
-  | "users"
-  | "pending"
-  | "shift-requests"
-  | "support"
-  | "deleted";
+const ADMIN_TABS = [
+  "folders",
+  "users",
+  "pending",
+  "shift-requests",
+  "support",
+  "deleted",
+] as const;
+
+type AdminTab = (typeof ADMIN_TABS)[number];
+
+function isAdminTab(value: string): value is AdminTab {
+  return (ADMIN_TABS as readonly string[]).includes(value);
+}
 
 /**
  * Underline-strip look on top of the shared Radix trigger. The base
@@ -113,7 +120,9 @@ export default function AdminPage() {
             the roving tabindex and arrow-key navigation the hand-rolled strip had none of. */}
         <Tabs
           value={activeTab}
-          onValueChange={(value) => setActiveTab(value as AdminTab)}
+          onValueChange={(value) => {
+            if (isAdminTab(value)) setActiveTab(value);
+          }}
           className="flex flex-col gap-6"
         >
           <TabsList className="flex h-auto items-center justify-start gap-3 rounded-none border-b border-border bg-transparent p-0 pb-0 -mx-1 px-1 overflow-x-auto scrollbar-none">

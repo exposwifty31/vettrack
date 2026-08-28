@@ -72,6 +72,12 @@ describe("S11.9 — the pending-users heading reads as Hebrew, not as English wo
     expect(empty.indexOf(NOUN)).toBeLessThan(empty.indexOf(MODIFIER));
   });
 
+  it("fails loudly when required admin copy is missing from a locale", () => {
+    // The failure path of the schema itself: a locale that lost the heading
+    // must fail validation at the parse, not surface as undefined downstream.
+    expect(() => adminPageCopySchema.parse({ adminPage: { pendingEmpty: "x" } })).toThrow();
+  });
+
   it("leaves the English side alone", () => {
     expect(en.adminPage.pendingUsersTitle).toBe("Pending users");
   });
