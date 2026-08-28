@@ -10965,3 +10965,23 @@ not a bare `— deleted`, so the span was read as a live path claim.
 
 That same commit also removed a stray `||||||| d3ec38083` line this branch left at the end of the file, and that half was a real defect: the marker survived because the grep used to confirm "no residual markers" covered `<<<<<<<`, `=======` and `>>>>>>>` but not `|||||||`, the diff3 base marker. Third instance this session of a search pattern narrower than the absence it was used to claim.
 
+
+## 2026-08-28 — fix(restock): serialize fallback NFC writes per tagId (CodeRabbit, open restock PR)
+
+**Heading note — the PR is deliberately NOT written as a `#`-number.** The claim gate reads any
+`#NNN` in a governed document as a *landing* claim and demands a merge commit or a `docs/pr-ledger.json`
+entry for it. This PR is still open, so the token made the gate fail — three checks at once, since
+`tests/claims-ledger.test.ts` runs the same engine and the merge gate follows both. Older entries in
+this file cite `PR #184` freely and pass only because #184 actually merged. Cite an OPEN pull request
+by branch name, never by `#`, until the day it lands.
+
+**Claim:** Fallback NFC scans of the same unresolved `tagId` are serialized so `prevCount`/`newCount` are computed inside a per-tag chain; after the first response resolves the item, later chained taps route through `scanLine` (optimistic row bump at issue time). Ownership-predicate structural tests reject incomplete guards. Bridge-only was verified insufficient (cache patch still sets `line.actual`).
+
+**Evidence:**
+- `src/pages/inventory-page.tsx` — `fallbackNfcChainByTagRef` + `nfcTagResolvedItemRef`; fallback path enqueues via `prior.catch(() => {}).then(async () => { … prevCount … })`; success stores resolved item; resolved taps `await scanLine(...)`.
+- RED→GREEN: `pnpm exec vitest run tests/inventory-restock-fallback-nfc-serialize-structure.test.ts` failed 5/5 on pre-fix tree; after fix all 5 pass.
+- Test: `pnpm exec vitest run tests/inventory-restock-*.test.ts* tests/inventory-nfc-hardening.test.ts` → 7 files / 34 passed.
+- Command: `pnpm typecheck` → exit 0 (client + server).
+- Finding 2: `tests/inventory-restock-response-guard-structure.test.ts` negative snippets reject `if (issuedTicketByCodeRef.current)` and `noNewerIssued(..., 0)`; accept full `noNewerIssued(ref.current, key, writeTicket)`.
+
+**Verdict:** VERIFIED
