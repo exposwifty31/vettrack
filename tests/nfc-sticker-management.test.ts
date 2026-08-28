@@ -57,6 +57,23 @@ describe("M1 — the write action is admin-gated and hidden without NFC", () => 
     // The handler refuses even if the button somehow renders.
     expect(src).toMatch(/if \(!nfcWriteSupported\)/);
   });
+
+  // The client gate above is a UI control, not an authorization control: both
+  // equipment write routes only require `requireEffectiveRole("technician")`, so
+  // the admin floor on `nfcTagId` has to live in the handlers themselves. Both
+  // paths accept the field — guarding only PATCH leaves POST open.
+  // Behavior (403 body, ordering, no collateral damage to non-admin edits) is
+  // asserted in `tests/equipment-nfc-bind-admin-guard.test.ts`.
+  it.each([
+    ["server/routes/equipment/handlers/patch-equipment.ts"],
+    ["server/routes/equipment/handlers/post-equipment-create.ts"],
+  ])("%s refuses a non-admin nfcTagId write server-side", (handlerPath) => {
+    const src = repoFile(handlerPath);
+    expect(src).toMatch(
+      /nfcTagId !== undefined &&\s*\n\s*req\.authUser\?\.role !== "admin" &&\s*\n\s*req\.authUser\?\.secondaryRole !== "admin"/,
+    );
+    expect(src).toMatch(/reason: "NFC_TAG_ID_ADMIN_ONLY"/);
+  });
 });
 
 describe("M2 — the sticker URL is the same universal link the QR sticker carries", () => {
