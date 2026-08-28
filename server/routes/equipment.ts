@@ -154,8 +154,10 @@ export const equipmentReturnBodySchema = z.object({
   plugInDeadlineMinutes: z.number().int().min(1).max(PLUG_IN_DEADLINE_MAX_MINUTES).optional(),
   /**
    * Admin-only override: return a unit held by someone else, or repair an
-   * orphaned `checked_out` row that has no holder at all. Honoured only for an
-   * admin — a non-admin sending it still gets 403.
+   * orphaned `checked_out` row that has no holder at all. Effective only for
+   * an admin (`allowForeignHolder = isAdmin && force`). A NON-admin sending
+   * it on their own return is simply ignored — the normal return proceeds;
+   * a non-admin forcing a FOREIGN return still hits the holder guard's 403.
    */
   force: z.boolean().optional(),
 }).strict();

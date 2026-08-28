@@ -66,20 +66,27 @@ if (DATABASE_URL) {
     // the same green result — a silent skip and a passing check look identical
     // from outside, and only one of them is honest. Skipping stays legitimate
     // only when no database was configured at all (see the guard below).
-    await probePool.end().catch(() => {});
+    let cleanupErr: unknown = null;
+    await probePool.end().catch((e: unknown) => {
+      cleanupErr = e;
+    });
     probePool = null;
     throw new Error(
       `DATABASE_URL is configured but the equipment quick-scan idempotency suite cannot use it: ${
         err instanceof Error ? err.message : String(err)
-      }`,
+      }${cleanupErr ? `; pool cleanup also failed: ${cleanupErr instanceof Error ? cleanupErr.message : String(cleanupErr)}` : ""}`,
     );
   }
   if (!schemaReady) {
-    await probePool.end().catch(() => {});
+    let cleanupErr: unknown = null;
+    await probePool.end().catch((e: unknown) => {
+      cleanupErr = e;
+    });
     probePool = null;
     throw new Error(
       "DATABASE_URL is configured but vt_equipment is missing custody_state/version, " +
-        "or vt_idempotency_keys does not exist. Run the migrations, or unset DATABASE_URL to skip this suite.",
+        "or vt_idempotency_keys does not exist. Run the migrations, or unset DATABASE_URL to skip this suite." +
+        (cleanupErr ? ` (pool cleanup also failed: ${cleanupErr instanceof Error ? cleanupErr.message : String(cleanupErr)})` : ""),
     );
   }
 }

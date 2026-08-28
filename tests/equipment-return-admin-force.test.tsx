@@ -136,7 +136,7 @@ vi.mock("@/lib/api", async (importOriginal) => {
 
 import EquipmentDetailPage from "@/pages/equipment-detail";
 
-function heldEquipment(holderId: string, holderEmail: string): Equipment {
+function heldEquipment(holderId: string | null, holderEmail: string | null): Equipment {
   return {
     id: "eq1",
     name: "Infusion Pump",
@@ -146,7 +146,7 @@ function heldEquipment(holderId: string, holderEmail: string): Equipment {
     checkedOutAt: new Date().toISOString(),
     createdAt: "2026-01-01T00:00:00.000Z",
     custodyState: "checked_out",
-  } as Equipment;
+  };
 }
 
 async function renderDetailPage(equipment: Equipment) {
@@ -192,7 +192,15 @@ describe("admin return of a unit held by someone else (D4 client half)", () => {
   it("does NOT send force when the admin returns their own unit — a routine self-return must not read as forcedByAdmin in the audit record", async () => {
     await renderDetailPage(heldEquipment("admin-1", "admin@clinic.test"));
     await confirmPluggedInReturn();
-    const options = returnMock.mock.calls[0][1] as Record<string, unknown>;
-    expect(options.force).toBeUndefined();
+    expect(returnMock).toHaveBeenCalledWith(
+      "eq1",
+      expect.not.objectContaining({ force: expect.anything() }),
+    );
+  });
+
+  it("offers an admin the return on an ORPHANED checked_out row (null holder) and sends force", async () => {
+    await renderDetailPage(heldEquipment(null, null));
+    await confirmPluggedInReturn();
+    expect(returnMock).toHaveBeenCalledWith("eq1", expect.objectContaining({ force: true }));
   });
 });
