@@ -112,6 +112,14 @@ describe("S11.2 — equipment filter chips announce their pressed state", () => 
     expect(pressed[0].getAttribute("data-testid")).toBe("status-chip-all");
   });
 
+  it("clicking an inactive status chip moves aria-pressed onto it", () => {
+    renderEquipmentList();
+    expect(screen.getByTestId("status-chip-ok").getAttribute("aria-pressed")).toBe("false");
+    fireEvent.click(screen.getByTestId("status-chip-ok"));
+    expect(screen.getByTestId("status-chip-ok").getAttribute("aria-pressed")).toBe("true");
+    expect(screen.getByTestId("status-chip-all").getAttribute("aria-pressed")).toBe("false");
+  });
+
   it("the recovery-attention chip exposes aria-pressed and toggles it on click", () => {
     renderEquipmentList();
     const chip = screen.getByTestId("recovery-attention-filter");

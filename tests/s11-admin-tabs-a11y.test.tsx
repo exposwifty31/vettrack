@@ -131,9 +131,7 @@ describe("S11.1 — admin tab strip exposes real tab semantics", () => {
   it("renders the active section inside a tabpanel wired to its tab", () => {
     renderAdmin();
     const panel = screen.getByRole("tabpanel");
-    const selectedTab = screen
-      .getAllByRole("tab")
-      .find((el) => el.getAttribute("aria-selected") === "true")!;
+    const selectedTab = screen.getByRole("tab", { selected: true });
     expect(panel.getAttribute("aria-labelledby")).toBe(selectedTab.id);
     expect(selectedTab.getAttribute("aria-controls")).toBe(panel.id);
     expect(panel.querySelector('[data-testid="section-folders"]')).toBeTruthy();
@@ -145,7 +143,7 @@ describe("S11.1 — admin tab strip exposes real tab semantics", () => {
     // the strip, the active tab is the single tab stop and the rest are
     // skipped. Six sequentially-tabbable buttons is what this replaces.
     const tabs = screen.getAllByRole("tab");
-    const selected = tabs.find((el) => el.getAttribute("aria-selected") === "true")!;
+    const selected = screen.getByRole("tab", { selected: true });
     fireEvent.focus(selected);
     expect(selected.getAttribute("tabindex")).toBe("0");
     for (const tab of tabs) {

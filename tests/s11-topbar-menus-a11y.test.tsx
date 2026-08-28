@@ -117,11 +117,8 @@ describe("S11.5 — the management dropdown stops claiming to be a menu", () => 
     const { container } = renderManagementMenu();
     const trigger = screen.getByRole("button", { name: new RegExp(t.nav.management) });
 
-    // Closed: no dangling IDREF.
-    const closedControls = trigger.getAttribute("aria-controls");
-    if (closedControls) {
-      expect(container.ownerDocument.getElementById(closedControls)).toBeNull();
-    }
+    // Closed: the attribute is absent entirely — not even a dangling IDREF.
+    expect(trigger.getAttribute("aria-controls")).toBeNull();
 
     fireEvent.click(trigger);
     expect(trigger.getAttribute("aria-expanded")).toBe("true");
@@ -130,6 +127,11 @@ describe("S11.5 — the management dropdown stops claiming to be a menu", () => 
     const panel = container.ownerDocument.getElementById(controls!);
     expect(panel).toBeTruthy();
     expect(panel!.querySelectorAll("a").length).toBe(MGMT_ITEMS.length);
+
+    // Closing removes the reference again.
+    fireEvent.click(trigger);
+    expect(trigger.getAttribute("aria-expanded")).toBe("false");
+    expect(trigger.getAttribute("aria-controls")).toBeNull();
   });
 
   it("exposes the open panel as a named navigation landmark", () => {
@@ -165,10 +167,7 @@ describe("S11.6 — the settings dropdown stops claiming to be a menu", () => {
     const { container } = renderSettingsMenu();
     const trigger = screen.getByRole("button", { name: t.nav.settings });
 
-    const closedControls = trigger.getAttribute("aria-controls");
-    if (closedControls) {
-      expect(container.ownerDocument.getElementById(closedControls)).toBeNull();
-    }
+    expect(trigger.getAttribute("aria-controls")).toBeNull();
 
     fireEvent.click(trigger);
     expect(trigger.getAttribute("aria-expanded")).toBe("true");
@@ -177,6 +176,11 @@ describe("S11.6 — the settings dropdown stops claiming to be a menu", () => {
     const panel = container.ownerDocument.getElementById(controls!);
     expect(panel).toBeTruthy();
     expect(panel!.textContent).toContain(t.nav.quickSettings);
+
+    // Closing removes the reference again.
+    fireEvent.click(trigger);
+    expect(trigger.getAttribute("aria-expanded")).toBe("false");
+    expect(trigger.getAttribute("aria-controls")).toBeNull();
   });
 
   it("stays out of the navigation-landmark budget — it is toggles, not links", () => {
