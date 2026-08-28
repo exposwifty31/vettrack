@@ -1507,7 +1507,7 @@
     "onShift": "במשמרת",
     "startedAt": "התחלה {time}",
     "elapsedLabel": "זמן שחלף",
-    "elapsedDays": "{count}d",
+    "elapsedDays": "{count} י׳",
     "noShiftSub": "אינך במשמרת מתוזמנת. סריקה וניפוק ציוד אינם זמינים עד למשמרת הבאה.",
     "criticalLabel": "קריטי",
     "overdueLabel": "באיחור",
