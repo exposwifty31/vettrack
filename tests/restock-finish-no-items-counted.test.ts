@@ -115,9 +115,14 @@ describe.skipIf(!DATABASE_URL)("finishSession with nothing counted", () => {
     const body = src.slice(fnStart, src.indexOf("\nexport ", fnStart + 1));
     const guardAt = body.indexOf('"NO_ITEMS_COUNTED"');
     const seedAt = body.indexOf("ensureTemplateItemsSeededInTx(");
+    // The container QUERY too — a regression that loads containers before the
+    // guard passes the seed assertion alone (CodeRabbit, this PR).
+    const containerAt = body.indexOf("from(containers)");
     expect(guardAt).toBeGreaterThan(-1);
     expect(seedAt).toBeGreaterThan(-1);
+    expect(containerAt).toBeGreaterThan(-1);
     expect(guardAt).toBeLessThan(seedAt);
+    expect(guardAt).toBeLessThan(containerAt);
   });
 
   it("throws a RestockServiceError, so the route maps it to a 400", async () => {
