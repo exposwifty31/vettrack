@@ -21,6 +21,7 @@
 
 import { getServerConfigValue } from "../../server-config.js";
 import type {
+  CustodyRosterEnforcementMode,
   OproleEnforcementMode,
   StaleEnforcementMode,
   TaskAssignmentEnforcementMode,
@@ -58,6 +59,24 @@ const staleTaskOwnershipCache = new Map<string, CacheEntry<StaleTaskOwnershipEnf
 // resolve independently per clinic. The cache TTL is shared with the other
 // families (10s), matching the rollback contract in master plan §11.
 const codeBlueManagerCache = new Map<string, CacheEntry<CodeBlueManagerEnforcementMode>>();
+// D1 — off-shift custody roster gate. Independent cache, same 10s TTL /
+// rollback contract as every other family.
+const custodyRosterCache = new Map<string, CacheEntry<CustodyRosterEnforcementMode>>();
+
+/**
+ * Structured enforcement-config events (console transport — the house
+ * pattern). Exported so tests assert the EVENT, and so an enforcement bypass
+ * is queryable, not prose.
+ */
+export const enforcementConfigLogger = {
+  custodyRosterReadFailed(fields: { clinicId: string; error: string }): void {
+    console.warn("[authority-enforcement]", {
+      event: "custody_roster_config_read_failed",
+      outcome: "fail_open_off",
+      ...fields,
+    });
+  },
+};
 // Phase 4 PR 4.4b — drug/shock actor authority enforcement flag.
 // Independent cache, single sub-key per clinic (no endpoint sub-key — this
 // is per-route, not per-endpoint).
@@ -115,6 +134,50 @@ export function getStaleCeilingMs(operationalRole: string | null): number {
 
 function isStaleMode(value: string | null | undefined): value is StaleEnforcementMode {
   return value === "off" || value === "shadow" || value === "enforce";
+}
+
+function isCustodyRosterMode(value: string | null | undefined): value is CustodyRosterEnforcementMode {
+  return value === "off" || value === "shadow" || value === "enforce";
+}
+
+/**
+ * D1 — off-shift custody gate mode resolver.
+ * Chain: authority.custody_roster_enforce.<clinicId> →
+ * AUTHORITY_CUSTODY_ROSTER_ENFORCE_V1 → "off". Shadow first in production —
+ * the live Capacitor fleet must never hit a day-one hard 403.
+ */
+export async function resolveCustodyRosterEnforcementMode(
+  clinicId: string,
+): Promise<CustodyRosterEnforcementMode> {
+  const cached = readCache(custodyRosterCache, clinicId);
+  if (cached !== null) return cached;
+
+  let override: string | null = null;
+  try {
+    override = await getServerConfigValue(
+      clinicId,
+      `authority.custody_roster_enforce.${clinicId}`,
+    );
+  } catch (err) {
+    // This family diverges from Strategy A (throw → env default) on purpose:
+    // its env default may be `enforce`, so a config-store outage falling back
+    // to the env would 403 off-shift clinicians exactly when nothing can be
+    // fixed. Fail OPEN to `off`, uncached — recovery re-reads immediately.
+    enforcementConfigLogger.custodyRosterReadFailed({
+      clinicId,
+      error: err instanceof Error ? err.message : String(err),
+    });
+    return "off";
+  }
+  if (isCustodyRosterMode(override)) {
+    writeCache(custodyRosterCache, clinicId, override);
+    return override;
+  }
+
+  const envDefault = process.env.AUTHORITY_CUSTODY_ROSTER_ENFORCE_V1;
+  const resolved: CustodyRosterEnforcementMode = isCustodyRosterMode(envDefault) ? envDefault : "off";
+  writeCache(custodyRosterCache, clinicId, resolved);
+  return resolved;
 }
 
 function isOproleMode(value: string | null | undefined): value is OproleEnforcementMode {
@@ -375,6 +438,7 @@ export async function resolveOproleEnforcementMode(
 // ---------------------------------------------------------------------------
 
 export function __resetEnforcementConfigCacheForTests(): void {
+  custodyRosterCache.clear();
   staleCache.clear();
   oproleCache.clear();
   taskAssignmentCache.clear();

@@ -88,7 +88,9 @@ function SkeletonRows({ rows }: { rows: number }) {
  * greeting, one card, and empty space. This dashboard externalizes clinic
  * context by composing the surfaces the earlier phases reconciled: the roster
  * shift hero, the equipment availability + not-verified split (same
- * `isInactive` predicate as the alert bell, Phase 2), the worst-first alert
+ * `isInactive` predicate as the alert bell, Phase 2 — now keyed on
+ * `lastVerifiedAt` rather than `lastSeen`, S5b, so the split counts actual
+ * verifications and a checkout no longer moves it), the worst-first alert
  * feed (shared `useAlertsController`, Phase 3), and room verification bars.
  * No new endpoints; every tile navigates to its full surface.
  */

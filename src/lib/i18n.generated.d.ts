@@ -357,6 +357,7 @@ export interface TStructure {
     noContainers: string;
     startSessionFailed: string;
     finishSessionFailed: string;
+    finishSessionNoItems: string;
     errorWithRequestId: string;
     departments: {
       hospital: string;

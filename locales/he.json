@@ -354,6 +354,7 @@
     "noContainers": "אין עגלות במערכת",
     "startSessionFailed": "לא ניתן להתחיל סשן מילוי — נסה שוב",
     "finishSessionFailed": "לא ניתן לסיים את המילוי — נסה שוב",
+    "finishSessionNoItems": "עדיין לא נספר דבר — ספור לפחות פריט אחד, או בטל את המילוי",
     "errorWithRequestId": "{message} (קוד תמיכה: {requestId})",
     "departments": {
       "hospital": "בית חולים",
