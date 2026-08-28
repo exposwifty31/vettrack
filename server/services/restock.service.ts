@@ -189,7 +189,6 @@ export async function startRestockSession(params: {
   return db.transaction(async (tx) => {
     const [container] = await tx
       .select()
-      // tenant-lint:scoped the where() below pins containers.clinicId to params.clinicId; the nearest-block heuristic reads only the NO_ITEMS_COUNTED guard
       .from(containers)
       .where(and(eq(containers.clinicId, params.clinicId), eq(containers.id, params.containerId)))
       .limit(1);
@@ -287,9 +286,8 @@ export async function scanItem(params: {
   // Resolve target PAR for this item from the blueprint
   const template = blueprintEntryForContainerName(
     (await db.select({ name: containers.name })
-      // tenant-lint:scoped the where() below pins containers.clinicId to params.clinicId; the nearest-block heuristic reads only the NO_ITEMS_COUNTED guard
       .from(containers)
-      .where(eq(containers.id, session.containerId))
+      .where(and(eq(containers.clinicId, params.clinicId), eq(containers.id, session.containerId)))
       .limit(1))[0]?.name ?? "",
   );
 
