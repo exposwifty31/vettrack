@@ -19,6 +19,8 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from "vitest";
 import type { Request, Response } from "express";
 
+import type { AuthUser, ResolveResult } from "../server/middleware/auth.js";
+
 const { dbResolves, getAuthMock, getUserMock } = vi.hoisted(() => ({
   dbResolves: [] as unknown[],
   getAuthMock: vi.fn(),
@@ -121,7 +123,7 @@ const USER_ROW = {
   deletedAt: null,
 };
 
-function makeReq(authUser?: Record<string, unknown>): Request {
+function makeReq(authUser?: AuthUser): Request {
   return {
     headers: {},
     socket: { remoteAddress: "127.0.0.1" },
@@ -150,7 +152,7 @@ function makeRes(): { res: Response; recorded: { statusCode: number; body: unkno
   return { res, recorded };
 }
 
-let resolveAuthUser: (req: Request) => Promise<{ ok: boolean; user?: Record<string, unknown> }>;
+let resolveAuthUser: (req: Request) => Promise<ResolveResult>;
 let meHandler: (req: Request, res: Response) => Promise<void> | void;
 
 const envBackup = {
@@ -177,7 +179,9 @@ beforeAll(async () => {
   };
   const layer = router.stack.find((l) => l.route?.path === "/me" && l.route?.methods.get);
   if (!layer?.route) throw new Error("GET /me handler not found in users router");
-  meHandler = layer.route.stack[layer.route.stack.length - 1]!.handle as typeof meHandler;
+  const lastLayer = layer.route.stack[layer.route.stack.length - 1];
+  if (!lastLayer) throw new Error("GET /me route has no handler layers");
+  meHandler = lastLayer.handle as typeof meHandler;
 }, 30000);
 
 afterAll(() => {
@@ -210,8 +214,21 @@ describe("A. resolveAuthUser — displayName reaches the AuthUser", () => {
     const result = await resolveAuthUser(makeReq());
 
     expect(result.ok).toBe(true);
-    expect(result.user!.name).toBe("Original Name");
-    expect(result.user!.displayName).toBe("Chosen Nickname");
+    if (!result.ok) throw new Error("unreachable — asserted ok above");
+    expect(result.user.name).toBe("Original Name");
+    expect(result.user.displayName).toBe("Chosen Nickname");
+  });
+
+  it("a soft-deleted row is refused: ACCESS_DENIED / ACCOUNT_DELETED, no user", async () => {
+    dbResolves.push([{ id: CLINIC_ID }]);
+    dbResolves.push([{ ...USER_ROW, deletedAt: new Date("2026-08-01T00:00:00.000Z") }]);
+
+    const result = await resolveAuthUser(makeReq());
+
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error("unreachable — asserted not-ok above");
+    expect(result.status).toBe(403);
+    expect(result.body).toMatchObject({ error: "ACCESS_DENIED", reason: "ACCOUNT_DELETED" });
   });
 });
 
@@ -220,6 +237,7 @@ describe("B. GET /api/users/me — payload carries displayName", () => {
     queueAuthReads();
     const resolved = await resolveAuthUser(makeReq());
     expect(resolved.ok).toBe(true);
+    if (!resolved.ok) throw new Error("unreachable — asserted ok above");
 
     // The /me profile SELECT (avatar + locale + eligibility).
     dbResolves.push([{ avatarUrl: null, preferredLocale: "he", seniorDoctorEligible: false }]);
