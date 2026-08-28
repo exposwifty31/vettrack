@@ -298,6 +298,9 @@ router.post("/:id/restore", requireAuth, requireAdmin, postEquipmentRestoreHandl
 // POST /api/equipment/scan — quick-scan alias for pilot/demo flows.
 // Body: { equipmentId: string }  (accepts plain string IDs like "eq1", not UUID-only)
 // Toggle semantics: available → checkout · held by caller → return · held by other → 409
+// D2 server half: a replayed offline scan (Idempotency-Key) must collapse to
+// its first outcome — /scan is TOGGLE semantics, so a blind duplicate flips
+// custody back. No header → pass-through (web callers unchanged).
 router.post("/scan", requireAuth, checkoutLimiter, requireEffectiveRole("student"), validateBody(quickScanBodySchema), equipmentReplayIdempotency(EQUIPMENT_REPLAY_IDEMPOTENCY_ENDPOINTS.quickScan), async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
   try {
