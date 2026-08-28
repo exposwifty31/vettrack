@@ -21,6 +21,7 @@
 
 import { getServerConfigValue } from "../../server-config.js";
 import type {
+  CustodyRosterEnforcementMode,
   OproleEnforcementMode,
   StaleEnforcementMode,
   TaskAssignmentEnforcementMode,
@@ -58,6 +59,9 @@ const staleTaskOwnershipCache = new Map<string, CacheEntry<StaleTaskOwnershipEnf
 // resolve independently per clinic. The cache TTL is shared with the other
 // families (10s), matching the rollback contract in master plan §11.
 const codeBlueManagerCache = new Map<string, CacheEntry<CodeBlueManagerEnforcementMode>>();
+// D1 — off-shift custody roster gate. Independent cache, same 10s TTL /
+// rollback contract as every other family.
+const custodyRosterCache = new Map<string, CacheEntry<CustodyRosterEnforcementMode>>();
 // Phase 4 PR 4.4b — drug/shock actor authority enforcement flag.
 // Independent cache, single sub-key per clinic (no endpoint sub-key — this
 // is per-route, not per-endpoint).
@@ -115,6 +119,42 @@ export function getStaleCeilingMs(operationalRole: string | null): number {
 
 function isStaleMode(value: string | null | undefined): value is StaleEnforcementMode {
   return value === "off" || value === "shadow" || value === "enforce";
+}
+
+function isCustodyRosterMode(value: string | null | undefined): value is CustodyRosterEnforcementMode {
+  return value === "off" || value === "shadow" || value === "enforce";
+}
+
+/**
+ * D1 — off-shift custody gate mode resolver.
+ * Chain: authority.custody_roster_enforce.<clinicId> →
+ * AUTHORITY_CUSTODY_ROSTER_ENFORCE_V1 → "off". Shadow first in production —
+ * the live Capacitor fleet must never hit a day-one hard 403.
+ */
+export async function resolveCustodyRosterEnforcementMode(
+  clinicId: string,
+): Promise<CustodyRosterEnforcementMode> {
+  const cached = readCache(custodyRosterCache, clinicId);
+  if (cached !== null) return cached;
+
+  let override: string | null = null;
+  try {
+    override = await getServerConfigValue(
+      clinicId,
+      `authority.custody_roster_enforce.${clinicId}`,
+    );
+  } catch {
+    override = null;
+  }
+  if (isCustodyRosterMode(override)) {
+    writeCache(custodyRosterCache, clinicId, override);
+    return override;
+  }
+
+  const envDefault = process.env.AUTHORITY_CUSTODY_ROSTER_ENFORCE_V1;
+  const resolved: CustodyRosterEnforcementMode = isCustodyRosterMode(envDefault) ? envDefault : "off";
+  writeCache(custodyRosterCache, clinicId, resolved);
+  return resolved;
 }
 
 function isOproleMode(value: string | null | undefined): value is OproleEnforcementMode {

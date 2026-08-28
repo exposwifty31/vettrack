@@ -35,6 +35,7 @@ import { EquipmentWaitlistError } from "../services/equipment-waitlist.service.j
 import { mountEquipmentWaitlistRoutes } from "./equipment-waitlist.js";
 import { EQUIPMENT_REPLAY_IDEMPOTENCY_ENDPOINTS } from "../lib/equipment-replay-idempotency.js";
 import { equipmentReplayIdempotency } from "../middleware/equipment-replay-idempotency.js";
+import { custodyRosterGate } from "../middleware/custody-roster-gate.js";
 import { apiError, mapCheckoutGateError, resolveRequestId } from "./equipment/equipment-route-utils.js";
 import { getCriticalEquipmentHandler } from "./equipment/handlers/get-critical-equipment.js";
 import { getDeletedEquipmentHandler } from "./equipment/handlers/get-deleted-equipment.js";
@@ -296,7 +297,7 @@ router.post("/:id/restore", requireAuth, requireAdmin, postEquipmentRestoreHandl
 // POST /api/equipment/scan — quick-scan alias for pilot/demo flows.
 // Body: { equipmentId: string }  (accepts plain string IDs like "eq1", not UUID-only)
 // Toggle semantics: available → checkout · held by caller → return · held by other → 409
-router.post("/scan", requireAuth, checkoutLimiter, requireEffectiveRole("student"), validateBody(quickScanBodySchema), equipmentReplayIdempotency(EQUIPMENT_REPLAY_IDEMPOTENCY_ENDPOINTS.quickScan), async (req, res) => {
+router.post("/scan", requireAuth, checkoutLimiter, requireEffectiveRole("student"), custodyRosterGate(), validateBody(quickScanBodySchema), equipmentReplayIdempotency(EQUIPMENT_REPLAY_IDEMPOTENCY_ENDPOINTS.quickScan), async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
   try {
     const clinicId = req.clinicId!;
@@ -384,6 +385,7 @@ router.post(
   requireAuth,
   checkoutLimiter,
   requireEffectiveRole("student"),
+  custodyRosterGate(),
   validateBody(equipmentToggleBodySchema),
   equipmentReplayIdempotency(EQUIPMENT_REPLAY_IDEMPOTENCY_ENDPOINTS.toggle),
   postEquipmentToggleHandler,
@@ -395,6 +397,7 @@ router.post(
   requireAuth,
   checkoutLimiter,
   requireEffectiveRole("student"),
+  custodyRosterGate(),
   validateBody(checkoutSchema),
   equipmentReplayIdempotency(EQUIPMENT_REPLAY_IDEMPOTENCY_ENDPOINTS.checkout),
   async (req, res) => {
@@ -628,6 +631,7 @@ router.post(
   requireAuth,
   checkoutLimiter,
   requireEffectiveRole("student"),
+  custodyRosterGate(),
   validateBody(equipmentReturnBodySchema),
   equipmentReplayIdempotency(EQUIPMENT_REPLAY_IDEMPOTENCY_ENDPOINTS.return),
   async (req, res) => {
