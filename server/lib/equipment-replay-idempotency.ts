@@ -34,6 +34,8 @@ export const EQUIPMENT_REPLAY_IDEMPOTENCY_ENDPOINTS = {
   update: "PATCH /api/equipment/:id",
   delete: "DELETE /api/equipment/:id",
   checkout: "POST /api/equipment/:id/checkout",
+  /** The body-identified quick toggle — the RN offline queue's replay target. */
+  quickScan: "POST /api/equipment/scan",
   return: "POST /api/equipment/:id/return",
   toggle: "POST /api/equipment/:id/toggle",
   seen: "POST /api/equipment/:id/seen",
