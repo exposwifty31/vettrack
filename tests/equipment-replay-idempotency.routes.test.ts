@@ -19,4 +19,14 @@ describe("equipment routes — replay idempotency wiring", () => {
     expect(routeSource).toContain("EQUIPMENT_REPLAY_IDEMPOTENCY_ENDPOINTS.update");
     expect(routeSource).toContain("EQUIPMENT_REPLAY_IDEMPOTENCY_ENDPOINTS.delete");
   });
+
+  it("mounts equipmentReplayIdempotency on the flat quick-scan alias", () => {
+    // POST /api/equipment/scan is a custody *toggle*, so an unguarded replay
+    // undoes the first checkout rather than repeating it. Match the middleware
+    // inside this route's own chain — a bare `toContain` would pass on a
+    // `quickScan` mention anywhere else in the file.
+    const quickScanChain =
+      /router\.post\(\s*"\/scan",[\s\S]{0,400}?EQUIPMENT_REPLAY_IDEMPOTENCY_ENDPOINTS\.quickScan/;
+    expect(quickScanChain.test(routeSource)).toBe(true);
+  });
 });
