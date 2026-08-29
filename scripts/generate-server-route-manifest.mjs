@@ -29,9 +29,30 @@ const ROOT = path.resolve(import.meta.dirname, "..");
 const METHODS = ["get", "post", "put", "patch", "delete"];
 
 const args = process.argv.slice(2);
+/**
+ * A flag that is present must carry a value. Returning `undefined` for a trailing
+ * flag would let `??` substitute a default *silently*, and both defaults here are
+ * dangerous: `--sha` would fall back to HEAD and stamp the manifest with a real,
+ * plausible-looking revision the operator did not ask for, and `--out` would write
+ * the default path while the intended file stays stale. The one guarantee this
+ * artifact sells is that `vettrackSha` describes the routes beside it — a silent
+ * substitution is precisely the thing it must not do.
+ *
+ * A value that itself looks like a flag is the same defect one step over
+ * (`--out --sha x` would take "--sha" as the output path), so it is refused too.
+ */
 const argOf = (flag) => {
   const i = args.indexOf(flag);
-  return i === -1 ? undefined : args[i + 1];
+  if (i === -1) return undefined;
+  const value = args[i + 1];
+  if (value === undefined || value.startsWith("--")) {
+    throw new Error(
+      `${flag} requires a value (got ${value === undefined ? "nothing" : `"${value}"`}). ` +
+        `Refusing to fall back to a default: that would silently produce a manifest ` +
+        `you did not ask for, which is the failure this generator exists to prevent.`,
+    );
+  }
+  return value;
 };
 const OUT = argOf("--out") ?? path.join(ROOT, "server-routes.manifest.json");
 
