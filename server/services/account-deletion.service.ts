@@ -214,12 +214,54 @@ async function cleanupClerkOrgsBeforeDeletion(clerkId: string): Promise<void> {
   }
 }
 
+/**
+ * B2 — explicitly delete the Clerk user's external accounts BEFORE the user.
+ *
+ * The RN app's Apple sign-in goes through Clerk (`oauth_apple`), so the Apple
+ * OAuth grant lives on the Clerk user as an external account — not in
+ * `vt_apple_oauth_tokens` (that table serves the Capacitor apple-link path,
+ * revoked directly above). Clerk documents that DELETING AN EXTERNAL ACCOUNT
+ * "also revokes all tokens related to the same OAuth grant"; user deletion
+ * removes the accounts but only this path is documented to revoke — so revoke
+ * deterministically, then delete the user (TN3194 ordering: revoke first).
+ * Best-effort per account, never fatal: the user deletion below proceeds
+ * regardless, and the `user.deleted` webhook keeps the systems consistent.
+ */
+export async function revokeClerkExternalAccounts(clerkId: string): Promise<number> {
+  if (!process.env.CLERK_SECRET_KEY?.trim()) return 0;
+  if (!clerkId.trim() || clerkId.startsWith("dev-")) return 0;
+  let revoked = 0;
+  try {
+    const clerkUser = await clerkClient.users.getUser(clerkId);
+    for (const account of clerkUser.externalAccounts ?? []) {
+      try {
+        await clerkClient.users.deleteUserExternalAccount({
+          userId: clerkId,
+          externalAccountId: account.id,
+        });
+        revoked += 1;
+      } catch (err) {
+        console.error("[account-deletion] external-account revoke failed (non-fatal)", {
+          externalAccountId: account.id,
+          err: err instanceof Error ? err.message : err,
+        });
+      }
+    }
+  } catch (err) {
+    console.error("[account-deletion] external-account listing failed (non-fatal)", {
+      err: err instanceof Error ? err.message : err,
+    });
+  }
+  return revoked;
+}
+
 /** Delete the Clerk user. Skipped in dev-bypass / when Clerk is not configured. */
 async function deleteClerkUser(clerkId: string): Promise<boolean> {
   if (!process.env.CLERK_SECRET_KEY?.trim()) return false;
   // Dev-bypass identities are synthetic and not present in Clerk.
   if (!clerkId.trim() || clerkId.startsWith("dev-")) return false;
   try {
+    await revokeClerkExternalAccounts(clerkId);
     await clerkClient.users.deleteUser(clerkId);
     return true;
   } catch (err) {
