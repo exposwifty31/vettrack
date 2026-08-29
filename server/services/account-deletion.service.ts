@@ -255,13 +255,23 @@ export async function revokeClerkExternalAccounts(clerkId: string): Promise<numb
   return revoked;
 }
 
-/** Delete the Clerk user. Skipped in dev-bypass / when Clerk is not configured. */
-async function deleteClerkUser(clerkId: string): Promise<boolean> {
+/** Revocation is additive: a stalled Clerk request must never block the
+ * user's Guideline 5.1.1(v) right to delete — after this bound, deletion
+ * proceeds and the still-pending revocation settles (or fails, observably)
+ * in the background. */
+const EXTERNAL_ACCOUNT_REVOCATION_TIMEOUT_MS = 8_000;
+
+/** Delete the Clerk user. Skipped in dev-bypass / when Clerk is not configured.
+ * Exported for tests (the planClerkOrgCleanup precedent). */
+export async function deleteClerkUser(clerkId: string): Promise<boolean> {
   if (!process.env.CLERK_SECRET_KEY?.trim()) return false;
   // Dev-bypass identities are synthetic and not present in Clerk.
   if (!clerkId.trim() || clerkId.startsWith("dev-")) return false;
   try {
-    await revokeClerkExternalAccounts(clerkId);
+    await Promise.race([
+      revokeClerkExternalAccounts(clerkId),
+      new Promise<void>((resolve) => setTimeout(resolve, EXTERNAL_ACCOUNT_REVOCATION_TIMEOUT_MS)),
+    ]);
     await clerkClient.users.deleteUser(clerkId);
     return true;
   } catch (err) {

@@ -15,6 +15,7 @@ import { readFileSync } from "node:fs";
 
 const getUser = vi.fn();
 const deleteUserExternalAccount = vi.fn();
+const deleteUser = vi.fn();
 vi.mock("@clerk/express", () => ({
   clerkClient: {
     users: {
@@ -24,11 +25,14 @@ vi.mock("@clerk/express", () => ({
       get deleteUserExternalAccount() {
         return deleteUserExternalAccount;
       },
+      get deleteUser() {
+        return deleteUser;
+      },
     },
   },
 }));
 
-import { revokeClerkExternalAccounts } from "../server/services/account-deletion.service.js";
+import { deleteClerkUser, revokeClerkExternalAccounts } from "../server/services/account-deletion.service.js";
 
 describe("revokeClerkExternalAccounts", () => {
   beforeEach(() => {
@@ -69,14 +73,43 @@ describe("revokeClerkExternalAccounts", () => {
   });
 });
 
-describe("deleteClerkUser calls the explicit revocation BEFORE deleting the user (source pin)", () => {
-  it("revokeClerkExternalAccounts precedes users.deleteUser in the function body", () => {
-    const source = readFileSync("server/services/account-deletion.service.ts", "utf8");
-    const body = source.slice(source.indexOf("async function deleteClerkUser"));
-    const revokeAt = body.indexOf("revokeClerkExternalAccounts(");
-    const deleteAt = body.indexOf("users.deleteUser(");
-    expect(revokeAt).toBeGreaterThan(-1);
-    expect(deleteAt).toBeGreaterThan(-1);
-    expect(revokeAt).toBeLessThan(deleteAt);
+describe("deleteClerkUser — revocation ordering and boundedness (review #269)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    process.env.CLERK_SECRET_KEY = "sk_test_x";
+  });
+
+  it("does not START user deletion until external-account revocation settles (runtime order)", async () => {
+    let releaseRevocation!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      releaseRevocation = resolve;
+    });
+    getUser.mockResolvedValue({ externalAccounts: [{ id: "eac_apple" }] });
+    deleteUserExternalAccount.mockImplementation(() => gate.then(() => ({})));
+    deleteUser.mockResolvedValue({});
+
+    const run = deleteClerkUser("user_1");
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(deleteUser).not.toHaveBeenCalled(); // revocation still pending
+
+    releaseRevocation();
+    await expect(run).resolves.toBe(true);
+    expect(deleteUser).toHaveBeenCalledWith("user_1");
+  });
+
+  it("a STALLED revocation cannot block the deletion — the timeout hands control back", async () => {
+    vi.useFakeTimers();
+    try {
+      getUser.mockImplementation(() => new Promise(() => undefined)); // never resolves
+      deleteUser.mockResolvedValue({});
+
+      const run = deleteClerkUser("user_1");
+      await vi.advanceTimersByTimeAsync(10_000);
+      await expect(run).resolves.toBe(true);
+      expect(deleteUser).toHaveBeenCalledWith("user_1");
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
