@@ -25,6 +25,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
 
+import { stripComments } from "./lib/strip-comments.mjs";
+
 const ROOT = path.resolve(import.meta.dirname, "..");
 const METHODS = ["get", "post", "put", "patch", "delete"];
 
@@ -64,7 +66,7 @@ if (!/^[0-9a-f]{40}$/.test(SHA)) {
   throw new Error(`--sha must be a 40-char lowercase sha, got: ${SHA}`);
 }
 
-const read = (p) => (fs.existsSync(p) ? fs.readFileSync(p, "utf8") : null);
+const read = (p) => (fs.existsSync(p) ? stripComments(fs.readFileSync(p, "utf8")) : null);
 
 /** `import x from "./y.js"` / `import { a, b as c } from "..."` -> alias -> absolute .ts path. */
 function importMap(file, source) {

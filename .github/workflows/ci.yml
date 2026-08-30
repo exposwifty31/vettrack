@@ -63,6 +63,21 @@ jobs:
       - name: 🔷 TypeScript (server)
         run: pnpm exec tsc --noEmit --project tsconfig.server-check.json --incremental --tsBuildInfoFile .cache/tsc-srv.tsbuildinfo
 
+      # The RN repo's endpoint-drift guard validates every /api path its client
+      # builds against a manifest generated from THIS route table. The generator
+      # fails when a module under server/routes/ declares an endpoint the walk
+      # cannot reach — i.e. when a route is registered by a form it does not know
+      # (two such forms already exist: `mountEquipmentWaitlistRoutes(router)` and
+      # `mountRfidRoutes(app, path, factory)`).
+      #
+      # Without this step that failure surfaces only when someone next regenerates
+      # the manifest, and until then the manifest silently UNDER-REPORTS — which
+      # would let the RN guard pass green over paths it never checked. Run here so
+      # the repo that owns the routes is the one that notices. Output is discarded;
+      # the exit code is the whole point.
+      - name: 🗺️ Server route manifest is still derivable
+        run: node scripts/generate-server-route-manifest.mjs --out "$RUNNER_TEMP/server-routes.manifest.json"
+
   # Frontend production build — pulled out of the old test job so it isn't repeated
   # once per test shard.
   build:
