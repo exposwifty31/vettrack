@@ -25,6 +25,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
 
+import { stripComments } from "./lib/strip-comments.mjs";
+
 const ROOT = path.resolve(import.meta.dirname, "..");
 const METHODS = ["get", "post", "put", "patch", "delete"];
 
@@ -62,81 +64,6 @@ function headSha() {
 const SHA = (argOf("--sha") ?? headSha()).toLowerCase();
 if (!/^[0-9a-f]{40}$/.test(SHA)) {
   throw new Error(`--sha must be a 40-char lowercase sha, got: ${SHA}`);
-}
-
-/**
- * Source with COMMENTS REMOVED, because the scanners below are regexes and a
- * regex cannot tell live code from a commented-out line. Found by trying to
- * prove the orphan invariant fires: commenting out `mountEquipmentWaitlistRoutes(router)`
- * left the walk still "reaching" the module through the text inside the comment,
- * so the check passed on a registration that no longer runs. Read the other way
- * round, that is worse than a false pass — a commented-out `app.use` would have
- * put a route in the manifest that the server does not serve, and the RN guard
- * would then have validated a client path against a phantom.
- *
- * Deliberately conservative: block comments, and whole-line comments only (a
- * trimmed line starting `//` or a JSDoc `*` continuation). A trailing `// note`
- * after live code is left alone, since the live half is what registers, and this
- * way no `//` inside a string literal is ever touched.
- */
-/**
- * Source with comments removed, by a single-pass scanner rather than regexes.
- *
- * Regex layering does not survive this file set, and both failures were silent:
- *
- *   - blocks-then-lines: a LINE comment may legally contain `/*`
- *     (`server/app/routes.ts` says "copilot nested routes (/:id/copilot/…)"),
- *     which opened a block that swallowed every `app.use` below it — 57 mounts
- *     became 15.
- *   - lines-then-blocks: dropping every line whose trim starts with `*` removes
- *     a JSDoc's CLOSING `*​/` while leaving its opening `/**`, so each docblock
- *     then ran on and ate the `router.get` beneath it — 292 routes became 287.
- *
- * Neither reported anything. A shorter manifest is exactly the outcome this
- * generator's orphan invariant exists to prevent, so the stripper has to be
- * correct rather than approximately correct: track strings (all three quote
- * forms, with escapes) so a delimiter inside one is never treated as syntax.
- */
-function stripComments(source) {
-  let out = "";
-  let i = 0;
-  const n = source.length;
-  while (i < n) {
-    const c = source[i];
-    const next = source[i + 1];
-    if (c === '"' || c === "'" || c === "`") {
-      const quote = c;
-      out += c;
-      i += 1;
-      while (i < n) {
-        if (source[i] === "\\") {
-          out += source.slice(i, i + 2);
-          i += 2;
-          continue;
-        }
-        out += source[i];
-        if (source[i] === quote) {
-          i += 1;
-          break;
-        }
-        i += 1;
-      }
-      continue;
-    }
-    if (c === "/" && next === "/") {
-      while (i < n && source[i] !== "\n") i += 1;
-      continue;
-    }
-    if (c === "/" && next === "*") {
-      i += 2;
-      while (i < n && !(source[i] === "*" && source[i + 1] === "/")) i += 1;
-      i += 2;
-      continue;
-    }
-    out += c;
-    i += 1;
-  }
-  return out;
 }
 
 const read = (p) => (fs.existsSync(p) ? stripComments(fs.readFileSync(p, "utf8")) : null);
