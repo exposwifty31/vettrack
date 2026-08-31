@@ -38,19 +38,30 @@ describe("Sentry ingest origins for CSP connect-src", () => {
     expect(origin).not.toContain("@");
   });
 
-  it("dedupes when the client and server DSNs share an org host", () => {
+  it("ignores SENTRY_DSN even when it matches — one source, not two", () => {
     expect(sentryIngestOrigins({ VITE_SENTRY_DSN: CLIENT, SENTRY_DSN: SERVER })).toEqual([
       "https://o4511187398950912.ingest.de.sentry.io",
     ]);
   });
 
-  it("returns both origins when they genuinely differ", () => {
+  /**
+   * The server's Sentry client posts from Node (`server/instrument.ts` reads
+   * SENTRY_DSN), and CSP governs the BROWSER only. Deriving from both would
+   * widen connect-src for a request the browser never makes — and because the
+   * two are normally the same host, the only case where including it changes
+   * the header at all is the case where it is wrong. Raised by review on #275.
+   */
+  it("does not widen connect-src to a server-only origin the browser never posts to", () => {
     const origins = sentryIngestOrigins({
       VITE_SENTRY_DSN: CLIENT,
       SENTRY_DSN: "https://k@o999.ingest.us.sentry.io/1",
     });
-    expect(origins).toContain("https://o4511187398950912.ingest.de.sentry.io");
-    expect(origins).toContain("https://o999.ingest.us.sentry.io");
+    expect(origins).toEqual(["https://o4511187398950912.ingest.de.sentry.io"]);
+    expect(origins).not.toContain("https://o999.ingest.us.sentry.io");
+  });
+
+  it("allows nothing when only the server DSN is set", () => {
+    expect(sentryIngestOrigins({ SENTRY_DSN: SERVER })).toEqual([]);
   });
 
   it("allows nothing when no DSN is configured — no needless CSP allowance", () => {

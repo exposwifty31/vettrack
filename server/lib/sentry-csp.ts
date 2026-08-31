@@ -14,18 +14,21 @@
 export function sentryIngestOrigins(env: NodeJS.ProcessEnv = process.env): string[] {
   const origins = new Set<string>();
 
-  // VITE_SENTRY_DSN is the browser's; SENTRY_DSN is the server's. Only the
-  // browser is subject to CSP, but both are included because they are normally
-  // the same host and a mismatch is worth allowing rather than debugging.
-  for (const dsn of [env.VITE_SENTRY_DSN, env.SENTRY_DSN]) {
-    if (!dsn) continue;
+  // ONLY the browser's DSN. server/instrument.ts sends from Node using
+  // SENTRY_DSN, and CSP does not govern that — so adding its origin here would
+  // widen the browser's allowlist for a request the browser never makes. The
+  // two are normally the same host, where including it is a no-op; the only
+  // case where it changes the header is the case where it is wrong.
+  const dsn = env.VITE_SENTRY_DSN;
+  if (dsn) {
     try {
       origins.add(new URL(dsn).origin);
     } catch {
       // A malformed DSN cannot yield an origin, and refusing to boot over it
       // would take the whole app down for a telemetry misconfiguration.
-      // Sentry.init rejects the same value just as visibly.
-      console.warn("[csp] ignoring malformed Sentry DSN; its origin is not in connect-src");
+      // Sentry.init rejects the same value just as visibly. The value itself is
+      // deliberately not logged — a DSN carries its public key.
+      console.warn("[csp] VITE_SENTRY_DSN is malformed; its origin is not in connect-src");
     }
   }
 
