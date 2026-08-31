@@ -28,55 +28,77 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { EventEmitter } from "node:events";
 import { createServer, type Server as HttpServer } from "node:http";
+import type { Redis } from "ioredis";
 import { initCollabServer } from "../server/lib/realtime-collab/server.js";
 
 const COLD_COMMAND_ERROR = "Stream isn't writeable and enableOfflineQueue options is false";
 
-type FakeSub = EventEmitter & {
-  status: string;
+/**
+ * Exactly the ioredis surface this code path touches — `status` and the event
+ * methods `waitUntilReady` reads, the two commands `RedisAdapter`'s constructor
+ * issues, and what `teardown()` calls — typed against the REAL `Redis`.
+ *
+ * Typing it this way is the point: a double declared `as never` compiles against
+ * anything, so an ioredis or adapter signature change would leave this suite
+ * green while the integration it claims to pin had already broken.
+ */
+type AdapterFacingRedis = Pick<Redis, "status" | "psubscribe" | "subscribe" | "quit" | "disconnect"> &
+  Pick<EventEmitter, "on" | "off" | "emit">;
+
+type FakeSub = AdapterFacingRedis & {
   /** The client's status at the moment the adapter issued its first command. */
   statusAtFirstCommand: string | null;
-  psubscribe(pattern: string): Promise<string>;
-  subscribe(channels: string[]): Promise<string>;
-  quit(): Promise<string>;
-  disconnect(): void;
 };
+
+type FakePub = Pick<Redis, "status" | "duplicate" | "quit"> & Pick<EventEmitter, "on" | "off" | "emit">;
+
+/**
+ * ONE boundary cast, isolated and explained. `getRedisClient` is typed
+ * `() => Promise<Redis | null>`, and no partial double can satisfy ioredis's full
+ * class surface (private fields included). Everything the code under test
+ * actually touches is checked above by `AdapterFacingRedis` / `FakePub`; this
+ * only widens that checked surface to the nominal type at the injection point.
+ */
+function asRedisClient(client: FakePub): Redis {
+  return client as unknown as Redis;
+}
 
 /**
  * An ioredis-shaped subscriber that behaves like the real one under
  * `enableOfflineQueue: false`: commands issued before `ready` reject, commands
  * issued after it resolve. Deliberately has no `pSubscribe` (capital S) so
  * `createAdapter` takes its ioredis branch, not its node-redis v4 branch.
+ *
+ * The `: FakeSub` return annotation is load-bearing — it is what makes TypeScript
+ * check this literal member-by-member against the real `Redis` declarations.
  */
 function createFakeSub(): FakeSub {
-  const sub = new EventEmitter() as FakeSub;
-  sub.status = "connecting";
-  sub.statusAtFirstCommand = null;
-  const issue = (): Promise<string> => {
+  const sub = Object.assign(new EventEmitter(), {
+    status: "connecting" as Redis["status"],
+    statusAtFirstCommand: null as string | null,
+    psubscribe: () => issue(),
+    subscribe: () => issue(),
+    quit: async () => "OK" as const,
+    disconnect: () => {},
+  });
+  function issue(): Promise<"OK"> {
     sub.statusAtFirstCommand ??= sub.status;
     return sub.status === "ready"
-      ? Promise.resolve("OK")
+      ? Promise.resolve("OK" as const)
       : Promise.reject(new Error(COLD_COMMAND_ERROR));
-  };
-  sub.psubscribe = issue;
-  sub.subscribe = issue;
-  sub.quit = async () => "OK";
-  sub.disconnect = () => {};
+  }
   return sub;
 }
 
-function createFakePub(sub: FakeSub): EventEmitter {
-  const pub = new EventEmitter() as EventEmitter & {
-    status: string;
-    duplicate(): FakeSub;
-    quit(): Promise<string>;
-  };
-  pub.status = "ready";
-  // `duplicate()` copies OPTIONS, never listeners or connection state — which is
-  // the whole reason the returned client is cold.
-  pub.duplicate = () => sub;
-  pub.quit = async () => "OK";
-  return pub;
+function createFakePub(sub: FakeSub): FakePub {
+  return Object.assign(new EventEmitter(), {
+    status: "ready" as Redis["status"],
+    // `duplicate()` copies OPTIONS, never listeners or connection state — which is
+    // the whole reason the returned client is cold. Its declared return is the
+    // nominal `Redis`; the double itself is structurally checked as `FakeSub`.
+    duplicate: () => sub as unknown as Redis,
+    quit: async () => "OK" as const,
+  });
 }
 
 /** Node delivers `unhandledRejection` at the end of a turn, not synchronously. */
@@ -108,7 +130,7 @@ describe("R-RTC-1.7 — the Redis adapter's ASYNC failure must be non-fatal too 
     }, 10);
 
     const collab = await initCollabServer(httpServer, {
-      getRedisClient: async () => pub as never,
+      getRedisClient: async () => asRedisClient(pub),
       recordAccess: async () => true,
     });
 
@@ -131,7 +153,7 @@ describe("R-RTC-1.7 — the Redis adapter's ASYNC failure must be non-fatal too 
       }, 10);
 
       const collab = await initCollabServer(httpServer, {
-        getRedisClient: async () => pub as never,
+        getRedisClient: async () => asRedisClient(pub),
         recordAccess: async () => true,
       });
       await settleEventLoop();
@@ -150,7 +172,7 @@ describe("R-RTC-1.7 — the Redis adapter's ASYNC failure must be non-fatal too 
     setTimeout(() => sub.emit("error", new Error("ECONNREFUSED")), 10);
 
     const collab = await initCollabServer(httpServer, {
-      getRedisClient: async () => pub as never,
+      getRedisClient: async () => asRedisClient(pub),
       recordAccess: async () => true,
     });
 
