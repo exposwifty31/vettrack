@@ -81,6 +81,13 @@ function createFakeSub(): FakeSub {
     quit: async () => "OK" as const,
     disconnect: () => {},
   });
+  /**
+   * One command, behaving as ioredis does under `enableOfflineQueue: false`:
+   * resolve once the socket is writable, reject before that instead of queueing.
+   * Records the status at the FIRST command, which is the assertion that
+   * distinguishes an adapter built on a ready client from one built on a cold
+   * one — the whole point of this suite.
+   */
   function issue(): Promise<"OK"> {
     sub.statusAtFirstCommand ??= sub.status;
     return sub.status === "ready"
@@ -90,6 +97,12 @@ function createFakeSub(): FakeSub {
   return sub;
 }
 
+/**
+ * The publisher side: already connected, and its `duplicate()` hands back the
+ * cold subscriber above — the production shape, where the shared client is live
+ * and only the duplicate has to catch up. The `: FakePub` return annotation is
+ * what makes TypeScript check this literal against the real `Redis` members.
+ */
 function createFakePub(sub: FakeSub): FakePub {
   return Object.assign(new EventEmitter(), {
     status: "ready" as Redis["status"],
