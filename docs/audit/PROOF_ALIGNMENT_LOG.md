@@ -11221,3 +11221,15 @@ by branch name, never by `#`, until the day it lands.
 - Command: `pnpm typecheck` → exit 0. `pnpm architecture:gates` → `All G1 checks passed`, `All claims accounted for`.
 
 **Verdict:** VERIFIED
+
+## 2026-08-31 — the VITE_* build-arg guard now checks the ENV's position too (review round 1)
+
+**Claim:** The guard added earlier today asserted that each `ARG` precedes the `pnpm build` RUN, but checked the matching `ENV` only for existence, not position. A reviewer flagged it; the gap was real and is closed.
+
+**Evidence:**
+- Reproduced the gap before changing anything: moving `ENV VITE_SENTRY_DSN=$VITE_SENTRY_DSN` below the `pnpm build` RUN while leaving the `ARG` above it left `tests/dockerfile-vite-build-args.test.ts` at 5 passed / 5 — the guard did not notice.
+- After adding `envLine()` and asserting both halves precede the build, that same mutation fails: `expected [ 'ENV VITE_SENTRY_DSN' ] to deeply equal []` and `ENV sits below the build: expected 33 to be less than 30`. Restored → 5 passed / 5.
+- The reviewer's stated consequence — that the split state would disable crash reporting — is NOT confirmed here, and the fix does not rest on it: a bare `ARG` is documented to reach `RUN` in the same stage, so the build would likely still see the value. I could not test that empirically: the `docker` binary is present in this container but no daemon is (`docker images` → `failed to connect to the docker API at unix:///var/run/docker.sock`). The assertion is justified by the Dockerfile's own ARG/ENV pairing convention rather than by that claim.
+- Command: `pnpm typecheck` → exit 0. `pnpm architecture:gates` → `All G1 checks passed`, `All claims accounted for`.
+
+**Verdict:** VERIFIED

@@ -71,8 +71,9 @@ function referencedViteVars(): Set<string> {
 
 const argLine = (name: string): number =>
   DOCKERFILE_LINES.findIndex((l) => new RegExp(`^ARG\\s+${name}(\\s|=|$)`).test(l.trim()));
-const hasEnv = (name: string): boolean =>
-  DOCKERFILE_LINES.some((l) => new RegExp(`^ENV\\s+${name}=`).test(l.trim()));
+const envLine = (name: string): number =>
+  DOCKERFILE_LINES.findIndex((l) => new RegExp(`^ENV\\s+${name}=`).test(l.trim()));
+const hasEnv = (name: string): boolean => envLine(name) !== -1;
 /**
  * The line that RUNS `pnpm build` — an ARG declared after it is declared too late.
  * Anchored to `RUN` on purpose: a comment mentioning `pnpm build` is prose, and
@@ -98,13 +99,23 @@ describe("Dockerfile passes every client-read VITE_* into the build", () => {
     expect(unpaired, "ARG declared without a matching ENV line").toEqual([]);
   });
 
-  it("declares every ARG before the line that runs pnpm build", () => {
+  it("declares every ARG *and* its ENV before the line that runs pnpm build", () => {
+    // Both halves, not just the ARG. An ENV left below the build is nonsense the
+    // file should reject even though the ARG above would still feed `pnpm build`
+    // on its own — the pair is this Dockerfile's convention, and a split one
+    // reads as configured while only half of it is positioned to matter.
     const build = buildLine();
-    expect(build, "no `pnpm build` line found in the Dockerfile").toBeGreaterThan(-1);
+    expect(build, "no `RUN ... pnpm build` line found in the Dockerfile").toBeGreaterThan(-1);
     const tooLate = [...referencedViteVars()]
-      .filter((name) => argLine(name) !== -1 && argLine(name) > build)
+      .flatMap((name) => [
+        argLine(name) > build ? `ARG ${name}` : null,
+        envLine(name) > build ? `ENV ${name}` : null,
+      ])
+      .filter((entry): entry is string => entry !== null)
       .sort();
-    expect(tooLate, "ARG declared after pnpm build, so the build cannot see it").toEqual([]);
+    expect(tooLate, "declared after pnpm build, so it is not positioned to reach the build").toEqual(
+      [],
+    );
   });
 
   it("keeps the intentionally-unset list from rotting", () => {
@@ -125,7 +136,8 @@ describe("Dockerfile passes every client-read VITE_* into the build", () => {
     expect(argLine("VITE_SENTRY_DSN"), "no `ARG VITE_SENTRY_DSN` in the Dockerfile").toBeGreaterThan(
       -1,
     );
-    expect(hasEnv("VITE_SENTRY_DSN")).toBe(true);
+    expect(hasEnv("VITE_SENTRY_DSN"), "no matching ENV line").toBe(true);
     expect(argLine("VITE_SENTRY_DSN")).toBeLessThan(buildLine());
+    expect(envLine("VITE_SENTRY_DSN"), "ENV sits below the build").toBeLessThan(buildLine());
   });
 });
