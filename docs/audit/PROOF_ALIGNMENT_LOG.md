@@ -11203,3 +11203,21 @@ by branch name, never by `#`, until the day it lands.
 - Command: `pnpm typecheck` → exit 0. `pnpm architecture:gates` → `All G1 checks passed`, `All claims accounted for`.
 
 **Verdict:** VERIFIED
+
+## 2026-08-31 — VITE_SENTRY_DSN never reached the bundle: the Dockerfile did not declare it
+
+**Claim:** Setting `VITE_SENTRY_DSN` on the Railway service was necessary but not sufficient. `railway.json` selects the DOCKERFILE builder, and a Docker stage only sees variables it declares as `ARG`. The `Dockerfile` declared `VITE_CLERK_PUBLISHABLE_KEY` but not `VITE_SENTRY_DSN`, so `vite build` inlined `undefined`, the guard in `src/instrument.ts` was false, `Sentry.init` never ran, and the web app stayed crash-blind after the deploy that was supposed to fix it. Fixed by declaring the ARG/ENV pair, and guarded by a new test.
+
+**Evidence:**
+- `Dockerfile` — Read before the change: `ARG VITE_CLERK_PUBLISHABLE_KEY` + matching ENV, `ARG ALLOW_EQUIPMENT_PILOT_MODE`, `ARG VITE_PILOT_MODE`, then `RUN ... && pnpm build`. No `VITE_SENTRY_DSN` anywhere. Single-stage build.
+- `railway.json` — Read: `"builder": "DOCKERFILE"`, `"dockerfilePath": "Dockerfile"`.
+- `src/instrument.ts` — Read: `if (import.meta.env.VITE_SENTRY_DSN)` wraps the whole `Sentry.init` call, so an undefined value is a silent no-op with no build or runtime error.
+- Observed symptom (owner, browser network log on the live site): requests to vettrack.uk, clerk.vettrack.uk and cloudflareinsights.com, and **none** to the Sentry ingest host. Clerk working is the control — its VITE var IS declared as an ARG, four lines above the gap.
+- Cross-check of all six `VITE_*` names read by the client (`grep -rhoE "import\.meta\.env\.VITE_[A-Z0-9_]+" src/`): only `VITE_SENTRY_DSN` was set on the Railway service, consumed by the client, and absent from the Dockerfile. The digit in the character class matters — `[A-Z_]+` truncates `VITE_OFFLINE_PHASE9_POST_SYNC_RECONCILIATION` at the `9`, and an earlier pass of mine did exactly that.
+- RED: `npx vitest run tests/dockerfile-vite-build-args.test.ts` on the unfixed tree → 2 failed / 3 passed, with `expected [ 'VITE_SENTRY_DSN' ] to deeply equal []` and ``no `ARG VITE_SENTRY_DSN` in the Dockerfile: expected -1 to be greater than -1``.
+- GREEN after adding the ARG/ENV pair → 5 passed / 5.
+- Falsification, both probes reverted afterwards: deleting the ARG line → 2 failed (`expected [ 'VITE_SENTRY_DSN' ] to deeply equal []`); moving the ARG/ENV pair below the `pnpm build` RUN → 2 failed (`expected 32 to be less than 29`). Clean as written.
+- The guard's own first version was wrong and was fixed before landing: its `pnpm build` detector matched the explanatory comment added in the same change rather than the RUN instruction, reporting `expected 22 to be less than 19`. It is now anchored to `/^RUN\b/`.
+- Command: `pnpm typecheck` → exit 0. `pnpm architecture:gates` → `All G1 checks passed`, `All claims accounted for`.
+
+**Verdict:** VERIFIED
