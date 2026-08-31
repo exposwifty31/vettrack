@@ -15,6 +15,12 @@ COPY . .
 ARG VITE_CLERK_PUBLISHABLE_KEY
 ENV VITE_CLERK_PUBLISHABLE_KEY=$VITE_CLERK_PUBLISHABLE_KEY
 
+# Read by src/instrument.ts, which gates Sentry.init on it. Vite inlines it at BUILD
+# time, so a value set only on the Railway service reaches the container but not this
+# stage — that is how the web app shipped crash-blind on 2026-08-31.
+ARG VITE_SENTRY_DSN
+ENV VITE_SENTRY_DSN=$VITE_SENTRY_DSN
+
 # Mainline image builds default to full platform. Pass ALLOW_EQUIPMENT_PILOT_MODE=true
 # and VITE_PILOT_MODE=true only for dedicated equipment-pilot images.
 ARG ALLOW_EQUIPMENT_PILOT_MODE=false
