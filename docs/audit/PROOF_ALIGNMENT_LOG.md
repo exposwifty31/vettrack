@@ -11168,3 +11168,23 @@ by branch name, never by `#`, until the day it lands.
 - Command: `pnpm i18n:check` → `✓ locales/en.json and locales/he.json are in deep key parity.`
 
 **Verdict:** VERIFIED
+
+## 2026-08-31 — Redis-adapter async failure is now non-fatal (NODE-Z) (claude/vettrack-rn-handover-j4i733)
+
+**Claim:** The R-RTC-1.7 non-fatal invariant did not hold for the Redis-adapter wiring's real (asynchronous) failure. `@socket.io/redis-adapter` issues `psubscribe`/`subscribe` inside its constructor and discards both promises; every client here carries `enableOfflineQueue: false`, so on the still-connecting client `redis.duplicate()` returns, ioredis rejects those commands. The rejections escape the synchronous `try/catch`, so `teardown()` never ran and `initCollabServer` returned `enabled: true` with a dead adapter. Fixed by waiting for the subscriber to be ready before constructing the adapter, and attaching the `error` listener `duplicate()` does not copy.
+
+**Evidence:**
+- Sentry NODE-Z (org `vettrack`, project `node`): 270 occurrences, first seen 2026-07-17T06:02:39Z, last seen 2026-08-31T02:12:11Z. Culprit `initCollabServer(lib.realtime-collab:server.ts)`; tags `mechanism: auto.node.onunhandledrejection`, `unhandledPromiseRejection: true`, `environment: production`. Event `app_start_time` 02:12:08.797Z vs occurrence 02:12:11.680Z — ~3s after boot.
+- `server/lib/redis.ts:122-123` — Read: `lazyConnect: false`, `enableOfflineQueue: false` on every client.
+- `node_modules/@socket.io/redis-adapter/dist/index.js:99-105` — Read: the ioredis branch calls `this.subClient.psubscribe(...)` and `this.subClient.subscribe([...])` with no `await` and no `.catch()`, then attaches `friendlyErrorHandler`.
+- `server/lib/realtime-collab/server.ts:422` — Read: the success path returns `enabled: true`, which the escaped rejection could not prevent. (It was line 364 when read on the pre-fix tree; the fix adds 58 lines above it.)
+- RED: `npx vitest run tests/collab-redis-adapter-async-nonfatal.test.ts` on the pre-fix tree → 3 failed / 3, with `AssertionError: expected 'connecting' to be 'ready'`, `expected [ …(4) ] to deeply equal []`, and `expected true to be false`; the run also printed two Unhandled Rejections whose frames match the production stack (`initCollabServer server/lib/realtime-collab/server.ts:148:12` → `Server.adapter` → `new RedisAdapter`).
+- GREEN: same command after the fix → 3 passed / 3, no unhandled rejections.
+- Regression: `npx vitest run tests/collab-emergency-isolation.test.ts tests/collab-integration.test.ts tests/collab-join-ack.test.ts tests/collab-ws-auth.test.ts tests/collab-dos-hardening.test.ts` → 5 files / 38 passed. The pre-existing synchronous-throw case (`duplicate()` that throws) still returns `REDIS_ADAPTER_FAILED`.
+- Command: `pnpm typecheck` → exit 0. `pnpm exec tsc --noEmit --project tsconfig.server-check.json` (the config CI uses) → exit 0.
+- Command: `pnpm verify:evidence` → `PASS typecheck`, `PASS i18n-parity`, `PASS depcruise`, `PASS tenant-scope`, "all declared gates passed".
+- Command: `pnpm verify:claims` → `1132 claims: 1105 verified, 24 registered, 3 attested, 2125 excluded by rule, 0 FAILED` / "All claims accounted for". (First run reported `git-unavailable`; that was this checkout being shallow — `git fetch --unshallow` then re-ran clean. Not a claim defect.)
+- Command: `pnpm exec vitest run` → 748 files passed, 4 failed; 6879 tests passed, 2 failed. All 17 failure causes in the log are `ECONNREFUSED 127.0.0.1:5432` (no Postgres in this container) in `equipment-quick-scan-idempotency`, `restock-finish-no-items-counted`, `shift-chat-broadcast-idempotency`, `support-ticket-idempotency`. Zero collab failures.
+- Railway (`get-service-config`, project VetTrack / production): the Redis service is `redis:8.2.1` on a Railway volume with `privateNetworkEndpoint: redis`, latest deployment SUCCESS since 2026-04-17; 24h metrics show 1441 samples, 17MB memory, 158MB disk. Redis is reachable — which is why this path is the connect race and not the handled `REDIS_REQUIRED` branch.
+
+**Verdict:** VERIFIED

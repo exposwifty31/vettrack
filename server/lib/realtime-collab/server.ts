@@ -78,6 +78,47 @@ export interface InitCollabOptions {
 }
 
 /**
+ * How long to let the Redis-adapter subscriber finish connecting. Matches the
+ * connect timeout the client itself was built with (`server/lib/redis.ts`), so
+ * this never outlives the connection attempt it is waiting on. A malformed
+ * override falls back rather than becoming `NaN`, which `setTimeout` treats as 0
+ * — that would disable the channel on every boot instead of waiting.
+ */
+const ADAPTER_SUB_READY_TIMEOUT_MS = (() => {
+  const configured = Number(process.env.REDIS_CONNECT_TIMEOUT_MS);
+  return Number.isFinite(configured) && configured > 0 ? configured : 5000;
+})();
+
+/**
+ * Resolve once `client` can accept commands; reject if it errors or never gets
+ * there. Needed because `@socket.io/redis-adapter` issues `psubscribe` and
+ * `subscribe` inside its CONSTRUCTOR and never awaits or catches either promise
+ * — see the call site below for why that is not merely untidy.
+ */
+function waitUntilReady(client: Redis, timeoutMs: number): Promise<void> {
+  if (client.status === "ready") return Promise.resolve();
+  return new Promise<void>((resolve, reject) => {
+    const settle = (err?: Error): void => {
+      clearTimeout(timer);
+      client.off("ready", onReady);
+      client.off("error", onError);
+      if (err) reject(err);
+      else resolve();
+    };
+    const onReady = (): void => settle();
+    const onError = (err: Error): void => settle(err);
+    const timer = setTimeout(
+      () => settle(new Error(`Redis adapter subscriber not ready within ${timeoutMs}ms`)),
+      timeoutMs,
+    );
+    // Never hold the process open on this timer alone.
+    timer.unref?.();
+    client.on("ready", onReady);
+    client.on("error", onError);
+  });
+}
+
+/**
  * Initialize the collaboration channel on `httpServer`. Always resolves — never
  * throws — so the caller can treat it as strictly additive.
  */
@@ -145,6 +186,23 @@ export async function initCollabServer(
         const { createAdapter } = await import("@socket.io/redis-adapter");
         const sub = redis.duplicate();
         adapterSub = sub;
+        // `duplicate()` copies OPTIONS, not listeners: the returned client starts
+        // with no 'error' handler of its own, and an ioredis 'error' event with no
+        // listener is an uncaught EventEmitter error — i.e. a process crash from
+        // the one channel this module's docblock promises can never cause one.
+        sub.on("error", (err) => {
+          console.error("[collab-ws] Redis adapter subscriber error (non-fatal)", {
+            message: err.message,
+          });
+        });
+        // The adapter's constructor issues `psubscribe` + `subscribe` IMMEDIATELY
+        // and discards both promises. Every client here is built with
+        // `enableOfflineQueue: false` (server/lib/redis.ts), so on a still-connecting
+        // subscriber ioredis REJECTS those commands instead of queueing them, and
+        // the rejections land on process.unhandledRejection — where the try/catch
+        // around this block cannot see them, leaving the channel reported `enabled`
+        // with a dead adapter. Sentry NODE-Z, 270 occurrences. Connect first.
+        await waitUntilReady(sub, ADAPTER_SUB_READY_TIMEOUT_MS);
         io.adapter(createAdapter(redis, sub));
       } else if (!allowsInProcessFallback()) {
         console.error(
