@@ -10,6 +10,26 @@
       "attestedAt": "2026-08-20",
       "staleAfterDays": 120,
       "reverifyWith": "RESUBMISSION_RUNBOOK.md#b-current-state-what-is-already-done"
+    },
+    {
+      "id": "play-alpha-aab-10301",
+      "claim": "versionCode 10301 (1.3.0) sits on the Play alpha track as a DRAFT release for uk.vettrack.app, so 'blocked until the first AAB is uploaded' is no longer why the App Signing certificate is unavailable. Re-verify with the authenticated gplay CLI: `gplay edits create --package uk.vettrack.app`, then `gplay tracks list --package uk.vettrack.app --edit <id>` — expect track 'alpha' carrying release 1.3.0 with versionCodes ['10301'].",
+      "target": "eas-store",
+      "evidence": "Play Developer API via the authenticated gplay CLI",
+      "attestedBy": "agent run 2026-08-31, credentials in ~/keys (not in this repo)",
+      "attestedAt": "2026-08-31",
+      "staleAfterDays": 60,
+      "reverifyWith": "TASKS.md"
+    },
+    {
+      "id": "gplay-exposes-no-signing-cert",
+      "claim": "The authenticated gplay CLI cannot read the Play App Signing certificate: no signing/cert command exists, and the sha256 returned by `gplay bundles list` is the digest of the uploaded AAB, not the certificate fingerprint. The SHA-256 for well-known-assetlinks.ts is therefore Console-only, owner-side. Re-verify with `gplay --help` and `gplay bundles --help`; this entry fails the day a certificate read is added, at which point the row becomes an agent step.",
+      "target": "eas-store",
+      "evidence": "gplay --help command surface; gplay bundles list output shape",
+      "attestedBy": "agent run 2026-08-31",
+      "attestedAt": "2026-08-31",
+      "staleAfterDays": 90,
+      "reverifyWith": "TASKS.md"
     }
   ]
 }
