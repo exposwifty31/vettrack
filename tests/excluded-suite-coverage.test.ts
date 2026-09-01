@@ -98,6 +98,12 @@ function suitesObject(relPath: string): Record<string, unknown> {
   } catch (cause) {
     throw new Error(`${relPath}: not valid JSON — ${(cause as Error).message}`);
   }
+  // Narrowed before the property read: `JSON.parse("null")` succeeds, and
+  // `null.suites` is a native TypeError naming no file — the exact failure this
+  // helper exists to replace (review finding on #281).
+  if (typeof parsed !== "object" || parsed === null) {
+    throw new Error(`${relPath}: expected a JSON object at the root`);
+  }
   const suites = (parsed as { suites?: unknown }).suites;
   if (typeof suites !== "object" || suites === null || Array.isArray(suites)) {
     throw new Error(`${relPath}: "suites" must be an object keyed by suite name`);

@@ -167,7 +167,7 @@ describe("readSuites", () => {
     return file;
   };
   afterEach(() => {
-    while (made.length) rmSync(made.pop() as string, { recursive: true, force: true });
+    for (const dir of made.splice(0)) rmSync(dir, { recursive: true, force: true });
   });
 
   it("reads a well-formed manifest", () => {
@@ -181,6 +181,11 @@ describe("readSuites", () => {
     // Malformed JSON throws inside JSON.parse, BEFORE the shape check — so
     // without a wrapper the error is a bare SyntaxError naming no file.
     ["a manifest that is not JSON at all", "{ not json"],
+    // `JSON.parse("null")` succeeds and returns null, so the property read below
+    // it throws a native TypeError before the file-specific message can run.
+    // Same class as the .test.ts reader — fixed in both, not only where the
+    // review pointed (review finding on #281).
+    ["a manifest whose JSON root is null", "null"],
   ])("refuses %s, naming the file it read", (_label, body) => {
     // Review finding on #281. Without this, a malformed manifest surfaces as a
     // TypeError inside .map() with no clue which file is wrong — and `{}` would

@@ -123,6 +123,11 @@ export function readSuites(file = SUITES_FILE) {
     // somewhere in CI. Rethrow with the path (review finding on #281).
     throw new Error(`${file}: not valid JSON — ${cause.message}`, { cause });
   }
+  // `JSON.parse("null")` succeeds and returns null, so reading `.suites` off it
+  // throws a native TypeError before the message below can name the file.
+  if (typeof parsed !== "object" || parsed === null) {
+    throw new Error(`${file}: expected a JSON object at the root`);
+  }
   const suites = parsed.suites;
   if (!Array.isArray(suites) || suites.some((s) => typeof s !== "string")) {
     throw new Error(`${file}: "suites" must be an array of file paths`);

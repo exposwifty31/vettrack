@@ -54,13 +54,14 @@ WHERE status = 'active';
     // 0, so "always attempt the restore" alone does not achieve what it looks
     // like it achieves.
     const purgeFixture = async () => {
-      let firstError;
-      for (const [sql, params] of [
+      let firstError: unknown;
+      const statements: Array<[string, string[]]> = [
         [`DELETE FROM vt_restock_sessions WHERE clinic_id = $1`, [clinicId]],
         [`DELETE FROM vt_containers WHERE clinic_id = $1`, [clinicId]],
         [`DELETE FROM vt_users WHERE clinic_id = $1`, [clinicId]],
         [`DELETE FROM vt_clinics WHERE id = $1`, [clinicId]],
-      ] as Array<[string, string[]]>) {
+      ];
+      for (const [sql, params] of statements) {
         try {
           await pool.query(sql, params);
         } catch (e) {
