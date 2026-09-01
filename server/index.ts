@@ -16,6 +16,7 @@ validateEnv();
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
+import { sentryIngestOrigins } from "./lib/sentry-csp.js";
 import compression from "compression";
 import xss from "xss";
 import { clerkMiddleware } from "@clerk/express";
@@ -146,6 +147,9 @@ app.use(
           "https://*.clerk.accounts.dev",
           "https://api.clerk.dev",
           "https://clerk.dev",
+          // Sentry posts every envelope to the DSN's origin. Without this the
+          // browser refuses the send and the SDK stays silent about it.
+          ...sentryIngestOrigins(),
           // Local dev tools (Vite HMR, loopback debug ingest). Omit in production.
           ...(isProduction
             ? []
