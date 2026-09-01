@@ -57,7 +57,7 @@
     {
       "kind": "path",
       "match": "server/schema/cases.ts",
-      "reason": "Case Spine spike prototype. The roadmap line that names it says 'Spike branch only' — it lives on the 2026-07-19 spike branch `worktree-agent-ad05bf556984d8f59`, 769 commits behind main as of 2026-09-01, and never landed. The declared artifact of task 0.2 is docs/plans/2.0/case-spine-spike-findings.md, which IS on main.",
+      "reason": "Case Spine spike prototype. The roadmap line that names it says 'Spike branch only' — it lives on the 2026-07-19 spike branch, 770 commits behind main as of 2026-09-01, and never landed. The declared artifact of task 0.2 is docs/plans/2.0/case-spine-spike-findings.md, which IS on main. The branch was machine-local when this entry was written; it is now on the remote as `spike/2.0-case-spine` (961378e55), so this exemption is auditable rather than unverifiable — re-verify the REMOTE tip, not the local object store — `git cat-file -e 961378e55:...` passes off any machine that still has the object, which is exactly the state this entry stopped describing. Run: git fetch --no-tags origin refs/heads/spike/2.0-case-spine:refs/remotes/origin/spike/2.0-case-spine && test \"$(git rev-parse origin/spike/2.0-case-spine)\" = \"$(git rev-parse 961378e55^{commit})\" && git cat-file -e origin/spike/2.0-case-spine:server/schema/cases.ts",
       "docs": [
         "docs/vettrack-2.0-roadmap.md"
       ]

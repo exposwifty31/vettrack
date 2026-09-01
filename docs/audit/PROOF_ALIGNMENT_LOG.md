@@ -11233,3 +11233,102 @@ by branch name, never by `#`, until the day it lands.
 - Command: `pnpm typecheck` → exit 0. `pnpm architecture:gates` → `All G1 checks passed`, `All claims accounted for`.
 
 **Verdict:** VERIFIED
+
+---
+
+## 2026-09-01 — the two 2.0 spikes are preserved remotely (append, not a rewrite)
+
+**Task:** exit condition 4 of the closure plan — "zero 2.0 code that exists only locally".
+
+**What the record above said, and why it is left standing:** the 2026-07-19 entry states that the
+spike commit was "**Not merged, not pushed**". That was accurate then and for the six weeks after,
+which is the point of an append-only log — the earlier line is evidence of a real state, not an
+error to correct. This entry appends what changed; it does not edit that one.
+
+**Evidence:**
+- Pushed 2026-09-01 under names that identify the work rather than a dead worktree hash:
+  `worktree-agent-ad05bf556984d8f59` → `spike/2.0-case-spine` (`961378e55`) and
+  `worktree-agent-a64779cdd0617e6ff` → `spike/2.0-shift-autopilot` (`951aa8f9e`).
+- Remote tips confirmed THROUGH the remote ref, not the local object store — the distinction
+  matters and was a review finding: `git cat-file -e 961378e55:server/schema/cases.ts` passes on
+  any machine that still holds the object, which is exactly the condition being retired.
+  `git fetch --no-tags origin refs/heads/spike/2.0-case-spine:refs/remotes/origin/spike/2.0-case-spine`
+  then `test "$(git rev-parse origin/spike/2.0-case-spine)" = "$(git rev-parse 961378e55^{commit})"`
+  → exit 0, and `git cat-file -e origin/spike/2.0-case-spine:server/schema/cases.ts` → exit 0.
+  Shown able to fail: the same comparison against `951aa8f9e` exits non-zero.
+- Unchanged, and deliberately so: both branches are **770 commits behind main** and neither is
+  merged or has a PR. `docs/plans/2.0/case-spine-spike-findings.md` §6 still reads "do not merge".
+  Preserved ≠ mergeable; the findings documents on main remain the declared artifacts of 0.2/0.3.
+- Command: `node scripts/verify-claims.mjs` → `1232 claims … 0 FAILED`, `All claims accounted for`.
+  `pnpm verify:evidence` → 4/4 PASS. `node scripts/ci/knip-unused-files.mjs` → 7, all frozen.
+
+**Verdict:** VERIFIED
+
+---
+
+## 2026-09-01 — CORRECTION to the entry above (append, per the append-only rule)
+
+**Task:** three review findings on the entry immediately above. It carried a **VERIFIED** verdict it
+had not earned. Recorded here rather than by editing that entry, which is the rule this log runs on.
+
+**What was wrong with it:**
+
+1. **`pnpm test` was never run.** The verdict rested on `verify-claims`, `verify:evidence` and
+   `knip:files` alone. "VERIFIED" without the test suite is the exact shape this log exists to stop.
+2. **Only ONE of the two spikes was actually verified.** The entry claims both are preserved, and
+   proves it for `spike/2.0-case-spine` only. `spike/2.0-shift-autopilot` was asserted, not checked.
+3. **The claim count came from a different tree.** It records `1232 claims`, which was the figure
+   BEFORE the sentence that named a bare sha was reworded — the reword changed what the scanner
+   counts. The tree that ships reports a different number.
+
+**Evidence — the three, run now:**
+- `pnpm test` → **`Test Files 777 passed (777)` · `Tests 7071 passed | 11 skipped (7082)`**, 64.74s.
+- `spike/2.0-shift-autopilot`, the half that was missing:
+  `git fetch --no-tags origin refs/heads/spike/2.0-shift-autopilot:refs/remotes/origin/spike/2.0-shift-autopilot`
+  then `test "$(git rev-parse origin/spike/2.0-shift-autopilot)" = "$(git rev-parse 951aa8f9e^{commit})"`
+  → exit 0, and `git cat-file -e origin/spike/2.0-shift-autopilot:server/workers/autopilotHandoverDraftWorker.ts`
+  → exit 0. Shown able to fail: the same comparison against the case-spine sha exits non-zero.
+- `node scripts/verify-claims.mjs`: the tree that carried the entry above reported **1234 claims,
+  0 FAILED**; with THIS correction appended it reports **`1236 claims: 1203 verified, 30 registered,
+  3 attested, 2366 excluded by rule, 0 FAILED`**. The `1232` in the entry above is not wrong about
+  its own tree — it is stale about this one, and all three numbers are kept so the difference is
+  legible. **Recording a count in this log CHANGES that count**, because the prose is itself scanned
+  for claims; a figure here is therefore always "as of the tree that did not yet contain this
+  sentence" unless it says otherwise. This line says otherwise: 1236 is the committed tree.
+
+**Verdict:** the entry above is **VERIFIED as corrected here** — its claim that both spikes are
+remotely preserved holds, and now both halves have been checked. Its own verdict line should be
+read together with this correction, not on its own.
+
+---
+
+## 2026-09-01 — "still no PR" was asserted in two documents and never queried
+
+**Task:** a review finding on the entry above. Both spike findings documents say the branches are
+still unmerged with **no PR opened**, and nothing in this log backed that half. The remote-tip
+checks proved preservation; they proved nothing about whether a pull request exists.
+
+Same shape as the `pnpm test` miss two entries up: a sentence carried by repetition rather than by a
+command. Recorded here so the claim is auditable instead of inherited.
+
+**Evidence — run for BOTH spikes, because they are a pair:**
+
+```text
+gh pr list --repo exposwifty31/vettrack --state all --head spike/2.0-case-spine       --json number --jq length   -> 0
+gh pr list --repo exposwifty31/vettrack --state all --head spike/2.0-shift-autopilot  --json number --jq length   -> 0
+```
+
+`--state all` on purpose: a closed or merged PR would still refute "no PR opened", and the default
+`--state open` would hide exactly that case.
+
+**Positive control**, because a query that returns 0 for everything proves nothing — the same
+command against a branch that DOES have one:
+
+```text
+gh pr list --repo exposwifty31/vettrack --state all --head docs/spikes-pushed-to-remote --json number --jq length   -> 1
+```
+
+So the 0s are the query working, not the query failing.
+
+**Verdict:** VERIFIED — no pull request has ever existed for either spike branch, and both remain
+unmerged and 770 commits behind `main`, exactly as both findings documents state.

@@ -168,6 +168,9 @@ actual worktree** (not taken on trust — a separate reviewer agent re-ran every
 (`spike(2.0): Case Spine physical×clinical join + offline reconcile (task 0.2)`), branched from
 `a428cba42`. Built in an isolated git worktree under the repo-local
 `.claude/worktrees/agent-ad05bf556984d8f59` (absolute machine path elided — environment-specific).
-Not pushed, no PR opened. This branch is
+~~Not pushed, no PR opened~~ — true **as of 2026-07-19, when this was written**, and it stayed
+true for six weeks. Verified and CHANGED 2026-09-01: the branch was pushed as
+`spike/2.0-case-spine` and `origin/spike/2.0-case-spine` resolves to `961378e55`. Still no PR, and
+still unmerged — the "do not merge" heading above is unchanged. This branch is
 a learning artifact only — Task 1.2 reads this findings document, it does not build on top of the spike
 branch's commits.
