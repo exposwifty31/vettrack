@@ -37,6 +37,8 @@ import path from "node:path";
 
 import { describe, expect, it } from "vitest";
 
+import { readSuites } from "../scripts/ci/db-script-tests.mjs";
+
 const ROOT = path.resolve(__dirname, "..");
 const read = (p: string) => readFileSync(path.join(ROOT, p), "utf8");
 
@@ -84,6 +86,25 @@ function expandGlob(entry: string): string[] {
   return walk(dir).filter((f) => /\.(test|integration\.test)\.(ts|tsx|js)$/.test(f));
 }
 
+/**
+ * `suites` from a keyed manifest, shape-checked. Unchecked, a missing key gives
+ * `Object.keys(undefined)` — a TypeError naming no file, from a test whose whole
+ * job is to say precisely which runner is wrong (review finding on #281).
+ */
+function suitesObject(relPath: string): Record<string, unknown> {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(read(relPath));
+  } catch (cause) {
+    throw new Error(`${relPath}: not valid JSON — ${(cause as Error).message}`);
+  }
+  const suites = (parsed as { suites?: unknown }).suites;
+  if (typeof suites !== "object" || suites === null || Array.isArray(suites)) {
+    throw new Error(`${relPath}: "suites" must be an object keyed by suite name`);
+  }
+  return suites as Record<string, unknown>;
+}
+
 /** name → the files it runs. */
 function runners(): Record<string, string[]> {
   const out: Record<string, string[]> = {
@@ -97,11 +118,16 @@ function runners(): Record<string, string[]> {
       arrayBlock(read("vitest.rls-pooling.config.ts"), "include"),
     ),
     "test:live-server": Object.keys(
-      JSON.parse(read("scripts/ci/live-server-assertion-floors.json")).suites,
+      suitesObject("scripts/ci/live-server-assertion-floors.json"),
     ).map((n) => `tests/${n}.test.js`),
   };
-  if (existsSync(path.join(ROOT, "scripts/ci/db-script-suites.json"))) {
-    out["test:db-scripts"] = JSON.parse(read("scripts/ci/db-script-suites.json")).suites;
+  const dbScripts = path.join(ROOT, "scripts/ci/db-script-suites.json");
+  if (existsSync(dbScripts)) {
+    // The runner's own reader, not a second unchecked JSON.parse here — it
+    // already validates the shape and names the file (review finding on #281).
+    // Two readers of one manifest that disagree about what is valid is the
+    // drift this file exists to prevent.
+    out["test:db-scripts"] = readSuites(dbScripts);
   }
   return out;
 }
