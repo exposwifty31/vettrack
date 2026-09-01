@@ -11299,3 +11299,36 @@ had not earned. Recorded here rather than by editing that entry, which is the ru
 **Verdict:** the entry above is **VERIFIED as corrected here** — its claim that both spikes are
 remotely preserved holds, and now both halves have been checked. Its own verdict line should be
 read together with this correction, not on its own.
+
+---
+
+## 2026-09-01 — "still no PR" was asserted in two documents and never queried
+
+**Task:** a review finding on the entry above. Both spike findings documents say the branches are
+still unmerged with **no PR opened**, and nothing in this log backed that half. The remote-tip
+checks proved preservation; they proved nothing about whether a pull request exists.
+
+Same shape as the `pnpm test` miss two entries up: a sentence carried by repetition rather than by a
+command. Recorded here so the claim is auditable instead of inherited.
+
+**Evidence — run for BOTH spikes, because they are a pair:**
+
+```
+gh pr list --repo exposwifty31/vettrack --state all --head spike/2.0-case-spine       --json number --jq length   -> 0
+gh pr list --repo exposwifty31/vettrack --state all --head spike/2.0-shift-autopilot  --json number --jq length   -> 0
+```
+
+`--state all` on purpose: a closed or merged PR would still refute "no PR opened", and the default
+`--state open` would hide exactly that case.
+
+**Positive control**, because a query that returns 0 for everything proves nothing — the same
+command against a branch that DOES have one:
+
+```
+gh pr list --repo exposwifty31/vettrack --state all --head docs/spikes-pushed-to-remote --json number --jq length   -> 1
+```
+
+So the 0s are the query working, not the query failing.
+
+**Verdict:** VERIFIED — no pull request has ever existed for either spike branch, and both remain
+unmerged and 770 commits behind `main`, exactly as both findings documents state.
