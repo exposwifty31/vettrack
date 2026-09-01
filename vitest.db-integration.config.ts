@@ -15,6 +15,19 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
  * now fails when any excluded suite has no runner, and when a runner is not
  * invoked by ci.yml.
  *
+ * NO SUITE RUNS UNDER TWO DIFFERENT CONFIGS. Two did until 2026-09-01 —
+ * equipment-operational-state and push-endpoint-cross-clinic, both also in
+ * vitest.integration.ops.config.ts. That was harmless only while
+ * `pnpm test:db-integration` was run by no workflow at all. The moment it ran,
+ * the duplication became an ordering hazard: this config sets
+ * `fileParallelism: false` against ONE database, so the 18 suites added
+ * alongside them — `dock-return-anchor` among them — write rows that the
+ * operational-metrics aggregates then read. CI failed exactly there
+ * (`dock_return_duration → averageDockReturnMs`, "received object"). Running a
+ * suite twice added no coverage and bought an order dependency, so those two
+ * are gone; `integration:ops` still owns them, which is what
+ * `tests/excluded-suite-coverage.test.ts` checks.
+ *
  * `.test.js` scripts under `tests/` are NOT vitest suites and cannot go here —
  * they declare no `describe`/`it` and run as standalone tsx programs. They are
  * covered by `scripts/ci/db-script-tests.mjs`.
@@ -30,10 +43,19 @@ export default defineConfig({
     environment: "node",
     setupFiles: ["./tests/vitest-setup.ts"],
     include: [
-      "tests/equipment-operational-state.integration.test.ts",
-      "tests/seed-reviewer-demo.integration.test.ts",
+      // Named by FILENAME through this same config, by the
+      // "🩺 Cross-repo contract suites (doctor gate + reviewer seed)" STEP of
+      // ci.yml's `integration-ops` job — NOT its "🔌 Integration ops suite"
+      // step, which runs `pnpm test:integration:ops` and names no files. The
+      // step before it, "🚦 Refuse a silent skip", is why both matter: it runs
+      // scripts/ci/db-integration-preflight.mjs so an unreachable DATABASE_URL
+      // cannot let them skip green.
+      //
+      // Verified 2026-09-01 that removing them from `include` breaks that step
+      // outright — vitest positional args FILTER the include set, so the command
+      // exits "No test files found, exiting with code 1". They stay.
       "tests/doctor-shift-gate.integration.test.ts",
-      "tests/push-endpoint-cross-clinic.integration.test.ts",
+      "tests/seed-reviewer-demo.integration.test.ts",
       "tests/push-subscription-race.integration.test.ts",
 
       // Added 2026-09-01 (#221 left these excluded with no runner). Measured

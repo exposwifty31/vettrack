@@ -11,10 +11,19 @@
   "ignore": [
     "android/**",
     "ios/**",
-    "src/design-system-entry.ts",
     "server/tests/**",
     "scripts/**",
     "tests/ui-smoke-*.ts",
-    "server/integrations/adapters/priza.ts"
+    "server/integrations/adapters/priza.ts",
+    ".agents/**",
+    ".claude/**",
+    "docs/**",
+    "load/**",
+    "public/**",
+    "tests/flow-walk/native/**"
+  ],
+  "entry": [
+    "src/design-system-entry.ts",
+    "tests/global.setup.ts"
   ]
 }

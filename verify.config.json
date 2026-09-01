@@ -51,7 +51,8 @@
     "docs/dev-signin-runbook.md",
     "docs/integrations-guide.md",
     "docs/engineering-rules-rollout.md",
-    "docs/vettrack-3.0-program.md"
+    "docs/vettrack-3.0-program.md",
+    "docs/vettrack-2.0-roadmap.md"
   ],
   "appendOnlyDocs": [
     "docs/audit/PROOF_ALIGNMENT_LOG.md"

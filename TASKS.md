@@ -218,6 +218,110 @@ _Agents: add out-of-scope items here rather than acting on them._
 - TASK-002: Add missing test coverage for restock service (`tests/restock.service.unit.test.ts`)
 - TASK-003: Hebrew translation parity sweep (use `pnpm i18n:check` / parity tests when touching locales)
 
+### Closure audit 2026-09-01 — what is NOT closed, and why
+
+Recorded so it is explicit rather than silent. The owner goal is "nothing planned that does
+not work, nothing built that is not wired properly"; these three are the residue.
+
+- ~~**TASK: `knip` is a dead-code detector that nothing reads, and its output is not yet
+  adjudicated.**~~ **CLOSED 2026-09-01.** The triage was the work, and the flag followed it.
+  The list was **125 unused files**; it is now **7**, and a blocking gate freezes those.
+  - **111 were never application code** — `.agents/**`, `.claude/**`, `docs/**` handoff
+    assets, `load/**`, `public/**`. Scoped out in `knip.json`.
+  - **3 were knip being wrong**, and the cause was the config: `AlertCard`,
+    `ShiftProgressHero` and `Sidebar` are reachable only through
+    `src/design-system-entry.ts`, which sat in `ignore` — so knip never traversed it and
+    called its dependents dead. Moving that one path from `ignore` to `entry` fixed all
+    three. The earlier note that "declaring `entry` is NOT the fix" was half right: knip
+    does report hand-written entries as redundant when its plugins already find them
+    (verified — the four vitest/playwright configs were, and were removed again), but the
+    two that remain are each load-bearing, measured one at a time: removing
+    `src/design-system-entry.ts` puts the count back to 11 and `tests/global.setup.ts` to 8.
+    A third attempt was WRONG and the tool said so: declaring
+    `tests/flow-walk/native/wdio.conf.ts` and `tests/flow-walk/native/native-walk.e2e.ts` as
+    entries made knip analyse them and report two WebdriverIO packages as unlisted
+    dependencies — correctly, because that directory is its own private package with its own
+    `tests/flow-walk/native/package.json` and `tests/flow-walk/native/package-lock.json`,
+    declaring those packages itself and "deliberately NOT part of the root install" in its
+    own description. It is `ignore`d now, which is what it always was.
+    (The claim gate made the same point about this very paragraph: naming those two packages
+    in backticks reads as a claim that THIS package.json declares them, which is the opposite
+    of what the sentence says. Hence the path citations.)
+  - **7 are genuine** — `shared/index.ts`, the five `src/infrastructure/*/index.ts` barrels
+    and `src/lib/query-keys/registry.ts`. Adjudicated against a real import graph
+    (dependency-cruiser with `tsPreCompilationDeps` + tsconfig paths), which is what the two
+    unreliable grep passes should have been.
+  - The gate: `pnpm knip:files` (`scripts/ci/knip-unused-files.mjs`) freezes those 7 in
+    `scripts/ci/knip-unused-files.baseline.json` and runs in `architecture-gates` **without**
+    `continue-on-error`. A new unreachable file fails; a baseline entry that gains a caller
+    also fails, so the freeze cannot outlive its reason. Proven red on both, plus on a third
+    case worth naming: a `knip.json` with an unrecognized key prints `ERROR: Invalid input`
+    and exits **2**, and the advisory step passed anyway — a config that analysed nothing
+    read as a clean run. The gate treats a non-zero knip exit as a failure.
+  - Still advisory, deliberately: **241 unused exports · 253 unused exported types.** A type
+    exported ahead of its consumer is a different judgement from a file nothing reaches, and
+    mixing them is how the report became unreadable. That remains open work. A review asked
+    for that step to be made blocking too; measured before answering — `pnpm knip` without
+    `--no-exit-code` exits 1 on those **494** pre-existing issues, so making it blocking
+    today fails every build on a backlog nobody has triaged. That is the "block on noise"
+    half of the dilemma this entry opened with, and it is why the blocking gate is a
+    separate, narrower step rather than a flag flipped on this one.
+
+- **TASK (new, SECURITY-ADJACENT, found while closing the one above): the tenant lint
+  cannot see a function that declares a return type — and 12 findings are hiding behind
+  that.** `scripts/architecture/tenant-query-lint.mjs` locates the enclosing scope with
+  header patterns that require `)` followed by `{`. A TypeScript signature with a return
+  type puts the annotation between them, so the function is invisible as a boundary and the
+  query is judged against whatever unrelated block happens to precede it. Measured on this
+  branch, not reasoned: the avatar lookup in `server/services/account-deletion.service.ts`
+  resolved to `constructor` at line 36 — a three-line error subclass.
+  Allowing an optional annotation in those two patterns moves the numbers a long way, and
+  in both directions:
+  - **202 → 148** findings; **51 baseline entries stop reproducing** — they were false
+    positives all along.
+  - **12 NEW findings appear that the blind pattern was hiding.** Among them
+    `server/routes/users.ts:128` and `:421`, `server/routes/analytics.ts:175`,
+    `server/services/equipment-location-inference.ts:60` and `:95`. Each needs reading
+    before it is called a defect or a false positive — that is the work, and it is the
+    reason the pattern was NOT changed in this PR: a security-adjacent reclassification of
+    ~200 findings does not belong in a change about dead-code reporting.
+  The one site this PR touched carries a `// tenant-lint:scoped` waiver instead, and the
+  waiver's own cost is measured rather than assumed: with it in place, replacing that
+  query's filter with an id-only one still passes the lint. A source-contract test in
+  `tests/account-deletion.service.test.ts` is what actually guards it, and reverting the
+  filter fails that test.
+  Two traps worth naming, both hit while writing that one-line waiver:
+  - the reason text originally contained the word for the tenant column, and the scope
+    check is a bare word match over the resolved body — so the prose SATISFIED the check
+    for a second, unrelated query in the same file, silently un-reporting a baseline entry.
+  - the same text contained `)` and `{` adjacently in an example, which MATCHED the header
+    pattern and created a fake scope marker inside a comment.
+  A waiver's prose is executable input to this tool. Keep it short and keep both out.
+
+- **TASK (new, found while closing the one above): the claim gate is blind to every
+  dot-directory.** `scripts/verify/claims.cjs` resolves globs without `dot: true`, so `**`
+  never matches `.agents/`, `.claude/` or `.github/` — a governed doc can claim a path under
+  any of them and the gate reports "glob matches nothing" whether the path exists or not.
+  Two such claims are registered in `docs/claims-registry.json` with the measurement that
+  proves them (`git ls-files .agents` → 10, `.claude` → 461). Not fixed here on purpose:
+  that engine is fingerprint-locked and byte-shared with the RN repo, so the fix is a
+  coordinated two-repo change with its own `engineFingerprint` bump, not a side effect of a
+  docs edit.
+
+- **TASK: the four ⏸ entries in the RN parity register carry reasons but no decision.**
+  D1 avatar upload (server ships `POST /api/uploads/avatar` and returns `avatarUrl`; RN's
+  `MeUser` has no such field — needs `expo-image-picker`, which invalidates the binaries
+  currently staged) · D4 iOS quick action (owner-gated) · G1 notification preferences
+  (**server-blocked**: no endpoint exists, and a naive toggle would silently disable Code
+  Blue — a documented refusal, not an omission) · H2 `ANDROID_PLAY_SIGNING_SHA256`
+  (Console-only certificate). None is code. Each needs a written owner decision before the
+  register can read 0 ⏸.
+
+- **TASK: `scripts/analysis/autopilot-backtest.ts` is a SYNTHETIC harness.**
+  `docs/vettrack-2.0-roadmap.md` marks it "never cite for real thresholds". It runs, so it
+  looks like evidence and is not. Either feed it real data or move it out of the evidence
+  path; until then no Autopilot threshold may be sourced from it.
+
 ### Ongoing
 
 - TASK: Investigate stale check-in sweep worker — confirm TTL sweep is running in production

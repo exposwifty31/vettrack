@@ -53,6 +53,54 @@
         "docs/audit/PROOF_ALIGNMENT_LOG.md"
       ],
       "reason": "another repository's history: 8455807 is a commit in VetTrack---RN-Migration-, cited in this log because it is the counter-example that made the all-decimal sha heuristic wrong (roughly one short sha in twenty-five is all digits). The cross-repo mechanism resolves PATHS by prefix and PULL REQUESTS by qualifier; it has no equivalent for a commit, so this is registered rather than silently reworded. Re-verify with: git -C ../VetTrack---RN-Migration- cat-file -e 8455807^{commit}"
+    },
+    {
+      "kind": "path",
+      "match": "server/schema/cases.ts",
+      "reason": "Case Spine spike prototype. The roadmap line that names it says 'Spike branch only' — it lives on the 2026-07-19 spike branch `worktree-agent-ad05bf556984d8f59`, 769 commits behind main as of 2026-09-01, and never landed. The declared artifact of task 0.2 is docs/plans/2.0/case-spine-spike-findings.md, which IS on main.",
+      "docs": [
+        "docs/vettrack-2.0-roadmap.md"
+      ]
+    },
+    {
+      "kind": "path",
+      "match": "docs/plans/2.0/task-1.2-case-spine.md",
+      "reason": "Planned artifact. The roadmap's task 1.2 Execute step instructs writing this file from the 0.1 spec + 0.2 findings; it has not been written. Delete this entry the moment it is — an exemption that would now verify on its own fails the gate.",
+      "docs": [
+        "docs/vettrack-2.0-roadmap.md"
+      ]
+    },
+    {
+      "kind": "path",
+      "match": "docs/plans/2.0/task-1.4-consumable-capture.md",
+      "reason": "Planned artifact, same shape as task-1.2-case-spine.md: the roadmap's Execute step instructs writing it. Delete this entry when the file lands.",
+      "docs": [
+        "docs/vettrack-2.0-roadmap.md"
+      ]
+    },
+    {
+      "kind": "dependency",
+      "match": "@capacitor/core",
+      "reason": "The roadmap's plugin-compatibility law cites 'Capacitor 3 uses 1.x plugins' as an example of an exception in the UPSTREAM ionic-team/capacitor-plugins compatibility table — a statement about that table, not about this repo's version. This repo is on @capacitor/core 8; the surrounding sentence tells the reader to pin against the version in package.json at bump time, precisely so the example is never read as our pin.",
+      "docs": [
+        "docs/vettrack-2.0-roadmap.md"
+      ]
+    },
+    {
+      "kind": "glob",
+      "match": ".agents/**",
+      "reason": "the claim is TRUE and the gate cannot see it: `scripts/verify/claims.cjs` resolves globs without `dot: true`, so `**` never matches a dot-prefixed directory. `.agents` exists and is TRACKED — `git ls-files .agents` returns 10 files, measured 2026-09-01 — and it is a live `ignore` entry in knip.json, one of the scopings that took knip's unused-file list from 125 to 7. Registered rather than reworded because the fix belongs in the engine, and that engine is fingerprint-locked and byte-shared with the RN repo, so changing it is a coordinated two-repo change and not a side effect of a docs edit. Re-verify with: git ls-files .agents | head -1",
+      "docs": [
+        "TASKS.md"
+      ]
+    },
+    {
+      "kind": "glob",
+      "match": ".claude/**",
+      "reason": "the claim is TRUE and the gate cannot see it: `scripts/verify/claims.cjs` resolves globs without `dot: true`, so `**` never matches a dot-prefixed directory. `.claude` exists and is TRACKED — `git ls-files .claude` returns 461 files, measured 2026-09-01 — and it is a live `ignore` entry in knip.json, one of the scopings that took knip's unused-file list from 125 to 7. Registered rather than reworded because the fix belongs in the engine, and that engine is fingerprint-locked and byte-shared with the RN repo, so changing it is a coordinated two-repo change and not a side effect of a docs edit. Re-verify with: git ls-files .claude | head -1",
+      "docs": [
+        "TASKS.md"
+      ]
     }
   ]
 }

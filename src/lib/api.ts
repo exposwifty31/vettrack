@@ -290,6 +290,18 @@ export interface DeleteAccountResult {
   appleRevocation: "revoked" | "failed" | "skipped";
   /** Whether the DB row was hard-deleted or kept as an anonymized tombstone. */
   dbOutcome: "hard_deleted" | "anonymized";
+  /**
+   * Whether the uploaded avatar OBJECT was removed from storage — not just its
+   * key from the row. `failed` means the object is orphaned and the audit row
+   * carries the key; the deletion itself still succeeded, because a bucket
+   * outage must not refuse a user's right to delete their account.
+   */
+  avatarObject: "deleted" | "skipped" | "failed";
+  /**
+   * Present ONLY when `avatarObject === "failed"` — the object key, so the
+   * orphan can be reconciled. The row that named it is gone by then.
+   */
+  avatarObjectKey?: string;
   clerkDeleted: boolean;
 }
 

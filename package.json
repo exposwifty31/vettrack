@@ -53,6 +53,7 @@
     "depcruise:check": "depcruise --config .dependency-cruiser.cjs --output-type err --ignore-known .dependency-cruiser-known-violations.json server src",
     "depcruise:baseline": "depcruise --config .dependency-cruiser.cjs --output-type baseline --output-to .dependency-cruiser-known-violations.json server src",
     "knip": "knip",
+    "knip:files": "node scripts/ci/knip-unused-files.mjs",
     "test:integration:ops": "vitest run --config vitest.integration.ops.config.ts",
     "test:db-integration": "vitest run --config vitest.db-integration.config.ts",
     "test:db-scripts": "node scripts/ci/db-script-tests.mjs",
