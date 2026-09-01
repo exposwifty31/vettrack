@@ -218,6 +218,39 @@ _Agents: add out-of-scope items here rather than acting on them._
 - TASK-002: Add missing test coverage for restock service (`tests/restock.service.unit.test.ts`)
 - TASK-003: Hebrew translation parity sweep (use `pnpm i18n:check` / parity tests when touching locales)
 
+### Closure audit 2026-09-01 — what is NOT closed, and why
+
+Recorded so it is explicit rather than silent. The owner goal is "nothing planned that does
+not work, nothing built that is not wired properly"; these three are the residue.
+
+- **TASK: `knip` is a dead-code detector that nothing reads, and its output is not yet
+  adjudicated.** `.github/workflows/ci.yml` runs it as `pnpm knip --no-exit-code`, so it
+  can never fail a build. Measured 2026-09-01: **117 unused files · 241 unused exports ·
+  253 unused exported types · 8 configuration hints.** Declaring `entry` is NOT the fix —
+  knip auto-detects `index.html`, `src/main.tsx`, `server/index.ts` and
+  `server/workers/notification.worker.ts` and reports hand-written entries as redundant;
+  adding them moved the count 121 → 117. **Whether the 117 are genuine is UNKNOWN.** Two
+  grep-based attempts to adjudicate a sample were both unreliable — matching on a file's
+  basename makes every `index.ts` look imported, and the second attempt matched any
+  directory of the same name. A path composed from a constant is invisible to a literal
+  grep, so neither run is evidence in either direction. Making the gate blocking before
+  the list is trustworthy would block on noise; leaving it `--no-exit-code` keeps a
+  detector nobody reads. Both are wrong, and the work is the triage, not the flag.
+
+- **TASK: the four ⏸ entries in the RN parity register carry reasons but no decision.**
+  D1 avatar upload (server ships `POST /api/uploads/avatar` and returns `avatarUrl`; RN's
+  `MeUser` has no such field — needs `expo-image-picker`, which invalidates the binaries
+  currently staged) · D4 iOS quick action (owner-gated) · G1 notification preferences
+  (**server-blocked**: no endpoint exists, and a naive toggle would silently disable Code
+  Blue — a documented refusal, not an omission) · H2 `ANDROID_PLAY_SIGNING_SHA256`
+  (Console-only certificate). None is code. Each needs a written owner decision before the
+  register can read 0 ⏸.
+
+- **TASK: `scripts/analysis/autopilot-backtest.ts` is a SYNTHETIC harness.**
+  `docs/vettrack-2.0-roadmap.md` marks it "never cite for real thresholds". It runs, so it
+  looks like evidence and is not. Either feed it real data or move it out of the evidence
+  path; until then no Autopilot threshold may be sourced from it.
+
 ### Ongoing
 
 - TASK: Investigate stale check-in sweep worker — confirm TTL sweep is running in production
