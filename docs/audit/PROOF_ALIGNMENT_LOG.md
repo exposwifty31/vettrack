@@ -11263,3 +11263,39 @@ error to correct. This entry appends what changed; it does not edit that one.
   `pnpm verify:evidence` → 4/4 PASS. `node scripts/ci/knip-unused-files.mjs` → 7, all frozen.
 
 **Verdict:** VERIFIED
+
+---
+
+## 2026-09-01 — CORRECTION to the entry above (append, per the append-only rule)
+
+**Task:** three review findings on the entry immediately above. It carried a **VERIFIED** verdict it
+had not earned. Recorded here rather than by editing that entry, which is the rule this log runs on.
+
+**What was wrong with it:**
+
+1. **`pnpm test` was never run.** The verdict rested on `verify-claims`, `verify:evidence` and
+   `knip:files` alone. "VERIFIED" without the test suite is the exact shape this log exists to stop.
+2. **Only ONE of the two spikes was actually verified.** The entry claims both are preserved, and
+   proves it for `spike/2.0-case-spine` only. `spike/2.0-shift-autopilot` was asserted, not checked.
+3. **The claim count came from a different tree.** It records `1232 claims`, which was the figure
+   BEFORE the sentence that named a bare sha was reworded — the reword changed what the scanner
+   counts. The tree that ships reports a different number.
+
+**Evidence — the three, run now:**
+- `pnpm test` → **`Test Files 777 passed (777)` · `Tests 7071 passed | 11 skipped (7082)`**, 64.74s.
+- `spike/2.0-shift-autopilot`, the half that was missing:
+  `git fetch --no-tags origin refs/heads/spike/2.0-shift-autopilot:refs/remotes/origin/spike/2.0-shift-autopilot`
+  then `test "$(git rev-parse origin/spike/2.0-shift-autopilot)" = "$(git rev-parse 951aa8f9e^{commit})"`
+  → exit 0, and `git cat-file -e origin/spike/2.0-shift-autopilot:server/workers/autopilotHandoverDraftWorker.ts`
+  → exit 0. Shown able to fail: the same comparison against the case-spine sha exits non-zero.
+- `node scripts/verify-claims.mjs`: the tree that carried the entry above reported **1234 claims,
+  0 FAILED**; with THIS correction appended it reports **`1236 claims: 1203 verified, 30 registered,
+  3 attested, 2366 excluded by rule, 0 FAILED`**. The `1232` in the entry above is not wrong about
+  its own tree — it is stale about this one, and all three numbers are kept so the difference is
+  legible. **Recording a count in this log CHANGES that count**, because the prose is itself scanned
+  for claims; a figure here is therefore always "as of the tree that did not yet contain this
+  sentence" unless it says otherwise. This line says otherwise: 1236 is the committed tree.
+
+**Verdict:** the entry above is **VERIFIED as corrected here** — its claim that both spikes are
+remotely preserved holds, and now both halves have been checked. Its own verdict line should be
+read together with this correction, not on its own.
