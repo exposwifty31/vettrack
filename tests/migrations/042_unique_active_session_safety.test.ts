@@ -44,6 +44,14 @@ WHERE status = 'active';
     try {
       await pool.query(`DROP INDEX IF EXISTS uniq_restock_session_active_container`);
 
+      // The clinic must exist before anything references it. Migration
+      // 065_core_table_fk_constraints.sql added `vt_users_clinic_id_fk`, so the
+      // user insert below — which this file has always made against a freshly
+      // generated clinic id — began failing with a foreign-key violation and the
+      // suite never reached its assertion. `id` is the only column without a
+      // default.
+      await pool.query(`INSERT INTO vt_clinics (id) VALUES ($1)`, [clinicId]);
+
       await pool.query(
         `INSERT INTO vt_users (id, clinic_id, clerk_id, email, name)
        VALUES ($1, $2, $3, $4, 'safety test')`,
@@ -78,6 +86,7 @@ WHERE status = 'active';
       await pool.query(`DELETE FROM vt_restock_sessions WHERE clinic_id = $1`, [clinicId]);
       await pool.query(`DELETE FROM vt_containers WHERE clinic_id = $1`, [clinicId]);
       await pool.query(`DELETE FROM vt_users WHERE clinic_id = $1`, [clinicId]);
+      await pool.query(`DELETE FROM vt_clinics WHERE id = $1`, [clinicId]);
 
       await pool.query(loadSafetyDoBlockFromMigration());
     } finally {
