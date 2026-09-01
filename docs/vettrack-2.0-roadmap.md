@@ -107,8 +107,8 @@ stack and is reference-only.
 | Task | Artifact | Lives on | Caveat carried forward |
 |---|---|---|---|
 | 0.1 | `docs/design/case-spine-allowlist.md` | **main** | — |
-| 0.2 | `docs/plans/2.0/case-spine-spike-findings.md` | **main** | Spike code is NOT preserved. It sat on a machine-local branch (`worktree-agent-ad05bf556984d8f59`, 2026-07-19) with no remote; re-checked 2026-09-01 it was **769 commits behind main** and would not apply. The findings document is the artifact, and it is on main. |
-| 0.3 | `docs/plans/2.0/autopilot-spike-findings.md` | **main** | Spike code is NOT preserved (`worktree-agent-a64779cdd0617e6ff`, 2026-07-19, machine-local, 769 commits behind as of 2026-09-01). It does not matter here: the production half **landed** — `server/routes/action-proposals.ts` and `server/workers/autopilotHandoverDraftWorker.ts` are on main under task 1.1. The findings document is the artifact. |
+| 0.2 | `docs/plans/2.0/case-spine-spike-findings.md` | **main** | **Spike code is now preserved — pushed 2026-09-01 as `spike/2.0-case-spine` (`961378e55`).** It read ~~"NOT preserved … machine-local branch (`worktree-agent-ad05bf556984d8f59`) with no remote"~~, which was true and was the point: one disk failure and it was gone. Still **770 commits behind main** and it would not apply as-is — preserved as a learning artifact, not a mergeable branch. The findings document remains the artifact, and it is on main. |
+| 0.3 | `docs/plans/2.0/autopilot-spike-findings.md` | **main** | **Spike code is now preserved — pushed 2026-09-01 as `spike/2.0-shift-autopilot` (`951aa8f9e`)**; it read ~~"NOT preserved … machine-local"~~ and is still 770 commits behind, so it is a learning artifact rather than a mergeable branch. It matters less here than for 0.2: the production half **landed** — `server/routes/action-proposals.ts` and `server/workers/autopilotHandoverDraftWorker.ts` are on main under task 1.1. The findings document is the artifact. |
 | 0.4 | `docs/design/autopilot-policy-layer.md` | **main** | — |
 | 0.5 | `docs/plans/2.0/autopilot-backtest.md` + `scripts/analysis/autopilot-backtest.ts` | **main** | **SYNTHETIC harness — never cite for real thresholds** |
 | 0.7 | code + `docs/capacitor-native-app.md` hygiene law | **main** | on-device residual → distribution program (H5) |
@@ -210,7 +210,9 @@ current versions, and branch-side PROOF_ALIGNMENT_LOG entries append to main's l
 
 ### Task 0.2 — `vt_cases` spike, one event path, offline-proven · **P0 · M · Opus 4.8** ⚠️
 - **Objective:** Prove the physical×clinical join + offline reconcile WITHOUT touching frozen surfaces.
-- **Files:** Spike branch only — prototype `server/schema/cases.ts`, one binding on the dispense path
+- **Files:** Spike branch only — prototype `server/schema/cases.ts`, one binding on the dispense path.
+  On the REMOTE since 2026-09-01 as `spike/2.0-case-spine`; "spike branch only" still means not
+  merged, but it no longer means not backed up
   (prefer dispense over Code Blue for the spike), additive Dexie store in `src/lib/offline-db.ts`.
 - **Execute:** (1) RED: failing vitest — creating a case + attaching a dispense event yields a queryable
   case timeline row; offline-queued attach reconciles after simulated reconnect. (2) Minimal `vt_cases`
