@@ -404,11 +404,16 @@ async function main() {
           .limit(1);
         assert(syringe);
 
-        await pool.query(
+        // rowCount asserted, not assumed (review finding on #281): an UPDATE
+        // that matches nothing leaves the container at its seeded quantity, and
+        // the scan below would then pass without the precondition this block
+        // exists to create — a green that proves nothing.
+        const seeded = await pool.query(
           `UPDATE vt_container_items SET quantity = $1, updated_at = NOW()
            WHERE clinic_id = $2 AND container_id = $3 AND item_id = $4`,
           [0, clinicId, containerId, syringe.id],
         );
+        assert.strictEqual(seeded.rowCount, 1, "expected the syringe row to be set to 0");
 
         // Should succeed: scanItem does not check containerItems.quantity
         const out = await scanItem({

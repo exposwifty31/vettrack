@@ -24,10 +24,18 @@
  * per-script check is deliberately preferred over a single upfront
  * DATABASE_URL probe: a probe can pass while an individual script still skips.
  *
- * Each script also ends with `✅ <name> passed`. Silence on exit 0 — a main()
- * that returned early, or an edited-away success line — is refused too, on the
- * same reasoning `scripts/ci/live-server-tests.mjs` refuses a suite that printed
- * no `Results:` line.
+ * Each script also ends with a `✅ … passed` line, and it must be the LAST
+ * non-empty line of the output. Silence on exit 0 — a main() that returned
+ * early, or an edited-away success line — is refused, on the same reasoning
+ * `scripts/ci/live-server-tests.mjs` refuses a suite that printed no `Results:`
+ * line; and a marker with chatter after it is refused too, so an incidental
+ * success line cannot stand in for the script's own verdict.
+ *
+ * The marker is deliberately NOT bound to the manifest name (review finding on
+ * #281). Measured across all eight: four print prose that names no file at all
+ * ("✅ push-native-tokens migration test passed"), so a name-bound match would
+ * refuse four passing suites. Last-line position is the invariant every one of
+ * them actually satisfies.
  *
  * The file list is `scripts/ci/db-script-suites.json`, asserted against
  * `vite.config.ts`'s exclude block by `tests/excluded-suite-coverage.test.ts`.
@@ -70,7 +78,16 @@ export function evaluateScript({ name, exitCode, stdout }) {
       ok: false,
       message:
         `${name}: exited 0 with no success marker. The script prints ` +
-        `"✅ <name> passed" when it completes; silence means it returned early.`,
+        `"✅ … passed" when it completes; silence means it returned early.`,
+    };
+  }
+  const lines = stdout.split("\n").filter((l) => l.trim() !== "");
+  if (!SUCCESS_MARKER.test(lines[lines.length - 1] ?? "")) {
+    return {
+      ok: false,
+      message:
+        `${name}: the success marker is not the last line. Something ran after ` +
+        `the script reported completion, so the marker is not its final verdict.`,
     };
   }
   return { ok: true, message: `${name}: passed` };
@@ -92,7 +109,16 @@ export function summarize(results) {
 }
 
 export function readSuites(file = SUITES_FILE) {
-  return JSON.parse(readFileSync(file, "utf8")).suites;
+  // Shape-checked rather than trusted (review finding on #281). A missing key
+  // yields `undefined` and a non-array yields something whose `.map` either
+  // throws deep inside main() or, worse, iterates characters — neither of which
+  // names the file that is actually wrong. An empty array is left to
+  // summarize(), which already refuses a run that executed nothing.
+  const suites = JSON.parse(readFileSync(file, "utf8")).suites;
+  if (!Array.isArray(suites) || suites.some((s) => typeof s !== "string")) {
+    throw new Error(`${file}: "suites" must be an array of file paths`);
+  }
+  return suites;
 }
 
 function main() {

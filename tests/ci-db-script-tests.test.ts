@@ -21,7 +21,11 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { evaluateScript, summarize } from "../scripts/ci/db-script-tests.mjs";
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
+
+import { evaluateScript, readSuites, summarize } from "../scripts/ci/db-script-tests.mjs";
 
 const NAME = "tests/migrations/damage-events.test.ts";
 
@@ -52,6 +56,43 @@ describe("evaluateScript", () => {
     const verdict = evaluateScript({ exitCode: 0, name: NAME, stdout: "" });
     expect(verdict.ok).toBe(false);
     expect(verdict.message).toMatch(/no success marker/i);
+  });
+
+  it("requires the marker on the LAST non-empty line, not merely somewhere in the output", () => {
+    // Review finding on #281: `✅ … passed` anywhere would accept an incidental
+    // line — a suite echoing another suite's summary, or a marker printed before
+    // a section that then failed quietly. Binding it to the manifest NAME was the
+    // suggested fix and would be wrong: four of the eight print prose with no
+    // filename at all ("✅ push-native-tokens migration test passed"). What IS
+    // true of all eight, measured: the marker is the last non-empty line.
+    const verdict = evaluateScript({
+      exitCode: 0,
+      name: NAME,
+      stdout: "✅ damage-events.test.ts passed\nand then some trailing chatter\n",
+    });
+    expect(verdict.ok).toBe(false);
+    expect(verdict.message).toMatch(/last line/i);
+  });
+
+  it("tolerates trailing blank lines around the marker", () => {
+    expect(
+      evaluateScript({
+        exitCode: 0,
+        name: NAME,
+        stdout: "work\n✅ damage-events.test.ts passed\n\n   \n",
+      }).ok,
+    ).toBe(true);
+  });
+
+  it("accepts a success line that names no file at all", () => {
+    // Four of the eight do exactly this. A name-bound marker would refuse them.
+    expect(
+      evaluateScript({
+        exitCode: 0,
+        name: "tests/migrations/push-native-tokens.test.ts",
+        stdout: "✅ push-native-tokens migration test passed\n",
+      }).ok,
+    ).toBe(true);
   });
 
   it("refuses a non-zero exit even when a success marker appears earlier", () => {
@@ -111,5 +152,30 @@ describe("summarize", () => {
     ]);
     expect(out).toMatchObject({ ok: false, failed: 1, total: 2 });
     expect(out.messages).toContain("b: skipped");
+  });
+});
+
+describe("readSuites", () => {
+  const fixture = (body: string) => {
+    const dir = mkdtempSync(path.join(tmpdir(), "db-script-suites-"));
+    const file = path.join(dir, "db-script-suites.json");
+    writeFileSync(file, body);
+    return file;
+  };
+
+  it("reads a well-formed manifest", () => {
+    expect(readSuites(fixture('{"suites":["tests/a.test.ts"]}'))).toEqual(["tests/a.test.ts"]);
+  });
+
+  it.each([
+    ["a missing suites key", "{}"],
+    ["a non-array suites value", '{"suites":"tests/a.test.ts"}'],
+    ["a non-string entry", '{"suites":["tests/a.test.ts",42]}'],
+  ])("refuses %s, naming the file it read", (_label, body) => {
+    // Review finding on #281. Without this, a malformed manifest surfaces as a
+    // TypeError inside .map() with no clue which file is wrong — and `{}` would
+    // yield undefined, which is a different failure from the empty-run refusal
+    // summarize() already covers.
+    expect(() => readSuites(fixture(body))).toThrow(/db-script-suites\.json/);
   });
 });

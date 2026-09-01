@@ -41,6 +41,14 @@ ON vt_restock_sessions (container_id)
 WHERE status = 'active';
 `;
 
+    // Children first — every FK in this graph is ON DELETE RESTRICT.
+    const purgeFixture = async () => {
+      await pool.query(`DELETE FROM vt_restock_sessions WHERE clinic_id = $1`, [clinicId]);
+      await pool.query(`DELETE FROM vt_containers WHERE clinic_id = $1`, [clinicId]);
+      await pool.query(`DELETE FROM vt_users WHERE clinic_id = $1`, [clinicId]);
+      await pool.query(`DELETE FROM vt_clinics WHERE id = $1`, [clinicId]);
+    };
+
     try {
       await pool.query(`DROP INDEX IF EXISTS uniq_restock_session_active_container`);
 
@@ -83,13 +91,17 @@ WHERE status = 'active';
       }
       assert(aborted, "expected duplicate-active safety check to raise Migration aborted");
 
-      await pool.query(`DELETE FROM vt_restock_sessions WHERE clinic_id = $1`, [clinicId]);
-      await pool.query(`DELETE FROM vt_containers WHERE clinic_id = $1`, [clinicId]);
-      await pool.query(`DELETE FROM vt_users WHERE clinic_id = $1`, [clinicId]);
-      await pool.query(`DELETE FROM vt_clinics WHERE id = $1`, [clinicId]);
+      // The re-run below asserts the safety block PASSES once the duplicates are
+      // gone, so the purge has to happen here on the success path. It also runs
+      // in `finally`, because an assertion above throwing would otherwise leave
+      // the clinic and its dependants in the database for every later suite in
+      // the same job (review finding on #281). DELETE is idempotent, so running
+      // it twice on the success path costs nothing.
+      await purgeFixture();
 
       await pool.query(loadSafetyDoBlockFromMigration());
     } finally {
+      await purgeFixture();
       await pool.query(restoreIndexSql);
     }
 
