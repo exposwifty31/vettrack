@@ -11313,7 +11313,7 @@ command. Recorded here so the claim is auditable instead of inherited.
 
 **Evidence — run for BOTH spikes, because they are a pair:**
 
-```
+```text
 gh pr list --repo exposwifty31/vettrack --state all --head spike/2.0-case-spine       --json number --jq length   -> 0
 gh pr list --repo exposwifty31/vettrack --state all --head spike/2.0-shift-autopilot  --json number --jq length   -> 0
 ```
@@ -11324,7 +11324,7 @@ gh pr list --repo exposwifty31/vettrack --state all --head spike/2.0-shift-autop
 **Positive control**, because a query that returns 0 for everything proves nothing — the same
 command against a branch that DOES have one:
 
-```
+```text
 gh pr list --repo exposwifty31/vettrack --state all --head docs/spikes-pushed-to-remote --json number --jq length   -> 1
 ```
 
