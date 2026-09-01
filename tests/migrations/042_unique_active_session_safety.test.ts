@@ -42,11 +42,32 @@ WHERE status = 'active';
 `;
 
     // Children first — every FK in this graph is ON DELETE RESTRICT.
+    //
+    // Each statement runs independently and the first error is rethrown at the
+    // end. That is not tidiness: `restoreIndexSql` is a UNIQUE index over ACTIVE
+    // sessions, and this test deliberately creates two of them for one
+    // container. If the sessions DELETE is skipped, the restore cannot succeed —
+    // it fails on the very duplicates the test planted, and every later run
+    // fails the same way until someone cleans the database by hand. Falsified
+    // before this shape was chosen: with an all-or-nothing purge and the restore
+    // in a nested `finally`, the index count after a cleanup failure was still
+    // 0, so "always attempt the restore" alone does not achieve what it looks
+    // like it achieves.
     const purgeFixture = async () => {
-      await pool.query(`DELETE FROM vt_restock_sessions WHERE clinic_id = $1`, [clinicId]);
-      await pool.query(`DELETE FROM vt_containers WHERE clinic_id = $1`, [clinicId]);
-      await pool.query(`DELETE FROM vt_users WHERE clinic_id = $1`, [clinicId]);
-      await pool.query(`DELETE FROM vt_clinics WHERE id = $1`, [clinicId]);
+      let firstError;
+      for (const [sql, params] of [
+        [`DELETE FROM vt_restock_sessions WHERE clinic_id = $1`, [clinicId]],
+        [`DELETE FROM vt_containers WHERE clinic_id = $1`, [clinicId]],
+        [`DELETE FROM vt_users WHERE clinic_id = $1`, [clinicId]],
+        [`DELETE FROM vt_clinics WHERE id = $1`, [clinicId]],
+      ] as Array<[string, string[]]>) {
+        try {
+          await pool.query(sql, params);
+        } catch (e) {
+          firstError ??= e;
+        }
+      }
+      if (firstError) throw firstError;
     };
 
     try {
@@ -101,8 +122,16 @@ WHERE status = 'active';
 
       await pool.query(loadSafetyDoBlockFromMigration());
     } finally {
-      await purgeFixture();
-      await pool.query(restoreIndexSql);
+      // Nested, because the previous revision of this block ran the purge first
+      // and the restore second: a purge that rejected left the database without
+      // `uniq_restock_session_active_container` for every later run. Schema
+      // restoration is the one step that must survive a cleanup failure
+      // (review finding on #281 — a regression introduced by the fix before it).
+      try {
+        await purgeFixture();
+      } finally {
+        await pool.query(restoreIndexSql);
+      }
     }
 
     const migrationPath = path.join(__dirname, "../../migrations/042_uniq_active_restock_session_per_container.sql");

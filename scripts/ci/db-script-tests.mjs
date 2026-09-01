@@ -114,7 +114,16 @@ export function readSuites(file = SUITES_FILE) {
   // throws deep inside main() or, worse, iterates characters — neither of which
   // names the file that is actually wrong. An empty array is left to
   // summarize(), which already refuses a run that executed nothing.
-  const suites = JSON.parse(readFileSync(file, "utf8")).suites;
+  let parsed;
+  try {
+    parsed = JSON.parse(readFileSync(file, "utf8"));
+  } catch (cause) {
+    // JSON.parse throws before the shape check below can run, and its message
+    // names no file — so a malformed manifest reads as a bare SyntaxError from
+    // somewhere in CI. Rethrow with the path (review finding on #281).
+    throw new Error(`${file}: not valid JSON — ${cause.message}`, { cause });
+  }
+  const suites = parsed.suites;
   if (!Array.isArray(suites) || suites.some((s) => typeof s !== "string")) {
     throw new Error(`${file}: "suites" must be an array of file paths`);
   }

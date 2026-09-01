@@ -19,9 +19,9 @@
  * nothing, so exit code alone is not admissible evidence and the runner reads
  * what the script said as well.
  */
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
@@ -156,12 +156,19 @@ describe("summarize", () => {
 });
 
 describe("readSuites", () => {
+  // Every case makes its own directory, including each it.each row. Tracked and
+  // removed rather than left in the OS temp dir (review finding on #281).
+  const made: string[] = [];
   const fixture = (body: string) => {
     const dir = mkdtempSync(path.join(tmpdir(), "db-script-suites-"));
+    made.push(dir);
     const file = path.join(dir, "db-script-suites.json");
     writeFileSync(file, body);
     return file;
   };
+  afterEach(() => {
+    while (made.length) rmSync(made.pop() as string, { recursive: true, force: true });
+  });
 
   it("reads a well-formed manifest", () => {
     expect(readSuites(fixture('{"suites":["tests/a.test.ts"]}'))).toEqual(["tests/a.test.ts"]);
@@ -171,6 +178,9 @@ describe("readSuites", () => {
     ["a missing suites key", "{}"],
     ["a non-array suites value", '{"suites":"tests/a.test.ts"}'],
     ["a non-string entry", '{"suites":["tests/a.test.ts",42]}'],
+    // Malformed JSON throws inside JSON.parse, BEFORE the shape check — so
+    // without a wrapper the error is a bare SyntaxError naming no file.
+    ["a manifest that is not JSON at all", "{ not json"],
   ])("refuses %s, naming the file it read", (_label, body) => {
     // Review finding on #281. Without this, a malformed manifest surfaces as a
     // TypeError inside .map() with no clue which file is wrong — and `{}` would
