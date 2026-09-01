@@ -11233,3 +11233,33 @@ by branch name, never by `#`, until the day it lands.
 - Command: `pnpm typecheck` → exit 0. `pnpm architecture:gates` → `All G1 checks passed`, `All claims accounted for`.
 
 **Verdict:** VERIFIED
+
+---
+
+## 2026-09-01 — the two 2.0 spikes are preserved remotely (append, not a rewrite)
+
+**Task:** exit condition 4 of the closure plan — "zero 2.0 code that exists only locally".
+
+**What the record above said, and why it is left standing:** the 2026-07-19 entry states that the
+spike commit was "**Not merged, not pushed**". That was accurate then and for the six weeks after,
+which is the point of an append-only log — the earlier line is evidence of a real state, not an
+error to correct. This entry appends what changed; it does not edit that one.
+
+**Evidence:**
+- Pushed 2026-09-01 under names that identify the work rather than a dead worktree hash:
+  `worktree-agent-ad05bf556984d8f59` → `spike/2.0-case-spine` (`961378e55`) and
+  `worktree-agent-a64779cdd0617e6ff` → `spike/2.0-shift-autopilot` (`951aa8f9e`).
+- Remote tips confirmed THROUGH the remote ref, not the local object store — the distinction
+  matters and was a review finding: `git cat-file -e 961378e55:server/schema/cases.ts` passes on
+  any machine that still holds the object, which is exactly the condition being retired.
+  `git fetch --no-tags origin refs/heads/spike/2.0-case-spine:refs/remotes/origin/spike/2.0-case-spine`
+  then `test "$(git rev-parse origin/spike/2.0-case-spine)" = "$(git rev-parse 961378e55^{commit})"`
+  → exit 0, and `git cat-file -e origin/spike/2.0-case-spine:server/schema/cases.ts` → exit 0.
+  Shown able to fail: the same comparison against `951aa8f9e` exits non-zero.
+- Unchanged, and deliberately so: both branches are **770 commits behind main** and neither is
+  merged or has a PR. `docs/plans/2.0/case-spine-spike-findings.md` §6 still reads "do not merge".
+  Preserved ≠ mergeable; the findings documents on main remain the declared artifacts of 0.2/0.3.
+- Command: `node scripts/verify-claims.mjs` → `1232 claims … 0 FAILED`, `All claims accounted for`.
+  `pnpm verify:evidence` → 4/4 PASS. `node scripts/ci/knip-unused-files.mjs` → 7, all frozen.
+
+**Verdict:** VERIFIED
