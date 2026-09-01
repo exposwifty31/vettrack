@@ -107,8 +107,8 @@ stack and is reference-only.
 | Task | Artifact | Lives on | Caveat carried forward |
 |---|---|---|---|
 | 0.1 | `docs/design/case-spine-allowlist.md` | **main** | — |
-| 0.2 | `docs/plans/2.0/case-spine-spike-findings.md` | **main** | spike code on local branch `worktree-agent-ad05bf556984d8f59` |
-| 0.3 | `docs/plans/2.0/autopilot-spike-findings.md` | **main** | spike code on local branch `worktree-agent-a64779cdd0617e6ff` |
+| 0.2 | `docs/plans/2.0/case-spine-spike-findings.md` | **main** | Spike code is NOT preserved. It sat on a machine-local branch (`worktree-agent-ad05bf556984d8f59`, 2026-07-19) with no remote; re-checked 2026-09-01 it was **769 commits behind main** and would not apply. The findings document is the artifact, and it is on main. |
+| 0.3 | `docs/plans/2.0/autopilot-spike-findings.md` | **main** | Spike code is NOT preserved (`worktree-agent-a64779cdd0617e6ff`, 2026-07-19, machine-local, 769 commits behind as of 2026-09-01). It does not matter here: the production half **landed** — `server/routes/action-proposals.ts` and `server/workers/autopilotHandoverDraftWorker.ts` are on main under task 1.1. The findings document is the artifact. |
 | 0.4 | `docs/design/autopilot-policy-layer.md` | **main** | — |
 | 0.5 | `docs/plans/2.0/autopilot-backtest.md` + `scripts/analysis/autopilot-backtest.ts` | **main** | **SYNTHETIC harness — never cite for real thresholds** |
 | 0.7 | code + `docs/capacitor-native-app.md` hygiene law | **main** | on-device residual → distribution program (H5) |
@@ -264,10 +264,11 @@ current versions, and branch-side PROOF_ALIGNMENT_LOG entries append to main's l
 
 ### Task 0.7 — Native shell & plugin hygiene · **P0 · S · Sonnet 5**
 - **Objective:** Plugins connect correctly EVERY time; haptics works on device; Android edge-to-edge ready.
-- **Files:** Modify `src/lib/haptics.ts` (dev-only failure log inside the existing catch); decide
+- **Files:** Modify `src/lib/haptics.ts` (dev-only failure log inside the existing catch); ~~decide
   finish-or-delete `src/infrastructure/platform/HapticsAdapter.ts` (zero consumers; latent
-  `selectionChanged()`-without-`selectionStart()` bug); possibly `android/app/build.gradle` (targetSdk),
-  safe-area CSS.
+  `selectionChanged()`-without-`selectionStart()` bug)~~ — *decided and done: deleted in `e59764bb2`
+  ("remove unused HapticsAdapter hexagonal leftover"), landed with Task 0.7 in `9766e548f`. The live
+  path is `src/lib/haptics.ts` alone*; possibly `android/app/build.gradle` (targetSdk), safe-area CSS.
 - **Execute:** (1) RED: on-device checklist (real iPhone + real Android) — `haptics.tap()` from the scan
   surface fires physically; currently expected FAIL/unknown. (2) Root-cause down the ranked list: fresh
   `npx cap sync` + `pnpm cap:build:native` (SPM/Gradle pin exact pnpm-store paths — stale sync = silent
@@ -555,8 +556,9 @@ FKs — resolve explicitly before either starts its own Phase 0, don't let two c
    `npx cap sync` after EVERY plugin/dep change (regenerates SPM/Gradle wiring pinning exact pnpm-store
    paths); native builds only via `scripts/build-native-shell.sh`; verify on a real device — the iOS
    Simulator has no Taptic Engine ("resolve without performing any action"). Haptics breakage tracked in
-   Task 0.7 (live path `src/lib/haptics.ts` swallows failures; `HapticsAdapter.ts` unused parallel
-   implementation slated finish-or-delete).
+   Task 0.7 (live path `src/lib/haptics.ts` swallows failures; ~~`HapticsAdapter.ts` unused parallel
+   implementation slated finish-or-delete~~ — *deleted in `e59764bb2`; there is no longer a parallel
+   implementation*).
 
 ---
 
