@@ -324,6 +324,62 @@ jobs:
   # runner gates on the reported assertion COUNT against a recorded floor, which is the
   # follow-up db-integration-preflight.mjs names in its own SCOPE note. Pure branches
   # tested in tests/ci-live-server-tests.test.ts.
+  db-integration:
+    name: 🗄️ DB integration suites
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: vettrack
+          POSTGRES_PASSWORD: vettrack
+          POSTGRES_DB: vettrack_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 20
+    env:
+      NODE_ENV: test
+      DATABASE_URL: postgresql://vettrack:vettrack@localhost:5432/vettrack_test
+      SESSION_SECRET: ci-test-secret-that-is-long-enough-32chars
+      PORT: 3001
+    steps:
+      - name: ⬇️ Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: 📦 pnpm
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+        with:
+          run_install: false
+      - name: 🟢 Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: ".nvmrc"
+          cache: "pnpm"
+      - name: 📥 Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: 🗄️ Database migrations
+        run: pnpm migrate
+      # The 23 vitest suites vite.config.ts excludes because they need a real
+      # database. 18 of them were named by NO runner at all until 2026-09-01 —
+      # docking, equipment-anchor, room-readiness and the shift-handover family
+      # among them — while this script and its config already existed. A runner
+      # nothing invokes is indistinguishable from no runner, which is why the
+      # step below exists and why tests/excluded-suite-coverage.test.ts now fails
+      # when a runner is missing from this file.
+      - name: 🗄️ DB integration suites (vitest)
+        run: pnpm test:db-integration
+      # The eight DB-backed files that are NOT vitest suites — standalone tsx
+      # programs that print a skip line and exit 0 when DATABASE_URL is unset.
+      # The runner treats that skip as a refusal, so this step cannot go green by
+      # running nothing.
+      - name: 🗄️ DB script suites (tsx)
+        run: pnpm test:db-scripts
+
   live-server:
     name: 🌐 Live-server suites
     runs-on: ubuntu-latest
@@ -629,7 +685,7 @@ jobs:
     name: ✅ Merge gate
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    needs: [typecheck, build, test, integration-ops, live-server, rfid-controller, architecture-gates, deploy, verify-deploy]
+    needs: [typecheck, build, test, integration-ops, db-integration, live-server, rfid-controller, architecture-gates, deploy, verify-deploy]
     if: always()
 
     steps:
@@ -649,6 +705,10 @@ jobs:
           fi
           if [[ "${{ needs.integration-ops.result }}" != "success" ]]; then
             echo "❌ Integration ops failed — blocking merge"
+            exit 1
+          fi
+          if [[ "${{ needs.db-integration.result }}" != "success" ]]; then
+            echo "❌ DB integration suites failed — blocking merge"
             exit 1
           fi
           if [[ "${{ needs.live-server.result }}" != "success" ]]; then
