@@ -1,0 +1,12 @@
+{
+  "$comment": "Files knip finds unreachable, FROZEN 2026-09-01. Not an approval: each is a real finding kept silent so the NEXT one fails loudly — the same freeze tenant:lint and the endpoint-drift uncalled-route baseline use. The list read 125 before knip.json was scoped: 111 of those were never application code (.agents/, .claude/, docs/ handoff assets), and 3 were WRONG — AlertCard, ShiftProgressHero and Sidebar are reachable only through src/design-system-entry.ts, which sat in `ignore` so knip never traversed it. Adjudicated against a real import graph (dependency-cruiser, tsPreCompilationDeps + tsconfig paths), not grep: matching on a basename makes every index.ts look imported, and two grep passes were both unreliable. What remains is six barrel files and one registry that nothing imports. Delete an entry the moment its file gains a caller — the gate fails on a stale entry too, so this list cannot outlive its reason.",
+  "files": [
+    "shared/index.ts",
+    "src/infrastructure/api/index.ts",
+    "src/infrastructure/auth/index.ts",
+    "src/infrastructure/db/index.ts",
+    "src/infrastructure/index.ts",
+    "src/infrastructure/platform/index.ts",
+    "src/lib/query-keys/registry.ts"
+  ]
+}

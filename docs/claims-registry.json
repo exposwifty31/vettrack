@@ -85,6 +85,22 @@
       "docs": [
         "docs/vettrack-2.0-roadmap.md"
       ]
+    },
+    {
+      "kind": "glob",
+      "match": ".agents/**",
+      "reason": "the claim is TRUE and the gate cannot see it: `scripts/verify/claims.cjs` resolves globs without `dot: true`, so `**` never matches a dot-prefixed directory. Both paths exist and are TRACKED — `git ls-files .agents` returns 10 files and `git ls-files .claude` returns 461 (measured 2026-09-01) — and both are live `ignore` entries in knip.json, each load-bearing: they are 2 of the 5 scopings that took knip's unused-file list from 125 to 7. Registered rather than reworded because the fix belongs in the engine, and that engine is fingerprint-locked and shared with the RN repo, so changing it is a coordinated two-repo change and not a side effect of a docs edit. Re-verify with: git ls-files .agents | head -1",
+      "docs": [
+        "TASKS.md"
+      ]
+    },
+    {
+      "kind": "glob",
+      "match": ".claude/**",
+      "reason": "the claim is TRUE and the gate cannot see it: `scripts/verify/claims.cjs` resolves globs without `dot: true`, so `**` never matches a dot-prefixed directory. Both paths exist and are TRACKED — `git ls-files .agents` returns 10 files and `git ls-files .claude` returns 461 (measured 2026-09-01) — and both are live `ignore` entries in knip.json, each load-bearing: they are 2 of the 5 scopings that took knip's unused-file list from 125 to 7. Registered rather than reworded because the fix belongs in the engine, and that engine is fingerprint-locked and shared with the RN repo, so changing it is a coordinated two-repo change and not a side effect of a docs edit. Re-verify with: git ls-files .agents | head -1",
+      "docs": [
+        "TASKS.md"
+      ]
     }
   ]
 }

@@ -576,10 +576,31 @@ jobs:
         run: node scripts/architecture/extract-express-routes.mjs --warn-only
         continue-on-error: true
 
-      # TODO: remove --no-exit-code once the dead-code baseline is established and violations are resolved
-      - name: Dead code check (knip)
+      # knip reports EVERY issue type here, unused exports included, and stays
+      # advisory: a type exported ahead of its consumer is a judgement call, not a
+      # defect. The blocking half is the next step.
+      - name: Dead code report (knip, advisory)
         run: pnpm knip --no-exit-code
         continue-on-error: true
+
+      # BLOCKING, and deliberately narrower: no NEW unreachable file.
+      #
+      # The step above could never fail — `continue-on-error: true` — and that
+      # swallowed more than findings. A knip.json with an unrecognized key prints
+      # `ERROR: Invalid input` and exits 2, and the step passed anyway: a config
+      # that analysed nothing looked exactly like a clean run. This step has no
+      # continue-on-error and treats a non-zero knip exit as a failure, so the
+      # gate cannot disarm itself.
+      #
+      # Today's 7 findings are frozen in scripts/ci/knip-unused-files.baseline.json
+      # (six barrels + one registry, adjudicated against a dependency-cruiser
+      # import graph). A file that becomes unreachable tomorrow fails here, and a
+      # baseline entry that gains a caller fails too — the freeze cannot outlive
+      # its reason. The list was 125 before knip.json was scoped; 111 of those
+      # were never application code and 3 were knip's own false positives, hidden
+      # because src/design-system-entry.ts sat in `ignore` and was never traversed.
+      - name: Dead code gate (no new unused file)
+        run: pnpm knip:files
 
   deploy:
     name: 🚢 Deploy to Railway

@@ -223,19 +223,45 @@ _Agents: add out-of-scope items here rather than acting on them._
 Recorded so it is explicit rather than silent. The owner goal is "nothing planned that does
 not work, nothing built that is not wired properly"; these three are the residue.
 
-- **TASK: `knip` is a dead-code detector that nothing reads, and its output is not yet
-  adjudicated.** `.github/workflows/ci.yml` runs it as `pnpm knip --no-exit-code`, so it
-  can never fail a build. Measured 2026-09-01: **117 unused files · 241 unused exports ·
-  253 unused exported types · 8 configuration hints.** Declaring `entry` is NOT the fix —
-  knip auto-detects `index.html`, `src/main.tsx`, `server/index.ts` and
-  `server/workers/notification.worker.ts` and reports hand-written entries as redundant;
-  adding them moved the count 121 → 117. **Whether the 117 are genuine is UNKNOWN.** Two
-  grep-based attempts to adjudicate a sample were both unreliable — matching on a file's
-  basename makes every `index.ts` look imported, and the second attempt matched any
-  directory of the same name. A path composed from a constant is invisible to a literal
-  grep, so neither run is evidence in either direction. Making the gate blocking before
-  the list is trustworthy would block on noise; leaving it `--no-exit-code` keeps a
-  detector nobody reads. Both are wrong, and the work is the triage, not the flag.
+- ~~**TASK: `knip` is a dead-code detector that nothing reads, and its output is not yet
+  adjudicated.**~~ **CLOSED 2026-09-01.** The triage was the work, and the flag followed it.
+  The list was **125 unused files**; it is now **7**, and a blocking gate freezes those.
+  - **111 were never application code** — `.agents/**`, `.claude/**`, `docs/**` handoff
+    assets, `load/**`, `public/**`. Scoped out in `knip.json`.
+  - **3 were knip being wrong**, and the cause was the config: `AlertCard`,
+    `ShiftProgressHero` and `Sidebar` are reachable only through
+    `src/design-system-entry.ts`, which sat in `ignore` — so knip never traversed it and
+    called its dependents dead. Moving that one path from `ignore` to `entry` fixed all
+    three. The earlier note that "declaring `entry` is NOT the fix" was half right: knip
+    does report hand-written entries as redundant when its plugins already find them
+    (verified — the four vitest/playwright configs were, and were removed again), but the
+    four that remain are each load-bearing, measured one at a time: removing
+    `src/design-system-entry.ts` puts the count back to 11, `tests/global.setup.ts` to 8,
+    the two wdio files to 9.
+  - **7 are genuine** — `shared/index.ts`, the five `src/infrastructure/*/index.ts` barrels
+    and `src/lib/query-keys/registry.ts`. Adjudicated against a real import graph
+    (dependency-cruiser with `tsPreCompilationDeps` + tsconfig paths), which is what the two
+    unreliable grep passes should have been.
+  - The gate: `pnpm knip:files` (`scripts/ci/knip-unused-files.mjs`) freezes those 7 in
+    `scripts/ci/knip-unused-files.baseline.json` and runs in `architecture-gates` **without**
+    `continue-on-error`. A new unreachable file fails; a baseline entry that gains a caller
+    also fails, so the freeze cannot outlive its reason. Proven red on both, plus on a third
+    case worth naming: a `knip.json` with an unrecognized key prints `ERROR: Invalid input`
+    and exits **2**, and the advisory step passed anyway — a config that analysed nothing
+    read as a clean run. The gate treats a non-zero knip exit as a failure.
+  - Still advisory, deliberately: **241 unused exports · 253 unused exported types.** A type
+    exported ahead of its consumer is a different judgement from a file nothing reaches, and
+    mixing them is how the report became unreadable. That remains open work.
+
+- **TASK (new, found while closing the one above): the claim gate is blind to every
+  dot-directory.** `scripts/verify/claims.cjs` resolves globs without `dot: true`, so `**`
+  never matches `.agents/`, `.claude/` or `.github/` — a governed doc can claim a path under
+  any of them and the gate reports "glob matches nothing" whether the path exists or not.
+  Two such claims are registered in `docs/claims-registry.json` with the measurement that
+  proves them (`git ls-files .agents` → 10, `.claude` → 461). Not fixed here on purpose:
+  that engine is fingerprint-locked and byte-shared with the RN repo, so the fix is a
+  coordinated two-repo change with its own `engineFingerprint` bump, not a side effect of a
+  docs edit.
 
 - **TASK: the four ⏸ entries in the RN parity register carry reasons but no decision.**
   D1 avatar upload (server ships `POST /api/uploads/avatar` and returns `avatarUrl`; RN's
