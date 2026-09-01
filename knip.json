@@ -19,12 +19,11 @@
     ".claude/**",
     "docs/**",
     "load/**",
-    "public/**"
+    "public/**",
+    "tests/flow-walk/native/**"
   ],
   "entry": [
     "src/design-system-entry.ts",
-    "tests/global.setup.ts",
-    "tests/flow-walk/native/wdio.conf.ts",
-    "tests/flow-walk/native/native-walk.e2e.ts"
+    "tests/global.setup.ts"
   ]
 }

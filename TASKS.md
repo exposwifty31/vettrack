@@ -235,9 +235,18 @@ not work, nothing built that is not wired properly"; these three are the residue
     three. The earlier note that "declaring `entry` is NOT the fix" was half right: knip
     does report hand-written entries as redundant when its plugins already find them
     (verified — the four vitest/playwright configs were, and were removed again), but the
-    four that remain are each load-bearing, measured one at a time: removing
-    `src/design-system-entry.ts` puts the count back to 11, `tests/global.setup.ts` to 8,
-    the two wdio files to 9.
+    two that remain are each load-bearing, measured one at a time: removing
+    `src/design-system-entry.ts` puts the count back to 11 and `tests/global.setup.ts` to 8.
+    A third attempt was WRONG and the tool said so: declaring
+    `tests/flow-walk/native/wdio.conf.ts` and `tests/flow-walk/native/native-walk.e2e.ts` as
+    entries made knip analyse them and report two WebdriverIO packages as unlisted
+    dependencies — correctly, because that directory is its own private package with its own
+    `tests/flow-walk/native/package.json` and `tests/flow-walk/native/package-lock.json`,
+    declaring those packages itself and "deliberately NOT part of the root install" in its
+    own description. It is `ignore`d now, which is what it always was.
+    (The claim gate made the same point about this very paragraph: naming those two packages
+    in backticks reads as a claim that THIS package.json declares them, which is the opposite
+    of what the sentence says. Hence the path citations.)
   - **7 are genuine** — `shared/index.ts`, the five `src/infrastructure/*/index.ts` barrels
     and `src/lib/query-keys/registry.ts`. Adjudicated against a real import graph
     (dependency-cruiser with `tsPreCompilationDeps` + tsconfig paths), which is what the two
@@ -251,7 +260,12 @@ not work, nothing built that is not wired properly"; these three are the residue
     read as a clean run. The gate treats a non-zero knip exit as a failure.
   - Still advisory, deliberately: **241 unused exports · 253 unused exported types.** A type
     exported ahead of its consumer is a different judgement from a file nothing reaches, and
-    mixing them is how the report became unreadable. That remains open work.
+    mixing them is how the report became unreadable. That remains open work. A review asked
+    for that step to be made blocking too; measured before answering — `pnpm knip` without
+    `--no-exit-code` exits 1 on those **494** pre-existing issues, so making it blocking
+    today fails every build on a backlog nobody has triaged. That is the "block on noise"
+    half of the dilemma this entry opened with, and it is why the blocking gate is a
+    separate, narrower step rather than a flag flipped on this one.
 
 - **TASK (new, found while closing the one above): the claim gate is blind to every
   dot-directory.** `scripts/verify/claims.cjs` resolves globs without `dot: true`, so `**`

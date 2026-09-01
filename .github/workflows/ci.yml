@@ -577,8 +577,13 @@ jobs:
         continue-on-error: true
 
       # knip reports EVERY issue type here, unused exports included, and stays
-      # advisory: a type exported ahead of its consumer is a judgement call, not a
-      # defect. The blocking half is the next step.
+      # advisory ON PURPOSE. A review asked for this step to be made blocking too;
+      # measured before answering — `pnpm knip` without --no-exit-code exits 1 on
+      # 241 unused exports + 253 unused exported types, none of them triaged. A
+      # type exported ahead of its consumer is a judgement call, not a defect, and
+      # blocking every build on 494 of them is the "block on noise" half of the
+      # dilemma the old TODO was stuck in. The blocking half is the NEXT step,
+      # which is narrower on purpose.
       - name: Dead code report (knip, advisory)
         run: pnpm knip --no-exit-code
         continue-on-error: true
