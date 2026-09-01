@@ -297,6 +297,11 @@ export interface DeleteAccountResult {
    * outage must not refuse a user's right to delete their account.
    */
   avatarObject: "deleted" | "skipped" | "failed";
+  /**
+   * Present ONLY when `avatarObject === "failed"` — the object key, so the
+   * orphan can be reconciled. The row that named it is gone by then.
+   */
+  avatarObjectKey?: string;
   clerkDeleted: boolean;
 }
 

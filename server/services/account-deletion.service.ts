@@ -89,17 +89,26 @@ function isFkViolation(err: unknown): boolean {
  * what a data-deletion declaration on either store claims.
  *
  * Non-fatal, exactly like Apple revocation above: a storage outage must not be
- * able to block a user's Guideline 5.1.1(v) right to delete their account. The
- * outcome is returned and audited so a failure is reconcilable, not invisible.
+ * able to block a user's Guideline 5.1.1(v) right to delete their account.
+ *
+ * Returns the KEY as well as the outcome, and that is the whole point of the pair
+ * (review finding on RN #203). On `failed`, eraseUserData is about to remove the
+ * only record of that key — so auditing "the avatar delete failed" without it
+ * leaves bytes in a bucket that nothing can name afterwards. A console line is
+ * not a recovery path; the audit row is.
  */
-async function deleteStoredAvatar(clinicId: string, userId: string): Promise<ObjectDeletionOutcome> {
+async function deleteStoredAvatar(
+  clinicId: string,
+  userId: string,
+): Promise<{ outcome: ObjectDeletionOutcome; key: string | null }> {
   const [row] = await db
     .select({ avatarUrl: users.avatarUrl })
     // tenant-lint:scoped filtered below by tenant AND user id; the lint resolves the wrong enclosing scope for a signature carrying a return type — measurement in TASKS.md
     .from(users)
     .where(and(eq(users.clinicId, clinicId), eq(users.id, userId)))
     .limit(1);
-  return deleteStoredObject(row?.avatarUrl);
+  const key = row?.avatarUrl ?? null;
+  return { outcome: await deleteStoredObject(key), key };
 }
 
 /** Revoke the user's Apple token at Apple, if we hold one. Never throws. */
@@ -327,7 +336,8 @@ export async function deleteOwnAccount(user: AuthUser): Promise<AccountDeletionR
 
   const appleRevocation = await revokeStoredAppleToken(user.clinicId, user.id);
   // Before eraseUserData, which drops the key this needs.
-  const avatarObject = await deleteStoredAvatar(user.clinicId, user.id);
+  const avatar = await deleteStoredAvatar(user.clinicId, user.id);
+  const avatarObject = avatar.outcome;
   const dbOutcome = await eraseUserData(user.clinicId, user.id, user.id);
   const clerkDeleted = await deleteClerkUser(user.clerkId);
 
@@ -339,7 +349,16 @@ export async function deleteOwnAccount(user: AuthUser): Promise<AccountDeletionR
     performedByEmail: user.email,
     targetId: user.id,
     targetType: "user",
-    metadata: { appleRevocation, dbOutcome, avatarObject, clerkDeleted },
+    metadata: {
+      appleRevocation,
+      dbOutcome,
+      avatarObject,
+      // Only on failure, and only then: this is the sole durable record of an
+      // object that outlived the row naming it. Recorded nowhere else once
+      // eraseUserData has run.
+      ...(avatarObject === "failed" && avatar.key ? { avatarObjectKey: avatar.key } : {}),
+      clerkDeleted,
+    },
   });
 
   if (appleRevocation === "revoked" || appleRevocation === "failed") {

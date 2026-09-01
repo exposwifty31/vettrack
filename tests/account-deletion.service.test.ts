@@ -66,6 +66,17 @@ describe("deleteStoredAvatar stays tenant-scoped (the waived lint's replacement)
     expect(body).toMatch(/eq\(users\.id,\s*userId\)/);
   });
 
+  it("audits the object KEY when its deletion failed, so the orphan is recoverable", () => {
+    // A `failed` outcome without the key is an unrecoverable orphan: eraseUserData
+    // removes the only row naming that object microseconds later, and a
+    // console.error is not a recovery path (review finding on RN #203). Asserted
+    // from source for the same reason as the test above — every behavioural route
+    // to `deleteOwnAccount` needs a live database, Clerk and a bucket.
+    expect(source).toMatch(/avatarObject === "failed"[\s\S]{0,80}avatarObjectKey/);
+    // And ONLY on failure — a successful delete has no orphan to name.
+    expect(source).not.toMatch(/metadata:\s*\{[^}]*avatarObjectKey: avatar\.key,/);
+  });
+
   it("still carries the waiver it is standing in for", () => {
     // If the waiver goes, the lint covers this line again and this guard is
     // redundant rather than load-bearing — which is worth noticing, not silently
