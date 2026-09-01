@@ -202,5 +202,8 @@ design review before Task 1.1's schema/UI work proceeds — same checkpoint patt
 
 `worktree-agent-a64779cdd0617e6ff`, commit `951aa8f9e`
 (built in an isolated git worktree at `/Users/dan/vettrack/.claude/worktrees/agent-a64779cdd0617e6ff`,
-branched from `a428cba42`). Not pushed, no PR opened. Learning artifact only — Task 1.1 reads this
+branched from `a428cba42`). ~~Not pushed, no PR opened~~ — true **as of 2026-07-19, when this was
+written**, and for the six weeks after. Verified and CHANGED 2026-09-01: pushed as
+`spike/2.0-shift-autopilot`, and `origin/spike/2.0-shift-autopilot` resolves to `951aa8f9e`. Still
+no PR, still unmerged, still 770 commits behind main. Learning artifact only — Task 1.1 reads this
 findings document; it does not build on top of the spike branch's commits.
