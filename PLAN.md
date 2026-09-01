@@ -97,7 +97,7 @@ Agents execute **plan cards**, not free-form interpretations of this file. Card 
 - WebSockets or polling as a realtime transport (SSE is frozen)
 - Offline queueing of Code Blue / emergency mutations
 - Appointment → task renames of internal surfaces (only copy changed)
-- Any work in the external RN mobile repo (separate **public** repo `exposwifty31/VetTrack---RN-Migration-`; `literate-dollop` is **gone** — the delete-versus-archive question is closed by fact: a full repo listing for `exposwifty31` on 2026-08-22 returns exactly four repos — `vettrack`, `VetTrack---RN-Migration-`, `VetCrew`, `aethel-orchestrator` — none archived. `docs/plans/master-plan-2026-07.md` Layer 4 is stale on this point)
+- Any work in the external RN mobile repo (separate **private** repo `exposwifty31/VetTrack---RN-Migration-`; *corrected 2026-09-01 — this line previously read ~~public~~. The repo was made private on 2026-08-28; the GitHub API reports `"private": true` for it, and `"private": false` for this one*; `literate-dollop` is **gone** — the delete-versus-archive question is closed by fact: a full repo listing for `exposwifty31` on 2026-08-22 returns exactly four repos — `vettrack`, `VetTrack---RN-Migration-`, `VetCrew`, `aethel-orchestrator` — none archived. `docs/plans/master-plan-2026-07.md` Layer 4 is stale on this point)
 - Phase 4 parked items until entry conditions clear: **massive-03** (clinic network), **medium-04** (copilot/voice)
 - ~~Starting Phase 1+ before Phase 0 exit drill (T-16) passes~~ — **historical; void as of 2026-08-13** (see banner)
 
