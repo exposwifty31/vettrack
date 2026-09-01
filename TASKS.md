@@ -267,6 +267,37 @@ not work, nothing built that is not wired properly"; these three are the residue
     half of the dilemma this entry opened with, and it is why the blocking gate is a
     separate, narrower step rather than a flag flipped on this one.
 
+- **TASK (new, SECURITY-ADJACENT, found while closing the one above): the tenant lint
+  cannot see a function that declares a return type — and 12 findings are hiding behind
+  that.** `scripts/architecture/tenant-query-lint.mjs` locates the enclosing scope with
+  header patterns that require `)` followed by `{`. A TypeScript signature with a return
+  type puts the annotation between them, so the function is invisible as a boundary and the
+  query is judged against whatever unrelated block happens to precede it. Measured on this
+  branch, not reasoned: the avatar lookup in `server/services/account-deletion.service.ts`
+  resolved to `constructor` at line 36 — a three-line error subclass.
+  Allowing an optional annotation in those two patterns moves the numbers a long way, and
+  in both directions:
+  - **202 → 148** findings; **51 baseline entries stop reproducing** — they were false
+    positives all along.
+  - **12 NEW findings appear that the blind pattern was hiding.** Among them
+    `server/routes/users.ts:128` and `:421`, `server/routes/analytics.ts:175`,
+    `server/services/equipment-location-inference.ts:60` and `:95`. Each needs reading
+    before it is called a defect or a false positive — that is the work, and it is the
+    reason the pattern was NOT changed in this PR: a security-adjacent reclassification of
+    ~200 findings does not belong in a change about dead-code reporting.
+  The one site this PR touched carries a `// tenant-lint:scoped` waiver instead, and the
+  waiver's own cost is measured rather than assumed: with it in place, replacing that
+  query's filter with an id-only one still passes the lint. A source-contract test in
+  `tests/account-deletion.service.test.ts` is what actually guards it, and reverting the
+  filter fails that test.
+  Two traps worth naming, both hit while writing that one-line waiver:
+  - the reason text originally contained the word for the tenant column, and the scope
+    check is a bare word match over the resolved body — so the prose SATISFIED the check
+    for a second, unrelated query in the same file, silently un-reporting a baseline entry.
+  - the same text contained `)` and `{` adjacently in an example, which MATCHED the header
+    pattern and created a fake scope marker inside a comment.
+  A waiver's prose is executable input to this tool. Keep it short and keep both out.
+
 - **TASK (new, found while closing the one above): the claim gate is blind to every
   dot-directory.** `scripts/verify/claims.cjs` resolves globs without `dot: true`, so `**`
   never matches `.agents/`, `.claude/` or `.github/` — a governed doc can claim a path under

@@ -95,6 +95,7 @@ function isFkViolation(err: unknown): boolean {
 async function deleteStoredAvatar(clinicId: string, userId: string): Promise<ObjectDeletionOutcome> {
   const [row] = await db
     .select({ avatarUrl: users.avatarUrl })
+    // tenant-lint:scoped filtered below by tenant AND user id; the lint resolves the wrong enclosing scope for a signature carrying a return type — measurement in TASKS.md
     .from(users)
     .where(and(eq(users.clinicId, clinicId), eq(users.id, userId)))
     .limit(1);
