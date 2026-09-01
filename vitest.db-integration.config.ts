@@ -43,10 +43,17 @@ export default defineConfig({
     environment: "node",
     setupFiles: ["./tests/vitest-setup.ts"],
     include: [
-      // Named by FILENAME in ci.yml's integration-ops job, through this same
-      // config. Verified 2026-09-01 that removing them from `include` breaks
-      // that step outright — vitest positional args filter the include set, so
-      // the command exits "No test files found, exiting with code 1". They stay.
+      // Named by FILENAME through this same config, by the
+      // "🩺 Cross-repo contract suites (doctor gate + reviewer seed)" STEP of
+      // ci.yml's `integration-ops` job — NOT its "🔌 Integration ops suite"
+      // step, which runs `pnpm test:integration:ops` and names no files. The
+      // step before it, "🚦 Refuse a silent skip", is why both matter: it runs
+      // scripts/ci/db-integration-preflight.mjs so an unreachable DATABASE_URL
+      // cannot let them skip green.
+      //
+      // Verified 2026-09-01 that removing them from `include` breaks that step
+      // outright — vitest positional args FILTER the include set, so the command
+      // exits "No test files found, exiting with code 1". They stay.
       "tests/doctor-shift-gate.integration.test.ts",
       "tests/seed-reviewer-demo.integration.test.ts",
       "tests/push-subscription-race.integration.test.ts",
