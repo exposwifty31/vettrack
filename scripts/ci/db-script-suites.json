@@ -1,0 +1,13 @@
+{
+  "$comment": "The DB-backed test files that are NOT vitest suites — standalone tsx programs with no describe/it. Run by scripts/ci/db-script-tests.mjs; asserted against vite.config.ts's exclude block by tests/excluded-suite-coverage.test.ts. Adding a file here without the corresponding exclude entry, or vice versa, fails that test.",
+  "suites": [
+    "tests/restock.service.test.ts",
+    "tests/shift-chat-window.integration.test.ts",
+    "tests/migrations/042_unique_active_session_safety.test.ts",
+    "tests/migrations/damage-events.test.ts",
+    "tests/migrations/event-outbox-clinic-seq.test.ts",
+    "tests/migrations/push-native-tokens.test.ts",
+    "tests/migrations/rfid-readers.test.ts",
+    "tests/migrations/shift-handover.test.ts"
+  ]
+}
