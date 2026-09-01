@@ -3,11 +3,14 @@
  *
  * Orchestrates the full delete path for a user deleting their OWN account:
  *   1. Revoke the stored Sign in with Apple token at Apple (non-fatal).
- *   2. Erase the user's personal data — hard-delete the row when referential
+ *   2. Delete the uploaded avatar OBJECT from storage (non-fatal), BEFORE the
+ *      row that holds its key is erased. Nulling the column is not deletion:
+ *      the bucket is private, so the image became unreachable and stayed.
+ *   3. Erase the user's personal data — hard-delete the row when referential
  *      integrity allows, otherwise anonymize + soft-delete as a tombstone
  *      (many vt_users FKs are ON DELETE RESTRICT, so a hard delete can fail for
  *      users with operational history; either way the PII is gone).
- *   3. Delete the Clerk user so the auth identity is removed and the reviewer's
+ *   4. Delete the Clerk user so the auth identity is removed and the reviewer's
  *      re-sign-in test provisions a brand-new account (non-fatal).
  *
  * Ordering follows Apple TN3194: revoke/erase first, then ensure the client is
@@ -21,6 +24,7 @@ import { clinics, db, users, appleOauthTokens } from "../db.js";
 import { decryptConfigValue } from "../lib/config-crypto.js";
 import { isAppleRevocationConfigured, revokeAppleToken } from "../lib/apple-auth.js";
 import { logAudit } from "../lib/audit.js";
+import { deleteStoredObject, type ObjectDeletionOutcome } from "../lib/object-storage.js";
 import type { AuthUser } from "../middleware/auth.js";
 
 const PG_FK_VIOLATION = "23503";
@@ -59,6 +63,8 @@ export type DbDeletionOutcome = "hard_deleted" | "anonymized";
 export interface AccountDeletionResult {
   appleRevocation: AppleRevocationOutcome;
   dbOutcome: DbDeletionOutcome;
+  /** Whether the uploaded avatar OBJECT was removed, not just its pointer. */
+  avatarObject: ObjectDeletionOutcome;
   clerkDeleted: boolean;
 }
 
@@ -68,6 +74,31 @@ function isFkViolation(err: unknown): boolean {
     err !== null &&
     (err as { code?: string }).code === PG_FK_VIOLATION
   );
+}
+
+/**
+ * Delete the user's uploaded avatar OBJECT from storage. Never throws.
+ *
+ * Must run BEFORE eraseUserData: both erasure paths drop `avatarUrl` — the hard
+ * delete removes the row, the tombstone nulls the column — and the key is the
+ * only handle on the object. Read it afterwards and the image is orphaned with
+ * nothing left pointing at it.
+ *
+ * The old behaviour was to null the column and stop, which is not deletion: the
+ * bucket is private so the image became unreachable, but it stayed. That is not
+ * what a data-deletion declaration on either store claims.
+ *
+ * Non-fatal, exactly like Apple revocation above: a storage outage must not be
+ * able to block a user's Guideline 5.1.1(v) right to delete their account. The
+ * outcome is returned and audited so a failure is reconcilable, not invisible.
+ */
+async function deleteStoredAvatar(clinicId: string, userId: string): Promise<ObjectDeletionOutcome> {
+  const [row] = await db
+    .select({ avatarUrl: users.avatarUrl })
+    .from(users)
+    .where(and(eq(users.clinicId, clinicId), eq(users.id, userId)))
+    .limit(1);
+  return deleteStoredObject(row?.avatarUrl);
 }
 
 /** Revoke the user's Apple token at Apple, if we hold one. Never throws. */
@@ -294,6 +325,8 @@ export async function deleteOwnAccount(user: AuthUser): Promise<AccountDeletionR
   await cleanupClerkOrgsBeforeDeletion(user.clerkId);
 
   const appleRevocation = await revokeStoredAppleToken(user.clinicId, user.id);
+  // Before eraseUserData, which drops the key this needs.
+  const avatarObject = await deleteStoredAvatar(user.clinicId, user.id);
   const dbOutcome = await eraseUserData(user.clinicId, user.id, user.id);
   const clerkDeleted = await deleteClerkUser(user.clerkId);
 
@@ -305,7 +338,7 @@ export async function deleteOwnAccount(user: AuthUser): Promise<AccountDeletionR
     performedByEmail: user.email,
     targetId: user.id,
     targetType: "user",
-    metadata: { appleRevocation, dbOutcome, clerkDeleted },
+    metadata: { appleRevocation, dbOutcome, avatarObject, clerkDeleted },
   });
 
   if (appleRevocation === "revoked" || appleRevocation === "failed") {
@@ -321,5 +354,5 @@ export async function deleteOwnAccount(user: AuthUser): Promise<AccountDeletionR
     });
   }
 
-  return { appleRevocation, dbOutcome, clerkDeleted };
+  return { appleRevocation, dbOutcome, avatarObject, clerkDeleted };
 }
