@@ -36,11 +36,17 @@ import { Link } from "wouter";
 import { cn } from "@/lib/utils";
 import { statusToBadgeVariant } from "@/lib/design-tokens";
 import { useAuth } from "@/hooks/use-auth";
+import { useIsDesktop } from "@/hooks/use-is-desktop";
+import { CriticalAlertsTable } from "@/pages/dashboard/desktop/CriticalAlertsTable";
 
 export default function ManagementDashboardPage() {
   const [expandedUsers, setExpandedUsers] = useState<Set<string>>(new Set());
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
   const { userId } = useAuth();
+  // Track A: at lg+ the critical-alerts list becomes a dense sortable table. The two
+  // grouped sections below (who-has-what, location overview) are group-by accordions,
+  // not flat card lists, and are deliberately left as they are.
+  const isDesktop = useIsDesktop();
 
   const { data: equipment, isLoading, isError, dataUpdatedAt, refetch } = useQuery({
     queryKey: ["/api/equipment"],
@@ -53,7 +59,7 @@ export default function ManagementDashboardPage() {
   });
 
   const dashData = equipment ? computeDashboardData(equipment) : null;
-  const counts = dashData?.counts ?? { available: 0, inUse: 0, issues: 0, missing: 0 };
+  const counts = dashData?.counts ?? { available: 0, inUse: 0, issues: 0, missing: 0, needsAttention: 0 };
   const legacyCritical = dashData?.criticalItems ?? [];
   const displayCriticalItems = useMemo((): Array<
     CriticalItem | ManagementRecoveryCriticalRow
@@ -163,7 +169,7 @@ export default function ManagementDashboardPage() {
               <span className="text-[11px] font-semibold text-[var(--status-stale-fg)]">{t.managementDashboardPage.inUse}</span>
             </div>
             <div className="flex flex-col items-center justify-center gap-1 rounded-xl border border-[var(--status-issue-border)] bg-[var(--status-issue-bg)] p-3 min-h-[72px]">
-              <p className="text-2xl font-bold text-[var(--status-issue-fg)] leading-none">{counts.issues + counts.missing}</p>
+              <p className="text-2xl font-bold text-[var(--status-issue-fg)] leading-none">{counts.needsAttention}</p>
               <span className="text-[11px] font-semibold text-[var(--status-issue-fg)]">{t.managementDashboardPage.issues}</span>
             </div>
           </div>
@@ -199,6 +205,8 @@ export default function ManagementDashboardPage() {
                 <p className="text-sm font-medium text-foreground">{t.managementDashboardPage.allGood}</p>
                 <p className="text-xs text-muted-foreground">{t.managementDashboardPage.allInPlace}</p>
               </div>
+            ) : isDesktop ? (
+              <CriticalAlertsTable items={displayCriticalItems} />
             ) : (
               <div className="flex flex-col gap-2">
                 {displayCriticalItems.map((item) => {

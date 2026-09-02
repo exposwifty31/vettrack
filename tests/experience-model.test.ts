@@ -319,9 +319,19 @@ describe("experience-model — student is a restricted-tech subset (Phase 8)", (
         "management.web",
         "management.webWrite",
         "equipment.actOffShift",
+        "management.actOffShift",
       ],
       vet: ["codeBlue.manage", "shiftChat.pin", "equipment.vetActions", "equipment.actOffShift"],
-      lead: ["codeBlue.manage", "shiftChat.broadcast", "shiftChat.pin", "management.web"],
+      // Track D 2026-09-01: `lead` gains the CONSOLE off-shift exemption only. It
+      // deliberately still lacks `equipment.actOffShift`, so the mobile/native roster
+      // gate on this archetype is unchanged.
+      lead: [
+        "codeBlue.manage",
+        "shiftChat.broadcast",
+        "shiftChat.pin",
+        "management.web",
+        "management.actOffShift",
+      ],
       tech: ["codeBlue.manage"],
       student: [],
     };

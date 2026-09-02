@@ -19,6 +19,9 @@ import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
 import { useConfirm } from "@/hooks/use-confirm";
 import { t } from "@/lib/i18n";
+import { useIsDesktop } from "@/hooks/use-is-desktop";
+import { FoldersTable } from "@/pages/admin/desktop/FoldersTable";
+import type { Folder } from "@/types";
 
 export function FoldersSection() {
   const confirm = useConfirm();
@@ -74,6 +77,27 @@ export function FoldersSection() {
 
   const manualFolders = folders?.filter((f) => f.type !== "smart") || [];
 
+  // Track A: at lg+ this tab is a management console — the card row stack below is
+  // replaced by a dense table. Both bodies share these handlers so the confirm step
+  // cannot drift between them.
+  const isDesktop = useIsDesktop();
+
+  const startEdit = (f: Folder) => {
+    setEditFolder(f);
+    setFolderName(f.name);
+  };
+
+  const confirmDelete = async (f: Folder) => {
+    const ok = await confirm({
+      title: t.adminPage.deleteFolderTitle(f.name),
+      description: t.adminPage.deleteFolderBody,
+      confirmLabel: t.adminPage.deleteFolderConfirm,
+      destructive: true,
+    });
+    if (!ok) return;
+    deleteMut.mutate(f.id);
+  };
+
   const isSaving = createMut.isPending || updateMut.isPending;
 
   const submit = () => {
@@ -109,7 +133,14 @@ export function FoldersSection() {
         </div>
       </CardHeader>
       <CardContent>
-        {isLoading ? (
+        {isDesktop ? (
+          <FoldersTable
+            folders={manualFolders}
+            isLoading={isLoading}
+            onEdit={startEdit}
+            onDelete={confirmDelete}
+          />
+        ) : isLoading ? (
           <div className="flex flex-col gap-2">
             {[1, 2, 3].map((i) => (
               <Skeleton key={i} className="h-12 rounded-xl" />
@@ -131,10 +162,7 @@ export function FoldersSection() {
                     variant="ghost"
                     size="icon-sm"
                     aria-label={`${t.adminPage.editFolder} — ${f.name}`}
-                    onClick={() => {
-                      setEditFolder(f);
-                      setFolderName(f.name);
-                    }}
+                    onClick={() => startEdit(f)}
                     data-testid={`btn-edit-folder-${f.id}`}
                   >
                     <Pencil className="w-3.5 h-3.5" />
@@ -145,19 +173,7 @@ export function FoldersSection() {
                     aria-label={`${t.common.delete} — ${f.name}`}
                     className="text-destructive hover:text-destructive h-11 w-11"
                     data-testid={`btn-delete-folder-${f.id}`}
-                    onClick={async () => {
-                      if (
-                        !(await confirm({
-                          title: t.adminPage.deleteFolderTitle(f.name),
-                          description: t.adminPage.deleteFolderBody,
-                          confirmLabel: t.adminPage.deleteFolderConfirm,
-                          destructive: true,
-                        }))
-                      ) {
-                        return;
-                      }
-                      deleteMut.mutate(f.id);
-                    }}
+                    onClick={() => confirmDelete(f)}
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                   </Button>

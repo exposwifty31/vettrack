@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { getCurrentUserId } from "@/lib/auth-store";
-import { equipmentTriageTier } from "@/lib/design-tokens";
+import { needsAttention } from "@/lib/attention";
 import { useAlertsController } from "@/features/alerts";
 import { proposalQueueQueryKey } from "@/features/autopilot/proposal-queue-keys";
 import { useTodayShift } from "../../hooks/use-today-shift";
@@ -57,10 +57,16 @@ export function useOpsHome() {
 
   const coverage = useMemo(() => {
     if (!equipment) return { availabilityPct: null as number | null, ready: 0, notReady: 0, inUse: 0 };
+    // Track C: the canonical `needsAttention` predicate, shared with the dashboard.
+    // This previously counted `equipmentTriageTier(eq) === "attention"`, which never
+    // reads `lastSeen` and returns `in_use` for anything checked out before it looks
+    // at status — so a fleet whose items simply had not been seen in a day scored a
+    // perfect 100% here while `/dashboard` flagged the same items.
+    const now = Date.now();
     let attention = 0;
     let inUse = 0;
     for (const eq of equipment) {
-      if (equipmentTriageTier(eq) === "attention") attention++;
+      if (needsAttention(eq, now)) attention++;
       if (eq.usageState === "in_use") inUse++;
     }
     const total = equipment.length;

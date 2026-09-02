@@ -171,6 +171,39 @@ describe("CrashCartDriftCard", () => {
     expect(screen.getByText("Epinephrine")).toBeTruthy();
   });
 
+  // Track C / Open Q3 — the `/autopilot/queue` "36 identical rows" report. There is
+  // no fan-out: `ux_vt_action_proposal_clinic_kind_session` makes one row per
+  // (clinic, kind, scanDate), so 36 rows are 36 distinct days. They only LOOKED
+  // identical in the never-checked branch, where the summary
+  // (`neverCheckedSummaryTemplate`) and every rendered card field are constants —
+  // `scanDate` is carried in draftContent and was the one distinguishing value the
+  // card never showed.
+  it("states the scan date, so two days of never-checked proposals are distinguishable", () => {
+    const neverChecked = (scanDate: string) =>
+      baseProposal({
+        id: `p-${scanDate}`,
+        kind: "crash_cart_drift",
+        draftContent: {
+          driftType: "stale_check",
+          scanDate,
+          hasNeverBeenChecked: true,
+          lastCheckPerformedAt: null,
+          hoursSinceLastCheck: null,
+          thresholdHours: 24,
+          title: "Crash cart needs attention",
+        },
+      });
+
+    const first = render(<CrashCartDriftCard proposal={neverChecked("2026-07-20")} />);
+    const firstText = first.container.textContent ?? "";
+    cleanup();
+    const second = render(<CrashCartDriftCard proposal={neverChecked("2026-08-25")} />);
+    const secondText = second.container.textContent ?? "";
+
+    expect(firstText).toContain(t.autopilotQueue.kinds.crashCartDrift.scanDateLabel);
+    expect(firstText).not.toBe(secondText);
+  });
+
   it("renders the stale-check state, including never-checked", () => {
     const proposal = baseProposal({
       kind: "crash_cart_drift",

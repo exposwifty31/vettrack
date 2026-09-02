@@ -37,31 +37,9 @@ import { useAuth } from "@/hooks/use-auth";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import type { CreateRoomRequest, Room } from "@/types";
-
-function SyncBadge({ status }: { status: string }) {
-  if (status === "synced") {
-    return (
-      <div className="flex items-center gap-1 text-[10px] font-bold tracking-wide text-[var(--status-ok-fg)] bg-[var(--status-ok-bg)] border border-[var(--status-ok-border)] rounded-full px-2 py-0.5 shrink-0">
-        <CheckCircle2 className="w-2.5 h-2.5" />
-        {t.roomsListPage.badgeSynced}
-      </div>
-    );
-  }
-  if (status === "requires_audit") {
-    return (
-      <div className="flex items-center gap-1 text-[10px] font-bold tracking-wide text-[var(--status-issue-fg)] bg-[var(--status-issue-bg)] border border-[var(--status-issue-border)] rounded-full px-2 py-0.5 shrink-0">
-        <AlertTriangle className="w-2.5 h-2.5" />
-        {t.roomsListPage.badgeAudit}
-      </div>
-    );
-  }
-  return (
-    <div className="flex items-center gap-1 text-[10px] font-bold tracking-wide text-[var(--status-stale-fg)] bg-[var(--status-stale-bg)] border border-[var(--status-stale-border)] rounded-full px-2 py-0.5 shrink-0">
-      <Clock className="w-2.5 h-2.5" />
-      {t.roomsListPage.badgeStale}
-    </div>
-  );
-}
+import { SyncBadge, computeEffectiveStatus } from "@/pages/rooms/room-sync-status";
+import { useIsDesktop } from "@/hooks/use-is-desktop";
+import { RoomsTable } from "@/pages/rooms/desktop/RoomsTable";
 
 function HealthRing({ total, recentlyVerified }: { total: number; recentlyVerified: number }) {
   if (total === 0) {
@@ -103,15 +81,6 @@ function HealthRing({ total, recentlyVerified }: { total: number; recentlyVerifi
 }
 
 // STALE_THRESHOLD_MS: shared 24h staleness cutoff, imported from @/lib/attention
-
-function computeEffectiveStatus(room: Room): string {
-  if (room.syncStatus === "requires_audit") return "requires_audit";
-  const auditAge = room.lastAuditAt
-    ? Date.now() - new Date(room.lastAuditAt).getTime()
-    : Infinity;
-  if (auditAge > STALE_THRESHOLD_MS) return "stale";
-  return room.syncStatus;
-}
 
 export function RoomCard({ room }: { room: Room }) {
   const available = room.availableCount ?? 0;
@@ -205,6 +174,9 @@ function inferZone(room: Room): Zone {
 export default function RoomsListPage({ singleColumn = false }: { singleColumn?: boolean } = {}) {
   const { isAdmin, userId } = useAuth();
   const queryClient = useQueryClient();
+  // Track A: at lg+ this page is a management console — the card grid below is
+  // replaced by a dense readiness table. Narrow/native are unchanged.
+  const isDesktop = useIsDesktop();
   const [createOpen, setCreateOpen] = useState(false);
   const [roomName, setRoomName] = useState("");
   const [roomFloor, setRoomFloor] = useState("");
@@ -391,11 +363,15 @@ export default function RoomsListPage({ singleColumn = false }: { singleColumn?:
             }
           />
         ) : filteredRooms && filteredRooms.length > 0 ? (
-          <div className={`grid ${singleColumn ? "grid-cols-1" : "grid-cols-2"}`} style={{ gap: "var(--content-gap)", minHeight: 240 }}>
-            {filteredRooms.map((room) => (
-              <RoomCard key={room.id} room={room} />
-            ))}
-          </div>
+          isDesktop ? (
+            <RoomsTable rooms={filteredRooms} />
+          ) : (
+            <div className={`grid ${singleColumn ? "grid-cols-1" : "grid-cols-2"}`} style={{ gap: "var(--content-gap)", minHeight: 240 }}>
+              {filteredRooms.map((room) => (
+                <RoomCard key={room.id} room={room} />
+              ))}
+            </div>
+          )
         ) : (
           <div className="flex flex-col items-center py-10 gap-2 text-center">
             <DoorOpen className="w-8 h-8 text-muted-foreground/40" />

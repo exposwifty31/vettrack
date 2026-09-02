@@ -34,8 +34,8 @@ import { shouldShowReservationBanner } from "@/lib/equipment-waitlist-ui";
 import { useDirection } from "@/hooks/useDirection";
 import { useAuth } from "@/hooks/use-auth";
 import { useActiveShift } from "@/hooks/use-active-shift";
-import { useExperience } from "@/hooks/use-experience";
 import { shouldBlockForShift } from "@/lib/shift-gate";
+import { useCanActOffShift } from "@/hooks/use-can-act-off-shift";
 import { haptics } from "@/lib/haptics";
 import { t } from "@/lib/i18n";
 import { api, request } from "@/lib/api";
@@ -59,7 +59,8 @@ export function EquipmentDetailScreen({ equipmentId, hideBack }: Props) {
   const queryClient = useQueryClient();
   const { userId } = useAuth();
   const { hasActiveShift, isLoading: shiftLoading, isError: shiftError } = useActiveShift();
-  const { can } = useExperience();
+  // equipment.actOffShift everywhere, or management.actOffShift on the web console.
+  const canActOffShift = useCanActOffShift();
   const [issueOpen, setIssueOpen] = useState(false);
   const [nfcPending, setNfcPending] = useState(false);
 
@@ -138,7 +139,7 @@ export function EquipmentDetailScreen({ equipmentId, hideBack }: Props) {
       shouldBlockForShift({
         hasActiveShift,
         shiftError,
-        canActOffShift: can("equipment.actOffShift"),
+        canActOffShift,
       })
     ) {
       toast.error(t.scan.offShiftBody);

@@ -28,6 +28,9 @@ interface DataTableProps<T> {
   /** Footer slot (e.g. pagination controls) rendered below the table. */
   footer?: ReactNode;
   onRowClick?: (row: T) => void;
+  /** Optional stable per-row hook, so a migrated body can keep the row identity its
+   *  card predecessor exposed. Omitted => no attribute, markup unchanged. */
+  rowTestId?: (row: T) => string;
 }
 
 type SortState = { key: string; dir: "asc" | "desc" } | null;
@@ -50,6 +53,7 @@ export function DataTable<T>({
   emptyMessage,
   footer,
   onRowClick,
+  rowTestId,
 }: DataTableProps<T>) {
   const [sort, setSort] = useState<SortState>(null);
 
@@ -136,6 +140,7 @@ export function DataTable<T>({
             {sorted.map((row) => (
               <tr
                 key={rowKey(row)}
+                data-testid={rowTestId?.(row)}
                 className={cn(
                   "border-t border-border/50",
                   onRowClick &&

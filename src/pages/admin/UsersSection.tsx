@@ -32,6 +32,8 @@ import { useConfirm } from "@/hooks/use-confirm";
 import { cn } from "@/lib/utils";
 import type { User } from "@/types";
 import { t, formatDateByLocale } from "@/lib/i18n";
+import { useIsDesktop } from "@/hooks/use-is-desktop";
+import { UsersTable, type UserRowActions } from "@/pages/admin/desktop/UsersTable";
 import { haptics } from "@/lib/haptics";
 
 type UserRole = "admin" | "vet" | "technician" | "senior_technician" | "student";
@@ -204,6 +206,11 @@ export function UsersSection() {
     onError: () => toast.error(t.adminPage.seniorDoctorEligibleUpdateFailed),
   });
 
+  // Track A: at lg+ this tab is a management console — the card row stack below is
+  // replaced by a dense table. Both bodies drive the SAME mutations via `rowActions`,
+  // so a confirm step or a pending-dialog cannot exist on one body and not the other.
+  const isDesktop = useIsDesktop();
+
   const deleteUserMut = useMutation({
     mutationFn: (id: string) => api.users.delete(id),
     onSuccess: () => {
@@ -227,6 +234,72 @@ export function UsersSection() {
     },
     onError: () => toast.error(t.adminPage.userRestoreFailed),
   });
+
+  const isMutatingUser =
+    updateStatusMut.isPending ||
+    deleteUserMut.isPending ||
+    restoreUserMut.isPending ||
+    setEquipmentCoordinatorMut.isPending ||
+    setSeniorDoctorEligibleMut.isPending;
+
+  const rowActions: UserRowActions = {
+    onRoleChange: (user, role) => setPendingRoleChange({ user, newRole: role as UserRole }),
+    onSecondaryRoleChange: (user, secondaryRole) => {
+      setPendingSecondaryRoleUserId(user.id);
+      setPendingSecondaryRole(secondaryRole);
+      updateSecondaryRoleMut.mutate({ id: user.id, secondaryRole });
+    },
+    // Blocking is the destructive direction and keeps its confirmation dialog.
+    onStatusChange: (user, status) => {
+      if (status === "blocked") setPendingStatusChange({ user, newStatus: status });
+      else updateStatusMut.mutate({ id: user.id, status });
+    },
+    onToggleEquipmentCoordinator: (user, checked) =>
+      setEquipmentCoordinatorMut.mutate({ id: user.id, isEquipmentCoordinator: checked }),
+    onToggleSeniorDoctorEligible: (user, checked) =>
+      setSeniorDoctorEligibleMut.mutate({ id: user.id, seniorDoctorEligible: checked }),
+    onApprove: (user) => updateStatusMut.mutate({ id: user.id, status: "active" }),
+    onReject: async (user) => {
+      const ok = await confirm({
+        title: t.adminPage.rejectUserTitle(user.displayName || user.name || user.email || ""),
+        description: t.adminPage.rejectUserBody,
+        confirmLabel: t.adminPage.rejectUserConfirm,
+        destructive: true,
+      });
+      if (!ok) return;
+      updateStatusMut.mutate({ id: user.id, status: "blocked" });
+    },
+    onSoftDelete: async (user) => {
+      const ok = await confirm({
+        title: t.adminPage.deleteUserTitle(user.displayName || user.name || user.email || ""),
+        description: t.adminPage.deleteUserBody,
+        confirmLabel: t.adminPage.deleteUserConfirm,
+        destructive: true,
+      });
+      if (!ok) return;
+      deleteUserMut.mutate(user.id);
+    },
+    onRestore: (user) => restoreUserMut.mutate(user.id),
+  };
+
+  const loadMoreButton = hasMoreUsers ? (
+    <div className="flex justify-center pt-1">
+      <Button
+        variant="outline"
+        size="sm"
+        className="h-11 text-xs"
+        onClick={() => fetchMoreUsers()}
+        disabled={isFetchingMoreUsers}
+        data-testid="btn-load-more-users"
+      >
+        {isFetchingMoreUsers ? (
+          <><Loader2 className="w-4 h-4 me-1 animate-spin" />{t.common.loading}</>
+        ) : (
+          t.adminPage.loadMore
+        )}
+      </Button>
+    </div>
+  ) : null;
 
   const filterButtons: { label: string; value: UserStatusFilter }[] = [
     { label: t.adminPage.filterAll, value: "all" },
@@ -283,6 +356,17 @@ export function UsersSection() {
                 : t.adminPage.tryOtherFilterHint
             }
           />
+        ) : isDesktop ? (
+          <div className="flex flex-col gap-3">
+            <UsersTable
+              users={users}
+              actions={rowActions}
+              isMutating={isMutatingUser}
+              pendingSecondaryRoleUserId={pendingSecondaryRoleUserId}
+              pendingSecondaryRole={pendingSecondaryRole}
+            />
+            {loadMoreButton}
+          </div>
         ) : (
           <div className="flex flex-col gap-2">
             {(users ?? []).map((user) => (
@@ -511,24 +595,7 @@ export function UsersSection() {
                 </div>
               </div>
             ))}
-            {hasMoreUsers && (
-              <div className="flex justify-center pt-1">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-11 text-xs"
-                  onClick={() => fetchMoreUsers()}
-                  disabled={isFetchingMoreUsers}
-                  data-testid="btn-load-more-users"
-                >
-                  {isFetchingMoreUsers ? (
-                    <><Loader2 className="w-4 h-4 me-1 animate-spin" />{t.common.loading}</>
-                  ) : (
-                    t.adminPage.loadMore
-                  )}
-                </Button>
-              </div>
-            )}
+            {loadMoreButton}
           </div>
         )}
       </CardContent>

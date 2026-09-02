@@ -5,8 +5,8 @@ import { Button } from "@/components/ui/button";
 import { UnifiedReturnDialog } from "@/components/equipment/UnifiedReturnDialog";
 import { useAuth } from "@/hooks/use-auth";
 import { useActiveShift } from "@/hooks/use-active-shift";
-import { useExperience } from "@/hooks/use-experience";
 import { shouldBlockForShift } from "@/lib/shift-gate";
+import { useCanActOffShift } from "@/hooks/use-can-act-off-shift";
 import { api, ApiError } from "@/lib/api";
 import { haptics } from "@/lib/haptics";
 import { t } from "@/lib/i18n";
@@ -38,7 +38,8 @@ export function EquipmentActions({ equipment }: Props) {
   const queryClient = useQueryClient();
   const [returnOpen, setReturnOpen] = useState(false);
   const { hasActiveShift, isLoading: shiftLoading, isError: shiftError } = useActiveShift();
-  const { can } = useExperience();
+  // equipment.actOffShift everywhere, or management.actOffShift on the web console.
+  const canActOffShift = useCanActOffShift();
 
   const isCheckedOut = !!equipment.checkedOutById;
   const checkedOutByMe = !!userId && equipment.checkedOutById === userId;
@@ -123,7 +124,7 @@ export function EquipmentActions({ equipment }: Props) {
       shouldBlockForShift({
         hasActiveShift,
         shiftError,
-        canActOffShift: can("equipment.actOffShift"),
+        canActOffShift,
       })
     ) {
       toast.error(t.scan.offShiftBody);
