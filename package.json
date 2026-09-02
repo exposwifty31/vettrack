@@ -138,7 +138,7 @@
     "jspdf": "^4.2.1",
     "lucide-react": "^0.446.0",
     "multer": "^2.1.1",
-    "nanoid": "^5.0.0",
+    "nanoid": "^5.1.16",
     "nodemailer": "^8.0.5",
     "pg": "^8.12.0",
     "qrcode.react": "^4.0.0",
