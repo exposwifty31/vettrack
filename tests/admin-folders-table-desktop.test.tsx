@@ -80,5 +80,10 @@ describe("FoldersTable — a failed request must not read as an empty list", () 
 
     expect(screen.queryByText(t.adminPage.noFoldersYet)).toBeNull();
     expect(document.querySelector("table")).toBeNull();
+    // Asserting only the ABSENCE of the empty state would also pass for a component
+    // that renders nothing at all — prove the error surface and its retry exist.
+    expect(screen.getByText(t.errorCard.defaultMessage)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: new RegExp(t.errorCard.retry) }));
+    expect(onRetry).toHaveBeenCalledTimes(1);
   });
 });

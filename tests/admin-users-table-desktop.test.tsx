@@ -149,9 +149,10 @@ describe("UsersTable — pending writes must not race", () => {
       <UsersTable users={USERS} actions={actions()} isMutating />,
     );
 
+    // getByTestId, not queryByTestId + continue: a skippable loop lets the whole
+    // test pass when a control disappears.
     for (const id of ["select-role-u1", "select-secondary-role-u1", "select-status-u1"]) {
-      const el = screen.queryByTestId(id);
-      if (!el) continue; // testid drift is covered by the parity tests above
+      const el = screen.getByTestId(id);
       expect(el.hasAttribute("disabled") || el.getAttribute("data-disabled") !== null).toBe(true);
     }
   });

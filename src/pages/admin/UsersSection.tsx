@@ -236,6 +236,7 @@ export function UsersSection() {
   });
 
   const isMutatingUser =
+    updateRoleMut.isPending ||
     updateStatusMut.isPending ||
     deleteUserMut.isPending ||
     restoreUserMut.isPending ||

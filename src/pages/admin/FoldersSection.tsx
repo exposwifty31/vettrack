@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ErrorCard } from "@/components/ui/error-card";
 import {
   Dialog,
   DialogContent,
@@ -133,12 +134,15 @@ export function FoldersSection() {
         </div>
       </CardHeader>
       <CardContent>
-        {isDesktop ? (
+        {/* Handled before the layout split: passing isError only to the desktop table
+            left the narrow branch rendering "no folders yet" — a wrong claim — with
+            no retry. Both targets now get the same failure surface. */}
+        {isError ? (
+          <ErrorCard onRetry={() => void refetch()} />
+        ) : isDesktop ? (
           <FoldersTable
             folders={manualFolders}
             isLoading={isLoading}
-            isError={isError}
-            onRetry={() => void refetch()}
             onEdit={startEdit}
             onDelete={confirmDelete}
           />

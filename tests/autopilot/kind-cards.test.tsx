@@ -9,7 +9,7 @@
  */
 import { describe, it, expect, afterEach } from "vitest";
 import { render, screen, cleanup } from "@testing-library/react";
-import { t } from "@/lib/i18n";
+import { t, formatDateByLocale } from "@/lib/i18n";
 import { HandoverDraftCard } from "@/features/autopilot/cards/HandoverDraftCard";
 import { CoordinatorReassignCard } from "@/features/autopilot/cards/CoordinatorReassignCard";
 import { RestockPoCard } from "@/features/autopilot/cards/RestockPoCard";
@@ -228,10 +228,15 @@ describe("CrashCartDriftCard", () => {
       render(<CrashCartDriftCard proposal={proposal} />);
 
       const line = screen.getByTestId("crash-cart-drift-scan-date").textContent ?? "";
-      expect(line).toMatch(/20/);
-      expect(line).not.toMatch(/19/);
+      // Assert the whole formatted date: /20/ alone also matches the "20" in 2026,
+      // so it proved nothing about the day.
+      const expected = formatDateByLocale("2026-07-20T12:00:00");
+      expect(line).toContain(expected);
     } finally {
-      process.env.TZ = original;
+      // Assigning undefined stores the STRING "undefined" and would leave every
+      // later test on a bogus zone.
+      if (original === undefined) delete process.env.TZ;
+      else process.env.TZ = original;
     }
   });
 
