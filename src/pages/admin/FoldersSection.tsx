@@ -138,7 +138,7 @@ export function FoldersSection() {
             left the narrow branch rendering "no folders yet" — a wrong claim — with
             no retry. Both targets now get the same failure surface. */}
         {isError ? (
-          <ErrorCard onRetry={() => void refetch()} />
+          <ErrorCard onRetry={() => refetch()} />
         ) : isDesktop ? (
           <FoldersTable
             folders={manualFolders}

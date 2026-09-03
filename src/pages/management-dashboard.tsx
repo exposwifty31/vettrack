@@ -161,15 +161,15 @@ export default function ManagementDashboardPage() {
         ) : (
           <div className="grid grid-cols-3 gap-2" data-testid="summary-strip">
             <div className="flex flex-col items-center justify-center gap-1 rounded-xl border border-[var(--status-ok-border)] bg-[var(--status-ok-bg)] p-3 min-h-[72px]">
-              <p className="text-2xl font-bold text-[var(--status-ok-fg)] leading-none">{counts.available}</p>
+              <p className="text-2xl font-bold text-[var(--status-ok-fg)] leading-none tabular-nums">{counts.available}</p>
               <span className="text-[11px] font-semibold text-[var(--status-ok-fg)]">{t.managementDashboardPage.available}</span>
             </div>
             <div className="flex flex-col items-center justify-center gap-1 rounded-xl border border-[var(--status-stale-border)] bg-[var(--status-stale-bg)] p-3 min-h-[72px]">
-              <p className="text-2xl font-bold text-[var(--status-stale-fg)] leading-none">{counts.inUse}</p>
+              <p className="text-2xl font-bold text-[var(--status-stale-fg)] leading-none tabular-nums">{counts.inUse}</p>
               <span className="text-[11px] font-semibold text-[var(--status-stale-fg)]">{t.managementDashboardPage.inUse}</span>
             </div>
             <div className="flex flex-col items-center justify-center gap-1 rounded-xl border border-[var(--status-issue-border)] bg-[var(--status-issue-bg)] p-3 min-h-[72px]">
-              <p className="text-2xl font-bold text-[var(--status-issue-fg)] leading-none">{counts.needsAttention}</p>
+              <p className="text-2xl font-bold text-[var(--status-issue-fg)] leading-none tabular-nums">{counts.needsAttention}</p>
               <span className="text-[11px] font-semibold text-[var(--status-issue-fg)]">{t.managementDashboardPage.needsAttention}</span>
             </div>
           </div>

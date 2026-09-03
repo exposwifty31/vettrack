@@ -87,6 +87,8 @@ export function EquipmentTable({ equipment, isLoading, isError, onRetry }: Equip
                 <Button
                   variant="ghost"
                   size="icon-sm"
+                  // icon-sm is 36x36; a dense desktop control still wants >=40x40.
+                  className="h-10 w-10"
                   aria-label={`${t.equipmentDetail.updateStatusTitle} — ${getEquipmentDisplayName(e)}`}
                   data-testid={`equipment-status-trigger-${e.id}`}
                   onClick={(ev) => {

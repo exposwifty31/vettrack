@@ -49,8 +49,8 @@ export function RoomsTable({ rooms, isLoading, isError, onRetry }: RoomsTablePro
         sortValue: (r) => r.availableCount ?? 0,
         cell: (r) => (
           <span data-testid={`rooms-table-availability-${r.id}`} className="whitespace-nowrap">
-            <span className="font-bold text-primary">{r.availableCount ?? 0}</span>
-            <span className="text-xs text-muted-foreground">/{r.totalEquipment ?? 0}</span>
+            <span className="font-bold text-primary tabular-nums">{r.availableCount ?? 0}</span>
+            <span className="text-xs text-muted-foreground tabular-nums">/{r.totalEquipment ?? 0}</span>
           </span>
         ),
       },
@@ -58,7 +58,7 @@ export function RoomsTable({ rooms, isLoading, isError, onRetry }: RoomsTablePro
         key: "inUse",
         header: t.roomsListPage.summaryInUse,
         sortValue: (r) => r.inUseCount ?? 0,
-        cell: (r) => r.inUseCount ?? 0,
+        cell: (r) => <span className="tabular-nums">{r.inUseCount ?? 0}</span>,
       },
       {
         key: "issues",
@@ -66,12 +66,12 @@ export function RoomsTable({ rooms, isLoading, isError, onRetry }: RoomsTablePro
         sortValue: (r) => r.issueCount ?? 0,
         cell: (r) =>
           (r.issueCount ?? 0) > 0 ? (
-            <span className="inline-flex items-center gap-0.5 rounded-md border border-[var(--status-issue-border)] bg-[var(--status-issue-bg)] px-1.5 py-0.5 text-xs font-semibold text-[var(--status-issue-fg)]">
+            <span className="inline-flex items-center gap-0.5 rounded-md border border-[var(--status-issue-border)] bg-[var(--status-issue-bg)] px-1.5 py-0.5 text-xs font-semibold text-[var(--status-issue-fg)] tabular-nums">
               <AlertTriangle className="h-3 w-3" aria-hidden />
               {r.issueCount}
             </span>
           ) : (
-            <span className="text-muted-foreground">0</span>
+            <span className="text-muted-foreground tabular-nums">0</span>
           ),
       },
       {

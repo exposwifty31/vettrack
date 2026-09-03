@@ -25,6 +25,7 @@ import {
 import { Bdi } from "@/components/ui/bdi";
 import { TruncatedText } from "@/components/ui/truncated-text";
 import { EmptyState } from "@/components/ui/empty-state";
+import { ErrorCard } from "@/components/ui/error-card";
 import { Users, XCircle, CheckCircle, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
@@ -112,6 +113,8 @@ export function UsersSection() {
   const {
     data: usersPages,
     isLoading,
+    isError: usersError,
+    refetch: refetchUsers,
     fetchNextPage: fetchMoreUsers,
     hasNextPage: hasMoreUsers,
     isFetchingNextPage: isFetchingMoreUsers,
@@ -207,7 +210,9 @@ export function UsersSection() {
   });
 
   // Track A: at lg+ this tab is a management console — the card row stack below is
-  // replaced by a dense table. Both bodies drive the SAME mutations via `rowActions`,
+  // replaced by a dense table. `rowActions` is the DESKTOP table's handler set; the
+  // narrow card body calls the same mutations directly, so a pending-write guard has
+  // to be applied to both bodies separately. Both drive the SAME mutations,
   // so a confirm step or a pending-dialog cannot exist on one body and not the other.
   const isDesktop = useIsDesktop();
 
@@ -247,7 +252,7 @@ export function UsersSection() {
     updateSecondaryRoleMut.isPending;
 
   const rowActions: UserRowActions = {
-    onRoleChange: (user, role) => setPendingRoleChange({ user, newRole: role as UserRole }),
+    onRoleChange: (user, role) => setPendingRoleChange({ user, newRole: role }),
     onSecondaryRoleChange: (user, secondaryRole) => {
       setPendingSecondaryRoleUserId(user.id);
       setPendingSecondaryRole(secondaryRole);
@@ -346,6 +351,10 @@ export function UsersSection() {
               <Skeleton key={i} className="h-20 rounded-xl" />
             ))}
           </div>
+        ) : usersError ? (
+          // retry:false means an initial failure leaves `users` undefined, which would
+          // otherwise fall through to EmptyState with no way to recover.
+          <ErrorCard onRetry={() => refetchUsers()} />
         ) : !users || users.length === 0 ? (
           <EmptyState
             icon={Users}
@@ -542,6 +551,7 @@ export function UsersSection() {
                     </SelectContent>
                   </Select>
                   <Select
+                    disabled={updateSecondaryRoleMut.isPending}
                     value={
                       pendingSecondaryRoleUserId === user.id && pendingSecondaryRole !== undefined
                         ? (pendingSecondaryRole ?? "none")
