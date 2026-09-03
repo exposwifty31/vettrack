@@ -70,6 +70,13 @@ export function EquipmentTable({ equipment, isLoading, isError, onRetry }: Equip
         sortValue: (e) => e.roomName ?? "",
         cell: (e) => (e.roomName ? <Bdi>{e.roomName}</Bdi> : BLANK),
       },
+      {
+        key: "lastSeen",
+        header: t.console.colLastSeen,
+        // Missing timestamps sort last in both directions rather than as the epoch.
+        sortValue: (e) => (e.lastSeen ? new Date(e.lastSeen).getTime() : 0),
+        cell: (e) => (e.lastSeen ? <Bdi>{formatRelativeTime(new Date(e.lastSeen))}</Bdi> : BLANK),
+      },
       ...(canWrite
         ? [
             {
@@ -95,13 +102,6 @@ export function EquipmentTable({ equipment, isLoading, isError, onRetry }: Equip
             } satisfies Column<Equipment>,
           ]
         : []),
-      {
-        key: "lastSeen",
-        header: t.console.colLastSeen,
-        // Missing timestamps sort last in both directions rather than as the epoch.
-        sortValue: (e) => (e.lastSeen ? new Date(e.lastSeen).getTime() : 0),
-        cell: (e) => (e.lastSeen ? <Bdi>{formatRelativeTime(new Date(e.lastSeen))}</Bdi> : BLANK),
-      },
     ],
     [canWrite],
   );

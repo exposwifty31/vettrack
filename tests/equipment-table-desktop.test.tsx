@@ -136,6 +136,25 @@ describe("EquipmentTable — desktop console body for /equipment", () => {
     }
   });
 
+  // Caught by looking at the running app, not by a test: the actions column was
+  // rendering between "room" and "last seen" because the column was spliced in at the
+  // lastSeen anchor. Both sibling console tables (FoldersTable, UsersTable) end with
+  // actions, and nothing here asserted ORDER.
+  it("puts the actions column last, like the other console tables", () => {
+    mockCan.mockImplementation((cap) => cap === "management.webWrite");
+    renderTable(ROWS);
+
+    const headers = screen.getAllByRole("columnheader").map((h) => h.textContent?.trim());
+    expect(headers).toEqual([
+      t.console.colName,
+      t.console.colType,
+      t.console.colStatus,
+      t.console.colRoom,
+      t.console.colLastSeen,
+      t.console.colActions,
+    ]);
+  });
+
   it("opens the status sheet from the row control without navigating away", () => {
     mockCan.mockImplementation((cap) => cap === "management.webWrite");
     const { history } = renderTable(ROWS);
