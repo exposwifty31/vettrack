@@ -240,7 +240,10 @@ export function UsersSection() {
     deleteUserMut.isPending ||
     restoreUserMut.isPending ||
     setEquipmentCoordinatorMut.isPending ||
-    setSeniorDoctorEligibleMut.isPending;
+    setSeniorDoctorEligibleMut.isPending ||
+    // Was missing: a secondary-role write left every control live, so a second
+    // selection could race it and the older value could win.
+    updateSecondaryRoleMut.isPending;
 
   const rowActions: UserRowActions = {
     onRoleChange: (user, role) => setPendingRoleChange({ user, newRole: role as UserRole }),
@@ -293,7 +296,7 @@ export function UsersSection() {
         data-testid="btn-load-more-users"
       >
         {isFetchingMoreUsers ? (
-          <><Loader2 className="w-4 h-4 me-1 animate-spin" />{t.common.loading}</>
+          <><Loader2 className="w-4 h-4 me-1 motion-safe:animate-spin" />{t.common.loading}</>
         ) : (
           t.adminPage.loadMore
         )}
@@ -637,7 +640,7 @@ export function UsersSection() {
               disabled={updateRoleMut.isPending}
             >
               {updateRoleMut.isPending ? (
-                <Loader2 className="w-4 h-4 me-1 animate-spin" />
+                <Loader2 className="w-4 h-4 me-1 motion-safe:animate-spin" />
               ) : null}
               {t.adminPage.changeRoleConfirm}
             </AlertDialogAction>
@@ -681,7 +684,7 @@ export function UsersSection() {
               disabled={updateStatusMut.isPending}
             >
               {updateStatusMut.isPending ? (
-                <Loader2 className="w-4 h-4 me-1 animate-spin" />
+                <Loader2 className="w-4 h-4 me-1 motion-safe:animate-spin" />
               ) : null}
               {t.adminPage.blockUserConfirm}
             </AlertDialogAction>

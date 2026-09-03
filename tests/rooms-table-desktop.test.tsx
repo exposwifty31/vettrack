@@ -16,13 +16,13 @@ import type { Room } from "@/types";
 
 import { RoomsTable } from "@/pages/rooms/desktop/RoomsTable";
 
-function room(over: Partial<Room> & Pick<Room, "id" | "name">): Room {
-  return {
-    syncStatus: "synced",
-    createdAt: "2026-08-01T00:00:00.000Z",
-    updatedAt: "2026-08-01T00:00:00.000Z",
-    ...over,
-  } as Room;
+function room({
+  syncStatus = "synced",
+  createdAt = "2026-08-01T00:00:00.000Z",
+  updatedAt = "2026-08-01T00:00:00.000Z",
+  ...rest
+}: Partial<Room> & Pick<Room, "id" | "name">): Room {
+  return { syncStatus, createdAt, updatedAt, ...rest };
 }
 
 const ROOMS: Room[] = [

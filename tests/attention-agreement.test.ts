@@ -17,8 +17,15 @@ const NOW = Date.now();
 const FRESH = new Date(NOW - 60_000).toISOString();
 const STALE = new Date(NOW - STALE_THRESHOLD_MS - 60 * 60_000).toISOString();
 
-function eq(over: Partial<Equipment>): Equipment {
-  return { id: "e", name: "n", status: "ok", lastSeen: FRESH, createdAt: FRESH, ...over } as Equipment;
+function eq({
+  id = "e",
+  name = "n",
+  status = "ok",
+  createdAt = FRESH,
+  lastSeen = FRESH,
+  ...rest
+}: Partial<Equipment> = {}): Equipment {
+  return { id, name, status, createdAt, lastSeen, ...rest };
 }
 
 /** Healthy statuses throughout; three of five simply have not been seen in over a day. */

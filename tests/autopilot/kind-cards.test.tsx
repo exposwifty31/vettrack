@@ -204,6 +204,37 @@ describe("CrashCartDriftCard", () => {
     expect(firstText).not.toBe(secondText);
   });
 
+  // CodeRabbit #3921508540 (Major), verified: `scanDate` is a date-only "YYYY-MM-DD".
+  // `new Date("2026-07-20")` parses as UTC midnight, so in any negative-offset zone
+  // the rendered calendar day is the PREVIOUS one — the scan date on a crash-cart
+  // proposal would be off by one for every US user. TZ is forced here so the guard
+  // fails on the bug everywhere, not only on a machine west of Greenwich.
+  it("renders scanDate as a calendar day, with no UTC day shift", () => {
+    const original = process.env.TZ;
+    process.env.TZ = "America/New_York";
+    try {
+      const proposal = baseProposal({
+        kind: "crash_cart_drift",
+        draftContent: {
+          driftType: "stale_check",
+          scanDate: "2026-07-20",
+          hasNeverBeenChecked: true,
+          lastCheckPerformedAt: null,
+          hoursSinceLastCheck: null,
+          thresholdHours: 24,
+          title: "Crash cart needs attention",
+        },
+      });
+      render(<CrashCartDriftCard proposal={proposal} />);
+
+      const line = screen.getByTestId("crash-cart-drift-scan-date").textContent ?? "";
+      expect(line).toMatch(/20/);
+      expect(line).not.toMatch(/19/);
+    } finally {
+      process.env.TZ = original;
+    }
+  });
+
   it("renders the stale-check state, including never-checked", () => {
     const proposal = baseProposal({
       kind: "crash_cart_drift",

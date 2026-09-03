@@ -13,11 +13,6 @@ import {
 
 type CriticalRow = CriticalItem | ManagementRecoveryCriticalRow;
 
-interface CriticalAlertsTableProps {
-  items: CriticalRow[] | undefined;
-  isLoading?: boolean;
-}
-
 /** Recovery rows carry an i18n key; legacy rows carry server free text. */
 function reasonOf(item: CriticalRow): string {
   return isManagementRecoveryCriticalRow(item)
@@ -35,6 +30,11 @@ function statusLabelOf(item: CriticalRow): string {
 function statusVariantOf(item: CriticalRow): "outline" | "issue" | "maintenance" {
   if (isManagementRecoveryCriticalRow(item)) return "outline";
   return item.status === "issue" ? "issue" : "maintenance";
+}
+
+interface CriticalAlertsTableProps {
+  items: CriticalRow[] | undefined;
+  isLoading?: boolean;
 }
 
 /**

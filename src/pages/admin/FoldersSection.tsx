@@ -34,7 +34,7 @@ export function FoldersSection() {
   } | null>(null);
   const [folderName, setFolderName] = useState("");
 
-  const { data: folders, isLoading } = useQuery({
+  const { data: folders, isLoading, isError, refetch } = useQuery({
     queryKey: ["/api/folders"],
     queryFn: api.folders.list,
     enabled: !!userId,
@@ -137,6 +137,8 @@ export function FoldersSection() {
           <FoldersTable
             folders={manualFolders}
             isLoading={isLoading}
+            isError={isError}
+            onRetry={() => void refetch()}
             onEdit={startEdit}
             onDelete={confirmDelete}
           />

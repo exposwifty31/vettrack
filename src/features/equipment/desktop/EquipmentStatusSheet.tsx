@@ -82,7 +82,7 @@ export function EquipmentStatusSheet({ equipment, open, onOpenChange }: Equipmen
                 <Icon className="h-4 w-4 shrink-0" aria-hidden />
                 <span className="flex-1">{equipmentStatusLabel(value)}</span>
                 {mut.isPending && mut.variables === value ? (
-                  <Loader2 className="h-4 w-4 shrink-0 animate-spin" aria-hidden />
+                  <Loader2 className="h-4 w-4 shrink-0 motion-safe:animate-spin" aria-hidden />
                 ) : isCurrent ? (
                   <Check className="h-4 w-4 shrink-0 text-primary" aria-hidden />
                 ) : null}

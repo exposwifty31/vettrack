@@ -1769,6 +1769,7 @@
     "available": "Available",
     "inUse": "In use",
     "issues": "Issues",
+    "needsAttention": "Needs attention",
     "missing": "Missing",
     "criticalAlerts": "Critical alerts",
     "allGood": "All good",

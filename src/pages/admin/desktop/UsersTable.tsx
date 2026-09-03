@@ -103,6 +103,7 @@ export function UsersTable({
         sortValue: (u) => u.role,
         cell: (u) => (
           <Select
+            disabled={isMutating}
             value={u.role}
             onValueChange={(role) => actions.onRoleChange(u, role as AdminUserRole)}
           >
@@ -125,6 +126,7 @@ export function UsersTable({
         sortValue: (u) => u.secondaryRole ?? "",
         cell: (u) => (
           <Select
+            disabled={isMutating}
             value={
               pendingSecondaryRoleUserId === u.id && pendingSecondaryRole !== undefined
                 ? (pendingSecondaryRole ?? "none")
@@ -154,6 +156,7 @@ export function UsersTable({
         sortValue: (u) => u.status,
         cell: (u) => (
           <Select
+            disabled={isMutating}
             value={u.status}
             onValueChange={(status) => actions.onStatusChange(u, status as AdminUserStatus)}
           >

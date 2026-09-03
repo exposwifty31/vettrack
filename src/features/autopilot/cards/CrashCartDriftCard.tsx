@@ -44,9 +44,12 @@ export function CrashCartDriftCard({ proposal }: { proposal: ActionProposal }) {
    * summary and every other rendered field are constants). Shown on both drift
    * types so the whole card kind is anchored, not just the branch that broke.
    */
+  // `scanDate` is date-only ("YYYY-MM-DD"); `new Date` would read it as UTC midnight
+  // and render the previous calendar day in any negative-offset zone. Anchoring at
+  // local noon is the same idiom `formatChartBucketDay` uses for yyyy-MM-dd buckets.
   const scanDateLine = (
     <p className="text-xs text-ivory-text3" data-testid="crash-cart-drift-scan-date">
-      {k.scanDateLabel}: {formatDateByLocale(content.scanDate)}
+      {k.scanDateLabel}: {formatDateByLocale(`${content.scanDate}T12:00:00`)}
     </p>
   );
 

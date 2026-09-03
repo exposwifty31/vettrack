@@ -67,3 +67,18 @@ describe("FoldersTable — dense desktop body for the /admin folders tab", () =>
     expect(screen.getByText(t.adminPage.noFoldersYet)).toBeTruthy();
   });
 });
+
+// CodeRabbit #3921508563 (Major), verified: FoldersSection sets manualFolders to []
+// when api.folders.list fails, and the desktop table had no isError/onRetry props —
+// so a failed request rendered "no folders yet", which is a different claim.
+describe("FoldersTable — a failed request must not read as an empty list", () => {
+  it("surfaces the error state and a retry instead of the empty message", () => {
+    const onRetry = vi.fn();
+    render(
+      <FoldersTable folders={[]} isError onRetry={onRetry} onEdit={() => {}} onDelete={() => {}} />,
+    );
+
+    expect(screen.queryByText(t.adminPage.noFoldersYet)).toBeNull();
+    expect(document.querySelector("table")).toBeNull();
+  });
+});

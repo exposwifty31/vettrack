@@ -25,8 +25,15 @@ const NOW = new Date("2026-09-01T12:00:00.000Z").getTime();
 const FRESH = new Date(NOW - 60_000).toISOString();
 const STALE = new Date(NOW - STALE_THRESHOLD_MS - 60_000).toISOString();
 
-function eq(over: Partial<Equipment>): Equipment {
-  return { id: "e", name: "n", status: "ok", lastSeen: FRESH, createdAt: FRESH, ...over } as Equipment;
+function eq({
+  id = "e",
+  name = "n",
+  status = "ok",
+  createdAt = FRESH,
+  lastSeen = FRESH,
+  ...rest
+}: Partial<Equipment> = {}): Equipment {
+  return { id, name, status, createdAt, lastSeen, ...rest };
 }
 
 describe("needsAttention — the canonical definition", () => {

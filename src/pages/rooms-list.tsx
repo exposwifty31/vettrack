@@ -1,5 +1,4 @@
 import { t } from "@/lib/i18n";
-import { STALE_THRESHOLD_MS } from "@/lib/attention";
 import { Bdi } from "@/components/ui/bdi";
 import { ForwardChevron } from "@/components/ui/directional-chevron";
 import { useState } from "react";
@@ -80,7 +79,6 @@ function HealthRing({ total, recentlyVerified }: { total: number; recentlyVerifi
   );
 }
 
-// STALE_THRESHOLD_MS: shared 24h staleness cutoff, imported from @/lib/attention
 
 export function RoomCard({ room }: { room: Room }) {
   const available = room.availableCount ?? 0;

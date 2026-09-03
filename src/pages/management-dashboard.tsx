@@ -170,7 +170,7 @@ export default function ManagementDashboardPage() {
             </div>
             <div className="flex flex-col items-center justify-center gap-1 rounded-xl border border-[var(--status-issue-border)] bg-[var(--status-issue-bg)] p-3 min-h-[72px]">
               <p className="text-2xl font-bold text-[var(--status-issue-fg)] leading-none">{counts.needsAttention}</p>
-              <span className="text-[11px] font-semibold text-[var(--status-issue-fg)]">{t.managementDashboardPage.issues}</span>
+              <span className="text-[11px] font-semibold text-[var(--status-issue-fg)]">{t.managementDashboardPage.needsAttention}</span>
             </div>
           </div>
         )}

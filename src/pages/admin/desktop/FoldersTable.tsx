@@ -9,6 +9,9 @@ import type { Folder } from "@/types";
 interface FoldersTableProps {
   folders: Folder[] | undefined;
   isLoading?: boolean;
+  /** A failed folder query must read as a failure, not as an empty folder list. */
+  isError?: boolean;
+  onRetry?: () => void;
   onEdit: (folder: Folder) => void;
   onDelete: (folder: Folder) => void;
 }
@@ -20,7 +23,7 @@ interface FoldersTableProps {
  * The actions column carries the same two controls, with the same aria-labels, that
  * the card row exposes — de-mobilizing the layout must not cost an affordance.
  */
-export function FoldersTable({ folders, isLoading, onEdit, onDelete }: FoldersTableProps) {
+export function FoldersTable({ folders, isLoading, isError, onRetry, onEdit, onDelete }: FoldersTableProps) {
   const columns = useMemo<Column<Folder>[]>(
     () => [
       {
@@ -72,6 +75,8 @@ export function FoldersTable({ folders, isLoading, onEdit, onDelete }: FoldersTa
       rows={folders}
       rowKey={(f) => f.id}
       isLoading={isLoading}
+      isError={isError}
+      onRetry={onRetry}
       emptyIcon={FolderOpen}
       emptyMessage={t.adminPage.noFoldersYet}
     />

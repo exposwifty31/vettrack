@@ -854,12 +854,10 @@ function EquipmentListPageDesktop() {
         {/* Equipment list — uses virtualization for large datasets (>100 items) */}
         <PageErrorBoundary fallbackLabel={t.equipmentList.errors.renderFailed}>
           {isDesktop ? (
-            <EquipmentTable
-              equipment={pageItems}
-              isLoading={isLoading}
-              isError={isError}
-              onRetry={() => refetchAll()}
-            />
+            // The page already renders ErrorCard above for both targets; passing
+            // isError down as well would stack a second error card and a second
+            // retry button. Suppressing the body on error mirrors the mobile branch.
+            isError ? null : <EquipmentTable equipment={pageItems} isLoading={isLoading} />
           ) : (
             <>
             {isLoading ? (

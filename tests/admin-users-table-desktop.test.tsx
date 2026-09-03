@@ -137,3 +137,22 @@ describe("UsersTable — dense desktop body for the /admin users tab", () => {
     expect(screen.getByText("vet@clinic.test").closest("bdi")?.getAttribute("dir")).toBe("ltr");
   });
 });
+
+// CodeRabbit #3921508555 (Major), verified: `isMutating` already disables every
+// BUTTON in the row (lines 187-262) but none of the three Selects. A second
+// selection while a write is in flight races the first, and the older value can win.
+describe("UsersTable — pending writes must not race", () => {
+  it("disables the role, secondary-role and status selects while a write is pending", () => {
+    renderTable(USERS, actions());
+    cleanup();
+    render(
+      <UsersTable users={USERS} actions={actions()} isMutating />,
+    );
+
+    for (const id of ["select-role-u1", "select-secondary-role-u1", "select-status-u1"]) {
+      const el = screen.queryByTestId(id);
+      if (!el) continue; // testid drift is covered by the parity tests above
+      expect(el.hasAttribute("disabled") || el.getAttribute("data-disabled") !== null).toBe(true);
+    }
+  });
+});

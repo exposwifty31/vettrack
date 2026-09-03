@@ -81,7 +81,7 @@ type AttentionInput = {
  * accountable for it, so "nobody has scanned it" is expected rather than alarming.
  * This matches the `!isInUse &&` guard the dashboard's `isMissing` already applied.
  */
-export function isStaleUnseen(eq: AttentionInput, now: number = Date.now()): boolean {
+function isStaleUnseen(eq: AttentionInput, now: number = Date.now()): boolean {
   if (eq.checkedOutById) return false;
   if (!eq.lastSeen) return true;
   return now - new Date(eq.lastSeen).getTime() > STALE_THRESHOLD_MS;
