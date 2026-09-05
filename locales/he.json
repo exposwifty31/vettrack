@@ -1769,6 +1769,7 @@
     "available": "זמין",
     "inUse": "בשימוש",
     "issues": "תקלות",
+    "needsAttention": "דורש טיפול",
     "missing": "חסר",
     "criticalAlerts": "התראות קריטיות",
     "allGood": "הכל תקין",
@@ -3286,6 +3287,12 @@
       "dlqPermanent": "כשלים קבועים"
     },
     "colName": "שם",
+    "colActions": "פעולות",
+    "colJoined": "הצטרפות",
+    "colFlags": "סימונים",
+    "colReason": "סיבה",
+    "statusUpdated": "הסטטוס עודכן",
+    "statusUpdateFailed": "עדכון הסטטוס נכשל",
     "colEmail": "דוא״ל",
     "colRole": "תפקיד",
     "people": {
@@ -4236,7 +4243,8 @@
         "lastCheckedLabel": "נבדק לאחרונה",
         "neverCheckedLabel": "מעולם לא נבדק",
         "hoursSinceLabel": "שעות מאז הבדיקה האחרונה",
-        "thresholdLabel": "סף חריגה (שעות)"
+        "thresholdLabel": "סף חריגה (שעות)",
+        "scanDateLabel": "תאריך הסריקה"
       }
     }
   }

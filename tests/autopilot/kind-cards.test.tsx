@@ -9,7 +9,7 @@
  */
 import { describe, it, expect, afterEach } from "vitest";
 import { render, screen, cleanup } from "@testing-library/react";
-import { t } from "@/lib/i18n";
+import { t, formatDateByLocale } from "@/lib/i18n";
 import { HandoverDraftCard } from "@/features/autopilot/cards/HandoverDraftCard";
 import { CoordinatorReassignCard } from "@/features/autopilot/cards/CoordinatorReassignCard";
 import { RestockPoCard } from "@/features/autopilot/cards/RestockPoCard";
@@ -169,6 +169,75 @@ describe("CrashCartDriftCard", () => {
     render(<CrashCartDriftCard proposal={proposal} />);
     expect(screen.getByText(t.autopilotQueue.kinds.crashCartDrift.failedItemsLabel)).toBeTruthy();
     expect(screen.getByText("Epinephrine")).toBeTruthy();
+  });
+
+  // Track C / Open Q3 — the `/autopilot/queue` "36 identical rows" report. There is
+  // no fan-out: `ux_vt_action_proposal_clinic_kind_session` makes one row per
+  // (clinic, kind, scanDate), so 36 rows are 36 distinct days. They only LOOKED
+  // identical in the never-checked branch, where the summary
+  // (`neverCheckedSummaryTemplate`) and every rendered card field are constants —
+  // `scanDate` is carried in draftContent and was the one distinguishing value the
+  // card never showed.
+  it("states the scan date, so two days of never-checked proposals are distinguishable", () => {
+    const neverChecked = (scanDate: string) =>
+      baseProposal({
+        id: `p-${scanDate}`,
+        kind: "crash_cart_drift",
+        draftContent: {
+          driftType: "stale_check",
+          scanDate,
+          hasNeverBeenChecked: true,
+          lastCheckPerformedAt: null,
+          hoursSinceLastCheck: null,
+          thresholdHours: 24,
+          title: "Crash cart needs attention",
+        },
+      });
+
+    const first = render(<CrashCartDriftCard proposal={neverChecked("2026-07-20")} />);
+    const firstText = first.container.textContent ?? "";
+    cleanup();
+    const second = render(<CrashCartDriftCard proposal={neverChecked("2026-08-25")} />);
+    const secondText = second.container.textContent ?? "";
+
+    expect(firstText).toContain(t.autopilotQueue.kinds.crashCartDrift.scanDateLabel);
+    expect(firstText).not.toBe(secondText);
+  });
+
+  // CodeRabbit #3921508540 (Major), verified: `scanDate` is a date-only "YYYY-MM-DD".
+  // `new Date("2026-07-20")` parses as UTC midnight, so in any negative-offset zone
+  // the rendered calendar day is the PREVIOUS one — the scan date on a crash-cart
+  // proposal would be off by one for every US user. TZ is forced here so the guard
+  // fails on the bug everywhere, not only on a machine west of Greenwich.
+  it("renders scanDate as a calendar day, with no UTC day shift", () => {
+    const original = process.env.TZ;
+    process.env.TZ = "America/New_York";
+    try {
+      const proposal = baseProposal({
+        kind: "crash_cart_drift",
+        draftContent: {
+          driftType: "stale_check",
+          scanDate: "2026-07-20",
+          hasNeverBeenChecked: true,
+          lastCheckPerformedAt: null,
+          hoursSinceLastCheck: null,
+          thresholdHours: 24,
+          title: "Crash cart needs attention",
+        },
+      });
+      render(<CrashCartDriftCard proposal={proposal} />);
+
+      const line = screen.getByTestId("crash-cart-drift-scan-date").textContent ?? "";
+      // Assert the whole formatted date: /20/ alone also matches the "20" in 2026,
+      // so it proved nothing about the day.
+      const expected = formatDateByLocale("2026-07-20T12:00:00");
+      expect(line).toContain(expected);
+    } finally {
+      // Assigning undefined stores the STRING "undefined" and would leave every
+      // later test on a bogus zone.
+      if (original === undefined) delete process.env.TZ;
+      else process.env.TZ = original;
+    }
   });
 
   it("renders the stale-check state, including never-checked", () => {

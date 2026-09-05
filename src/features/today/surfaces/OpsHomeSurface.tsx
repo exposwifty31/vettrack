@@ -57,6 +57,7 @@ export function OpsHomeSurface() {
               overdueCount={home.overdueCount}
               itemsOutCount={home.itemsOut}
               activeAlertCount={home.activeAlertCount}
+              attentionCount={home.notReady}
               isTablet={isDesktop}
             />
 

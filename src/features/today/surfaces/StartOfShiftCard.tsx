@@ -18,6 +18,13 @@ export interface StartOfShiftCardProps {
   itemsOutCount: number;
   /** Ops-only: unacknowledged alert feed count (`useAlertsController().activeAlertCount`). */
   activeAlertCount?: number;
+  /**
+   * Ops-only: the canonical `needsAttention` count (`useOpsHome().notReady`), which
+   * counts staleness and is ack-blind. It leads for the management branch — keying
+   * off the ack-aware alert count let this card claim "all clear" while the coverage
+   * ring beside it reported items not ready.
+   */
+  attentionCount?: number;
   /** iPad-native → hero band (larger, bolder). Phone/desktop-web → compact card. */
   isTablet?: boolean;
   className?: string;
@@ -30,7 +37,7 @@ interface Focal {
   Icon: LucideIcon;
 }
 
-type FocalInput = Pick<StartOfShiftCardProps, "criticalCount" | "overdueCount" | "itemsOutCount" | "activeAlertCount">;
+type FocalInput = Pick<StartOfShiftCardProps, "criticalCount" | "overdueCount" | "itemsOutCount" | "activeAlertCount" | "attentionCount">;
 
 /**
  * Capability-gated "what needs me now" read — one line, one action. Branch
@@ -44,7 +51,7 @@ function resolveFocal(input: FocalInput, can: (capability: Capability) => boolea
   const s = t.homeSurface.startOfShift;
 
   if (can("management.web")) {
-    const exceptions = input.activeAlertCount ?? input.criticalCount;
+    const exceptions = input.attentionCount ?? input.activeAlertCount ?? input.criticalCount;
     return exceptions > 0
       ? { message: s.opsExceptions, actionLabel: s.opsExceptionsAction, href: "/alerts", Icon: AlertTriangle }
       : { message: s.opsAllClear, actionLabel: s.opsAllClearAction, href: "/equipment", Icon: PackageCheck };
@@ -90,6 +97,7 @@ function resolveFocal(input: FocalInput, can: (capability: Capability) => boolea
 export function StartOfShiftCard({
   heroState,
   criticalCount,
+  attentionCount,
   overdueCount,
   itemsOutCount,
   activeAlertCount,
@@ -121,7 +129,7 @@ export function StartOfShiftCard({
     );
   }
 
-  const focal = resolveFocal({ criticalCount, overdueCount, itemsOutCount, activeAlertCount }, can);
+  const focal = resolveFocal({ criticalCount, overdueCount, itemsOutCount, activeAlertCount, attentionCount }, can);
   const variant = isTablet ? "hero" : "compact";
 
   return (

@@ -180,3 +180,32 @@ describe("StartOfShiftCard — RTL correctness", () => {
     expect(message.className).toContain("text-start");
   });
 });
+
+/**
+ * Caught by the live desktop pass, not by any test: `/home` rendered
+ * "אין כרגע דבר שדורש תשומת לב" directly above an exceptions tile listing 5 items,
+ * while the coverage ring beside it read 6 not-ready. The ops branch keyed off the
+ * ack-aware alert count — a FIFTH definition of attention on one screen, and the
+ * exact class Track C exists to remove.
+ *
+ * Owner decision stands: staleness counts, acknowledgement does not clear. So an
+ * "all clear" claim must follow the canonical attention count.
+ */
+describe("StartOfShiftCard — the ops line must not contradict the coverage ring", () => {
+  beforeEach(() => {
+    caps = new Set<Capability>(["management.web"]);
+  });
+
+  it("does not claim all-clear while items need attention, even with no unacked alerts", () => {
+    renderCard({ attentionCount: 6, activeAlertCount: 0, criticalCount: 0 });
+
+    expect(screen.queryByText(t.homeSurface.startOfShift.opsAllClear)).toBeNull();
+    expect(screen.getByText(t.homeSurface.startOfShift.opsExceptions)).toBeTruthy();
+  });
+
+  it("still reads all-clear when nothing needs attention", () => {
+    renderCard({ attentionCount: 0, activeAlertCount: 0, criticalCount: 0 });
+
+    expect(screen.getByText(t.homeSurface.startOfShift.opsAllClear)).toBeTruthy();
+  });
+});

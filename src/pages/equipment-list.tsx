@@ -1,5 +1,7 @@
 import { useMobileShellContext } from "@/shell/mobile/MobileShellContext";
 import { EquipmentListScreen } from "@/features/equipment";
+import { EquipmentTable } from "@/features/equipment/desktop/EquipmentTable";
+import { useIsDesktop } from "@/hooks/use-is-desktop";
 import { getEquipmentDisplayName } from "@/lib/equipment-display";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Bdi } from "@/components/ui/bdi";
@@ -367,6 +369,10 @@ function EquipmentListPageDesktop() {
   }, [filtered]);
 
   const displayList = isEquipmentRecoveryUiEnabled ? listForDisplay : filtered;
+
+  // Track A: at lg+ this page is a management console, not a phone screen —
+  // the card list below is replaced by a dense table. Narrow/native are unchanged.
+  const isDesktop = useIsDesktop();
 
   // Virtualization is active when filtered results exceed threshold and select mode is off.
   const isVirtualized = displayList.length > VIRTUALIZATION_THRESHOLD && !selectMode;
@@ -847,112 +853,121 @@ function EquipmentListPageDesktop() {
 
         {/* Equipment list — uses virtualization for large datasets (>100 items) */}
         <PageErrorBoundary fallbackLabel={t.equipmentList.errors.renderFailed}>
-          {isLoading ? (
-            <EquipmentListSkeleton count={PAGE_SIZE} />
-          ) : !isError && displayList.length === 0 ? (
-            <EmptyState
-              icon={Package}
-              message={t.equipmentList.empty.message}
-              subMessage={
-                search ||
-                statusFilter !== "all" ||
-                folderFilter !== "all" ||
-                locationFilter !== "all" ||
-                recoveryAttentionFilterActive
-                  ? t.equipmentList.empty.filteredHint
-                  : t.equipmentList.empty.emptyHint
-              }
-              action={
-                search ||
-                statusFilter !== "all" ||
-                folderFilter !== "all" ||
-                locationFilter !== "all" ||
-                recoveryAttentionFilterActive ? (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-11 text-xs"
-                    onClick={() => navigate("/equipment", { replace: true })}
-                  >
-                    {t.equipmentList.empty.clearFilters}
-                  </Button>
-                ) : (
-                  <Link href="/equipment/new">
-                    <Button size="sm" className="h-11 text-xs">
-                      <Plus className="w-4 h-4 me-1" />
-                      {t.home.addEquipment}
-                    </Button>
-                  </Link>
-                )
-              }
-            />
-          ) : displayList.length > VIRTUALIZATION_THRESHOLD && !selectMode ? (
-            <div data-testid="equipment-list">
-              {/*
-                Row height 112 (comfortable) or 104 (compact): card padding p-4 vs p-3
-                from settings.density, plus ~80px content. minHeight: 72 in the card
-                keeps the row stable. pb-3 on the virtualized row wrapper is in the item height.
-              */}
-              <VirtualizedEquipmentList
-                items={displayList}
-                height={600}
-                itemHeight={virtualizedItemHeight}
-                renderItem={renderVirtualizedRow}
-              />
-            </div>
-          ) : useMobileTriage ? (
-            <div className="md:hidden space-y-3" data-testid="equipment-list-triage">
-              <EquipmentStatStrip
-                total={triageCounts.total}
-                attention={triageCounts.attention}
-                inUse={triageCounts.inUse}
-              />
-              <EquipmentTriageList items={pageItems} />
-            </div>
-          ) : null}
-          {!isVirtualized && pageItems.length > 0 && (
-            <div
-              className={cn(
-                "flex flex-col gap-3",
-                useMobileTriage && "hidden md:flex",
-              )}
-              data-testid="equipment-list"
-            >
-              {(["attention", "in_use", "operational"] as EquipmentTriageTier[])
-                .sort((a, b) => TRIAGE_ORDER[a] - TRIAGE_ORDER[b])
-                .flatMap((tier) => {
-                  const group = pageItems.filter(
-                    (eq) => equipmentTriageTier(eq) === tier,
-                  );
-                  if (!group.length) return [];
-                  const tierLabels: Record<EquipmentTriageTier, string> = {
-                    attention: t.equipmentList.triageAttention,
-                    in_use: t.equipmentList.triageInUse,
-                    operational: t.equipmentList.triageOperational,
-                  };
-                  return [
-                    <p
-                      key={`tier-hd-${tier}`}
-                      className="vt-text-2xs font-bold uppercase tracking-[0.18em] text-ivory-text3 pt-1 first:pt-0"
+          {isDesktop ? (
+            // The page already renders ErrorCard above for both targets; passing
+            // isError down as well would stack a second error card and a second
+            // retry button. Suppressing the body on error mirrors the mobile branch.
+            isError ? null : <EquipmentTable equipment={pageItems} isLoading={isLoading} />
+          ) : (
+            <>
+            {isLoading ? (
+              <EquipmentListSkeleton count={PAGE_SIZE} />
+            ) : !isError && displayList.length === 0 ? (
+              <EmptyState
+                icon={Package}
+                message={t.equipmentList.empty.message}
+                subMessage={
+                  search ||
+                  statusFilter !== "all" ||
+                  folderFilter !== "all" ||
+                  locationFilter !== "all" ||
+                  recoveryAttentionFilterActive
+                    ? t.equipmentList.empty.filteredHint
+                    : t.equipmentList.empty.emptyHint
+                }
+                action={
+                  search ||
+                  statusFilter !== "all" ||
+                  folderFilter !== "all" ||
+                  locationFilter !== "all" ||
+                  recoveryAttentionFilterActive ? (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-11 text-xs"
+                      onClick={() => navigate("/equipment", { replace: true })}
                     >
-                      {tierLabels[tier]}
-                    </p>,
-                    ...group.map((eq) => (
-                      <EquipmentItem
-                        key={eq.id}
-                        equipment={eq}
-                        selectMode={selectMode}
-                        selected={selected.has(eq.id)}
-                        onToggleSelect={() => toggleSelect(eq.id)}
-                        hasActiveShift={hasActiveShift}
-                        shiftLoading={shiftLoading}
-                        shiftError={shiftError}
-                        localSyncState={localSyncByEquipmentId.get(eq.id) ?? "synced"}
-                      />
-                    )),
-                  ];
-                })}
-            </div>
+                      {t.equipmentList.empty.clearFilters}
+                    </Button>
+                  ) : (
+                    <Link href="/equipment/new">
+                      <Button size="sm" className="h-11 text-xs">
+                        <Plus className="w-4 h-4 me-1" />
+                        {t.home.addEquipment}
+                      </Button>
+                    </Link>
+                  )
+                }
+              />
+            ) : displayList.length > VIRTUALIZATION_THRESHOLD && !selectMode ? (
+              <div data-testid="equipment-list">
+                {/*
+                  Row height 112 (comfortable) or 104 (compact): card padding p-4 vs p-3
+                  from settings.density, plus ~80px content. minHeight: 72 in the card
+                  keeps the row stable. pb-3 on the virtualized row wrapper is in the item height.
+                */}
+                <VirtualizedEquipmentList
+                  items={displayList}
+                  height={600}
+                  itemHeight={virtualizedItemHeight}
+                  renderItem={renderVirtualizedRow}
+                />
+              </div>
+            ) : useMobileTriage ? (
+              <div className="md:hidden space-y-3" data-testid="equipment-list-triage">
+                <EquipmentStatStrip
+                  total={triageCounts.total}
+                  attention={triageCounts.attention}
+                  inUse={triageCounts.inUse}
+                />
+                <EquipmentTriageList items={pageItems} />
+              </div>
+            ) : null}
+            {!isVirtualized && pageItems.length > 0 && (
+              <div
+                className={cn(
+                  "flex flex-col gap-3",
+                  useMobileTriage && "hidden md:flex",
+                )}
+                data-testid="equipment-list"
+              >
+                {(["attention", "in_use", "operational"] as EquipmentTriageTier[])
+                  .sort((a, b) => TRIAGE_ORDER[a] - TRIAGE_ORDER[b])
+                  .flatMap((tier) => {
+                    const group = pageItems.filter(
+                      (eq) => equipmentTriageTier(eq) === tier,
+                    );
+                    if (!group.length) return [];
+                    const tierLabels: Record<EquipmentTriageTier, string> = {
+                      attention: t.equipmentList.triageAttention,
+                      in_use: t.equipmentList.triageInUse,
+                      operational: t.equipmentList.triageOperational,
+                    };
+                    return [
+                      <p
+                        key={`tier-hd-${tier}`}
+                        className="vt-text-2xs font-bold uppercase tracking-[0.18em] text-ivory-text3 pt-1 first:pt-0"
+                      >
+                        {tierLabels[tier]}
+                      </p>,
+                      ...group.map((eq) => (
+                        <EquipmentItem
+                          key={eq.id}
+                          equipment={eq}
+                          selectMode={selectMode}
+                          selected={selected.has(eq.id)}
+                          onToggleSelect={() => toggleSelect(eq.id)}
+                          hasActiveShift={hasActiveShift}
+                          shiftLoading={shiftLoading}
+                          shiftError={shiftError}
+                          localSyncState={localSyncByEquipmentId.get(eq.id) ?? "synced"}
+                        />
+                      )),
+                    ];
+                  })}
+              </div>
+            )}
+            </>
           )}
         </PageErrorBoundary>
 
