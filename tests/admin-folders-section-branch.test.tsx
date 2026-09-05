@@ -33,6 +33,8 @@ vi.mock("@/lib/api", () => ({
   },
 }));
 
+import { api } from "@/lib/api";
+import { t } from "@/lib/i18n";
 import { FoldersSection } from "@/pages/admin/FoldersSection";
 
 function renderSection() {
@@ -44,7 +46,11 @@ function renderSection() {
   );
 }
 
-afterEach(() => cleanup());
+afterEach(() => {
+  cleanup();
+  vi.mocked(api.folders.list).mockReset();
+  vi.mocked(api.folders.list).mockResolvedValue(FOLDERS);
+});
 
 describe("/admin folders tab — desktop table vs narrow card rows", () => {
   it("renders the dense table on desktop", async () => {
@@ -63,5 +69,31 @@ describe("/admin folders tab — desktop table vs narrow card rows", () => {
 
     await waitFor(() => expect(screen.getByTestId("btn-edit-folder-f1")).toBeTruthy());
     expect(document.querySelector("table")).toBeNull();
+  });
+
+  it("shows ErrorCard and no folder rows when the first fetch fails", async () => {
+    mockIsDesktop.mockReturnValue(false);
+    vi.mocked(api.folders.list).mockRejectedValueOnce(new Error("fail"));
+    renderSection();
+
+    expect(await screen.findByRole("button", { name: t.errorCard.retry })).toBeTruthy();
+    expect(screen.queryByTestId("btn-edit-folder-f1")).toBeNull();
+  });
+
+  it("keeps cached folders and shows retry when a refetch fails", async () => {
+    mockIsDesktop.mockReturnValue(false);
+    vi.mocked(api.folders.list).mockRejectedValue(new Error("fail"));
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    qc.setQueryData(["/api/folders"], FOLDERS);
+    render(
+      <QueryClientProvider client={qc}>
+        <FoldersSection />
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() => expect(screen.getByTestId("btn-edit-folder-f1")).toBeTruthy());
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: t.errorCard.retry })).toBeTruthy(),
+    );
   });
 });

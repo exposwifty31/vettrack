@@ -4,18 +4,23 @@ export type AdminUserRole = "admin" | "vet" | "technician" | "senior_technician"
 export type AdminUserStatus = "pending" | "active" | "blocked";
 
 /**
- * Option vocabulary for the `/admin` users tab selects.
- *
- * Extracted for the desktop `UsersTable`. The card row in `UsersSection.tsx` still
- * inlines the same `<SelectItem>` lists; pointing it here too is a follow-up, kept
- * out of this change to hold the diff to the desktop branch.
+ * Option vocabulary for the `/admin` users tab selects, shared by the
+ * desktop `UsersTable` and the narrow `UsersMobileList`.
  */
+export const ROLE_LABELS: Record<AdminUserRole, string> = {
+  admin: t.adminPage.roleAdmin,
+  vet: t.adminPage.roleVet,
+  technician: t.adminPage.roleTechnician,
+  senior_technician: t.adminPage.roleSeniorTechnician,
+  student: t.adminPage.roleStudent,
+};
+
 export const ROLE_OPTIONS: ReadonlyArray<{ value: AdminUserRole; label: string }> = [
-  { value: "admin", label: t.adminPage.roleAdmin },
-  { value: "vet", label: t.adminPage.roleVet },
-  { value: "technician", label: t.adminPage.roleTechnician },
-  { value: "senior_technician", label: t.adminPage.roleSeniorTechnician },
-  { value: "student", label: t.adminPage.roleStudent },
+  { value: "admin", label: ROLE_LABELS.admin },
+  { value: "vet", label: ROLE_LABELS.vet },
+  { value: "technician", label: ROLE_LABELS.technician },
+  { value: "senior_technician", label: ROLE_LABELS.senior_technician },
+  { value: "student", label: ROLE_LABELS.student },
 ];
 
 /** `none` is the sentinel the select uses for "no secondary role" (mapped to null on change). */

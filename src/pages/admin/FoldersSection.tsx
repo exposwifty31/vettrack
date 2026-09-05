@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ErrorCard } from "@/components/ui/error-card";
+import { RetainedQueryError } from "@/pages/admin/RetainedQueryError";
 import {
   Dialog,
   DialogContent,
@@ -134,65 +134,68 @@ export function FoldersSection() {
         </div>
       </CardHeader>
       <CardContent>
-        {/* Handled before the layout split: passing isError only to the desktop table
-            left the narrow branch rendering "no folders yet" — a wrong claim — with
-            no retry. Both targets now get the same failure surface. */}
-        {isError ? (
-          <ErrorCard onRetry={() => refetch()} />
-        ) : isDesktop ? (
-          <FoldersTable
-            folders={manualFolders}
-            isLoading={isLoading}
-            onEdit={startEdit}
-            onDelete={confirmDelete}
-          />
-        ) : isLoading ? (
+        {isLoading ? (
           <div className="flex flex-col gap-2">
             {[1, 2, 3].map((i) => (
               <Skeleton key={i} className="h-12 rounded-xl" />
             ))}
           </div>
         ) : (
-          <div className="flex flex-col gap-2">
-            {manualFolders.map((f) => (
-              <div
-                key={f.id}
-                className="flex items-center justify-between p-3 bg-muted/50 rounded-xl border"
-              >
-                <div className="flex items-center gap-2">
-                  <FolderOpen className="w-4 h-4 text-muted-foreground" />
-                  <span className="text-sm font-medium">{f.name}</span>
-                </div>
-                <div className="flex gap-1">
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    aria-label={`${t.adminPage.editFolder} — ${f.name}`}
-                    onClick={() => startEdit(f)}
-                    data-testid={`btn-edit-folder-${f.id}`}
+          <RetainedQueryError
+            isError={isError}
+            hasCachedData={folders !== undefined}
+            onRetry={() => refetch()}
+          >
+            {isDesktop ? (
+              <FoldersTable
+                folders={manualFolders}
+                isLoading={false}
+                onEdit={startEdit}
+                onDelete={confirmDelete}
+              />
+            ) : (
+              <div className="flex flex-col gap-2">
+                {manualFolders.map((f) => (
+                  <div
+                    key={f.id}
+                    className="flex items-center justify-between p-3 bg-muted/50 rounded-xl border"
                   >
-                    <Pencil className="w-3.5 h-3.5" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    aria-label={`${t.common.delete} — ${f.name}`}
-                    className="text-destructive hover:text-destructive h-11 w-11"
-                    data-testid={`btn-delete-folder-${f.id}`}
-                    onClick={() => confirmDelete(f)}
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </Button>
-                </div>
-              </div>
-            ))}
+                    <div className="flex items-center gap-2">
+                      <FolderOpen className="w-4 h-4 text-muted-foreground" />
+                      <span className="text-sm font-medium">{f.name}</span>
+                    </div>
+                    <div className="flex gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        aria-label={`${t.adminPage.editFolder} — ${f.name}`}
+                        onClick={() => startEdit(f)}
+                        data-testid={`btn-edit-folder-${f.id}`}
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        aria-label={`${t.common.delete} — ${f.name}`}
+                        className="text-destructive hover:text-destructive h-11 w-11"
+                        data-testid={`btn-delete-folder-${f.id}`}
+                        onClick={() => confirmDelete(f)}
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
 
-            {manualFolders.length === 0 && (
-              <p className="text-sm text-muted-foreground text-center py-4">
-                {t.adminPage.noFoldersYet}
-              </p>
+                {manualFolders.length === 0 && (
+                  <p className="text-sm text-muted-foreground text-center py-4">
+                    {t.adminPage.noFoldersYet}
+                  </p>
+                )}
+              </div>
             )}
-          </div>
+          </RetainedQueryError>
         )}
       </CardContent>
 

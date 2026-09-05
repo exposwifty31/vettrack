@@ -48,6 +48,8 @@ vi.mock("@/lib/api", () => ({
   },
 }));
 
+import { api } from "@/lib/api";
+import { t } from "@/lib/i18n";
 import { UsersSection } from "@/pages/admin/UsersSection";
 
 function renderSection() {
@@ -59,7 +61,17 @@ function renderSection() {
   );
 }
 
-afterEach(() => cleanup());
+afterEach(() => {
+  cleanup();
+  vi.mocked(api.users.listPaginated).mockReset();
+  vi.mocked(api.users.listPaginated).mockResolvedValue({
+    items: USERS,
+    total: USERS.length,
+    page: 1,
+    pageSize: 100,
+    hasMore: false,
+  });
+});
 
 describe("/admin users tab — desktop table vs narrow card rows", () => {
   it("renders the dense table on desktop, keeping every row control", async () => {
@@ -80,5 +92,58 @@ describe("/admin users tab — desktop table vs narrow card rows", () => {
 
     await waitFor(() => expect(screen.getByTestId("user-row-u1")).toBeTruthy());
     expect(document.querySelector("table")).toBeNull();
+  });
+
+  it("shows ErrorCard and no user rows when the first fetch fails", async () => {
+    mockIsDesktop.mockReturnValue(false);
+    vi.mocked(api.users.listPaginated).mockRejectedValueOnce(new Error("fail"));
+    renderSection();
+
+    expect(await screen.findByRole("button", { name: t.errorCard.retry })).toBeTruthy();
+    expect(screen.queryByTestId("user-row-u1")).toBeNull();
+  });
+
+  it("keeps cached users and shows retry when a background refetch fails", async () => {
+    mockIsDesktop.mockReturnValue(false);
+    vi.mocked(api.users.listPaginated).mockRejectedValue(new Error("fail"));
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    qc.setQueryData(["/api/users", "all"], {
+      pages: [{ items: USERS, total: USERS.length, page: 1, pageSize: 100, hasMore: false }],
+      pageParams: [1],
+    });
+    render(
+      <QueryClientProvider client={qc}>
+        <UsersSection />
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() => expect(screen.getByTestId("user-row-u1")).toBeTruthy());
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: t.errorCard.retry })).toBeTruthy(),
+    );
+  });
+
+  it("keeps loaded users and retries fetchNextPage when the next page fails", async () => {
+    mockIsDesktop.mockReturnValue(false);
+    vi.mocked(api.users.listPaginated).mockImplementation(async (page = 1) => {
+      if (page === 1) {
+        return { items: USERS, total: 2, page: 1, pageSize: 100, hasMore: true };
+      }
+      throw new Error("fail");
+    });
+    renderSection();
+
+    await waitFor(() => expect(screen.getByTestId("user-row-u1")).toBeTruthy());
+    screen.getByTestId("btn-load-more-users").click();
+
+    expect(await screen.findByRole("button", { name: t.errorCard.retry })).toBeTruthy();
+    expect(screen.getByTestId("user-row-u1")).toBeTruthy();
+
+    const callsBeforeRetry = vi.mocked(api.users.listPaginated).mock.calls.length;
+    screen.getByRole("button", { name: t.errorCard.retry }).click();
+    await waitFor(() =>
+      expect(vi.mocked(api.users.listPaginated).mock.calls.length).toBeGreaterThan(callsBeforeRetry),
+    );
+    expect(vi.mocked(api.users.listPaginated).mock.calls.at(-1)?.[0]).toBe(2);
   });
 });
