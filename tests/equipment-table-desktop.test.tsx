@@ -168,6 +168,23 @@ describe("EquipmentTable — desktop console body for /equipment", () => {
     expect(history.length).toBe(before);
   });
 
+  // CodeRabbit #3927779738: DataTable negates the comparator for descending
+  // (`cmp * dir`), so a numeric sentinel cannot sort last in BOTH directions. The
+  // old comment claimed it did. Never-seen IS the oldest, so it belongs with the
+  // stale end — this pins the real, direction-dependent behaviour.
+  it.each([
+    ["ascending", 1, "Infusion Pump"],
+    ["descending", 2, "\u05d0\u05d5\u05dc\u05d8\u05e8\u05e1\u05d0\u05d5\u05e0\u05d3 \u05d0"],
+  ])("sorts never-seen rows to the oldest end (%s)", (_label, clicks, expectedFirst) => {
+    renderTable(ROWS);
+    const header = screen.getByRole("columnheader", { name: new RegExp(t.console.colLastSeen) });
+    const button = header.querySelector("button")!;
+    for (let i = 0; i < clicks; i++) fireEvent.click(button);
+
+    const firstRowText = screen.getAllByRole("row")[1]?.textContent ?? "";
+    expect(firstRowText).toContain(expectedFirst);
+  });
+
   it("renders the empty state instead of a table when there are no rows", () => {
     renderTable([]);
 

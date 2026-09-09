@@ -209,3 +209,20 @@ describe("StartOfShiftCard — the ops line must not contradict the coverage rin
     expect(screen.getByText(t.homeSurface.startOfShift.opsAllClear)).toBeTruthy();
   });
 });
+
+/**
+ * CodeRabbit #3927779744: useOpsHome returns `notReady: 0` while equipment is still
+ * loading. Passing that sentinel as attentionCount defeats the `??` fallback, so if
+ * alerts resolve before equipment the card can claim all-clear while alerts exist.
+ */
+describe("StartOfShiftCard — the loading sentinel must not mask live alerts", () => {
+  beforeEach(() => {
+    caps = new Set<Capability>(["management.web"]);
+  });
+
+  it("falls back to activeAlertCount when attentionCount is undefined", () => {
+    renderCard({ attentionCount: undefined, activeAlertCount: 4, criticalCount: 0 });
+
+    expect(screen.getByText(t.homeSurface.startOfShift.opsExceptions)).toBeTruthy();
+  });
+});

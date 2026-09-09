@@ -73,7 +73,10 @@ export function EquipmentTable({ equipment, isLoading, isError, onRetry }: Equip
       {
         key: "lastSeen",
         header: t.console.colLastSeen,
-        // Missing timestamps sort last in both directions rather than as the epoch.
+        // `DataTable` negates one comparator for descending (`cmp * dir`), so no numeric
+        // sentinel can sort last in BOTH directions — an earlier comment here claimed it
+        // did. The epoch is deliberate instead: never-seen IS the stalest state, so these
+        // rows travel with the oldest end. Both directions are pinned by test.
         sortValue: (e) => (e.lastSeen ? new Date(e.lastSeen).getTime() : 0),
         cell: (e) => (e.lastSeen ? <Bdi>{formatRelativeTime(new Date(e.lastSeen))}</Bdi> : BLANK),
       },
