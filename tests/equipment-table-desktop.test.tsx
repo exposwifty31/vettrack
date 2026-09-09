@@ -118,7 +118,7 @@ describe("EquipmentTable — desktop console body for /equipment", () => {
     expect(bdi?.getAttribute("dir")).toBe("auto");
   });
 
-  it("offers no write affordance without management.webWrite", () => {
+  it("offers no write affordance without equipment.consoleWrite", () => {
     mockCan.mockReturnValue(false);
     renderTable(ROWS);
 
@@ -127,7 +127,7 @@ describe("EquipmentTable — desktop console body for /equipment", () => {
   });
 
   it("adds an actions column with a per-row status control when the capability is held", () => {
-    mockCan.mockImplementation((cap) => cap === "management.webWrite");
+    mockCan.mockImplementation((cap) => cap === "equipment.consoleWrite");
     renderTable(ROWS);
 
     expect(screen.getByRole("columnheader", { name: t.console.colActions })).toBeTruthy();
@@ -141,7 +141,7 @@ describe("EquipmentTable — desktop console body for /equipment", () => {
   // lastSeen anchor. Both sibling console tables (FoldersTable, UsersTable) end with
   // actions, and nothing here asserted ORDER.
   it("puts the actions column last, like the other console tables", () => {
-    mockCan.mockImplementation((cap) => cap === "management.webWrite");
+    mockCan.mockImplementation((cap) => cap === "equipment.consoleWrite");
     renderTable(ROWS);
 
     const headers = screen.getAllByRole("columnheader").map((h) => h.textContent?.trim());
@@ -156,7 +156,7 @@ describe("EquipmentTable — desktop console body for /equipment", () => {
   });
 
   it("opens the status sheet from the row control without navigating away", () => {
-    mockCan.mockImplementation((cap) => cap === "management.webWrite");
+    mockCan.mockImplementation((cap) => cap === "equipment.consoleWrite");
     const { history } = renderTable(ROWS);
     const before = history.length;
 

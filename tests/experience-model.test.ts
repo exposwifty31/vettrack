@@ -320,6 +320,7 @@ describe("experience-model — student is a restricted-tech subset (Phase 8)", (
         "management.webWrite",
         "equipment.actOffShift",
         "management.actOffShift",
+        "equipment.consoleWrite",
       ],
       vet: ["codeBlue.manage", "shiftChat.pin", "equipment.vetActions", "equipment.actOffShift"],
       // Track D 2026-09-01: `lead` gains the CONSOLE off-shift exemption only. It
@@ -331,6 +332,7 @@ describe("experience-model — student is a restricted-tech subset (Phase 8)", (
         "shiftChat.pin",
         "management.web",
         "management.actOffShift",
+        "equipment.consoleWrite",
       ],
       tech: ["codeBlue.manage"],
       student: [],

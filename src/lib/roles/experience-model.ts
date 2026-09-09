@@ -47,7 +47,18 @@ export type Capability =
    * both at once. Consumers must pair this with a `desktop` platform target; on its
    * own it grants nothing, and the server remains the enforcement boundary.
    */
-  | "management.actOffShift";
+  | "management.actOffShift"
+  /**
+   * Write affordances on the DESKTOP equipment console (the `/equipment` table's
+   * per-row status control). Deliberately NOT `management.webWrite`: that capability
+   * gates ten console pages whose every route is `requireAdmin`, an identity check
+   * that no non-admin passes, so granting it to `lead` would render ten pages and a
+   * set of destructive buttons that all 403. This one sits on
+   * `PATCH /api/equipment/:id`, which is `requireEffectiveRole("technician")` — a
+   * route `lead` already passes, and already uses from the equipment detail page.
+   * Surfaces an existing permission in the console; it grants nothing new.
+   */
+  | "equipment.consoleWrite";
 
 /**
  * Capabilities that respond to shift elevation (`roleSource === "shift"` overlays
@@ -136,6 +147,7 @@ const WITHHELD_FROM_STUDENT: ReadonlySet<Capability> = new Set<Capability>([
   "management.webWrite",
   "equipment.actOffShift",
   "management.actOffShift",
+  "equipment.consoleWrite",
 ]);
 
 /** Technician base grant — the floor authority the student archetype is a restricted subset of. */
@@ -160,6 +172,7 @@ const CAPABILITIES_BY_ARCHETYPE: Record<ExperienceArchetype, readonly Capability
     "management.webWrite",
     "equipment.actOffShift",
     "management.actOffShift",
+    "equipment.consoleWrite",
   ],
   vet: ["codeBlue.manage", "shiftChat.pin", "equipment.vetActions", "equipment.actOffShift"],
   lead: [
@@ -168,6 +181,7 @@ const CAPABILITIES_BY_ARCHETYPE: Record<ExperienceArchetype, readonly Capability
     "shiftChat.pin",
     "management.web",
     "management.actOffShift",
+    "equipment.consoleWrite",
   ],
   tech: TECH_CAPABILITIES,
   // student = tech − WITHHELD_FROM_STUDENT (restricted technician). Derived, not
@@ -211,6 +225,7 @@ const SECONDARY_ADMIN_CAPS: readonly Capability[] = [
   "management.webWrite",
   "equipment.actOffShift",
   "management.actOffShift",
+  "equipment.consoleWrite",
 ];
 
 export interface RoleExperience {
