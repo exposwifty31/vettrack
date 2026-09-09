@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { RetainedQueryError } from "@/pages/admin/RetainedQueryError";
 import {
   Dialog,
   DialogContent,
@@ -19,6 +20,9 @@ import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
 import { useConfirm } from "@/hooks/use-confirm";
 import { t } from "@/lib/i18n";
+import { useIsDesktop } from "@/hooks/use-is-desktop";
+import { FoldersTable } from "@/pages/admin/desktop/FoldersTable";
+import type { Folder } from "@/types";
 
 export function FoldersSection() {
   const confirm = useConfirm();
@@ -31,7 +35,7 @@ export function FoldersSection() {
   } | null>(null);
   const [folderName, setFolderName] = useState("");
 
-  const { data: folders, isLoading } = useQuery({
+  const { data: folders, isLoading, isError, refetch } = useQuery({
     queryKey: ["/api/folders"],
     queryFn: api.folders.list,
     enabled: !!userId,
@@ -73,6 +77,27 @@ export function FoldersSection() {
   });
 
   const manualFolders = folders?.filter((f) => f.type !== "smart") || [];
+
+  // Track A: at lg+ this tab is a management console — the card row stack below is
+  // replaced by a dense table. Both bodies share these handlers so the confirm step
+  // cannot drift between them.
+  const isDesktop = useIsDesktop();
+
+  const startEdit = (f: Folder) => {
+    setEditFolder(f);
+    setFolderName(f.name);
+  };
+
+  const confirmDelete = async (f: Folder) => {
+    const ok = await confirm({
+      title: t.adminPage.deleteFolderTitle(f.name),
+      description: t.adminPage.deleteFolderBody,
+      confirmLabel: t.adminPage.deleteFolderConfirm,
+      destructive: true,
+    });
+    if (!ok) return;
+    deleteMut.mutate(f.id);
+  };
 
   const isSaving = createMut.isPending || updateMut.isPending;
 
@@ -116,61 +141,61 @@ export function FoldersSection() {
             ))}
           </div>
         ) : (
-          <div className="flex flex-col gap-2">
-            {manualFolders.map((f) => (
-              <div
-                key={f.id}
-                className="flex items-center justify-between p-3 bg-muted/50 rounded-xl border"
-              >
-                <div className="flex items-center gap-2">
-                  <FolderOpen className="w-4 h-4 text-muted-foreground" />
-                  <span className="text-sm font-medium">{f.name}</span>
-                </div>
-                <div className="flex gap-1">
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    aria-label={`${t.adminPage.editFolder} — ${f.name}`}
-                    onClick={() => {
-                      setEditFolder(f);
-                      setFolderName(f.name);
-                    }}
-                    data-testid={`btn-edit-folder-${f.id}`}
+          <RetainedQueryError
+            isError={isError}
+            hasCachedData={folders !== undefined}
+            onRetry={() => refetch()}
+          >
+            {isDesktop ? (
+              <FoldersTable
+                folders={manualFolders}
+                isLoading={false}
+                onEdit={startEdit}
+                onDelete={confirmDelete}
+              />
+            ) : (
+              <div className="flex flex-col gap-2">
+                {manualFolders.map((f) => (
+                  <div
+                    key={f.id}
+                    className="flex items-center justify-between p-3 bg-muted/50 rounded-xl border"
                   >
-                    <Pencil className="w-3.5 h-3.5" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    aria-label={`${t.common.delete} — ${f.name}`}
-                    className="text-destructive hover:text-destructive h-11 w-11"
-                    data-testid={`btn-delete-folder-${f.id}`}
-                    onClick={async () => {
-                      if (
-                        !(await confirm({
-                          title: t.adminPage.deleteFolderTitle(f.name),
-                          description: t.adminPage.deleteFolderBody,
-                          confirmLabel: t.adminPage.deleteFolderConfirm,
-                          destructive: true,
-                        }))
-                      ) {
-                        return;
-                      }
-                      deleteMut.mutate(f.id);
-                    }}
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </Button>
-                </div>
-              </div>
-            ))}
+                    <div className="flex items-center gap-2">
+                      <FolderOpen className="w-4 h-4 text-muted-foreground" />
+                      <span className="text-sm font-medium">{f.name}</span>
+                    </div>
+                    <div className="flex gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        aria-label={`${t.adminPage.editFolder} — ${f.name}`}
+                        onClick={() => startEdit(f)}
+                        data-testid={`btn-edit-folder-${f.id}`}
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        aria-label={`${t.common.delete} — ${f.name}`}
+                        className="text-destructive hover:text-destructive h-11 w-11"
+                        data-testid={`btn-delete-folder-${f.id}`}
+                        onClick={() => confirmDelete(f)}
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
 
-            {manualFolders.length === 0 && (
-              <p className="text-sm text-muted-foreground text-center py-4">
-                {t.adminPage.noFoldersYet}
-              </p>
+                {manualFolders.length === 0 && (
+                  <p className="text-sm text-muted-foreground text-center py-4">
+                    {t.adminPage.noFoldersYet}
+                  </p>
+                )}
+              </div>
             )}
-          </div>
+          </RetainedQueryError>
         )}
       </CardContent>
 

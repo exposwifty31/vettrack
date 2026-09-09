@@ -1,5 +1,6 @@
 import type { Equipment } from "@/types";
 import { getEquipmentDisplayName } from "@/lib/equipment-display";
+import { needsAttention } from "@/lib/attention";
 import { t } from "@/lib/i18n";
 
 const MISSING_HOURS = 24;
@@ -11,6 +12,16 @@ export interface DashboardCounts {
   inUse: number;
   issues: number;
   missing: number;
+  /**
+   * The canonical attention count (Track C) — `needsAttention` from
+   * `@/lib/attention`, the same predicate `/home`'s coverage ring uses. Render THIS
+   * as the headline "needs attention" number rather than `issues + missing`: that sum
+   * misses `maintenance` / `critical` / `needs_attention` statuses, and the two
+   * surfaces computing their own variants is what let `/home` read 100% while this
+   * page read 65 on one fleet. `issues` and `missing` remain as the breakdown behind
+   * it and still drive `criticalItems`.
+   */
+  needsAttention: number;
 }
 
 export interface CriticalItem {
@@ -63,15 +74,18 @@ export function computeDashboardCounts(equipment: Equipment[]): DashboardCounts 
   let inUse = 0;
   let issues = 0;
   let missing = 0;
+  let attention = 0;
+  const now = Date.now();
 
   for (const eq of equipment) {
     if (isEquipmentAvailable(eq)) available++;
     if (isEquipmentInUse(eq)) inUse++;
     if (isEquipmentIssue(eq)) issues++;
     if (isEquipmentMissing(eq)) missing++;
+    if (needsAttention(eq, now)) attention++;
   }
 
-  return { available, inUse, issues, missing };
+  return { available, inUse, issues, missing, needsAttention: attention };
 }
 
 /**
@@ -180,6 +194,7 @@ export function computeDashboardData(equipment: Equipment[]): DashboardData {
   let inUse = 0;
   let issues = 0;
   let missing = 0;
+  let attention = 0;
   let missingCost = 0;
   let issueCost = 0;
 
@@ -194,6 +209,7 @@ export function computeDashboardData(equipment: Equipment[]): DashboardData {
     const isInUse = !!eq.checkedOutById;
     const isAvailable = eq.status === "ok" && !isInUse;
     const hasIssue = eq.status === "issue";
+    if (needsAttention(eq, now)) attention++;
     const isMissing =
       !isInUse &&
       (!eq.lastSeen || now - new Date(eq.lastSeen).getTime() > MISSING_MS);
@@ -234,7 +250,7 @@ export function computeDashboardData(equipment: Equipment[]): DashboardData {
     .map(([location, count]) => ({ location, count }))
     .sort((a, b) => b.count - a.count);
 
-  const counts: DashboardCounts = { available, inUse, issues, missing };
+  const counts: DashboardCounts = { available, inUse, issues, missing, needsAttention: attention };
   const operational = available + inUse;
   const operationalPercent =
     equipment.length === 0

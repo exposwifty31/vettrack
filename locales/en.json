@@ -1769,6 +1769,7 @@
     "available": "Available",
     "inUse": "In use",
     "issues": "Issues",
+    "needsAttention": "Needs attention",
     "missing": "Missing",
     "criticalAlerts": "Critical alerts",
     "allGood": "All good",
@@ -3286,6 +3287,12 @@
       "dlqPermanent": "Permanent (DLQ)"
     },
     "colName": "Name",
+    "colActions": "Actions",
+    "colJoined": "Joined",
+    "colFlags": "Flags",
+    "colReason": "Reason",
+    "statusUpdated": "Status updated",
+    "statusUpdateFailed": "Could not update status",
     "colEmail": "Email",
     "colRole": "Role",
     "people": {
@@ -4236,7 +4243,8 @@
         "lastCheckedLabel": "Last checked",
         "neverCheckedLabel": "Never checked",
         "hoursSinceLabel": "Hours since last check",
-        "thresholdLabel": "Overdue threshold (hours)"
+        "thresholdLabel": "Overdue threshold (hours)",
+        "scanDateLabel": "Scan date"
       }
     }
   }

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useCanActOffShift } from "@/hooks/use-can-act-off-shift";
 import { Link } from "wouter";
 import { Clock } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -61,6 +62,13 @@ export function OnShiftHero({
   emphasis?: "primary" | "demoted";
   className?: string;
 }) {
+  /**
+   * Track D: the no-shift sub-line claims scanning and dispensing are unavailable.
+   * For anyone exempt that is simply untrue — and on `/home` it contradicted the
+   * capability-gated `StartOfShiftCard` sitting right beside it. The heading stays
+   * (there really is no active shift); only the false half is withheld.
+   */
+  const canActOffShift = useCanActOffShift();
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 30_000);
@@ -111,9 +119,11 @@ export function OnShiftHero({
             <Clock className="h-6 w-6" aria-hidden />
           </span>
           <p className="mt-1.5 text-[20px] font-bold">{t.home.shift.noShift}</p>
-          <p className="max-w-[38ch] text-sm leading-relaxed" style={{ color: "var(--on-ink-strong)" }}>
-            {t.homePage.noShiftSub}
-          </p>
+          {!canActOffShift && (
+            <p className="max-w-[38ch] text-sm leading-relaxed" style={{ color: "var(--on-ink-strong)" }}>
+              {t.homePage.noShiftSub}
+            </p>
+          )}
           {pulse?.nextShift && (
             <p className="mt-1 text-sm font-semibold" style={{ color: "var(--on-ink-strong)" }}>
               {t.common.nextShiftLabel}:{" "}

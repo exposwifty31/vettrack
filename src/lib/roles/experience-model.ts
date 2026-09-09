@@ -38,7 +38,16 @@ export type Capability =
   | "app.adminNav" // see `adminOnly` nav sections — today's `isAdmin` nav gate
   | "management.web" // Phase 6: reach the web management console
   | "management.webWrite" // Phase 6: mutate in the web console (admin only)
-  | "equipment.actOffShift"; // scan/checkout/claim without an active roster shift — doctor pilot 2026-07; admins per owner decision 2026-07
+  | "equipment.actOffShift" // scan/checkout/claim without an active roster shift — doctor pilot 2026-07; admins per owner decision 2026-07
+  /**
+   * Track D 2026-09-01: the same exemption, but scoped to the WEB MANAGEMENT
+   * CONSOLE. Deliberately separate from `equipment.actOffShift` — `lead` reaches the
+   * console and needs the exemption there, but must keep the field-tech roster gate
+   * on mobile/native. Widening `equipment.actOffShift` to `lead` would have relaxed
+   * both at once. Consumers must pair this with a `desktop` platform target; on its
+   * own it grants nothing, and the server remains the enforcement boundary.
+   */
+  | "management.actOffShift";
 
 /**
  * Capabilities that respond to shift elevation (`roleSource === "shift"` overlays
@@ -126,6 +135,7 @@ const WITHHELD_FROM_STUDENT: ReadonlySet<Capability> = new Set<Capability>([
   "management.web",
   "management.webWrite",
   "equipment.actOffShift",
+  "management.actOffShift",
 ]);
 
 /** Technician base grant — the floor authority the student archetype is a restricted subset of. */
@@ -149,9 +159,16 @@ const CAPABILITIES_BY_ARCHETYPE: Record<ExperienceArchetype, readonly Capability
     "management.web",
     "management.webWrite",
     "equipment.actOffShift",
+    "management.actOffShift",
   ],
   vet: ["codeBlue.manage", "shiftChat.pin", "equipment.vetActions", "equipment.actOffShift"],
-  lead: ["codeBlue.manage", "shiftChat.broadcast", "shiftChat.pin", "management.web"],
+  lead: [
+    "codeBlue.manage",
+    "shiftChat.broadcast",
+    "shiftChat.pin",
+    "management.web",
+    "management.actOffShift",
+  ],
   tech: TECH_CAPABILITIES,
   // student = tech − WITHHELD_FROM_STUDENT (restricted technician). Derived, not
   // literal, so it is a strict subset of tech by construction. Today → [].
@@ -193,6 +210,7 @@ const SECONDARY_ADMIN_CAPS: readonly Capability[] = [
   "management.web",
   "management.webWrite",
   "equipment.actOffShift",
+  "management.actOffShift",
 ];
 
 export interface RoleExperience {

@@ -3,14 +3,15 @@ import { useLocation } from "wouter";
 import { CalendarClock } from "lucide-react";
 import { QrScanner } from "@/components/qr-scanner";
 import { useActiveShift } from "@/hooks/use-active-shift";
-import { useExperience } from "@/hooks/use-experience";
 import { shouldBlockForShift } from "@/lib/shift-gate";
+import { useCanActOffShift } from "@/hooks/use-can-act-off-shift";
 import { t, formatDateTimeByLocale } from "@/lib/i18n";
 
 export function ScanScreen() {
   const [, navigate] = useLocation();
   const { hasActiveShift, isLoading: shiftLoading, isError: shiftError, nextShift } = useActiveShift();
-  const { can } = useExperience();
+  // equipment.actOffShift everywhere, or management.actOffShift on the web console.
+  const canActOffShift = useCanActOffShift();
 
   const handleClose = useCallback(() => {
     navigate("/home");
@@ -24,7 +25,7 @@ export function ScanScreen() {
   const scanBlocked = shouldBlockForShift({
     hasActiveShift,
     shiftError,
-    canActOffShift: can("equipment.actOffShift"),
+    canActOffShift,
   });
 
   return (

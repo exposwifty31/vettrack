@@ -51,12 +51,16 @@ export function OpsHomeSurface() {
               isLoading={home.isLoading}
             />
 
+            {/* attentionCount: `notReady` is 0 while equipment is still loading, and
+                passing that sentinel would defeat the card's fallback — letting it claim
+                all-clear when alerts have already resolved. */}
             <StartOfShiftCard
               heroState={home.heroState}
               criticalCount={home.criticalCount}
               overdueCount={home.overdueCount}
               itemsOutCount={home.itemsOut}
               activeAlertCount={home.activeAlertCount}
+              attentionCount={home.equipment ? home.notReady : undefined}
               isTablet={isDesktop}
             />
 

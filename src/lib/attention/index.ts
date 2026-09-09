@@ -57,3 +57,59 @@ export function formatBadgeCount(n: number): string {
 
 /** Rooms audit staleness cutoff — one shared source for the 24h threshold. */
 export const STALE_THRESHOLD_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Statuses that mean "a human needs to deal with this". Mirrors the set
+ * `equipmentTriageTier` already treats as attention-worthy, so this does not invent
+ * a fifth opinion about what a problem status is.
+ */
+const PROBLEM_STATUSES: ReadonlySet<string> = new Set([
+  "issue",
+  "maintenance",
+  "critical",
+  "needs_attention",
+]);
+
+type AttentionInput = {
+  status: string;
+  lastSeen?: string | Date | null;
+  checkedOutById?: string | null;
+};
+
+/**
+ * Not seen within the staleness window. A checked-out item is exempt: someone is
+ * accountable for it, so "nobody has scanned it" is expected rather than alarming.
+ * This matches the `!isInUse &&` guard the dashboard's `isMissing` already applied.
+ */
+function isStaleUnseen(eq: AttentionInput, now: number = Date.now()): boolean {
+  if (eq.checkedOutById) return false;
+  if (!eq.lastSeen) return true;
+  return now - new Date(eq.lastSeen).getTime() > STALE_THRESHOLD_MS;
+}
+
+/**
+ * THE canonical "needs attention" test — one definition for every management count.
+ *
+ * Problem status **or** unseen past the staleness window. Deliberately ack-blind:
+ * acknowledging an alert changes inbox noise, not fleet truth, so the ack-aware count
+ * stays on `/alerts` (inbox semantics) while this answers "what is the state of the
+ * fleet" (owner decision, 2026-09-01).
+ *
+ * Note it does NOT short-circuit on `checkedOutById` the way `equipmentTriageTier`
+ * does — a broken item is broken whoever is holding it. That short-circuit, combined
+ * with never reading `lastSeen`, is why `/home`'s coverage ring could read 100% while
+ * `/dashboard` read 65 on the same fleet.
+ */
+export function needsAttention(eq: AttentionInput, now: number = Date.now()): boolean {
+  return PROBLEM_STATUSES.has(eq.status) || isStaleUnseen(eq, now);
+}
+
+/** Fleet-level count of {@link needsAttention}. */
+export function countNeedsAttention(
+  equipment: readonly AttentionInput[],
+  now: number = Date.now(),
+): number {
+  let n = 0;
+  for (const eq of equipment) if (needsAttention(eq, now)) n++;
+  return n;
+}
