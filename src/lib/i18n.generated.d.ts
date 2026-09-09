@@ -1772,6 +1772,7 @@ export interface TStructure {
     available: string;
     inUse: string;
     issues: string;
+    needsAttention: string;
     missing: string;
     criticalAlerts: string;
     allGood: string;
@@ -3289,6 +3290,12 @@ export interface TStructure {
       dlqPermanent: string;
     };
     colName: string;
+    colActions: string;
+    colJoined: string;
+    colFlags: string;
+    colReason: string;
+    statusUpdated: string;
+    statusUpdateFailed: string;
     colEmail: string;
     colRole: string;
     people: {
@@ -4240,6 +4247,7 @@ export interface TStructure {
         neverCheckedLabel: string;
         hoursSinceLabel: string;
         thresholdLabel: string;
+        scanDateLabel: string;
       };
     };
   };
