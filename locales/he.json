@@ -869,7 +869,7 @@
     "inventoryActionHint": "ניפוק או חידוש פריטים",
     "myEquipmentRefreshFailed": "לא ניתן לרענן — מוצג מידע שמור",
     "startOfShift": {
-      "idleTitle": "אין כרגע דבר שדורש תשומת לב",
+      "idleTitle": "אין כרגע משימות שדורשות אותך",
       "opsExceptions": "חריגות בציוד דורשות בדיקה",
       "opsExceptionsAction": "בדיקת חריגות",
       "opsAllClear": "כיסוי הציוד תקין",

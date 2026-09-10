@@ -39,7 +39,7 @@ export function EquipmentTable({ equipment, isLoading, isError, onRetry }: Equip
   // Same `hasServerAccess` idiom the ten *ConsolePage.tsx files use. Read-only
   // operators keep the dense table; only holders of the write capability see the
   // action column. Server stays the enforcement boundary either way.
-  const canWrite = useExperience().can("management.webWrite");
+  const canWrite = useExperience().can("equipment.consoleWrite");
   const [statusTarget, setStatusTarget] = useState<Equipment | null>(null);
 
   const columns = useMemo<Column<Equipment>[]>(
