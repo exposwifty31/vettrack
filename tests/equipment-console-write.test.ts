@@ -15,9 +15,10 @@
  */
 import { describe, it, expect } from "vitest";
 import { buildRoleExperience, can } from "@/lib/roles/experience-model";
+import type { UserRole } from "@/types/platform";
 
-const exp = (role: string, isAdmin = false) =>
-  buildRoleExperience({ role, effectiveRole: role, roleSource: "permanent", isAdmin } as never);
+const exp = (role: UserRole, isAdmin = false) =>
+  buildRoleExperience({ role, effectiveRole: role, roleSource: "permanent", isAdmin });
 
 describe("equipment.consoleWrite grants", () => {
   it("is held by admin and by the lead archetype", () => {
@@ -30,7 +31,8 @@ describe("equipment.consoleWrite grants", () => {
   });
 
   it("is NOT held by floor roles", () => {
-    for (const role of ["technician", "vet_tech", "student"]) {
+    const floorRoles: UserRole[] = ["technician", "vet_tech", "student"];
+    for (const role of floorRoles) {
       expect(can(exp(role), "equipment.consoleWrite")).toBe(false);
     }
   });
