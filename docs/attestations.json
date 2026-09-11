@@ -13,7 +13,7 @@
     },
     {
       "id": "play-alpha-aab-10301",
-      "claim": "An AAB of uk.vettrack.app is uploaded and sits on the Play alpha track as a DRAFT release, so 'blocked until the first AAB is uploaded' is no longer why the App Signing certificate is unavailable. Re-verified 2026-09-10: the draft now carries versionCode 10302 (1.3.0); 10301 was superseded inside the same draft and both bundles remain in Play's library. Re-verify with the authenticated gplay CLI: `gplay status --package uk.vettrack.app` — expect track 'alpha' carrying release 1.3.0 with status draft and version_codes [10302] (or higher); `gplay bundles list` must include 10301 and 10302.",
+      "claim": "An AAB of uk.vettrack.app is uploaded and sits on the Play alpha track as a DRAFT release, so 'blocked until the first AAB is uploaded' is no longer why the App Signing certificate is unavailable. Re-verified 2026-09-09: the draft now carries versionCode 10302 (1.3.0); 10301 was superseded inside the same draft and both bundles remain in Play's library. Re-verify with the authenticated gplay CLI: `gplay status --package uk.vettrack.app` — expect track 'alpha' carrying release 1.3.0 with status draft and version_codes [10302] (or higher); `gplay bundles list` must include 10301 and 10302.",
       "target": "eas-store",
       "evidence": "Play Developer API via the authenticated gplay CLI",
       "attestedBy": "agent run 2026-09-09 UTC (founder-review), credentials in ~/keys (not in this repo); first attested 2026-08-31",

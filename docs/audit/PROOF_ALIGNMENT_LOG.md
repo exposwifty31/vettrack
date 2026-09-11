@@ -11559,7 +11559,6 @@ unmerged and 770 commits behind `main`, exactly as both findings documents state
 - The earlier merged commits were also verified live: VetTrack log after `27bc6f3f4` shows `[stale-returned-sweep] scheduled via BullMQ` with no `startup sweep failed` line (the #295 fix), and no `first connection refused` line was needed (Redis was up).
 
 **Verdict:** VERIFIED
-||||||| parent of f031ea141 (wip: founder-review store-truth edits (to be cherry-picked onto main))
 ## 2026-09-09 — founder-review: both build-number floors were green on numbers the stores had already burnt
 
 Both lanes' offline build-number gates passed while comparing against a shipped-build record
