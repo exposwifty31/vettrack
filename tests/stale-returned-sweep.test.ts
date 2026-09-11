@@ -288,6 +288,8 @@ describe("runStaleReturnedSweep", () => {
     // process. (Cross-instance overlap is bounded separately by the Phase C re-check.)
     mockCandidatesAndAnchors([makeCandidate()], []);
     setupTransactionMock({ priorAcks: [] });
+    // Definite-assignment `!`: the sendPushToRole mock below assigns this synchronously on its first
+    // call, and `vi.waitFor` blocks until that first call has happened, so every read is after the write.
     let releasePush!: () => void;
     vi.mocked(sendPushToRole).mockImplementation(
       () => new Promise((resolve) => { releasePush = () => resolve({ deliveredAny: true, transientFailures: 0, invalidOrGoneCount: 0 }); }),
