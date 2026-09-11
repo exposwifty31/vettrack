@@ -144,6 +144,11 @@ export async function runStaleReturnedSweep(now = new Date()): Promise<{ scanned
           gt(alertAcks.acknowledgedAt, custodyStateSince),
         ));
       if (prior.length >= MAX_NUDGES) return false; // cap hit by concurrent process — acceptable
+      // vt_alert_acks is UNIQUE(equipment_id, alert_type) (migrations/001), so the second nudge
+      // for an item — or the first nudge after a later return — hits the row the previous one
+      // wrote. A plain INSERT threw here on every production boot ("startup sweep failed:
+      // duplicate key…") and aborted the whole sweep. Upsert in place: refreshing acknowledgedAt
+      // is what keeps the RENUDGE_INTERVAL_MS gate above honest for the next tick.
       await tx.insert(alertAcks).values({          // D2 — every NOT NULL column present
         id: randomUUID(),
         clinicId,
@@ -153,6 +158,14 @@ export async function runStaleReturnedSweep(now = new Date()): Promise<{ scanned
         acknowledgedByEmail: SYSTEM_USER_EMAIL,
         acknowledgedAt: now,
         ackStatus: "SEEN",
+      }).onConflictDoUpdate({
+        target: [alertAcks.equipmentId, alertAcks.alertType],
+        set: {
+          acknowledgedById: SYSTEM_USER_ID,
+          acknowledgedByEmail: SYSTEM_USER_EMAIL,
+          acknowledgedAt: now,
+          ackStatus: "SEEN",
+        },
       });
       return true;
     });

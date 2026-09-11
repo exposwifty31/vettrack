@@ -11332,3 +11332,18 @@ So the 0s are the query working, not the query failing.
 
 **Verdict:** VERIFIED — no pull request has ever existed for either spike branch, and both remain
 unmerged and 770 commits behind `main`, exactly as both findings documents state.
+
+## 2026-09-11 — stale-returned-sweep: ack write is an upsert on (equipment_id, alert_type)
+
+**Claim:** `runStaleReturnedSweep` no longer aborts with `duplicate key value violates unique constraint "vt_alert_acks_equipment_id_alert_type_key"` when it re-nudges an item that already has a `stale_returned_nudge` row; the write is `INSERT … ON CONFLICT (equipment_id, alert_type) DO UPDATE` and later candidates in the same run are processed.
+
+**Evidence:**
+- `migrations/001_initial_schema.sql:78` — Read: `UNIQUE(equipment_id, alert_type)` on `vt_alert_acks`. `server/workers/stale-returned-sweep.worker.ts` inserted a fresh `randomUUID()` row per nudge, so the second nudge for any item could never succeed; production logged `[stale-returned-sweep] startup sweep failed: … duplicate key …` on every boot.
+- RED: `npx vitest run tests/stale-returned-sweep.test.ts` with the new Postgres-faithful insert fake (a plain `await values()` rejects with the production error when the row exists; only `.onConflictDoUpdate()` resolves) → `2 failed | 11 passed (13)`, both failing on `duplicate key value violates unique constraint "vt_alert_acks_equipment_id_alert_type_key"`.
+- GREEN: after chaining `.onConflictDoUpdate({ target: [equipmentId, alertType], set: { acknowledgedAt: now, … } })` → `tests/stale-returned-sweep.test.ts` + `tests/stale-checkout-sweep.test.ts` + `tests/equipment-missing-alert.service.test.ts` → `3 passed (3)`, `31 passed (31)`.
+- Case 7 asserts the conflict target is `["equipment_id", "alert_type"]` and `set.acknowledgedAt === now`; case 7b asserts a two-candidate run resolves `{ scanned: 2, nudged: 2 }` and the second item's push carries `tag: "stale-returned:eq-2"`.
+- Chose `DO UPDATE` over `DO NOTHING` deliberately: with `DO NOTHING` the existing row's `acknowledgedAt` never advances, so the `RENUDGE_INTERVAL_MS` gate would re-push the same item on every hourly tick. Not re-verified against a live DB in this session — the fake models the constraint, it does not run it.
+- NOT fixed, flagged: `MAX_NUDGES` counts rows per `(equipment, alert_type)`, which the unique constraint caps at 1, so the "3 nudges then stop" cap is unreachable in both this worker and `server/workers/staleCheckoutSweepWorker.ts:108-117`, which still does the plain insert.
+- Command: `pnpm typecheck:server` → exit 0.
+
+**Verdict:** VERIFIED (unit); PARTIAL (no live-DB run)
