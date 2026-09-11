@@ -11359,6 +11359,6 @@ unmerged and 770 commits behind `main`, exactly as both findings documents state
 - `git ls-remote --heads origin staging` → empty: `docs/infra/branch-protection.md` and `CONTRIBUTING.md` no longer describe a `staging` branch, baseline, or promotion flow.
 - `docs/attestations.json` — three entries added (`railway-production-state-2026-09-10`, `assetlinks-two-fingerprints-2026-09-10`, `github-owner-exposwifty31-2026-09-11`), each with `attestedAt`, `staleAfterDays`, and a `reverifyWith` that resolves to an existing document; referenced from this governed entry and from the ungoverned docs that make the claims.
 - `docs/infra/railway-api-gotchas.md` — appended the redacted GraphQL introspection output for the mutations it relies on (captured 2026-09-10) with the `curl` to reproduce it. A disposable-environment rehearsal was NOT added: the project has one environment, this session performs no Railway mutations, and the behaviours were exercised on production on 2026-09-10 by the operations session (recorded in the attestation).
-- Command: `pnpm verify:claims` → see the line recorded in the PR after this entry was written.
+- Command: `pnpm verify:claims` → `1254 claims: 1218 verified, 30 registered, 6 attested, 2374 excluded by rule, 0 FAILED` · `All claims accounted for.`
 
 **Verdict:** VERIFIED (docs); the Railway/GitHub/assetlinks state itself is ATTESTED (layer 4), not re-checked here.

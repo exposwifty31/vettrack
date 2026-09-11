@@ -1,4 +1,4 @@
-# Branch protection — `main` and `staging`
+# Branch protection — `main`
 
 Template for the GitHub branch-protection / ruleset configuration of the
 VetTrack repository. The Section B infrastructure audit could not read the

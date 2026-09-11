@@ -43,7 +43,7 @@
     },
     {
       "id": "assetlinks-two-fingerprints-2026-09-10",
-      "claim": "https://vettrack.uk/.well-known/assetlinks.json serves two sha256_cert_fingerprints for uk.vettrack.app: the UPLOAD_KEY_CERT_FINGERPRINT constant (93:34:4C…5C:83) and the Play App Signing key from the ANDROID_PLAY_SIGNING_SHA256 variable (C4:17:D1…CE:3E). Re-verify: `curl -s https://vettrack.uk/.well-known/assetlinks.json | jq '.[0].target.sha256_cert_fingerprints | length'` → 2.",
+      "claim": "https://vettrack.uk/.well-known/assetlinks.json serves exactly two sha256_cert_fingerprints for uk.vettrack.app: the UPLOAD_KEY_CERT_FINGERPRINT constant from server/lib/well-known-assetlinks.ts (93:34:4C:4B:9F:2D:22:CC:61:DA:0C:35:71:CF:98:E5:85:22:A3:0A:CA:B8:98:17:2A:28:E7:FC:9F:82:5C:83) and the value of the ANDROID_PLAY_SIGNING_SHA256 variable, which is the Play App Signing key (C4:17:D1:FA:83:F3:4A:7C:C9:4E:63:14:39:ED:FE:FD:13:F0:B3:2F:D2:BA:D5:65:A8:7C:CC:78:5F:B9:CE:3E). This attests what the endpoint serves; it does NOT attest that the constant equals the Play Console upload key (Play Console lists 38:31:8A:…:4F:5F there — an open owner decision recorded in docs/runbooks/o2-eas-keystore.md). Re-verify by comparing normalized values, not a count: `curl -s https://vettrack.uk/.well-known/assetlinks.json | jq -r '.[0].target.sha256_cert_fingerprints[] | ascii_upcase' | sort` must print exactly `C4:17:D1:FA:83:F3:4A:7C:C9:4E:63:14:39:ED:FE:FD:13:F0:B3:2F:D2:BA:D5:65:A8:7C:CC:78:5F:B9:CE:3E` and `93:34:4C:4B:9F:2D:22:CC:61:DA:0C:35:71:CF:98:E5:85:22:A3:0A:CA:B8:98:17:2A:28:E7:FC:9F:82:5C:83` (one per line, sorted), and the second must equal the output of `grep -o '\"[0-9A-F:]\\{95\\}\"' server/lib/well-known-assetlinks.ts`.",
       "target": "external-service",
       "evidence": "curl of the live endpoint after the 2026-09-10 redeploy",
       "attestedBy": "operations session 2026-09-10/11 (Cowork)",
@@ -53,7 +53,7 @@
     },
     {
       "id": "github-owner-exposwifty31-2026-09-11",
-      "claim": "The dboy3156 GitHub account is deleted (https://github.com/dboy3156 → 404) and every repository the project depends on lives under exposwifty31: vettrack, VetTrack---RN-Migration-, VetTrack-Updated-, shifts, and VetTrack-legacy (formerly dboy3156/VetTrack). Re-verify: `gh api users/dboy3156` → 404 and `gh repo view exposwifty31/VetTrack-legacy --json name`.",
+      "claim": "The dboy3156 GitHub account is deleted, and these five repositories exist under exposwifty31: vettrack, VetTrack---RN-Migration-, VetTrack-Updated-, shifts, and VetTrack-legacy (the former dboy3156/VetTrack). Nothing more is claimed about what depends on what. Re-verify all six facts: `gh api users/dboy3156` must return HTTP 404, and `for r in vettrack VetTrack---RN-Migration- VetTrack-Updated- shifts VetTrack-legacy; do gh repo view exposwifty31/$r --json owner,name --jq '.owner.login+\"/\"+.name'; done` must print the five exposwifty31/<name> lines with no error.",
       "target": "external-service",
       "evidence": "gh API responses on 2026-09-11",
       "attestedBy": "operations session 2026-09-10/11 (Cowork)",
