@@ -11535,3 +11535,14 @@ unmerged and 770 commits behind `main`, exactly as both findings documents state
 - The underlying finding is real and is NOT fixed here: certificate verification is disabled in production. Filed in `TASKS.md` Backlog (ops/security) with the order: flip the Railway variable → redeploy → then tighten both gates together.
 
 **Verdict:** VERIFIED (code); production recovery is verified by the Worker boot line after deploy, recorded in a later entry.
+
+## 2026-09-11 — SECURITY EXCEPTION (owner decision): Worker boots with Postgres certificate verification disabled
+
+**Claim:** The repository owner (`exposwifty31`) decided on 2026-09-11 to merge the warn-only worker gate (#298) rather than keep the Worker down, accepting that production runs `DB_SSL_REJECT_UNAUTHORIZED="false"` — i.e. neither service verifies the managed-Postgres certificate — as a documented exception that **expires 2026-10-11**.
+
+**Evidence:**
+- Decision recorded from the owner's answer in this session (option "merge the hotfix + documented exception"), after both CodeRabbit (threads on #298) and the automated commit security review asked for fail-closed behaviour.
+- Why fail-closed was not shippable today: `server/lib/postgresql.ts` (`getPgSslConfig`) passes only `rejectUnauthorized`, no `ssl.ca`; Railway's `postgres-ssl` service presents a self-signed certificate, so setting the variable to `"true"` would make BOTH VetTrack and Worker reject the database. The value has been `"false"` since before this session; #294 did not change the security state, it only made the Worker refuse it.
+- Exit criteria (filed in `TASKS.md`, same item): wire a trusted chain (`ssl.ca` from Railway's CA or the service's certificate), flip the Railway variable to `"true"`, redeploy Worker then VetTrack with `/api/health` `db: ok`, then tighten `validateEnv()` and `validateWorkerEnv()` in `server/lib/envValidation.ts` to the exact string in one change. If not done by the expiry, this entry is superseded by a new one that either extends it with a reason or records the fix.
+
+**Verdict:** VERIFIED (decision and its basis); the underlying security state is ATTESTED as insecure, by design of this exception, until the exit criteria are met.
