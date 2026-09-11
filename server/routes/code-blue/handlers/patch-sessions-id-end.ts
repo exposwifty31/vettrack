@@ -40,9 +40,9 @@ import { param } from "../../../lib/route-params.js";
 // and identity validation. Shadow-only.
 export const patchSessionsIdEndHandler: RequestHandler = async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
+  const sessionId = param(req, "id");
   try {
     const clinicId = req.clinicId!;
-    const sessionId = param(req, "id");
     const { outcome, earlyStopReason: rawEarlyStopReason } = req.body as z.infer<typeof endSessionSchema>;
     const earlyStopReason = rawEarlyStopReason ? rawEarlyStopReason.trim() : undefined;
     if (earlyStopReason !== undefined && earlyStopReason.length < 3) {

@@ -130,12 +130,13 @@ router.post(
   async (req, res) => {
     const requestId = resolveRequestId(res, req.headers["x-request-id"]);
     const clinicId = requireClinicId(req);
+    const idParam = param(req, "id");
     try {
       const [ticket] = await db
         .select()
         .from(supportTickets)
         .where(
-          and(eq(supportTickets.id, param(req, "id")), eq(supportTickets.clinicId, clinicId)),
+          and(eq(supportTickets.id, idParam), eq(supportTickets.clinicId, clinicId)),
         )
         .limit(1);
 
@@ -210,8 +211,9 @@ router.post(
 
 router.get("/agents/:agentId", async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
+  const agentIdParam = param(req, "agentId");
   try {
-    const agent = await getCursorBugFixerAgent(param(req, "agentId"));
+    const agent = await getCursorBugFixerAgent(agentIdParam);
     res.json(agent);
   } catch (err) {
     const mapped = mapServiceError(err);

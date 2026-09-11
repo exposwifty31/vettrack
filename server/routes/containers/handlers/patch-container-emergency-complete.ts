@@ -22,11 +22,11 @@ type CompleteEmergencyBody = {
 // student floor (a student who taps emergency must be able to complete it).
 export const patchContainerEmergencyCompleteHandler: RequestHandler = async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
+  const eventId = param(req, "eventId");
   try {
     const clinicId = req.clinicId!;
     const actorUserId = req.authUser!.id;
     const actorDisplayName = req.authUser!.name || req.authUser!.email;
-    const eventId = param(req, "eventId");
     const body = req.body as CompleteEmergencyBody;
     const takenAt = new Date();
 

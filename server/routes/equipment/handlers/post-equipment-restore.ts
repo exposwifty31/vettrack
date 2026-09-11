@@ -9,12 +9,13 @@ import { param } from "../../../lib/route-params.js";
 /** POST /api/equipment/:id/restore — admin only, restore a soft-deleted equipment record */
 export const postEquipmentRestoreHandler: RequestHandler = async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
+  const idParam = param(req, "id");
   try {
     const clinicId = req.clinicId!;
     const [existing] = await db
       .select()
       .from(equipment)
-      .where(and(eq(equipment.clinicId, clinicId), eq(equipment.id, param(req, "id")), isNotNull(equipment.deletedAt)))
+      .where(and(eq(equipment.clinicId, clinicId), eq(equipment.id, idParam), isNotNull(equipment.deletedAt)))
       .limit(1);
 
     if (!existing) {
@@ -31,7 +32,7 @@ export const postEquipmentRestoreHandler: RequestHandler = async (req, res) => {
     const [restored] = await db
       .update(equipment)
       .set({ deletedAt: null, deletedBy: null })
-      .where(and(eq(equipment.clinicId, clinicId), eq(equipment.id, param(req, "id"))))
+      .where(and(eq(equipment.clinicId, clinicId), eq(equipment.id, idParam)))
       .returning();
 
     if (restored) {
@@ -41,7 +42,7 @@ export const postEquipmentRestoreHandler: RequestHandler = async (req, res) => {
         actionType: "equipment_restored",
         performedBy: req.authUser!.id,
         performedByEmail: req.authUser!.email ?? "",
-        targetId: param(req, "id"),
+        targetId: idParam,
         targetType: "equipment",
         metadata: { equipmentName: restored.name },
       });

@@ -13,9 +13,9 @@ import { param } from "../../../lib/route-params.js";
 // next to this route's registration.
 export const patchEventsIdHandler: RequestHandler = async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
+  const id = param(req, "id");
   try {
     const clinicId = req.clinicId!;
-    const id = param(req, "id");
     const body = req.body as z.infer<typeof endSchema>;
 
     const [updated] = await db

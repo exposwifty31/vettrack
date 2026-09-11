@@ -83,12 +83,9 @@ describe("end-to-end on a throwaway app", () => {
   let baseUrl: string;
   beforeAll(async () => {
     const app = express();
-    // A sync throw reaches the error middleware on Express 4 and 5 alike; the
-    // async-throw propagation is Express 5 behaviour and is pinned in
-    // tests/express5-runtime-contract.test.ts once the bump lands.
-    app.get("/items/:id", (req, res) => {
-      // Simulate what path-to-regexp v8 hands over for a repeated segment.
-      (req.params as Record<string, unknown>).id = ["a", "b"];
+    // Express 5 / path-to-regexp v8: a wildcard segment hands the handler a real
+    // string[] (`/items/a/b` -> req.params.id === ["a", "b"]) — no injection needed.
+    app.get("/items/*id", (req, res) => {
       const id = param(req, "id");
       res.json({ id });
     });
@@ -102,8 +99,8 @@ describe("end-to-end on a throwaway app", () => {
     await new Promise<void>((resolve) => server.close(() => resolve()));
   });
 
-  it("answers 400 INVALID_ROUTE_PARAM for an array param", async () => {
-    const r = await fetch(`${baseUrl}/items/x`);
+  it("answers 400 INVALID_ROUTE_PARAM for an array param (a two-segment wildcard match)", async () => {
+    const r = await fetch(`${baseUrl}/items/a/b`);
     expect(r.status).toBe(400);
     expect(await r.json()).toMatchObject({ code: "INVALID_ROUTE_PARAM", param: "id" });
   });

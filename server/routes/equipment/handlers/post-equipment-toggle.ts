@@ -12,13 +12,14 @@ import { param } from "../../../lib/route-params.js";
 /** POST /api/equipment/:id/toggle — NFC quick custody flip (online-only client) */
 export const postEquipmentToggleHandler: RequestHandler = async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
+  const idParam = param(req, "id");
   try {
     const clinicId = req.clinicId!;
     const { isPluggedIn } = req.body as { isPluggedIn?: boolean };
 
     const result = await toggleEquipmentCustody({
       clinicId,
-      equipmentId: param(req, "id"),
+      equipmentId: idParam,
       actor: { id: req.authUser!.id, email: req.authUser!.email },
       isPluggedIn: isPluggedIn ?? true,
       actorRole: resolveAuditActorRole(req) ?? undefined,

@@ -96,12 +96,13 @@ router.get("/", requireAuth, requireEffectiveRole("technician"), async (req, res
 // GET /api/procurement/:id — get single PO with lines
 router.get("/:id", requireAuth, requireEffectiveRole("technician"), validateUuid("id"), async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
+  const idParam = param(req, "id");
   try {
     const clinicId = req.clinicId!;
     const [order] = await db
       .select()
       .from(purchaseOrders)
-      .where(and(eq(purchaseOrders.clinicId, clinicId), eq(purchaseOrders.id, param(req, "id"))))
+      .where(and(eq(purchaseOrders.clinicId, clinicId), eq(purchaseOrders.id, idParam)))
       .limit(1);
 
     if (!order) return res.status(404).json(apiError({ code: "NOT_FOUND", reason: "PO_NOT_FOUND", message: "Purchase order not found", requestId }));
@@ -201,12 +202,13 @@ router.post("/", requireAuth, requireAdmin, validateBody(createPoSchema), async 
 // PATCH /api/procurement/:id/submit — mark as ordered
 router.patch("/:id/submit", requireAuth, requireAdmin, validateUuid("id"), async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
+  const idParam = param(req, "id");
   try {
     const clinicId = req.clinicId!;
     const [existing] = await db
       .select()
       .from(purchaseOrders)
-      .where(and(eq(purchaseOrders.clinicId, clinicId), eq(purchaseOrders.id, param(req, "id"))))
+      .where(and(eq(purchaseOrders.clinicId, clinicId), eq(purchaseOrders.id, idParam)))
       .limit(1);
 
     if (!existing) return res.status(404).json(apiError({ code: "NOT_FOUND", reason: "PO_NOT_FOUND", message: "Purchase order not found", requestId }));
@@ -215,7 +217,7 @@ router.patch("/:id/submit", requireAuth, requireAdmin, validateUuid("id"), async
     const [updated] = await db
       .update(purchaseOrders)
       .set({ status: "ordered", orderedAt: new Date(), updatedAt: new Date() })
-      .where(and(eq(purchaseOrders.clinicId, clinicId), eq(purchaseOrders.id, param(req, "id")), eq(purchaseOrders.status, "draft")))
+      .where(and(eq(purchaseOrders.clinicId, clinicId), eq(purchaseOrders.id, idParam), eq(purchaseOrders.status, "draft")))
       .returning();
     if (!updated) {
       return res.status(409).json(apiError({ code: "CONFLICT", reason: "INVALID_STATUS", message: "Only draft orders can be submitted", requestId }));
@@ -226,7 +228,7 @@ router.patch("/:id/submit", requireAuth, requireAdmin, validateUuid("id"), async
       actionType: "purchase_order_submitted",
       performedBy: req.authUser!.id,
       performedByEmail: req.authUser!.email ?? "",
-      targetId: param(req, "id"),
+      targetId: idParam,
       targetType: "purchase_order",
       metadata: {
         previousStatus: existing.status,
@@ -243,6 +245,7 @@ router.patch("/:id/submit", requireAuth, requireAdmin, validateUuid("id"), async
 // PATCH /api/procurement/:id/receive — receive stock
 router.patch("/:id/receive", requireAuth, requireEffectiveRole("technician"), validateUuid("id"), validateBody(receivePoSchema), async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
+  const idParam = param(req, "id");
   try {
     const clinicId = req.clinicId!;
     const userId = req.authUser!.id;
@@ -251,7 +254,7 @@ router.patch("/:id/receive", requireAuth, requireEffectiveRole("technician"), va
     const [existing] = await db
       .select()
       .from(purchaseOrders)
-      .where(and(eq(purchaseOrders.clinicId, clinicId), eq(purchaseOrders.id, param(req, "id"))))
+      .where(and(eq(purchaseOrders.clinicId, clinicId), eq(purchaseOrders.id, idParam)))
       .limit(1);
 
     if (!existing) return res.status(404).json(apiError({ code: "NOT_FOUND", reason: "PO_NOT_FOUND", message: "Purchase order not found", requestId }));
@@ -268,7 +271,7 @@ router.patch("/:id/receive", requireAuth, requireEffectiveRole("technician"), va
       // order; two requests with the same lines in different order would deadlock.
       // Holding the PO lock throughout ensures only one receive proceeds at a time.
       await tx.select({ id: purchaseOrders.id }).from(purchaseOrders)
-        .where(and(eq(purchaseOrders.clinicId, clinicId), eq(purchaseOrders.id, param(req, "id"))))
+        .where(and(eq(purchaseOrders.clinicId, clinicId), eq(purchaseOrders.id, idParam)))
         .for("update");
 
       for (const incoming of b.lines) {
@@ -280,7 +283,7 @@ router.patch("/:id/receive", requireAuth, requireEffectiveRole("technician"), va
           .where(and(
             eq(poLines.id, incoming.lineId),
             eq(poLines.clinicId, clinicId),
-            eq(poLines.purchaseOrderId, param(req, "id")),
+            eq(poLines.purchaseOrderId, idParam),
           ))
           .limit(1)
           .for("update");
@@ -304,7 +307,7 @@ router.patch("/:id/receive", requireAuth, requireEffectiveRole("technician"), va
           .where(and(
             eq(poLines.id, incoming.lineId),
             eq(poLines.clinicId, clinicId),
-            eq(poLines.purchaseOrderId, param(req, "id")),
+            eq(poLines.purchaseOrderId, idParam),
           ));
 
         receiveAuditLines.push({
@@ -359,7 +362,7 @@ router.patch("/:id/receive", requireAuth, requireEffectiveRole("technician"), va
           quantityBefore: ciRow.quantity - effectiveDelta,
           quantityAdded: effectiveDelta,
           quantityAfter: ciRow.quantity,
-          note: `Received via PO ${param(req, "id")}`,
+          note: `Received via PO ${idParam}`,
           createdByUserId: userId,
         });
       }
@@ -372,7 +375,7 @@ router.patch("/:id/receive", requireAuth, requireEffectiveRole("technician"), va
       // "draft" is promoted to "ordered" when a receive starts; "cancelled"/"received" are
       // rejected at the top of the handler so existing.status ∈ {draft, ordered, partial} here.
       const refreshedLines = await tx.select().from(poLines)
-        .where(and(eq(poLines.purchaseOrderId, param(req, "id")), eq(poLines.clinicId, clinicId)));
+        .where(and(eq(poLines.purchaseOrderId, idParam), eq(poLines.clinicId, clinicId)));
       const allFullyReceived = refreshedLines.every((l) => l.quantityReceived >= l.quantityOrdered);
       const anyReceived = refreshedLines.some((l) => l.quantityReceived > 0);
       const newStatus = allFullyReceived ? "received" : anyReceived ? "partial" : existing.status === "draft" ? "ordered" : existing.status;
@@ -380,7 +383,7 @@ router.patch("/:id/receive", requireAuth, requireEffectiveRole("technician"), va
       const [poAfter] = await tx
         .update(purchaseOrders)
         .set({ status: newStatus, updatedAt: new Date() })
-        .where(and(eq(purchaseOrders.clinicId, clinicId), eq(purchaseOrders.id, param(req, "id")), notInArray(purchaseOrders.status, ["received", "cancelled"])))
+        .where(and(eq(purchaseOrders.clinicId, clinicId), eq(purchaseOrders.id, idParam), notInArray(purchaseOrders.status, ["received", "cancelled"])))
         .returning();
       if (!poAfter) throw new Error("CONCURRENT_MODIFICATION");
     });
@@ -388,7 +391,7 @@ router.patch("/:id/receive", requireAuth, requireEffectiveRole("technician"), va
     const [updated] = await db
       .select()
       .from(purchaseOrders)
-      .where(and(eq(purchaseOrders.clinicId, clinicId), eq(purchaseOrders.id, param(req, "id"))))
+      .where(and(eq(purchaseOrders.clinicId, clinicId), eq(purchaseOrders.id, idParam)))
       .limit(1);
     if (!updated) {
       return res.status(404).json(apiError({ code: "NOT_FOUND", reason: "PO_NOT_FOUND", message: "Purchase order not found", requestId }));
@@ -407,7 +410,7 @@ router.patch("/:id/receive", requireAuth, requireEffectiveRole("technician"), va
       })
       .from(poLines)
       .leftJoin(inventoryItems, eq(poLines.itemId, inventoryItems.id))
-      .where(eq(poLines.purchaseOrderId, param(req, "id")));
+      .where(eq(poLines.purchaseOrderId, idParam));
 
     logAudit({
       actorRole: resolveAuditActorRole(req),
@@ -415,7 +418,7 @@ router.patch("/:id/receive", requireAuth, requireEffectiveRole("technician"), va
       actionType: "purchase_order_received",
       performedBy: req.authUser!.id,
       performedByEmail: req.authUser!.email ?? "",
-      targetId: param(req, "id"),
+      targetId: idParam,
       targetType: "purchase_order",
       metadata: {
         previousStatus: existing.status,
@@ -456,12 +459,13 @@ router.patch("/:id/receive", requireAuth, requireEffectiveRole("technician"), va
 // PATCH /api/procurement/:id/cancel — cancel PO
 router.patch("/:id/cancel", requireAuth, requireAdmin, validateUuid("id"), async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
+  const idParam = param(req, "id");
   try {
     const clinicId = req.clinicId!;
     const [existing] = await db
       .select()
       .from(purchaseOrders)
-      .where(and(eq(purchaseOrders.clinicId, clinicId), eq(purchaseOrders.id, param(req, "id"))))
+      .where(and(eq(purchaseOrders.clinicId, clinicId), eq(purchaseOrders.id, idParam)))
       .limit(1);
 
     if (!existing) return res.status(404).json(apiError({ code: "NOT_FOUND", reason: "PO_NOT_FOUND", message: "Purchase order not found", requestId }));
@@ -470,7 +474,7 @@ router.patch("/:id/cancel", requireAuth, requireAdmin, validateUuid("id"), async
 
     // Block cancellation if any line has already been received
     const allPoLines = await db.select({ quantityReceived: poLines.quantityReceived }).from(poLines)
-      .where(and(eq(poLines.purchaseOrderId, param(req, "id")), eq(poLines.clinicId, clinicId)));
+      .where(and(eq(poLines.purchaseOrderId, idParam), eq(poLines.clinicId, clinicId)));
     const anyReceived = allPoLines.some((l) => l.quantityReceived > 0);
     if (anyReceived) {
       return res.status(409).json(apiError({
@@ -484,7 +488,7 @@ router.patch("/:id/cancel", requireAuth, requireAdmin, validateUuid("id"), async
     const [updated] = await db
       .update(purchaseOrders)
       .set({ status: "cancelled", updatedAt: new Date() })
-      .where(and(eq(purchaseOrders.clinicId, clinicId), eq(purchaseOrders.id, param(req, "id")), inArray(purchaseOrders.status, ["draft", "ordered"])))
+      .where(and(eq(purchaseOrders.clinicId, clinicId), eq(purchaseOrders.id, idParam), inArray(purchaseOrders.status, ["draft", "ordered"])))
       .returning();
     if (!updated) {
       return res.status(409).json(apiError({ code: "CONFLICT", reason: "CONCURRENT_MODIFICATION", message: "Order status changed concurrently", requestId }));
@@ -495,7 +499,7 @@ router.patch("/:id/cancel", requireAuth, requireAdmin, validateUuid("id"), async
       actionType: "purchase_order_cancelled",
       performedBy: req.authUser!.id,
       performedByEmail: req.authUser!.email ?? "",
-      targetId: param(req, "id"),
+      targetId: idParam,
       targetType: "purchase_order",
       metadata: {
         previousStatus: existing.status,

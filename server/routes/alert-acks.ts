@@ -214,9 +214,9 @@ router.post("/", requireAuth, requireEffectiveRole("senior_technician"), async (
 // The alert-reminder scanner validates the underlying condition and may re-open.
 router.patch("/:id/resolve", requireAuth, requireEffectiveRole("senior_technician"), async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
+  const ackId = param(req, "id");
   try {
     const clinicId = req.clinicId!;
-    const ackId = param(req, "id");
     const resolutionNote = typeof req.body?.resolutionNote === "string" ? req.body.resolutionNote.trim() : null;
 
     const [existing] = await db

@@ -123,8 +123,9 @@ router.post(
       }),
     );
   }
+  const idParam = param(req, "id");
   try {
-    const task = await startTask(req.clinicId!, param(req, "id"), {
+    const task = await startTask(req.clinicId!, idParam, {
       userId: req.authUser.id,
       clerkId: req.authUser.clerkId,
       email: req.authUser.email,
@@ -173,8 +174,9 @@ router.post(
       }),
     );
   }
+  const idParam = param(req, "id");
   try {
-    const { task } = await completeTask(req.clinicId!, param(req, "id"), {
+    const { task } = await completeTask(req.clinicId!, idParam, {
       userId: req.authUser.id,
       clerkId: req.authUser.clerkId,
       email: req.authUser.email,

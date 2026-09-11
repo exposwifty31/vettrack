@@ -14,6 +14,7 @@ type EquipmentRow = typeof equipment.$inferSelect;
 /** PATCH /api/equipment/:id */
 export const patchEquipmentHandler: RequestHandler = async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
+  const idParam = param(req, "id");
   try {
     const clinicId = req.clinicId!;
     const {
@@ -105,7 +106,7 @@ export const patchEquipmentHandler: RequestHandler = async (req, res) => {
       const [oldItem] = await tx
         .select()
         .from(equipment)
-        .where(and(eq(equipment.clinicId, clinicId), eq(equipment.id, param(req, "id")), isNull(equipment.deletedAt)))
+        .where(and(eq(equipment.clinicId, clinicId), eq(equipment.id, idParam), isNull(equipment.deletedAt)))
         .limit(1);
 
       if (!oldItem) return;
@@ -142,7 +143,7 @@ export const patchEquipmentHandler: RequestHandler = async (req, res) => {
         .where(
           and(
             eq(equipment.clinicId, clinicId),
-            eq(equipment.id, param(req, "id")),
+            eq(equipment.id, idParam),
             isNull(equipment.deletedAt),
             ...(expectedVersion !== undefined ? [eq(equipment.version, expectedVersion)] : []),
           ),
@@ -166,7 +167,7 @@ export const patchEquipmentHandler: RequestHandler = async (req, res) => {
         await tx.insert(transferLogs).values({
           id: randomUUID(),
           clinicId,
-          equipmentId: param(req, "id"),
+          equipmentId: idParam,
           fromFolderId: oldItem.folderId ?? null,
           fromFolderName: oldFolder?.name ?? null,
           toFolderId: targetFolderId,
@@ -175,13 +176,13 @@ export const patchEquipmentHandler: RequestHandler = async (req, res) => {
         });
 
         const itemName = result?.name ?? oldItem.name;
-        if (shouldSendPilotEnglishEquipmentPush() && !checkDedupe(param(req, "id"), "transfer")) {
+        if (shouldSendPilotEnglishEquipmentPush() && !checkDedupe(idParam, "transfer")) {
           const toLabel = newFolder?.name ?? "unassigned";
           sendPushToAll(clinicId, {
             title: "Equipment Transferred",
             body: `${itemName} moved to ${toLabel}`,
-            tag: `transfer:${param(req, "id")}`,
-            url: `/equipment/${param(req, "id")}`,
+            tag: `transfer:${idParam}`,
+            url: `/equipment/${idParam}`,
           });
         }
       }
@@ -215,7 +216,7 @@ export const patchEquipmentHandler: RequestHandler = async (req, res) => {
       actionType: "equipment_updated",
       performedBy: req.authUser!.id,
       performedByEmail: req.authUser!.email,
-      targetId: param(req, "id"),
+      targetId: idParam,
       targetType: "equipment",
       metadata: { name: (result as EquipmentRow).name, changes: req.body },
     });

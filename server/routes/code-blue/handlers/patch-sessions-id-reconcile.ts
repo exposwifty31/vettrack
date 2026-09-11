@@ -15,9 +15,9 @@ import { param } from "../../../lib/route-params.js";
  */
 export const patchSessionsIdReconcileHandler: RequestHandler = async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
+  const sessionId = param(req, "id");
   try {
     const clinicId = req.clinicId!;
-    const sessionId = param(req, "id");
     const force = req.query.force === "true";
     const { forceReason } = req.body as z.infer<typeof reconcileSchema>;
 

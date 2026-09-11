@@ -7,12 +7,13 @@ import { param } from "../../../lib/route-params.js";
 /** GET /api/equipment/:id/transfers */
 export const getEquipmentTransfersHandler: RequestHandler = async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
+  const idParam = param(req, "id");
   try {
     const clinicId = req.clinicId!;
     const transfers = await db
       .select()
       .from(transferLogs)
-      .where(and(eq(transferLogs.clinicId, clinicId), eq(transferLogs.equipmentId, param(req, "id"))))
+      .where(and(eq(transferLogs.clinicId, clinicId), eq(transferLogs.equipmentId, idParam)))
       .orderBy(desc(transferLogs.timestamp));
     res.json(transfers);
   } catch (err) {

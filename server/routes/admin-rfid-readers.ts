@@ -136,6 +136,7 @@ router.post("/rfid-readers", requireAuth, requireAdmin, writeLimiter, async (req
 /** PATCH /api/admin/rfid-readers/:id — rename. Clinic-scoped; cross-clinic id → 404. */
 router.patch("/rfid-readers/:id", requireAuth, requireAdmin, writeLimiter, async (req, res: Response) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
+  const idParam = param(req, "id");
   try {
     const clinicId = requireClinicId(req, res, requestId);
     if (!clinicId) return;
@@ -144,7 +145,7 @@ router.patch("/rfid-readers/:id", requireAuth, requireAdmin, writeLimiter, async
       res.status(400).json({ code: "INVALID_INPUT", error: "INVALID_INPUT", message: "Invalid rename payload", requestId });
       return;
     }
-    const reader = await renameRfidReader(clinicId, param(req, "id"), parsed.data.name);
+    const reader = await renameRfidReader(clinicId, idParam, parsed.data.name);
     if (!reader) {
       res.status(404).json({ code: "READER_NOT_FOUND", error: "READER_NOT_FOUND", message: "RFID reader not found", requestId });
       return;
@@ -168,10 +169,11 @@ router.patch("/rfid-readers/:id", requireAuth, requireAdmin, writeLimiter, async
 /** POST /api/admin/rfid-readers/:id/deactivate — soft-deactivate. Clinic-scoped; cross-clinic id → 404. */
 router.post("/rfid-readers/:id/deactivate", requireAuth, requireAdmin, writeLimiter, async (req, res: Response) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
+  const idParam = param(req, "id");
   try {
     const clinicId = requireClinicId(req, res, requestId);
     if (!clinicId) return;
-    const reader = await deactivateRfidReader(clinicId, param(req, "id"));
+    const reader = await deactivateRfidReader(clinicId, idParam);
     if (!reader) {
       res.status(404).json({ code: "READER_NOT_FOUND", error: "READER_NOT_FOUND", message: "RFID reader not found", requestId });
       return;

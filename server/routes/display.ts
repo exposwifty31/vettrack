@@ -532,9 +532,9 @@ function createDevicesListHandler(): RequestHandler {
 function createDeviceRenameHandler(): RequestHandler {
   return async (req, res) => {
     const requestId = resolveRequestId(res, req.headers["x-request-id"]);
+    const id = param(req, "id");
     try {
       const clinicId = req.clinicId!;
-      const id = param(req, "id");
       const rawName = (req.body as { name?: unknown } | undefined)?.name;
       if (typeof rawName !== "string" || !rawName.trim()) {
         return res.status(400).json(
@@ -611,9 +611,9 @@ function createDeviceRenameHandler(): RequestHandler {
 function createDeviceRevokeHandler(): RequestHandler {
   return async (req, res) => {
     const requestId = resolveRequestId(res, req.headers["x-request-id"]);
+    const id = param(req, "id");
     try {
       const clinicId = req.clinicId!;
-      const id = param(req, "id");
       const now = new Date();
 
       const [revoked] = await db
@@ -674,9 +674,9 @@ function createDeviceRevokeHandler(): RequestHandler {
 function createDeviceDeleteHandler(): RequestHandler {
   return async (req, res) => {
     const requestId = resolveRequestId(res, req.headers["x-request-id"]);
+    const id = param(req, "id");
     try {
       const clinicId = req.clinicId!;
-      const id = param(req, "id");
 
       const [deleted] = await db
         .delete(displayDevices)

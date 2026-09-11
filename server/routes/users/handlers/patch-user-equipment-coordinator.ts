@@ -16,6 +16,7 @@ import { param } from "../../../lib/route-params.js";
  */
 export const patchUserEquipmentCoordinatorHandler: RequestHandler = async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
+  const idParam = param(req, "id");
   try {
     const clinicId = req.clinicId!;
     const { isEquipmentCoordinator } = req.body as { isEquipmentCoordinator: boolean };
@@ -23,7 +24,7 @@ export const patchUserEquipmentCoordinatorHandler: RequestHandler = async (req, 
     const [updated] = await db
       .update(users)
       .set({ isEquipmentCoordinator })
-      .where(and(eq(users.clinicId, clinicId), eq(users.id, param(req, "id")), isNull(users.deletedAt)))
+      .where(and(eq(users.clinicId, clinicId), eq(users.id, idParam), isNull(users.deletedAt)))
       .returning();
 
     if (!updated) {
@@ -43,7 +44,7 @@ export const patchUserEquipmentCoordinatorHandler: RequestHandler = async (req, 
       actionType: "equipment_coordinator_eligibility_set",
       performedBy: req.authUser!.id,
       performedByEmail: req.authUser!.email,
-      targetId: param(req, "id"),
+      targetId: idParam,
       targetType: "user",
       metadata: { isEquipmentCoordinator, targetEmail: updated.email },
     });

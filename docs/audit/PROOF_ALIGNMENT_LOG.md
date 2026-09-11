@@ -11699,3 +11699,14 @@ not a release plan. Android is the only open store lane (alpha draft 10302, zero
 - `pnpm architecture:gates` → `All G1 checks passed` before this entry was appended; `pnpm verify:claims` re-run after the wording below → 0 FAILED.
 
 **Verdict:** VERIFIED
+
+## 2026-09-11 — addendum to the Express-major entry: review round 1 on #305 — `param()` hoisted out of every handler `try`
+
+**Claim:** no `param(req, …)` call in `server/routes/**` sits inside a `try` block, so a `RouteParamError` always reaches the terminal handler as 400 `INVALID_ROUTE_PARAM` instead of being swallowed by a handler-local catch that answers 500.
+
+**Evidence:**
+- An AST scan (TypeScript compiler API) found 135 `param()` calls inside `try` blocks across 42 route files; the same scan drove the fix (hoist to `const <name>Param = param(req, "<name>")` — or the handler's own `const x = param(...)` moved above the `try` — and every inner call replaced by the variable). Re-scan → 0.
+- The scan now lives as a guard in `tests/express5-runtime-contract.test.ts` ("param() is never called inside a try block"); `tests/route-params.test.ts` produces the array case with a real Express 5 wildcard route (`/items/*id` ← `/items/a/b`) instead of an injected assignment.
+- `pnpm typecheck` → 0 `error TS`; `pnpm test` → `Test Files 802 passed · Tests 7225 passed | 11 skipped`.
+
+**Verdict:** VERIFIED

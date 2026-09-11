@@ -10,9 +10,9 @@ import { param } from "../../../lib/route-params.js";
 /** POST /api/equipment/:id/confirm-in-room — assign room + verification scan (passive location loop). */
 export const postEquipmentConfirmInRoomHandler: RequestHandler = async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
+  const equipmentId = param(req, "id");
   try {
     const clinicId = req.clinicId!;
-    const equipmentId = param(req, "id");
     const { roomId } = req.body as { roomId: string };
 
     const now = new Date();

@@ -275,6 +275,7 @@ router.post(
       );
       return;
     }
+    const idParam = param(req, "id");
     try {
       const result = await forceCloseCheckIn({
         admin: {
@@ -283,7 +284,7 @@ router.post(
           role: resolveAuditActorRole(req) ?? req.authUser!.role,
           clinicId: req.authUser!.clinicId,
         },
-        targetCheckInId: param(req, "id"),
+        targetCheckInId: idParam,
         reason: parsed.data.reason ?? null,
         requestId,
       });

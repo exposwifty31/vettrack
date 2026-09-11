@@ -129,9 +129,9 @@ router.post("/items", requireAuth, requireAdmin, validateBody(createItemSchema),
 // PATCH /api/crash-cart/items/:id — update item (admin only)
 router.patch("/items/:id", requireAuth, requireAdmin, validateBody(updateItemSchema), async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
+  const id = param(req, "id");
   try {
     const clinicId = req.clinicId!;
-    const id = param(req, "id");
     const body = req.body as z.infer<typeof updateItemSchema>;
 
     const [updated] = await db
@@ -158,9 +158,9 @@ router.patch("/items/:id", requireAuth, requireAdmin, validateBody(updateItemSch
 // DELETE /api/crash-cart/items/:id — soft-delete item (admin only)
 router.delete("/items/:id", requireAuth, requireAdmin, async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
+  const id = param(req, "id");
   try {
     const clinicId = req.clinicId!;
-    const id = param(req, "id");
 
     const [deactivated] = await db
       .update(crashCartItems)

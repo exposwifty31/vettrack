@@ -9,6 +9,7 @@ import { param } from "../../../lib/route-params.js";
 /** PATCH /api/users/:id/role */
 export const patchUserRoleHandler: RequestHandler = async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
+  const idParam = param(req, "id");
   try {
     const clinicId = req.clinicId!;
     const { role } = req.body as { role: "admin" | "vet" | "technician" | "senior_technician" | "student" };
@@ -16,7 +17,7 @@ export const patchUserRoleHandler: RequestHandler = async (req, res) => {
     const [target] = await db
       .select()
       .from(users)
-      .where(and(eq(users.clinicId, clinicId), eq(users.id, param(req, "id")), isNull(users.deletedAt)))
+      .where(and(eq(users.clinicId, clinicId), eq(users.id, idParam), isNull(users.deletedAt)))
       .limit(1);
 
     if (!target) {
@@ -50,10 +51,10 @@ export const patchUserRoleHandler: RequestHandler = async (req, res) => {
     const [user] = await db
       .update(users)
       .set({ role })
-      .where(and(eq(users.clinicId, clinicId), eq(users.id, param(req, "id")), isNull(users.deletedAt)))
+      .where(and(eq(users.clinicId, clinicId), eq(users.id, idParam), isNull(users.deletedAt)))
       .returning();
 
-    invalidateForUser(clinicId, param(req, "id"));
+    invalidateForUser(clinicId, idParam);
 
     logAudit({
       actorRole: resolveAuditActorRole(req),
@@ -61,7 +62,7 @@ export const patchUserRoleHandler: RequestHandler = async (req, res) => {
       actionType: "user_role_changed",
       performedBy: req.authUser!.id,
       performedByEmail: req.authUser!.email,
-      targetId: param(req, "id"),
+      targetId: idParam,
       targetType: "user",
       metadata: { previousRole: target.role, newRole: role, targetEmail: target.email },
     });

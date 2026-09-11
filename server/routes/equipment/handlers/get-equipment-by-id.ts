@@ -10,6 +10,7 @@ import { param } from "../../../lib/route-params.js";
 /** GET /api/equipment/:id */
 export const getEquipmentByIdHandler: RequestHandler = async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
+  const idParam = param(req, "id");
   try {
     const clinicId = req.clinicId!;
     const [item] = await db
@@ -60,7 +61,7 @@ export const getEquipmentByIdHandler: RequestHandler = async (req, res) => {
       .leftJoin(folders, and(eq(equipment.folderId, folders.id), eq(folders.clinicId, clinicId), isNull(folders.deletedAt)))
       .leftJoin(rooms, and(eq(equipment.roomId, rooms.id), eq(rooms.clinicId, clinicId)))
       .leftJoin(users, and(eq(equipment.lastVerifiedById, users.id), eq(users.clinicId, clinicId)))
-      .where(and(eq(equipment.clinicId, clinicId), eq(equipment.id, param(req, "id")), isNull(equipment.deletedAt)))
+      .where(and(eq(equipment.clinicId, clinicId), eq(equipment.id, idParam), isNull(equipment.deletedAt)))
       .limit(1);
     if (!item) {
       return res.status(404).json(

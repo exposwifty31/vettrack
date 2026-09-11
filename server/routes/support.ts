@@ -152,6 +152,7 @@ router.get("/unresolved-count", requireAuth, requireAdmin, async (req, res) => {
 
 router.patch("/:id", requireAuth, requireAdmin, validateUuid("id"), validateBody(patchTicketSchema), async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
+  const idParam = param(req, "id");
   try {
     const clinicId = requireClinicId(req);
     const { status, adminNote } = req.body as z.infer<typeof patchTicketSchema>;
@@ -166,7 +167,7 @@ router.patch("/:id", requireAuth, requireAdmin, validateUuid("id"), validateBody
     const [ticket] = await db
       .update(supportTickets)
       .set(updateData)
-      .where(and(eq(supportTickets.id, param(req, "id")), eq(supportTickets.clinicId, clinicId)))
+      .where(and(eq(supportTickets.id, idParam), eq(supportTickets.clinicId, clinicId)))
       .returning();
 
     if (!ticket) {

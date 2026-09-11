@@ -28,9 +28,9 @@ import { param } from "../../../lib/route-params.js";
 // never blocks the log write — the helper internally absorbs all errors.
 export const postSessionsIdLogsHandler: RequestHandler = async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
+  const sessionId = param(req, "id");
   try {
     const clinicId = req.clinicId!;
-    const sessionId = param(req, "id");
     const body = req.body as z.infer<typeof logEntrySchema>;
 
     // Verify session belongs to clinic. Phase 4 PR 4.4a selects

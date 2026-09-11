@@ -403,10 +403,11 @@ router.patch(
     return;
   }
 
+  const idParam = param(req, "id");
   try {
     const appointment = await updateAppointment(
       req.clinicId!,
-      param(req, "id"),
+      idParam,
       parsed.data,
       req.authUser
         ? {
@@ -473,10 +474,11 @@ router.delete("/:id", requireAuth, requireEffectiveRole("technician"), async (re
     });
   }
 
+  const idParam = param(req, "id");
   try {
     const appointment = await cancelAppointment(
       req.clinicId!,
-      param(req, "id"),
+      idParam,
       parsed.data.reason,
       req.authUser
         ? {

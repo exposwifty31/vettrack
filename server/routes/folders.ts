@@ -107,6 +107,7 @@ router.post("/", requireAuth, requireEffectiveRole("technician"), async (req, re
 
 router.patch("/:id", requireAuth, requireEffectiveRole("technician"), async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
+  const idParam = param(req, "id");
   try {
     const clinicId = req.clinicId!;
     const { name } = req.body;
@@ -124,13 +125,13 @@ router.patch("/:id", requireAuth, requireEffectiveRole("technician"), async (req
     const [existing] = await db
       .select()
       .from(folders)
-      .where(and(eq(folders.id, param(req, "id")), eq(folders.clinicId, clinicId)))
+      .where(and(eq(folders.id, idParam), eq(folders.clinicId, clinicId)))
       .limit(1);
 
     const [folder] = await db
       .update(folders)
       .set({ name: name.trim() })
-      .where(and(eq(folders.id, param(req, "id")), eq(folders.clinicId, clinicId), isNull(folders.deletedAt)))
+      .where(and(eq(folders.id, idParam), eq(folders.clinicId, clinicId), isNull(folders.deletedAt)))
       .returning();
 
     if (!folder) {
@@ -171,18 +172,19 @@ router.patch("/:id", requireAuth, requireEffectiveRole("technician"), async (req
 
 router.delete("/:id", requireAuth, requireAdmin, async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
+  const idParam = param(req, "id");
   try {
     const clinicId = req.clinicId!;
     const [existing] = await db
       .select()
       .from(folders)
-      .where(and(eq(folders.id, param(req, "id")), eq(folders.clinicId, clinicId)))
+      .where(and(eq(folders.id, idParam), eq(folders.clinicId, clinicId)))
       .limit(1);
 
     const [deleted] = await db
       .update(folders)
       .set({ deletedAt: new Date(), deletedBy: req.authUser!.id })
-      .where(and(eq(folders.id, param(req, "id")), eq(folders.clinicId, clinicId), isNull(folders.deletedAt)))
+      .where(and(eq(folders.id, idParam), eq(folders.clinicId, clinicId), isNull(folders.deletedAt)))
       .returning({ id: folders.id });
 
     if (!deleted) {
@@ -202,7 +204,7 @@ router.delete("/:id", requireAuth, requireAdmin, async (req, res) => {
       actionType: "folder_deleted",
       performedBy: req.authUser!.id,
       performedByEmail: req.authUser!.email,
-      targetId: param(req, "id"),
+      targetId: idParam,
       targetType: "folder",
       metadata: { name: existing?.name },
     });

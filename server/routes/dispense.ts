@@ -119,10 +119,11 @@ router.post(
   validateUuid("id"),
   async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
+  const idParam = param(req, "id");
   try {
     const { event, copDegraded } = await confirmDispense({
       clinicId: req.clinicId!,
-      dispenseEventId: param(req, "id"),
+      dispenseEventId: idParam,
       confirmedBy: req.authUser!.id,
       confirmedByEmail: req.authUser!.email,
       // Dispense is now non-clinical (T26 reclassification): no clinical-authority

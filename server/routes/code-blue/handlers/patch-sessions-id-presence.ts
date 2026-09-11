@@ -8,9 +8,9 @@ import { param } from "../../../lib/route-params.js";
 // PATCH /api/code-blue/sessions/:id/presence — heartbeat (every 10s)
 export const patchSessionsIdPresenceHandler: RequestHandler = async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
+  const sessionId = param(req, "id");
   try {
     const clinicId = req.clinicId!;
-    const sessionId = param(req, "id");
     const userId = req.authUser!.id;
     const userName = req.authUser!.name;
 

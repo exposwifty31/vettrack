@@ -59,11 +59,11 @@ type DispenseBody = {
 // middleware stay in force for Code Blue + genuinely-clinical routes.
 export const postContainerDispenseHandler: RequestHandler = async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
+  const containerId = param(req, "id");
   try {
     const clinicId = req.clinicId!;
     const actorUserId = req.authUser!.id;
     const actorDisplayName = req.authUser!.name || req.authUser!.email;
-    const containerId = param(req, "id");
     const body = req.body as DispenseBody;
     const { isEmergency } = body;
           const requestIdempotencyKey = res.locals.dispenseIdempotencyKey;

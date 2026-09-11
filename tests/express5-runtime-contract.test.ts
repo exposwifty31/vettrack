@@ -5,6 +5,7 @@
  * or a "harmless" middleware edit that changes one of these fails here, not in
  * production.
  */
+import ts from "typescript";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createServer, type Server } from "node:http";
 import express from "express";
@@ -38,6 +39,8 @@ beforeAll(async () => {
   app.get("/query-assign", (req, res) => {
     let threw = false;
     try {
+      // Express types `Request.query` readonly; the double cast is the only way to
+      // exercise the RUNTIME getter-only contract, which is what this route pins.
       (req as unknown as { query: unknown }).query = { replaced: true };
     } catch {
       threw = true;
@@ -142,6 +145,43 @@ describe("removed Express 4 signatures are absent from the source", () => {
           for (const p of patterns) if (p.test(src)) offenders.push(`${path.relative(root, full)}: ${p}`);
         }
       }
+    };
+    walk(root);
+    expect(offenders).toEqual([]);
+  });
+});
+
+describe("param() is never called inside a try block", () => {
+  // A handler-local catch that answers 500 swallows RouteParamError before the
+  // terminal handler can map it to 400 INVALID_ROUTE_PARAM. Resolve the param
+  // above the try (or outside the catch's reach); this scan keeps that true.
+  it("every param(req, ...) call in server/routes sits outside any try block", () => {
+    const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "server", "routes");
+    const offenders: string[] = [];
+    const walk = (dir: string) => {
+      for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+        const full = path.join(dir, entry.name);
+        if (entry.isDirectory()) walk(full);
+        else if (entry.name.endsWith(".ts")) scan(full);
+      }
+    };
+    const scan = (file: string) => {
+      const src = fs.readFileSync(file, "utf8");
+      const sf = ts.createSourceFile(file, src, ts.ScriptTarget.Latest, true);
+      const visit = (n: ts.Node, inTry: boolean) => {
+        if (ts.isTryStatement(n)) {
+          visit(n.tryBlock, true);
+          if (n.catchClause) visit(n.catchClause, inTry);
+          if (n.finallyBlock) visit(n.finallyBlock, inTry);
+          return;
+        }
+        if (inTry && ts.isCallExpression(n) && ts.isIdentifier(n.expression) && n.expression.text === "param") {
+          const { line } = sf.getLineAndCharacterOfPosition(n.getStart());
+          offenders.push(`${path.relative(root, file)}:${line + 1}`);
+        }
+        ts.forEachChild(n, (c) => visit(c, inTry));
+      };
+      visit(sf, false);
     };
     walk(root);
     expect(offenders).toEqual([]);
