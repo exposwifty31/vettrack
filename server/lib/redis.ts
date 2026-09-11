@@ -150,7 +150,8 @@ function redisQueueOptions(): RedisOptions {
 }
 
 function isConnectionRefused(err: Error): boolean {
-  return (err as NodeJS.ErrnoException).code === "ECONNREFUSED" || err.message.includes("ECONNREFUSED");
+  const code = "code" in err && typeof err.code === "string" ? err.code : undefined;
+  return code === "ECONNREFUSED" || err.message.includes("ECONNREFUSED");
 }
 
 function attachRedisObservers(client: Redis, source: "app" | "queue"): void {

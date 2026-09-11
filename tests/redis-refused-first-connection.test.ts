@@ -101,22 +101,25 @@ describe("Redis refuses the first connection at boot", () => {
     expect(lines(errorSpy).filter((line) => line.includes("[redis:app] error"))).toEqual([]);
   }, READY_WAIT_MS + 5000);
 
-  it("an error AFTER the client was ready is still reported on the error line (not swallowed)", async () => {
+  it("a refused connection AFTER the client was ready is still reported on the error line (not swallowed)", async () => {
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
     vi.spyOn(console, "warn").mockImplementation(() => undefined);
     vi.spyOn(console, "log").mockImplementation(() => undefined);
 
     const { createRedisConnection } = await import("../server/lib/redis.js");
     const conn = await createRedisConnection();
-    expect(conn).not.toBeNull();
-    clients.push(conn!);
+    if (!conn) {
+      throw new Error("createRedisConnection() returned null: REDIS_URL was set, so a client (even a reconnecting one) was expected");
+    }
+    clients.push(conn);
 
-    // Simulate a client that had connected, then lost the socket: ioredis emits `ready`
-    // then `error`. The post-ready error must reach the loud path.
-    conn!.emit("ready");
-    conn!.emit("error", new Error("read ECONNRESET"));
+    // Simulate a client that had connected, then lost Redis entirely: ioredis emits `ready`
+    // then a refused reconnect. A refusal AFTER ready is the regression the guard must not
+    // swallow — so this emits the exact error class the guard special-cases.
+    conn.emit("ready");
+    conn.emit("error", new Error("connect ECONNREFUSED 127.0.0.1:6379"));
 
-    const postReady = lines(errorSpy).filter((line) => line.includes("[redis:queue] error") && line.includes("ECONNRESET"));
+    const postReady = lines(errorSpy).filter((line) => line.includes("[redis:queue] error") && line.includes("ECONNREFUSED"));
     expect(postReady).toHaveLength(1);
   }, READY_WAIT_MS + 5000);
 });

@@ -11346,3 +11346,14 @@ unmerged and 770 commits behind `main`, exactly as both findings documents state
 - Command: `pnpm typecheck:server` → exit 0.
 
 **Verdict:** VERIFIED
+
+## 2026-09-11 — redis.ts, review round 1 on #296
+
+**Claim:** `isConnectionRefused` narrows `err.code` with an `in`/`typeof` check instead of an erased cast; the post-ready test now emits the exact class the guard special-cases (`connect ECONNREFUSED …`) so a regression that swallows a refusal after `ready` is caught; the test has an explicit null branch instead of `!` assertions. Console-based telemetry was kept on purpose.
+
+**Evidence:**
+- `server/lib/redis.ts` — the file's existing telemetry is `redisMetric()` → `console.log("[redis-metric]", …)` plus `console.warn/error` lines (used throughout the file before this PR); `grep -rn "pino\|winston\|createLogger" server/lib/*.ts` → no structured logger exists in the repo, so "route through the approved structured logging path" has no target here. The new warning carries `source`, `phase`, and `message` as fields on the same path.
+- `npx vitest run tests/redis-refused-first-connection.test.ts tests/collab-redis-adapter-async-nonfatal.test.ts` → `2 passed (2)`, `6 passed (6)` (real ioredis against a refused port).
+- Command: `pnpm typecheck:server` → exit 0.
+
+**Verdict:** VERIFIED
