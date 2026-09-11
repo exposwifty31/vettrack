@@ -22,8 +22,9 @@ via `deploy.sh`; neither app service has a GitHub source.
   `environmentStageChanges(input: { services: { <serviceId>: { variables: { KEY: null } } } },
   merge: true)` → confirm in the dashboard ("Apply N changes") →
   `environmentPatchCommitStaged(skipDeploys: true)`.
-- `variableUpsert` / `variableCollectionUpsert` accept `skipDeploys: true` and
-  `replace: false`.
+- `variableUpsert` accepts `skipDeploys: true`. `variableCollectionUpsert` accepts
+  `skipDeploys: true` **and** `replace: false` — `replace` exists only on the collection form;
+  GraphQL validation rejects it on `variableUpsert`.
 
 ## Service config and images
 
