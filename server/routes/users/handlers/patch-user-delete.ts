@@ -3,6 +3,7 @@ import { db, users } from "../../../db.js";
 import { eq, and, isNull, sql } from "drizzle-orm";
 import { logAudit, resolveAuditActorRole } from "../../../lib/audit.js";
 import { resolveRequestId, apiError } from "../users-route-utils.js";
+import { param } from "../../../lib/route-params.js";
 
 /** PATCH /api/users/:id/delete */
 export const patchUserDeleteHandler: RequestHandler = async (req, res) => {
@@ -23,7 +24,7 @@ export const patchUserDeleteHandler: RequestHandler = async (req, res) => {
     const [existing] = await db
       .select()
       .from(users)
-      .where(and(eq(users.clinicId, clinicId), eq(users.id, req.params.id), isNull(users.deletedAt)))
+      .where(and(eq(users.clinicId, clinicId), eq(users.id, param(req, "id")), isNull(users.deletedAt)))
       .limit(1);
 
     if (!existing) {
@@ -38,7 +39,7 @@ export const patchUserDeleteHandler: RequestHandler = async (req, res) => {
     }
 
     const actorId = req.authUser.id;
-    const isSelf = actorId === req.params.id;
+    const isSelf = actorId === param(req, "id");
     const isAdmin = req.authUser.role === "admin";
     if (!isSelf && !isAdmin) {
       return res.status(403).json(
@@ -71,7 +72,7 @@ export const patchUserDeleteHandler: RequestHandler = async (req, res) => {
     const [deleted] = await db
       .update(users)
       .set({ deletedAt: new Date(), deletedBy: actorId })
-      .where(and(eq(users.clinicId, clinicId), eq(users.id, req.params.id), isNull(users.deletedAt)))
+      .where(and(eq(users.clinicId, clinicId), eq(users.id, param(req, "id")), isNull(users.deletedAt)))
       .returning();
 
     if (!deleted) {
@@ -91,7 +92,7 @@ export const patchUserDeleteHandler: RequestHandler = async (req, res) => {
       actionType: "user_deleted",
       performedBy: actorId,
       performedByEmail: req.authUser.email,
-      targetId: req.params.id,
+      targetId: param(req, "id"),
       targetType: "user",
       metadata: { email: deleted.email, role: deleted.role },
     });

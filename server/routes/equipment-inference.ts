@@ -2,12 +2,13 @@ import { Router } from "express";
 import { requireAuth } from "../middleware/auth.js";
 import { inferEquipmentLocation } from "../services/equipment-location-inference.js";
 import { apiError } from "../lib/apiError.js";
+import { param } from "../lib/route-params.js";
 
 const router = Router();
 
 router.get("/:id/location-inference", requireAuth, async (req, res) => {
   const clinicId = req.clinicId;
-  const equipmentId = req.params.id?.trim();
+  const equipmentId = param(req, "id")?.trim();
 
   if (!clinicId) {
     return apiError(req, res, "errors.er.notAuthenticated", undefined, 401);

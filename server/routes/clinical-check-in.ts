@@ -21,6 +21,7 @@ import {
 } from "../services/clinical-check-in.js";
 import type { ClinicalCheckIn } from "../db.js";
 import { resolveRequestId, apiError } from "../lib/route-utils.js";
+import { param } from "../lib/route-params.js";
 
 const router = Router();
 
@@ -282,7 +283,7 @@ router.post(
           role: resolveAuditActorRole(req) ?? req.authUser!.role,
           clinicId: req.authUser!.clinicId,
         },
-        targetCheckInId: req.params.id,
+        targetCheckInId: param(req, "id"),
         reason: parsed.data.reason ?? null,
         requestId,
       });

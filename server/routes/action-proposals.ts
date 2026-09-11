@@ -39,6 +39,7 @@ import {
   editProposal,
   rejectProposal,
 } from "../lib/autopilot/action-proposal-service.js";
+import { param } from "../lib/route-params.js";
 
 const router = Router();
 const writer = new DrizzleActionProposalWriter();
@@ -111,7 +112,7 @@ router.post(
       const proposal = await approveProposal(
         { writer },
         // Non-null params.id: the /:id route shape guarantees it.
-        { clinicId, proposalId: req.params.id!, actorUserId: userId, actorEmail: email, actorRole },
+        { clinicId, proposalId: param(req, "id")!, actorUserId: userId, actorEmail: email, actorRole },
       );
       notifyProposalQueueChanged(clinicId); // Task 1.1 §1.5 — advisory, fire-and-forget
       return res.json({ proposal });
@@ -134,7 +135,7 @@ router.post(
         { writer },
         {
           clinicId,
-          proposalId: req.params.id!, // the /:id route shape guarantees params.id
+          proposalId: param(req, "id")!, // the /:id route shape guarantees params.id
           actorUserId: userId,
           actorEmail: email,
           actorRole,
@@ -162,7 +163,7 @@ router.post(
         { writer },
         {
           clinicId,
-          proposalId: req.params.id!, // the /:id route shape guarantees params.id
+          proposalId: param(req, "id")!, // the /:id route shape guarantees params.id
           actorUserId: userId,
           actorEmail: email,
           actorRole,

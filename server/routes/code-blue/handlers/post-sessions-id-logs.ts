@@ -7,6 +7,7 @@ import { logAudit, resolveAuditActorRole } from "../../../lib/audit.js";
 import { detectMidsessionManagerDrift } from "../../../lib/authority/code-blue-manager-midsession.js";
 import { resolveRequestId, apiError } from "../../../lib/route-utils.js";
 import type { logEntrySchema } from "../schemas.js";
+import { param } from "../../../lib/route-params.js";
 
 // POST /api/code-blue/sessions/:id/logs — add a log entry
 //
@@ -29,7 +30,7 @@ export const postSessionsIdLogsHandler: RequestHandler = async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
   try {
     const clinicId = req.clinicId!;
-    const { id: sessionId } = req.params;
+    const sessionId = param(req, "id");
     const body = req.body as z.infer<typeof logEntrySchema>;
 
     // Verify session belongs to clinic. Phase 4 PR 4.4a selects

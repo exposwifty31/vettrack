@@ -10,10 +10,11 @@ import { dedupeCitations } from "../../../domain/equipment/evidence/resolver/hel
 import { ASSET_COPILOT_RESOLVER_VERSION } from "../../../../shared/equipment-truth.js";
 import type { EquipmentTruthResponse } from "../../../../shared/equipment-truth.js";
 import { apiError, resolveRequestId } from "../equipment-route-utils.js";
+import { param } from "../../../lib/route-params.js";
 
 export async function getEquipmentTruthHandler(req: Request, res: Response): Promise<void> {
   const clinicId = req.clinicId;
-  const equipmentId = req.params.id;
+  const equipmentId = param(req, "id");
 
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
 

@@ -11,6 +11,7 @@ import {
   listRfidReaders,
   renameRfidReader,
 } from "../services/rfid-readers.service.js";
+import { param } from "../lib/route-params.js";
 
 const router = Router();
 
@@ -143,7 +144,7 @@ router.patch("/rfid-readers/:id", requireAuth, requireAdmin, writeLimiter, async
       res.status(400).json({ code: "INVALID_INPUT", error: "INVALID_INPUT", message: "Invalid rename payload", requestId });
       return;
     }
-    const reader = await renameRfidReader(clinicId, req.params.id, parsed.data.name);
+    const reader = await renameRfidReader(clinicId, param(req, "id"), parsed.data.name);
     if (!reader) {
       res.status(404).json({ code: "READER_NOT_FOUND", error: "READER_NOT_FOUND", message: "RFID reader not found", requestId });
       return;
@@ -170,7 +171,7 @@ router.post("/rfid-readers/:id/deactivate", requireAuth, requireAdmin, writeLimi
   try {
     const clinicId = requireClinicId(req, res, requestId);
     if (!clinicId) return;
-    const reader = await deactivateRfidReader(clinicId, req.params.id);
+    const reader = await deactivateRfidReader(clinicId, param(req, "id"));
     if (!reader) {
       res.status(404).json({ code: "READER_NOT_FOUND", error: "READER_NOT_FOUND", message: "RFID reader not found", requestId });
       return;

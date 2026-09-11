@@ -4,6 +4,7 @@ import { and, eq, isNotNull } from "drizzle-orm";
 import { invalidateAnalyticsCache } from "../../../lib/analytics-cache.js";
 import { logAudit, resolveAuditActorRole } from "../../../lib/audit.js";
 import { apiError, resolveRequestId } from "../equipment-route-utils.js";
+import { param } from "../../../lib/route-params.js";
 
 /** POST /api/equipment/:id/restore — admin only, restore a soft-deleted equipment record */
 export const postEquipmentRestoreHandler: RequestHandler = async (req, res) => {
@@ -13,7 +14,7 @@ export const postEquipmentRestoreHandler: RequestHandler = async (req, res) => {
     const [existing] = await db
       .select()
       .from(equipment)
-      .where(and(eq(equipment.clinicId, clinicId), eq(equipment.id, req.params.id), isNotNull(equipment.deletedAt)))
+      .where(and(eq(equipment.clinicId, clinicId), eq(equipment.id, param(req, "id")), isNotNull(equipment.deletedAt)))
       .limit(1);
 
     if (!existing) {
@@ -30,7 +31,7 @@ export const postEquipmentRestoreHandler: RequestHandler = async (req, res) => {
     const [restored] = await db
       .update(equipment)
       .set({ deletedAt: null, deletedBy: null })
-      .where(and(eq(equipment.clinicId, clinicId), eq(equipment.id, req.params.id)))
+      .where(and(eq(equipment.clinicId, clinicId), eq(equipment.id, param(req, "id"))))
       .returning();
 
     if (restored) {
@@ -40,7 +41,7 @@ export const postEquipmentRestoreHandler: RequestHandler = async (req, res) => {
         actionType: "equipment_restored",
         performedBy: req.authUser!.id,
         performedByEmail: req.authUser!.email ?? "",
-        targetId: req.params.id,
+        targetId: param(req, "id"),
         targetType: "equipment",
         metadata: { equipmentName: restored.name },
       });

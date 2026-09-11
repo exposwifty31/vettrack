@@ -18,6 +18,7 @@ import { listLowStockItems } from "../services/inventory-console.service.js";
 import { isUniqueViolation, ITEM_CODE_UNIQUE_CONSTRAINT, ITEM_NFC_TAG_UNIQUE_CONSTRAINT } from "../lib/pg-errors.js";
 import { getLocaleDictionaries } from "../../lib/i18n/loader.js";
 import { translate } from "../../lib/i18n/index.js";
+import { param } from "../lib/route-params.js";
 
 const router = Router();
 
@@ -105,7 +106,7 @@ router.get("/:id/detail", requireAuth, requireEffectiveRole("student"), validate
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
   try {
     const clinicId = req.clinicId!;
-    const id = req.params.id;
+    const id = param(req, "id");
 
     const [item] = await db
       .select()
@@ -250,7 +251,7 @@ router.patch("/:id", requireAuth, requireAdmin, validateUuid("id"), validateBody
     const [existing] = await db
       .select()
       .from(inventoryItems)
-      .where(and(eq(inventoryItems.clinicId, clinicId), eq(inventoryItems.id, req.params.id)))
+      .where(and(eq(inventoryItems.clinicId, clinicId), eq(inventoryItems.id, param(req, "id"))))
       .limit(1);
 
     if (!existing) return res.status(404).json(apiError({ code: "NOT_FOUND", reason: "ITEM_NOT_FOUND", message: "Inventory item not found", requestId }));
@@ -266,8 +267,8 @@ router.patch("/:id", requireAuth, requireAdmin, validateUuid("id"), validateBody
     if (b.parLevel !== undefined) updates.parLevel = b.parLevel;
     if (b.reorderPoint !== undefined) updates.reorderPoint = b.reorderPoint;
 
-    await db.update(inventoryItems).set(updates).where(and(eq(inventoryItems.clinicId, clinicId), eq(inventoryItems.id, req.params.id)));
-    const [updated] = await db.select().from(inventoryItems).where(eq(inventoryItems.id, req.params.id)).limit(1);
+    await db.update(inventoryItems).set(updates).where(and(eq(inventoryItems.clinicId, clinicId), eq(inventoryItems.id, param(req, "id"))));
+    const [updated] = await db.select().from(inventoryItems).where(eq(inventoryItems.id, param(req, "id"))).limit(1);
 
     logAudit({
       actorRole: resolveAuditActorRole(req),
@@ -275,7 +276,7 @@ router.patch("/:id", requireAuth, requireAdmin, validateUuid("id"), validateBody
       actionType: "inventory_item_updated",
       performedBy: req.authUser!.id,
       performedByEmail: req.authUser!.email,
-      targetId: req.params.id,
+      targetId: param(req, "id"),
       targetType: "inventory_item",
       metadata: { changes: updates, code: existing.code },
     });
@@ -302,13 +303,13 @@ router.patch("/:id/deactivate", requireAuth, requireAdmin, validateUuid("id"), a
     const [existing] = await db
       .select()
       .from(inventoryItems)
-      .where(and(eq(inventoryItems.clinicId, clinicId), eq(inventoryItems.id, req.params.id)))
+      .where(and(eq(inventoryItems.clinicId, clinicId), eq(inventoryItems.id, param(req, "id"))))
       .limit(1);
 
     if (!existing) return res.status(404).json(apiError({ code: "NOT_FOUND", reason: "ITEM_NOT_FOUND", message: "Inventory item not found", requestId }));
     if (!existing.isActive) return res.status(409).json(apiError({ code: "ALREADY_INACTIVE", reason: "ALREADY_INACTIVE", message: "Item is already inactive", requestId }));
 
-    await db.update(inventoryItems).set({ isActive: false }).where(and(eq(inventoryItems.clinicId, clinicId), eq(inventoryItems.id, req.params.id)));
+    await db.update(inventoryItems).set({ isActive: false }).where(and(eq(inventoryItems.clinicId, clinicId), eq(inventoryItems.id, param(req, "id"))));
 
     logAudit({
       actorRole: resolveAuditActorRole(req),
@@ -316,7 +317,7 @@ router.patch("/:id/deactivate", requireAuth, requireAdmin, validateUuid("id"), a
       actionType: "inventory_item_deactivated",
       performedBy: req.authUser!.id,
       performedByEmail: req.authUser!.email,
-      targetId: req.params.id,
+      targetId: param(req, "id"),
       targetType: "inventory_item",
       metadata: { code: existing.code, label: existing.label, itemType: existing.itemType },
     });
@@ -343,7 +344,7 @@ router.post("/:id/prices", requireAuth, requireAdmin, validateUuid("id"), valida
     const [item] = await db
       .select({ id: inventoryItems.id, isActive: inventoryItems.isActive })
       .from(inventoryItems)
-      .where(and(eq(inventoryItems.clinicId, clinicId), eq(inventoryItems.id, req.params.id)))
+      .where(and(eq(inventoryItems.clinicId, clinicId), eq(inventoryItems.id, param(req, "id"))))
       .limit(1);
 
     if (!item) return res.status(404).json(apiError({ code: "NOT_FOUND", reason: "ITEM_NOT_FOUND", message: "Inventory item not found", requestId }));
@@ -352,7 +353,7 @@ router.post("/:id/prices", requireAuth, requireAdmin, validateUuid("id"), valida
     await db.insert(inventoryItemPrices).values({
       id: priceId,
       clinicId,
-      itemId: req.params.id,
+      itemId: param(req, "id"),
       contextType: b.contextType,
       contextId: b.contextId?.trim() || null,
       priceCents: b.priceCents,
@@ -373,7 +374,7 @@ router.post("/:id/prices", requireAuth, requireAdmin, validateUuid("id"), valida
       targetId: priceId,
       targetType: "inventory_item_price",
       metadata: {
-        itemId: req.params.id,
+        itemId: param(req, "id"),
         contextType: b.contextType,
         contextId: b.contextId ?? null,
         priceCents: b.priceCents,
@@ -399,7 +400,7 @@ router.get("/:id/prices", requireAuth, requireEffectiveRole("student"), validate
     const prices = await db
       .select()
       .from(inventoryItemPrices)
-      .where(and(eq(inventoryItemPrices.clinicId, clinicId), eq(inventoryItemPrices.itemId, req.params.id)));
+      .where(and(eq(inventoryItemPrices.clinicId, clinicId), eq(inventoryItemPrices.itemId, param(req, "id"))));
     res.json(prices);
   } catch (err) {
     console.error(err);

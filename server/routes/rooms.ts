@@ -8,6 +8,7 @@ import { validateBody } from "../middleware/validate.js";
 import { logAudit, resolveAuditActorRole } from "../lib/audit.js";
 import { resolveRequestId, apiError } from "../lib/route-utils.js";
 import { roomExpected, resolveHomeDock, classifyReconciliationBucket } from "../services/docking.service.js";
+import { param } from "../lib/route-params.js";
 
 /*
  * PERMISSIONS MATRIX — /api/rooms
@@ -220,7 +221,7 @@ router.get("/:id", requireAuth, async (req, res) => {
     const [room] = await db
       .select()
       .from(rooms)
-      .where(and(eq(rooms.id, req.params.id), eq(rooms.clinicId, clinicId)))
+      .where(and(eq(rooms.id, param(req, "id")), eq(rooms.clinicId, clinicId)))
       .limit(1);
 
     if (!room) {
@@ -306,7 +307,7 @@ router.get("/:id/activity", requireAuth, async (req, res) => {
         equipment,
         and(
           eq(scanLogs.equipmentId, equipment.id),
-          eq(equipment.roomId, req.params.id),
+          eq(equipment.roomId, param(req, "id")),
           eq(equipment.clinicId, clinicId),
           eq(scanLogs.clinicId, clinicId)
         )
@@ -411,7 +412,7 @@ router.patch("/:id", requireAuth, requireAdmin, validateBody(patchRoomSchema), a
     const [existing] = await db
       .select()
       .from(rooms)
-      .where(and(eq(rooms.id, req.params.id), eq(rooms.clinicId, clinicId)))
+      .where(and(eq(rooms.id, param(req, "id")), eq(rooms.clinicId, clinicId)))
       .limit(1);
 
     if (!existing) {
@@ -453,7 +454,7 @@ router.patch("/:id", requireAuth, requireAdmin, validateBody(patchRoomSchema), a
         ...(syncStatus !== undefined && { syncStatus }),
         updatedAt: new Date(),
       })
-      .where(and(eq(rooms.id, req.params.id), eq(rooms.clinicId, clinicId)))
+      .where(and(eq(rooms.id, param(req, "id")), eq(rooms.clinicId, clinicId)))
       .returning();
 
     logAudit({
@@ -462,7 +463,7 @@ router.patch("/:id", requireAuth, requireAdmin, validateBody(patchRoomSchema), a
       actionType: "room_updated",
       performedBy: req.authUser!.id,
       performedByEmail: req.authUser!.email,
-      targetId: req.params.id,
+      targetId: param(req, "id"),
       targetType: "room",
       metadata: { previousName: existing.name, changes: req.body },
     });
@@ -489,7 +490,7 @@ router.delete("/:id", requireAuth, requireAdmin, async (req, res) => {
     const [existing] = await db
       .select()
       .from(rooms)
-      .where(and(eq(rooms.id, req.params.id), eq(rooms.clinicId, clinicId)))
+      .where(and(eq(rooms.id, param(req, "id")), eq(rooms.clinicId, clinicId)))
       .limit(1);
 
     if (!existing) {
@@ -506,7 +507,7 @@ router.delete("/:id", requireAuth, requireAdmin, async (req, res) => {
     const [{ count }] = await db
       .select({ count: sql<number>`count(*)::int` })
       .from(equipment)
-      .where(and(eq(equipment.clinicId, clinicId), eq(equipment.roomId, req.params.id), isNull(equipment.deletedAt)));
+      .where(and(eq(equipment.clinicId, clinicId), eq(equipment.roomId, param(req, "id")), isNull(equipment.deletedAt)));
 
     if (count > 0) {
       return res.status(409).json({
@@ -519,7 +520,7 @@ router.delete("/:id", requireAuth, requireAdmin, async (req, res) => {
       });
     }
 
-    await db.delete(rooms).where(and(eq(rooms.id, req.params.id), eq(rooms.clinicId, clinicId)));
+    await db.delete(rooms).where(and(eq(rooms.id, param(req, "id")), eq(rooms.clinicId, clinicId)));
 
     logAudit({
       actorRole: resolveAuditActorRole(req),
@@ -527,7 +528,7 @@ router.delete("/:id", requireAuth, requireAdmin, async (req, res) => {
       actionType: "room_deleted",
       performedBy: req.authUser!.id,
       performedByEmail: req.authUser!.email,
-      targetId: req.params.id,
+      targetId: param(req, "id"),
       targetType: "room",
       metadata: { name: existing.name },
     });

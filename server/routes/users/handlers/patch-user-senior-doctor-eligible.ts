@@ -3,6 +3,7 @@ import { db, users } from "../../../db.js";
 import { eq, and, isNull } from "drizzle-orm";
 import { logAudit, resolveAuditActorRole } from "../../../lib/audit.js";
 import { resolveRequestId, apiError } from "../users-route-utils.js";
+import { param } from "../../../lib/route-params.js";
 
 /**
  * PATCH /api/users/:id/senior-doctor-eligible
@@ -23,7 +24,7 @@ export const patchUserSeniorDoctorEligibleHandler: RequestHandler = async (req, 
     const [updated] = await db
       .update(users)
       .set({ seniorDoctorEligible })
-      .where(and(eq(users.clinicId, clinicId), eq(users.id, req.params.id), isNull(users.deletedAt)))
+      .where(and(eq(users.clinicId, clinicId), eq(users.id, param(req, "id")), isNull(users.deletedAt)))
       .returning();
 
     if (!updated) {
@@ -43,7 +44,7 @@ export const patchUserSeniorDoctorEligibleHandler: RequestHandler = async (req, 
       actionType: "senior_doctor_eligible_set",
       performedBy: req.authUser!.id,
       performedByEmail: req.authUser!.email,
-      targetId: req.params.id,
+      targetId: param(req, "id"),
       targetType: "user",
       metadata: { seniorDoctorEligible, targetEmail: updated.email },
     });

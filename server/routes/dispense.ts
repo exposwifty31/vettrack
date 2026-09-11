@@ -19,6 +19,7 @@ import {
   isInventoryConstraintError,
 } from "../lib/db-constraint-errors.js";
 import { resolveRequestId, apiError } from "../lib/route-utils.js";
+import { param } from "../lib/route-params.js";
 
 const router = Router();
 
@@ -121,7 +122,7 @@ router.post(
   try {
     const { event, copDegraded } = await confirmDispense({
       clinicId: req.clinicId!,
-      dispenseEventId: req.params.id,
+      dispenseEventId: param(req, "id"),
       confirmedBy: req.authUser!.id,
       confirmedByEmail: req.authUser!.email,
       // Dispense is now non-clinical (T26 reclassification): no clinical-authority

@@ -5,13 +5,14 @@ import { and, eq, isNull, sql } from "drizzle-orm";
 import { logAudit, resolveAuditActorRole } from "../../../lib/audit.js";
 import { recordEquipmentSeen } from "../../../lib/equipment-seen.js";
 import { apiError, resolveRequestId } from "../equipment-route-utils.js";
+import { param } from "../../../lib/route-params.js";
 
 /** POST /api/equipment/:id/confirm-in-room — assign room + verification scan (passive location loop). */
 export const postEquipmentConfirmInRoomHandler: RequestHandler = async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
   try {
     const clinicId = req.clinicId!;
-    const equipmentId = req.params.id;
+    const equipmentId = param(req, "id");
     const { roomId } = req.body as { roomId: string };
 
     const now = new Date();

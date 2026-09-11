@@ -8,6 +8,7 @@ import {
   joinEquipmentWaitlist,
   leaveEquipmentWaitlist,
 } from "../services/equipment-waitlist.service.js";
+import { param } from "../lib/route-params.js";
 
 export function mountEquipmentWaitlistRoutes(router: Router): void {
   router.get(
@@ -16,7 +17,7 @@ export function mountEquipmentWaitlistRoutes(router: Router): void {
     requireEffectiveRole("student"),
     async (req, res) => {
       const clinicId = req.clinicId!;
-      const equipmentId = req.params.id;
+      const equipmentId = param(req, "id");
       const snapshot = await buildWaitlistSnapshot(clinicId, equipmentId, req.authUser!.id);
       res.json(snapshot);
     },
@@ -28,7 +29,7 @@ export function mountEquipmentWaitlistRoutes(router: Router): void {
     requireEffectiveRole("student"),
     async (req, res) => {
       const clinicId = req.clinicId!;
-      const equipmentId = req.params.id;
+      const equipmentId = param(req, "id");
       const { id: userId, email } = req.authUser!;
 
       try {
@@ -61,7 +62,7 @@ export function mountEquipmentWaitlistRoutes(router: Router): void {
     requireEffectiveRole("student"),
     async (req, res) => {
       const clinicId = req.clinicId!;
-      const equipmentId = req.params.id;
+      const equipmentId = param(req, "id");
       const { id: userId, email } = req.authUser!;
 
       try {

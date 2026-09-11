@@ -12,6 +12,7 @@ import { getTaskRecommendations } from "../services/task-intelligence.service.js
 import { getTaskDashboard } from "../services/task-recall.service.js";
 import { canPerformTaskAction, type TaskAction } from "../lib/task-rbac.js";
 import { resolveRequestId, apiError } from "../lib/route-utils.js";
+import { param } from "../lib/route-params.js";
 
 const router = Router();
 
@@ -102,7 +103,7 @@ router.post(
   async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
   if (!requireTaskActionPermission(req, res, "task.start")) return;
-  if (!req.params.id?.trim()) {
+  if (!param(req, "id")?.trim()) {
     return res.status(400).json(
       apiError({
         code: "VALIDATION_FAILED",
@@ -123,7 +124,7 @@ router.post(
     );
   }
   try {
-    const task = await startTask(req.clinicId!, req.params.id, {
+    const task = await startTask(req.clinicId!, param(req, "id"), {
       userId: req.authUser.id,
       clerkId: req.authUser.clerkId,
       email: req.authUser.email,
@@ -152,7 +153,7 @@ router.post(
   async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
   if (!requireTaskActionPermission(req, res, "task.complete")) return;
-  if (!req.params.id?.trim()) {
+  if (!param(req, "id")?.trim()) {
     return res.status(400).json(
       apiError({
         code: "VALIDATION_FAILED",
@@ -173,7 +174,7 @@ router.post(
     );
   }
   try {
-    const { task } = await completeTask(req.clinicId!, req.params.id, {
+    const { task } = await completeTask(req.clinicId!, param(req, "id"), {
       userId: req.authUser.id,
       clerkId: req.authUser.clerkId,
       email: req.authUser.email,

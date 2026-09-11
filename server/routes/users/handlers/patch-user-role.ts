@@ -4,6 +4,7 @@ import { eq, and, isNull, sql } from "drizzle-orm";
 import { logAudit, resolveAuditActorRole } from "../../../lib/audit.js";
 import { invalidateForUser } from "../../../lib/authority-cache.js";
 import { resolveRequestId, apiError } from "../users-route-utils.js";
+import { param } from "../../../lib/route-params.js";
 
 /** PATCH /api/users/:id/role */
 export const patchUserRoleHandler: RequestHandler = async (req, res) => {
@@ -15,7 +16,7 @@ export const patchUserRoleHandler: RequestHandler = async (req, res) => {
     const [target] = await db
       .select()
       .from(users)
-      .where(and(eq(users.clinicId, clinicId), eq(users.id, req.params.id), isNull(users.deletedAt)))
+      .where(and(eq(users.clinicId, clinicId), eq(users.id, param(req, "id")), isNull(users.deletedAt)))
       .limit(1);
 
     if (!target) {
@@ -49,10 +50,10 @@ export const patchUserRoleHandler: RequestHandler = async (req, res) => {
     const [user] = await db
       .update(users)
       .set({ role })
-      .where(and(eq(users.clinicId, clinicId), eq(users.id, req.params.id), isNull(users.deletedAt)))
+      .where(and(eq(users.clinicId, clinicId), eq(users.id, param(req, "id")), isNull(users.deletedAt)))
       .returning();
 
-    invalidateForUser(clinicId, req.params.id);
+    invalidateForUser(clinicId, param(req, "id"));
 
     logAudit({
       actorRole: resolveAuditActorRole(req),
@@ -60,7 +61,7 @@ export const patchUserRoleHandler: RequestHandler = async (req, res) => {
       actionType: "user_role_changed",
       performedBy: req.authUser!.id,
       performedByEmail: req.authUser!.email,
-      targetId: req.params.id,
+      targetId: param(req, "id"),
       targetType: "user",
       metadata: { previousRole: target.role, newRole: role, targetEmail: target.email },
     });

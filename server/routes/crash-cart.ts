@@ -6,6 +6,7 @@ import { eq, and, desc, asc, sql } from "drizzle-orm";
 import { requireAuth, requireAdmin } from "../middleware/auth.js";
 import { validateBody } from "../middleware/validate.js";
 import { resolveRequestId, apiError } from "../lib/route-utils.js";
+import { param } from "../lib/route-params.js";
 
 const router = Router();
 
@@ -130,7 +131,7 @@ router.patch("/items/:id", requireAuth, requireAdmin, validateBody(updateItemSch
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
   try {
     const clinicId = req.clinicId!;
-    const { id } = req.params;
+    const id = param(req, "id");
     const body = req.body as z.infer<typeof updateItemSchema>;
 
     const [updated] = await db
@@ -159,7 +160,7 @@ router.delete("/items/:id", requireAuth, requireAdmin, async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
   try {
     const clinicId = req.clinicId!;
-    const { id } = req.params;
+    const id = param(req, "id");
 
     const [deactivated] = await db
       .update(crashCartItems)

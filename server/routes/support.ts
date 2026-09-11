@@ -9,6 +9,7 @@ import { validateBody, validateUuid } from "../middleware/validate.js";
 import { equipmentReplayIdempotency } from "../middleware/equipment-replay-idempotency.js";
 import { sendPushToAll } from "../lib/push.js";
 import { resolveRequestId, apiError } from "../lib/route-utils.js";
+import { param } from "../lib/route-params.js";
 
 /*
  * PERMISSIONS MATRIX — /api/support
@@ -165,7 +166,7 @@ router.patch("/:id", requireAuth, requireAdmin, validateUuid("id"), validateBody
     const [ticket] = await db
       .update(supportTickets)
       .set(updateData)
-      .where(and(eq(supportTickets.id, req.params.id), eq(supportTickets.clinicId, clinicId)))
+      .where(and(eq(supportTickets.id, param(req, "id")), eq(supportTickets.clinicId, clinicId)))
       .returning();
 
     if (!ticket) {

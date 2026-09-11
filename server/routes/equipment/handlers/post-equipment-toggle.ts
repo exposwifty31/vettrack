@@ -7,6 +7,7 @@ import {
   toggleEquipmentCustody,
 } from "../../../services/equipment-custody-toggle.service.js";
 import { apiError, mapCheckoutGateError, resolveRequestId } from "../equipment-route-utils.js";
+import { param } from "../../../lib/route-params.js";
 
 /** POST /api/equipment/:id/toggle — NFC quick custody flip (online-only client) */
 export const postEquipmentToggleHandler: RequestHandler = async (req, res) => {
@@ -17,7 +18,7 @@ export const postEquipmentToggleHandler: RequestHandler = async (req, res) => {
 
     const result = await toggleEquipmentCustody({
       clinicId,
-      equipmentId: req.params.id,
+      equipmentId: param(req, "id"),
       actor: { id: req.authUser!.id, email: req.authUser!.email },
       isPluggedIn: isPluggedIn ?? true,
       actorRole: resolveAuditActorRole(req) ?? undefined,

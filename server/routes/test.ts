@@ -15,6 +15,7 @@ import { runExpiryCheckWorker } from "../workers/expiryCheckWorker.js";
 import { runChargeAlertJobForReturn } from "../workers/chargeAlertWorker.js";
 import { apiError as i18nApiError } from "../lib/apiError.js";
 import { resolveRequestId, apiError, requireNotProduction } from "../lib/route-utils.js";
+import { param } from "../lib/route-params.js";
 
 const router = Router();
 
@@ -178,7 +179,7 @@ router.post("/charge-alert/run", requireAuth, requireTestMode, validateBody(runC
 router.get("/returns/:id", requireAuth, requireTestMode, async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
   const clinicId = req.clinicId!;
-  const returnId = req.params.id;
+  const returnId = param(req, "id");
   try {
     const [row] = await db
       .select()

@@ -7,6 +7,7 @@ import { writeLimiter } from "../middleware/rate-limiters.js";
 import { logAudit, resolveAuditActorRole } from "../lib/audit.js";
 import { pgUpdateMatchedZeroRows } from "../lib/pg-result.js";
 import { apiError, resolveRequestId } from "./equipment/equipment-route-utils.js";
+import { param } from "../lib/route-params.js";
 
 /** Non-"ok" condition value applied to equipment on a damage report (R-EQ-F3). */
 const DAMAGED_CONDITION_STATUS = "damaged";
@@ -24,7 +25,7 @@ const router = Router();
 router.post("/:id/damage", requireAuth, writeLimiter, async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
   const clinicId = req.clinicId;
-  const equipmentId = req.params.id;
+  const equipmentId = param(req, "id");
 
   if (!clinicId) {
     res.status(401).json(

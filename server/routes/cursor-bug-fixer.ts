@@ -16,6 +16,7 @@ import {
   isCursorBugFixerEnabled,
 } from "../services/cursor-bug-fixer.service.js";
 import { resolveRequestId, apiError } from "../lib/route-utils.js";
+import { param } from "../lib/route-params.js";
 
 const router = Router();
 
@@ -134,7 +135,7 @@ router.post(
         .select()
         .from(supportTickets)
         .where(
-          and(eq(supportTickets.id, req.params.id), eq(supportTickets.clinicId, clinicId)),
+          and(eq(supportTickets.id, param(req, "id")), eq(supportTickets.clinicId, clinicId)),
         )
         .limit(1);
 
@@ -210,7 +211,7 @@ router.post(
 router.get("/agents/:agentId", async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
   try {
-    const agent = await getCursorBugFixerAgent(req.params.agentId);
+    const agent = await getCursorBugFixerAgent(param(req, "agentId"));
     res.json(agent);
   } catch (err) {
     const mapped = mapServiceError(err);
@@ -227,8 +228,8 @@ router.get("/agents/:agentId", async (req, res) => {
 
 router.get("/agents/:agentId/runs/:runId", async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
-  const agentId = req.params.agentId?.trim();
-  const runId = req.params.runId?.trim();
+  const agentId = param(req, "agentId")?.trim();
+  const runId = param(req, "runId")?.trim();
   if (!agentId || !runId) {
     return res.status(400).json(
       apiError({

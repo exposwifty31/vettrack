@@ -10,6 +10,7 @@ import {
   normalizeTime,
   checkAdjustmentDirection,
 } from "../lib/shift-adjustment-window.js";
+import { param } from "../lib/route-params.js";
 
 /*
  * Shift-adjustment requests (Phase 1). A rostered person requests to work past
@@ -203,7 +204,7 @@ router.patch("/:id", requireAuth, requireAdmin, async (req, res) => {
     const [existing] = await db
       .select()
       .from(shiftAdjustments)
-      .where(and(eq(shiftAdjustments.id, req.params.id), eq(shiftAdjustments.clinicId, clinicId)))
+      .where(and(eq(shiftAdjustments.id, param(req, "id")), eq(shiftAdjustments.clinicId, clinicId)))
       .limit(1);
     if (!existing) {
       return res
@@ -268,7 +269,7 @@ router.post("/:id/cancel", requireAuth, async (req, res) => {
     const [existing] = await db
       .select()
       .from(shiftAdjustments)
-      .where(and(eq(shiftAdjustments.id, req.params.id), eq(shiftAdjustments.clinicId, clinicId)))
+      .where(and(eq(shiftAdjustments.id, param(req, "id")), eq(shiftAdjustments.clinicId, clinicId)))
       .limit(1);
     if (!existing) {
       return res

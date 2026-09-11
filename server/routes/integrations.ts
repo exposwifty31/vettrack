@@ -67,6 +67,7 @@ import {
 } from "../integrations/vendor-x-rollout.js";
 import { VENDOR_X_ADAPTER_ID } from "../integrations/adapters/vendor-x.js";
 import { apiError } from "../lib/route-utils.js";
+import { param } from "../lib/route-params.js";
 
 const router = Router();
 
@@ -132,7 +133,7 @@ const mappingReviewPatchSchema = z.object({
 router.patch("/mappings/:id", requireAdmin, validateBody(mappingReviewPatchSchema), async (req, res) => {
   const requestId = randomUUID();
   const clinicId = req.clinicId!;
-  const { id } = req.params;
+  const id = param(req, "id");
   const body = req.body as z.infer<typeof mappingReviewPatchSchema>;
 
   const [updated] = await db
@@ -317,7 +318,7 @@ router.post("/configs", requireAdmin, validateBody(createConfigSchema), async (r
 router.get("/configs/:adapterId", requireAdmin, async (req, res) => {
   const requestId = randomUUID();
   const clinicId = req.clinicId!;
-  const { adapterId } = req.params;
+  const adapterId = param(req, "adapterId");
 
   const config = await db
     .select()
@@ -348,7 +349,7 @@ const patchConfigSchema = z.object({
 router.patch("/configs/:adapterId", requireAdmin, validateBody(patchConfigSchema), async (req, res) => {
   const requestId = randomUUID();
   const clinicId = req.clinicId!;
-  const { adapterId } = req.params;
+  const adapterId = param(req, "adapterId");
   const body = req.body as z.infer<typeof patchConfigSchema>;
 
   const existingRow = await db
@@ -392,7 +393,7 @@ router.patch("/configs/:adapterId", requireAdmin, validateBody(patchConfigSchema
 router.delete("/configs/:adapterId", requireAdmin, async (req, res) => {
   const requestId = randomUUID();
   const clinicId = req.clinicId!;
-  const { adapterId } = req.params;
+  const adapterId = param(req, "adapterId");
 
   const deleted = await db
     .delete(integrationConfigs)
@@ -422,7 +423,7 @@ const credentialsSchema = z.object({
 router.post("/configs/:adapterId/credentials", requireAdmin, validateBody(credentialsSchema), async (req, res) => {
   const requestId = randomUUID();
   const clinicId = req.clinicId!;
-  const { adapterId } = req.params;
+  const adapterId = param(req, "adapterId");
   const { credentials } = req.body as z.infer<typeof credentialsSchema>;
 
   if (!isKnownAdapter(adapterId)) {
@@ -460,7 +461,7 @@ router.post("/configs/:adapterId/credentials", requireAdmin, validateBody(creden
 router.post("/configs/:adapterId/validate", requireAdmin, async (req, res) => {
   const requestId = randomUUID();
   const clinicId = req.clinicId!;
-  const { adapterId } = req.params;
+  const adapterId = param(req, "adapterId");
 
   const adapter = getAdapter(adapterId);
   if (!adapter) {
@@ -508,7 +509,7 @@ const syncTriggerSchema = z.object({
 router.post("/configs/:adapterId/sync", requireAdmin, validateBody(syncTriggerSchema), async (req, res) => {
   const requestId = randomUUID();
   const clinicId = req.clinicId!;
-  const { adapterId } = req.params;
+  const adapterId = param(req, "adapterId");
   const body = req.body as z.infer<typeof syncTriggerSchema>;
 
   if (!isKnownAdapter(adapterId)) {
@@ -579,7 +580,7 @@ router.post("/configs/:adapterId/sync", requireAdmin, validateBody(syncTriggerSc
 router.post("/configs/:adapterId/rollback", requireAdmin, async (req, res) => {
   const requestId = randomUUID();
   const clinicId = req.clinicId!;
-  const { adapterId } = req.params;
+  const adapterId = param(req, "adapterId");
 
   if (adapterId !== VENDOR_X_ADAPTER_ID) {
     return res.status(404).json(apiError({ code: "NOT_FOUND", reason: "Rollback supported for vendor-x-v1 only", message: "Not found", requestId }));
@@ -635,7 +636,7 @@ const vendorPromoteSchema = z.object({
 router.post("/configs/:adapterId/promote", requireAdmin, validateBody(vendorPromoteSchema), async (req, res) => {
   const requestId = randomUUID();
   const clinicId = req.clinicId!;
-  const { adapterId } = req.params;
+  const adapterId = param(req, "adapterId");
 
   if (adapterId !== VENDOR_X_ADAPTER_ID) {
     return res.status(404).json(apiError({ code: "NOT_FOUND", reason: "Promote supported for vendor-x-v1 only", message: "Not found", requestId }));
@@ -683,7 +684,7 @@ router.post("/configs/:adapterId/promote", requireAdmin, validateBody(vendorProm
 // ---------------------------------------------------------------------------
 router.get("/configs/:adapterId/logs", requireAdmin, async (req, res) => {
   const clinicId = req.clinicId!;
-  const { adapterId } = req.params;
+  const adapterId = param(req, "adapterId");
   const limit = Math.min(parseInt(String(req.query.limit ?? "50"), 10), 200);
 
   const logs = await db

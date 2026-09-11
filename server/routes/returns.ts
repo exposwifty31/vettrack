@@ -11,6 +11,7 @@ import { enqueueChargeAlertJob } from "../jobs/charge-alert-enqueue.js";
 import { cancelChargeAlertJob } from "../workers/chargeAlertWorker.js";
 import { logAudit, resolveAuditActorRole } from "../lib/audit.js";
 import { resolveRequestId, apiError } from "../lib/route-utils.js";
+import { param } from "../lib/route-params.js";
 
 const router = Router();
 
@@ -142,7 +143,7 @@ router.patch(
   async (req, res) => {
     const requestId = resolveRequestId(res, req.headers["x-request-id"]);
     const clinicId = req.clinicId!;
-    const returnId = req.params.id;
+    const returnId = param(req, "id");
     const { isPluggedIn, plugInDeadlineMinutes } = req.body as z.infer<typeof patchReturnSchema>;
 
     try {

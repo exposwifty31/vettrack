@@ -5,6 +5,7 @@ import { eq, and } from "drizzle-orm";
 import { logAudit, resolveAuditActorRole } from "../../../lib/audit.js";
 import { resolveRequestId, apiError } from "../../../lib/route-utils.js";
 import type { reconcileSchema } from "../schemas.js";
+import { param } from "../../../lib/route-params.js";
 
 /**
  * PATCH /api/code-blue/sessions/:id/reconcile
@@ -16,7 +17,7 @@ export const patchSessionsIdReconcileHandler: RequestHandler = async (req, res) 
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
   try {
     const clinicId = req.clinicId!;
-    const sessionId = req.params.id;
+    const sessionId = param(req, "id");
     const force = req.query.force === "true";
     const { forceReason } = req.body as z.infer<typeof reconcileSchema>;
 

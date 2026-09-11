@@ -6,6 +6,7 @@ import { requireAuth, requireEffectiveRole } from "../middleware/auth.js";
 import { sendPushToOthers, checkDedupe } from "../lib/push.js";
 import { logAudit, resolveAuditActorRole } from "../lib/audit.js";
 import { resolveRequestId, apiError } from "../lib/route-utils.js";
+import { param } from "../lib/route-params.js";
 
 /*
  * PERMISSIONS MATRIX — /api/alert-acks
@@ -215,7 +216,7 @@ router.patch("/:id/resolve", requireAuth, requireEffectiveRole("senior_technicia
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
   try {
     const clinicId = req.clinicId!;
-    const ackId = req.params.id;
+    const ackId = param(req, "id");
     const resolutionNote = typeof req.body?.resolutionNote === "string" ? req.body.resolutionNote.trim() : null;
 
     const [existing] = await db

@@ -10,6 +10,7 @@ import {
   isInventoryConstraintError,
   toInventoryConstraintError,
 } from "../../../lib/db-constraint-errors.js";
+import { param } from "../../../lib/route-params.js";
 
 type CompleteEmergencyBody = {
   items: Array<{ itemId: string; quantity: number }>;
@@ -25,7 +26,7 @@ export const patchContainerEmergencyCompleteHandler: RequestHandler = async (req
     const clinicId = req.clinicId!;
     const actorUserId = req.authUser!.id;
     const actorDisplayName = req.authUser!.name || req.authUser!.email;
-    const eventId = req.params.eventId;
+    const eventId = param(req, "eventId");
     const body = req.body as CompleteEmergencyBody;
     const takenAt = new Date();
 

@@ -5,6 +5,7 @@ import { invalidateAnalyticsCache } from "../../../lib/analytics-cache.js";
 import { logAudit, resolveAuditActorRole } from "../../../lib/audit.js";
 import { consumeUndoToken } from "../equipment-undo-tokens.js";
 import { apiError, resolveRequestId } from "../equipment-route-utils.js";
+import { param } from "../../../lib/route-params.js";
 
 type EquipmentRow = typeof equipment.$inferSelect;
 
@@ -18,7 +19,7 @@ export const postEquipmentRevertHandler: RequestHandler = async (req, res) => {
     const [existingItem] = await db
       .select()
       .from(equipment)
-      .where(and(eq(equipment.clinicId, clinicId), eq(equipment.id, req.params.id), isNull(equipment.deletedAt)))
+      .where(and(eq(equipment.clinicId, clinicId), eq(equipment.id, param(req, "id")), isNull(equipment.deletedAt)))
       .limit(1);
 
     if (!existingItem) {
@@ -36,7 +37,7 @@ export const postEquipmentRevertHandler: RequestHandler = async (req, res) => {
 
     try {
       await db.transaction(async (tx) => {
-        const token = await consumeUndoToken(clinicId, tokenId, req.params.id, req.authUser!.id, tx);
+        const token = await consumeUndoToken(clinicId, tokenId, param(req, "id"), req.authUser!.id, tx);
         if (!token) {
           throw new Error("UNDO_TOKEN_INVALID");
         }
@@ -69,7 +70,7 @@ export const postEquipmentRevertHandler: RequestHandler = async (req, res) => {
           .where(
             and(
               eq(equipment.clinicId, clinicId),
-              eq(equipment.id, req.params.id),
+              eq(equipment.id, param(req, "id")),
               eq(equipment.version, existingItem.version),
             ),
           )
@@ -118,7 +119,7 @@ export const postEquipmentRevertHandler: RequestHandler = async (req, res) => {
       actionType: "equipment_reverted",
       performedBy: req.authUser!.id,
       performedByEmail: req.authUser!.email,
-      targetId: req.params.id,
+      targetId: param(req, "id"),
       targetType: "equipment",
       metadata: { name: (updated as EquipmentRow | null)?.name ?? null },
     });

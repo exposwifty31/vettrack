@@ -27,6 +27,7 @@ import {
   ShiftHandoverAccessError,
   ShiftHandoverNotFoundError,
 } from "../services/shift-handover.service.js";
+import { param } from "../lib/route-params.js";
 
 const router = Router();
 
@@ -58,7 +59,7 @@ router.post("/:id/acknowledge", requireAuth, async (req: Request, res: Response)
   try {
     const row = await acknowledgeHandover({
       clinicId,
-      handoverId: req.params.id!,
+      handoverId: param(req, "id")!,
       actorUserId: userId,
       actorEmail: email,
       actorRole,
@@ -76,7 +77,7 @@ router.delete("/:id/acknowledge", requireAuth, async (req: Request, res: Respons
   try {
     const row = await unconfirmHandover({
       clinicId,
-      handoverId: req.params.id!,
+      handoverId: param(req, "id")!,
       actorUserId: userId,
       actorEmail: email,
       actorRole,

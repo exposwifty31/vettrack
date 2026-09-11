@@ -4,6 +4,7 @@ import { getNotificationsDlq, getNotificationsQueue, getQueueJobCounts, queueMet
 import { requireAuth, requireAdmin } from "../middleware/auth.js";
 import { safeRedisGet, getRedisUrl } from "../lib/redis.js";
 import { resolveRequestId, apiError } from "../lib/route-utils.js";
+import { param } from "../lib/route-params.js";
 
 const router = Router();
 
@@ -126,7 +127,7 @@ router.get("/dlq", requireAuth, requireAdmin, async (req, res) => {
 
 router.post("/dlq/:jobId/replay", requireAuth, requireAdmin, async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
-  const jobId = String(req.params.jobId ?? "").trim();
+  const jobId = String(param(req, "jobId") ?? "").trim();
   if (!jobId) {
     res.status(400).json(
       apiError({

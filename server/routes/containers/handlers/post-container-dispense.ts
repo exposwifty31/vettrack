@@ -43,6 +43,7 @@ import {
   toInventoryConstraintError,
 } from "../../../lib/db-constraint-errors.js";
 import { apiError, resolveRequestId } from "../../../lib/route-utils.js";
+import { param } from "../../../lib/route-params.js";
 
 type DispenseBody = {
   items: Array<{ itemId: string; quantity: number }>;
@@ -62,7 +63,7 @@ export const postContainerDispenseHandler: RequestHandler = async (req, res) => 
     const clinicId = req.clinicId!;
     const actorUserId = req.authUser!.id;
     const actorDisplayName = req.authUser!.name || req.authUser!.email;
-    const containerId = req.params.id;
+    const containerId = param(req, "id");
     const body = req.body as DispenseBody;
     const { isEmergency } = body;
           const requestIdempotencyKey = res.locals.dispenseIdempotencyKey;

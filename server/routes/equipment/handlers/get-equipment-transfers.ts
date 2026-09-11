@@ -2,6 +2,7 @@ import type { RequestHandler } from "express";
 import { db, transferLogs } from "../../../db.js";
 import { and, desc, eq } from "drizzle-orm";
 import { apiError, resolveRequestId } from "../equipment-route-utils.js";
+import { param } from "../../../lib/route-params.js";
 
 /** GET /api/equipment/:id/transfers */
 export const getEquipmentTransfersHandler: RequestHandler = async (req, res) => {
@@ -11,7 +12,7 @@ export const getEquipmentTransfersHandler: RequestHandler = async (req, res) => 
     const transfers = await db
       .select()
       .from(transferLogs)
-      .where(and(eq(transferLogs.clinicId, clinicId), eq(transferLogs.equipmentId, req.params.id)))
+      .where(and(eq(transferLogs.clinicId, clinicId), eq(transferLogs.equipmentId, param(req, "id"))))
       .orderBy(desc(transferLogs.timestamp));
     res.json(transfers);
   } catch (err) {

@@ -60,6 +60,7 @@ import {
   insertEquipmentUndoToken,
   snapshotEquipmentState,
 } from "./equipment/equipment-undo-tokens.js";
+import { param } from "../lib/route-params.js";
 
 const EQUIPMENT_STATUS_VALUES = [
   "ok",
@@ -423,7 +424,7 @@ router.post(
     const [snap] = await db
       .select()
       .from(equipment)
-      .where(and(eq(equipment.clinicId, clinicId), eq(equipment.id, req.params.id), isNull(equipment.deletedAt)))
+      .where(and(eq(equipment.clinicId, clinicId), eq(equipment.id, param(req, "id")), isNull(equipment.deletedAt)))
       .limit(1);
 
     if (snap) {
@@ -514,7 +515,7 @@ router.post(
       try {
         const preCheck = await evaluateCheckoutV1Preconditions(
           clinicId,
-          req.params.id,
+          param(req, "id"),
           req.authUser!.id,
           snap,
         );
@@ -550,7 +551,7 @@ router.post(
 
     if (!isEmergency) {
       try {
-        await assertWaitlistCheckoutAllowed(clinicId, req.params.id, req.authUser!.id);
+        await assertWaitlistCheckoutAllowed(clinicId, param(req, "id"), req.authUser!.id);
       } catch (err) {
         if (err instanceof EquipmentWaitlistError) {
           const status = err.code === "WAITLIST_RESERVATION_HELD_BY_OTHER" ? 409 : 422;
@@ -563,7 +564,7 @@ router.post(
     const txResult = await db.transaction(async (tx) =>
       performEquipmentCheckout(tx, {
         clinicId,
-        equipmentId: req.params.id,
+        equipmentId: param(req, "id"),
         actor: { id: req.authUser!.id, email: req.authUser!.email },
         location,
         clientTimestamp,
@@ -586,11 +587,11 @@ router.post(
     updated = txResult.updated;
     undoToken = txResult.undoToken;
 
-    invalidateAnchorAfterCheckout(clinicId, req.params.id);
+    invalidateAnchorAfterCheckout(clinicId, param(req, "id"));
 
     await finalizeCheckoutSideEffects({
       clinicId,
-      equipmentId: req.params.id,
+      equipmentId: param(req, "id"),
       actor: { id: req.authUser!.id, email: req.authUser!.email },
       actorRole: resolveAuditActorRole(req) ?? undefined,
       equipment: txResult.updated,
@@ -657,7 +658,7 @@ router.post(
     const txResult = await db.transaction(async (tx) =>
       performEquipmentReturn(tx, {
         clinicId,
-        equipmentId: req.params.id,
+        equipmentId: param(req, "id"),
         actor: { id: req.authUser!.id, email: req.authUser!.email },
         clientTimestamp,
         allowForeignHolder,
@@ -685,7 +686,7 @@ router.post(
 
     const returnRecord = await finalizeReturnSideEffects({
       clinicId,
-      equipmentId: req.params.id,
+      equipmentId: param(req, "id"),
       actor: { id: req.authUser!.id, email: req.authUser!.email },
       actorRole: resolveAuditActorRole(req) ?? undefined,
       equipment: txResult.updated,
@@ -750,7 +751,7 @@ router.post(
       const { roomId, scanLogId } = req.body as z.infer<typeof seenSchema>;
       const result = await recordEquipmentSeen({
         clinicId,
-        equipmentId: req.params.id,
+        equipmentId: param(req, "id"),
         roomId: roomId ?? null,
         scanLogId: scanLogId ?? null,
       });
@@ -817,7 +818,7 @@ router.post(
       const [existing] = await tx
         .select()
         .from(equipment)
-        .where(and(eq(equipment.clinicId, clinicId), eq(equipment.id, req.params.id), isNull(equipment.deletedAt)))
+        .where(and(eq(equipment.clinicId, clinicId), eq(equipment.id, param(req, "id")), isNull(equipment.deletedAt)))
         .limit(1);
 
       if (!existing) return;
@@ -841,7 +842,7 @@ router.post(
         const [result] = await tx
           .update(equipment)
           .set(updates)
-          .where(and(eq(equipment.clinicId, clinicId), eq(equipment.id, req.params.id)))
+          .where(and(eq(equipment.clinicId, clinicId), eq(equipment.id, param(req, "id"))))
           .returning();
         updatedEquipment = result;
       } else {
@@ -853,7 +854,7 @@ router.post(
         .values({
           id: randomUUID(),
           clinicId,
-          equipmentId: req.params.id,
+          equipmentId: param(req, "id"),
           userId: req.authUser!.id,
           userEmail: req.authUser!.email,
           status,
@@ -867,7 +868,7 @@ router.post(
 
       undoToken = await insertEquipmentUndoToken(tx, {
         clinicId,
-        equipmentId: req.params.id,
+        equipmentId: param(req, "id"),
         actorId: req.authUser!.id,
         scanLogId: log.id,
         previousState: snapshotEquipmentState(existing),
@@ -893,7 +894,7 @@ router.post(
       actionType: "equipment_scanned",
       performedBy: req.authUser!.id,
       performedByEmail: req.authUser!.email,
-      targetId: req.params.id,
+      targetId: param(req, "id"),
       targetType: "equipment",
       metadata: { name: eq2.name, status, note: note ?? null },
     });
