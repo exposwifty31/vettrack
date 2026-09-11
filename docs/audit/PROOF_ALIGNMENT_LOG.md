@@ -11380,3 +11380,14 @@ unmerged and 770 commits behind `main`, exactly as both findings documents state
 - After the two waivers: `pnpm tenant:lint:enforce` → `no new findings vs baseline (201 known)`; `tests/stale-returned-sweep.test.ts` → `15 passed (15)`; `pnpm architecture:gates` → `All G1 checks passed`, `All claims accounted for`.
 
 **Verdict:** VERIFIED
+
+## 2026-09-11 — stale-returned-sweep, review round 3 on #295: reopening a RESOLVED ack clears its resolution metadata
+
+**Claim:** The conflict update now sets `resolvedAt`, `resolvedById`, `resolutionNote` to `null` alongside `ackStatus: "SEEN"`, so a re-nudge over a row a manager had RESOLVED does not report stale resolution data as SEEN. The second outside-diff suggestion (take a fresh timestamp after the push for Phase C) was NOT applied: `now` is the injected sweep clock the suite depends on for determinism, and a push fan-out is bounded in seconds (per-transport timeouts) against a re-nudge interval measured in hours, so the described drift cannot occur in practice.
+
+**Evidence:**
+- RED: case 7c → `expected { …(4) } to deeply equal ObjectContaining{…}` (the `set` had only four keys).
+- GREEN: `tests/stale-returned-sweep.test.ts` + `tests/stale-checkout-sweep.test.ts` → `2 passed (2)`, `25 passed (25)`.
+- Command: `pnpm typecheck:server` → exit 0.
+
+**Verdict:** VERIFIED

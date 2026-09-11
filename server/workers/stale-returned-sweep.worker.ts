@@ -203,6 +203,11 @@ async function sweepStaleReturnedOnce(now: Date): Promise<{ scanned: number; nud
           acknowledgedByEmail: SYSTEM_USER_EMAIL,
           acknowledgedAt: now,
           ackStatus: "SEEN",
+          // A manager may have RESOLVED the earlier nudge; reopening the row as SEEN must not keep
+          // that resolution's metadata, which the alert-acks API would then report alongside SEEN.
+          resolvedAt: null,
+          resolvedById: null,
+          resolutionNote: null,
         },
       });
       return true;

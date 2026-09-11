@@ -247,6 +247,22 @@ describe("runStaleReturnedSweep", () => {
     expect(incrementMetric).toHaveBeenCalledWith("stale_returned_nudged");
   });
 
+  it("case 7c: re-nudging over a previously RESOLVED row clears its resolution metadata", async () => {
+    // A manager may have marked the earlier nudge RESOLVED; the item was then returned again and
+    // went stale again. Reopening the same unique row as SEEN must not leave resolvedAt /
+    // resolvedById / resolutionNote from the old resolution on a row the API now reports as SEEN.
+    mockCandidatesAndAnchors([makeCandidate()], []);
+    const insertCapture = {} as { values: ReturnType<typeof vi.fn>; onConflictDoUpdate: ReturnType<typeof vi.fn> };
+    setupTransactionMock({ priorAcks: [], insertCapture, rowAlreadyExists: true });
+
+    await runStaleReturnedSweep(NOW);
+
+    const [conflict] = insertCapture.onConflictDoUpdate.mock.calls[0];
+    expect(conflict.set).toEqual(
+      expect.objectContaining({ ackStatus: "SEEN", resolvedAt: null, resolvedById: null, resolutionNote: null }),
+    );
+  });
+
   it("case 7b: the sweep completes on a second run — later candidates are still processed after a re-nudge", async () => {
     // Two candidates; the first already has its ack row (re-nudge), the second is brand new.
     // Before the upsert, the first insert threw and the whole sweep aborted, so the second
