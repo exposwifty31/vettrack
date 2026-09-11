@@ -85,17 +85,42 @@ function segments(path: string): string[] {
 /**
  * The sub-path of a nested `router.use("/ops", subRouter)` layer.
  *
- * Express 4 keeps it only as a compiled regexp (`/^\/ops\/?(?=\/|$)/i`), so it
- * has to be read back out. A regexp carrying anything but literal segments
- * (a `:param` in the sub-mount) is reported as unresolved rather than guessed.
+ * Express 5's router (router@2) keeps no readable regexp on a mount layer —
+ * only a compiled matcher — but `layer.match(path)` sets `layer.path` to the
+ * mount prefix it consumed. So the mount is recovered by probing it with the
+ * client paths under this prefix (each `*` segment stood in by a literal): the
+ * first probe the layer accepts yields its sub-path. A nested mount no client
+ * path reaches is reported as unresolved rather than guessed, exactly as the
+ * unreadable-regexp case was under Express 4.
  */
-function nestedMountPath(layer: { regexp?: RegExp & { fast_slash?: boolean } }): string | null {
-  const re = layer.regexp;
-  if (!re) return null;
-  if (re.fast_slash) return "";
-  const body = re.source.replace(/^\^/, "").replace(/\\\/\?\(\?=\\\/\|\$\)$/, "");
-  const literal = body.replace(/\\\//g, "/");
-  return /^(?:\/[A-Za-z0-9._~-]+)+$/.test(literal) ? literal : null;
+function nestedMountPath(
+  layer: { match?: (p: string) => boolean; path?: string },
+  prefix: string,
+): string | null {
+  if (typeof layer.match !== "function") return null;
+  for (const probe of probeRemainders(prefix)) {
+    if (layer.match(probe) && typeof layer.path === "string") {
+      const sub = layer.path.replace(/\/+$/, "");
+      return /^(?:\/[A-Za-z0-9._~-]+)*$/.test(sub) ? sub : null;
+    }
+  }
+  return null;
+}
+
+let probeCache: string[] | null = null;
+/** Client-called paths under `prefix`, with wildcard segments made literal, minus the prefix. */
+function probeRemainders(prefix: string): string[] {
+  if (probeCache === null) {
+    probeCache = clientApiPaths(clientSourceFiles()).map((c) =>
+      c.path
+        .split("/")
+        .map((seg) => (seg === "*" ? "probe" : seg))
+        .join("/"),
+    );
+  }
+  return probeCache
+    .filter((p) => p === prefix || p.startsWith(`${prefix}/`))
+    .map((p) => p.slice(prefix.length) || "/");
 }
 
 /** Every full path a mounted router serves, expanded recursively. */
@@ -111,7 +136,8 @@ function expandRouter(prefix: string, router: unknown, out: Set<string>): void {
       route?: { path?: unknown };
       handle?: { stack?: unknown[] };
       name?: string;
-      regexp?: RegExp & { fast_slash?: boolean };
+      match?: (p: string) => boolean;
+      path?: string;
     };
     const routePath = layer.route?.path;
     if (layer.route !== undefined) {
@@ -124,9 +150,9 @@ function expandRouter(prefix: string, router: unknown, out: Set<string>): void {
       continue;
     }
     if (layer.name === "router" && Array.isArray(layer.handle?.stack) && layer.handle.stack.length > 0) {
-      const sub = nestedMountPath(layer);
+      const sub = nestedMountPath(layer as { match?: (p: string) => boolean; path?: string }, prefix);
       if (sub === null) {
-        unresolved.push(`${prefix} → unreadable nested mount ${String(layer.regexp)}`);
+        unresolved.push(`${prefix} → unreadable nested mount (no client path under it probed a sub-path)`);
         continue;
       }
       expandRouter(prefix + sub, layer.handle, out);

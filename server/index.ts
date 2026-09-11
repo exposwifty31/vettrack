@@ -286,7 +286,8 @@ function sanitizeValue(value: unknown): unknown {
 
 // Global request body sanitization (keeps route-level Zod validation intact).
 app.use((req, _res, next) => {
-  req.body = sanitizeValue(req.body) as Record<string, unknown>;
+  // Express 5 / body-parser 2: req.body is undefined when nothing parsed (v4 gave {}).
+  req.body = sanitizeValue(req.body ?? {}) as Record<string, unknown>;
   next();
 });
 
@@ -320,7 +321,7 @@ registerApiRoutes(app);
 
 // Apple App Site Association — enables iOS Universal Links for applinks:vettrack.uk.
 // Registered unconditionally (so dev also serves it) and BEFORE the production static/
-// catch-all block so it wins over the SPA `app.get("*")`. Must be application/json and
+// catch-all block so it wins over the SPA `app.get("/{*splat}")`. Must be application/json and
 // must NOT redirect — Apple's CDN fetches /.well-known/apple-app-site-association directly.
 app.get("/.well-known/apple-app-site-association", (_req, res) => {
   res.setHeader("Content-Type", "application/json; charset=UTF-8");

@@ -3,7 +3,9 @@ import { ZodSchema } from "zod";
 
 export function validateBody<T>(schema: ZodSchema<T>) {
   return (req: Request, res: Response, next: NextFunction): void => {
-    const result = schema.safeParse(req.body);
+    // body-parser 2 (Express 5) leaves req.body undefined when nothing parsed;
+    // an empty strict schema must keep accepting a body-less POST.
+    const result = schema.safeParse(req.body ?? {});
     if (!result.success) {
       console.error("Validation failed", {
         path: req.originalUrl,
