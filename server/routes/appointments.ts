@@ -365,7 +365,8 @@ router.patch(
   idempotencyMiddleware("appointments:update"),
   async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
-  if (!param(req, "id") || !param(req, "id").trim()) {
+  const idParam = param(req, "id");
+  if (!idParam.trim()) {
     return res.status(400).json(
       apiError({
         code: "VALIDATION_FAILED",
@@ -403,7 +404,6 @@ router.patch(
     return;
   }
 
-  const idParam = param(req, "id");
   try {
     const appointment = await updateAppointment(
       req.clinicId!,
@@ -444,7 +444,8 @@ router.patch(
 
 router.delete("/:id", requireAuth, requireEffectiveRole("technician"), async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
-  if (!param(req, "id") || !param(req, "id").trim()) {
+  const idParam = param(req, "id");
+  if (!idParam.trim()) {
     return res.status(400).json(
       apiError({
         code: "VALIDATION_FAILED",
@@ -474,7 +475,6 @@ router.delete("/:id", requireAuth, requireEffectiveRole("technician"), async (re
     });
   }
 
-  const idParam = param(req, "id");
   try {
     const appointment = await cancelAppointment(
       req.clinicId!,

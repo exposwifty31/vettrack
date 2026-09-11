@@ -269,7 +269,11 @@ router.patch("/:id", requireAuth, requireAdmin, validateUuid("id"), validateBody
     if (b.reorderPoint !== undefined) updates.reorderPoint = b.reorderPoint;
 
     await db.update(inventoryItems).set(updates).where(and(eq(inventoryItems.clinicId, clinicId), eq(inventoryItems.id, idParam)));
-    const [updated] = await db.select().from(inventoryItems).where(eq(inventoryItems.id, idParam)).limit(1);
+    const [updated] = await db
+      .select()
+      .from(inventoryItems)
+      .where(and(eq(inventoryItems.clinicId, clinicId), eq(inventoryItems.id, idParam)))
+      .limit(1);
 
     logAudit({
       actorRole: resolveAuditActorRole(req),

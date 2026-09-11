@@ -410,7 +410,7 @@ router.patch("/:id/receive", requireAuth, requireEffectiveRole("technician"), va
       })
       .from(poLines)
       .leftJoin(inventoryItems, eq(poLines.itemId, inventoryItems.id))
-      .where(eq(poLines.purchaseOrderId, idParam));
+      .where(and(eq(poLines.purchaseOrderId, idParam), eq(poLines.clinicId, clinicId)));
 
     logAudit({
       actorRole: resolveAuditActorRole(req),
