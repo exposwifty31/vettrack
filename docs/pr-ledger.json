@@ -1,4 +1,21 @@
 {
   "$comment": "Pull requests that landed WITHOUT a merge commit (rebase or squash merge). The entry supplies only the head sha someone read off the GitHub API; the proof stays local - that sha must be an ancestor of the default branch.",
-  "entries": []
+  "entries": [
+    {
+      "number": 295,
+      "headSha": "a314223367cd60299ae8b069fd60787bbd534935",
+      "mergedAt": "2026-09-11",
+      "how": "squash",
+      "title": "fix(sweep): upsert the stale-returned ack instead of colliding on the unique key",
+      "readFrom": "gh pr view <n> --json mergeCommit \u2014 for a SQUASH merge the PR head (headRefOid) is not an ancestor of main; the squash commit is, and that is what the gate checks"
+    },
+    {
+      "number": 298,
+      "headSha": "82bd2025ac87ddc582995c6cf2d3095f2956e533",
+      "mergedAt": "2026-09-11",
+      "how": "squash",
+      "title": "hotfix(worker): warn, do not exit, on DB_SSL_REJECT_UNAUTHORIZED != \"true\"",
+      "readFrom": "gh pr view <n> --json mergeCommit \u2014 for a SQUASH merge the PR head (headRefOid) is not an ancestor of main; the squash commit is, and that is what the gate checks"
+    }
+  ]
 }
