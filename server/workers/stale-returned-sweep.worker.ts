@@ -95,6 +95,7 @@ export async function runStaleReturnedSweep(now = new Date()): Promise<StaleRetu
 
 async function sweepStaleReturnedOnce(now: Date): Promise<{ scanned: number; nudged: number }> {
   const cutoff = new Date(now.getTime() - STALE_RETURNED_HOURS * 3600_000);
+  // tenant-lint:scoped system sweep over every clinic by design — filters isNotNull(clinicId) and every per-row write below is scoped by row.clinicId
   const candidates = await db.select().from(equipment).where(and(
     eq(equipment.custodyState, "returned"),
     lt(equipment.custodyStateSince, cutoff),
@@ -110,6 +111,7 @@ async function sweepStaleReturnedOnce(now: Date): Promise<{ scanned: number; nud
   const candidateIds = candidates.map((row) => row.id);
   const openAnchors = await db
     .select({ equipmentId: equipmentAnchors.equipmentId })
+    // tenant-lint:scoped batched lookup keyed by the candidate ids the clinic-filtered scan above returned
     .from(equipmentAnchors)
     .where(and(
       inArray(equipmentAnchors.equipmentId, candidateIds),

@@ -11370,3 +11370,13 @@ unmerged and 770 commits behind `main`, exactly as both findings documents state
 - NOT done (outside-diff, heavy lift, pre-existing, already listed in the PR): `MAX_NUDGES` is unreachable under `UNIQUE(equipment_id, alert_type)`; enforcing it needs a persisted attempt count per return event (schema + migration). Separate ticket.
 
 **Verdict:** VERIFIED
+
+## 2026-09-11 — #295 CI: tenant-lint waivers on the two by-design cross-clinic reads
+
+**Claim:** Moving the sweep body into `sweepStaleReturnedOnce` made the tenant linter's function-scope heuristic stop seeing `clinicId` for the two candidate reads (`.from(equipment)`, `.from(equipmentAnchors)`); both are cross-clinic on purpose (a system scheduler filtering `isNotNull(equipment.clinicId)`, with every per-row transaction and push scoped by `row.clinicId`), so each carries a one-line `// tenant-lint:scoped <reason>` waiver naming that. No other site is waived.
+
+**Evidence:**
+- CI run on `d2a96fa62`: G1 and the evidence job both failed on `stale-returned-sweep.worker.ts::equipment (baseline allows 0, found 1)` and `::equipmentAnchors (baseline allows 0, found 1)`; reproduced locally with `pnpm tenant:lint:enforce`.
+- After the two waivers: `pnpm tenant:lint:enforce` → `no new findings vs baseline (201 known)`; `tests/stale-returned-sweep.test.ts` → `15 passed (15)`; `pnpm architecture:gates` → `All G1 checks passed`, `All claims accounted for`.
+
+**Verdict:** VERIFIED
