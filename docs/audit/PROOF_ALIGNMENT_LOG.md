@@ -11559,3 +11559,60 @@ unmerged and 770 commits behind `main`, exactly as both findings documents state
 - The earlier merged commits were also verified live: VetTrack log after `27bc6f3f4` shows `[stale-returned-sweep] scheduled via BullMQ` with no `startup sweep failed` line (the #295 fix), and no `first connection refused` line was needed (Redis was up).
 
 **Verdict:** VERIFIED
+||||||| parent of f031ea141 (wip: founder-review store-truth edits (to be cherry-picked onto main))
+## 2026-09-09 — founder-review: both build-number floors were green on numbers the stores had already burnt
+
+Both lanes' offline build-number gates passed while comparing against a shipped-build record
+one step behind reality. Checked against the stores, not the docs:
+
+```text
+asc builds list --app 6778937527 --paginate                       -> 30 | 1.3.0 | 2026-09-02 | VALID   (also 29 2026-08-29, 28 2026-08-13)
+npx eas build:list --limit 6 --json                               -> IOS 30 FINISHED production 2026-09-02T21:39Z · ANDROID 10302 FINISHED 2026-09-02T21:38Z
+gplay status --package uk.vettrack.app                            -> alpha: 1.3.0 draft version_codes [10302]
+gplay bundles list --package uk.vettrack.app --edit <id>          -> versionCodes 10301, 10302
+gplay testers get --package uk.vettrack.app --edit <id> --track alpha -> {}
+node scripts/release-preflight.mjs --offline   (RN, before)       -> ios local=30 floor=29 -> ok · android local=10302 floor=10301 -> ok
+bash scripts/verify-resubmission-static.sh     (here, before)     -> PASS  build 30 > last shipped 29
+```
+
+ASC accepted build 30 and Play accepted bundle 10302 on 2026-09-02, so 30 / 10302 are consumed
+and both `-> ok` lines were the exact failure the floors exist to prevent (RN #208's own words).
+Builds 28, 29 and 30 are all EAS production builds of the RN lane (`eas build:list`), which is why
+no vettrack git ref ever set `CURRENT_PROJECT_VERSION = 28` — the 2026-08-19 "build 28 is
+unreproducible" finding was looking in the wrong repo.
+
+**Changed (uncommitted, this worktree):** `ios/.last-shipped-build` 29 → 30;
+`CURRENT_PROJECT_VERSION` 30 → 31 in all four pbxproj configurations (match count asserted = 4);
+`docs/attestations.json` `play-alpha-aab-10301` re-attested 2026-09-09 with the draft now carrying
+10302; `TASKS.md:31` corrected in place. RN repo: floors 30 / 10302, its Expo app config bumped to 31 / 10303, and the
+five docs the previous session had already corrected to "10301 on alpha" corrected again to 10302.
+
+```text
+bash scripts/verify-resubmission-static.sh     (here, after)      -> PASS  build 31 > last shipped 30 · STATIC_RESULT PASS=7 FAIL=0
+pnpm -s verify:claims                          (here, after)      -> 1232 claims … 0 FAILED · All claims accounted for.
+node scripts/release-preflight.mjs --offline   (RN, after)        -> ios local=31 floor=30 -> ok · android local=10303 floor=10302 -> ok
+npm run -s verify:claims                       (RN, after)        -> All claims accounted for.
+```
+
+**Not verified here (needs the Console / owner):** Play developer-identity verification status,
+the Critical Alerts entitlement request `763HU9ZH38`, and whether ASC will offer build 30 to a
+version other than 1.3.0 — `asc validate --version 1.3.0` reports 1.3.0 `READY_FOR_DISTRIBUTION`
+(non-editable), and 28/29/30 all carry marketing version 1.3.0.
+
+## 2026-09-09 — CORRECTION to the entry above: the RN build is already the live App Store app
+
+The entry above said build 30 "cannot be attached" to version 1.3.0 because that version is
+non-editable. True — and the reason it is non-editable is that build 30 IS its build:
+
+```text
+asc versions view --version-id c83b868a-82f0-43da-95ef-04624a160cd5 --include-build
+  -> {"versionString":"1.3.0","state":"READY_FOR_DISTRIBUTION","buildId":"cc0a5d5d-…","buildVersion":"30"}
+asc review submissions list --app 6778937527   -> 07f95220 IOS COMPLETE 2026-09-03T00:27
+https://apps.apple.com/il/app/vettrack/id6778937527   -> 1.3.0 released 2026-09-03 (fetched 2026-09-09), what's-new "נבנתה מחדש מהיסוד"
+```
+
+So the RN lane (EAS build 30, `uk.vettrack.app`) has been the shipping App Store app since
+2026-09-03. Every "get the RN app into App Review" line in the living docs of both repos
+describes a milestone that is already behind us; the iOS half of the store program is closed.
+The Capacitor shell's `CURRENT_PROJECT_VERSION = 31` in this repo is now a safety-net counter,
+not a release plan. Android is the only open store lane (alpha draft 10302, zero testers).
