@@ -7,7 +7,7 @@
       "mergedAt": "2026-09-11",
       "how": "squash",
       "title": "fix(sweep): upsert the stale-returned ack instead of colliding on the unique key",
-      "readFrom": "gh pr view <n> --json mergeCommit"
+      "readFrom": "gh pr view <n> --json mergeCommit \u2014 for a SQUASH merge the PR head (headRefOid) is not an ancestor of main; the squash commit is, and that is what the gate checks"
     },
     {
       "number": 298,
@@ -15,7 +15,7 @@
       "mergedAt": "2026-09-11",
       "how": "squash",
       "title": "hotfix(worker): warn, do not exit, on DB_SSL_REJECT_UNAUTHORIZED != \"true\"",
-      "readFrom": "gh pr view <n> --json mergeCommit"
+      "readFrom": "gh pr view <n> --json mergeCommit \u2014 for a SQUASH merge the PR head (headRefOid) is not an ancestor of main; the squash commit is, and that is what the gate checks"
     }
   ]
 }
