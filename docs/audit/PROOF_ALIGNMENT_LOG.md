@@ -11347,3 +11347,14 @@ unmerged and 770 commits behind `main`, exactly as both findings documents state
 - Command: `pnpm typecheck:server` → exit 0.
 
 **Verdict:** VERIFIED (unit); PARTIAL (no live-DB run)
+
+## 2026-09-11 — stale-returned-sweep, review round 1 on #295: Phase C re-checks the re-nudge interval
+
+**Claim:** When two sweeps overlap, the one that reaches Phase C second now sees the winner's refreshed `acknowledgedAt` under the advisory lock and backs off — no second upsert, no second `stale_returned_nudged` metric, no second audit row. Both phases gate on one helper (`withinRenudgeInterval`).
+
+**Evidence:**
+- RED: new case 8 (Phase A select → old ack, Phase C select → ack written 1 min ago) → `expected { scanned: 1, nudged: 1 } to deeply equal { scanned: 1, nudged: 0 }` — the cap-only Phase C check let the second upsert through, exactly as the review said.
+- GREEN: `tests/stale-returned-sweep.test.ts` + `tests/stale-checkout-sweep.test.ts` → `2 passed (2)`, `23 passed (23)`. The push in case 8 still goes out (this sweep sent it before Phase C) — that double push is the known cost of pushing outside the lock and is unchanged.
+- Command: `pnpm typecheck:server` → exit 0.
+
+**Verdict:** VERIFIED

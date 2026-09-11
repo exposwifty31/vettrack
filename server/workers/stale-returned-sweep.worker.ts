@@ -60,6 +60,16 @@ async function nudgeManagers(clinicId: string, payload: PushPayload): Promise<Pu
   return result;
 }
 
+/** The newest ack in `prior`, or null. Both phases gate the re-nudge cadence on it. */
+function latestAckAt(prior: { acknowledgedAt: Date }[]): Date | null {
+  return prior.reduce<Date | null>((m, r) => (!m || r.acknowledgedAt > m ? r.acknowledgedAt : m), null);
+}
+
+function withinRenudgeInterval(prior: { acknowledgedAt: Date }[], now: Date): boolean {
+  const lastAt = latestAckAt(prior);
+  return lastAt !== null && now.getTime() - lastAt.getTime() < RENUDGE_INTERVAL_MS;
+}
+
 export async function runStaleReturnedSweep(now = new Date()): Promise<{ scanned: number; nudged: number }> {
   const cutoff = new Date(now.getTime() - STALE_RETURNED_HOURS * 3600_000);
   const candidates = await db.select().from(equipment).where(and(
@@ -114,8 +124,7 @@ export async function runStaleReturnedSweep(now = new Date()): Promise<{ scanned
           gt(alertAcks.acknowledgedAt, custodyStateSince),
         ));
       if (prior.length >= MAX_NUDGES) { incrementMetric("stale_returned_skipped"); return null; }
-      const lastAt = prior.reduce<Date | null>((m, r) => (!m || r.acknowledgedAt > m ? r.acknowledgedAt : m), null);
-      if (lastAt && now.getTime() - lastAt.getTime() < RENUDGE_INTERVAL_MS) {
+      if (withinRenudgeInterval(prior, now)) {
         incrementMetric("stale_returned_skipped"); return null; // D7 — gate on the threshold
       }
       return { clinicId, equipmentId: row.id };
@@ -144,6 +153,10 @@ export async function runStaleReturnedSweep(now = new Date()): Promise<{ scanned
           gt(alertAcks.acknowledgedAt, custodyStateSince),
         ));
       if (prior.length >= MAX_NUDGES) return false; // cap hit by concurrent process — acceptable
+      // Phase A committed before the push, so a concurrent sweep can pass the same gate and
+      // refresh the ack first. Under this lock its write is visible: back off instead of
+      // upserting a second time and counting a nudge that was not ours to count.
+      if (withinRenudgeInterval(prior, now)) return false;
       // vt_alert_acks is UNIQUE(equipment_id, alert_type) (migrations/001), so the second nudge
       // for an item — or the first nudge after a later return — hits the row the previous one
       // wrote. A plain INSERT threw here on every production boot ("startup sweep failed:

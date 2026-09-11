@@ -259,6 +259,29 @@ describe("runStaleReturnedSweep", () => {
     expect(sendPushToRole).toHaveBeenCalledWith("clinic-1", "admin", expect.objectContaining({ tag: "stale-returned:eq-2" }));
   });
 
+  it("case 8: concurrent sweep — a fresh ack written between Phase A and Phase C → no upsert, not counted", async () => {
+    // Two sweeps overlap (startup + cron, or two instances). Both pass the Phase A gate on the
+    // same stale ack and both push; the Phase C advisory lock serializes them. The LOSER must
+    // see the winner's fresh acknowledgedAt under the lock and back off — not upsert again and
+    // count a second nudge. Phase A here returns the old ack; Phase C returns the fresh one.
+    mockCandidatesAndAnchors([makeCandidate()], []);
+    const oldAck = { acknowledgedAt: new Date(NOW.getTime() - __test.RENUDGE_INTERVAL_MS - 60_000) };
+    const freshAck = { acknowledgedAt: new Date(NOW.getTime() - 60_000) };
+    const insertCapture = {} as { values: ReturnType<typeof vi.fn>; onConflictDoUpdate: ReturnType<typeof vi.fn> };
+    const tx = setupTransactionMock({ priorAcks: [oldAck], insertCapture, rowAlreadyExists: true });
+    tx.select
+      .mockReturnValueOnce(makeSelectChain([oldAck]))     // Phase A — eligible
+      .mockReturnValueOnce(makeSelectChain([freshAck]));  // Phase C — someone else just nudged
+
+    const result = await runStaleReturnedSweep(NOW);
+
+    expect(result).toEqual({ scanned: 1, nudged: 0 });
+    expect(sendPushToRole).toHaveBeenCalled();           // this sweep's push already went out
+    expect(insertCapture.onConflictDoUpdate).not.toHaveBeenCalled();
+    expect(incrementMetric).not.toHaveBeenCalledWith("stale_returned_nudged");
+    expect(logAudit).not.toHaveBeenCalled();
+  });
+
   it("case 6: deliveredAny false → no ack insert, not counted as nudged", async () => {
     mockCandidatesAndAnchors([makeCandidate()], []);
     setupTransactionMock({});
