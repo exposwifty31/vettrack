@@ -282,6 +282,34 @@ describe("runStaleReturnedSweep", () => {
     expect(logAudit).not.toHaveBeenCalled();
   });
 
+  it("case 9: two sweeps started in the same process overlap → the second one yields, one push goes out", async () => {
+    // Startup sweep + first BullMQ tick, or two ticks straddling a slow push. The in-process
+    // guard makes the later caller return without scanning, so a single push leaves this
+    // process. (Cross-instance overlap is bounded separately by the Phase C re-check.)
+    mockCandidatesAndAnchors([makeCandidate()], []);
+    setupTransactionMock({ priorAcks: [] });
+    let releasePush!: () => void;
+    vi.mocked(sendPushToRole).mockImplementation(
+      () => new Promise((resolve) => { releasePush = () => resolve({ deliveredAny: true, transientFailures: 0, invalidOrGoneCount: 0 }); }),
+    );
+
+    const first = runStaleReturnedSweep(NOW);
+    await vi.waitFor(() => expect(sendPushToRole).toHaveBeenCalledTimes(1)); // first sweep is mid-push
+    const second = await runStaleReturnedSweep(NOW);
+    releasePush();
+    // Later roles of the same nudge resolve through the same mock; release each as it arrives.
+    const firstResult = await (async () => {
+      const pending = first;
+      const timer = setInterval(() => { if (releasePush) releasePush(); }, 1);
+      try { return await pending; } finally { clearInterval(timer); }
+    })();
+
+    expect(second).toEqual({ scanned: 0, nudged: 0, skippedOverlap: true });
+    expect(firstResult).toEqual({ scanned: 1, nudged: 1 });
+    expect(incrementMetric).toHaveBeenCalledWith("stale_returned_skipped");
+    expect(db.select).toHaveBeenCalledTimes(2); // candidate scan + anchor lookup, once — the second run never scanned
+  });
+
   it("case 6: deliveredAny false → no ack insert, not counted as nudged", async () => {
     mockCandidatesAndAnchors([makeCandidate()], []);
     setupTransactionMock({});

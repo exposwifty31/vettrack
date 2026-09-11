@@ -11358,3 +11358,15 @@ unmerged and 770 commits behind `main`, exactly as both findings documents state
 - Command: `pnpm typecheck:server` → exit 0.
 
 **Verdict:** VERIFIED
+
+## 2026-09-11 — stale-returned-sweep, review round 2 on #295: one sweep at a time per process
+
+**Claim:** Overlapping in-process sweeps (startup run + first BullMQ tick, or two ticks straddling a slow push) no longer both push: a module-level in-flight guard makes the later caller return `{ scanned: 0, nudged: 0, skippedOverlap: true }` without scanning. The push stays outside the advisory lock by design (holding a DB lock across an HTTP fan-out exhausts the pool); cross-instance overlap remains bounded by the Phase C re-check rather than prevented.
+
+**Evidence:**
+- RED: case 9 (first sweep parked mid-push, second sweep started) → the second run scanned and died on the exhausted select mock (`Cannot read properties of undefined (reading 'from')`) — i.e. it did not yield.
+- GREEN: after the guard → `tests/stale-returned-sweep.test.ts` + `tests/stale-checkout-sweep.test.ts` → `2 passed (2)`, `24 passed (24)`; case 9 asserts one push, `db.select` called exactly twice (one scan), and the second result flagged `skippedOverlap`.
+- Command: `pnpm typecheck:server` → exit 0. No other caller reads the result shape (`grep runStaleReturnedSweep server/app server/workers` → only the worker file).
+- NOT done (outside-diff, heavy lift, pre-existing, already listed in the PR): `MAX_NUDGES` is unreachable under `UNIQUE(equipment_id, alert_type)`; enforcing it needs a persisted attempt count per return event (schema + migration). Separate ticket.
+
+**Verdict:** VERIFIED

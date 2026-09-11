@@ -70,7 +70,30 @@ function withinRenudgeInterval(prior: { acknowledgedAt: Date }[], now: Date): bo
   return lastAt !== null && now.getTime() - lastAt.getTime() < RENUDGE_INTERVAL_MS;
 }
 
-export async function runStaleReturnedSweep(now = new Date()): Promise<{ scanned: number; nudged: number }> {
+export type StaleReturnedSweepResult = { scanned: number; nudged: number; skippedOverlap?: true };
+
+// One sweep at a time per process. The startup run and the first BullMQ tick (or two ticks
+// straddling a slow push) would otherwise both pass Phase A on the same item and both push:
+// the push deliberately happens OUTSIDE the advisory lock (holding a DB lock across an HTTP
+// fan-out exhausts the pool), so serialization of the *decision* has to live here.
+// Cross-instance overlap is bounded by the Phase C re-check, not prevented.
+let sweepInFlight: Promise<StaleReturnedSweepResult> | null = null;
+
+export async function runStaleReturnedSweep(now = new Date()): Promise<StaleReturnedSweepResult> {
+  if (sweepInFlight) {
+    incrementMetric("stale_returned_skipped");
+    console.warn("[stale-returned-sweep] a sweep is already running in this process — skipping this tick");
+    return { scanned: 0, nudged: 0, skippedOverlap: true };
+  }
+  sweepInFlight = sweepStaleReturnedOnce(now);
+  try {
+    return await sweepInFlight;
+  } finally {
+    sweepInFlight = null;
+  }
+}
+
+async function sweepStaleReturnedOnce(now: Date): Promise<{ scanned: number; nudged: number }> {
   const cutoff = new Date(now.getTime() - STALE_RETURNED_HOURS * 3600_000);
   const candidates = await db.select().from(equipment).where(and(
     eq(equipment.custodyState, "returned"),
