@@ -11615,3 +11615,18 @@ So the RN lane (EAS build 30, `uk.vettrack.app`) has been the shipping App Store
 describes a milestone that is already behind us; the iOS half of the store program is closed.
 The Capacitor shell's `CURRENT_PROJECT_VERSION = 31` in this repo is now a safety-net counter,
 not a release plan. Android is the only open store lane (alpha draft 10302, zero testers).
+
+## 2026-09-11 — #268: the maintenance-interval helper text goes through `t.*` (RED first)
+
+**Claim:** `src/pages/new-equipment.tsx` no longer carries the hardcoded English helper under `data-testid="input-maintenance-interval"`; the copy lives in both locales as `newEquipment.fields.maintenanceIntervalDays.description`, and the denylist guard now catches a regression.
+
+**Evidence:**
+- RED: added the literal to `FORBIDDEN_LITERALS` in `tests/no-hardcoded-ui-strings.test.js` → `pnpm exec vitest run tests/no-hardcoded-ui-strings.test.js` → `× no forbidden literals in src files … found in src/pages/new-equipment.tsx … Tests 1 failed (1)`.
+- GREEN: keys added to `locales/he.json` (Hebrew-first: "קובע התראה אוטומטית כשהתחזוקה באיחור.") and `locales/en.json`; `pnpm i18n:generate-types` rewrote `src/lib/i18n.generated.d.ts` (+1 line); the `<p>` reads `t.newEquipment.fields.maintenanceIntervalDays.description`, mirroring the sibling `expectedReturnMinutes` field.
+- `pnpm exec vitest run tests/no-hardcoded-ui-strings.test.js tests/i18n-parity.test.ts` → `Test Files 2 passed · Tests 5 passed`.
+- `pnpm i18n:check` → `locales/en.json and locales/he.json are in deep key parity.`
+- `npx tsc --noEmit` → exit 0.
+
+**Not in scope, recorded:** the three card headings in the same file (`Basic Info` :334, `Organization` :418, `Maintenance` :521) are also raw literals with no locale keys — separate issue.
+
+**Verdict:** VERIFIED
