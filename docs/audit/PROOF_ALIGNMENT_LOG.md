@@ -11683,3 +11683,19 @@ not a release plan. Android is the only open store lane (alpha draft 10302, zero
 - `pnpm test` (full default suite, this branch) → `Tests 7209 passed | 11 skipped (7220)`.
 
 **Verdict:** VERIFIED
+
+## 2026-09-11 — #280: the Express major bump on `feat/express-5` (every gate run against the migrated server, with a pre-migration control for the two suites that are red)
+
+**Claim:** the server runs on the new Express major with one v5 serve-static-core type tree (pinned through `pnpm.overrides`); every `req.params` read goes through `param()` in `server/lib/route-params.ts` (a missing/empty/array value is a 400 `INVALID_ROUTE_PARAM`, mapped in `server/lib/body-parser-errors.ts`); the SPA catch-all is `app.get("/{*splat}")`; a body-less request reaches handlers as `{}`; every `res.sendFile` passes `{ root: PUBLIC_DIR }` because send@1 applies `dotfiles: "ignore"` to an absolute path (send@0 did not — a checkout under `.claude/worktrees/` answered every shell route with a 500 `NotFoundError` until the change).
+
+**Evidence:**
+- `pnpm typecheck` → 0 `error TS` (282 before the `param()` sweep).
+- `pnpm exec vitest run tests/route-params.test.ts tests/express5-runtime-contract.test.ts tests/api-client-server-path-contract.test.ts tests/code-blue-presence-audit.test.ts tests/store-build-max.test.ts` → `Test Files 5 passed · Tests 33 passed` (after merging `origin/main` at `46d441c4d`).
+- `pnpm test:live-server` against `start:playwright-api` with `TEST_MODE=true` after `pnpm seed:dev:e2e` → `74 assertions across 6 suites — PASS`. The earlier run without `TEST_MODE` refused `charge-alert-worker` (3/5) and `expiry-check-worker` (6/8) identically on the pre-migration tree — `/api/test/*` is gated by `requireTestMode`, not by the framework.
+- `pnpm test:playwright:ci` (CI shape: `pnpm build` → `start:playwright-api` → `seed:dev:e2e`) → `47 passed · 7 failed`; `pnpm test:playwright:phase9` → `6 passed · 3 failed · 1 skipped`. All 10 failures wait on `navigator.serviceWorker.ready` (P04–P07, drills 2/7/8). Control on a detached `origin/main` (`46d441c4d`, the pre-migration major, same build/serve/seed) → the same 4 + 3 fail. A headless page against the Express 5 server shows `/sw.js`, `/index.html`, `/manifest.json`, both icons → 200 and a manual `navigator.serviceWorker.register("/sw.js")` reaching `activated` in 3 s; the app's own registration in `src/main.tsx` never fires in this local environment on either tree. Environmental, not the migration; CI's Playwright job is the gate.
+- `pnpm test:server:smoke` (not in CI) → migrated tree: 10 PASS / 7 FAIL; pre-migration control: 3 PASS / 7 FAIL — the seven failing assertions are the same set on both (`Expected 403 … got 409/404` ×3, stale `100/min` limiter expectations ×4).
+- The `sendFile` defect: `node -e` with `express@5.2.1`: `res.sendFile(<absolute path under .claude/…>)` → 500 `NotFoundError`; `{ dotfiles: "allow" }` → 200; `{ root }` → 200. The same absolute call on the pre-migration major → 200. The runtime-contract source scan now forbids `res.sendFile(path.join(`.
+- `pnpm test` (full default suite, merged branch) → `Test Files 802 passed · Tests 7224 passed | 11 skipped`.
+- `pnpm architecture:gates` → `All G1 checks passed` before this entry was appended; `pnpm verify:claims` re-run after the wording below → 0 FAILED.
+
+**Verdict:** VERIFIED
