@@ -322,6 +322,14 @@ not work, nothing built that is not wired properly"; these three are the residue
   looks like evidence and is not. Either feed it real data or move it out of the evidence
   path; until then no Autopilot threshold may be sourced from it.
 
+### Follow-ups from the Railway/GitHub close-out PRs (2026-09-11)
+
+- TASK: Move `BROADCAST_TEMPLATES` out of `server/routes/shift-chat.ts` into `server/lib/` and import it from both the route and `server/workers/notification.worker.main.ts` — today the worker evaluates a full Express route module (`Router()` + handlers) to read one constant. Deferred from the worker env-gate PR (#294) as out of scope; CodeRabbit flagged it as "poor tradeoff", agreed.
+- TASK: Make `MAX_NUDGES` enforceable in `server/workers/stale-returned-sweep.worker.ts` and `server/workers/staleCheckoutSweepWorker.ts` — `vt_alert_acks` is `UNIQUE(equipment_id, alert_type)` (`migrations/001_initial_schema.sql`), so the per-pair row count never exceeds 1 and the "stop after three nudges" cap is unreachable; needs a persisted attempt count per return event (schema + migration). Deferred from #295. `staleCheckoutSweepWorker.ts` also still does the plain insert that #295 turned into an upsert for the returned sweep.
+- TASK (owner): decide the `UPLOAD_KEY_CERT_FINGERPRINT` mismatch in `server/lib/well-known-assetlinks.ts` — the constant (`93:34:…`) is not the upload key Play Console lists (`38:31:…`); store installs verify through the Play App Signing key either way. Update, remove, or document why. See `docs/runbooks/o2-eas-keystore.md`.
+- TASK (ops): delete the empty Railway bucket `sorted-cabinet` (region iad) — every reference on the VetTrack service was removed on 2026-09-10; rename the Railway username/workspace label `dboy3156` → `exposwifty31` (cosmetic, dashboard-only).
+- TASK (owner): install the Cursor GitHub App under `exposwifty31` when Cursor asks (it was installed only under the deleted account); close the unused Neon and Resend accounts, whose only login was the deleted GitHub account.
+
 ### Ongoing
 
 - TASK: Investigate stale check-in sweep worker — confirm TTL sweep is running in production

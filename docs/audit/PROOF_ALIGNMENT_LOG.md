@@ -11381,3 +11381,14 @@ unmerged and 770 commits behind `main`, exactly as both findings documents state
 - Commands: `pnpm typecheck:server` → exit 0; `pnpm architecture:gates` → `All G1 checks passed`, `All claims accounted for`.
 
 **Verdict:** VERIFIED
+
+## 2026-09-11 — #294 review round 3: full test run recorded; deferred follow-ups moved to TASKS.md
+
+**Claim:** The worker env-gate branch passes the full default vitest suite, and the follow-ups its reviews deferred (the `BROADCAST_TEMPLATES` import move, and — from the sibling sweep PR — the unreachable `MAX_NUDGES` cap) are recorded in the `TASKS.md` Backlog rather than only in review threads.
+
+**Evidence:**
+- Command: `pnpm test` on this branch → `Test Files 795 passed (795)` · `Tests 7178 passed | 11 skipped (7189)` · `Duration 64.90s`.
+- `TASKS.md` — Read after the edit: new subsection "Follow-ups from the Railway/GitHub close-out PRs (2026-09-11)" under Backlog, above "Ongoing".
+- Command: `pnpm verify:claims` → see the gate line recorded in this same commit's CI (`📎 Claim verification`); locally it reported `0 FAILED` before the commit was made.
+
+**Verdict:** VERIFIED
