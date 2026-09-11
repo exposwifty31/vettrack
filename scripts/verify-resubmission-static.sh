@@ -90,9 +90,13 @@ if ! [[ "${BN:-}" =~ ^[0-9]+$ ]]; then
   no "could not parse a numeric CURRENT_PROJECT_VERSION from pbxproj (got '${BN:-<empty>}')"
 elif [ -z "${LAST:-}" ]; then
   no "no last-shipped baseline (ios/.last-shipped-build absent and LAST_SHIPPED_BUILD unset) — record the last build uploaded to App Store Connect there before archiving"
-elif ! [[ "$LAST" =~ ^[0-9]+$ ]]; then
-  no "last-shipped baseline is not a number (got '$LAST') — fix ios/.last-shipped-build or the LAST_SHIPPED_BUILD env"
-elif [ "$BN" -gt "$LAST" ]; then
+elif ! [[ "$LAST" =~ ^[0-9]+(\.[0-9]+)*$ ]]; then
+  no "last-shipped baseline is not a dotted-numeric build number (got '$LAST') — fix ios/.last-shipped-build or the LAST_SHIPPED_BUILD env"
+elif [ "$(python3 -c '
+import sys
+a=[int(p) for p in sys.argv[1].split(".")]; b=[int(p) for p in sys.argv[2].split(".")]
+n=max(len(a),len(b)); a+=[0]*(n-len(a)); b+=[0]*(n-len(b))
+print(1 if a>b else 0)' "$BN" "$LAST")" = "1" ]; then
   ok "build $BN > last shipped $LAST"
   # Offline visibility only (git, no network, no new failure mode): a record that has
   # not moved in weeks is the drift the LIVE gate in verify-resubmission.sh catches.

@@ -11675,10 +11675,11 @@ not a release plan. Android is the only open store lane (alpha draft 10302, zero
 **Claim:** the entry above omitted the type-check result; here it is, together with the four review findings verified against the files and fixed.
 
 **Evidence:**
-- `npx tsc --noEmit` → exit 0; `npx tsc -p tsconfig.server.json --noEmit` → exit 0 (no TypeScript was touched by the oracle change — the new files are bash and vitest).
+- `npx tsc --noEmit` → exit 0; `npx tsc -p tsconfig.server.json --noEmit` → exit 0 (no production TypeScript changed; the new tests `tests/store-build-max.test.ts` and `tests/resubmit-store-oracle.test.ts` are TypeScript/Vitest files and typecheck with the rest).
 - `scripts/resubmit.sh` captured `$?` after `! cmd`, so the failure line always said "exit 0"; now the unnegated status is captured and the fixture test asserts `store-build-max.sh exit 2`.
 - `tests/store-build-max.test.ts` gains the missing-record `--sync` case (file created with `30`, `<missing>` printed).
-- `RESUBMISSION_RUNBOOK.md` states the sync is the default with the `RESUBMIT_SKIP_STORE_ORACLE=1` override, and that the record equals the highest build ASC returns including failed/expired uploads.
-- `pnpm exec vitest run tests/store-build-max.test.ts tests/resubmit-store-oracle.test.ts` → `2 files, 14 passed`.
+- `RESUBMISSION_RUNBOOK.md` states the sync is the default with the `RESUBMIT_SKIP_STORE_ORACLE=1` override, and that the sync is non-decreasing — it raises a behind record, leaves an equal one, and refuses with an error to lower an ahead record — against the highest build ASC returns including failed/expired uploads.
+- `pnpm exec vitest run tests/store-build-max.test.ts tests/resubmit-store-oracle.test.ts` → `2 files, 15 passed` (round 2 added the dotted-record case: store max `30.1` → record `30.1`, next build 31, LIVE gate `PASS build 31 > ASC max 30.1`; the static gate compares dotted numbers too: `LAST_SHIPPED_BUILD=30.1` → PASS, `31.2` → FAIL).
+- `pnpm test` (full default suite, this branch) → `Tests 7209 passed | 11 skipped (7220)`.
 
 **Verdict:** VERIFIED

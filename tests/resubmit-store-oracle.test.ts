@@ -73,6 +73,14 @@ describe("scripts/resubmit.sh consults the App Store Connect oracle before bumpi
     expect(r.out).toMatch(/PASS\s+build 31 > ASC max 30/);
   });
 
+  it("handles a dotted store max (the RN lane can leave 30.1): record 30.1, next integer build 31", () => {
+    const r = fixture({ pbxBuild: 30, record: "30\n", ascMax: "30.1" });
+    expect(r.out).toMatch(/RECORD 30 -> 30\.1/);
+    expect(r.record).toBe("30.1\n");
+    expect(r.build).toBe(31);
+    expect(r.out).toMatch(/PASS\s+build 31 > ASC max 30\.1/);
+  });
+
   it("refuses to bump when the oracle is unavailable, and says why (exit 2, nothing edited)", () => {
     const r = fixture({ pbxBuild: 29, record: "29\n", ascMax: "30", noAsc: true });
     expect(r.code).toBe(2);

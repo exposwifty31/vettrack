@@ -93,8 +93,13 @@ LAST_SHIPPED=$(<"$LAST_SHIPPED_FILE")
 # "28" and hand back a wrong baseline as if it were valid.
 LAST_SHIPPED="${LAST_SHIPPED#"${LAST_SHIPPED%%[![:space:]]*}"}"
 LAST_SHIPPED="${LAST_SHIPPED%"${LAST_SHIPPED##*[![:space:]]}"}"
-[[ "$LAST_SHIPPED" =~ ^[0-9]+$ ]] || {
-  echo "FAIL: $LAST_SHIPPED_FILE is not a decimal integer (got '$LAST_SHIPPED') — fix it before bumping"; exit 2; }
+# The record mirrors App Store Connect, which accepts dotted CFBundleVersions ("30.1")
+# from the other lane. This lane bumps integers, so the floor is the record's INTEGER
+# part: the next integer above it is above every "30.x" the store may hold.
+[[ "$LAST_SHIPPED" =~ ^[0-9]+(\.[0-9]+)*$ ]] || {
+  echo "FAIL: $LAST_SHIPPED_FILE is not a dotted-numeric build number (got '$LAST_SHIPPED') — fix it before bumping"; exit 2; }
+LAST_SHIPPED_RECORD="$LAST_SHIPPED"
+LAST_SHIPPED="${LAST_SHIPPED%%.*}"
 
 # Force base 10 everywhere: a zero-padded "08" satisfies ^[0-9]+$ but shell
 # arithmetic reads it as octal and aborts with "value too great for base".
@@ -102,8 +107,8 @@ LAST_SHIPPED=$((10#$LAST_SHIPPED))
 CUR_BUILD=$((10#$CUR_BUILD))
 
 FLOOR="$CUR_BUILD"
-if [ "$LAST_SHIPPED" -gt "$FLOOR" ]; then
-  echo "  note: ios/.last-shipped-build ($LAST_SHIPPED) is ahead of the repo ($CUR_BUILD) — bumping from the baseline"
+if [ "$LAST_SHIPPED" -ge "$FLOOR" ]; then
+  echo "  note: ios/.last-shipped-build ($LAST_SHIPPED_RECORD) is at or ahead of the repo ($CUR_BUILD) — bumping from the baseline"
   FLOOR="$LAST_SHIPPED"
 fi
 NEW_BUILD=$((FLOOR + 1))

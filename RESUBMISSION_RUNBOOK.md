@@ -231,7 +231,7 @@ The Apple-sign-up error had a stack of causes, each hiding the next. All are loa
 - `capacitor.config.ts` bundled mode (no `server.url`) for the shipped archive.
 - Clerk: redirect URLs, `allowed_origins`, Apple/Google OAuth, Client Trust OFF.
 - The native-OAuth chain in §F.
-- Build number is monotonic — bump for each new upload via `pnpm resubmit` (§B.1), never by hand. It must exceed `ios/.last-shipped-build`, which `scripts/store-build-max.sh --sync` keeps equal to the highest build App Store Connect returns for the app — including failed and expired uploads, which consumed their number too (the RN lane shares the counter).
+- Build number is monotonic — bump for each new upload via `pnpm resubmit` (§B.1), never by hand. It must exceed `ios/.last-shipped-build`, which `scripts/store-build-max.sh --sync` keeps from falling behind the highest build App Store Connect returns for the app (including failed and expired uploads, which consumed their number too): it raises a record that is behind, leaves an equal one unchanged, and refuses — with an error, never silently — to lower a record that is ahead of the store. The RN lane shares the counter and may leave dotted numbers (`30.1`); this lane's next build is the integer above the record's integer part.
 
 ## J. After acceptance
 
