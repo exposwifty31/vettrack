@@ -3,6 +3,8 @@
  * Run as a separate process: pnpm run worker
  */
 import "../lib/env-bootstrap.js";
+import { validateWorkerEnv } from "../lib/envValidation.js";
+validateWorkerEnv();
 
 import crypto from "crypto";
 import { Worker } from "bullmq";

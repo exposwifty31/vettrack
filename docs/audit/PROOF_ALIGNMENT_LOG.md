@@ -11332,3 +11332,17 @@ So the 0s are the query working, not the query failing.
 
 **Verdict:** VERIFIED — no pull request has ever existed for either spike branch, and both remain
 unmerged and 770 commits behind `main`, exactly as both findings documents state.
+
+## 2026-09-11 — worker production env gate: validateWorkerEnv() wired into notification.worker.ts
+
+**Claim:** `pnpm worker` now refuses to boot in production without the names it actually needs (`REDIS_URL`, `DB_SSL_REJECT_UNAUTHORIZED`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, the four `APNS_*`, `FCM_SERVICE_ACCOUNT_JSON`, a Postgres URL, and `NODE_ENV=production` whenever `RAILWAY_ENVIRONMENT_NAME` says it is deployed). This closes item 3 of the 2026-08-19 rotation follow-ups; the Worker service has carried every one of these since 2026-09-10, so the gate passes there.
+
+**Evidence:**
+- RED: `npx vitest run tests/env-validation-worker.test.ts` before the implementation → `Tests 15 failed (15)` — `validateWorkerEnv is not a function`, and the static wiring check `expected -1 to be greater than 122`.
+- GREEN: same command after adding `validateWorkerEnv()` to `server/lib/envValidation.ts` and the call at the top of `server/workers/notification.worker.ts` → `Tests 15 passed (15)`; with the neighbouring suites (`tests/env-validation-runtime.test.ts`, `tests/phase-5-p0-hardening.test.js`) → `3 passed (3)`, `33 passed (33)`.
+- Mutation probe: replacing the `validateWorkerEnv();` call line with a comment → `1 failed | 14 passed`, `expected -1 to be greater than 165`; restored byte-for-byte (`cmp -s` → restored) → `15 passed (15)`.
+- `server/lib/push-apns.ts:41-44`, `server/lib/push-fcm.ts:37` — Read: the required names match what those modules read.
+- The gate deliberately does NOT require `VITE_CLERK_PUBLISHABLE_KEY` or `ALLOWED_ORIGIN` (test "does not require the API-only variables") — the Worker service no longer has the publishable key.
+- Command: `pnpm typecheck:server` → exit 0.
+
+**Verdict:** VERIFIED
