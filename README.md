@@ -27,7 +27,7 @@
   | **Auth** | Clerk (required in production) or dev-bypass (non-production only — no Clerk secret, or explicit `CLERK_ENABLED=false`) |
   | **Native** | Capacitor 8 (`ios/`, `android/`) wrapping the built web bundle |
   | **Observability** | Sentry (`@sentry/node`, `@sentry/react`) |
-  | **Deploy** | Railway (`railway.json`, `Dockerfile`, `nixpacks.toml`) |
+  | **Deploy** | Railway (`railway.json`, `Dockerfile`) |
 
   Runtime: Node ≥ 22.12 and < 25 (Node 25+ is refused by `engine-strict`), pnpm 9.15.9.
 

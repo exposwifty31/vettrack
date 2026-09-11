@@ -12,7 +12,7 @@ const push = fs.readFileSync(path.join(repoRoot, "server", "lib", "push.ts"), "u
 const migration = fs.readFileSync(path.join(repoRoot, "migrations", "031_task_recall_indexes.sql"), "utf8");
 const api = fs.readFileSync(path.join(repoRoot, "src", "lib", "api.ts"), "utf8");
 const appointmentsPage = fs.readFileSync(path.join(repoRoot, "src", "pages", "Tasks.tsx"), "utf8");
-const worker = fs.readFileSync(path.join(repoRoot, "server", "workers", "notification.worker.ts"), "utf8");
+const worker = fs.readFileSync(path.join(repoRoot, "server", "workers", "notification.worker.main.ts"), "utf8");
 
 function computeIsOverdue(endTimeIso, nowMs) {
   return new Date(endTimeIso).getTime() < nowMs;

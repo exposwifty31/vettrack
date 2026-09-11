@@ -119,7 +119,7 @@ If a change must modify a frozen surface by design (e.g., adding a new realtime 
 
 | Approver | Scope |
 |---|---|
-| Repository owner (`@dboy31561`) | Any frozen surface |
+| Repository owner (`@exposwifty31`) | Any frozen surface |
 | Second engineer (on-call or designated lead) | SSE/outbox or Code Blue path |
 | Written rationale in PR description | All exceptions |
 
@@ -158,7 +158,7 @@ Forbidden exceptions regardless of approval:
 <!-- Why the invariant is preserved despite the change — e.g. "cursor ordering is unaffected because..." -->
 
 **Exception approval:**
-<!-- Link to comment or approval from @dboy31561 or designated lead -->
+<!-- Link to comment or approval from @exposwifty31 or designated lead -->
 
 ## Checklist
 

@@ -85,7 +85,7 @@ Omit both Clerk keys for dev-bypass mode (hardcoded admin user, no SDK required)
 | `REDIS_URL` | Redis for BullMQ workers (app runs without; queues log `QUEUE_DISABLED_NO_REDIS`) |
 | `ALLOWED_ORIGIN` | CORS allowed origin(s) for production |
 | `DB_CONFIG_ENCRYPTION_KEY` | AES-256-GCM key for `vt_server_config` integration credentials |
-| `DATA_INTEGRITY_HEALTH_TOKEN` | Bearer token for `/api/admin/data-integrity` endpoint |
+| `DATA_INTEGRITY_HEALTH_TOKEN` | Token for `GET /api/health/data-integrity` (alias `/health/data-integrity`), sent as the `x-health-token` header (`server/routes/health.ts`) |
 | `SENTRY_DSN` | Sentry error tracking |
 | `PORT` | API server port (default: 3001) |
 
@@ -102,10 +102,30 @@ Omit both Clerk keys for dev-bypass mode (hardcoded admin user, no SDK required)
 | Variable | Description |
 |----------|-------------|
 | `VITE_API_ORIGIN` | Production API host baked into **bundled** Capacitor shell (e.g. `https://vettrack.uk`). Set in `.env`; native builds use `./scripts/build-native-shell.sh` which reads `.env` only (ignores `.env.local`). |
+| `APNS_KEY_P8` | APNs p8 private key content (`server/lib/push-apns.ts`) |
 | `APNS_KEY_ID` | APNs p8 key ID (10-char string) |
 | `APNS_TEAM_ID` | Apple Developer Team ID |
-| `APNS_P8_KEY` | APNs p8 private key content |
-| `FCM_JSON` | FCM service account JSON (stringified) |
+| `APNS_BUNDLE_ID` | iOS bundle id the APNs token is issued for |
+| `FCM_SERVICE_ACCOUNT_JSON` | FCM service account JSON, stringified (`server/lib/push-fcm.ts`) |
+| `ANDROID_PLAY_SIGNING_SHA256` | Play App Signing certificate SHA-256, served additively in `/.well-known/assetlinks.json` (`server/lib/well-known-assetlinks.ts`). Set on Railway `VetTrack` since 2026-09-10 |
+
+The four `APNS_*` values and `FCM_SERVICE_ACCOUNT_JSON` are env-only — there is no
+`vt_server_config` fallback for them (unlike `VAPID_*`). Both Railway services
+(`VetTrack`, `Worker`) carry them.
+
+### Railway production services (state as of 2026-09-10)
+
+<!-- vt-claim: attested railway-production-state-2026-09-10 -->
+
+- `Worker` carries every `REQUIRED_IN_PRODUCTION` name from `server/lib/envValidation.ts`
+  plus `NODE_ENV=production`. `DB_SSL_REJECT_UNAUTHORIZED`, `S3_ACCESS_KEY_ID` and
+  `S3_SECRET_ACCESS_KEY` are Railway references to the `VetTrack` values, so one write on
+  `VetTrack` updates both. `VITE_CLERK_PUBLISHABLE_KEY` is not set on `Worker` (nothing in
+  the worker reads it).
+- `VetTrack` no longer has `NIXPACKS_NODE_VERSION` (the builder is the Dockerfile) nor the
+  unprefixed `ACCESS_KEY_ID` / `BUCKET` / `ENDPOINT` / `REGION` / `SECRET_ACCESS_KEY` /
+  `RAILWAY_BUCKET_ID` twins — those were auto-injected references to an orphan bucket; the
+  code reads only the `S3_*` names (`server/lib/object-storage.ts`).
 
 ---
 

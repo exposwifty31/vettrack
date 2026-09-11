@@ -28,7 +28,7 @@ const SKIP_DIR_NAMES = new Set(["node_modules", "dist", ".git"]);
 
 /** Queues outside Job registry 1b — not compared to static definitions. */
 const SKIP_REL_FILES = new Set([
-  "server/workers/notification.worker.ts",
+  "server/workers/notification.worker.main.ts",
   "server/lib/queue.ts",
   "server/routes/queue.ts",
 ]);

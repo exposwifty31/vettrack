@@ -1,4 +1,4 @@
-# Branch protection — `main` and `staging`
+# Branch protection — `main`
 
 Template for the GitHub branch-protection / ruleset configuration of the
 VetTrack repository. The Section B infrastructure audit could not read the
@@ -14,10 +14,13 @@ below must be filled from an admin export and then reconciled against the
 A repo admin runs (or uses the Settings → Rules UI):
 
 ```bash
-gh api repos/dboy3156/vettrack/rulesets
-gh api repos/dboy3156/vettrack/branches/main/protection
-gh api repos/dboy3156/vettrack/branches/staging/protection
+gh api repos/exposwifty31/vettrack/rulesets
+gh api repos/exposwifty31/vettrack/branches/main/protection
 ```
+
+(The repository lives under `exposwifty31` — the former `dboy3156` account was
+deleted on 2026-09-11. <!-- vt-claim: attested github-owner-exposwifty31-2026-09-11 --> `origin` has no `staging` branch, so there is no
+`staging` protection to export.)
 
 Record the results in the **Actual** columns and open an issue for any row
 that does not match **Expected**.
@@ -40,22 +43,10 @@ that does not match **Expected**.
 | Allow deletions | No | _tbd_ |
 | Require linear history | Recommended | _tbd_ |
 
-### `staging` (integration branch)
-
-| Setting | Expected | Actual |
-|---|---|---|
-| Require a pull request before merging | Yes | _tbd_ |
-| Required approving reviews | >= 1 | _tbd_ |
-| Require status checks to pass | Yes | _tbd_ |
-| Required checks | CI `test` job; Playwright shards | _tbd_ |
-| Require branches up to date before merge | Recommended | _tbd_ |
-| Allow force pushes | No | _tbd_ |
-| Allow deletions | No | _tbd_ |
-
 ## Notes on required status checks
 
 - `ci.yml` runs the `test` job (typecheck + build + migrations + full vitest)
-  on PRs targeting `main` and `staging`. Its `gate` job is the single
+  on PRs targeting `main`. Its `gate` job is the single
   merge-gate check to require.
 - `playwright.yml` runs as a sharded matrix (`shard 1`, `shard 2`); if
   Playwright is a required check, require **each shard**.
@@ -64,8 +55,8 @@ that does not match **Expected**.
 
 ## Reconciliation checklist
 
-- [ ] Export the live rulesets for `main` and `staging`.
+- [ ] Export the live rulesets for `main`.
 - [ ] Fill the **Actual** columns above.
 - [ ] File an issue for every Expected/Actual mismatch.
-- [ ] Confirm force-push and deletion are disabled on both branches.
-- [ ] Confirm the CI merge gate is a required check on both branches.
+- [ ] Confirm force-push and deletion are disabled on `main`.
+- [ ] Confirm the CI merge gate is a required check on `main`.
