@@ -11332,3 +11332,17 @@ So the 0s are the query working, not the query failing.
 
 **Verdict:** VERIFIED — no pull request has ever existed for either spike branch, and both remain
 unmerged and 770 commits behind `main`, exactly as both findings documents state.
+
+## 2026-09-11 — redis.ts: a refused first connection is one warning, not an error per retry
+
+**Claim:** When Redis refuses the first connection at boot, `createRedisConnection()` / `getRedis()` still resolve, leave no unhandled rejection, log exactly one `[redis:<source>] first connection refused` warning that points at the existing `reconnect_scheduled` metric, and stop repeating `[redis:<source>] error` on every retry until the client has been ready once. Errors after `ready` stay on the error line.
+
+**Evidence:**
+- Root cause of the 2026-08-22 boot rejection was re-read from the actual Railway log of deployment `fa944a5d` (read-only `get-logs`): `💥 UNHANDLED PROMISE: Error: Stream isn't writeable and enableOfflineQueue options is false` with the stack ending `at initCollabServer (server/lib/realtime-collab/server.ts:148:12)` → `new RedisAdapter`. That path was already fixed on `main` by `3e9c65180` (`fix(collab): the Redis adapter's ASYNC failure is now non-fatal too`); `tests/collab-redis-adapter-async-nonfatal.test.ts` → `3 passed (3)`; production logs since 2026-09-10 filtered on `writeable` → empty. So this change covers the remaining client-factory path, not that one.
+- Empirical probe with real ioredis + BullMQ against `redis://127.0.0.1:1` (before the change): `createRedisConnection → client status=reconnecting after 5001ms`, `queue.add → still pending after 3s`, `unhandledRejections: []` — a refused first connection produces no rejection; what it produced was one `[redis:queue] error` line per retry.
+- RED: `npx vitest run tests/redis-refused-first-connection.test.ts` → `2 failed | 1 passed (3)`, both `expected [] to have a length of 1` on the single-warning assertion (real ioredis, no fakes).
+- GREEN: after the `everReady` / `refusedWarned` guard in `attachRedisObservers` (`server/lib/redis.ts`) → `3 passed (3)`; with `tests/collab-redis-adapter-async-nonfatal.test.ts` → `6 passed (6)`; every test file importing `server/lib/redis` (16 files) → `131 passed (131)`.
+- The post-ready pin (`an error AFTER the client was ready is still reported`) passed before and after — it guards the change, it did not drive it.
+- Command: `pnpm typecheck:server` → exit 0.
+
+**Verdict:** VERIFIED

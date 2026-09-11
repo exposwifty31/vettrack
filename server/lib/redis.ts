@@ -149,19 +149,41 @@ function redisQueueOptions(): RedisOptions {
   };
 }
 
+function isConnectionRefused(err: Error): boolean {
+  return (err as NodeJS.ErrnoException).code === "ECONNREFUSED" || err.message.includes("ECONNREFUSED");
+}
+
 function attachRedisObservers(client: Redis, source: "app" | "queue"): void {
+  // A Redis that refuses the FIRST connection (cold container, mid-restart, wrong port) is
+  // not an incident yet: ioredis keeps retrying through `retryStrategy`, which already
+  // emits `reconnect_scheduled`. Before the client has ever been ready, say so once and
+  // stop repeating it on every attempt; after `ready`, every error stays loud.
+  let everReady = false;
+  let refusedWarned = false;
   client.on("connect", () => {
     redisMetric("connect", { source });
     console.log(`[redis:${source}] connecting`);
   });
   client.on("ready", () => {
+    everReady = true;
     redisMetric("ready", { source });
     console.log(`[redis:${source}] ready`);
     if (source === "app") sharedReadyResolve?.();
   });
   client.on("error", (err) => {
     recordFailure("redis");
-    redisMetric("error", { source, phase: "event" });
+    redisMetric("error", { source, phase: everReady ? "event" : "initial_connect" });
+    if (!everReady && isConnectionRefused(err)) {
+      if (!refusedWarned) {
+        refusedWarned = true;
+        console.warn(
+          `[redis:${source}] first connection refused — ioredis keeps retrying via retryStrategy ` +
+            `(watch [redis-metric] reconnect_scheduled); further refusals are not repeated here`,
+          { message: err.message },
+        );
+      }
+      return;
+    }
     console.error(`[redis:${source}] error`, { message: err.message });
   });
   client.on("close", () => {
