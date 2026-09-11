@@ -11559,6 +11559,21 @@ unmerged and 770 commits behind `main`, exactly as both findings documents state
 - The earlier merged commits were also verified live: VetTrack log after `27bc6f3f4` shows `[stale-returned-sweep] scheduled via BullMQ` with no `startup sweep failed` line (the #295 fix), and no `first connection refused` line was needed (Redis was up).
 
 **Verdict:** VERIFIED
+
+## 2026-09-11 — assetlinks: the "wrong upload key" was a second lane, and the endpoint now serves both (RED first)
+
+**Claim:** `server/lib/well-known-assetlinks.ts` serves a list of upload-key fingerprints — the Capacitor shell's `93:34…` and the EAS-managed `38:31…` that signs the RN AABs — plus the Play App Signing key from `ANDROID_PLAY_SIGNING_SHA256`. The 2026-09-10 "mismatch" (`docs/runbooks/o2-eas-keystore.md`, `TASKS.md`) is resolved by measurement, not by decision.
+
+**Evidence:**
+- Measurement: `npx eas build:view 5e3760cb-… --json` → artifact URL; `curl` → `app-10302.aab` (93,137,215 bytes); `keytool -printcert -jarfile app-10302.aab` → `SHA256: 38:31:8A:51:1A:61:74:CF:F9:0A:BF:3F:8C:4B:AB:DF:B6:9B:34:F4:82:90:3F:C1:A6:F9:9D:FA:8B:A1:4F:5F`. The same value is what Play Console → App integrity lists as the Upload key (read by the Cowork session 2026-09-10). The AAB is signed with the upload key before Play re-signs it, so this is the EAS keystore's certificate.
+- RED: new `tests/well-known-assetlinks.test.ts` → `pnpm exec vitest run tests/well-known-assetlinks.test.ts` → `Tests 3 failed | 1 passed (4)`, each failing on `expected [ Array(1) ] to include '38:31:8A:…'`.
+- GREEN: `UPLOAD_KEY_CERT_FINGERPRINT` → `UPLOAD_KEY_CERT_FINGERPRINTS` (two entries), `resolveAndroidCertFingerprints()` spreads the list; `pnpm exec vitest run tests/well-known-assetlinks.test.ts tests/nfc-qr-sticker-chain.test.ts tests/nfc-sticker-management.test.ts` → `3 files, 29 passed`.
+- Universal checklist (`docs/governance/FROZEN_SURFACE_CHANGE_PROTOCOL.md` §2): `npx tsc --noEmit` → exit 0; `npx tsc --noEmit --project tsconfig.server-check.json` → exit 0; `pnpm test` → `Test Files 797 passed (797) · Tests 7190 passed | 11 skipped`; `bash scripts/ci/contracts-gate.sh` → exit 0 (`40 passed`).
+- `docs/attestations.json` `assetlinks-two-fingerprints-2026-09-10` rewritten to the three-fingerprint form with a fail-closed jq recipe; **attested against the code and the AAB, not the live endpoint** — the endpoint serves three only after this deploys. Re-run the recipe after the deploy and record it here.
+- `pnpm -s verify:claims` → `1244 claims … 0 FAILED · All claims accounted for.`
+
+**Verdict:** VERIFIED (code + artifact); live endpoint PENDING deploy.
+
 ## 2026-09-09 — founder-review: both build-number floors were green on numbers the stores had already burnt
 
 Both lanes' offline build-number gates passed while comparing against a shipped-build record
