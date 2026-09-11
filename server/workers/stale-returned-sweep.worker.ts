@@ -60,8 +60,42 @@ async function nudgeManagers(clinicId: string, payload: PushPayload): Promise<Pu
   return result;
 }
 
-export async function runStaleReturnedSweep(now = new Date()): Promise<{ scanned: number; nudged: number }> {
+/** The newest ack in `prior`, or null. Both phases gate the re-nudge cadence on it. */
+function latestAckAt(prior: { acknowledgedAt: Date }[]): Date | null {
+  return prior.reduce<Date | null>((m, r) => (!m || r.acknowledgedAt > m ? r.acknowledgedAt : m), null);
+}
+
+function withinRenudgeInterval(prior: { acknowledgedAt: Date }[], now: Date): boolean {
+  const lastAt = latestAckAt(prior);
+  return lastAt !== null && now.getTime() - lastAt.getTime() < RENUDGE_INTERVAL_MS;
+}
+
+export type StaleReturnedSweepResult = { scanned: number; nudged: number; skippedOverlap?: true };
+
+// One sweep at a time per process. The startup run and the first BullMQ tick (or two ticks
+// straddling a slow push) would otherwise both pass Phase A on the same item and both push:
+// the push deliberately happens OUTSIDE the advisory lock (holding a DB lock across an HTTP
+// fan-out exhausts the pool), so serialization of the *decision* has to live here.
+// Cross-instance overlap is bounded by the Phase C re-check, not prevented.
+let sweepInFlight: Promise<StaleReturnedSweepResult> | null = null;
+
+export async function runStaleReturnedSweep(now = new Date()): Promise<StaleReturnedSweepResult> {
+  if (sweepInFlight) {
+    incrementMetric("stale_returned_skipped");
+    console.warn("[stale-returned-sweep] sweep_overlap_skipped", { event: "sweep_overlap_skipped", reason: "sweep_in_flight", scope: "process" });
+    return { scanned: 0, nudged: 0, skippedOverlap: true };
+  }
+  sweepInFlight = sweepStaleReturnedOnce(now);
+  try {
+    return await sweepInFlight;
+  } finally {
+    sweepInFlight = null;
+  }
+}
+
+async function sweepStaleReturnedOnce(now: Date): Promise<{ scanned: number; nudged: number }> {
   const cutoff = new Date(now.getTime() - STALE_RETURNED_HOURS * 3600_000);
+  // tenant-lint:scoped system sweep over every clinic by design — filters isNotNull(clinicId) and every per-row write below is scoped by row.clinicId
   const candidates = await db.select().from(equipment).where(and(
     eq(equipment.custodyState, "returned"),
     lt(equipment.custodyStateSince, cutoff),
@@ -77,6 +111,7 @@ export async function runStaleReturnedSweep(now = new Date()): Promise<{ scanned
   const candidateIds = candidates.map((row) => row.id);
   const openAnchors = await db
     .select({ equipmentId: equipmentAnchors.equipmentId })
+    // tenant-lint:scoped batched lookup keyed by the candidate ids the clinic-filtered scan above returned
     .from(equipmentAnchors)
     .where(and(
       inArray(equipmentAnchors.equipmentId, candidateIds),
@@ -114,8 +149,7 @@ export async function runStaleReturnedSweep(now = new Date()): Promise<{ scanned
           gt(alertAcks.acknowledgedAt, custodyStateSince),
         ));
       if (prior.length >= MAX_NUDGES) { incrementMetric("stale_returned_skipped"); return null; }
-      const lastAt = prior.reduce<Date | null>((m, r) => (!m || r.acknowledgedAt > m ? r.acknowledgedAt : m), null);
-      if (lastAt && now.getTime() - lastAt.getTime() < RENUDGE_INTERVAL_MS) {
+      if (withinRenudgeInterval(prior, now)) {
         incrementMetric("stale_returned_skipped"); return null; // D7 — gate on the threshold
       }
       return { clinicId, equipmentId: row.id };
@@ -144,6 +178,15 @@ export async function runStaleReturnedSweep(now = new Date()): Promise<{ scanned
           gt(alertAcks.acknowledgedAt, custodyStateSince),
         ));
       if (prior.length >= MAX_NUDGES) return false; // cap hit by concurrent process — acceptable
+      // Phase A committed before the push, so a concurrent sweep can pass the same gate and
+      // refresh the ack first. Under this lock its write is visible: back off instead of
+      // upserting a second time and counting a nudge that was not ours to count.
+      if (withinRenudgeInterval(prior, now)) return false;
+      // vt_alert_acks is UNIQUE(equipment_id, alert_type) (migrations/001), so the second nudge
+      // for an item — or the first nudge after a later return — hits the row the previous one
+      // wrote. A plain INSERT threw here on every production boot ("startup sweep failed:
+      // duplicate key…") and aborted the whole sweep. Upsert in place: refreshing acknowledgedAt
+      // is what keeps the RENUDGE_INTERVAL_MS gate above honest for the next tick.
       await tx.insert(alertAcks).values({          // D2 — every NOT NULL column present
         id: randomUUID(),
         clinicId,
@@ -153,6 +196,19 @@ export async function runStaleReturnedSweep(now = new Date()): Promise<{ scanned
         acknowledgedByEmail: SYSTEM_USER_EMAIL,
         acknowledgedAt: now,
         ackStatus: "SEEN",
+      }).onConflictDoUpdate({
+        target: [alertAcks.equipmentId, alertAcks.alertType],
+        set: {
+          acknowledgedById: SYSTEM_USER_ID,
+          acknowledgedByEmail: SYSTEM_USER_EMAIL,
+          acknowledgedAt: now,
+          ackStatus: "SEEN",
+          // A manager may have RESOLVED the earlier nudge; reopening the row as SEEN must not keep
+          // that resolution's metadata, which the alert-acks API would then report alongside SEEN.
+          resolvedAt: null,
+          resolvedById: null,
+          resolutionNote: null,
+        },
       });
       return true;
     });

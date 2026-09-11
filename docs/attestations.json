@@ -30,6 +30,36 @@
       "attestedAt": "2026-08-31",
       "staleAfterDays": 90,
       "reverifyWith": "TASKS.md"
+    },
+    {
+      "id": "railway-production-state-2026-09-10",
+      "claim": "The Railway project VetTrack (adf88531-75ce-41a8-9f9f-b27e88c87772) has a single environment, production (63549599-7b9a-4214-aba6-d1b8a9b638bf). On the Worker service, these names are all set: NODE_ENV (= production), DATABASE_URL, REDIS_URL, DB_SSL_REJECT_UNAUTHORIZED, S3_ACCESS_KEY_ID, S3_SECRET_ACCESS_KEY, APNS_KEY_P8, APNS_KEY_ID, APNS_TEAM_ID, APNS_BUNDLE_ID, FCM_SERVICE_ACCOUNT_JSON — the worker's own required set, which is deliberately NOT the API's REQUIRED_IN_PRODUCTION list (that list also names VITE_CLERK_PUBLISHABLE_KEY and ALLOWED_ORIGIN, which the worker does not need and does not carry) — and the three shared names are defined as exact references: DB_SSL_REJECT_UNAUTHORIZED=${{VetTrack.DB_SSL_REJECT_UNAUTHORIZED}}, S3_ACCESS_KEY_ID=${{VetTrack.S3_ACCESS_KEY_ID}}, S3_SECRET_ACCESS_KEY=${{VetTrack.S3_SECRET_ACCESS_KEY}}. On the VetTrack service (551051c2-fcda-47f8-9823-1d95455a5e3e) none of NIXPACKS_NODE_VERSION, ACCESS_KEY_ID, BUCKET, ENDPOINT, REGION, SECRET_ACCESS_KEY, RAILWAY_BUCKET_ID is set and ANDROID_PLAY_SIGNING_SHA256 is. No staged patch is pending. Re-verify with GraphQL, UNRENDERED (the CLI's `variables --json` renders references into literals and cannot tell the two apart), asserting booleans only so no secret value is printed — with T=$(jq -r .user.accessToken ~/.railway/config.json), P=adf88531-75ce-41a8-9f9f-b27e88c87772, E=63549599-7b9a-4214-aba6-d1b8a9b638bf, W=<Worker serviceId from `railway status --json`>, V=551051c2-fcda-47f8-9823-1d95455a5e3e: `curl -s -X POST https://backboard.railway.com/graphql/v2 -H \"Authorization: Bearer $T\" -H 'Content-Type: application/json' -d \"{\\\"query\\\":\\\"{ envs: project(id:\\\\\\\"$P\\\\\\\"){ environments { edges { node { name } } } } w: variables(projectId:\\\\\\\"$P\\\\\\\", environmentId:\\\\\\\"$E\\\\\\\", serviceId:\\\\\\\"$W\\\\\\\", unrendered:true) v: variables(projectId:\\\\\\\"$P\\\\\\\", environmentId:\\\\\\\"$E\\\\\\\", serviceId:\\\\\\\"$V\\\\\\\", unrendered:true) s: environmentStagedChanges(environmentId:\\\\\\\"$E\\\\\\\"){ patch } }\\\"}\" | jq -e '. as $root | (.errors == null) and (.data != null) and ([ (.data.envs.environments.edges | map(.node.name)) == [\"production\"], (.data.w.NODE_ENV == \"production\"), ([\"DATABASE_URL\",\"REDIS_URL\",\"APNS_KEY_P8\",\"APNS_KEY_ID\",\"APNS_TEAM_ID\",\"APNS_BUNDLE_ID\",\"FCM_SERVICE_ACCOUNT_JSON\"] | all(. as $n | ($root.data.w | has($n)) and (($root.data.w[$n] | length) > 0))), (.data.w.DB_SSL_REJECT_UNAUTHORIZED == \"${{VetTrack.DB_SSL_REJECT_UNAUTHORIZED}}\"), (.data.w.S3_ACCESS_KEY_ID == \"${{VetTrack.S3_ACCESS_KEY_ID}}\"), (.data.w.S3_SECRET_ACCESS_KEY == \"${{VetTrack.S3_SECRET_ACCESS_KEY}}\"), ((.data.w | has(\"VITE_CLERK_PUBLISHABLE_KEY\")) | not), ([\"NIXPACKS_NODE_VERSION\",\"ACCESS_KEY_ID\",\"BUCKET\",\"ENDPOINT\",\"REGION\",\"SECRET_ACCESS_KEY\",\"RAILWAY_BUCKET_ID\"] | all(. as $n | ($root.data.v | has($n)) | not)), (.data.v | has(\"ANDROID_PLAY_SIGNING_SHA256\")), ((.data.s == null) or (.data.s.patch == {})) ] | all)'` must exit 0 and print `true`. `jq -e` exits non-zero on `false`, so the check fails closed; a GraphQL error or missing `data` fails on the first two terms rather than being read as \"empty\". The last term accepts `null` for `s` because after `environmentPatchCommitStaged` Railway has no staged record at all (`describe-environment` reports `staged: null`), which is the desired state — it never treats a missing `patch` inside a present record as empty.",
+      "target": "external-service",
+      "evidence": "Railway CLI variable listings (names only) and GraphQL environmentStagedChanges, read by the operations session of 2026-09-10/11",
+      "attestedBy": "operations session 2026-09-10/11 (Cowork), recorded in docs/audit/PROOF_ALIGNMENT_LOG.md",
+      "attestedAt": "2026-09-11",
+      "staleAfterDays": 90,
+      "reverifyWith": "docs/infra/railway-api-gotchas.md"
+    },
+    {
+      "id": "assetlinks-two-fingerprints-2026-09-10",
+      "claim": "https://vettrack.uk/.well-known/assetlinks.json is exactly one statement, for android_app uk.vettrack.app with the handle_all_urls relation, whose sha256_cert_fingerprints set is exactly two values: the UPLOAD_KEY_CERT_FINGERPRINT constant from server/lib/well-known-assetlinks.ts (93:34:4C:4B:9F:2D:22:CC:61:DA:0C:35:71:CF:98:E5:85:22:A3:0A:CA:B8:98:17:2A:28:E7:FC:9F:82:5C:83) and the value of the ANDROID_PLAY_SIGNING_SHA256 variable, which is the Play App Signing key (C4:17:D1:FA:83:F3:4A:7C:C9:4E:63:14:39:ED:FE:FD:13:F0:B3:2F:D2:BA:D5:65:A8:7C:CC:78:5F:B9:CE:3E). This attests what the endpoint serves; it does NOT attest that the constant equals the Play Console upload key (Play Console lists 38:31:8A:…:4F:5F there — an open owner decision recorded in docs/runbooks/o2-eas-keystore.md). Re-verify the whole document, not one field, with a fail-closed jq: `UP=$(grep -o '[0-9A-F:]\\{95\\}' server/lib/well-known-assetlinks.ts); PLAY=C4:17:D1:FA:83:F3:4A:7C:C9:4E:63:14:39:ED:FE:FD:13:F0:B3:2F:D2:BA:D5:65:A8:7C:CC:78:5F:B9:CE:3E; test \"$UP\" = 93:34:4C:4B:9F:2D:22:CC:61:DA:0C:35:71:CF:98:E5:85:22:A3:0A:CA:B8:98:17:2A:28:E7:FC:9F:82:5C:83 && curl -s https://vettrack.uk/.well-known/assetlinks.json | jq -e --arg up \"$UP\" --arg play \"$PLAY\" 'length == 1 and .[0].relation == [\"delegate_permission/common.handle_all_urls\"] and .[0].target.namespace == \"android_app\" and .[0].target.package_name == \"uk.vettrack.app\" and ((.[0].target.sha256_cert_fingerprints | map(ascii_upcase) | sort) == ([$up, $play] | sort))'` must exit 0 and print `true` (the `test` first pins the source constant to the expected value; jq's own `sort` is locale-independent, so no `LC_ALL` is needed).",
+      "target": "external-service",
+      "evidence": "curl of the live endpoint after the 2026-09-10 redeploy",
+      "attestedBy": "operations session 2026-09-10/11 (Cowork)",
+      "attestedAt": "2026-09-11",
+      "staleAfterDays": 120,
+      "reverifyWith": "docs/runbooks/o2-eas-keystore.md"
+    },
+    {
+      "id": "github-owner-exposwifty31-2026-09-11",
+      "claim": "The dboy3156 GitHub account is deleted, and these five repositories exist under exposwifty31: vettrack, VetTrack---RN-Migration-, VetTrack-Updated-, shifts, and VetTrack-legacy (the former dboy3156/VetTrack). Nothing more is claimed about what depends on what. Re-verify all six facts: `gh api users/dboy3156` must return HTTP 404, and `for r in vettrack VetTrack---RN-Migration- VetTrack-Updated- shifts VetTrack-legacy; do gh repo view exposwifty31/$r --json owner,name --jq '.owner.login+\"/\"+.name'; done` must print the five exposwifty31/<name> lines with no error.",
+      "target": "external-service",
+      "evidence": "gh API responses on 2026-09-11",
+      "attestedBy": "operations session 2026-09-10/11 (Cowork)",
+      "attestedAt": "2026-09-11",
+      "staleAfterDays": 180,
+      "reverifyWith": "docs/infra/branch-protection.md"
     }
   ]
 }

@@ -24,22 +24,20 @@ git push -u origin feat/my-change
 
 When CI resumes, required checks include typecheck, vitest, architecture gates, and Playwright shards. Squash-merge if intermediate commits in the MR left CI red and the final head is green.
 
-## Branches: `main` vs `staging`
+## Branches
 
-- **`staging`** — integration branch. Feature work may branch from and merge into `staging`. CI runs on PRs targeting `staging` and on pushes to it.
-- **`main`** — release branch. Railway deploy jobs run on `main` push when `RAILWAY_USE_CLI_DEPLOY` is enabled.
-- **Promotion** — `staging → main` via reviewed merge. Scheduled workflows fire from the **default branch (`main`)** only.
+- **`main`** — the only long-lived branch and the release branch. Feature work branches from `main` and comes back through a reviewed PR. CI runs on PRs targeting `main` and on pushes to it; Railway deploy jobs run on `main` push when `RAILWAY_USE_CLI_DEPLOY` is enabled. Scheduled workflows fire from the **default branch (`main`)** only.
+- There is no `staging` branch (and no Staging environment on Railway — the tier was removed on 2026-08-19).
 
 ### Multi-step remediation PRs
 
-If intermediate commits left CI red (fixed by a later commit in the same PR), squash-merge. Do not preserve red commits on `staging` / `main`.
+If intermediate commits left CI red (fixed by a later commit in the same PR), squash-merge. Do not preserve red commits on `main`.
 
 ## Release flow
 
-1. MRs merge into `staging` when that branch exists; CI enforces `tsc`, build, migrations, vitest, architecture gates, Playwright when remote CI is active.
-2. `staging → main` promotion merge.
-3. On push to `main`, CI runs the same gate and — when `RAILWAY_USE_CLI_DEPLOY` is enabled — deploy pre-flight + Railway deploy.
-4. **Release gate** is manual: Actions → **Release Gate** → **Run workflow**. Trigger before a pilot/demo release.
+1. Feature branch → PR → `main`. CI enforces `tsc`, build, migrations, vitest, architecture gates, Playwright when remote CI is active.
+2. On push to `main`, CI runs the same gate and — when `RAILWAY_USE_CLI_DEPLOY` is enabled — deploy pre-flight + Railway deploy (VetTrack, then Worker).
+3. **Release gate** is manual: Actions → **Release Gate** → **Run workflow**. Trigger before a pilot/demo release.
 
 ## Running tests
 
@@ -89,9 +87,8 @@ server as part of release validation.
 ## Deployment & infrastructure config
 
 - **`RAILWAY_USE_CLI_DEPLOY`** — GitHub repository variable. When `true`, the
-  `deploy-check` and `deploy` jobs in `.github/workflows/ci.yml` run on push
-  to `main`; when unset/false they are skipped (the merge gate tolerates
-  skipped deploy jobs).
+  `deploy` job in `.github/workflows/ci.yml` runs on push to `main`; when
+  unset/false it is skipped (the merge gate tolerates a skipped deploy job).
 - **Redis is required in production.** Redis is optional in dev (queues log
   `QUEUE_DISABLED_NO_REDIS` and the app still runs), but every BullMQ worker
   and scheduler in `server/app/start-schedulers.ts` needs Redis in prod.
@@ -118,7 +115,7 @@ All `/api/health/*` routes are also mounted at `/health/*` (see `server/app/rout
 | Production + match | `200 { ok: true, ... }` |
 | Non-production | `200` (no token required) |
 
-Set in: Railway → Variables → Production AND Staging.
+Set in: Railway → Variables → `production` (the only environment; there is no Staging).
 
 Monitoring callers must include header:
 

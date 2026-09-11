@@ -96,13 +96,30 @@ function mockCandidatesAndAnchors(candidates: unknown[], anchoredEquipmentIds: s
     .mockReturnValueOnce(chainAnchors as never);
 }
 
+// Postgres enforces UNIQUE(equipment_id, alert_type) on vt_alert_acks (migrations/001). This
+// fake behaves like the driver: awaiting `.values(...)` directly runs a plain INSERT, which
+// REJECTS with the production error whenever a row for the pair already exists; chaining
+// `.onConflictDoUpdate(...)` is the only path that resolves. So a worker that forgets the
+// upsert fails here for the same reason it failed at every production boot.
+const UNIQUE_VIOLATION = 'duplicate key value violates unique constraint "vt_alert_acks_equipment_id_alert_type_key"';
+
 function setupTransactionMock(options: {
   priorAcks?: { acknowledgedAt: Date }[];
-  insertCapture?: { values: ReturnType<typeof vi.fn> };
+  insertCapture?: { values: ReturnType<typeof vi.fn>; onConflictDoUpdate: ReturnType<typeof vi.fn> };
+  /** When true, a plain INSERT (no ON CONFLICT clause) rejects like Postgres would. */
+  rowAlreadyExists?: boolean;
 }) {
-  const insertValues = vi.fn().mockResolvedValue(undefined);
+  const onConflictDoUpdate = vi.fn().mockResolvedValue(undefined);
+  const insertValues = vi.fn().mockImplementation(() => ({
+    onConflictDoUpdate,
+    then(resolve: (v: unknown) => void, reject: (e: Error) => void) {
+      if (options.rowAlreadyExists) reject(new Error(UNIQUE_VIOLATION));
+      else resolve(undefined);
+    },
+  }));
   if (options.insertCapture) {
     options.insertCapture.values = insertValues;
+    options.insertCapture.onConflictDoUpdate = onConflictDoUpdate;
   }
   const tx = {
     execute: vi.fn().mockResolvedValue(undefined),
@@ -210,6 +227,105 @@ describe("runStaleReturnedSweep", () => {
     expect(result).toEqual({ scanned: 1, nudged: 0 });
     expect(db.transaction).not.toHaveBeenCalled();
     expect(sendPushToRole).not.toHaveBeenCalled();
+  });
+
+  it("case 7: re-nudge of an item that already has a stale_returned_nudge row → upserts on (equipment_id, alert_type) instead of failing the sweep", async () => {
+    // Second sweep run for the same item: one prior ack, older than the re-nudge interval, and
+    // the (eq-1, stale_returned_nudge) row already exists in vt_alert_acks.
+    mockCandidatesAndAnchors([makeCandidate()], []);
+    const oldAck = { acknowledgedAt: new Date(NOW.getTime() - __test.RENUDGE_INTERVAL_MS - 60_000) };
+    const insertCapture = {} as { values: ReturnType<typeof vi.fn>; onConflictDoUpdate: ReturnType<typeof vi.fn> };
+    setupTransactionMock({ priorAcks: [oldAck], insertCapture, rowAlreadyExists: true });
+
+    const result = await runStaleReturnedSweep(NOW);
+
+    expect(result).toEqual({ scanned: 1, nudged: 1 });
+    expect(insertCapture.onConflictDoUpdate).toHaveBeenCalledTimes(1);
+    const [conflict] = insertCapture.onConflictDoUpdate.mock.calls[0];
+    expect(conflict.target).toEqual(["equipment_id", "alert_type"]);
+    expect(conflict.set).toEqual(expect.objectContaining({ acknowledgedAt: NOW }));
+    expect(incrementMetric).toHaveBeenCalledWith("stale_returned_nudged");
+  });
+
+  it("case 7c: re-nudging over a previously RESOLVED row clears its resolution metadata", async () => {
+    // A manager may have marked the earlier nudge RESOLVED; the item was then returned again and
+    // went stale again. Reopening the same unique row as SEEN must not leave resolvedAt /
+    // resolvedById / resolutionNote from the old resolution on a row the API now reports as SEEN.
+    mockCandidatesAndAnchors([makeCandidate()], []);
+    const insertCapture = {} as { values: ReturnType<typeof vi.fn>; onConflictDoUpdate: ReturnType<typeof vi.fn> };
+    setupTransactionMock({ priorAcks: [], insertCapture, rowAlreadyExists: true });
+
+    await runStaleReturnedSweep(NOW);
+
+    const [conflict] = insertCapture.onConflictDoUpdate.mock.calls[0];
+    expect(conflict.set).toEqual(
+      expect.objectContaining({ ackStatus: "SEEN", resolvedAt: null, resolvedById: null, resolutionNote: null }),
+    );
+  });
+
+  it("case 7b: the sweep completes on a second run — later candidates are still processed after a re-nudge", async () => {
+    // Two candidates; the first already has its ack row (re-nudge), the second is brand new.
+    // Before the upsert, the first insert threw and the whole sweep aborted, so the second
+    // item was never nudged and every boot logged "startup sweep failed".
+    mockCandidatesAndAnchors([makeCandidate({ id: "eq-1" }), makeCandidate({ id: "eq-2" })], []);
+    const oldAck = { acknowledgedAt: new Date(NOW.getTime() - __test.RENUDGE_INTERVAL_MS - 60_000) };
+    setupTransactionMock({ priorAcks: [oldAck], rowAlreadyExists: true });
+
+    await expect(runStaleReturnedSweep(NOW)).resolves.toEqual({ scanned: 2, nudged: 2 });
+    expect(sendPushToRole).toHaveBeenCalledWith("clinic-1", "admin", expect.objectContaining({ tag: "stale-returned:eq-2" }));
+  });
+
+  it("case 8: concurrent sweep — a fresh ack written between Phase A and Phase C → no upsert, not counted", async () => {
+    // Two sweeps overlap (startup + cron, or two instances). Both pass the Phase A gate on the
+    // same stale ack and both push; the Phase C advisory lock serializes them. The LOSER must
+    // see the winner's fresh acknowledgedAt under the lock and back off — not upsert again and
+    // count a second nudge. Phase A here returns the old ack; Phase C returns the fresh one.
+    mockCandidatesAndAnchors([makeCandidate()], []);
+    const oldAck = { acknowledgedAt: new Date(NOW.getTime() - __test.RENUDGE_INTERVAL_MS - 60_000) };
+    const freshAck = { acknowledgedAt: new Date(NOW.getTime() - 60_000) };
+    const insertCapture = {} as { values: ReturnType<typeof vi.fn>; onConflictDoUpdate: ReturnType<typeof vi.fn> };
+    const tx = setupTransactionMock({ priorAcks: [oldAck], insertCapture, rowAlreadyExists: true });
+    tx.select
+      .mockReturnValueOnce(makeSelectChain([oldAck]))     // Phase A — eligible
+      .mockReturnValueOnce(makeSelectChain([freshAck]));  // Phase C — someone else just nudged
+
+    const result = await runStaleReturnedSweep(NOW);
+
+    expect(result).toEqual({ scanned: 1, nudged: 0 });
+    expect(sendPushToRole).toHaveBeenCalled();           // this sweep's push already went out
+    expect(insertCapture.onConflictDoUpdate).not.toHaveBeenCalled();
+    expect(incrementMetric).not.toHaveBeenCalledWith("stale_returned_nudged");
+    expect(logAudit).not.toHaveBeenCalled();
+  });
+
+  it("case 9: two sweeps started in the same process overlap → the second one yields, one push goes out", async () => {
+    // Startup sweep + first BullMQ tick, or two ticks straddling a slow push. The in-process
+    // guard makes the later caller return without scanning, so a single push leaves this
+    // process. (Cross-instance overlap is bounded separately by the Phase C re-check.)
+    mockCandidatesAndAnchors([makeCandidate()], []);
+    setupTransactionMock({ priorAcks: [] });
+    // Definite-assignment `!`: the sendPushToRole mock below assigns this synchronously on its first
+    // call, and `vi.waitFor` blocks until that first call has happened, so every read is after the write.
+    let releasePush!: () => void;
+    vi.mocked(sendPushToRole).mockImplementation(
+      () => new Promise((resolve) => { releasePush = () => resolve({ deliveredAny: true, transientFailures: 0, invalidOrGoneCount: 0 }); }),
+    );
+
+    const first = runStaleReturnedSweep(NOW);
+    await vi.waitFor(() => expect(sendPushToRole).toHaveBeenCalledTimes(1)); // first sweep is mid-push
+    const second = await runStaleReturnedSweep(NOW);
+    releasePush();
+    // Later roles of the same nudge resolve through the same mock; release each as it arrives.
+    const firstResult = await (async () => {
+      const pending = first;
+      const timer = setInterval(() => { if (releasePush) releasePush(); }, 1);
+      try { return await pending; } finally { clearInterval(timer); }
+    })();
+
+    expect(second).toEqual({ scanned: 0, nudged: 0, skippedOverlap: true });
+    expect(firstResult).toEqual({ scanned: 1, nudged: 1 });
+    expect(incrementMetric).toHaveBeenCalledWith("stale_returned_skipped");
+    expect(db.select).toHaveBeenCalledTimes(2); // candidate scan + anchor lookup, once — the second run never scanned
   });
 
   it("case 6: deliveredAny false → no ack insert, not counted as nudged", async () => {

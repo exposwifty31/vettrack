@@ -11333,6 +11333,159 @@ So the 0s are the query working, not the query failing.
 **Verdict:** VERIFIED — no pull request has ever existed for either spike branch, and both remain
 unmerged and 770 commits behind `main`, exactly as both findings documents state.
 
+## 2026-09-11 — docs: align repo docs with the Railway/GitHub cleanup of 2026-09-10/11
+
+**Claim:** Every doc that still described the pre-cleanup state (deleted `dboy3156` account, a Staging environment, the dead ~~`nixpacks.toml`~~, wrong push-credential names, missing required vars, a `deploy-check` job that no longer exists) now matches production, and the Railway API facts learned during the cleanup are recorded once in `docs/infra/railway-api-gotchas.md`.
+
+**Evidence:**
+- `git ls-remote --heads origin staging` → empty output, exit 0 — no `staging` branch exists, so the third `gh api` line in `docs/infra/branch-protection.md` was dropped rather than re-owned.
+- `.github/workflows/ci.yml:610` — Read: the only deploy job is `deploy:`; `grep -n "deploy-check"` over the workflow → no match. `CONTRIBUTING.md` now names only `deploy`.
+- `server/lib/push-apns.ts:41-44` and `server/lib/push-fcm.ts:37` — Read: the env names are `APNS_KEY_P8`, `APNS_KEY_ID`, `APNS_TEAM_ID`, `APNS_BUNDLE_ID`, `FCM_SERVICE_ACCOUNT_JSON`; `docs/setup/environment.md` previously listed `APNS_P8_KEY` and `FCM_JSON`, neither of which any file reads.
+- `server/lib/envValidation.ts:7-31` — Read: `REQUIRED_IN_PRODUCTION` includes `DB_SSL_REJECT_UNAUTHORIZED`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`; the gate comment in `.env.example` omitted all three and now lists them.
+- `server/lib/object-storage.ts:18-35` and `server/routes/uploads.ts:107,158` — Read: only `S3_*` names are read, which is the basis for marking the "duplicate S3-ish pairs" row resolved in `docs/audit/railway-housekeeping-2026-07-10.md`.
+- `server/lib/well-known-assetlinks.ts:35` — Read: `UPLOAD_KEY_CERT_FINGERPRINT` is `93:34:4C:…:5C:83`; the Play Console upload-key value (`38:31:8A:…:4F:5F`) differs. Recorded as an open discrepancy in `docs/runbooks/o2-eas-keystore.md`, not changed (frozen surface, owner decision).
+- `ls nixpacks.toml` → `No such file or directory`; the README stack table no longer cites it.
+- The Railway state itself (variables added/removed, staged patch empty, Redis 8.2.9, webhook re-enabled) was produced and verified by the operations session of 2026-09-10/11 and is NOT re-verified here — this entry covers the docs only.
+- Command: `pnpm verify:claims` → `1232 claims: 1199 verified, 30 registered, 3 attested, 2333 excluded by rule, 0 FAILED` · `All claims accounted for.`
+
+**Verdict:** VERIFIED (docs); PARTIAL for the underlying infra state, which is attested by the operations session rather than re-checked.
+
+## 2026-09-11 — docs close-out, review round 1 on #293 (supersedes the "align repo docs" entry above)
+
+**Claim:** Supersedes the scope of the earlier entry: the docs in the requested list now match production; `docs/audit/railway-housekeeping-2026-07-10.md` is a dated historical report whose July rows are kept verbatim, with resolutions appended in a dated section rather than edited in place. The external state those docs describe is attested, not asserted: <!-- vt-claim: attested railway-production-state-2026-09-10 --> <!-- vt-claim: attested assetlinks-two-fingerprints-2026-09-10 --> <!-- vt-claim: attested github-owner-exposwifty31-2026-09-11 -->.
+
+**Evidence:**
+- `server/routes/health.ts:178-182` — Read: the data-integrity probe is `GET /data-integrity` under the health router and reads the `x-health-token` header; `docs/setup/environment.md` said `/api/admin/data-integrity` + "Bearer", now corrected.
+- `git ls-remote --heads origin staging` → empty: `docs/infra/branch-protection.md` and `CONTRIBUTING.md` no longer describe a `staging` branch, baseline, or promotion flow.
+- `docs/attestations.json` — three entries added (`railway-production-state-2026-09-10`, `assetlinks-two-fingerprints-2026-09-10`, `github-owner-exposwifty31-2026-09-11`), each with `attestedAt`, `staleAfterDays`, and a `reverifyWith` that resolves to an existing document; referenced from this governed entry and from the ungoverned docs that make the claims.
+- `docs/infra/railway-api-gotchas.md` — appended the redacted GraphQL introspection output for the mutations it relies on (captured 2026-09-10) with the `curl` to reproduce it. A disposable-environment rehearsal was NOT added: the project has one environment, this session performs no Railway mutations, and the behaviours were exercised on production on 2026-09-10 by the operations session (recorded in the attestation).
+- Command: `pnpm verify:claims` → `1254 claims: 1218 verified, 30 registered, 6 attested, 2374 excluded by rule, 0 FAILED` · `All claims accounted for.`
+
+**Verdict:** VERIFIED (docs); the Railway/GitHub/assetlinks state itself is ATTESTED (layer 4), not re-checked here.
+
+## 2026-09-11 — docs close-out, review round 2 on #293: attestation recipes are executable and narrowed
+
+**Claim:** The two external-state attestations now carry recipes that compare values, not counts (assetlinks: the two served fingerprints against the constant and the Play App Signing value; GitHub: the deleted account plus all five repositories), and each claim says only what was observed — the assetlinks entry explicitly does not attest that the constant equals the Play Console upload key.
+
+**Evidence:**
+- `docs/attestations.json` — Read after the edit: both `claim` fields contain the full recipes; `pnpm verify:claims` → `1254 claims: 1218 verified, 30 registered, 6 attested, 2376 excluded by rule, 0 FAILED` · `All claims accounted for.`
+- `docs/infra/branch-protection.md:1` — title names `main` only. `docs/audit/railway-housekeeping-2026-07-10.md` — the GitHub row cites `github-owner-exposwifty31-2026-09-11`.
+- Process note, recorded because it matters: the first attempt's edit script failed to parse and wrote nothing, but three thread replies naming the previous commit were posted before that was noticed. Corrections naming the real commit (the round-2 docs commit on this branch — not cited by hash here because the layer-2 gate requires cited commits to already be on `main`) were posted on the same threads.
+
+## 2026-09-11 — worker production env gate: validateWorkerEnv() wired into notification.worker.ts
+
+**Claim:** `pnpm worker` now refuses to boot in production without the names it actually needs (`REDIS_URL`, `DB_SSL_REJECT_UNAUTHORIZED`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, the four `APNS_*`, `FCM_SERVICE_ACCOUNT_JSON`, a Postgres URL, and `NODE_ENV=production` whenever `RAILWAY_ENVIRONMENT_NAME` says it is deployed). This closes item 3 of the 2026-08-19 rotation follow-ups; the Worker service has carried every one of these since 2026-09-10, so the gate passes there.
+
+**Evidence:**
+- RED: `npx vitest run tests/env-validation-worker.test.ts` before the implementation → `Tests 15 failed (15)` — `validateWorkerEnv is not a function`, and the static wiring check `expected -1 to be greater than 122`.
+- GREEN: same command after adding `validateWorkerEnv()` to `server/lib/envValidation.ts` and the call at the top of `server/workers/notification.worker.ts` → `Tests 15 passed (15)`; with the neighbouring suites (`tests/env-validation-runtime.test.ts`, `tests/phase-5-p0-hardening.test.js`) → `3 passed (3)`, `33 passed (33)`.
+- Mutation probe: replacing the `validateWorkerEnv();` call line with a comment → `1 failed | 14 passed`, `expected -1 to be greater than 165`; restored byte-for-byte (`cmp -s` → restored) → `15 passed (15)`.
+- `server/lib/push-apns.ts:41-44`, `server/lib/push-fcm.ts:37` — Read: the required names match what those modules read.
+- The gate deliberately does NOT require `VITE_CLERK_PUBLISHABLE_KEY` or `ALLOWED_ORIGIN` (test "does not require the API-only variables") — the Worker service no longer has the publishable key.
+- Command: `pnpm typecheck:server` → exit 0.
+
+**Verdict:** VERIFIED
+
+## 2026-09-11 — worker env gate, review round 1 on #294: the gate now runs BEFORE the worker body loads
+
+**Claim:** Four CodeRabbit findings verified against the code and fixed: (1) ESM hoists static imports, so `validateWorkerEnv()` placed after `import "../db.js"` ran only after the Pool existed — the worker is now a thin entry (`server/workers/notification.worker.ts`: env-bootstrap → gate → `import("./notification.worker.main.js")`) and the body moved to `server/workers/notification.worker.main.ts`; (2) Railway with an explicit `NODE_ENV=development`/`test` no longer takes the production path — only an UNSET `NODE_ENV` on Railway does; (3) `DB_SSL_REJECT_UNAUTHORIZED` must be exactly `"true"` (`server/lib/postgresql.ts:35` verifies certificates only on that string); (4) the tests isolate `PGBOUNCER_URL` and `ALLOWED_ORIGIN`.
+
+**Evidence:**
+- RED (before any fix): `npx vitest run tests/env-validation-worker.test.ts` → `4 failed | 14 passed (18)`; the import-boundary test failed with `CLERK_SECRET_KEY is required in produ…` thrown from a module the hoisted imports had already evaluated — the finding reproduced exactly.
+- GREEN: same file + `tests/env-validation-runtime.test.ts`, `tests/phase-5-p0-hardening.test.js`, `tests/phase-1-reliability-ops.test.js`, `tests/phase-3-3-recall-production.test.js` (the last two now read the `.main.ts` body) → `5 passed (5)`, `56 passed (56)`.
+- The import-boundary test mocks `../server/db.js` with a factory that flips a flag, makes the `process.exit` stand-in throw like the real one, breaks the env, imports the real entry → rejects with `process.exit(1)` and the flag is still `false`.
+- `package.json:33` — `worker:notifications` still points at `notification.worker.ts`; `pnpm worker` is unchanged.
+- Command: `pnpm typecheck:server` → exit 0.
+
+**Verdict:** VERIFIED
+
+## 2026-09-11 — #294 CI: repoint the static readers and the tenant-lint baseline to notification.worker.main.ts
+
+**Claim:** Moving the worker body to `server/workers/notification.worker.main.ts` broke every guard that read the old path as a file and the two tenant-lint baseline keys; all now point at the body module, and the thin entry keeps its name so `pnpm worker` is unchanged.
+
+**Evidence:**
+- CI run 34549623517 on the previous head: shards 1/2/4 red on `tests/code-blue-push-unmutable.test.ts` (`expected '' to contain 'sendEmergencyPushToAll'`), `tests/phase-3-4-automation.test.js`, `tests/phase-3-3-5-hardening.test.js`, `tests/i18n-no-hebrew-in-source.test.ts` (allowlist named the old path); G1 red on `notification.worker.main.ts::shiftSessions` / `::inventoryLogs` "baseline allows 0, found 1"; the evidence job failed on the same tenant gate.
+- Fix is a path rename in 6 test files + the 2 baseline keys (counts unchanged: 1 and 1 — the same two pre-existing findings, moved with the file, not new ones).
+- Local: the nine affected suites → `9 passed (9)`, `87 passed (87)`; `pnpm tenant:lint:enforce` → `no new findings vs baseline (201 known)`; `pnpm architecture:gates` → `All G1 checks passed`, `All claims accounted for`.
+
+**Verdict:** VERIFIED
+
+## 2026-09-11 — #294 review round 2: the CRITICAL-push escalation failure is logged and counted
+
+**Claim:** In the worker's DLQ handler, a failed `postSystemMessage(clinicId, "critical_push_delivery_failed", …)` no longer disappears into `.catch(() => {})`: it increments the new bounded metric `critical_push_escalation_failed` (added to the closed union in `server/lib/metrics.ts`) and logs `[dlq] CRITICAL push escalation failed to post` with `sourceJobId`, `clinicId`, and the message. The pre-existing worker→`routes/shift-chat.ts` import for `BROADCAST_TEMPLATES` was NOT moved (out of scope; see the thread reply).
+
+**Evidence:**
+- RED: new static contract in `tests/phase-3-3-5-hardening.test.js` → `expected '() => {}' not to match /^\s*\(\)\s*=>\s*\{\s*\}\s*$/`.
+- GREEN: `tests/phase-3-3-5-hardening.test.js` + `tests/f1-server-metrics.test.ts` → `2 passed (2)`, `27 passed (27)`; the six worker-reading suites + metrics → `74 passed` before the regex fix, all green after.
+- Commands: `pnpm typecheck:server` → exit 0; `pnpm architecture:gates` → `All G1 checks passed`, `All claims accounted for`.
+
+**Verdict:** VERIFIED
+
+## 2026-09-11 — #294 review round 3: full test run recorded; deferred follow-ups moved to TASKS.md
+
+**Claim:** The worker env-gate branch passes the full default vitest suite, and the follow-ups its reviews deferred (the `BROADCAST_TEMPLATES` import move, and — from the sibling sweep PR — the unreachable `MAX_NUDGES` cap) are recorded in the `TASKS.md` Backlog rather than only in review threads.
+
+**Evidence:**
+- Command: `pnpm test` on this branch → `Test Files 795 passed (795)` · `Tests 7178 passed | 11 skipped (7189)` · `Duration 64.90s`.
+- `TASKS.md` — Read after the edit: new subsection "Follow-ups from the Railway/GitHub close-out PRs (2026-09-11)" under Backlog, above "Ongoing".
+- Command: `pnpm verify:claims` → see the gate line recorded in this same commit's CI (`📎 Claim verification`); locally it reported `0 FAILED` before the commit was made.
+
+## 2026-09-11 — stale-returned-sweep: ack write is an upsert on (equipment_id, alert_type)
+
+**Claim:** `runStaleReturnedSweep` no longer aborts with `duplicate key value violates unique constraint "vt_alert_acks_equipment_id_alert_type_key"` when it re-nudges an item that already has a `stale_returned_nudge` row; the write is `INSERT … ON CONFLICT (equipment_id, alert_type) DO UPDATE` and later candidates in the same run are processed.
+
+**Evidence:**
+- `migrations/001_initial_schema.sql:78` — Read: `UNIQUE(equipment_id, alert_type)` on `vt_alert_acks`. `server/workers/stale-returned-sweep.worker.ts` inserted a fresh `randomUUID()` row per nudge, so the second nudge for any item could never succeed; production logged `[stale-returned-sweep] startup sweep failed: … duplicate key …` on every boot.
+- RED: `npx vitest run tests/stale-returned-sweep.test.ts` with the new Postgres-faithful insert fake (a plain `await values()` rejects with the production error when the row exists; only `.onConflictDoUpdate()` resolves) → `2 failed | 11 passed (13)`, both failing on `duplicate key value violates unique constraint "vt_alert_acks_equipment_id_alert_type_key"`.
+- GREEN: after chaining `.onConflictDoUpdate({ target: [equipmentId, alertType], set: { acknowledgedAt: now, … } })` → `tests/stale-returned-sweep.test.ts` + `tests/stale-checkout-sweep.test.ts` + `tests/equipment-missing-alert.service.test.ts` → `3 passed (3)`, `31 passed (31)`.
+- Case 7 asserts the conflict target is `["equipment_id", "alert_type"]` and `set.acknowledgedAt === now`; case 7b asserts a two-candidate run resolves `{ scanned: 2, nudged: 2 }` and the second item's push carries `tag: "stale-returned:eq-2"`.
+- Chose `DO UPDATE` over `DO NOTHING` deliberately: with `DO NOTHING` the existing row's `acknowledgedAt` never advances, so the `RENUDGE_INTERVAL_MS` gate would re-push the same item on every hourly tick. Not re-verified against a live DB in this session — the fake models the constraint, it does not run it.
+- NOT fixed, flagged: `MAX_NUDGES` counts rows per `(equipment, alert_type)`, which the unique constraint caps at 1, so the "3 nudges then stop" cap is unreachable in both this worker and `server/workers/staleCheckoutSweepWorker.ts:108-117`, which still does the plain insert.
+- Command: `pnpm typecheck:server` → exit 0.
+
+**Verdict:** VERIFIED (unit); PARTIAL (no live-DB run)
+
+## 2026-09-11 — stale-returned-sweep, review round 1 on #295: Phase C re-checks the re-nudge interval
+
+**Claim:** When two sweeps overlap, the one that reaches Phase C second now sees the winner's refreshed `acknowledgedAt` under the advisory lock and backs off — no second upsert, no second `stale_returned_nudged` metric, no second audit row. Both phases gate on one helper (`withinRenudgeInterval`).
+
+**Evidence:**
+- RED: new case 8 (Phase A select → old ack, Phase C select → ack written 1 min ago) → `expected { scanned: 1, nudged: 1 } to deeply equal { scanned: 1, nudged: 0 }` — the cap-only Phase C check let the second upsert through, exactly as the review said.
+- GREEN: `tests/stale-returned-sweep.test.ts` + `tests/stale-checkout-sweep.test.ts` → `2 passed (2)`, `23 passed (23)`. The push in case 8 still goes out (this sweep sent it before Phase C) — that double push is the known cost of pushing outside the lock and is unchanged.
+- Command: `pnpm typecheck:server` → exit 0.
+
+**Verdict:** VERIFIED
+
+## 2026-09-11 — stale-returned-sweep, review round 2 on #295: one sweep at a time per process
+
+**Claim:** Overlapping in-process sweeps (startup run + first BullMQ tick, or two ticks straddling a slow push) no longer both push: a module-level in-flight guard makes the later caller return `{ scanned: 0, nudged: 0, skippedOverlap: true }` without scanning. The push stays outside the advisory lock by design (holding a DB lock across an HTTP fan-out exhausts the pool); cross-instance overlap remains bounded by the Phase C re-check rather than prevented.
+
+**Evidence:**
+- RED: case 9 (first sweep parked mid-push, second sweep started) → the second run scanned and died on the exhausted select mock (`Cannot read properties of undefined (reading 'from')`) — i.e. it did not yield.
+- GREEN: after the guard → `tests/stale-returned-sweep.test.ts` + `tests/stale-checkout-sweep.test.ts` → `2 passed (2)`, `24 passed (24)`; case 9 asserts one push, `db.select` called exactly twice (one scan), and the second result flagged `skippedOverlap`.
+- Command: `pnpm typecheck:server` → exit 0. No other caller reads the result shape (`grep runStaleReturnedSweep server/app server/workers` → only the worker file).
+- NOT done (outside-diff, heavy lift, pre-existing, already listed in the PR): `MAX_NUDGES` is unreachable under `UNIQUE(equipment_id, alert_type)`; enforcing it needs a persisted attempt count per return event (schema + migration). Separate ticket.
+
+**Verdict:** VERIFIED
+
+## 2026-09-11 — #295 CI: tenant-lint waivers on the two by-design cross-clinic reads
+
+**Claim:** Moving the sweep body into `sweepStaleReturnedOnce` made the tenant linter's function-scope heuristic stop seeing `clinicId` for the two candidate reads (`.from(equipment)`, `.from(equipmentAnchors)`); both are cross-clinic on purpose (a system scheduler filtering `isNotNull(equipment.clinicId)`, with every per-row transaction and push scoped by `row.clinicId`), so each carries a one-line `// tenant-lint:scoped <reason>` waiver naming that. No other site is waived.
+
+**Evidence:**
+- CI run on `d2a96fa62`: G1 and the evidence job both failed on `stale-returned-sweep.worker.ts::equipment (baseline allows 0, found 1)` and `::equipmentAnchors (baseline allows 0, found 1)`; reproduced locally with `pnpm tenant:lint:enforce`.
+- After the two waivers: `pnpm tenant:lint:enforce` → `no new findings vs baseline (201 known)`; `tests/stale-returned-sweep.test.ts` → `15 passed (15)`; `pnpm architecture:gates` → `All G1 checks passed`, `All claims accounted for`.
+
+**Verdict:** VERIFIED
+
+## 2026-09-11 — stale-returned-sweep, review round 3 on #295: reopening a RESOLVED ack clears its resolution metadata
+
+**Claim:** The conflict update now sets `resolvedAt`, `resolvedById`, `resolutionNote` to `null` alongside `ackStatus: "SEEN"`, so a re-nudge over a row a manager had RESOLVED does not report stale resolution data as SEEN. The second outside-diff suggestion (take a fresh timestamp after the push for Phase C) was NOT applied: `now` is the injected sweep clock the suite depends on for determinism, and a push fan-out is bounded in seconds (per-transport timeouts) against a re-nudge interval measured in hours, so the described drift cannot occur in practice.
+
+**Evidence:**
+- RED: case 7c → `expected { …(4) } to deeply equal ObjectContaining{…}` (the `set` had only four keys).
+- GREEN: `tests/stale-returned-sweep.test.ts` + `tests/stale-checkout-sweep.test.ts` → `2 passed (2)`, `25 passed (25)`.
+
 ## 2026-09-11 — redis.ts: a refused first connection is one warning, not an error per retry
 
 **Claim:** When Redis refuses the first connection at boot, `createRedisConnection()` / `getRedis()` still resolve, leave no unhandled rejection, log exactly one `[redis:<source>] first connection refused` warning that points at the existing `reconnect_scheduled` metric, and stop repeating `[redis:<source>] error` on every retry until the client has been ready once. Errors after `ready` stay on the error line.

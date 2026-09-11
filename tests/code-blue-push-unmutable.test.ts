@@ -170,7 +170,7 @@ describe("the emergency path cannot regain the preference gate", () => {
     // The gate is only closed if the emergency producer actually uses it; this
     // is the wire, and it is the half a future refactor would silently undo.
     const worker = readFileSync(
-      resolve(process.cwd(), "server/workers/notification.worker.ts"),
+      resolve(process.cwd(), "server/workers/notification.worker.main.ts"),
       "utf8",
     );
     const branch = worker.slice(worker.indexOf('data.type === "code_blue_broadcast"'));
