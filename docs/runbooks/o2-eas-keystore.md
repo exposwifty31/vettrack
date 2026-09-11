@@ -35,6 +35,14 @@
 - הזרימה: אתה שולף ומוסר את ה-SHA-256 → אני קובע את `ANDROID_PLAY_SIGNING_SHA256` על Railway ועושה redeploy → אימות: `curl https://vettrack.uk/.well-known/assetlinks.json` מציג **שני** fingerprints.
 - עד שהמשתנה מוגדר, השרת מגיש את מפתח-ההעלאה בלבד ורושם אזהרה חד-פעמית בלוג — התקנות מהחנות לא יאמתו App Links עד ההזנה.
 
+### סטטוס 2026-09-10 — בוצע
+
+<!-- vt-claim: attested assetlinks-two-fingerprints-2026-09-10 -->
+
+- `ANDROID_PLAY_SIGNING_SHA256` **מוגדר** על שירות `VetTrack` ב-Railway (ערך ה-App signing key מ-Play Console, `C4:17:D1:…:CE:3E`).
+- `https://vettrack.uk/.well-known/assetlinks.json` מגיש **שני** fingerprints: הקבוע `93:34:4C:…:5C:83` מהקוד + `C4:17:…` מהמשתנה. אומת ב-`curl` אחרי ה-redeploy.
+- **פער פתוח, לא תוקן (משטח קפוא — החלטת בעלים):** הקבוע `UPLOAD_KEY_CERT_FINGERPRINT` ב-`server/lib/well-known-assetlinks.ts` הוא `93:34:4C:4B:9F:2D:22:CC:61:DA:0C:35:71:CF:98:E5:85:22:A3:0A:CA:B8:98:17:2A:28:E7:FC:9F:82:5C:83`, בעוד ש-Play Console מציג כ-**Upload key** את `38:31:8A:51:1A:61:74:CF:F9:0A:BF:3F:8C:4B:AB:DF:B6:9B:34:F4:82:90:3F:C1:A6:F9:9D:FA:8B:A1:4F:5F`. או שהקבוע הוא מפתח-העלאה ישן (Capacitor) שכבר לא בשימוש, או שהוא שגוי. ההתקנות מהחנות מאומתות בכל מקרה דרך ה-signing key (`C4:17:…`), כך שאין תקלה בפועל — אבל הקבוע דורש הכרעה: לעדכן ל-`38:31:…`, להסיר, או להשאיר ולתעד מדוע.
+
 ---
 
 ## צד iOS — Apple credentials (אותו רעיון, פעולה מקבילה)
@@ -50,5 +58,5 @@
 
 ## סיכום פעולות שלך (checklist)
 1. [ ] אשר "Yes" ליצירת keystore מנוהל כשהסוכן מריץ את ה-build הראשון.
-2. [ ] אחרי ההעלאה הראשונה: שלוף SHA-256 של **App signing key** מ-App integrity ומסור לי.
+2. [x] אחרי ההעלאה הראשונה: שלוף SHA-256 של **App signing key** מ-App integrity ומסור לי. — **בוצע 2026-09-10** (ראה "סטטוס 2026-09-10" למעלה; פער ה-upload-key שם הוא נושא נפרד ופתוח).
 3. [ ] iOS: אשר EAS-managed Apple credentials **או** מסור App Store Connect API Key (`.p8`+KeyID+IssuerID).
