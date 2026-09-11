@@ -12,6 +12,9 @@ type EquipmentRow = typeof equipment.$inferSelect;
 /** POST /api/equipment/:id/revert */
 export const postEquipmentRevertHandler: RequestHandler = async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
+  // Narrowed once, above the try: an array param is a 400 from the terminal
+  // handler, not a 500 from this handler's own catch.
+  const id = param(req, "id");
   try {
     const clinicId = req.clinicId!;
     const { undoToken: tokenId } = req.body as { undoToken: string };
@@ -19,7 +22,7 @@ export const postEquipmentRevertHandler: RequestHandler = async (req, res) => {
     const [existingItem] = await db
       .select()
       .from(equipment)
-      .where(and(eq(equipment.clinicId, clinicId), eq(equipment.id, param(req, "id")), isNull(equipment.deletedAt)))
+      .where(and(eq(equipment.clinicId, clinicId), eq(equipment.id, id), isNull(equipment.deletedAt)))
       .limit(1);
 
     if (!existingItem) {
@@ -37,7 +40,7 @@ export const postEquipmentRevertHandler: RequestHandler = async (req, res) => {
 
     try {
       await db.transaction(async (tx) => {
-        const token = await consumeUndoToken(clinicId, tokenId, param(req, "id"), req.authUser!.id, tx);
+        const token = await consumeUndoToken(clinicId, tokenId, id, req.authUser!.id, tx);
         if (!token) {
           throw new Error("UNDO_TOKEN_INVALID");
         }
@@ -70,7 +73,7 @@ export const postEquipmentRevertHandler: RequestHandler = async (req, res) => {
           .where(
             and(
               eq(equipment.clinicId, clinicId),
-              eq(equipment.id, param(req, "id")),
+              eq(equipment.id, id),
               eq(equipment.version, existingItem.version),
             ),
           )
@@ -119,7 +122,7 @@ export const postEquipmentRevertHandler: RequestHandler = async (req, res) => {
       actionType: "equipment_reverted",
       performedBy: req.authUser!.id,
       performedByEmail: req.authUser!.email,
-      targetId: param(req, "id"),
+      targetId: id,
       targetType: "equipment",
       metadata: { name: (updated as EquipmentRow | null)?.name ?? null },
     });
