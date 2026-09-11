@@ -82,7 +82,7 @@ let sweepInFlight: Promise<StaleReturnedSweepResult> | null = null;
 export async function runStaleReturnedSweep(now = new Date()): Promise<StaleReturnedSweepResult> {
   if (sweepInFlight) {
     incrementMetric("stale_returned_skipped");
-    console.warn("[stale-returned-sweep] sweep_overlap_skipped", { reason: "sweep_in_flight", scope: "process" });
+    console.warn("[stale-returned-sweep] sweep_overlap_skipped", { event: "sweep_overlap_skipped", reason: "sweep_in_flight", scope: "process" });
     return { scanned: 0, nudged: 0, skippedOverlap: true };
   }
   sweepInFlight = sweepStaleReturnedOnce(now);
