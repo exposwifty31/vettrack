@@ -11560,6 +11560,17 @@ unmerged and 770 commits behind `main`, exactly as both findings documents state
 
 **Verdict:** VERIFIED
 
+## 2026-09-11 — #250: the Code Blue presence heartbeat audits the JOIN, not every beat (RED first, live-verified)
+
+**Claim:** `PATCH /api/code-blue/sessions/:id/presence` writes one `code_blue_presence_joined` audit row when a participant first appears in a session and none on later beats; the presence upsert still runs on every beat. Clinical Safety Officer check: the liveness write (`vt_code_blue_presence` upsert) is unchanged, `logAudit` stays fire-and-forget, no emergency mutation, transport, cache or offline path is touched — pass.
+
+**Evidence:**
+- RED: `tests/code-blue-presence-audit.test.ts` (handler called directly, db + audit mocked) → `pnpm exec vitest run tests/code-blue-presence-audit.test.ts` → `2 failed | 1 passed` — `expected "vi.fn()" to be called 1 times, but got 3 times` / `2 … got 4`; the "upsert on every beat" case passed before and after, as it must.
+- GREEN: `.onConflictDoUpdate(...).returning({ inserted: sql\`(xmax = 0)\` })` and `logAudit` only when `inserted`; new union member `code_blue_presence_joined` (`server/lib/audit.ts`), the per-beat kind kept for history; he/en labels added, `pnpm i18n:generate-types`. Same test → `3 passed`.
+- `npx tsc --noEmit` → exit 0; `npx tsc -p tsconfig.server.json --noEmit` → exit 0; `pnpm i18n:check` → parity; targeted suites (`code-blue-presence-audit`, `code-blue-sessions`, `code-blue-offline-queue-removed`, `authority-code-blue-manager-audit-kinds`, `i18n-parity`, `no-hardcoded-ui-strings`) → `6 files, 52 passed`; `pnpm test` → `7189 passed | 11 skipped (7200)`.
+- LIVE (dev API on :3001, dev-bypass admin, local Postgres; session row `11111111-2222-4333-8444-555555555555` inserted for `dev-clinic-default`): three `PATCH …/presence` → `{"ok":true} [200]` ×3; `select action_type, count(*) from vt_audit_logs where target_id=…` → `code_blue_presence_joined|1`; `GET /api/audit-logs?actionType=code_blue_presence_joined` → 1 row for the session, `…=code_blue_presence_heartbeat` → 0; `vt_code_blue_presence` holds one row with the last beat's `last_seen_at`. Fixture deleted afterwards (audit rows are append-only and stay).
+- `docs/runbooks/code-blue-qa-walkthrough.md` presence row updated to the join-only contract.
+
 ## 2026-09-11 — assetlinks: the "wrong upload key" was a second lane, and the endpoint now serves both (RED first)
 
 **Claim:** `server/lib/well-known-assetlinks.ts` serves a list of upload-key fingerprints — the Capacitor shell's `93:34…` and the EAS-managed `38:31…` that signs the RN AABs — plus the Play App Signing key from `ANDROID_PLAY_SIGNING_SHA256`. The 2026-09-10 "mismatch" (`docs/runbooks/o2-eas-keystore.md`, `TASKS.md`) is resolved by measurement, not by decision.
