@@ -11362,3 +11362,14 @@ unmerged and 770 commits behind `main`, exactly as both findings documents state
 - Command: `pnpm verify:claims` → `1254 claims: 1218 verified, 30 registered, 6 attested, 2374 excluded by rule, 0 FAILED` · `All claims accounted for.`
 
 **Verdict:** VERIFIED (docs); the Railway/GitHub/assetlinks state itself is ATTESTED (layer 4), not re-checked here.
+
+## 2026-09-11 — docs close-out, review round 2 on #293: attestation recipes are executable and narrowed
+
+**Claim:** The two external-state attestations now carry recipes that compare values, not counts (assetlinks: the two served fingerprints against the constant and the Play App Signing value; GitHub: the deleted account plus all five repositories), and each claim says only what was observed — the assetlinks entry explicitly does not attest that the constant equals the Play Console upload key.
+
+**Evidence:**
+- `docs/attestations.json` — Read after the edit: both `claim` fields contain the full recipes; `pnpm verify:claims` → `1254 claims: 1218 verified, 30 registered, 6 attested, 2376 excluded by rule, 0 FAILED` · `All claims accounted for.`
+- `docs/infra/branch-protection.md:1` — title names `main` only. `docs/audit/railway-housekeeping-2026-07-10.md` — the GitHub row cites `github-owner-exposwifty31-2026-09-11`.
+- Process note, recorded because it matters: the first attempt's edit script failed to parse and wrote nothing, but three thread replies naming the previous commit were posted before that was noticed. Corrections naming the real commit (`b4401597e`) were posted on the same threads.
+
+**Verdict:** VERIFIED
