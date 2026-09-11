@@ -591,7 +591,16 @@ async function main(): Promise<void> {
             reason: data?.reason ?? "unknown",
             pushType: innerData.type,
             tag: typeof innerData.tag === "string" ? innerData.tag : null,
-          }).catch(() => {});
+          }).catch((err: unknown) => {
+            // Last resort for a CRITICAL push that exhausted every retry. If even this post
+            // fails, nobody in the clinic was told — that must be visible, not silent.
+            incrementMetric("critical_push_escalation_failed");
+            console.error("[dlq] CRITICAL push escalation failed to post", {
+              sourceJobId: data?.sourceJobId ?? null,
+              clinicId,
+              message: err instanceof Error ? err.message : String(err),
+            });
+          });
         }
         console.error("[dlq] CRITICAL push job permanently failed — escalation triggered", {
           sourceJobId: data?.sourceJobId,

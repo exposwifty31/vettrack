@@ -69,6 +69,18 @@ describe("Phase 3.3.5 Production hardening (static checks)", () => {
     ).toBe(true);
   });
 
+  it("DLQ handler does not swallow a failed CRITICAL-push escalation", () => {
+    // The shift-chat post is the last resort for a CRITICAL push that exhausted every retry.
+    // If posting it fails, an operator must be able to see that: the catch logs and counts.
+    const at = worker.indexOf('"critical_push_delivery_failed"');
+    expect(at).toBeGreaterThan(-1);
+    const catchBlock = worker.slice(at, at + 1200).match(/\.catch\(([\s\S]*?\})\);/);
+    expect(catchBlock).not.toBeNull();
+    expect(catchBlock[1]).not.toMatch(/^\s*\(\)\s*=>\s*\{\s*\}\s*$/);
+    expect(catchBlock[1]).toContain('incrementMetric("critical_push_escalation_failed")');
+    expect(catchBlock[1]).toContain("console.error(");
+  });
+
   it("package.json lists ioredis + bullmq", () => {
     expect(pkg.dependencies?.ioredis && pkg.dependencies?.bullmq).toBeTruthy();
   });

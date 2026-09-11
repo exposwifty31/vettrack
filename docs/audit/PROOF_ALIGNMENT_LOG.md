@@ -11370,3 +11370,14 @@ unmerged and 770 commits behind `main`, exactly as both findings documents state
 - Local: the nine affected suites → `9 passed (9)`, `87 passed (87)`; `pnpm tenant:lint:enforce` → `no new findings vs baseline (201 known)`; `pnpm architecture:gates` → `All G1 checks passed`, `All claims accounted for`.
 
 **Verdict:** VERIFIED
+
+## 2026-09-11 — #294 review round 2: the CRITICAL-push escalation failure is logged and counted
+
+**Claim:** In the worker's DLQ handler, a failed `postSystemMessage(clinicId, "critical_push_delivery_failed", …)` no longer disappears into `.catch(() => {})`: it increments the new bounded metric `critical_push_escalation_failed` (added to the closed union in `server/lib/metrics.ts`) and logs `[dlq] CRITICAL push escalation failed to post` with `sourceJobId`, `clinicId`, and the message. The pre-existing worker→`routes/shift-chat.ts` import for `BROADCAST_TEMPLATES` was NOT moved (out of scope; see the thread reply).
+
+**Evidence:**
+- RED: new static contract in `tests/phase-3-3-5-hardening.test.js` → `expected '() => {}' not to match /^\s*\(\)\s*=>\s*\{\s*\}\s*$/`.
+- GREEN: `tests/phase-3-3-5-hardening.test.js` + `tests/f1-server-metrics.test.ts` → `2 passed (2)`, `27 passed (27)`; the six worker-reading suites + metrics → `74 passed` before the regex fix, all green after.
+- Commands: `pnpm typecheck:server` → exit 0; `pnpm architecture:gates` → `All G1 checks passed`, `All claims accounted for`.
+
+**Verdict:** VERIFIED
