@@ -94,6 +94,16 @@ serviceInstanceVulnRemediationPatchNow
      Returns the new deployment id."
   args: environmentId:String, serviceId:String
 Builder enum: HEROKU | NIXPACKS | PAKETO | RAILPACK      (no DOCKERFILE — see above)
+
+variableDelete                   — "Deletes a variable."
+  args: input:VariableDeleteInput
+  VariableDeleteInput:           environmentId, name, projectId, serviceId      (no skipDeploys)
+variableUpsert                   — "Upserts a variable."
+  args: input:VariableUpsertInput
+  VariableUpsertInput:           environmentId, name, projectId, serviceId, skipDeploys:Boolean, value
+variableCollectionUpsert         — "Upserts a collection of variables."
+  args: input:VariableCollectionUpsertInput
+  VariableCollectionUpsertInput: environmentId, projectId, replace:Boolean, serviceId, skipDeploys:Boolean, variables
 ```
 
 Re-run it yourself (no token needed for the schema):
@@ -101,7 +111,12 @@ Re-run it yourself (no token needed for the schema):
 ```bash
 curl -s -X POST https://backboard.railway.com/graphql/v2 -H 'Content-Type: application/json' \
   -d '{"query":"{ __schema { mutationType { fields { name description args { name type { name ofType { name } } } } } } }"}' \
-  | jq '.data.__schema.mutationType.fields[] | select(.name|test("environmentStage|environmentPatch|VulnRemediation"))'
+  | jq '.data.__schema.mutationType.fields[] | select(.name|test("environmentStage|environmentPatch|VulnRemediation|^variable(Delete|Upsert|CollectionUpsert)$"))'
+
+# and the input shapes that carry (or lack) skipDeploys:
+curl -s -X POST https://backboard.railway.com/graphql/v2 -H 'Content-Type: application/json' \
+  -d '{"query":"{ a: __type(name:\"VariableDeleteInput\") { inputFields { name } } b: __type(name:\"VariableUpsertInput\") { inputFields { name } } c: __type(name:\"VariableCollectionUpsertInput\") { inputFields { name } } }"}' \
+  | jq '.data | map_values(.inputFields | map(.name))'
 ```
 
 The behaviours (staged patch persisting after `input: {}`; `variableDelete` deploying;
