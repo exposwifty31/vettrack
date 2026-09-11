@@ -90,11 +90,14 @@ export function validateWorkerEnv(): void {
 
   // The pool enables certificate verification only on the exact string "true"
   // (getPgSslConfig in server/lib/postgresql.ts); any other non-empty value silently
-  // disables it, which a presence check would wave through.
+  // disables it. This is a WARNING, not a fatal, on purpose: validateEnv() (the API gate)
+  // only checks presence, and production ran "false" on 2026-09-11 — an exact-"true"
+  // fatal here crash-looped the Worker while VetTrack stayed up on the identical variable.
+  // Fix the value on Railway (TASKS.md), then tighten BOTH gates in the same change.
   const dbSsl = process.env.DB_SSL_REJECT_UNAUTHORIZED?.trim();
   if (dbSsl && dbSsl !== "true") {
-    errors.push(
-      `  - DB_SSL_REJECT_UNAUTHORIZED must be exactly "true" in production (got "${dbSsl}") — anything else disables Postgres certificate verification`,
+    console.warn(
+      `⚠️  DB_SSL_REJECT_UNAUTHORIZED is "${dbSsl}" — Postgres certificate verification is DISABLED for this worker; set it to "true" on Railway`,
     );
   }
 

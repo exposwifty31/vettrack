@@ -11521,3 +11521,17 @@ unmerged and 770 commits behind `main`, exactly as both findings documents state
 - Command: `pnpm typecheck:server` → exit 0.
 
 **Verdict:** VERIFIED
+
+## 2026-09-11 — HOTFIX: worker gate accepts DB_SSL_REJECT_UNAUTHORIZED="false" with a warning (Worker crash loop after #294)
+
+**Claim:** `validateWorkerEnv()` no longer exits when `DB_SSL_REJECT_UNAUTHORIZED` is a non-`"true"` value; it warns. Production runs `"false"`, the API gate accepts it (presence only), and the exact-`"true"` fatal shipped in #294 crash-looped the Worker while VetTrack stayed up on the identical variable.
+
+**Evidence:**
+- Railway Worker deployment `0c30be0f` (read-only `get-logs`, status CRASHED): `❌ FATAL: Worker production environment validation failed:` followed by `  - DB_SSL_REJECT_UNAUTHORIZED must be exactly "true" in production (got "false") …`, repeating every ~1.3 s (restart loop).
+- `/api/health` still reported `worker: ok` at the time — the heartbeat key has a 120 s TTL, so the check lags the crash.
+- RED: `tests/env-validation-worker.test.ts` with the `"false"` case flipped to "boots but warns" → `expected "Mock" to not be called at all, but actually been called 1 times` (the exit).
+- GREEN: `tests/env-validation-worker.test.ts` + `tests/env-validation-runtime.test.ts` + `tests/phase-5-p0-hardening.test.js` → `3 passed (3)`, `36 passed (36)`.
+- Command: `pnpm typecheck:server` → exit 0.
+- The underlying finding is real and is NOT fixed here: certificate verification is disabled in production. Filed in `TASKS.md` Backlog (ops/security) with the order: flip the Railway variable → redeploy → then tighten both gates together.
+
+**Verdict:** VERIFIED (code); production recovery is verified by the Worker boot line after deploy, recorded in a later entry.
