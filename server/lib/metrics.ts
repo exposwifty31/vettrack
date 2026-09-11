@@ -342,6 +342,9 @@ type MetricName =
   | "sweep_escalation_stage_2_fired"
   | "sweep_escalation_stage_3_fired"
   | "sweep_escalation_stage_4_fired"
+  // notification.worker.main.ts DLQ handler: the shift-chat escalation for a CRITICAL push that
+  // exhausted every retry could not itself be posted — the clinic was never told.
+  | "critical_push_escalation_failed"
   // R-RTC-1.7 — collaboration WS channel (bounded enum, no PII, no coordinates).
   | "collab_ws_connected"
   | "collab_ws_disconnected"
@@ -1029,6 +1032,7 @@ const DEFAULT_COUNTERS: MetricBuckets = {
   sweep_escalation_stage_2_fired: 0,
   sweep_escalation_stage_3_fired: 0,
   sweep_escalation_stage_4_fired: 0,
+  critical_push_escalation_failed: 0,
   collab_ws_connected: 0,
   collab_ws_disconnected: 0,
   collab_typing: 0,

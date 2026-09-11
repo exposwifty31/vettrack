@@ -22,7 +22,7 @@ const stageSource = readFileSync(
 );
 const overlaySource = readFileSync("./src/features/command-board/components/CodeBlueOverlay.tsx", "utf-8");
 const hookSource = readFileSync("./src/hooks/useDisplaySnapshot.ts", "utf-8");
-const workerSource = readFileSync("./server/workers/notification.worker.ts", "utf-8");
+const workerSource = readFileSync("./server/workers/notification.worker.main.ts", "utf-8");
 const queueSource = readFileSync("./server/lib/queue.ts", "utf-8");
 
 describe("Ward Display — route", () => {

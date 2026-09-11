@@ -9,7 +9,7 @@ const repoRoot = path.resolve(__dirname, "..");
 const automation = fs.readFileSync(path.join(repoRoot, "server", "services", "task-automation.service.ts"), "utf8");
 const queue = fs.readFileSync(path.join(repoRoot, "server", "lib", "queue.ts"), "utf8");
 const audit = fs.readFileSync(path.join(repoRoot, "server", "lib", "audit.ts"), "utf8");
-const worker = fs.readFileSync(path.join(repoRoot, "server", "workers", "notification.worker.ts"), "utf8");
+const worker = fs.readFileSync(path.join(repoRoot, "server", "workers", "notification.worker.main.ts"), "utf8");
 const envExample = fs.readFileSync(path.join(repoRoot, ".env.example"), "utf8");
 
 describe("Phase 3.4 Automation Engine (static checks)", () => {
