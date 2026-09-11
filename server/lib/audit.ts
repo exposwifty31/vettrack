@@ -101,6 +101,7 @@ export type AuditActionType =
   | "whatsapp_alert_created"
   | "code_blue_log_entry_created"
   | "code_blue_presence_heartbeat"
+  | "code_blue_presence_joined"
   | "forecast_parse_keepalive"
   | "formulary_entry_upserted"
   | "formulary_entry_created"
