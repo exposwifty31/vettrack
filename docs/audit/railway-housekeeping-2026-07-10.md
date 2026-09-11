@@ -2,6 +2,8 @@
 
 Findings from the CI/Railway deploy review (PR #77). **Nothing here has been deleted or changed** — every item is confirm-before-act, for the project owner to decide.
 
+> **Amended 2026-09-11:** the July findings above are kept verbatim as the historical record. What has since been resolved is listed in the dated section at the end of this file, not edited in place.
+
 ## Confirm-before-delete candidates
 
 | Item | Finding | Suggested action |
@@ -25,3 +27,15 @@ Findings from the CI/Railway deploy review (PR #77). **Nothing here has been del
 - **Canonical path:** CI `deploy` job on push/dispatch to `main` → `deploy.sh` → `railway up --ci` (VetTrack) → status poll to `SUCCESS` → `curl https://vettrack.uk/api/healthz` → `railway up --ci` (Worker) → status poll. Kill-switch: repo variable `RAILWAY_USE_CLI_DEPLOY`.
 - **Auto-deploy:** disconnected for production VetTrack + Worker (no `source.repo` on either instance). Staging auto-deploys from `exposwifty31/vettrack@main` as a mirror.
 - **Known API footgun:** Railway `serviceInstanceUpdate` **nulls `source` when omitted** from the input. Always re-include `source` (or expect disconnection) when updating instance config via GraphQL.
+
+## Resolution log — 2026-09-10 (Railway cleanup)
+
+Appended after the fact; the July rows above are unchanged. Live state is attested in `docs/attestations.json` (`railway-production-state-2026-09-10`).
+
+| July item | Resolution |
+|---|---|
+| `NIXPACKS_NODE_VERSION` variable (VetTrack) | Removed 2026-09-10. |
+| Duplicate S3-ish variable pairs (VetTrack) | The code reads only `S3_*` (`server/lib/object-storage.ts`, `server/routes/uploads.ts`). The five unprefixed twins plus `RAILWAY_BUCKET_ID` were auto-injected references to the orphan `sorted-cabinet` bucket; all six removed 2026-09-10. Deleting the (empty) bucket itself is a separate ticket. |
+| Worker `NODE_ENV` | Set to `production` 2026-09-10, together with the three `REQUIRED_IN_PRODUCTION` names the Worker was missing (as references to VetTrack's values). |
+| `Staging` environment name | Moot — the Staging environment was removed on 2026-08-19; `production` is the only environment. The "Staging auto-deploys from `exposwifty31/vettrack@main`" line in the deploy-pipeline section below describes the July state only. |
+| `dboy3156/VetTrack` GitHub repo | Transferred to `exposwifty31/VetTrack-legacy`; the `dboy3156` account was deleted on 2026-09-11. Attestation: `github-owner-exposwifty31-2026-09-11` (not the Railway one above). |

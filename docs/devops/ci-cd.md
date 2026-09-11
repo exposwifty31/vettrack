@@ -108,7 +108,7 @@ Both services build from the root `Dockerfile` (pinned in `railway.json`).
 
 **Known limitation:** `playwright.yml` is a separate workflow, so the deploy job cannot `needs:` it. Branch protection (both Playwright shards required + strict up-to-date) guarantees Playwright passed on the exact merged tree; a push-run Playwright failure on `main` does not retroactively block the deploy.
 
-**Staging** (`Staging ` environment) auto-deploys from `main` via Railway's GitHub integration — it is a mirror of production code with staging variables, not a pre-production gate.
+There is **no Staging environment** on Railway: `production` is the only environment of the VetTrack project (the staging tier was removed on 2026-08-19, see above), and neither production service has a GitHub source — every deploy goes through `deploy.sh`. <!-- vt-claim: attested railway-production-state-2026-09-10 -->
 
 ---
 
