@@ -11560,6 +11560,19 @@ unmerged and 770 commits behind `main`, exactly as both findings documents state
 
 **Verdict:** VERIFIED
 
+## 2026-09-11 — the shipped-build record becomes a mirror of App Store Connect (store oracle on the bump path, RED first)
+
+**Claim:** `scripts/store-build-max.sh` asks App Store Connect for the highest build under app 6778937527 and, with `--sync`, raises `ios/.last-shipped-build` to it (never lowers); `scripts/resubmit.sh` runs that sync before choosing a number; `scripts/verify-resubmission.sh` carries a LIVE gate that fails when the record is behind or ahead of the store or the local number is already burnt; the offline static gate only gains a "record last touched" line.
+
+**Evidence:**
+- RED: `tests/store-build-max.test.ts` (stub `asc` on PATH) → `10 failed (10)` (script absent); `tests/resubmit-store-oracle.test.ts` (fixture repo, stub `asc`/`curl`/`railway`) → `3 failed (3)` — the 2026-09-02 shape (repo 29, record 29, store 30) bumped to the burnt 30.
+- GREEN: `pnpm exec vitest run tests/store-build-max.test.ts tests/resubmit-store-oracle.test.ts` → `2 files, 13 passed`; the fixture run now prints `RECORD 29 -> 30`, bumps to 31, and the LIVE gate prints `PASS  build 31 > ASC max 30`.
+- REAL (this Mac, authenticated asc): `bash scripts/store-build-max.sh` → `ASC_MAX=30 COUNT=29 LATEST=30@2026-09-02T15:14:50-07:00/VALID`; `--sync` on this branch (record 29, from main) → `RECORD 29 -> 30  proof: asc builds list --app 6778937527 --paginate → max version 30 (…), 29 builds`; the static gate then read `FAIL  build 30 must be > last shipped 30` — the burnt number refused, which is the whole point. The record was restored to main's 29 afterwards so this branch stays orthogonal to #300 (which carries 30 / 31); on main as it stands the LIVE gate prints `FAIL  ios/.last-shipped-build (29) is BEHIND App Store Connect (30)` — the regression proof the plan asked for.
+- `bash scripts/verify-resubmission-static.sh` → `PASS  build 30 > last shipped 29 · record last touched: 2026-09-02 · STATIC_RESULT PASS=7 FAIL=0`.
+- Docs: `RESUBMISSION_RUNBOOK.md` §B.1 replaces the hand-typed `echo <n> >` with `bash scripts/store-build-max.sh --sync`.
+
+**Verdict:** VERIFIED (scripts + tests + real oracle); the companion RN half (`--sync-floors`, `(B0) store oracle`) is its own PR.
+
 ## 2026-09-11 — #250: the Code Blue presence heartbeat audits the JOIN, not every beat (RED first, live-verified)
 
 **Claim:** `PATCH /api/code-blue/sessions/:id/presence` writes one `code_blue_presence_joined` audit row when a participant first appears in a session and none on later beats; the presence upsert still runs on every beat. Clinical Safety Officer check: the liveness write (`vt_code_blue_presence` upsert) is unchanged, `logAudit` stays fire-and-forget, no emergency mutation, transport, cache or offline path is touched — pass.
@@ -11654,5 +11667,19 @@ not a release plan. Android is the only open store lane (alpha draft 10302, zero
 - `npx tsc --noEmit` → exit 0.
 
 **Not in scope, recorded:** the three card headings in the same file (`Basic Info` :334, `Organization` :418, `Maintenance` :521) are also raw literals with no locale keys — separate issue.
+
+**Verdict:** VERIFIED
+
+## 2026-09-11 — addendum to the store-oracle entry: type-check recorded, review round 1 on #304
+
+**Claim:** the entry above omitted the type-check result; here it is, together with the four review findings verified against the files and fixed.
+
+**Evidence:**
+- `npx tsc --noEmit` → exit 0; `npx tsc -p tsconfig.server.json --noEmit` → exit 0 (no production TypeScript changed; the new tests `tests/store-build-max.test.ts` and `tests/resubmit-store-oracle.test.ts` are TypeScript/Vitest files and typecheck with the rest).
+- `scripts/resubmit.sh` captured `$?` after `! cmd`, so the failure line always said "exit 0"; now the unnegated status is captured and the fixture test asserts `store-build-max.sh exit 2`.
+- `tests/store-build-max.test.ts` gains the missing-record `--sync` case (file created with `30`, `<missing>` printed).
+- `RESUBMISSION_RUNBOOK.md` states the sync is the default with the `RESUBMIT_SKIP_STORE_ORACLE=1` override, and that the sync is non-decreasing — it raises a behind record, leaves an equal one, and refuses with an error to lower an ahead record — against the highest build ASC returns including failed/expired uploads.
+- `pnpm exec vitest run tests/store-build-max.test.ts tests/resubmit-store-oracle.test.ts` → `2 files, 15 passed` (round 2 added the dotted-record case: store max `30.1` → record `30.1`, next build 31, LIVE gate `PASS build 31 > ASC max 30.1`; the static gate compares dotted numbers too: `LAST_SHIPPED_BUILD=30.1` → PASS, `31.2` → FAIL).
+- `pnpm test` (full default suite, this branch) → `Tests 7209 passed | 11 skipped (7220)`.
 
 **Verdict:** VERIFIED
