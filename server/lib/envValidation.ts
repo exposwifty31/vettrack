@@ -51,13 +51,16 @@ const WORKER_REQUIRED_IN_PRODUCTION: string[] = [
 ];
 
 // Railway injects RAILWAY_ENVIRONMENT_NAME into every deployed container. A worker
-// running there with NODE_ENV unset used to skip the production gate silently
-// (NODE_ENV was unset on the Worker service until 2026-09-10); treat "deployed" as
-// production so the omission fails loudly instead.
+// running there with NODE_ENV UNSET used to skip the production gate silently
+// (NODE_ENV was unset on the Worker service until 2026-09-10); treat "deployed with no
+// NODE_ENV at all" as production so the omission fails loudly. An explicit
+// non-production value (development, test) is respected — that is a choice, not an
+// omission.
 function isDeployedProduction(): boolean {
+  const nodeEnv = process.env.NODE_ENV?.trim();
   return (
-    process.env.NODE_ENV === "production" ||
-    Boolean(process.env.RAILWAY_ENVIRONMENT_NAME?.trim())
+    nodeEnv === "production" ||
+    (!nodeEnv && Boolean(process.env.RAILWAY_ENVIRONMENT_NAME?.trim()))
   );
 }
 
@@ -66,7 +69,7 @@ export function validateWorkerEnv(): void {
 
   const errors: string[] = [];
 
-  if (process.env.NODE_ENV !== "production") {
+  if (process.env.NODE_ENV?.trim() !== "production") {
     errors.push(
       "  - NODE_ENV must be \"production\" on a deployed worker (RAILWAY_ENVIRONMENT_NAME is set but NODE_ENV is not)",
     );
@@ -83,6 +86,16 @@ export function validateWorkerEnv(): void {
     if (!value || value.trim() === "") {
       errors.push(`  - ${varName} is required by the worker in production but is missing or empty`);
     }
+  }
+
+  // The pool enables certificate verification only on the exact string "true"
+  // (getPgSslConfig in server/lib/postgresql.ts); any other non-empty value silently
+  // disables it, which a presence check would wave through.
+  const dbSsl = process.env.DB_SSL_REJECT_UNAUTHORIZED?.trim();
+  if (dbSsl && dbSsl !== "true") {
+    errors.push(
+      `  - DB_SSL_REJECT_UNAUTHORIZED must be exactly "true" in production (got "${dbSsl}") — anything else disables Postgres certificate verification`,
+    );
   }
 
   if (errors.length > 0) {

@@ -9,7 +9,7 @@ const repoRoot = path.resolve(__dirname, "..");
 const metrics = fs.readFileSync(path.join(repoRoot, "server", "lib", "metrics.ts"), "utf8");
 const queueLib = fs.readFileSync(path.join(repoRoot, "server", "lib", "queue.ts"), "utf8");
 const queueRoute = fs.readFileSync(path.join(repoRoot, "server", "routes", "queue.ts"), "utf8");
-const worker = fs.readFileSync(path.join(repoRoot, "server", "workers", "notification.worker.ts"), "utf8");
+const worker = fs.readFileSync(path.join(repoRoot, "server", "workers", "notification.worker.main.ts"), "utf8");
 
 describe("Phase 1 reliability/ops checks (static)", () => {
   it("Metrics include persisted state loading/writing", () => {

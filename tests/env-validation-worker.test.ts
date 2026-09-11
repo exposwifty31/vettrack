@@ -14,6 +14,18 @@ import { fileURLToPath } from "url";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, "..");
 
+// The import-boundary test below imports the real worker entry. ESM evaluates every
+// static import before the first statement runs, so the only way the gate can run
+// BEFORE `../db.js` builds its Pool is for the entry to load the worker body lazily.
+// These mocks record whether that boundary held; env-bootstrap is a no-op so a local
+// .env cannot repair a deliberately broken environment.
+let dbModuleEvaluated = false;
+vi.mock("../server/db.js", () => {
+  dbModuleEvaluated = true;
+  return {};
+});
+vi.mock("../server/lib/env-bootstrap.js", () => ({}));
+
 const envBackup: Record<string, string | undefined> = {};
 
 function backupEnv(keys: readonly string[]): void {
@@ -32,6 +44,7 @@ const ENV_KEYS = [
   "RAILWAY_ENVIRONMENT_NAME",
   "DATABASE_URL",
   "POSTGRES_URL",
+  "PGBOUNCER_URL",
   "REDIS_URL",
   "DB_SSL_REJECT_UNAUTHORIZED",
   "S3_ACCESS_KEY_ID",
@@ -43,12 +56,15 @@ const ENV_KEYS = [
   "FCM_SERVICE_ACCOUNT_JSON",
   "VITE_CLERK_PUBLISHABLE_KEY",
   "CLERK_SECRET_KEY",
+  "ALLOWED_ORIGIN",
 ] as const;
 
 function setProductionWorkerEnv(): void {
   process.env.NODE_ENV = "production";
   process.env.RAILWAY_ENVIRONMENT_NAME = "production";
   process.env.DATABASE_URL = "postgres://vettrack:vettrack@localhost:5432/vettrack";
+  delete process.env.POSTGRES_URL;
+  delete process.env.PGBOUNCER_URL;
   process.env.REDIS_URL = "redis://localhost:6379";
   process.env.DB_SSL_REJECT_UNAUTHORIZED = "true";
   process.env.S3_ACCESS_KEY_ID = "test-s3-access-key";
@@ -68,6 +84,7 @@ describe("validateWorkerEnv runtime", () => {
 
   beforeEach(() => {
     vi.resetModules();
+    dbModuleEvaluated = false;
     backupEnv(ENV_KEYS);
     exitSpy = vi.spyOn(process, "exit").mockImplementation((() => undefined) as never);
     errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
@@ -79,6 +96,10 @@ describe("validateWorkerEnv runtime", () => {
     restoreEnv(ENV_KEYS);
     vi.restoreAllMocks();
   });
+
+  function printedErrors(): string {
+    return errorSpy.mock.calls.map((call) => String(call[0])).join("\n");
+  }
 
   it("passes in production when every worker-required variable is present", async () => {
     setProductionWorkerEnv();
@@ -107,14 +128,25 @@ describe("validateWorkerEnv runtime", () => {
     validateWorkerEnv();
 
     expect(exitSpy).toHaveBeenCalledWith(1);
-    const printed = errorSpy.mock.calls.map((call) => String(call[0])).join("\n");
-    expect(printed).toContain(name);
+    expect(printedErrors()).toContain(name);
   });
 
-  it("exits in production when neither DATABASE_URL nor POSTGRES_URL is set", async () => {
+  it('exits in production when DB_SSL_REJECT_UNAUTHORIZED is "false" — the pool verifies certificates only on the exact string "true"', async () => {
+    setProductionWorkerEnv();
+    process.env.DB_SSL_REJECT_UNAUTHORIZED = "false";
+
+    const { validateWorkerEnv } = await import("../server/lib/envValidation.js");
+    validateWorkerEnv();
+
+    expect(exitSpy).toHaveBeenCalledWith(1);
+    expect(printedErrors()).toContain("DB_SSL_REJECT_UNAUTHORIZED");
+  });
+
+  it("exits in production when no Postgres URL is set (DATABASE_URL, POSTGRES_URL, PGBOUNCER_URL)", async () => {
     setProductionWorkerEnv();
     delete process.env.DATABASE_URL;
     delete process.env.POSTGRES_URL;
+    delete process.env.PGBOUNCER_URL;
 
     const { validateWorkerEnv } = await import("../server/lib/envValidation.js");
     validateWorkerEnv();
@@ -130,8 +162,19 @@ describe("validateWorkerEnv runtime", () => {
     validateWorkerEnv();
 
     expect(exitSpy).toHaveBeenCalledWith(1);
-    const printed = errorSpy.mock.calls.map((call) => String(call[0])).join("\n");
-    expect(printed).toContain("NODE_ENV");
+    expect(printedErrors()).toContain("NODE_ENV");
+  });
+
+  it("does not take the production path on Railway when NODE_ENV is explicitly non-production", async () => {
+    setProductionWorkerEnv();
+    process.env.NODE_ENV = "development";
+    delete process.env.APNS_KEY_P8;
+    delete process.env.FCM_SERVICE_ACCOUNT_JSON;
+
+    const { validateWorkerEnv } = await import("../server/lib/envValidation.js");
+    validateWorkerEnv();
+
+    expect(exitSpy).not.toHaveBeenCalled();
   });
 
   it("does not require the API-only variables (publishable Clerk key, ALLOWED_ORIGIN)", async () => {
@@ -159,20 +202,49 @@ describe("validateWorkerEnv runtime", () => {
   });
 });
 
-describe("notification worker wiring (static)", () => {
-  it("calls validateWorkerEnv() before any queue or push client is created", () => {
+describe("notification worker import boundary", () => {
+  beforeEach(() => {
+    vi.resetModules();
+    dbModuleEvaluated = false;
+    backupEnv(ENV_KEYS);
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    vi.spyOn(console, "log").mockImplementation(() => undefined);
+  });
+
+  afterEach(() => {
+    restoreEnv(ENV_KEYS);
+    vi.restoreAllMocks();
+  });
+
+  it("an invalid production environment stops the entry before ../db.js (and the rest of the worker body) is evaluated", async () => {
+    setProductionWorkerEnv();
+    delete process.env.APNS_KEY_P8;
+    // The real process.exit never returns; make the test's stand-in behave the same way so
+    // the entry cannot fall through to the dynamic import.
+    vi.spyOn(process, "exit").mockImplementation(((code: number) => {
+      throw new Error(`process.exit(${code})`);
+    }) as never);
+
+    await expect(import("../server/workers/notification.worker.js")).rejects.toThrow("process.exit(1)");
+
+    expect(dbModuleEvaluated).toBe(false);
+  });
+
+  it("source contract: the entry has no static imports beyond env-bootstrap and the gate, and loads the body dynamically after validateWorkerEnv()", () => {
     const source = fs.readFileSync(
       path.join(repoRoot, "server", "workers", "notification.worker.ts"),
       "utf8",
     );
-    const bootstrapAt = source.indexOf('import "../lib/env-bootstrap.js";');
-    const importAt = source.indexOf("validateWorkerEnv");
+    // `^import\s` — a static import statement; `import(` (the lazy body load) must not match.
+    const staticImports = source.match(/^import\s.*$/gm) ?? [];
+    expect(staticImports).toEqual([
+      'import "../lib/env-bootstrap.js";',
+      'import { validateWorkerEnv } from "../lib/envValidation.js";',
+    ]);
     const callAt = source.indexOf("validateWorkerEnv();");
-    const mainAt = source.indexOf("async function main()");
-
-    expect(bootstrapAt).toBeGreaterThan(-1);
-    expect(importAt).toBeGreaterThan(bootstrapAt);
-    expect(callAt).toBeGreaterThan(importAt);
-    expect(callAt).toBeLessThan(mainAt);
+    const lazyAt = source.indexOf('import("./notification.worker.main.js")');
+    expect(callAt).toBeGreaterThan(-1);
+    expect(lazyAt).toBeGreaterThan(callAt);
   });
 });

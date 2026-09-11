@@ -11346,3 +11346,16 @@ unmerged and 770 commits behind `main`, exactly as both findings documents state
 - Command: `pnpm typecheck:server` → exit 0.
 
 **Verdict:** VERIFIED
+
+## 2026-09-11 — worker env gate, review round 1 on #294: the gate now runs BEFORE the worker body loads
+
+**Claim:** Four CodeRabbit findings verified against the code and fixed: (1) ESM hoists static imports, so `validateWorkerEnv()` placed after `import "../db.js"` ran only after the Pool existed — the worker is now a thin entry (`server/workers/notification.worker.ts`: env-bootstrap → gate → `import("./notification.worker.main.js")`) and the body moved to `server/workers/notification.worker.main.ts`; (2) Railway with an explicit `NODE_ENV=development`/`test` no longer takes the production path — only an UNSET `NODE_ENV` on Railway does; (3) `DB_SSL_REJECT_UNAUTHORIZED` must be exactly `"true"` (`server/lib/postgresql.ts:35` verifies certificates only on that string); (4) the tests isolate `PGBOUNCER_URL` and `ALLOWED_ORIGIN`.
+
+**Evidence:**
+- RED (before any fix): `npx vitest run tests/env-validation-worker.test.ts` → `4 failed | 14 passed (18)`; the import-boundary test failed with `CLERK_SECRET_KEY is required in produ…` thrown from a module the hoisted imports had already evaluated — the finding reproduced exactly.
+- GREEN: same file + `tests/env-validation-runtime.test.ts`, `tests/phase-5-p0-hardening.test.js`, `tests/phase-1-reliability-ops.test.js`, `tests/phase-3-3-recall-production.test.js` (the last two now read the `.main.ts` body) → `5 passed (5)`, `56 passed (56)`.
+- The import-boundary test mocks `../server/db.js` with a factory that flips a flag, makes the `process.exit` stand-in throw like the real one, breaks the env, imports the real entry → rejects with `process.exit(1)` and the flag is still `false`.
+- `package.json:33` — `worker:notifications` still points at `notification.worker.ts`; `pnpm worker` is unchanged.
+- Command: `pnpm typecheck:server` → exit 0.
+
+**Verdict:** VERIFIED
