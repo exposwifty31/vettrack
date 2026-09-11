@@ -535,7 +535,7 @@ export default function NewEquipmentPage() {
                   data-testid="input-maintenance-interval"
                 />
                 <p className="text-xs text-muted-foreground">
-                  Set to auto-alert when maintenance is overdue.
+                  {t.newEquipment.fields.maintenanceIntervalDays.description}
                 </p>
               </div>
 
