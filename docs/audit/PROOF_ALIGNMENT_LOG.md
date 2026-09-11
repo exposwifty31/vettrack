@@ -11332,3 +11332,20 @@ So the 0s are the query working, not the query failing.
 
 **Verdict:** VERIFIED — no pull request has ever existed for either spike branch, and both remain
 unmerged and 770 commits behind `main`, exactly as both findings documents state.
+
+## 2026-09-11 — docs: align repo docs with the Railway/GitHub cleanup of 2026-09-10/11
+
+**Claim:** Every doc that still described the pre-cleanup state (deleted `dboy3156` account, a Staging environment, the dead ~~`nixpacks.toml`~~, wrong push-credential names, missing required vars, a `deploy-check` job that no longer exists) now matches production, and the Railway API facts learned during the cleanup are recorded once in `docs/infra/railway-api-gotchas.md`.
+
+**Evidence:**
+- `git ls-remote --heads origin staging` → empty output, exit 0 — no `staging` branch exists, so the third `gh api` line in `docs/infra/branch-protection.md` was dropped rather than re-owned.
+- `.github/workflows/ci.yml:610` — Read: the only deploy job is `deploy:`; `grep -n "deploy-check"` over the workflow → no match. `CONTRIBUTING.md` now names only `deploy`.
+- `server/lib/push-apns.ts:41-44` and `server/lib/push-fcm.ts:37` — Read: the env names are `APNS_KEY_P8`, `APNS_KEY_ID`, `APNS_TEAM_ID`, `APNS_BUNDLE_ID`, `FCM_SERVICE_ACCOUNT_JSON`; `docs/setup/environment.md` previously listed `APNS_P8_KEY` and `FCM_JSON`, neither of which any file reads.
+- `server/lib/envValidation.ts:7-31` — Read: `REQUIRED_IN_PRODUCTION` includes `DB_SSL_REJECT_UNAUTHORIZED`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`; the gate comment in `.env.example` omitted all three and now lists them.
+- `server/lib/object-storage.ts:18-35` and `server/routes/uploads.ts:107,158` — Read: only `S3_*` names are read, which is the basis for marking the "duplicate S3-ish pairs" row resolved in `docs/audit/railway-housekeeping-2026-07-10.md`.
+- `server/lib/well-known-assetlinks.ts:35` — Read: `UPLOAD_KEY_CERT_FINGERPRINT` is `93:34:4C:…:5C:83`; the Play Console upload-key value (`38:31:8A:…:4F:5F`) differs. Recorded as an open discrepancy in `docs/runbooks/o2-eas-keystore.md`, not changed (frozen surface, owner decision).
+- `ls nixpacks.toml` → `No such file or directory`; the README stack table no longer cites it.
+- The Railway state itself (variables added/removed, staged patch empty, Redis 8.2.9, webhook re-enabled) was produced and verified by the operations session of 2026-09-10/11 and is NOT re-verified here — this entry covers the docs only.
+- Command: `pnpm verify:claims` → `1232 claims: 1199 verified, 30 registered, 3 attested, 2333 excluded by rule, 0 FAILED` · `All claims accounted for.`
+
+**Verdict:** VERIFIED (docs); PARTIAL for the underlying infra state, which is attested by the operations session rather than re-checked.

@@ -14,10 +14,13 @@ below must be filled from an admin export and then reconciled against the
 A repo admin runs (or uses the Settings → Rules UI):
 
 ```bash
-gh api repos/dboy3156/vettrack/rulesets
-gh api repos/dboy3156/vettrack/branches/main/protection
-gh api repos/dboy3156/vettrack/branches/staging/protection
+gh api repos/exposwifty31/vettrack/rulesets
+gh api repos/exposwifty31/vettrack/branches/main/protection
 ```
+
+(The repository lives under `exposwifty31` — the former `dboy3156` account was
+deleted on 2026-09-11. `origin` has no `staging` branch, so there is no
+`staging` protection to export.)
 
 Record the results in the **Actual** columns and open an issue for any row
 that does not match **Expected**.

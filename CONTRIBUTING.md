@@ -89,9 +89,8 @@ server as part of release validation.
 ## Deployment & infrastructure config
 
 - **`RAILWAY_USE_CLI_DEPLOY`** — GitHub repository variable. When `true`, the
-  `deploy-check` and `deploy` jobs in `.github/workflows/ci.yml` run on push
-  to `main`; when unset/false they are skipped (the merge gate tolerates
-  skipped deploy jobs).
+  `deploy` job in `.github/workflows/ci.yml` runs on push to `main`; when
+  unset/false it is skipped (the merge gate tolerates a skipped deploy job).
 - **Redis is required in production.** Redis is optional in dev (queues log
   `QUEUE_DISABLED_NO_REDIS` and the app still runs), but every BullMQ worker
   and scheduler in `server/app/start-schedulers.ts` needs Redis in prod.
@@ -118,7 +117,7 @@ All `/api/health/*` routes are also mounted at `/health/*` (see `server/app/rout
 | Production + match | `200 { ok: true, ... }` |
 | Non-production | `200` (no token required) |
 
-Set in: Railway → Variables → Production AND Staging.
+Set in: Railway → Variables → `production` (the only environment; there is no Staging).
 
 Monitoring callers must include header:
 
