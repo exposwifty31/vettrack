@@ -628,7 +628,8 @@
       },
       "maintenanceIntervalDays": {
         "placeholder": "לדוגמה: 30",
-        "label": "מרווח תחזוקה (ימים)"
+        "label": "מרווח תחזוקה (ימים)",
+        "description": "קובע התראה אוטומטית כשהתחזוקה באיחור."
       },
       "purchaseDate": {
         "label": "תאריך רכישה"
