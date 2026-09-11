@@ -17,22 +17,29 @@ const SHA256_FINGERPRINT_RE = /^([0-9A-F]{2}:){31}[0-9A-F]{2}$/;
 
 // SHA-256 signing-cert fingerprints Android checks against the installed build.
 //
-// - The UPLOAD key (what our local/testing AAB is signed with) is the constant below —
-//   it lets an upload-signed install verify during the pre-launch audit. This covers
-//   the Capacitor shell and is intentionally left unchanged.
-// - Play-delivered installs are re-signed with Google's App Signing key. Both the
-//   Capacitor shell and the Expo/RN app (post identity-migration) ship under the same
-//   package `uk.vettrack.app`, i.e. one Play listing with one immutable Play App
+// - The UPLOAD keys are what OUR artifacts are signed with before Play re-signs them,
+//   so an upload-signed install (a local build, an internal-sharing link, the
+//   pre-launch audit) verifies. Two lanes ship under the same package, each with
+//   its own upload keystore:
+//     1. the Capacitor shell's local keystore (Phase 3.5, unchanged);
+//     2. the EAS-managed keystore that signs the RN AABs. Measured 2026-09-11:
+//        `keytool -printcert -jarfile app-10302.aab` and Play Console → App integrity →
+//        "Upload key certificate" both read 38:31:8A:51:…:4F:5F.
+// - Play-delivered installs are re-signed with Google's App Signing key. Both lanes
+//   ship under `uk.vettrack.app`, i.e. one Play listing with one immutable Play App
 //   Signing key — so a single fingerprint covers both. Its SHA-256 (Play Console →
-//   App integrity, exists only AFTER the first AAB upload) is owner-gated (O2,
-//   EAS-managed signing not yet created), so it is NOT hardcoded here: it is injected
-//   at runtime via the ANDROID_PLAY_SIGNING_SHA256 env var and appended additively.
-//   Until it is provided we serve the upload-key fingerprint only and log a warning.
+//   App integrity, exists only AFTER the first AAB upload) is injected at runtime via
+//   the ANDROID_PLAY_SIGNING_SHA256 env var and appended additively (set on Railway
+//   2026-09-10). Until it is provided we serve the upload keys only and log a warning.
 //   Owner workflow: docs/runbooks/o2-eas-keystore.md — retrieve the SHA-256 from Play
 //   Console, set the env var on Railway, redeploy, then validate
-//   https://vettrack.uk/.well-known/assetlinks.json serves both fingerprints.
-const UPLOAD_KEY_CERT_FINGERPRINT =
-  "93:34:4C:4B:9F:2D:22:CC:61:DA:0C:35:71:CF:98:E5:85:22:A3:0A:CA:B8:98:17:2A:28:E7:FC:9F:82:5C:83";
+//   https://vettrack.uk/.well-known/assetlinks.json serves every fingerprint.
+const UPLOAD_KEY_CERT_FINGERPRINTS = [
+  // Capacitor shell — local upload keystore
+  "93:34:4C:4B:9F:2D:22:CC:61:DA:0C:35:71:CF:98:E5:85:22:A3:0A:CA:B8:98:17:2A:28:E7:FC:9F:82:5C:83",
+  // Expo/RN lane — EAS-managed upload keystore
+  "38:31:8A:51:1A:61:74:CF:F9:0A:BF:3F:8C:4B:AB:DF:B6:9B:34:F4:82:90:3F:C1:A6:F9:9D:FA:8B:A1:4F:5F",
+];
 
 let warnedMissingPlaySigning = false;
 let warnedInvalidPlaySigning = false;
@@ -49,7 +56,7 @@ function resolvePlaySigningFingerprint(): string | undefined {
         `[assetlinks] ${PLAY_SIGNING_SHA256_ENV_VAR} is not set — Play-delivered ` +
           `(App Signing) installs of ${ANDROID_PACKAGE} will NOT verify Android App ` +
           `Links until it is provided (Play Console → App integrity → App signing key ` +
-          `certificate SHA-256). Serving the upload-key fingerprint only.`,
+          `certificate SHA-256). Serving the upload-key fingerprints only.`,
       );
     }
     return undefined;
@@ -71,11 +78,11 @@ function resolvePlaySigningFingerprint(): string | undefined {
 }
 
 // SHA-256 fingerprints served for the Android App Links statement, resolved fresh each
-// call: the constant upload key plus the env-sourced Play App Signing key when present
-// and well-formed. Additive — the upload-key entry is never dropped.
+// call: the constant upload keys plus the env-sourced Play App Signing key when present
+// and well-formed. Additive — no upload-key entry is ever dropped.
 export function resolveAndroidCertFingerprints(): string[] {
   const playSigning = resolvePlaySigningFingerprint();
-  return playSigning ? [UPLOAD_KEY_CERT_FINGERPRINT, playSigning] : [UPLOAD_KEY_CERT_FINGERPRINT];
+  return playSigning ? [...UPLOAD_KEY_CERT_FINGERPRINTS, playSigning] : [...UPLOAD_KEY_CERT_FINGERPRINTS];
 }
 
 export interface AssetLinkStatement {
