@@ -5,10 +5,12 @@ import { logAudit, resolveAuditActorRole } from "../../../lib/audit.js";
 import { resolveApprovalRole } from "../../../lib/approval-role.js";
 import { invalidateForUser } from "../../../lib/authority-cache.js";
 import { resolveRequestId, apiError } from "../users-route-utils.js";
+import { param } from "../../../lib/route-params.js";
 
 /** PATCH /api/users/:id/status */
 export const patchUserStatusHandler: RequestHandler = async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
+  const idParam = param(req, "id");
   try {
     const clinicId = req.clinicId!;
     const { status, role: overrideRole } = req.body as {
@@ -19,7 +21,7 @@ export const patchUserStatusHandler: RequestHandler = async (req, res) => {
     const [existing] = await db
       .select()
       .from(users)
-      .where(and(eq(users.clinicId, clinicId), eq(users.id, req.params.id), isNull(users.deletedAt)))
+      .where(and(eq(users.clinicId, clinicId), eq(users.id, idParam), isNull(users.deletedAt)))
       .limit(1);
 
     if (!existing) {
@@ -63,7 +65,7 @@ export const patchUserStatusHandler: RequestHandler = async (req, res) => {
       .where(
         and(
           eq(users.clinicId, clinicId),
-          eq(users.id, req.params.id),
+          eq(users.id, idParam),
           eq(users.status, existing.status),
           isNull(users.deletedAt),
         ),
@@ -93,7 +95,7 @@ export const patchUserStatusHandler: RequestHandler = async (req, res) => {
       actionType: "user_status_changed",
       performedBy: req.authUser!.id,
       performedByEmail: req.authUser!.email,
-      targetId: req.params.id,
+      targetId: idParam,
       targetType: "user",
       metadata: {
         previousStatus: existing.status,

@@ -15,6 +15,7 @@ import { evaluateCodeBlueManagerForRoute } from "../../../lib/authority/code-blu
 import { codeBlueManagerMetrics } from "../../../lib/authority/enforcement/code-blue-manager.metrics.js";
 import { resolveRequestId, apiError } from "../../../lib/route-utils.js";
 import type { endSessionSchema } from "../schemas.js";
+import { param } from "../../../lib/route-params.js";
 
 // PATCH /api/code-blue/sessions/:id/end — close session (manager only for ALL outcomes)
 //
@@ -39,9 +40,9 @@ import type { endSessionSchema } from "../schemas.js";
 // and identity validation. Shadow-only.
 export const patchSessionsIdEndHandler: RequestHandler = async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
+  const sessionId = param(req, "id");
   try {
     const clinicId = req.clinicId!;
-    const { id: sessionId } = req.params;
     const { outcome, earlyStopReason: rawEarlyStopReason } = req.body as z.infer<typeof endSessionSchema>;
     const earlyStopReason = rawEarlyStopReason ? rawEarlyStopReason.trim() : undefined;
     if (earlyStopReason !== undefined && earlyStopReason.length < 3) {

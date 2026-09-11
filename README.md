@@ -22,7 +22,7 @@
   | | |
   |---|---|
   | **Frontend** | React 18 · Vite 7 · TypeScript · wouter routing · TanStack Query · Zustand · Tailwind/shadcn · RTL (Hebrew default) · PWA/offline-first (Dexie + service worker) |
-  | **Backend** | Express 4 · TypeScript · Drizzle ORM 0.45 · PostgreSQL (`pg`) · Server-Sent Events realtime (+ an additive Socket.io collaboration channel) |
+  | **Backend** | Express 5 · TypeScript · Drizzle ORM 0.45 · PostgreSQL (`pg`) · Server-Sent Events realtime (+ an additive Socket.io collaboration channel) |
   | **Jobs** | BullMQ 5 + Redis (ioredis) — workers & schedulers; Redis optional in dev, required in prod |
   | **Auth** | Clerk (required in production) or dev-bypass (non-production only — no Clerk secret, or explicit `CLERK_ENABLED=false`) |
   | **Native** | Capacitor 8 (`ios/`, `android/`) wrapping the built web bundle |

@@ -48,7 +48,7 @@ inventory/containers/dispense, shifts & scheduling, and external PMS integration
 ```
 
 **Stack:** React 18 · Vite 7 · TypeScript 5.9 · wouter (routing) · TanStack Query ·
-Zustand · Dexie (IndexedDB) · Express 4 · Drizzle ORM 0.45 · PostgreSQL (`pg`) ·
+Zustand · Dexie (IndexedDB) · Express 5 · Drizzle ORM 0.45 · PostgreSQL (`pg`) ·
 BullMQ 5 + ioredis · Clerk (auth) · Capacitor 8 (native) · Sentry · Vitest + Playwright.
 
 ---

@@ -8,6 +8,7 @@ import { validateBody } from "../middleware/validate.js";
 import { logAudit, resolveAuditActorRole } from "../lib/audit.js";
 import { resolveRequestId, apiError } from "../lib/route-utils.js";
 import { roomExpected, resolveHomeDock, classifyReconciliationBucket } from "../services/docking.service.js";
+import { param } from "../lib/route-params.js";
 
 /*
  * PERMISSIONS MATRIX — /api/rooms
@@ -215,12 +216,13 @@ router.get("/", requireAuth, async (req, res) => {
 // GET /api/rooms/:id — single room with counts
 router.get("/:id", requireAuth, async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
+  const idParam = param(req, "id");
   try {
     const clinicId = req.clinicId!;
     const [room] = await db
       .select()
       .from(rooms)
-      .where(and(eq(rooms.id, req.params.id), eq(rooms.clinicId, clinicId)))
+      .where(and(eq(rooms.id, idParam), eq(rooms.clinicId, clinicId)))
       .limit(1);
 
     if (!room) {
@@ -287,6 +289,7 @@ router.get("/:id", requireAuth, async (req, res) => {
 // GET /api/rooms/:id/activity — last 5 scan_log entries for equipment in this room
 router.get("/:id/activity", requireAuth, async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
+  const idParam = param(req, "id");
   try {
     const clinicId = req.clinicId!;
     const entries = await db
@@ -306,7 +309,7 @@ router.get("/:id/activity", requireAuth, async (req, res) => {
         equipment,
         and(
           eq(scanLogs.equipmentId, equipment.id),
-          eq(equipment.roomId, req.params.id),
+          eq(equipment.roomId, idParam),
           eq(equipment.clinicId, clinicId),
           eq(scanLogs.clinicId, clinicId)
         )
@@ -404,6 +407,7 @@ router.post("/", requireAuth, requireEffectiveRole("technician"), validateBody(c
 // PATCH /api/rooms/:id — update room metadata
 router.patch("/:id", requireAuth, requireAdmin, validateBody(patchRoomSchema), async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
+  const idParam = param(req, "id");
   try {
     const clinicId = req.clinicId!;
     const { name, floor, masterNfcTagId, gatewayCode, syncStatus } = req.body as z.infer<typeof patchRoomSchema>;
@@ -411,7 +415,7 @@ router.patch("/:id", requireAuth, requireAdmin, validateBody(patchRoomSchema), a
     const [existing] = await db
       .select()
       .from(rooms)
-      .where(and(eq(rooms.id, req.params.id), eq(rooms.clinicId, clinicId)))
+      .where(and(eq(rooms.id, idParam), eq(rooms.clinicId, clinicId)))
       .limit(1);
 
     if (!existing) {
@@ -453,7 +457,7 @@ router.patch("/:id", requireAuth, requireAdmin, validateBody(patchRoomSchema), a
         ...(syncStatus !== undefined && { syncStatus }),
         updatedAt: new Date(),
       })
-      .where(and(eq(rooms.id, req.params.id), eq(rooms.clinicId, clinicId)))
+      .where(and(eq(rooms.id, idParam), eq(rooms.clinicId, clinicId)))
       .returning();
 
     logAudit({
@@ -462,7 +466,7 @@ router.patch("/:id", requireAuth, requireAdmin, validateBody(patchRoomSchema), a
       actionType: "room_updated",
       performedBy: req.authUser!.id,
       performedByEmail: req.authUser!.email,
-      targetId: req.params.id,
+      targetId: idParam,
       targetType: "room",
       metadata: { previousName: existing.name, changes: req.body },
     });
@@ -484,12 +488,13 @@ router.patch("/:id", requireAuth, requireAdmin, validateBody(patchRoomSchema), a
 // DELETE /api/rooms/:id — admin only, only if room has no equipment assigned
 router.delete("/:id", requireAuth, requireAdmin, async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
+  const idParam = param(req, "id");
   try {
     const clinicId = req.clinicId!;
     const [existing] = await db
       .select()
       .from(rooms)
-      .where(and(eq(rooms.id, req.params.id), eq(rooms.clinicId, clinicId)))
+      .where(and(eq(rooms.id, idParam), eq(rooms.clinicId, clinicId)))
       .limit(1);
 
     if (!existing) {
@@ -506,7 +511,7 @@ router.delete("/:id", requireAuth, requireAdmin, async (req, res) => {
     const [{ count }] = await db
       .select({ count: sql<number>`count(*)::int` })
       .from(equipment)
-      .where(and(eq(equipment.clinicId, clinicId), eq(equipment.roomId, req.params.id), isNull(equipment.deletedAt)));
+      .where(and(eq(equipment.clinicId, clinicId), eq(equipment.roomId, idParam), isNull(equipment.deletedAt)));
 
     if (count > 0) {
       return res.status(409).json({
@@ -519,7 +524,7 @@ router.delete("/:id", requireAuth, requireAdmin, async (req, res) => {
       });
     }
 
-    await db.delete(rooms).where(and(eq(rooms.id, req.params.id), eq(rooms.clinicId, clinicId)));
+    await db.delete(rooms).where(and(eq(rooms.id, idParam), eq(rooms.clinicId, clinicId)));
 
     logAudit({
       actorRole: resolveAuditActorRole(req),
@@ -527,7 +532,7 @@ router.delete("/:id", requireAuth, requireAdmin, async (req, res) => {
       actionType: "room_deleted",
       performedBy: req.authUser!.id,
       performedByEmail: req.authUser!.email,
-      targetId: req.params.id,
+      targetId: idParam,
       targetType: "room",
       metadata: { name: existing.name },
     });

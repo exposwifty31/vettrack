@@ -3,10 +3,12 @@ import { db, users } from "../../../db.js";
 import { eq, and, isNotNull } from "drizzle-orm";
 import { logAudit, resolveAuditActorRole } from "../../../lib/audit.js";
 import { resolveRequestId, apiError } from "../users-route-utils.js";
+import { param } from "../../../lib/route-params.js";
 
 /** PATCH /api/users/:id/restore */
 export const patchUserRestoreHandler: RequestHandler = async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
+  const idParam = param(req, "id");
   try {
     if (!req.authUser) {
       return res.status(401).json(
@@ -21,7 +23,7 @@ export const patchUserRestoreHandler: RequestHandler = async (req, res) => {
     const clinicId = req.clinicId!;
 
     const actorId = req.authUser.id;
-    const isSelf = actorId === req.params.id;
+    const isSelf = actorId === idParam;
     const isAdmin = req.authUser.role === "admin";
     if (!isSelf && !isAdmin) {
       return res.status(403).json(
@@ -37,7 +39,7 @@ export const patchUserRestoreHandler: RequestHandler = async (req, res) => {
     const [existing] = await db
       .select()
       .from(users)
-      .where(and(eq(users.clinicId, clinicId), eq(users.id, req.params.id), isNotNull(users.deletedAt)))
+      .where(and(eq(users.clinicId, clinicId), eq(users.id, idParam), isNotNull(users.deletedAt)))
       .limit(1);
 
     if (!existing) {
@@ -54,7 +56,7 @@ export const patchUserRestoreHandler: RequestHandler = async (req, res) => {
     const [restored] = await db
       .update(users)
       .set({ deletedAt: null, deletedBy: null })
-      .where(and(eq(users.clinicId, clinicId), eq(users.id, req.params.id)))
+      .where(and(eq(users.clinicId, clinicId), eq(users.id, idParam)))
       .returning();
 
     logAudit({
@@ -63,7 +65,7 @@ export const patchUserRestoreHandler: RequestHandler = async (req, res) => {
       actionType: "user_restored",
       performedBy: actorId,
       performedByEmail: req.authUser.email,
-      targetId: req.params.id,
+      targetId: idParam,
       targetType: "user",
       metadata: { email: restored.email, role: restored.role },
     });

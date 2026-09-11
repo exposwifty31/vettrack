@@ -2,6 +2,7 @@ import type { RequestHandler } from "express";
 import { db, scanLogs, users } from "../../../db.js";
 import { and, desc, eq, gte, sql } from "drizzle-orm";
 import { apiError, resolveRequestId } from "../equipment-route-utils.js";
+import { param } from "../../../lib/route-params.js";
 
 const LOGS_DEFAULT_PAGE_SIZE = 50;
 const LOGS_MAX_PAGE_SIZE = 200;
@@ -9,6 +10,7 @@ const LOGS_MAX_PAGE_SIZE = 200;
 /** GET /api/equipment/:id/logs */
 export const getEquipmentLogsHandler: RequestHandler = async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
+  const idParam = param(req, "id");
   try {
     const clinicId = req.clinicId!;
     const rawLimit = parseInt(req.query.limit as string, 10);
@@ -23,7 +25,7 @@ export const getEquipmentLogsHandler: RequestHandler = async (req, res) => {
 
     const baseWhere = and(
       eq(scanLogs.clinicId, clinicId),
-      eq(scanLogs.equipmentId, req.params.id),
+      eq(scanLogs.equipmentId, idParam),
       sinceFilter,
     );
 

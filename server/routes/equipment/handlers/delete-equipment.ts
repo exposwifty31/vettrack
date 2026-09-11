@@ -4,16 +4,18 @@ import { and, eq, isNull } from "drizzle-orm";
 import { invalidateAnalyticsCache } from "../../../lib/analytics-cache.js";
 import { logAudit, resolveAuditActorRole } from "../../../lib/audit.js";
 import { apiError, resolveRequestId } from "../equipment-route-utils.js";
+import { param } from "../../../lib/route-params.js";
 
 /** DELETE /api/equipment/:id — admin soft-delete */
 export const deleteEquipmentHandler: RequestHandler = async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
+  const idParam = param(req, "id");
   try {
     const clinicId = req.clinicId!;
     const [existing] = await db
       .select()
       .from(equipment)
-      .where(and(eq(equipment.clinicId, clinicId), eq(equipment.id, req.params.id), isNull(equipment.deletedAt)))
+      .where(and(eq(equipment.clinicId, clinicId), eq(equipment.id, idParam), isNull(equipment.deletedAt)))
       .limit(1);
 
     if (!existing) {
@@ -30,7 +32,7 @@ export const deleteEquipmentHandler: RequestHandler = async (req, res) => {
     await db
       .update(equipment)
       .set({ deletedAt: new Date(), deletedBy: req.authUser!.id })
-      .where(and(eq(equipment.clinicId, clinicId), eq(equipment.id, req.params.id), isNull(equipment.deletedAt)));
+      .where(and(eq(equipment.clinicId, clinicId), eq(equipment.id, idParam), isNull(equipment.deletedAt)));
 
     logAudit({
       actorRole: resolveAuditActorRole(req),
@@ -38,7 +40,7 @@ export const deleteEquipmentHandler: RequestHandler = async (req, res) => {
       actionType: "equipment_deleted",
       performedBy: req.authUser!.id,
       performedByEmail: req.authUser!.email,
-      targetId: req.params.id,
+      targetId: idParam,
       targetType: "equipment",
       metadata: { name: existing.name, serialNumber: existing.serialNumber },
     });

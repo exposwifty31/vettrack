@@ -30,6 +30,7 @@ import { promoteEquipmentWaitlistWithNotify } from "../lib/equipment-waitlist-pr
 import { isPostgresUniqueViolation, pgUpdateMatchedZeroRows, getPostgresConstraintName } from "../lib/pg-result.js";
 import { incrementMetric } from "../lib/metrics.js";
 import { createAnchor } from "../services/equipment-anchor.service.js";
+import { param } from "../lib/route-params.js";
 
 const router = Router();
 
@@ -121,7 +122,7 @@ const createConditionSchema = z.object({
 router.post("/asset-types/:assetTypeId/conditions", requireAuth, requireAdmin, validateBody(createConditionSchema), async (req, res) => {
   const clinicId = req.clinicId!;
   const { id: userId, email } = req.authUser!;
-  const { assetTypeId } = req.params;
+  const assetTypeId = param(req, "assetTypeId");
   const body = req.body as z.infer<typeof createConditionSchema>;
 
   const [assetType] = await db.select().from(assetTypes).where(and(eq(assetTypes.id, assetTypeId), eq(assetTypes.clinicId, clinicId)));
@@ -143,7 +144,7 @@ router.post("/asset-types/:assetTypeId/conditions", requireAuth, requireAdmin, v
 
 router.get("/asset-types/:assetTypeId/conditions", requireAuth, async (req, res) => {
   const clinicId = req.clinicId!;
-  const { assetTypeId } = req.params;
+  const assetTypeId = param(req, "assetTypeId");
 
   const [assetType] = await db.select().from(assetTypes).where(and(eq(assetTypes.id, assetTypeId), eq(assetTypes.clinicId, clinicId)));
   if (!assetType) return apiError(req, res, "errors.notFound", undefined, 404);
@@ -161,7 +162,7 @@ router.get("/asset-types/:assetTypeId/conditions", requireAuth, async (req, res)
 
 router.get("/equipment/:equipmentId/deployability", requireAuth, async (req, res) => {
   const clinicId = req.clinicId!;
-  const { equipmentId } = req.params;
+  const equipmentId = param(req, "equipmentId");
 
   const [eq_row] = await db.select().from(equipment).where(and(eq(equipment.id, equipmentId), eq(equipment.clinicId, clinicId)));
   if (!eq_row) return apiError(req, res, "errors.notFound", undefined, 404);
@@ -210,7 +211,7 @@ const dockReturnSchema = z
 router.post("/equipment/:equipmentId/dock-return", requireAuth, validateBody(dockReturnSchema), async (req, res) => {
   const clinicId = req.clinicId!;
   const { id: userId, email } = req.authUser!;
-  const { equipmentId } = req.params;
+  const equipmentId = param(req, "equipmentId");
   const body = req.body as z.infer<typeof dockReturnSchema>;
   const { conditionVerifications } = body;
 
@@ -449,7 +450,7 @@ const stageSchema = z.object({
 router.post("/equipment/:equipmentId/stage", requireAuth, validateBody(stageSchema), async (req, res) => {
   const clinicId = req.clinicId!;
   const { id: userId, email } = req.authUser!;
-  const { equipmentId } = req.params;
+  const equipmentId = param(req, "equipmentId");
   const { clinicalPriority, taskId, notes, emergencyStage } = req.body as z.infer<typeof stageSchema>;
   const isEmergencyStage = emergencyStage === true || clinicalPriority === "emergency";
 
@@ -556,7 +557,8 @@ router.post("/equipment/:equipmentId/stage", requireAuth, validateBody(stageSche
 router.delete("/equipment/:equipmentId/stage/:claimId", requireAuth, async (req, res) => {
   const clinicId = req.clinicId!;
   const { id: userId, email } = req.authUser!;
-  const { equipmentId, claimId } = req.params;
+  const equipmentId = param(req, "equipmentId");
+  const claimId = param(req, "claimId");
 
   const [eq_row] = await db.select().from(equipment).where(and(eq(equipment.id, equipmentId), eq(equipment.clinicId, clinicId)));
   if (!eq_row) return apiError(req, res, "errors.notFound", undefined, 404);
@@ -631,7 +633,7 @@ router.delete("/equipment/:equipmentId/stage/:claimId", requireAuth, async (req,
 
 router.get("/equipment/:equipmentId/staging-queue", requireAuth, async (req, res) => {
   const clinicId = req.clinicId!;
-  const { equipmentId } = req.params;
+  const equipmentId = param(req, "equipmentId");
 
   const [eq_row] = await db.select().from(equipment).where(and(eq(equipment.id, equipmentId), eq(equipment.clinicId, clinicId)));
   if (!eq_row) return apiError(req, res, "errors.notFound", undefined, 404);
@@ -660,7 +662,7 @@ router.get("/asset-types", requireAuth, async (req, res) => {
 
 router.get("/equipment/:equipmentId/condition-states", requireAuth, async (req, res) => {
   const clinicId = req.clinicId!;
-  const { equipmentId } = req.params;
+  const equipmentId = param(req, "equipmentId");
 
   const [eq_row] = await db
     .select({ id: equipment.id, assetTypeId: equipment.assetTypeId })

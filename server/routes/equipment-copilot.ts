@@ -2,6 +2,7 @@ import { Router } from "express";
 import { requireAuth } from "../middleware/auth.js";
 import { writeLimiter } from "../middleware/rate-limiters.js";
 import { explainEquipmentCopilot } from "../services/asset-copilot-orchestrator.service.js";
+import { param } from "../lib/route-params.js";
 
 const router = Router();
 
@@ -34,7 +35,7 @@ router.post(
   writeLimiter,
   async (req, res) => {
     const clinicId = req.clinicId;
-    const equipmentId = req.params.id?.trim();
+    const equipmentId = param(req, "id")?.trim();
 
     if (!clinicId) {
       return res.status(401).json({

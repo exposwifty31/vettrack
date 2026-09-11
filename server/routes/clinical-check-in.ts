@@ -21,6 +21,7 @@ import {
 } from "../services/clinical-check-in.js";
 import type { ClinicalCheckIn } from "../db.js";
 import { resolveRequestId, apiError } from "../lib/route-utils.js";
+import { param } from "../lib/route-params.js";
 
 const router = Router();
 
@@ -274,6 +275,7 @@ router.post(
       );
       return;
     }
+    const idParam = param(req, "id");
     try {
       const result = await forceCloseCheckIn({
         admin: {
@@ -282,7 +284,7 @@ router.post(
           role: resolveAuditActorRole(req) ?? req.authUser!.role,
           clinicId: req.authUser!.clinicId,
         },
-        targetCheckInId: req.params.id,
+        targetCheckInId: idParam,
         reason: parsed.data.reason ?? null,
         requestId,
       });

@@ -4,10 +4,12 @@ import { eq, and, isNull } from "drizzle-orm";
 import { logAudit, resolveAuditActorRole } from "../../../lib/audit.js";
 import { invalidateForUser } from "../../../lib/authority-cache.js";
 import { resolveRequestId, apiError } from "../users-route-utils.js";
+import { param } from "../../../lib/route-params.js";
 
 /** PATCH /api/users/:id/display_name */
 export const patchUserDisplayNameHandler: RequestHandler = async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
+  const idParam = param(req, "id");
   try {
     if (!req.authUser) {
       return res.status(401).json(
@@ -24,7 +26,7 @@ export const patchUserDisplayNameHandler: RequestHandler = async (req, res) => {
     const { display_name } = req.body as { display_name: string };
     const actorId = req.authUser.id;
 
-    if (actorId !== req.params.id && req.authUser.role !== "admin") {
+    if (actorId !== idParam && req.authUser.role !== "admin") {
       return res.status(403).json(
         apiError({
           code: "FORBIDDEN",
@@ -38,7 +40,7 @@ export const patchUserDisplayNameHandler: RequestHandler = async (req, res) => {
     const [existing] = await db
       .select()
       .from(users)
-      .where(and(eq(users.clinicId, clinicId), eq(users.id, req.params.id), isNull(users.deletedAt)))
+      .where(and(eq(users.clinicId, clinicId), eq(users.id, idParam), isNull(users.deletedAt)))
       .limit(1);
 
     if (!existing) {
@@ -55,10 +57,10 @@ export const patchUserDisplayNameHandler: RequestHandler = async (req, res) => {
     const [updated] = await db
       .update(users)
       .set({ displayName: display_name })
-      .where(and(eq(users.clinicId, clinicId), eq(users.id, req.params.id)))
+      .where(and(eq(users.clinicId, clinicId), eq(users.id, idParam)))
       .returning();
 
-    invalidateForUser(clinicId, req.params.id);
+    invalidateForUser(clinicId, idParam);
 
     logAudit({
       actorRole: resolveAuditActorRole(req),
@@ -66,7 +68,7 @@ export const patchUserDisplayNameHandler: RequestHandler = async (req, res) => {
       actionType: "user_display_name_changed",
       performedBy: actorId,
       performedByEmail: req.authUser.email,
-      targetId: req.params.id,
+      targetId: idParam,
       targetType: "user",
       metadata: {
         field: "display_name",

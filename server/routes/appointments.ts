@@ -18,6 +18,7 @@ import {
   updateAppointment,
 } from "../services/appointments.service.js";
 import { resolveRequestId, apiError } from "../lib/route-utils.js";
+import { param } from "../lib/route-params.js";
 const router = Router();
 
 const statusSchema = z.enum([
@@ -364,7 +365,8 @@ router.patch(
   idempotencyMiddleware("appointments:update"),
   async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
-  if (!req.params.id || !req.params.id.trim()) {
+  const idParam = param(req, "id");
+  if (!idParam.trim()) {
     return res.status(400).json(
       apiError({
         code: "VALIDATION_FAILED",
@@ -405,7 +407,7 @@ router.patch(
   try {
     const appointment = await updateAppointment(
       req.clinicId!,
-      req.params.id,
+      idParam,
       parsed.data,
       req.authUser
         ? {
@@ -442,7 +444,8 @@ router.patch(
 
 router.delete("/:id", requireAuth, requireEffectiveRole("technician"), async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
-  if (!req.params.id || !req.params.id.trim()) {
+  const idParam = param(req, "id");
+  if (!idParam.trim()) {
     return res.status(400).json(
       apiError({
         code: "VALIDATION_FAILED",
@@ -475,7 +478,7 @@ router.delete("/:id", requireAuth, requireEffectiveRole("technician"), async (re
   try {
     const appointment = await cancelAppointment(
       req.clinicId!,
-      req.params.id,
+      idParam,
       parsed.data.reason,
       req.authUser
         ? {

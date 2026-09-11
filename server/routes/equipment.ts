@@ -60,6 +60,7 @@ import {
   insertEquipmentUndoToken,
   snapshotEquipmentState,
 } from "./equipment/equipment-undo-tokens.js";
+import { param } from "../lib/route-params.js";
 
 const EQUIPMENT_STATUS_VALUES = [
   "ok",
@@ -407,6 +408,7 @@ router.post(
   custodyRosterGate(),
   async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
+  const idParam = param(req, "id");
   try {
     const clinicId = req.clinicId!;
     const { location, emergencyReason } = req.body as z.infer<typeof checkoutSchema>;
@@ -423,7 +425,7 @@ router.post(
     const [snap] = await db
       .select()
       .from(equipment)
-      .where(and(eq(equipment.clinicId, clinicId), eq(equipment.id, req.params.id), isNull(equipment.deletedAt)))
+      .where(and(eq(equipment.clinicId, clinicId), eq(equipment.id, idParam), isNull(equipment.deletedAt)))
       .limit(1);
 
     if (snap) {
@@ -514,7 +516,7 @@ router.post(
       try {
         const preCheck = await evaluateCheckoutV1Preconditions(
           clinicId,
-          req.params.id,
+          idParam,
           req.authUser!.id,
           snap,
         );
@@ -550,7 +552,7 @@ router.post(
 
     if (!isEmergency) {
       try {
-        await assertWaitlistCheckoutAllowed(clinicId, req.params.id, req.authUser!.id);
+        await assertWaitlistCheckoutAllowed(clinicId, idParam, req.authUser!.id);
       } catch (err) {
         if (err instanceof EquipmentWaitlistError) {
           const status = err.code === "WAITLIST_RESERVATION_HELD_BY_OTHER" ? 409 : 422;
@@ -563,7 +565,7 @@ router.post(
     const txResult = await db.transaction(async (tx) =>
       performEquipmentCheckout(tx, {
         clinicId,
-        equipmentId: req.params.id,
+        equipmentId: idParam,
         actor: { id: req.authUser!.id, email: req.authUser!.email },
         location,
         clientTimestamp,
@@ -586,11 +588,11 @@ router.post(
     updated = txResult.updated;
     undoToken = txResult.undoToken;
 
-    invalidateAnchorAfterCheckout(clinicId, req.params.id);
+    invalidateAnchorAfterCheckout(clinicId, idParam);
 
     await finalizeCheckoutSideEffects({
       clinicId,
-      equipmentId: req.params.id,
+      equipmentId: idParam,
       actor: { id: req.authUser!.id, email: req.authUser!.email },
       actorRole: resolveAuditActorRole(req) ?? undefined,
       equipment: txResult.updated,
@@ -641,6 +643,7 @@ router.post(
   custodyRosterGate(),
   async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
+  const idParam = param(req, "id");
   try {
     const clinicId = req.clinicId!;
     const clientTimestamp = parseInt(req.headers["x-client-timestamp"] as string || "0", 10);
@@ -657,7 +660,7 @@ router.post(
     const txResult = await db.transaction(async (tx) =>
       performEquipmentReturn(tx, {
         clinicId,
-        equipmentId: req.params.id,
+        equipmentId: idParam,
         actor: { id: req.authUser!.id, email: req.authUser!.email },
         clientTimestamp,
         allowForeignHolder,
@@ -685,7 +688,7 @@ router.post(
 
     const returnRecord = await finalizeReturnSideEffects({
       clinicId,
-      equipmentId: req.params.id,
+      equipmentId: idParam,
       actor: { id: req.authUser!.id, email: req.authUser!.email },
       actorRole: resolveAuditActorRole(req) ?? undefined,
       equipment: txResult.updated,
@@ -745,12 +748,13 @@ router.post(
   equipmentReplayIdempotency(EQUIPMENT_REPLAY_IDEMPOTENCY_ENDPOINTS.seen),
   async (req, res) => {
     const requestId = resolveRequestId(res, req.headers["x-request-id"]);
+    const idParam = param(req, "id");
     try {
       const clinicId = req.clinicId!;
       const { roomId, scanLogId } = req.body as z.infer<typeof seenSchema>;
       const result = await recordEquipmentSeen({
         clinicId,
-        equipmentId: req.params.id,
+        equipmentId: idParam,
         roomId: roomId ?? null,
         scanLogId: scanLogId ?? null,
       });
@@ -792,6 +796,7 @@ router.post(
   equipmentReplayIdempotency(EQUIPMENT_REPLAY_IDEMPOTENCY_ENDPOINTS.scan),
   async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
+  const idParam = param(req, "id");
   try {
     const clinicId = req.clinicId!;
     const { status, note, photoUrl } = req.body as z.infer<typeof scanSchema>;
@@ -817,7 +822,7 @@ router.post(
       const [existing] = await tx
         .select()
         .from(equipment)
-        .where(and(eq(equipment.clinicId, clinicId), eq(equipment.id, req.params.id), isNull(equipment.deletedAt)))
+        .where(and(eq(equipment.clinicId, clinicId), eq(equipment.id, idParam), isNull(equipment.deletedAt)))
         .limit(1);
 
       if (!existing) return;
@@ -841,7 +846,7 @@ router.post(
         const [result] = await tx
           .update(equipment)
           .set(updates)
-          .where(and(eq(equipment.clinicId, clinicId), eq(equipment.id, req.params.id)))
+          .where(and(eq(equipment.clinicId, clinicId), eq(equipment.id, idParam)))
           .returning();
         updatedEquipment = result;
       } else {
@@ -853,7 +858,7 @@ router.post(
         .values({
           id: randomUUID(),
           clinicId,
-          equipmentId: req.params.id,
+          equipmentId: idParam,
           userId: req.authUser!.id,
           userEmail: req.authUser!.email,
           status,
@@ -867,7 +872,7 @@ router.post(
 
       undoToken = await insertEquipmentUndoToken(tx, {
         clinicId,
-        equipmentId: req.params.id,
+        equipmentId: idParam,
         actorId: req.authUser!.id,
         scanLogId: log.id,
         previousState: snapshotEquipmentState(existing),
@@ -893,7 +898,7 @@ router.post(
       actionType: "equipment_scanned",
       performedBy: req.authUser!.id,
       performedByEmail: req.authUser!.email,
-      targetId: req.params.id,
+      targetId: idParam,
       targetType: "equipment",
       metadata: { name: eq2.name, status, note: note ?? null },
     });

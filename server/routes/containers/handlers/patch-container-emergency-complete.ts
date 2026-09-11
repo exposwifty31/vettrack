@@ -10,6 +10,7 @@ import {
   isInventoryConstraintError,
   toInventoryConstraintError,
 } from "../../../lib/db-constraint-errors.js";
+import { param } from "../../../lib/route-params.js";
 
 type CompleteEmergencyBody = {
   items: Array<{ itemId: string; quantity: number }>;
@@ -21,11 +22,11 @@ type CompleteEmergencyBody = {
 // student floor (a student who taps emergency must be able to complete it).
 export const patchContainerEmergencyCompleteHandler: RequestHandler = async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
+  const eventId = param(req, "eventId");
   try {
     const clinicId = req.clinicId!;
     const actorUserId = req.authUser!.id;
     const actorDisplayName = req.authUser!.name || req.authUser!.email;
-    const eventId = req.params.eventId;
     const body = req.body as CompleteEmergencyBody;
     const takenAt = new Date();
 

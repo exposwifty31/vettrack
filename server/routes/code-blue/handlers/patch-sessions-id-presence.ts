@@ -3,13 +3,14 @@ import { db, codeBlueSessions, codeBluePresence } from "../../../db.js";
 import { eq, and, sql } from "drizzle-orm";
 import { logAudit, resolveAuditActorRole } from "../../../lib/audit.js";
 import { resolveRequestId, apiError } from "../../../lib/route-utils.js";
+import { param } from "../../../lib/route-params.js";
 
 // PATCH /api/code-blue/sessions/:id/presence — heartbeat (every 10s)
 export const patchSessionsIdPresenceHandler: RequestHandler = async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
+  const sessionId = param(req, "id");
   try {
     const clinicId = req.clinicId!;
-    const { id: sessionId } = req.params;
     const userId = req.authUser!.id;
     const userName = req.authUser!.name;
 

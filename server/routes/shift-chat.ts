@@ -19,6 +19,7 @@ import { insertRealtimeDomainEvent } from "../lib/realtime-outbox.js";
 import { touchPresence, getPresence } from "../lib/shift-chat-presence.js";
 import { logAudit, resolveAuditActorRole } from "../lib/audit.js";
 import { resolveRequestId } from "../lib/route-utils.js";
+import { param } from "../lib/route-params.js";
 
 const router = Router();
 
@@ -325,7 +326,7 @@ router.post(
   async (req, res) => {
     const clinicId  = req.clinicId!;
     const userId    = req.authUser!.id;
-    const messageId = req.params.id;
+    const messageId = param(req, "id");
     const { status } = req.body as z.infer<typeof ackSchema>;
 
     try {
@@ -417,7 +418,7 @@ router.post(
   async (req, res) => {
     const clinicId  = req.clinicId!;
     const userId    = req.authUser!.id;
-    const messageId = req.params.id;
+    const messageId = param(req, "id");
 
     try {
       const shiftWindow = await getRequestShiftWindow(req);
@@ -567,7 +568,7 @@ router.get(
   requireEffectiveRole("senior_technician"),
   async (req, res) => {
     const clinicId = req.clinicId!;
-    const shiftId  = req.params.shiftId;
+    const shiftId  = param(req, "shiftId");
 
     try {
       const windowRef = parseWindowSessionId(shiftId);

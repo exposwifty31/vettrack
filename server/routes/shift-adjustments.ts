@@ -10,6 +10,7 @@ import {
   normalizeTime,
   checkAdjustmentDirection,
 } from "../lib/shift-adjustment-window.js";
+import { param } from "../lib/route-params.js";
 
 /*
  * Shift-adjustment requests (Phase 1). A rostered person requests to work past
@@ -199,11 +200,12 @@ router.patch("/:id", requireAuth, requireAdmin, async (req, res) => {
   }
   const note = typeof body.note === "string" ? body.note.trim().slice(0, MAX_REASON_LENGTH) : null;
 
+  const idParam = param(req, "id");
   try {
     const [existing] = await db
       .select()
       .from(shiftAdjustments)
-      .where(and(eq(shiftAdjustments.id, req.params.id), eq(shiftAdjustments.clinicId, clinicId)))
+      .where(and(eq(shiftAdjustments.id, idParam), eq(shiftAdjustments.clinicId, clinicId)))
       .limit(1);
     if (!existing) {
       return res
@@ -264,11 +266,12 @@ router.post("/:id/cancel", requireAuth, async (req, res) => {
       .json(apiError({ code: "UNAUTHORIZED", reason: "MISSING_AUTH_USER", message: "Unauthorized", requestId }));
   }
 
+  const idParam = param(req, "id");
   try {
     const [existing] = await db
       .select()
       .from(shiftAdjustments)
-      .where(and(eq(shiftAdjustments.id, req.params.id), eq(shiftAdjustments.clinicId, clinicId)))
+      .where(and(eq(shiftAdjustments.id, idParam), eq(shiftAdjustments.clinicId, clinicId)))
       .limit(1);
     if (!existing) {
       return res

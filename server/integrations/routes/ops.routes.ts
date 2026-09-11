@@ -24,6 +24,7 @@ import {
 } from "../webhooks/repository.js";
 import { evaluateVendorXSyncRollout } from "../vendor-x-rollout.js";
 import { VENDOR_X_ADAPTER_ID } from "../adapters/vendor-x.js";
+import { param } from "../../lib/route-params.js";
 
 const router = Router();
 
@@ -58,7 +59,7 @@ const retryBodySchema = z.object({
 router.post("/runs/:runId/retry", requireAdmin, validateBody(retryBodySchema), async (req, res) => {
   const requestId = randomUUID();
   const clinicId = req.clinicId!;
-  const { runId } = req.params;
+  const runId = param(req, "runId");
   const body = req.body as z.infer<typeof retryBodySchema>;
 
   const row = await db
@@ -141,7 +142,7 @@ router.post("/runs/:runId/retry", requireAdmin, validateBody(retryBodySchema), a
 router.post("/webhooks/:id/replay", requireAdmin, async (req, res) => {
   const requestId = randomUUID();
   const clinicId = req.clinicId!;
-  const { id } = req.params;
+  const id = param(req, "id");
 
   const event = await getWebhookEventForClinic(clinicId, id);
   if (!event) {

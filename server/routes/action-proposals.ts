@@ -39,6 +39,7 @@ import {
   editProposal,
   rejectProposal,
 } from "../lib/autopilot/action-proposal-service.js";
+import { param } from "../lib/route-params.js";
 
 const router = Router();
 const writer = new DrizzleActionProposalWriter();
@@ -107,11 +108,12 @@ router.post(
   async (req: Request, res: Response) => {
     const { id: userId, email, clinicId } = req.authUser!; // requireAuth guarantees authUser
     const actorRole = resolveAuditActorRole({ effectiveRole: req.effectiveRole, authUser: req.authUser });
+    const idParam = param(req, "id");
     try {
       const proposal = await approveProposal(
         { writer },
         // Non-null params.id: the /:id route shape guarantees it.
-        { clinicId, proposalId: req.params.id!, actorUserId: userId, actorEmail: email, actorRole },
+        { clinicId, proposalId: idParam, actorUserId: userId, actorEmail: email, actorRole },
       );
       notifyProposalQueueChanged(clinicId); // Task 1.1 §1.5 — advisory, fire-and-forget
       return res.json({ proposal });
@@ -129,12 +131,13 @@ router.post(
   async (req: Request, res: Response) => {
     const { id: userId, email, clinicId } = req.authUser!; // requireAuth guarantees authUser
     const actorRole = resolveAuditActorRole({ effectiveRole: req.effectiveRole, authUser: req.authUser });
+    const idParam = param(req, "id");
     try {
       const proposal = await editProposal(
         { writer },
         {
           clinicId,
-          proposalId: req.params.id!, // the /:id route shape guarantees params.id
+          proposalId: idParam, // the /:id route shape guarantees params.id
           actorUserId: userId,
           actorEmail: email,
           actorRole,
@@ -157,12 +160,13 @@ router.post(
   async (req: Request, res: Response) => {
     const { id: userId, email, clinicId } = req.authUser!; // requireAuth guarantees authUser
     const actorRole = resolveAuditActorRole({ effectiveRole: req.effectiveRole, authUser: req.authUser });
+    const idParam = param(req, "id");
     try {
       const proposal = await rejectProposal(
         { writer },
         {
           clinicId,
-          proposalId: req.params.id!, // the /:id route shape guarantees params.id
+          proposalId: idParam, // the /:id route shape guarantees params.id
           actorUserId: userId,
           actorEmail: email,
           actorRole,

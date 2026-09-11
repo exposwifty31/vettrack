@@ -1,4 +1,5 @@
 import type express from "express";
+import { RouteParamError } from "./route-params.js";
 
 // Aligned with the 5 MB multer file-upload limits (server/routes/uploads.ts,
 // server/routes/shifts.ts) so JSON-posted CSV payloads don't hit a lower
@@ -39,6 +40,14 @@ export function terminalErrorHandler(
   res: express.Response,
   _next: express.NextFunction,
 ): void {
+  // A route param that failed narrowing (see route-params.ts) is a client error
+  // with a stable code, not an unhandled exception: no console.error, 400.
+  if (err instanceof RouteParamError) {
+    if (!res.headersSent) {
+      res.status(err.status).json({ error: err.message, code: err.code, param: err.param });
+    }
+    return;
+  }
   const classified = classifyBodyParserError(err);
   if (classified) {
     if (!res.headersSent) {

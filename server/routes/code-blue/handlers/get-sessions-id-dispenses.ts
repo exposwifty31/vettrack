@@ -2,6 +2,7 @@ import type { RequestHandler } from "express";
 import { db, pool, codeBlueSessions } from "../../../db.js";
 import { eq, and } from "drizzle-orm";
 import { resolveRequestId, apiError } from "../../../lib/route-utils.js";
+import { param } from "../../../lib/route-params.js";
 
 /**
  * GET /api/code-blue/sessions/:id/dispenses
@@ -9,9 +10,9 @@ import { resolveRequestId, apiError } from "../../../lib/route-utils.js";
  */
 export const getSessionsIdDispensesHandler: RequestHandler = async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
+  const sessionId = param(req, "id");
   try {
     const clinicId = req.clinicId!;
-    const sessionId = req.params.id;
     const [session] = await db
       .select({ startedAt: codeBlueSessions.startedAt, endedAt: codeBlueSessions.endedAt })
       .from(codeBlueSessions)

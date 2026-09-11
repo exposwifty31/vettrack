@@ -40,6 +40,7 @@ import {
 } from "../services/board-responsibles.service.js";
 import type { EquipmentCommandBoardSnapshot } from "../../shared/equipment-board.js";
 import { resolveRequestId, apiError } from "../lib/route-utils.js";
+import { param } from "../lib/route-params.js";
 
 export const COMMAND_BOARD_TIMEOUT_MS = 2500;
 
@@ -531,9 +532,9 @@ function createDevicesListHandler(): RequestHandler {
 function createDeviceRenameHandler(): RequestHandler {
   return async (req, res) => {
     const requestId = resolveRequestId(res, req.headers["x-request-id"]);
+    const id = param(req, "id");
     try {
       const clinicId = req.clinicId!;
-      const id = req.params.id;
       const rawName = (req.body as { name?: unknown } | undefined)?.name;
       if (typeof rawName !== "string" || !rawName.trim()) {
         return res.status(400).json(
@@ -610,9 +611,9 @@ function createDeviceRenameHandler(): RequestHandler {
 function createDeviceRevokeHandler(): RequestHandler {
   return async (req, res) => {
     const requestId = resolveRequestId(res, req.headers["x-request-id"]);
+    const id = param(req, "id");
     try {
       const clinicId = req.clinicId!;
-      const id = req.params.id;
       const now = new Date();
 
       const [revoked] = await db
@@ -673,9 +674,9 @@ function createDeviceRevokeHandler(): RequestHandler {
 function createDeviceDeleteHandler(): RequestHandler {
   return async (req, res) => {
     const requestId = resolveRequestId(res, req.headers["x-request-id"]);
+    const id = param(req, "id");
     try {
       const clinicId = req.clinicId!;
-      const id = req.params.id;
 
       const [deleted] = await db
         .delete(displayDevices)

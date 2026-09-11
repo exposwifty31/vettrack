@@ -18,6 +18,7 @@ import { listLowStockItems } from "../services/inventory-console.service.js";
 import { isUniqueViolation, ITEM_CODE_UNIQUE_CONSTRAINT, ITEM_NFC_TAG_UNIQUE_CONSTRAINT } from "../lib/pg-errors.js";
 import { getLocaleDictionaries } from "../../lib/i18n/loader.js";
 import { translate } from "../../lib/i18n/index.js";
+import { param } from "../lib/route-params.js";
 
 const router = Router();
 
@@ -103,9 +104,9 @@ router.get("/low-stock", requireAuth, requireAdmin, async (req, res) => {
 // GET /api/inventory-items/:id/detail — aggregate facts, container distribution, 7-day usage
 router.get("/:id/detail", requireAuth, requireEffectiveRole("student"), validateUuid("id"), async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
+  const id = param(req, "id");
   try {
     const clinicId = req.clinicId!;
-    const id = req.params.id;
 
     const [item] = await db
       .select()
@@ -243,6 +244,7 @@ router.post("/", requireAuth, requireAdmin, validateBody(createItemSchema), asyn
 // PATCH /api/inventory-items/:id — update fields
 router.patch("/:id", requireAuth, requireAdmin, validateUuid("id"), validateBody(updateItemSchema), async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
+  const idParam = param(req, "id");
   try {
     const clinicId = req.clinicId!;
     const b = req.body as z.infer<typeof updateItemSchema>;
@@ -250,7 +252,7 @@ router.patch("/:id", requireAuth, requireAdmin, validateUuid("id"), validateBody
     const [existing] = await db
       .select()
       .from(inventoryItems)
-      .where(and(eq(inventoryItems.clinicId, clinicId), eq(inventoryItems.id, req.params.id)))
+      .where(and(eq(inventoryItems.clinicId, clinicId), eq(inventoryItems.id, idParam)))
       .limit(1);
 
     if (!existing) return res.status(404).json(apiError({ code: "NOT_FOUND", reason: "ITEM_NOT_FOUND", message: "Inventory item not found", requestId }));
@@ -266,8 +268,12 @@ router.patch("/:id", requireAuth, requireAdmin, validateUuid("id"), validateBody
     if (b.parLevel !== undefined) updates.parLevel = b.parLevel;
     if (b.reorderPoint !== undefined) updates.reorderPoint = b.reorderPoint;
 
-    await db.update(inventoryItems).set(updates).where(and(eq(inventoryItems.clinicId, clinicId), eq(inventoryItems.id, req.params.id)));
-    const [updated] = await db.select().from(inventoryItems).where(eq(inventoryItems.id, req.params.id)).limit(1);
+    await db.update(inventoryItems).set(updates).where(and(eq(inventoryItems.clinicId, clinicId), eq(inventoryItems.id, idParam)));
+    const [updated] = await db
+      .select()
+      .from(inventoryItems)
+      .where(and(eq(inventoryItems.clinicId, clinicId), eq(inventoryItems.id, idParam)))
+      .limit(1);
 
     logAudit({
       actorRole: resolveAuditActorRole(req),
@@ -275,7 +281,7 @@ router.patch("/:id", requireAuth, requireAdmin, validateUuid("id"), validateBody
       actionType: "inventory_item_updated",
       performedBy: req.authUser!.id,
       performedByEmail: req.authUser!.email,
-      targetId: req.params.id,
+      targetId: idParam,
       targetType: "inventory_item",
       metadata: { changes: updates, code: existing.code },
     });
@@ -297,18 +303,19 @@ router.patch("/:id", requireAuth, requireAdmin, validateUuid("id"), validateBody
  */
 router.patch("/:id/deactivate", requireAuth, requireAdmin, validateUuid("id"), async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
+  const idParam = param(req, "id");
   try {
     const clinicId = req.clinicId!;
     const [existing] = await db
       .select()
       .from(inventoryItems)
-      .where(and(eq(inventoryItems.clinicId, clinicId), eq(inventoryItems.id, req.params.id)))
+      .where(and(eq(inventoryItems.clinicId, clinicId), eq(inventoryItems.id, idParam)))
       .limit(1);
 
     if (!existing) return res.status(404).json(apiError({ code: "NOT_FOUND", reason: "ITEM_NOT_FOUND", message: "Inventory item not found", requestId }));
     if (!existing.isActive) return res.status(409).json(apiError({ code: "ALREADY_INACTIVE", reason: "ALREADY_INACTIVE", message: "Item is already inactive", requestId }));
 
-    await db.update(inventoryItems).set({ isActive: false }).where(and(eq(inventoryItems.clinicId, clinicId), eq(inventoryItems.id, req.params.id)));
+    await db.update(inventoryItems).set({ isActive: false }).where(and(eq(inventoryItems.clinicId, clinicId), eq(inventoryItems.id, idParam)));
 
     logAudit({
       actorRole: resolveAuditActorRole(req),
@@ -316,7 +323,7 @@ router.patch("/:id/deactivate", requireAuth, requireAdmin, validateUuid("id"), a
       actionType: "inventory_item_deactivated",
       performedBy: req.authUser!.id,
       performedByEmail: req.authUser!.email,
-      targetId: req.params.id,
+      targetId: idParam,
       targetType: "inventory_item",
       metadata: { code: existing.code, label: existing.label, itemType: existing.itemType },
     });
@@ -336,6 +343,7 @@ router.patch("/:id/deactivate", requireAuth, requireAdmin, validateUuid("id"), a
  */
 router.post("/:id/prices", requireAuth, requireAdmin, validateUuid("id"), validateBody(addPriceSchema), async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
+  const idParam = param(req, "id");
   try {
     const clinicId = req.clinicId!;
     const b = req.body as z.infer<typeof addPriceSchema>;
@@ -343,7 +351,7 @@ router.post("/:id/prices", requireAuth, requireAdmin, validateUuid("id"), valida
     const [item] = await db
       .select({ id: inventoryItems.id, isActive: inventoryItems.isActive })
       .from(inventoryItems)
-      .where(and(eq(inventoryItems.clinicId, clinicId), eq(inventoryItems.id, req.params.id)))
+      .where(and(eq(inventoryItems.clinicId, clinicId), eq(inventoryItems.id, idParam)))
       .limit(1);
 
     if (!item) return res.status(404).json(apiError({ code: "NOT_FOUND", reason: "ITEM_NOT_FOUND", message: "Inventory item not found", requestId }));
@@ -352,7 +360,7 @@ router.post("/:id/prices", requireAuth, requireAdmin, validateUuid("id"), valida
     await db.insert(inventoryItemPrices).values({
       id: priceId,
       clinicId,
-      itemId: req.params.id,
+      itemId: idParam,
       contextType: b.contextType,
       contextId: b.contextId?.trim() || null,
       priceCents: b.priceCents,
@@ -373,7 +381,7 @@ router.post("/:id/prices", requireAuth, requireAdmin, validateUuid("id"), valida
       targetId: priceId,
       targetType: "inventory_item_price",
       metadata: {
-        itemId: req.params.id,
+        itemId: idParam,
         contextType: b.contextType,
         contextId: b.contextId ?? null,
         priceCents: b.priceCents,
@@ -394,12 +402,13 @@ router.post("/:id/prices", requireAuth, requireAdmin, validateUuid("id"), valida
 // student floor so a dispensing student sees pricing). Price mutations stay requireAdmin.
 router.get("/:id/prices", requireAuth, requireEffectiveRole("student"), validateUuid("id"), async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
+  const idParam = param(req, "id");
   try {
     const clinicId = req.clinicId!;
     const prices = await db
       .select()
       .from(inventoryItemPrices)
-      .where(and(eq(inventoryItemPrices.clinicId, clinicId), eq(inventoryItemPrices.itemId, req.params.id)));
+      .where(and(eq(inventoryItemPrices.clinicId, clinicId), eq(inventoryItemPrices.itemId, idParam)));
     res.json(prices);
   } catch (err) {
     console.error(err);

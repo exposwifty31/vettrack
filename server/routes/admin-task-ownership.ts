@@ -23,6 +23,7 @@ import { logAudit, resolveAuditActorRole } from "../lib/audit.js";
 import { taskOwnershipBackfillQueue } from "../queues/taskOwnershipBackfill.queue.js";
 import { validateConfirmationCandidate } from "../lib/task-ownership-resolver.js";
 import { resolveRequestId } from "../lib/route-utils.js";
+import { param } from "../lib/route-params.js";
 
 const router = Router();
 
@@ -102,7 +103,7 @@ router.get(
     if (!clinicId) {
       return apiError(res, requestId, 400, "MISSING_CLINIC_ID", "clinicId is required");
     }
-    const { jobId } = req.params;
+    const jobId = param(req, "jobId");
     try {
       const job = await taskOwnershipBackfillQueue.getJob(jobId);
       if (!job) {
@@ -215,7 +216,7 @@ async function resolveQueueRow(
     apiError(res, requestId, 400, "MISSING_CLINIC_ID", "clinicId is required");
     return;
   }
-  const rowId = req.params.id;
+  const rowId = param(req, "id");
 
   const row = await loadPendingRowInClinic(rowId, clinicId);
   if (!row) {

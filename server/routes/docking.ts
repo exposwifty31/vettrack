@@ -31,6 +31,7 @@ import { createAnchor, invalidateCurrentAnchor } from "../services/equipment-anc
 import { alertMissingEquipmentAfterSweep } from "../services/equipment-missing-alert.service.js";
 import { resolveShiftCoordinator, confirmShiftCoordinator } from "../services/equipment-coordinator.service.js";
 import { mapLegacyRoleToClinicalRole } from "../lib/authority-roles.js";
+import { param } from "../lib/route-params.js";
 
 const router = Router();
 
@@ -56,7 +57,7 @@ router.patch(
   async (req, res) => {
     const clinicId = req.clinicId!;
     const { id: userId, email } = req.authUser!;
-    const { id } = req.params;
+    const id = param(req, "id");
     const { homeRoomId, assetTypeId } = req.body as z.infer<typeof assignHomeSchema>;
 
     if (!(await referencedIdsBelongToClinic(clinicId, homeRoomId, assetTypeId))) {
@@ -322,7 +323,7 @@ router.get("/reconciliation", requireAuth, async (req, res) => {
 router.post("/equipment/:id/citizen-anchor", requireAuth, writeLimiter, async (req, res) => {
   const clinicId = req.clinicId!;
   const { id: userId, email } = req.authUser!;
-  const { id } = req.params;
+  const id = param(req, "id");
 
   const [item] = await db
     .select()
@@ -387,7 +388,7 @@ router.post("/equipment/:id/citizen-anchor", requireAuth, writeLimiter, async (r
 router.post("/equipment/:id/not-found-here", requireAuth, writeLimiter, async (req, res) => {
   const clinicId = req.clinicId!;
   const { id: userId, email } = req.authUser!;
-  const { id } = req.params;
+  const id = param(req, "id");
 
   const [item] = await db
     .select()
@@ -440,7 +441,7 @@ router.post("/equipment/:id/not-found-here", requireAuth, writeLimiter, async (r
  */
 router.get("/rooms/:roomId/sweep", requireAuth, async (req, res) => {
   const clinicId = req.clinicId!;
-  const { roomId } = req.params;
+  const roomId = param(req, "roomId");
 
   const [room] = await db.select().from(rooms).where(and(eq(rooms.clinicId, clinicId), eq(rooms.id, roomId)));
   if (!room) return apiError(req, res, "errors.notFound", undefined, 404);
@@ -522,7 +523,7 @@ router.post(
   async (req, res) => {
     const clinicId = req.clinicId!;
     const { id: userId, email } = req.authUser!;
-    const { roomId } = req.params;
+    const roomId = param(req, "roomId");
     const { confirmedEquipmentIds } = req.body as z.infer<typeof roomSweepCommitSchema>;
 
     const [room] = await db.select().from(rooms).where(and(eq(rooms.clinicId, clinicId), eq(rooms.id, roomId)));

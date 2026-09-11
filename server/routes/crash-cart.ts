@@ -6,6 +6,7 @@ import { eq, and, desc, asc, sql } from "drizzle-orm";
 import { requireAuth, requireAdmin } from "../middleware/auth.js";
 import { validateBody } from "../middleware/validate.js";
 import { resolveRequestId, apiError } from "../lib/route-utils.js";
+import { param } from "../lib/route-params.js";
 
 const router = Router();
 
@@ -128,9 +129,9 @@ router.post("/items", requireAuth, requireAdmin, validateBody(createItemSchema),
 // PATCH /api/crash-cart/items/:id — update item (admin only)
 router.patch("/items/:id", requireAuth, requireAdmin, validateBody(updateItemSchema), async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
+  const id = param(req, "id");
   try {
     const clinicId = req.clinicId!;
-    const { id } = req.params;
     const body = req.body as z.infer<typeof updateItemSchema>;
 
     const [updated] = await db
@@ -157,9 +158,9 @@ router.patch("/items/:id", requireAuth, requireAdmin, validateBody(updateItemSch
 // DELETE /api/crash-cart/items/:id — soft-delete item (admin only)
 router.delete("/items/:id", requireAuth, requireAdmin, async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
+  const id = param(req, "id");
   try {
     const clinicId = req.clinicId!;
-    const { id } = req.params;
 
     const [deactivated] = await db
       .update(crashCartItems)
