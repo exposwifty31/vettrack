@@ -19,6 +19,8 @@ const FORBIDDEN_LITERALS = [
   "No deleted users.",
   "User deleted",
   "Failed to delete user",
+  // Previously hardcoded helper text on new-equipment.tsx (issue #268) — now t.newEquipment.fields.maintenanceIntervalDays.description
+  "Set to auto-alert when maintenance is overdue.",
   // Previously hardcoded Hebrew UI text now covered by t.adminPage.* / t.common.*
   // Note: only add tokens that are specific enough to not false-positive on Hebrew word roots
   "מחק",            // delete button (t.adminPage.deleteUser / t.common.delete)

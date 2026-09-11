@@ -632,6 +632,7 @@ export interface TStructure {
       maintenanceIntervalDays: {
         placeholder: string;
         label: string;
+        description: string;
       };
       purchaseDate: {
         label: string;
