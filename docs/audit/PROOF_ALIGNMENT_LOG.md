@@ -11560,6 +11560,101 @@ unmerged and 770 commits behind `main`, exactly as both findings documents state
 
 **Verdict:** VERIFIED
 
+## 2026-09-11 — the shipped-build record becomes a mirror of App Store Connect (store oracle on the bump path, RED first)
+
+**Claim:** `scripts/store-build-max.sh` asks App Store Connect for the highest build under app 6778937527 and, with `--sync`, raises `ios/.last-shipped-build` to it (never lowers); `scripts/resubmit.sh` runs that sync before choosing a number; `scripts/verify-resubmission.sh` carries a LIVE gate that fails when the record is behind or ahead of the store or the local number is already burnt; the offline static gate only gains a "record last touched" line.
+
+**Evidence:**
+- RED: `tests/store-build-max.test.ts` (stub `asc` on PATH) → `10 failed (10)` (script absent); `tests/resubmit-store-oracle.test.ts` (fixture repo, stub `asc`/`curl`/`railway`) → `3 failed (3)` — the 2026-09-02 shape (repo 29, record 29, store 30) bumped to the burnt 30.
+- GREEN: `pnpm exec vitest run tests/store-build-max.test.ts tests/resubmit-store-oracle.test.ts` → `2 files, 13 passed`; the fixture run now prints `RECORD 29 -> 30`, bumps to 31, and the LIVE gate prints `PASS  build 31 > ASC max 30`.
+- REAL (this Mac, authenticated asc): `bash scripts/store-build-max.sh` → `ASC_MAX=30 COUNT=29 LATEST=30@2026-09-02T15:14:50-07:00/VALID`; `--sync` on this branch (record 29, from main) → `RECORD 29 -> 30  proof: asc builds list --app 6778937527 --paginate → max version 30 (…), 29 builds`; the static gate then read `FAIL  build 30 must be > last shipped 30` — the burnt number refused, which is the whole point. The record was restored to main's 29 afterwards so this branch stays orthogonal to #300 (which carries 30 / 31); on main as it stands the LIVE gate prints `FAIL  ios/.last-shipped-build (29) is BEHIND App Store Connect (30)` — the regression proof the plan asked for.
+- `bash scripts/verify-resubmission-static.sh` → `PASS  build 30 > last shipped 29 · record last touched: 2026-09-02 · STATIC_RESULT PASS=7 FAIL=0`.
+- Docs: `RESUBMISSION_RUNBOOK.md` §B.1 replaces the hand-typed `echo <n> >` with `bash scripts/store-build-max.sh --sync`.
+
+**Verdict:** VERIFIED (scripts + tests + real oracle); the companion RN half (`--sync-floors`, `(B0) store oracle`) is its own PR.
+
+## 2026-09-11 — #250: the Code Blue presence heartbeat audits the JOIN, not every beat (RED first, live-verified)
+
+**Claim:** `PATCH /api/code-blue/sessions/:id/presence` writes one `code_blue_presence_joined` audit row when a participant first appears in a session and none on later beats; the presence upsert still runs on every beat. Clinical Safety Officer check: the liveness write (`vt_code_blue_presence` upsert) is unchanged, `logAudit` stays fire-and-forget, no emergency mutation, transport, cache or offline path is touched — pass.
+
+**Evidence:**
+- RED: `tests/code-blue-presence-audit.test.ts` (handler called directly, db + audit mocked) → `pnpm exec vitest run tests/code-blue-presence-audit.test.ts` → `2 failed | 1 passed` — `expected "vi.fn()" to be called 1 times, but got 3 times` / `2 … got 4`; the "upsert on every beat" case passed before and after, as it must.
+- GREEN: `.onConflictDoUpdate(...).returning({ inserted: sql\`(xmax = 0)\` })` and `logAudit` only when `inserted`; new union member `code_blue_presence_joined` (`server/lib/audit.ts`), the per-beat kind kept for history; he/en labels added, `pnpm i18n:generate-types`. Same test → `3 passed`.
+- `npx tsc --noEmit` → exit 0; `npx tsc -p tsconfig.server.json --noEmit` → exit 0; `pnpm i18n:check` → parity; targeted suites (`code-blue-presence-audit`, `code-blue-sessions`, `code-blue-offline-queue-removed`, `authority-code-blue-manager-audit-kinds`, `i18n-parity`, `no-hardcoded-ui-strings`) → `6 files, 52 passed`; `pnpm test` → `7189 passed | 11 skipped (7200)`.
+- LIVE (dev API on :3001, dev-bypass admin, local Postgres; session row `11111111-2222-4333-8444-555555555555` inserted for `dev-clinic-default`): three `PATCH …/presence` → `{"ok":true} [200]` ×3; `select action_type, count(*) from vt_audit_logs where target_id=…` → `code_blue_presence_joined|1`; `GET /api/audit-logs?actionType=code_blue_presence_joined` → 1 row for the session, `…=code_blue_presence_heartbeat` → 0; `vt_code_blue_presence` holds one row with the last beat's `last_seen_at`. Fixture deleted afterwards (audit rows are append-only and stay).
+- `docs/runbooks/code-blue-qa-walkthrough.md` presence row updated to the join-only contract.
+
+## 2026-09-11 — assetlinks: the "wrong upload key" was a second lane, and the endpoint now serves both (RED first)
+
+**Claim:** `server/lib/well-known-assetlinks.ts` serves a list of upload-key fingerprints — the Capacitor shell's `93:34…` and the EAS-managed `38:31…` that signs the RN AABs — plus the Play App Signing key from `ANDROID_PLAY_SIGNING_SHA256`. The 2026-09-10 "mismatch" (`docs/runbooks/o2-eas-keystore.md`, `TASKS.md`) is resolved by measurement, not by decision.
+
+**Evidence:**
+- Measurement: `npx eas build:view 5e3760cb-… --json` → artifact URL; `curl` → `app-10302.aab` (93,137,215 bytes); `keytool -printcert -jarfile app-10302.aab` → `SHA256: 38:31:8A:51:1A:61:74:CF:F9:0A:BF:3F:8C:4B:AB:DF:B6:9B:34:F4:82:90:3F:C1:A6:F9:9D:FA:8B:A1:4F:5F`. The same value is what Play Console → App integrity lists as the Upload key (read by the Cowork session 2026-09-10). The AAB is signed with the upload key before Play re-signs it, so this is the EAS keystore's certificate.
+- RED: new `tests/well-known-assetlinks.test.ts` → `pnpm exec vitest run tests/well-known-assetlinks.test.ts` → `Tests 3 failed | 1 passed (4)`, each failing on `expected [ Array(1) ] to include '38:31:8A:…'`.
+- GREEN: `UPLOAD_KEY_CERT_FINGERPRINT` → `UPLOAD_KEY_CERT_FINGERPRINTS` (two entries), `resolveAndroidCertFingerprints()` spreads the list; `pnpm exec vitest run tests/well-known-assetlinks.test.ts tests/nfc-qr-sticker-chain.test.ts tests/nfc-sticker-management.test.ts` → `3 files, 29 passed`.
+- Universal checklist (`docs/governance/FROZEN_SURFACE_CHANGE_PROTOCOL.md` §2): `npx tsc --noEmit` → exit 0; `npx tsc --noEmit --project tsconfig.server-check.json` → exit 0; `pnpm test` → `Test Files 797 passed (797) · Tests 7190 passed | 11 skipped`; `bash scripts/ci/contracts-gate.sh` → exit 0 (`40 passed`).
+- `docs/attestations.json` `assetlinks-two-fingerprints-2026-09-10` rewritten to the three-fingerprint form with a fail-closed jq recipe; **attested against the code and the AAB, not the live endpoint** — the endpoint serves three only after this deploys. Re-run the recipe after the deploy and record it here.
+- `pnpm -s verify:claims` → `1244 claims … 0 FAILED · All claims accounted for.`
+
+**Verdict:** VERIFIED (code + artifact); live endpoint PENDING deploy.
+
+## 2026-09-09 — founder-review: both build-number floors were green on numbers the stores had already burnt
+
+Both lanes' offline build-number gates passed while comparing against a shipped-build record
+one step behind reality. Checked against the stores, not the docs:
+
+```text
+asc builds list --app 6778937527 --paginate                       -> 30 | 1.3.0 | 2026-09-02 | VALID   (also 29 2026-08-29, 28 2026-08-13)
+npx eas build:list --limit 6 --json                               -> IOS 30 FINISHED production 2026-09-02T21:39Z · ANDROID 10302 FINISHED 2026-09-02T21:38Z
+gplay status --package uk.vettrack.app                            -> alpha: 1.3.0 draft version_codes [10302]
+gplay bundles list --package uk.vettrack.app --edit <id>          -> versionCodes 10301, 10302
+gplay testers get --package uk.vettrack.app --edit <id> --track alpha -> {}
+node scripts/release-preflight.mjs --offline   (RN, before)       -> ios local=30 floor=29 -> ok · android local=10302 floor=10301 -> ok
+bash scripts/verify-resubmission-static.sh     (here, before)     -> PASS  build 30 > last shipped 29
+```
+
+ASC accepted build 30 and Play accepted bundle 10302 on 2026-09-02, so 30 / 10302 are consumed
+and both `-> ok` lines were the exact failure the floors exist to prevent (RN #208's own words).
+Builds 28, 29 and 30 are all EAS production builds of the RN lane (`eas build:list`), which is why
+no vettrack git ref ever set `CURRENT_PROJECT_VERSION = 28` — the 2026-08-19 "build 28 is
+unreproducible" finding was looking in the wrong repo.
+
+**Changed (uncommitted, this worktree):** `ios/.last-shipped-build` 29 → 30;
+`CURRENT_PROJECT_VERSION` 30 → 31 in all four pbxproj configurations (match count asserted = 4);
+`docs/attestations.json` `play-alpha-aab-10301` re-attested 2026-09-09 with the draft now carrying
+10302; `TASKS.md:31` corrected in place. RN repo: floors 30 / 10302, its Expo app config bumped to 31 / 10303, and the
+five docs the previous session had already corrected to "10301 on alpha" corrected again to 10302.
+
+```text
+bash scripts/verify-resubmission-static.sh     (here, after)      -> PASS  build 31 > last shipped 30 · STATIC_RESULT PASS=7 FAIL=0
+pnpm -s verify:claims                          (here, after)      -> 1232 claims … 0 FAILED · All claims accounted for.
+node scripts/release-preflight.mjs --offline   (RN, after)        -> ios local=31 floor=30 -> ok · android local=10303 floor=10302 -> ok
+npm run -s verify:claims                       (RN, after)        -> All claims accounted for.
+```
+
+**Not verified here (needs the Console / owner):** Play developer-identity verification status,
+the Critical Alerts entitlement request `763HU9ZH38`, and whether ASC will offer build 30 to a
+version other than 1.3.0 — `asc validate --version 1.3.0` reports 1.3.0 `READY_FOR_DISTRIBUTION`
+(non-editable), and 28/29/30 all carry marketing version 1.3.0.
+
+## 2026-09-09 — CORRECTION to the entry above: the RN build is already the live App Store app
+
+The entry above said build 30 "cannot be attached" to version 1.3.0 because that version is
+non-editable. True — and the reason it is non-editable is that build 30 IS its build:
+
+```text
+asc versions view --version-id c83b868a-82f0-43da-95ef-04624a160cd5 --include-build
+  -> {"versionString":"1.3.0","state":"READY_FOR_DISTRIBUTION","buildId":"cc0a5d5d-…","buildVersion":"30"}
+asc review submissions list --app 6778937527   -> 07f95220 IOS COMPLETE 2026-09-03T00:27
+https://apps.apple.com/il/app/vettrack/id6778937527   -> 1.3.0 released 2026-09-03 (fetched 2026-09-09), what's-new "נבנתה מחדש מהיסוד"
+```
+
+So the RN lane (EAS build 30, `uk.vettrack.app`) has been the shipping App Store app since
+2026-09-03. Every "get the RN app into App Review" line in the living docs of both repos
+describes a milestone that is already behind us; the iOS half of the store program is closed.
+The Capacitor shell's `CURRENT_PROJECT_VERSION = 31` in this repo is now a safety-net counter,
+not a release plan. Android is the only open store lane (alpha draft 10302, zero testers).
+
 ## 2026-09-11 — #268: the maintenance-interval helper text goes through `t.*` (RED first)
 
 **Claim:** `src/pages/new-equipment.tsx` no longer carries the hardcoded English helper under `data-testid="input-maintenance-interval"`; the copy lives in both locales as `newEquipment.fields.maintenanceIntervalDays.description`, and the denylist guard now catches a regression.
@@ -11572,5 +11667,19 @@ unmerged and 770 commits behind `main`, exactly as both findings documents state
 - `npx tsc --noEmit` → exit 0.
 
 **Not in scope, recorded:** the three card headings in the same file (`Basic Info` :334, `Organization` :418, `Maintenance` :521) are also raw literals with no locale keys — separate issue.
+
+**Verdict:** VERIFIED
+
+## 2026-09-11 — addendum to the store-oracle entry: type-check recorded, review round 1 on #304
+
+**Claim:** the entry above omitted the type-check result; here it is, together with the four review findings verified against the files and fixed.
+
+**Evidence:**
+- `npx tsc --noEmit` → exit 0; `npx tsc -p tsconfig.server.json --noEmit` → exit 0 (no production TypeScript changed; the new tests `tests/store-build-max.test.ts` and `tests/resubmit-store-oracle.test.ts` are TypeScript/Vitest files and typecheck with the rest).
+- `scripts/resubmit.sh` captured `$?` after `! cmd`, so the failure line always said "exit 0"; now the unnegated status is captured and the fixture test asserts `store-build-max.sh exit 2`.
+- `tests/store-build-max.test.ts` gains the missing-record `--sync` case (file created with `30`, `<missing>` printed).
+- `RESUBMISSION_RUNBOOK.md` states the sync is the default with the `RESUBMIT_SKIP_STORE_ORACLE=1` override, and that the sync is non-decreasing — it raises a behind record, leaves an equal one, and refuses with an error to lower an ahead record — against the highest build ASC returns including failed/expired uploads.
+- `pnpm exec vitest run tests/store-build-max.test.ts tests/resubmit-store-oracle.test.ts` → `2 files, 15 passed` (round 2 added the dotted-record case: store max `30.1` → record `30.1`, next build 31, LIVE gate `PASS build 31 > ASC max 30.1`; the static gate compares dotted numbers too: `LAST_SHIPPED_BUILD=30.1` → PASS, `31.2` → FAIL).
+- `pnpm test` (full default suite, this branch) → `Tests 7209 passed | 11 skipped (7220)`.
 
 **Verdict:** VERIFIED

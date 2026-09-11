@@ -65,6 +65,26 @@ PKG_VER=$(python3 -c "import json;print(json.load(open('$PKG'))['version'])")
 # Fail closed on a baseline we cannot trust. The app is LIVE, so a missing or
 # unreadable marker is misconfiguration, not a first submission — the same posture
 # verify-resubmission-static.sh takes.
+# The record is a MIRROR of App Store Connect, not a hand-typed guess: both this
+# lane and the RN lane burn the same CFBundleVersion sequence under uk.vettrack.app,
+# and on 2026-09-02 the record said 29 while the store held 30 (the RN lane's
+# upload) — a plain bump proposed a number Apple would have refused at upload.
+# Ask the store first and raise the record with printed proof (never lower it).
+if [ "${RESUBMIT_SKIP_STORE_ORACLE:-}" = "1" ]; then
+  echo "  WARNING: RESUBMIT_SKIP_STORE_ORACLE=1 — bumping from the LOCAL record only; verify-resubmission's live gate will still refuse a burnt number"
+else
+  # `|| SYNC_STATUS=$?` keeps the oracle's real exit code AND survives `set -e`
+  # (a failing command substitution in a bare assignment would abort the script
+  # before the message below is printed).
+  SYNC_STATUS=0
+  SYNC_OUT="$(REPO="$REPO" bash "$SCRIPT_DIR/store-build-max.sh" --sync)" || SYNC_STATUS=$?
+  if [ "$SYNC_STATUS" -ne 0 ]; then
+    printf '%s\n' "$SYNC_OUT"
+    echo "FAIL: could not reconcile ios/.last-shipped-build with App Store Connect (store-build-max.sh exit $SYNC_STATUS) — fix asc auth, or set RESUBMIT_SKIP_STORE_ORACLE=1 knowingly"
+    exit 2
+  fi
+  printf '%s\n' "$SYNC_OUT" | sed 's/^/  /'
+fi
 [ -f "$LAST_SHIPPED_FILE" ] || {
   echo "FAIL: $LAST_SHIPPED_FILE is missing — record the last build uploaded to App Store Connect there before bumping"; exit 2; }
 LAST_SHIPPED=$(<"$LAST_SHIPPED_FILE")
@@ -73,8 +93,13 @@ LAST_SHIPPED=$(<"$LAST_SHIPPED_FILE")
 # "28" and hand back a wrong baseline as if it were valid.
 LAST_SHIPPED="${LAST_SHIPPED#"${LAST_SHIPPED%%[![:space:]]*}"}"
 LAST_SHIPPED="${LAST_SHIPPED%"${LAST_SHIPPED##*[![:space:]]}"}"
-[[ "$LAST_SHIPPED" =~ ^[0-9]+$ ]] || {
-  echo "FAIL: $LAST_SHIPPED_FILE is not a decimal integer (got '$LAST_SHIPPED') — fix it before bumping"; exit 2; }
+# The record mirrors App Store Connect, which accepts dotted CFBundleVersions ("30.1")
+# from the other lane. This lane bumps integers, so the floor is the record's INTEGER
+# part: the next integer above it is above every "30.x" the store may hold.
+[[ "$LAST_SHIPPED" =~ ^[0-9]+(\.[0-9]+)*$ ]] || {
+  echo "FAIL: $LAST_SHIPPED_FILE is not a dotted-numeric build number (got '$LAST_SHIPPED') — fix it before bumping"; exit 2; }
+LAST_SHIPPED_RECORD="$LAST_SHIPPED"
+LAST_SHIPPED="${LAST_SHIPPED%%.*}"
 
 # Force base 10 everywhere: a zero-padded "08" satisfies ^[0-9]+$ but shell
 # arithmetic reads it as octal and aborts with "value too great for base".
@@ -82,8 +107,8 @@ LAST_SHIPPED=$((10#$LAST_SHIPPED))
 CUR_BUILD=$((10#$CUR_BUILD))
 
 FLOOR="$CUR_BUILD"
-if [ "$LAST_SHIPPED" -gt "$FLOOR" ]; then
-  echo "  note: ios/.last-shipped-build ($LAST_SHIPPED) is ahead of the repo ($CUR_BUILD) — bumping from the baseline"
+if [ "$LAST_SHIPPED" -ge "$FLOOR" ]; then
+  echo "  note: ios/.last-shipped-build ($LAST_SHIPPED_RECORD) is at or ahead of the repo ($CUR_BUILD) — bumping from the baseline"
   FLOOR="$LAST_SHIPPED"
 fi
 NEW_BUILD=$((FLOOR + 1))
@@ -176,7 +201,7 @@ if REPO="$REPO" bash "$SCRIPT_DIR/verify-resubmission.sh"; then
   echo
   echo "✅ resubmit OK — build=$NEW_BUILD marketing=$NEW_MKT."
   echo "   Next: pnpm cap:build:native  →  archive/upload in Xcode (runbook §D)."
-  echo "   After a SUCCESSFUL App Store upload, record it:  echo $NEW_BUILD > $LAST_SHIPPED_FILE"
+  echo "   After a SUCCESSFUL App Store upload, sync the record from the store:  bash scripts/store-build-max.sh --sync"
 else
   echo
   echo "⚠️  Version bump applied, but verify-resubmission FAILED — fix the gates above"

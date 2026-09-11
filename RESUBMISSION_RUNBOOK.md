@@ -68,10 +68,16 @@ then runs the §C verification. It edits version fields only — no app logic.
   ```
 
 Then `pnpm cap:build:native` and archive (§C/§D). After a **successful** App Store
-upload, record the shipped build so the next bump is validated against it:
+upload, sync the shipped-build record FROM App Store Connect (the record is a mirror of
+the store, never a hand-typed number — the RN lane uploads under the same bundle id and
+burns the same counter):
 ```bash
-echo <that build number> > ios/.last-shipped-build
+bash scripts/store-build-max.sh --sync
 ```
+`pnpm resubmit` runs the same sync before choosing a number by default (`RESUBMIT_SKIP_STORE_ORACLE=1`
+bypasses it, loudly, for a Mac without `asc` — the LIVE gate below still refuses a burnt number),
+and `verify-resubmission.sh` carries that LIVE gate: it fails when the record is behind or ahead of
+the store.
 The §C build-number gate fails until the current build exceeds `ios/.last-shipped-build`
 (override for a one-off with `LAST_SHIPPED_BUILD=<n>`). Native builds still go only
 through `scripts/build-native-shell.sh`; the archive/upload is human-run (§D).
@@ -225,7 +231,7 @@ The Apple-sign-up error had a stack of causes, each hiding the next. All are loa
 - `capacitor.config.ts` bundled mode (no `server.url`) for the shipped archive.
 - Clerk: redirect URLs, `allowed_origins`, Apple/Google OAuth, Client Trust OFF.
 - The native-OAuth chain in §F.
-- Build number is monotonic — bump for each new upload via `pnpm resubmit` (§B.1), never by hand. It must exceed `ios/.last-shipped-build`.
+- Build number is monotonic — bump for each new upload via `pnpm resubmit` (§B.1), never by hand. It must exceed `ios/.last-shipped-build`, which `scripts/store-build-max.sh --sync` keeps from falling behind the highest build App Store Connect returns for the app (including failed and expired uploads, which consumed their number too): it raises a record that is behind, leaves an equal one unchanged, and refuses — with an error, never silently — to lower a record that is ahead of the store. The RN lane shares the counter and may leave dotted numbers (`30.1`); this lane's next build is the integer above the record's integer part.
 
 ## J. After acceptance
 

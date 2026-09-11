@@ -1,6 +1,6 @@
 import type { RequestHandler } from "express";
 import { db, codeBlueSessions, codeBluePresence } from "../../../db.js";
-import { eq, and } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 import { logAudit, resolveAuditActorRole } from "../../../lib/audit.js";
 import { resolveRequestId, apiError } from "../../../lib/route-utils.js";
 import { param } from "../../../lib/route-params.js";
@@ -27,23 +27,30 @@ export const patchSessionsIdPresenceHandler: RequestHandler = async (req, res) =
       );
     }
 
-    await db
+    // vt_code_blue_presence is the liveness record (PK session+user, last_seen_at
+    // refreshed on every beat). The audit trail records the JOIN only: `xmax = 0`
+    // is true on the row Postgres just inserted and false on an updated one, so
+    // a 10 s heartbeat no longer writes an append-only audit row per beat (#250).
+    const [presence] = await db
       .insert(codeBluePresence)
       .values({ sessionId, userId, userName, lastSeenAt: new Date() })
       .onConflictDoUpdate({
         target: [codeBluePresence.sessionId, codeBluePresence.userId],
         set: { userName, lastSeenAt: new Date() },
-      });
+      })
+      .returning({ inserted: sql<boolean>`(xmax = 0)` });
 
-    logAudit({
-      actorRole: resolveAuditActorRole(req),
-      clinicId,
-      actionType: "code_blue_presence_heartbeat",
-      performedBy: req.authUser!.id,
-      performedByEmail: req.authUser!.email ?? "",
-      targetId: sessionId,
-      targetType: "code_blue_session",
-    });
+    if (presence?.inserted) {
+      logAudit({
+        actorRole: resolveAuditActorRole(req),
+        clinicId,
+        actionType: "code_blue_presence_joined",
+        performedBy: req.authUser!.id,
+        performedByEmail: req.authUser!.email ?? "",
+        targetId: sessionId,
+        targetType: "code_blue_session",
+      });
+    }
 
     res.json({ ok: true });
   } catch (err) {

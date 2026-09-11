@@ -58,6 +58,47 @@ else
   no "static-gate script did not report a STATIC_RESULT line (missing or unrunnable)"
 fi
 
+# --- build number vs App Store Connect (LIVE) ---------------------------------
+# The static gate compares against ios/.last-shipped-build, an offline record that
+# went stale for a week in 2026-09 while the RN lane burnt the number on the shared
+# uk.vettrack.app counter. This gate asks the store. Every non-PASS is a FAIL, never
+# a skip: an unreachable oracle cannot prove the number is free.
+hdr "[build number vs App Store Connect — LIVE]"
+BN_LIVE=$(grep -m1 'CURRENT_PROJECT_VERSION = ' ios/App/App.xcodeproj/project.pbxproj | grep -oE '[0-9]+' | head -1)
+REC_LIVE=""
+if [ -f ios/.last-shipped-build ]; then
+  REC_LIVE="$(<ios/.last-shipped-build)"
+  REC_LIVE="${REC_LIVE#"${REC_LIVE%%[![:space:]]*}"}"; REC_LIVE="${REC_LIVE%"${REC_LIVE##*[![:space:]]}"}"
+fi
+if ORACLE_OUT="$(REPO="$REPO" bash "$SCRIPT_DIR/store-build-max.sh" 2>&1)"; then
+  ASC_MAX="${ORACLE_OUT#*ASC_MAX=}"; ASC_MAX="${ASC_MAX%% *}"
+  ASC_COUNT="${ORACLE_OUT#*COUNT=}"; ASC_COUNT="${ASC_COUNT%% *}"
+  echo "  ASC max build   = $ASC_MAX   ($ASC_COUNT builds; latest ${ORACLE_OUT#*LATEST=})"
+  echo "  local pbxproj   = ${BN_LIVE:-?}   (CURRENT_PROJECT_VERSION)"
+  echo "  recorded floor  = ${REC_LIVE:-<missing>}   (ios/.last-shipped-build)"
+  vcmp() { python3 -c '
+import sys
+a=[int(p) for p in sys.argv[1].split(".")]; b=[int(p) for p in sys.argv[2].split(".")]
+n=max(len(a),len(b)); a+=[0]*(n-len(a)); b+=[0]*(n-len(b))
+print(-1 if a<b else (1 if a>b else 0))' "$1" "$2"; }
+  if ! [[ "${REC_LIVE:-}" =~ ^[0-9]+(\.[0-9]+)*$ ]]; then
+    no "ios/.last-shipped-build is missing or not numeric ('${REC_LIVE:-}') — run: bash scripts/store-build-max.sh --sync"
+  else
+    case "$(vcmp "$REC_LIVE" "$ASC_MAX")" in
+      -1) no "ios/.last-shipped-build ($REC_LIVE) is BEHIND App Store Connect ($ASC_MAX): an upload from the other lane (RN/EAS) or an unrecorded one burnt it. Fix: bash scripts/store-build-max.sh --sync && pnpm resubmit" ;;
+      1)  no "ios/.last-shipped-build ($REC_LIVE) is AHEAD of App Store Connect ($ASC_MAX) — the record claims an upload the store never accepted; check ASC_APP_ID / the key" ;;
+      0)  if [[ "${BN_LIVE:-}" =~ ^[0-9]+$ ]] && [ "$(vcmp "$BN_LIVE" "$ASC_MAX")" = "1" ]; then
+            ok "build $BN_LIVE > ASC max $ASC_MAX; record in sync with the store"
+          else
+            no "build ${BN_LIVE:-?} already exists on App Store Connect (max $ASC_MAX) — pnpm resubmit"
+          fi ;;
+    esac
+  fi
+else
+  printf '%s\n' "$ORACLE_OUT" | sed 's/^/  /'
+  no "App Store Connect unreachable/unauthenticated — cannot prove build ${BN_LIVE:-?} is free (asc auth status)"
+fi
+
 # --- demo-reviewer credential (NEVER hardcoded) ------------------------------
 # The password comes from the REVIEWER_PASSWORD env — keep it in your password
 # manager (it also goes into the App Store Connect review notes), never in the repo.
