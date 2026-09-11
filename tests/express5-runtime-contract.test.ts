@@ -129,6 +129,9 @@ describe("removed Express 4 signatures are absent from the source", () => {
       /\breq\.param\(/,
       /\bres\.sendfile\(/,
       /\.get\(\s*["']\*["']/,
+      // send@1 applies `dotfiles: "ignore"` to an ABSOLUTE sendFile path (a checkout
+      // under `.claude/worktrees/` 404s the shell); every sendFile passes `root`.
+      /\bres\.sendFile\(\s*path\.join\(/,
     ];
     const walk = (dir: string) => {
       for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {

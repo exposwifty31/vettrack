@@ -348,6 +348,12 @@ app.get("/.well-known/assetlinks.json", (_req, res) => {
   res.json(buildAndroidAssetLinks());
 });
 
+// send@1 (Express 5) applies its `dotfiles: "ignore"` default to the WHOLE path
+// when sendFile gets an absolute path — a checkout under a dot-directory (a
+// `.claude/worktrees/...` tree) 404s every shell response. With `root` the policy
+// only sees the path relative to it, which is what Express 4 effectively did.
+const PUBLIC_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), "../dist/public");
+
 if (process.env.NODE_ENV === "production" || process.env.PLAYWRIGHT_E2E === "true") {
   // Vite content-hashed assets: safe to cache indefinitely (new content = new URL).
   app.use(
@@ -368,7 +374,7 @@ if (process.env.NODE_ENV === "production" || process.env.PLAYWRIGHT_E2E === "tru
     res.setHeader("Expires", "0");
     res.setHeader("Surrogate-Control", "no-store");
     res.setHeader("Content-Type", "application/javascript; charset=UTF-8");
-    res.sendFile(path.join(path.dirname(fileURLToPath(import.meta.url)), "../dist/public/sw.js"));
+    res.sendFile("sw.js", { root: PUBLIC_DIR });
   });
   // Manifest: iOS Safari requires application/manifest+json (not application/json).
   // Without the correct MIME type iOS does not recognise the file as a web-app
@@ -376,7 +382,7 @@ if (process.env.NODE_ENV === "production" || process.env.PLAYWRIGHT_E2E === "tru
   app.get("/manifest.json", (_req, res) => {
     res.setHeader("Content-Type", "application/manifest+json; charset=UTF-8");
     res.setHeader("Cache-Control", "no-cache");
-    res.sendFile(path.join(path.dirname(fileURLToPath(import.meta.url)), "../dist/public/manifest.json"));
+    res.sendFile("manifest.json", { root: PUBLIC_DIR });
   });
   // Everything else (icons, etc.): short cache.
   app.use(express.static(path.join(path.dirname(fileURLToPath(import.meta.url)), "../dist/public"), { maxAge: 0 }));
@@ -406,7 +412,7 @@ if (process.env.NODE_ENV === "production" || process.env.PLAYWRIGHT_E2E === "tru
   // optional-wildcard form matches "/" as well as every deeper path.
   app.get("/{*splat}", (_req, res) => {
     res.setHeader("Cache-Control", "no-store");
-    res.sendFile(path.join(path.dirname(fileURLToPath(import.meta.url)), "../dist/public/index.html"));
+    res.sendFile("index.html", { root: PUBLIC_DIR });
   });
 }
 
