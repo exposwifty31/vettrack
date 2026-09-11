@@ -152,4 +152,11 @@ describe("scripts/store-build-max.sh — App Store Connect build oracle", () => 
     expect(r.code).toBe(2);
     expect(r.record).toBe("29\n");
   });
+
+  it("--sync creates a missing record from the store and says it was missing", () => {
+    const r = run("ok", ["--sync"]);
+    expect(r.code).toBe(0);
+    expect(r.record).toBe("30\n");
+    expect(r.out).toMatch(/RECORD <unreadable: '<missing>'> -> 30/);
+  });
 });

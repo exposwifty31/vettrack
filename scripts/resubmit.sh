@@ -73,8 +73,9 @@ PKG_VER=$(python3 -c "import json;print(json.load(open('$PKG'))['version'])")
 if [ "${RESUBMIT_SKIP_STORE_ORACLE:-}" = "1" ]; then
   echo "  WARNING: RESUBMIT_SKIP_STORE_ORACLE=1 — bumping from the LOCAL record only; verify-resubmission's live gate will still refuse a burnt number"
 else
-  if ! SYNC_OUT="$(REPO="$REPO" bash "$SCRIPT_DIR/store-build-max.sh" --sync)"; then
-    SYNC_STATUS=$?
+  SYNC_OUT="$(REPO="$REPO" bash "$SCRIPT_DIR/store-build-max.sh" --sync)"
+  SYNC_STATUS=$?
+  if [ "$SYNC_STATUS" -ne 0 ]; then
     printf '%s\n' "$SYNC_OUT"
     echo "FAIL: could not reconcile ios/.last-shipped-build with App Store Connect (store-build-max.sh exit $SYNC_STATUS) — fix asc auth, or set RESUBMIT_SKIP_STORE_ORACLE=1 knowingly"
     exit 2

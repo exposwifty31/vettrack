@@ -79,6 +79,8 @@ describe("scripts/resubmit.sh consults the App Store Connect oracle before bumpi
     expect(r.build).toBe(29);
     expect(r.record).toBe("29\n");
     expect(r.out).toMatch(/RESUBMIT_SKIP_STORE_ORACLE/);
+    // The message carries the oracle's real exit code, not the negated `!` status.
+    expect(r.out).toMatch(/store-build-max\.sh exit 2/);
   });
 
   it("RESUBMIT_SKIP_STORE_ORACLE=1 bumps from the local record only, loudly", () => {

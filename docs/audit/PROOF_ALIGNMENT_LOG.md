@@ -11658,3 +11658,16 @@ not a release plan. Android is the only open store lane (alpha draft 10302, zero
 **Not in scope, recorded:** the three card headings in the same file (`Basic Info` :334, `Organization` :418, `Maintenance` :521) are also raw literals with no locale keys — separate issue.
 
 **Verdict:** VERIFIED
+
+## 2026-09-11 — addendum to the store-oracle entry: type-check recorded, review round 1 on #304
+
+**Claim:** the entry above omitted the type-check result; here it is, together with the four review findings verified against the files and fixed.
+
+**Evidence:**
+- `npx tsc --noEmit` → exit 0; `npx tsc -p tsconfig.server.json --noEmit` → exit 0 (no TypeScript was touched by the oracle change — the new files are bash and vitest).
+- `scripts/resubmit.sh` captured `$?` after `! cmd`, so the failure line always said "exit 0"; now the unnegated status is captured and the fixture test asserts `store-build-max.sh exit 2`.
+- `tests/store-build-max.test.ts` gains the missing-record `--sync` case (file created with `30`, `<missing>` printed).
+- `RESUBMISSION_RUNBOOK.md` states the sync is the default with the `RESUBMIT_SKIP_STORE_ORACLE=1` override, and that the record equals the highest build ASC returns including failed/expired uploads.
+- `pnpm exec vitest run tests/store-build-max.test.ts tests/resubmit-store-oracle.test.ts` → `2 files, 14 passed`.
+
+**Verdict:** VERIFIED
