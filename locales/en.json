@@ -2890,6 +2890,7 @@
       "code_blue_session_reconciled": "Code blue session reconciled",
       "code_blue_log_entry_created": "Code blue log entry created",
       "code_blue_presence_heartbeat": "Code blue presence heartbeat",
+      "code_blue_presence_joined": "Code blue participant joined",
       "code_blue_replay_authority_denied": "Code blue replay authority denied",
       "code_blue_manager_authority_fault_open": "Code blue manager authority fault open",
       "code_blue_manager_midsession_authority_shadow_denied": "Code blue manager midsession authority shadow denied",

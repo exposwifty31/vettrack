@@ -2893,6 +2893,7 @@ export interface TStructure {
       code_blue_session_reconciled: string;
       code_blue_log_entry_created: string;
       code_blue_presence_heartbeat: string;
+      code_blue_presence_joined: string;
       code_blue_replay_authority_denied: string;
       code_blue_manager_authority_fault_open: string;
       code_blue_manager_midsession_authority_shadow_denied: string;

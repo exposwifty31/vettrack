@@ -2890,6 +2890,7 @@
       "code_blue_session_reconciled": "החייאה יושבה",
       "code_blue_log_entry_created": "רישום החייאה נוצר",
       "code_blue_presence_heartbeat": "דופק נוכחות החייאה",
+      "code_blue_presence_joined": "משתתף הצטרף לאירוע החייאה",
       "code_blue_replay_authority_denied": "הרשאת שידור חוזר נדחתה",
       "code_blue_manager_authority_fault_open": "תקלת הרשאת מנהל החייאה",
       "code_blue_manager_midsession_authority_shadow_denied": "הרשאת מנהל נדחתה (צל)",
