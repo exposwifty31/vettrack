@@ -11359,3 +11359,14 @@ unmerged and 770 commits behind `main`, exactly as both findings documents state
 - Command: `pnpm typecheck:server` → exit 0.
 
 **Verdict:** VERIFIED
+
+## 2026-09-11 — #294 CI: repoint the static readers and the tenant-lint baseline to notification.worker.main.ts
+
+**Claim:** Moving the worker body to `server/workers/notification.worker.main.ts` broke every guard that read the old path as a file and the two tenant-lint baseline keys; all now point at the body module, and the thin entry keeps its name so `pnpm worker` is unchanged.
+
+**Evidence:**
+- CI run 34549623517 on the previous head: shards 1/2/4 red on `tests/code-blue-push-unmutable.test.ts` (`expected '' to contain 'sendEmergencyPushToAll'`), `tests/phase-3-4-automation.test.js`, `tests/phase-3-3-5-hardening.test.js`, `tests/i18n-no-hebrew-in-source.test.ts` (allowlist named the old path); G1 red on `notification.worker.main.ts::shiftSessions` / `::inventoryLogs` "baseline allows 0, found 1"; the evidence job failed on the same tenant gate.
+- Fix is a path rename in 6 test files + the 2 baseline keys (counts unchanged: 1 and 1 — the same two pre-existing findings, moved with the file, not new ones).
+- Local: the nine affected suites → `9 passed (9)`, `87 passed (87)`; `pnpm tenant:lint:enforce` → `no new findings vs baseline (201 known)`; `pnpm architecture:gates` → `All G1 checks passed`, `All claims accounted for`.
+
+**Verdict:** VERIFIED

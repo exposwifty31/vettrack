@@ -10,7 +10,7 @@ const redis = fs.readFileSync(path.join(repoRoot, "server", "lib", "redis.ts"), 
 const queue = fs.readFileSync(path.join(repoRoot, "server", "lib", "queue.ts"), "utf8");
 const taskNotification = fs.readFileSync(path.join(repoRoot, "server", "lib", "task-notification.ts"), "utf8");
 const recall = fs.readFileSync(path.join(repoRoot, "server", "services", "task-recall.service.ts"), "utf8");
-const worker = fs.readFileSync(path.join(repoRoot, "server", "workers", "notification.worker.ts"), "utf8");
+const worker = fs.readFileSync(path.join(repoRoot, "server", "workers", "notification.worker.main.ts"), "utf8");
 const pkg = JSON.parse(fs.readFileSync(path.join(repoRoot, "package.json"), "utf8"));
 const envExample = fs.readFileSync(path.join(repoRoot, ".env.example"), "utf8");
 
