@@ -11559,3 +11559,16 @@ unmerged and 770 commits behind `main`, exactly as both findings documents state
 - The earlier merged commits were also verified live: VetTrack log after `27bc6f3f4` shows `[stale-returned-sweep] scheduled via BullMQ` with no `startup sweep failed` line (the #295 fix), and no `first connection refused` line was needed (Redis was up).
 
 **Verdict:** VERIFIED
+
+## 2026-09-11 — the shipped-build record becomes a mirror of App Store Connect (store oracle on the bump path, RED first)
+
+**Claim:** `scripts/store-build-max.sh` asks App Store Connect for the highest build under app 6778937527 and, with `--sync`, raises `ios/.last-shipped-build` to it (never lowers); `scripts/resubmit.sh` runs that sync before choosing a number; `scripts/verify-resubmission.sh` carries a LIVE gate that fails when the record is behind or ahead of the store or the local number is already burnt; the offline static gate only gains a "record last touched" line.
+
+**Evidence:**
+- RED: `tests/store-build-max.test.ts` (stub `asc` on PATH) → `10 failed (10)` (script absent); `tests/resubmit-store-oracle.test.ts` (fixture repo, stub `asc`/`curl`/`railway`) → `3 failed (3)` — the 2026-09-02 shape (repo 29, record 29, store 30) bumped to the burnt 30.
+- GREEN: `pnpm exec vitest run tests/store-build-max.test.ts tests/resubmit-store-oracle.test.ts` → `2 files, 13 passed`; the fixture run now prints `RECORD 29 -> 30`, bumps to 31, and the LIVE gate prints `PASS  build 31 > ASC max 30`.
+- REAL (this Mac, authenticated asc): `bash scripts/store-build-max.sh` → `ASC_MAX=30 COUNT=29 LATEST=30@2026-09-02T15:14:50-07:00/VALID`; `--sync` on this branch (record 29, from main) → `RECORD 29 -> 30  proof: asc builds list --app 6778937527 --paginate → max version 30 (…), 29 builds`; the static gate then read `FAIL  build 30 must be > last shipped 30` — the burnt number refused, which is the whole point. The record was restored to main's 29 afterwards so this branch stays orthogonal to #300 (which carries 30 / 31); on main as it stands the LIVE gate prints `FAIL  ios/.last-shipped-build (29) is BEHIND App Store Connect (30)` — the regression proof the plan asked for.
+- `bash scripts/verify-resubmission-static.sh` → `PASS  build 30 > last shipped 29 · record last touched: 2026-09-02 · STATIC_RESULT PASS=7 FAIL=0`.
+- Docs: `RESUBMISSION_RUNBOOK.md` §B.1 replaces the hand-typed `echo <n> >` with `bash scripts/store-build-max.sh --sync`.
+
+**Verdict:** VERIFIED (scripts + tests + real oracle); the companion RN half (`--sync-floors`, `(B0) store oracle`) is its own PR.

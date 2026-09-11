@@ -68,10 +68,14 @@ then runs the §C verification. It edits version fields only — no app logic.
   ```
 
 Then `pnpm cap:build:native` and archive (§C/§D). After a **successful** App Store
-upload, record the shipped build so the next bump is validated against it:
+upload, sync the shipped-build record FROM App Store Connect (the record is a mirror of
+the store, never a hand-typed number — the RN lane uploads under the same bundle id and
+burns the same counter):
 ```bash
-echo <that build number> > ios/.last-shipped-build
+bash scripts/store-build-max.sh --sync
 ```
+`pnpm resubmit` runs the same sync before choosing a number, and `verify-resubmission.sh`
+carries a LIVE gate that fails when the record is behind or ahead of the store.
 The §C build-number gate fails until the current build exceeds `ios/.last-shipped-build`
 (override for a one-off with `LAST_SHIPPED_BUILD=<n>`). Native builds still go only
 through `scripts/build-native-shell.sh`; the archive/upload is human-run (§D).
@@ -225,7 +229,7 @@ The Apple-sign-up error had a stack of causes, each hiding the next. All are loa
 - `capacitor.config.ts` bundled mode (no `server.url`) for the shipped archive.
 - Clerk: redirect URLs, `allowed_origins`, Apple/Google OAuth, Client Trust OFF.
 - The native-OAuth chain in §F.
-- Build number is monotonic — bump for each new upload via `pnpm resubmit` (§B.1), never by hand. It must exceed `ios/.last-shipped-build`.
+- Build number is monotonic — bump for each new upload via `pnpm resubmit` (§B.1), never by hand. It must exceed `ios/.last-shipped-build`, which `scripts/store-build-max.sh --sync` keeps equal to App Store Connect's highest accepted build (the RN lane shares the counter).
 
 ## J. After acceptance
 

@@ -94,6 +94,9 @@ elif ! [[ "$LAST" =~ ^[0-9]+$ ]]; then
   no "last-shipped baseline is not a number (got '$LAST') — fix ios/.last-shipped-build or the LAST_SHIPPED_BUILD env"
 elif [ "$BN" -gt "$LAST" ]; then
   ok "build $BN > last shipped $LAST"
+  # Offline visibility only (git, no network, no new failure mode): a record that has
+  # not moved in weeks is the drift the LIVE gate in verify-resubmission.sh catches.
+  echo "        record last touched: $(git log -1 --format=%cs -- ios/.last-shipped-build 2>/dev/null || echo untracked)"
 else
   no "build ${BN} must be > last shipped $LAST — bump first: pnpm resubmit  (then update ios/.last-shipped-build after upload)"
 fi

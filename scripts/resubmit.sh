@@ -65,6 +65,22 @@ PKG_VER=$(python3 -c "import json;print(json.load(open('$PKG'))['version'])")
 # Fail closed on a baseline we cannot trust. The app is LIVE, so a missing or
 # unreadable marker is misconfiguration, not a first submission — the same posture
 # verify-resubmission-static.sh takes.
+# The record is a MIRROR of App Store Connect, not a hand-typed guess: both this
+# lane and the RN lane burn the same CFBundleVersion sequence under uk.vettrack.app,
+# and on 2026-09-02 the record said 29 while the store held 30 (the RN lane's
+# upload) — a plain bump proposed a number Apple would have refused at upload.
+# Ask the store first and raise the record with printed proof (never lower it).
+if [ "${RESUBMIT_SKIP_STORE_ORACLE:-}" = "1" ]; then
+  echo "  WARNING: RESUBMIT_SKIP_STORE_ORACLE=1 — bumping from the LOCAL record only; verify-resubmission's live gate will still refuse a burnt number"
+else
+  if ! SYNC_OUT="$(REPO="$REPO" bash "$SCRIPT_DIR/store-build-max.sh" --sync)"; then
+    SYNC_STATUS=$?
+    printf '%s\n' "$SYNC_OUT"
+    echo "FAIL: could not reconcile ios/.last-shipped-build with App Store Connect (store-build-max.sh exit $SYNC_STATUS) — fix asc auth, or set RESUBMIT_SKIP_STORE_ORACLE=1 knowingly"
+    exit 2
+  fi
+  printf '%s\n' "$SYNC_OUT" | sed 's/^/  /'
+fi
 [ -f "$LAST_SHIPPED_FILE" ] || {
   echo "FAIL: $LAST_SHIPPED_FILE is missing — record the last build uploaded to App Store Connect there before bumping"; exit 2; }
 LAST_SHIPPED=$(<"$LAST_SHIPPED_FILE")
@@ -176,7 +192,7 @@ if REPO="$REPO" bash "$SCRIPT_DIR/verify-resubmission.sh"; then
   echo
   echo "✅ resubmit OK — build=$NEW_BUILD marketing=$NEW_MKT."
   echo "   Next: pnpm cap:build:native  →  archive/upload in Xcode (runbook §D)."
-  echo "   After a SUCCESSFUL App Store upload, record it:  echo $NEW_BUILD > $LAST_SHIPPED_FILE"
+  echo "   After a SUCCESSFUL App Store upload, sync the record from the store:  bash scripts/store-build-max.sh --sync"
 else
   echo
   echo "⚠️  Version bump applied, but verify-resubmission FAILED — fix the gates above"
