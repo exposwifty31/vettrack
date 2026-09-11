@@ -11430,4 +11430,61 @@ unmerged and 770 commits behind `main`, exactly as both findings documents state
 - `TASKS.md` — Read after the edit: new subsection "Follow-ups from the Railway/GitHub close-out PRs (2026-09-11)" under Backlog, above "Ongoing".
 - Command: `pnpm verify:claims` → see the gate line recorded in this same commit's CI (`📎 Claim verification`); locally it reported `0 FAILED` before the commit was made.
 
+## 2026-09-11 — stale-returned-sweep: ack write is an upsert on (equipment_id, alert_type)
+
+**Claim:** `runStaleReturnedSweep` no longer aborts with `duplicate key value violates unique constraint "vt_alert_acks_equipment_id_alert_type_key"` when it re-nudges an item that already has a `stale_returned_nudge` row; the write is `INSERT … ON CONFLICT (equipment_id, alert_type) DO UPDATE` and later candidates in the same run are processed.
+
+**Evidence:**
+- `migrations/001_initial_schema.sql:78` — Read: `UNIQUE(equipment_id, alert_type)` on `vt_alert_acks`. `server/workers/stale-returned-sweep.worker.ts` inserted a fresh `randomUUID()` row per nudge, so the second nudge for any item could never succeed; production logged `[stale-returned-sweep] startup sweep failed: … duplicate key …` on every boot.
+- RED: `npx vitest run tests/stale-returned-sweep.test.ts` with the new Postgres-faithful insert fake (a plain `await values()` rejects with the production error when the row exists; only `.onConflictDoUpdate()` resolves) → `2 failed | 11 passed (13)`, both failing on `duplicate key value violates unique constraint "vt_alert_acks_equipment_id_alert_type_key"`.
+- GREEN: after chaining `.onConflictDoUpdate({ target: [equipmentId, alertType], set: { acknowledgedAt: now, … } })` → `tests/stale-returned-sweep.test.ts` + `tests/stale-checkout-sweep.test.ts` + `tests/equipment-missing-alert.service.test.ts` → `3 passed (3)`, `31 passed (31)`.
+- Case 7 asserts the conflict target is `["equipment_id", "alert_type"]` and `set.acknowledgedAt === now`; case 7b asserts a two-candidate run resolves `{ scanned: 2, nudged: 2 }` and the second item's push carries `tag: "stale-returned:eq-2"`.
+- Chose `DO UPDATE` over `DO NOTHING` deliberately: with `DO NOTHING` the existing row's `acknowledgedAt` never advances, so the `RENUDGE_INTERVAL_MS` gate would re-push the same item on every hourly tick. Not re-verified against a live DB in this session — the fake models the constraint, it does not run it.
+- NOT fixed, flagged: `MAX_NUDGES` counts rows per `(equipment, alert_type)`, which the unique constraint caps at 1, so the "3 nudges then stop" cap is unreachable in both this worker and `server/workers/staleCheckoutSweepWorker.ts:108-117`, which still does the plain insert.
+- Command: `pnpm typecheck:server` → exit 0.
+
+**Verdict:** VERIFIED (unit); PARTIAL (no live-DB run)
+
+## 2026-09-11 — stale-returned-sweep, review round 1 on #295: Phase C re-checks the re-nudge interval
+
+**Claim:** When two sweeps overlap, the one that reaches Phase C second now sees the winner's refreshed `acknowledgedAt` under the advisory lock and backs off — no second upsert, no second `stale_returned_nudged` metric, no second audit row. Both phases gate on one helper (`withinRenudgeInterval`).
+
+**Evidence:**
+- RED: new case 8 (Phase A select → old ack, Phase C select → ack written 1 min ago) → `expected { scanned: 1, nudged: 1 } to deeply equal { scanned: 1, nudged: 0 }` — the cap-only Phase C check let the second upsert through, exactly as the review said.
+- GREEN: `tests/stale-returned-sweep.test.ts` + `tests/stale-checkout-sweep.test.ts` → `2 passed (2)`, `23 passed (23)`. The push in case 8 still goes out (this sweep sent it before Phase C) — that double push is the known cost of pushing outside the lock and is unchanged.
+- Command: `pnpm typecheck:server` → exit 0.
+
+**Verdict:** VERIFIED
+
+## 2026-09-11 — stale-returned-sweep, review round 2 on #295: one sweep at a time per process
+
+**Claim:** Overlapping in-process sweeps (startup run + first BullMQ tick, or two ticks straddling a slow push) no longer both push: a module-level in-flight guard makes the later caller return `{ scanned: 0, nudged: 0, skippedOverlap: true }` without scanning. The push stays outside the advisory lock by design (holding a DB lock across an HTTP fan-out exhausts the pool); cross-instance overlap remains bounded by the Phase C re-check rather than prevented.
+
+**Evidence:**
+- RED: case 9 (first sweep parked mid-push, second sweep started) → the second run scanned and died on the exhausted select mock (`Cannot read properties of undefined (reading 'from')`) — i.e. it did not yield.
+- GREEN: after the guard → `tests/stale-returned-sweep.test.ts` + `tests/stale-checkout-sweep.test.ts` → `2 passed (2)`, `24 passed (24)`; case 9 asserts one push, `db.select` called exactly twice (one scan), and the second result flagged `skippedOverlap`.
+- Command: `pnpm typecheck:server` → exit 0. No other caller reads the result shape (`grep runStaleReturnedSweep server/app server/workers` → only the worker file).
+- NOT done (outside-diff, heavy lift, pre-existing, already listed in the PR): `MAX_NUDGES` is unreachable under `UNIQUE(equipment_id, alert_type)`; enforcing it needs a persisted attempt count per return event (schema + migration). Separate ticket.
+
+**Verdict:** VERIFIED
+
+## 2026-09-11 — #295 CI: tenant-lint waivers on the two by-design cross-clinic reads
+
+**Claim:** Moving the sweep body into `sweepStaleReturnedOnce` made the tenant linter's function-scope heuristic stop seeing `clinicId` for the two candidate reads (`.from(equipment)`, `.from(equipmentAnchors)`); both are cross-clinic on purpose (a system scheduler filtering `isNotNull(equipment.clinicId)`, with every per-row transaction and push scoped by `row.clinicId`), so each carries a one-line `// tenant-lint:scoped <reason>` waiver naming that. No other site is waived.
+
+**Evidence:**
+- CI run on `d2a96fa62`: G1 and the evidence job both failed on `stale-returned-sweep.worker.ts::equipment (baseline allows 0, found 1)` and `::equipmentAnchors (baseline allows 0, found 1)`; reproduced locally with `pnpm tenant:lint:enforce`.
+- After the two waivers: `pnpm tenant:lint:enforce` → `no new findings vs baseline (201 known)`; `tests/stale-returned-sweep.test.ts` → `15 passed (15)`; `pnpm architecture:gates` → `All G1 checks passed`, `All claims accounted for`.
+
+**Verdict:** VERIFIED
+
+## 2026-09-11 — stale-returned-sweep, review round 3 on #295: reopening a RESOLVED ack clears its resolution metadata
+
+**Claim:** The conflict update now sets `resolvedAt`, `resolvedById`, `resolutionNote` to `null` alongside `ackStatus: "SEEN"`, so a re-nudge over a row a manager had RESOLVED does not report stale resolution data as SEEN. The second outside-diff suggestion (take a fresh timestamp after the push for Phase C) was NOT applied: `now` is the injected sweep clock the suite depends on for determinism, and a push fan-out is bounded in seconds (per-transport timeouts) against a re-nudge interval measured in hours, so the described drift cannot occur in practice.
+
+**Evidence:**
+- RED: case 7c → `expected { …(4) } to deeply equal ObjectContaining{…}` (the `set` had only four keys).
+- GREEN: `tests/stale-returned-sweep.test.ts` + `tests/stale-checkout-sweep.test.ts` → `2 passed (2)`, `25 passed (25)`.
+- Command: `pnpm typecheck:server` → exit 0.
+
 **Verdict:** VERIFIED
