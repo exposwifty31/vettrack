@@ -628,7 +628,8 @@
       },
       "maintenanceIntervalDays": {
         "placeholder": "e.g. 30",
-        "label": "Maintenance interval (days)"
+        "label": "Maintenance interval (days)",
+        "description": "Set to auto-alert when maintenance is overdue."
       },
       "purchaseDate": {
         "label": "Purchase date"
