@@ -8,7 +8,7 @@ The product surface spans:
 - **App (mobile-first PWA)** — the operational product used during active shifts. Hebrew RTL by default, English supported. Includes equipment, alerts, patients, medication tasks, billing, inventory, the ER command center, and Code Blue emergency surfaces.
 
 > **Sources used**
-> - **GitHub** — [`exposwifty31/vettrack`](https://github.com/exposwifty31/vettrack) — primary codebase. Explore this for full component implementations, page-level interactions, and the i18n string tables. (The snapshot this handoff was extracted from, formerly `dboy3156/VetTrack`, survives as [`exposwifty31/VetTrack-legacy`](https://github.com/exposwifty31/VetTrack-legacy); the `dboy3156` account was deleted on 2026-09-11.)
+> - **GitHub** — [`exposwifty31/vettrack`](https://github.com/exposwifty31/vettrack) — primary codebase. Explore this for full component implementations, page-level interactions, and the i18n string tables. (The snapshot this handoff was extracted from, formerly `dboy3156/VetTrack`, survives as [`exposwifty31/VetTrack-legacy`](https://github.com/exposwifty31/VetTrack-legacy); the `dboy3156` account was deleted on 2026-09-11. <!-- vt-claim: attested github-owner-exposwifty31-2026-09-11 -->)
 > - **Live PWA** — `https://vettrack.uk` — referenced via `index.html` metadata.
 >
 > If you have repo access, dig deeper. The codebase is canonical; this design system extracts and condenses what's reusable for new design work.

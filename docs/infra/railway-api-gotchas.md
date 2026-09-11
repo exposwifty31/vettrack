@@ -6,6 +6,7 @@ here cost real time; none of it is in Railway's docs in this form.
 Project `VetTrack` (`adf88531-…`), environment `production` (`63549599-…`) — the **only**
 environment. Services: `VetTrack`, `Worker`, `Redis`, `Postgres`. Deploys are CI-driven
 via `deploy.sh`; neither app service has a GitHub source.
+<!-- vt-claim: attested railway-production-state-2026-09-10 -->
 
 ## Staged changes
 
@@ -70,3 +71,47 @@ via `deploy.sh`; neither app service has a GitHub source.
 - Svix auto-**disables** an endpoint after sustained signature failures and the Clerk UI
   does not shout about it. Re-enable via Actions → Enable Endpoint after fixing the
   secret, then send a test event and confirm `2xx`.
+
+## Evidence for the staged-change contract
+
+The mutation names and argument shapes above are not from memory. Unauthenticated
+introspection of `https://backboard.railway.com/graphql/v2` on 2026-09-10 returned, for the
+mutations this page relies on (redacted to name, description, and argument types):
+
+```
+environmentStageChanges          — "Sets the staged patch for a single environment."
+  args: environmentId:String, input:EnvironmentConfig, merge:Boolean
+environmentPatchCommitStaged     — "Commits the staged changes for a single environment."
+  args: commitMessage:String, environmentId:String, skipDeploys:Boolean
+environmentPatchCommit           — "Commit the provided patch to the environment."
+  args: commitMessage:String, environmentId:String, patch:EnvironmentConfig
+environmentPatchRestage          — "Copy a FAILED patch's changes into the environment's staged patch"
+  args: patchId:String
+serviceInstanceUpdate            — "Update a service instance"
+  args: environmentId:String, input:ServiceInstanceUpdateInput, serviceId:String
+serviceInstanceVulnRemediationPatchNow
+  — "Immediately apply a platform-armed database security update (backup + redeploy).
+     Returns the new deployment id."
+  args: environmentId:String, serviceId:String
+Builder enum: HEROKU | NIXPACKS | PAKETO | RAILPACK      (no DOCKERFILE — see above)
+```
+
+Re-run it yourself (no token needed for the schema):
+
+```bash
+curl -s -X POST https://backboard.railway.com/graphql/v2 -H 'Content-Type: application/json' \
+  -d '{"query":"{ __schema { mutationType { fields { name description args { name type { name ofType { name } } } } } } }"}' \
+  | jq '.data.__schema.mutationType.fields[] | select(.name|test("environmentStage|environmentPatch|VulnRemediation"))'
+```
+
+The behaviours (staged patch persisting after `input: {}`; `variableDelete` deploying;
+`environmentPatchCommitStaged(skipDeploys: true)` clearing the STAGED record without a
+deployment; `serviceInstanceUpdate` applying immediately) were exercised against the real
+production environment on 2026-09-10 — that is where the 8-deletion patch was committed
+with `skipDeploys: true` and verified with `get-staged-changes` → empty and no new deployment
+in `list-deployments`. The verified end state is the attestation referenced at the top of
+this page. There is **no** disposable Railway environment to rehearse on (the project has
+exactly one), so the safeguard is procedural: read `environmentStagedChanges { patch }` before
+and after every staging call, and never call `environmentPatchCommitStaged` without
+`skipDeploys: true` unless a deployment is the intent.
+

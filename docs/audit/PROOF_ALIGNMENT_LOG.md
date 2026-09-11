@@ -11349,3 +11349,16 @@ unmerged and 770 commits behind `main`, exactly as both findings documents state
 - Command: `pnpm verify:claims` → `1232 claims: 1199 verified, 30 registered, 3 attested, 2333 excluded by rule, 0 FAILED` · `All claims accounted for.`
 
 **Verdict:** VERIFIED (docs); PARTIAL for the underlying infra state, which is attested by the operations session rather than re-checked.
+
+## 2026-09-11 — docs close-out, review round 1 on #293 (supersedes the "align repo docs" entry above)
+
+**Claim:** Supersedes the scope of the earlier entry: the docs in the requested list now match production; `docs/audit/railway-housekeeping-2026-07-10.md` is a dated historical report whose July rows are kept verbatim, with resolutions appended in a dated section rather than edited in place. The external state those docs describe is attested, not asserted: <!-- vt-claim: attested railway-production-state-2026-09-10 --> <!-- vt-claim: attested assetlinks-two-fingerprints-2026-09-10 --> <!-- vt-claim: attested github-owner-exposwifty31-2026-09-11 -->.
+
+**Evidence:**
+- `server/routes/health.ts:178-182` — Read: the data-integrity probe is `GET /data-integrity` under the health router and reads the `x-health-token` header; `docs/setup/environment.md` said `/api/admin/data-integrity` + "Bearer", now corrected.
+- `git ls-remote --heads origin staging` → empty: `docs/infra/branch-protection.md` and `CONTRIBUTING.md` no longer describe a `staging` branch, baseline, or promotion flow.
+- `docs/attestations.json` — three entries added (`railway-production-state-2026-09-10`, `assetlinks-two-fingerprints-2026-09-10`, `github-owner-exposwifty31-2026-09-11`), each with `attestedAt`, `staleAfterDays`, and a `reverifyWith` that resolves to an existing document; referenced from this governed entry and from the ungoverned docs that make the claims.
+- `docs/infra/railway-api-gotchas.md` — appended the redacted GraphQL introspection output for the mutations it relies on (captured 2026-09-10) with the `curl` to reproduce it. A disposable-environment rehearsal was NOT added: the project has one environment, this session performs no Railway mutations, and the behaviours were exercised on production on 2026-09-10 by the operations session (recorded in the attestation).
+- Command: `pnpm verify:claims` → see the line recorded in the PR after this entry was written.
+
+**Verdict:** VERIFIED (docs); the Railway/GitHub/assetlinks state itself is ATTESTED (layer 4), not re-checked here.

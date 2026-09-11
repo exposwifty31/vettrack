@@ -85,7 +85,7 @@ Omit both Clerk keys for dev-bypass mode (hardcoded admin user, no SDK required)
 | `REDIS_URL` | Redis for BullMQ workers (app runs without; queues log `QUEUE_DISABLED_NO_REDIS`) |
 | `ALLOWED_ORIGIN` | CORS allowed origin(s) for production |
 | `DB_CONFIG_ENCRYPTION_KEY` | AES-256-GCM key for `vt_server_config` integration credentials |
-| `DATA_INTEGRITY_HEALTH_TOKEN` | Bearer token for `/api/admin/data-integrity` endpoint |
+| `DATA_INTEGRITY_HEALTH_TOKEN` | Token for `GET /api/health/data-integrity` (alias `/health/data-integrity`), sent as the `x-health-token` header (`server/routes/health.ts`) |
 | `SENTRY_DSN` | Sentry error tracking |
 | `PORT` | API server port (default: 3001) |
 
@@ -114,6 +114,8 @@ The four `APNS_*` values and `FCM_SERVICE_ACCOUNT_JSON` are env-only — there i
 (`VetTrack`, `Worker`) carry them.
 
 ### Railway production services (state as of 2026-09-10)
+
+<!-- vt-claim: attested railway-production-state-2026-09-10 -->
 
 - `Worker` carries every `REQUIRED_IN_PRODUCTION` name from `server/lib/envValidation.ts`
   plus `NODE_ENV=production`. `DB_SSL_REJECT_UNAUTHORIZED`, `S3_ACCESS_KEY_ID` and
