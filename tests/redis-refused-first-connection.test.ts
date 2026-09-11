@@ -74,6 +74,9 @@ describe("Redis refuses the first connection at boot", () => {
     expect(refusedWarnings).toHaveLength(1);
     expect(refusedWarnings[0]).toContain("[redis:queue]");
     expect(refusedWarnings[0]).toContain("ECONNREFUSED");
+    // The payload carries the same queryable fields as the metric event, not just the message.
+    expect(refusedWarnings[0]).toContain('"source":"queue"');
+    expect(refusedWarnings[0]).toContain('"phase":"initial_connect"');
 
     // The per-retry error line is what the single warning replaces.
     const perRetryErrors = lines(errorSpy).filter((line) => line.includes("[redis:queue] error"));

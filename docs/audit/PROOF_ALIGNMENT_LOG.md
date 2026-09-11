@@ -11357,3 +11357,14 @@ unmerged and 770 commits behind `main`, exactly as both findings documents state
 - Command: `pnpm typecheck:server` → exit 0.
 
 **Verdict:** VERIFIED
+
+## 2026-09-11 — redis.ts, review round 2 on #296: the refusal warning carries source/phase/message fields
+
+**Claim:** The single `[redis:<source>] first connection refused` warning now emits `{ source, phase: "initial_connect", message }` as payload fields — the same queryable shape as the `redisMetric` event — on the file's existing console telemetry path.
+
+**Evidence:**
+- RED: added assertions for `"source":"queue"` and `"phase":"initial_connect"` in the joined warning line → `expected '[redis:queue] first connection refuse…' to contain '"source":"queue"'`.
+- GREEN: `tests/redis-refused-first-connection.test.ts` + `tests/collab-redis-adapter-async-nonfatal.test.ts` → `2 passed (2)`, `6 passed (6)`.
+- Command: `pnpm typecheck:server` → exit 0.
+
+**Verdict:** VERIFIED

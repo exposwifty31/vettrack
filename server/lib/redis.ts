@@ -180,7 +180,7 @@ function attachRedisObservers(client: Redis, source: "app" | "queue"): void {
         console.warn(
           `[redis:${source}] first connection refused — ioredis keeps retrying via retryStrategy ` +
             `(watch [redis-metric] reconnect_scheduled); further refusals are not repeated here`,
-          { message: err.message },
+          { source, phase: "initial_connect", message: err.message },
         );
       }
       return;
