@@ -401,7 +401,9 @@ if (process.env.NODE_ENV === "production" || process.env.PLAYWRIGHT_E2E === "tru
   });
   // SPA shell: never cache — browsers must always get the latest index.html
   // so they pick up new content-hashed asset filenames after a deployment.
-  app.get("*", (_req, res) => {
+  // Express 5 / path-to-regexp v8: a bare "*" throws at registration; the
+  // optional-wildcard form matches "/" as well as every deeper path.
+  app.get("/{*splat}", (_req, res) => {
     res.setHeader("Cache-Control", "no-store");
     res.sendFile(path.join(path.dirname(fileURLToPath(import.meta.url)), "../dist/public/index.html"));
   });
