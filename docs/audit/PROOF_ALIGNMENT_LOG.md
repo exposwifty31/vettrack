@@ -11546,3 +11546,16 @@ unmerged and 770 commits behind `main`, exactly as both findings documents state
 - Exit criteria (filed in `TASKS.md`, same item): wire a trusted chain (`ssl.ca` from Railway's CA or the service's certificate), flip the Railway variable to `"true"`, redeploy Worker then VetTrack with `/api/health` `db: ok`, then tighten `validateEnv()` and `validateWorkerEnv()` in `server/lib/envValidation.ts` to the exact string in one change. If not done by the expiry, this entry must be superseded by a new one that either records the fix, or renews the exception — and a renewal is valid only with (a) fresh, explicit owner approval quoted in the entry, (b) a durable reference (PR, issue, or claim id) to where the remediation is tracked, and (c) a new absolute expiry date. `TASKS.md` remains the tracking record; no CI gate or alert is bound to the expiry, so the proof log is the only place it can lapse visibly.
 
 **Verdict:** VERIFIED (decision and its basis); the underlying security state is ATTESTED as insecure, by design of this exception, until the exit criteria are met.
+
+## 2026-09-11 — Worker recovered after the hotfix deploy (closes the incident opened by #294)
+
+**Claim:** After #298 merged (`82bd2025a`), the Railway Worker boots, passes the warn-only gate, logs the DB-TLS warning, and reaches `NOTIFICATION_WORKER_STARTED`; the crash-looping deployment is gone; production serves the hotfix commit and reports healthy.
+
+**Evidence:**
+- CI run 34568523115 on `82bd2025a` → `🚢 Deploy to Railway: success`, `🔎 Verify production deploy: success`.
+- Railway Worker deployment `7b97796b` (read-only `get-logs`, status SUCCESS), in order: `⚠️  DB_SSL_REJECT_UNAUTHORIZED is "false" — Postgres certificate verification is DISABLED for this worker; set it to "true" on Railway` → `✅ Worker production environment validation passed` → `NOTIFICATION_WORKER_STARTED`.
+- `list-deployments` for the Worker service: `7b97796b` SUCCESS; the crash-looping `0c30be0f` and its predecessor are REMOVED.
+- `curl https://vettrack.uk/api/version` → `gitCommit: 82bd2025a`; `curl https://vettrack.uk/api/health` → `status: ok`, `checks: db ok, clerk ok, vapid ok, worker ok` — read after the 120 s heartbeat TTL, so `worker: ok` now reflects the new process.
+- The earlier merged commits were also verified live: VetTrack log after `27bc6f3f4` shows `[stale-returned-sweep] scheduled via BullMQ` with no `startup sweep failed` line (the #295 fix), and no `first connection refused` line was needed (Redis was up).
+
+**Verdict:** VERIFIED
