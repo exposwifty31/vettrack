@@ -11521,3 +11521,28 @@ unmerged and 770 commits behind `main`, exactly as both findings documents state
 - Command: `pnpm typecheck:server` → exit 0.
 
 **Verdict:** VERIFIED
+
+## 2026-09-11 — HOTFIX: worker gate accepts DB_SSL_REJECT_UNAUTHORIZED="false" with a warning (Worker crash loop after #294)
+
+**Claim:** `validateWorkerEnv()` no longer exits when `DB_SSL_REJECT_UNAUTHORIZED` is a non-`"true"` value; it warns. Production runs `"false"`, the API gate accepts it (presence only), and the exact-`"true"` fatal shipped in #294 crash-looped the Worker while VetTrack stayed up on the identical variable.
+
+**Evidence:**
+- Railway Worker deployment `0c30be0f` (read-only `get-logs`, status CRASHED): `❌ FATAL: Worker production environment validation failed:` followed by `  - DB_SSL_REJECT_UNAUTHORIZED must be exactly "true" in production (got "false") …`, repeating every ~1.3 s (restart loop).
+- `/api/health` still reported `worker: ok` at the time — the heartbeat key has a 120 s TTL, so the check lags the crash.
+- RED: `tests/env-validation-worker.test.ts` with the `"false"` case flipped to "boots but warns" → `expected "Mock" to not be called at all, but actually been called 1 times` (the exit).
+- GREEN: `tests/env-validation-worker.test.ts` + `tests/env-validation-runtime.test.ts` + `tests/phase-5-p0-hardening.test.js` → `3 passed (3)`, `36 passed (36)`.
+- Command: `pnpm typecheck:server` → exit 0.
+- The underlying finding is real and is NOT fixed here: certificate verification is disabled in production. Filed in `TASKS.md` Backlog (ops/security) with the order: flip the Railway variable → redeploy → then tighten both gates together.
+
+**Verdict:** VERIFIED (code); production recovery is verified by the Worker boot line after deploy, recorded in a later entry.
+
+## 2026-09-11 — SECURITY EXCEPTION (owner decision): Worker boots with Postgres certificate verification disabled
+
+**Claim:** The repository owner (`exposwifty31`) decided on 2026-09-11 to merge the warn-only worker gate (#298) rather than keep the Worker down, accepting that production runs `DB_SSL_REJECT_UNAUTHORIZED="false"` — i.e. neither service verifies the managed-Postgres certificate — as a documented exception that **expires 2026-10-11**.
+
+**Evidence:**
+- Decision recorded from the owner's answer in this session (option "merge the hotfix + documented exception"), after both CodeRabbit (threads on #298) and the automated commit security review asked for fail-closed behaviour.
+- Why fail-closed was not shippable today: `server/lib/postgresql.ts` (`getPgSslConfig`) passes only `rejectUnauthorized`, no `ssl.ca`; Railway's `postgres-ssl` service presents a self-signed certificate, so setting the variable to `"true"` would make BOTH VetTrack and Worker reject the database. The value has been `"false"` since before this session; #294 did not change the security state, it only made the Worker refuse it.
+- Exit criteria (filed in `TASKS.md`, same item): wire a trusted chain (`ssl.ca` from Railway's CA or the service's certificate), flip the Railway variable to `"true"`, redeploy Worker then VetTrack with `/api/health` `db: ok`, then tighten `validateEnv()` and `validateWorkerEnv()` in `server/lib/envValidation.ts` to the exact string in one change. If not done by the expiry, this entry must be superseded by a new one that either records the fix, or renews the exception — and a renewal is valid only with (a) fresh, explicit owner approval quoted in the entry, (b) a durable reference (PR, issue, or claim id) to where the remediation is tracked, and (c) a new absolute expiry date. `TASKS.md` remains the tracking record; no CI gate or alert is bound to the expiry, so the proof log is the only place it can lapse visibly.
+
+**Verdict:** VERIFIED (decision and its basis); the underlying security state is ATTESTED as insecure, by design of this exception, until the exit criteria are met.

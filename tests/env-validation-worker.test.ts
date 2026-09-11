@@ -131,15 +131,21 @@ describe("validateWorkerEnv runtime", () => {
     expect(printedErrors()).toContain(name);
   });
 
-  it('exits in production when DB_SSL_REJECT_UNAUTHORIZED is "false" — the pool verifies certificates only on the exact string "true"', async () => {
+  it('boots but warns loudly when DB_SSL_REJECT_UNAUTHORIZED is "false" — the API gate (validateEnv) accepts the same value, so the worker must not be the only process that refuses it', async () => {
+    // 2026-09-11 incident: production runs "false"; an exact-"true" check here crash-looped the Worker
+    // while VetTrack stayed up on the identical variable. Presence stays required; the value is a
+    // Railway-side fix (TASKS.md), after which BOTH gates tighten together.
     setProductionWorkerEnv();
     process.env.DB_SSL_REJECT_UNAUTHORIZED = "false";
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => undefined);
 
     const { validateWorkerEnv } = await import("../server/lib/envValidation.js");
     validateWorkerEnv();
 
-    expect(exitSpy).toHaveBeenCalledWith(1);
-    expect(printedErrors()).toContain("DB_SSL_REJECT_UNAUTHORIZED");
+    expect(exitSpy).not.toHaveBeenCalled();
+    const warned = warnSpy.mock.calls.map((call) => String(call[0])).join("\n");
+    expect(warned).toContain("DB_SSL_REJECT_UNAUTHORIZED");
+    expect(warned).toContain("certificate verification");
   });
 
   it("exits in production when no Postgres URL is set (DATABASE_URL, POSTGRES_URL, PGBOUNCER_URL)", async () => {
